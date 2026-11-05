@@ -132,7 +132,21 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public SubAssembly? EditingSubAssembly
     {
         get => _editingSubAssembly;
-        set => this.RaiseAndSetIfChanged(ref _editingSubAssembly, value);
+        set
+        {
+            if (EqualityComparer<SubAssembly?>.Default.Equals(_editingSubAssembly, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingSubAssembly, value);
+
+            // Another sub-assembly picked after Edit settles it, and the badge comes back.
+            if (value is not null && IsChangingSubAssembly)
+            {
+                IsChangingSubAssembly = false;
+            }
+        }
     }
 
     private bool _isChangingSubAssembly;
@@ -221,11 +235,35 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     private RawMaterial? _selectedRawMaterial;
+
+    /// <summary>
+    /// Each material picked, by the user or for them (Open, Save's reload), nothing picked included: what loads a material
+    /// into the form. Fed by <see cref="SelectedRawMaterial"/>'s setter alone, starting with nothing picked.
+    /// </summary>
+    private readonly BehaviorSubject<RawMaterial?> _picks = new(null);
+
+    /// <summary>
+    /// The material the form is about. Setting it is a pick, which loads that material into the form (_picks); a load that
+    /// only finds a fresh copy of it re-points it quietly (<see cref="RepointSelection"/>), leaving what's typed alone.
+    /// </summary>
     public RawMaterial? SelectedRawMaterial
     {
         get => _selectedRawMaterial;
-        set => this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
+        set
+        {
+            if (EqualityComparer<RawMaterial?>.Default.Equals(_selectedRawMaterial, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
+            _picks.OnNext(value);
+        }
     }
+
+    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the material picked: shown, not picked again.</summary>
+    private void RepointSelection(RawMaterial? fresh) =>
+        this.RaiseAndSetIfChanged(ref _selectedRawMaterial, fresh, nameof(SelectedRawMaterial));
 
     /// <summary>The material whose price history, brand prices and BOM the grids hold; null for none (a new material).</summary>
     private int? _detailMaterialId;
@@ -280,7 +318,17 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public RawMaterialType EditingType
     {
         get => _editingType;
-        set => this.RaiseAndSetIfChanged(ref _editingType, value);
+        set
+        {
+            if (_editingType == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingType, value);
+            TypeEdited(value);
+            BaseUnitEdited();
+        }
     }
 
     private RawMaterialCategory? _editingCategory;
@@ -300,7 +348,23 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public RawMaterialSource EditingSource
     {
         get => _editingSource;
-        set => this.RaiseAndSetIfChanged(ref _editingSource, value);
+        set
+        {
+            if (_editingSource == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingSource, value);
+
+            // A made ingredient starts at 3% weight loss (2026-09-21, at the user's request: a small shrink is the normal
+            // case in the shop), and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
+            // box is empty, so a saved material keeps what it was saved with.
+            if (value == RawMaterialSource.Made)
+            {
+                EditingWeightLossPercent ??= 3m;
+            }
+        }
     }
 
     private decimal? _editingWeightLossPercent;
@@ -523,7 +587,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     public UnitOfMeasure? EditingBaseUnit
     {
         get => _editingBaseUnit;
-        set => this.RaiseAndSetIfChanged(ref _editingBaseUnit, value);
+        set
+        {
+            if (EqualityComparer<UnitOfMeasure?>.Default.Equals(_editingBaseUnit, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingBaseUnit, value);
+            BaseUnitEdited();
+        }
     }
 
     /// <summary>Only a new material's type and source can be picked: both are fixed once saved (RawMaterialRules).</summary>
@@ -1109,33 +1182,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 UpdatePurchaseCostTexts();
             });
 
-        // A packaging material is always purchased, and an ingredient's base unit is the gram, so
-        // switching a new material's type clears whatever the other type had filled in.
-        this.WhenAnyValue(x => x.EditingType)
-            .Where(_ => !IsBusyApplying)
-            .Subscribe(type =>
-            {
-                if (type == RawMaterialType.Packaging)
-                {
-                    EditingSource = RawMaterialSource.Purchased;
-                    EditingWeightLossPercent = null;
-                    EditingLinkedTo = null;
-                    EditingWeightSharePercent = null;
-                    EditingCostSharePercent = null;
-                }
-                else
-                {
-                    EditingBaseUnit = null;
-                }
-            });
-
-        // A made ingredient starts at 3% weight loss (2026-09-21, at the user's request: a small shrink is the
-        // normal case in the shop), and the box stays freely editable — typing 0 is a legitimate custom value.
-        // Only when the box is empty, so a saved material keeps what it was saved with.
-        this.WhenAnyValue(x => x.EditingSource)
-            .Where(source => source == RawMaterialSource.Made && !IsBusyApplying)
-            .Subscribe(_ => EditingWeightLossPercent ??= 3m);
-
         // The made-ingredient tiles follow the Weight Loss % box, which moves the yield the cost is spread over.
         this.WhenAnyValue(x => x.EditingWeightLossPercent)
             .Where(_ => !IsBusyApplying)
@@ -1157,40 +1203,27 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .Select(subAssembly => subAssembly is null ? string.Empty : $"{subAssembly.Name}, from Sub-Assemblies")
             .ToProperty(this, x => x.SubAssemblyBadgeText, string.Empty);
 
-        // Another sub-assembly picked after Edit settles it, and the badge comes back. A refresh's re-pointing isn't a pick.
-        this.WhenAnyValue(x => x.EditingSubAssembly)
-            .Where(subAssembly => subAssembly is not null && IsChangingSubAssembly && !IsBusyApplying)
-            .Subscribe(_ => IsChangingSubAssembly = false);
-
         StartChangingSubAssemblyCommand = ReactiveCommand.Create(
             () => { IsChangingSubAssembly = true; },
             this.WhenAnyValue(x => x.IsShowingSubAssemblyBadge));
         CancelChangingSubAssemblyCommand = ReactiveCommand.Create(() => { IsChangingSubAssembly = false; });
 
-        // The alternative units and the purchase unit choices name the base unit, which a new
-        // material can still change.
+        // The alternative units and the purchase unit choices name the base unit: worked out again whenever it or the type
+        // changes, a load's or an undo's included, as they're only ever derived from them.
         this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
-            .Where(_ => !IsBusyApplying)
-            .Subscribe(_ =>
-            {
-                MoveBrandRowsOntoTheBaseUnit();
-                RebuildUnitViews();
-            });
+            .Subscribe(_ => RebuildUnitViews());
 
-        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which
-        // only re-points a selection at its refreshed copy; the form and details must stay as-is.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(material => material is not null && !IsBusyApplying)
+        // A pick loads the material into the form, in these three steps, in this order. Only a pick does (_picks): a load
+        // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
+        _picks
+            .Where(material => material is not null)
             .Subscribe(material => LoadIntoForm(material!));
 
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(_ => !IsBusyApplying)
-            .Subscribe(ResetDetails);
+        _picks.Subscribe(ResetDetails);
 
-        // A newer selection cancels an older one still loading (Switch disposes it, which cancels its token), so a quick
-        // second pick never gets the first one's details added to its own. One that fails shows why, and the next pick
-        // loads as usual.
-        LoadLatest(this.WhenAnyValue(x => x.SelectedRawMaterial).Where(_ => !IsBusyApplying), LoadDetailsAsync);
+        // A newer pick cancels an older one still loading (Switch disposes it, which cancels its token), so a quick second
+        // pick never gets the first one's details added to its own. One that fails shows why, and the next pick loads as usual.
+        LoadLatest(_picks, LoadDetailsAsync);
 
         // The Used By tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
         LoadLatest(
@@ -1258,9 +1291,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
                 // A packaging set is never a recipe to make an ingredient from.
                 SubAssemblyOptions.MergeFrom([.. subAssemblies.Where(s => s.Role is not { IsPackaging: true })], s => s.Id);
-                EditingSubAssembly = SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId);
+                ShowSubAssembly(SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId));
                 var previousBaseUnit = EditingBaseUnit;
-                EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
+                ShowBaseUnit(UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId));
 
                 IngredientLineRow.Resolve(AddInEdits, Ingredients.ToDictionary(m => m.Id));
 
@@ -1268,7 +1301,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 // elsewhere into the header's totals: the change set above is suppressed while a refresh applies.
                 RecomputeBomTotals();
 
-                SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
+                RepointSelection(RawMaterials.FirstOrDefault(m => m.Id == selectedId));
 
                 // The form's alternative units may not be saved yet, so they stay rather than being
                 // reloaded from the refreshed material. Each points at its refreshed unit of measure,
@@ -1646,13 +1679,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             _editingId = snapshot.EditingId;
             CanChangeTypeAndSource = snapshot.CanChangeTypeAndSource;
             EditingName = snapshot.Name;
-            EditingType = snapshot.Type;
+            ShowType(snapshot.Type);
             EditingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
-            EditingSource = snapshot.Source;
-            EditingBaseUnit = snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null;
+            ShowSource(snapshot.Source);
+            ShowBaseUnit(snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null);
             EditingWeightLossPercent = snapshot.WeightLossPercent;
             IsChangingSubAssembly = false;
-            EditingSubAssembly = snapshot.SubAssemblyId is { } subAssemblyId ? SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null;
+            ShowSubAssembly(snapshot.SubAssemblyId is { } subAssemblyId ? SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null);
             EditingLinkedTo = snapshot.LinkedToId is { } linkedToId ? Ingredients.FirstOrDefault(m => m.Id == linkedToId) : null;
             EditingWeightSharePercent = snapshot.WeightSharePercent;
             EditingCostSharePercent = snapshot.CostSharePercent;
@@ -1779,12 +1812,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _editingId = material.Id;
         CanChangeTypeAndSource = false;
         EditingName = material.Name;
-        EditingType = material.Type;
+        ShowType(material.Type);
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
-        EditingSource = material.Source;
+        ShowSource(material.Source);
         EditingWeightLossPercent = material.WeightLossPercent;
         IsChangingSubAssembly = false;
-        EditingSubAssembly = SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId);
+        ShowSubAssembly(SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId));
         EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == material.LinkedToId);
         EditingWeightSharePercent = material.WeightSharePercent;
         EditingCostSharePercent = material.CostSharePercent;
@@ -1792,7 +1825,46 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         EditingTargetCostBufferPercent = RawMaterialRules.TargetBufferPercentOf(material);
         EditingPreferredBrand = material.PreferredBrand;
         EditingBufferedCost = material.BufferedCostPerBaseUnit;
-        EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
+        ShowBaseUnit(UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId));
+    }
+
+    // A material loaded, an undo putting the form back, or a load's fresh copy: each field written and said to have changed
+    // without the edit that setting it is (TypeEdited, the made ingredient's starting weight loss, BaseUnitEdited, Edit
+    // settled), so nothing follows from it but what's worked out from it.
+    private void ShowType(RawMaterialType type) => this.RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType));
+
+    private void ShowSource(RawMaterialSource source) => this.RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource));
+
+    private void ShowBaseUnit(UnitOfMeasure? unit) => this.RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit));
+
+    private void ShowSubAssembly(SubAssembly? subAssembly) =>
+        this.RaiseAndSetIfChanged(ref _editingSubAssembly, subAssembly, nameof(EditingSubAssembly));
+
+    /// <summary>
+    /// The type changed by the user, on a new material: a packaging material is always purchased, and an ingredient's base
+    /// unit is the gram, so whatever the other type had filled in goes.
+    /// </summary>
+    private void TypeEdited(RawMaterialType type)
+    {
+        if (type == RawMaterialType.Packaging)
+        {
+            EditingSource = RawMaterialSource.Purchased;
+            EditingWeightLossPercent = null;
+            EditingLinkedTo = null;
+            EditingWeightSharePercent = null;
+            EditingCostSharePercent = null;
+        }
+        else
+        {
+            EditingBaseUnit = null;
+        }
+    }
+
+    /// <summary>The base unit changed by the user, on a new packaging material: the brand rows priced in it move onto it.</summary>
+    private void BaseUnitEdited()
+    {
+        MoveBrandRowsOntoTheBaseUnit();
+        RebuildUnitViews();
     }
 
     /// <summary>
@@ -3116,5 +3188,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         _categoryCache.Dispose();
         _productOpenRequests.Dispose();
         _costSharesWanted.Dispose();
+        _picks.Dispose();
     }
 }
