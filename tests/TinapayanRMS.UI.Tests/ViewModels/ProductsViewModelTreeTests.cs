@@ -52,6 +52,31 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     [Fact]
+    public Task A_drop_moves_products_onto_a_folder_and_gives_the_first_back_to_bring_into_view() => StaThread.RunAsync(async () =>
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        var cakesId = await AddProductCategoryAsync("Cakes");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+        var mamon = viewModel.ProductTree.Find(mamonId)!;
+        var cakes = TreeFolder(viewModel, ProductStage.Production, "Cakes");
+
+        screen.CanDrag([mamon]).Should().BeTrue();
+        screen.CanDrag([mamon, cakes]).Should().BeFalse("a folder isn't dragged");
+        screen.CanDrop([mamon], TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads")).Should().BeFalse("it's there already");
+        screen.CanDrop([mamon], viewModel.ProductTree.DeletedFolder).Should().BeFalse("nothing is dropped into Deleted");
+        screen.CanDrop([mamon], cakes).Should().BeTrue();
+
+        (await screen.Drop([mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
+
+        (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, cakesId));
+        cakes.Products.Should().ContainSingle();
+        viewModel.MoveNotice.Should().Be("Moved Mamon to Production › Cakes");
+        (await screen.Drop([mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
+    });
+
+    [Fact]
     public Task Promote_saves_the_move_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");

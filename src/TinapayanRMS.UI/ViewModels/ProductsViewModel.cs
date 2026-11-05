@@ -25,7 +25,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen
+public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen, IListTreeScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Scaling, then Clone.</summary>
     public const int RecipeTab = 0;
@@ -4551,6 +4551,27 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SelectedTreeNodes is [ProductTreeNode node]
             ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
             : null;
+
+    IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or ProductTreeNode ? TreeMenuFor(node as ProductTreeNode) : [];
+
+    /// <summary>Only products can be dragged, one or several: the folders are fixed, and a deleted product only comes back by Restore.</summary>
+    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is ProductLeafNode { IsDeleted: false });
+
+    bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
+
+    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target)
+    {
+        var moves = DropMoves(nodes, target);
+        return moves.Count == 0
+            ? Observable.Return<object?>(null)
+            : MoveProductsCommand.Execute(moves).Select(_ => (object?)ProductTree.Find(moves[0].ProductId));
+    }
+
+    /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (ProductTree.MovesTo): none unless every one is a record.</summary>
+    private static IReadOnlyList<ProductMove> DropMoves(IEnumerable<object> nodes, object? target) =>
+        nodes.ToList() is { Count: > 0 } dragging && dragging.All(node => node is ProductLeafNode)
+            ? ProductTree.MovesTo(target as ProductTreeNode, dragging.Cast<ProductLeafNode>().Select(leaf => leaf.Product))
+            : [];
 
     private List<TreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
     {

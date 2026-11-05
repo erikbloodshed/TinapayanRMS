@@ -45,6 +45,28 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     });
 
     [Fact]
+    public Task A_drop_moves_materials_into_another_category_of_their_type_and_gives_the_first_back_to_bring_into_view() => StaThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
+        await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+        var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
+
+        screen.CanDrag([breadFlour]).Should().BeTrue();
+        screen.CanDrag([TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")]).Should().BeFalse("a folder isn't dragged");
+        screen.CanDrop([breadFlour], TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes")).Should().BeFalse("a material's type is fixed");
+        screen.CanDrop([breadFlour], viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
+
+        (await screen.Drop([breadFlour], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods"))).Should().BeSameAs(breadFlour);
+
+        (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
+        viewModel.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+    });
+
+    [Fact]
     public Task Move_to_saves_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);

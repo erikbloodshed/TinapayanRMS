@@ -22,7 +22,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen, IUnsavedChangesScreen
+public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen, IUnsavedChangesScreen, IListTreeScreen
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -1243,6 +1243,27 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SelectedTreeNodes is [SubAssemblyTreeNode node]
             ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
             : null;
+
+    IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or SubAssemblyTreeNode ? TreeMenuFor(node as SubAssemblyTreeNode) : [];
+
+    /// <summary>Only sub-assemblies can be dragged, one or several: the folders are the roles, in their own order.</summary>
+    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is SubAssemblyLeafNode);
+
+    bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
+
+    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target)
+    {
+        var moves = DropMoves(nodes, target);
+        return moves.Count == 0
+            ? Observable.Return<object?>(null)
+            : MoveSubAssembliesCommand.Execute(moves).Select(_ => (object?)SubAssemblyTree.Find(moves[0].SubAssemblyId));
+    }
+
+    /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (SubAssemblyTree.MovesTo): none unless every one is a record.</summary>
+    private static IReadOnlyList<SubAssemblyMove> DropMoves(IEnumerable<object> nodes, object? target) =>
+        nodes.ToList() is { Count: > 0 } dragging && dragging.All(node => node is SubAssemblyLeafNode)
+            ? SubAssemblyTree.MovesTo(target as SubAssemblyTreeNode, dragging.Cast<SubAssemblyLeafNode>().Select(leaf => leaf.SubAssembly))
+            : [];
 
     private List<TreeMenuItem> SubAssembliesMenu(IReadOnlyList<SubAssemblyLeafNode> leaves)
     {

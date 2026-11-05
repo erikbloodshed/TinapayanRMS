@@ -24,7 +24,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
 /// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IUnsavedChangesScreen
+public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IUnsavedChangesScreen, IListTreeScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -2947,6 +2947,27 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         SelectedTreeNodes is [RawMaterialTreeNode node]
             ? TreeMenuFor(node).FirstOrDefault(item => item.Gesture == gesture && item.IsEnabled)
             : null;
+
+    IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or RawMaterialTreeNode ? TreeMenuFor(node as RawMaterialTreeNode) : [];
+
+    /// <summary>Only materials can be dragged, one or several: the folders are fixed.</summary>
+    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is RawMaterialLeafNode);
+
+    bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
+
+    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target)
+    {
+        var moves = DropMoves(nodes, target);
+        return moves.Count == 0
+            ? Observable.Return<object?>(null)
+            : MoveMaterialsCommand.Execute(moves).Select(_ => (object?)RawMaterialTree.Find(moves[0].RawMaterialId));
+    }
+
+    /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (RawMaterialTree.MovesTo): none unless every one is a record.</summary>
+    private static IReadOnlyList<RawMaterialMove> DropMoves(IEnumerable<object> nodes, object? target) =>
+        nodes.ToList() is { Count: > 0 } dragging && dragging.All(node => node is RawMaterialLeafNode)
+            ? RawMaterialTree.MovesTo(target as RawMaterialTreeNode, dragging.Cast<RawMaterialLeafNode>().Select(leaf => leaf.RawMaterial))
+            : [];
 
     /// <summary>"Ingredient", "Made Ingredient" (in a Made category's folder) or "Packaging Material": what a New … Here item makes.</summary>
     private static string MaterialNoun(RawMaterialFolderNode folder) => folder switch

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
+             xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
              xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
     <!-- The screen's first region: its title with the search box beside it, then the products in their folders filling the rest. -->
     <Border Style="{StaticResource CardStyle}">
@@ -91,48 +92,16 @@
                                       Command="{Binding CollapseAllCommand}" />
             </StackPanel>
 
-            <!--
-                What the last move did, with Undo (ProductsViewModel.MoveNotice), under the tree: a drag, Move To or Promote
-                saves at once, so this is where one made by mistake is taken back. It hides itself a few seconds on, unless
-                the mouse is over it (the code-behind). As wide as the tree, so a long message wraps rather than widening
-                the card.
-            -->
-            <Border x:Name="MoveNoticeBar"
-                    DockPanel.Dock="Bottom"
-                    Width="{Binding Width, ElementName=Tree}"
-                    Margin="0,8,0,0"
-                    Padding="10,4,4,4"
-                    CornerRadius="6"
-                    Background="{StaticResource InfoBackgroundBrush}"
-                    Visibility="{Binding MoveNotice, Converter={StaticResource NotNullToVisibilityConverter}}"
-                    AutomationProperties.AutomationId="MoveNotice">
-                <DockPanel>
-                    <Button DockPanel.Dock="Right"
-                            Style="{StaticResource ToastCloseButtonStyle}"
-                            Command="{Binding DismissMoveNoticeCommand}"
-                            VerticalAlignment="Center"
-                            ToolTip="Close"
-                            AutomationProperties.Name="Close">
-                        <TextBlock Text="&#xE711;" Style="{StaticResource IconGlyphStyle}" FontSize="12" />
-                    </Button>
-                    <syncfusion:ButtonAdv DockPanel.Dock="Right"
-                                          Label="Undo"
-                                          IconTemplate="{StaticResource UndoIconTemplate}"
-                                          Command="{Binding UndoMoveCommand}"
-                                          VerticalAlignment="Center"
-                                          Margin="8,0,4,0" />
-                    <TextBlock Text="{Binding MoveNotice}"
-                               Foreground="{StaticResource InfoForegroundBrush}"
-                               TextWrapping="Wrap"
-                               VerticalAlignment="Center" />
-                </DockPanel>
-            </Border>
+            <!-- What the last move did, with Undo (MoveNoticeBar), under the tree and as wide as it, so a long message wraps -->
+            <controls:MoveNoticeBar DockPanel.Dock="Bottom"
+                                    Width="{Binding Width, ElementName=Tree}"
+                                    Margin="0,8,0,0" />
 
             <!--
                 The products filed by stage, then category (ProductsViewModel.ProductTree), each folder's by name, and the
                 deleted ones in the Deleted folder after the stages. Clicking a folder opens or closes it; dragging a product onto one moves it there, with Ctrl or Shift held several at
                 once; a right-click opens a menu for the row, or for the list in its empty space; and F2, Del and Enter do
-                what the menu shows beside them (the code-behind). As wide as the Raw Materials list's two columns, so the
+                what the menu shows beside them (ListTree). As wide as the Raw Materials list's two columns, so the
                 three lists are the same width.
 
                 White behind it, as the Raw Materials and Sub-Assemblies grids are (ListBackgroundBrush). The theme's template
@@ -150,17 +119,12 @@
                                        FullRowSelect="True"
                                        AllowDragging="True"
                                        AllowDrop="True"
-                                       ItemDragStarting="Tree_ItemDragStarting"
-                                       ItemDragOver="Tree_ItemDragOver"
-                                       ItemDropping="Tree_ItemDropping"
-                                       ItemContextMenuOpening="Tree_ItemContextMenuOpening"
-                                       ContextMenuOpening="Tree_ContextMenuOpening"
-                                       KeyDown="Tree_KeyDown"
+                                       controls:ListTree.IsEnabled="True"
                                        FocusVisualStyle="{x:Null}">
                     <!--
                         Stand-ins: the tree opens a row's menu only while ItemContextMenu is set, and the service a menu for
                         its empty space only while ContextMenu is; each is replaced by the one built for where the click
-                        was, just before it opens (the code-behind).
+                        was, just before it opens (ListTree).
                     -->
                     <syncfusion:SfTreeView.ItemContextMenu>
                         <ContextMenu />

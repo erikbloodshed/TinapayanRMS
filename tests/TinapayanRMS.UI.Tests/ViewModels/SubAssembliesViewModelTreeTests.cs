@@ -65,6 +65,28 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
     [Fact]
+    public Task A_drop_moves_recipes_onto_another_roles_folder_and_gives_the_first_back_to_bring_into_view() => StaThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+        var halaya = viewModel.SubAssemblyTree.Find(halayaId)!;
+        var filling = viewModel.SubAssemblyTree.Folder(fillingRoleId)!;
+
+        screen.CanDrag([halaya]).Should().BeTrue();
+        screen.CanDrag([filling]).Should().BeFalse("a folder isn't dragged");
+        screen.CanDrop([halaya], viewModel.SubAssemblyTree.Folder(doughRoleId)).Should().BeFalse("it's there already");
+
+        (await screen.Drop([halaya], filling)).Should().BeSameAs(halaya);
+
+        (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
+        filling.SubAssemblies.Should().ContainSingle();
+        viewModel.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
+    });
+
+    [Fact]
     public Task Move_to_saves_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
