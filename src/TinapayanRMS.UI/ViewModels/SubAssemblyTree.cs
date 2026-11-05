@@ -26,7 +26,7 @@ public closed class SubAssemblyTreeNode : ReactiveObject
 /// <see cref="Children"/> through a HierarchyPropertyDescriptor for this type alone (SubAssemblyListCard), as the Raw
 /// Materials list does (RawMaterialFolderNode).
 /// </summary>
-public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, IListFolder
+public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<SubAssemblyTreeNode>
 {
     internal SubAssemblyFolderNode(SubAssemblyRole role)
     {
@@ -94,11 +94,12 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, IListFolder
         }
     }
 
-    /// <summary>
-    /// Tells the tree again whether the folder is open, for a folder shown again after a search hid it, or one that was
-    /// empty when it opened and has rows now (ProductFolderNode.AnnounceExpanded says why).
-    /// </summary>
+    /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
     internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+
+    void ITreeFolder<SubAssemblyTreeNode>.ShowCount(int count) => ShowCount(count);
+
+    void ITreeFolder<SubAssemblyTreeNode>.AnnounceExpanded() => AnnounceExpanded();
 }
 
 /// <summary>
@@ -138,7 +139,7 @@ public sealed class SubAssemblyLeafNode(StandaloneSubAssemblyRow row) : SubAssem
 /// </summary>
 public sealed class SubAssemblyTree : IDisposable
 {
-    private readonly Dictionary<int, SubAssemblyLeafNode> _leaves = [];
+    private readonly TreeLeaves<StandaloneSubAssemblyRow, SubAssemblyLeafNode> _leaves = new(r => r.Id, r => new SubAssemblyLeafNode(r), (leaf, r) => leaf.Row = r);
 
     /// <summary>Every role's folder, shown or not, by role id.</summary>
     private readonly Dictionary<int, SubAssemblyFolderNode> _folders = [];
@@ -162,7 +163,7 @@ public sealed class SubAssemblyTree : IDisposable
     public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The sub-assembly's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
-    public SubAssemblyLeafNode? Find(int subAssemblyId) => _leaves.GetValueOrDefault(subAssemblyId);
+    public SubAssemblyLeafNode? Find(int subAssemblyId) => _leaves.Find(subAssemblyId);
 
     /// <summary>The role's folder, shown or not; null for one it has no folder for yet.</summary>
     public SubAssemblyFolderNode? Folder(int roleId) => _folders.GetValueOrDefault(roleId);
@@ -245,22 +246,7 @@ public sealed class SubAssemblyTree : IDisposable
             .ToList();
         var roleIds = allRoles.Select(r => r.Id).ToHashSet();
 
-        foreach (var row in rows)
-        {
-            if (_leaves.TryGetValue(row.Id, out var leaf))
-            {
-                leaf.Row = row;
-            }
-            else
-            {
-                _leaves[row.Id] = new SubAssemblyLeafNode(row);
-            }
-        }
-
-        foreach (var gone in _leaves.Keys.Except(rows.Select(r => r.Id)).ToList())
-        {
-            _leaves.Remove(gone);
-        }
+        _leaves.Merge(rows);
 
         foreach (var role in allRoles)
         {
@@ -282,46 +268,12 @@ public sealed class SubAssemblyTree : IDisposable
 
         var byRole = rows.ToLookup(r => r.SubAssembly.RoleId);
         List<(SubAssemblyFolderNode Folder, List<SubAssemblyTreeNode> Rows)> wanted =
-            [.. allRoles.Select(role => (_folders[role.Id], (List<SubAssemblyTreeNode>)[.. byRole[role.Id].Select(r => _leaves[r.Id])]))];
-        List<SubAssemblyFolderNode> shown = [.. wanted.Where(f => !isFiltered || f.Rows.Count > 0).Select(f => f.Folder)];
+            [.. allRoles.Select(role => (_folders[role.Id], (List<SubAssemblyTreeNode>)[.. _leaves.RowsOf(byRole[role.Id])]))];
 
         // Everything leaving the tree goes before anything arrives, so a sub-assembly moving from one folder to another is
-        // never in both at once.
-        TreeRows.RemoveMissing(Roots, shown);
-        foreach (var (folder, folderRows) in wanted)
-        {
-            TreeRows.RemoveMissing(folder.Children, folderRows);
-        }
-
-        var added = TreeRows.Arrange(Roots, shown);
-        List<SubAssemblyFolderNode> filled = [];
-        foreach (var (folder, folderRows) in wanted)
-        {
-            if (folder.Children.Count == 0 && folderRows.Count > 0)
-            {
-                filled.Add(folder);
-            }
-
-            TreeRows.Arrange(folder.Children, folderRows);
-            folder.ShowCount(folderRows.Count);
-        }
-
-        // Every match shows. The folders stay open once the search is cleared, as they would in a file explorer.
-        if (isFiltered)
-        {
-            foreach (var folder in shown)
-            {
-                folder.IsExpanded = true;
-            }
-        }
-
-        // The tree is told again about a folder shown (for the first time, or again after a search hid it), and one that
-        // has just got its first rows: it can't open a folder with nothing in it, and doesn't look at it again when rows
-        // arrive (ProductTree.Refresh says more). The roles come in before their sub-assemblies on a load, so on the first
-        // one every folder is shown empty and filled a moment later.
-        foreach (var folder in added.Union(filled).Where(f => f.IsExpanded))
-        {
-            folder.AnnounceExpanded();
-        }
+        // never in both at once. The roles come in before their sub-assemblies on a load, so on the first one every folder
+        // is shown empty and filled a moment later.
+        TreeRows.RemoveLeaving(Roots, wanted, isFiltered);
+        TreeRows.LayFolders(Roots, wanted, isFiltered);
     }
 }

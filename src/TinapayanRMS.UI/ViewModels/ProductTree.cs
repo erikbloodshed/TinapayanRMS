@@ -64,7 +64,7 @@ public enum ProductIcon
 /// for this type alone (ProductListCard). A product has no children at all: the tree gives an expander to every row whose
 /// children are an observable collection, even an empty one.
 /// </summary>
-public sealed class ProductFolderNode : ProductTreeNode, IListFolder
+public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTreeNode>
 {
     private ProductFolderNode(ProductStage stage, int? categoryId, bool isStage, string title, bool isDeletedFolder = false)
     {
@@ -170,12 +170,12 @@ public sealed class ProductFolderNode : ProductTreeNode, IListFolder
         }
     }
 
-    /// <summary>
-    /// Tells the tree again whether the folder is open. The tree reads IsExpanded as it changes, but not for a folder
-    /// shown again after a search hid it, nor for one that was empty when it opened (it can't open a folder with
-    /// nothing in it) and has rows now: without this, an open folder would come back closed.
-    /// </summary>
+    /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
     internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+
+    void ITreeFolder<ProductTreeNode>.ShowCount(int count) => ShowCount(count);
+
+    void ITreeFolder<ProductTreeNode>.AnnounceExpanded() => AnnounceExpanded();
 }
 
 /// <summary>
@@ -238,7 +238,7 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
 /// </summary>
 public sealed class ProductTree : IDisposable
 {
-    private readonly Dictionary<int, ProductLeafNode> _leaves = [];
+    private readonly TreeLeaves<Product, ProductLeafNode> _leaves = new(p => p.Id, p => new ProductLeafNode(p), (leaf, p) => leaf.Product = p);
 
     /// <summary>Every folder each stage has, shown or not: one per category, and its Uncategorized.</summary>
     private readonly Dictionary<ProductFolderNode, StageFolders> _foldersByRoot = [];
@@ -279,7 +279,7 @@ public sealed class ProductTree : IDisposable
     public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The product's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
-    public ProductLeafNode? Find(int productId) => _leaves.GetValueOrDefault(productId);
+    public ProductLeafNode? Find(int productId) => _leaves.Find(productId);
 
     /// <summary>The stage's folder.</summary>
     public ProductFolderNode StageFolder(ProductStage stage) => Stages.Single(r => r.Stage == stage);
@@ -411,22 +411,7 @@ public sealed class ProductTree : IDisposable
             .ToList();
         var categoryIds = allCategories.Select(c => c.Id).ToHashSet();
 
-        foreach (var product in products.Concat(deleted))
-        {
-            if (_leaves.TryGetValue(product.Id, out var leaf))
-            {
-                leaf.Product = product;
-            }
-            else
-            {
-                _leaves[product.Id] = new ProductLeafNode(product);
-            }
-        }
-
-        foreach (var gone in _leaves.Keys.Except(products.Concat(deleted).Select(p => p.Id)).ToList())
-        {
-            _leaves.Remove(gone);
-        }
+        _leaves.Merge(products.Concat(deleted));
 
         // Each stage's folders as they should show, and each folder's products.
         var layout = Stages.ToDictionary(root => root, root =>
@@ -459,25 +444,17 @@ public sealed class ProductTree : IDisposable
             return wanted;
         });
 
-        // The top-level folders with nothing in them yet: on the screen showing at startup, the tree binds before the first
-        // load has filled them, and holds them closed however they're set (see below).
-        var emptyRoots = Stages.Where(r => r.Children.Count == 0).ToHashSet();
-
         // Everything leaving the tree goes before anything arrives, so a product moving from one folder to another, or to
         // and from Deleted, is never in both at once.
         var deletedRows = RowsOf(deleted);
         TreeRows.RemoveMissing(DeletedFolder.Children, deletedRows);
         foreach (var (root, wanted) in layout)
         {
-            TreeRows.RemoveMissing(root.Children, Shown(wanted));
-            foreach (var (folder, rows) in wanted)
-            {
-                TreeRows.RemoveMissing(folder.Children, rows);
-            }
+            TreeRows.RemoveLeaving(root.Children, wanted, isFiltered);
         }
 
         // Deleted holds its products straight, whatever their stage and category. It opens on a search's matches, as the
-        // stages' folders do, and the tree is told again when it gets its first rows open (see below).
+        // stages' folders do, and the tree is told again when it gets its first rows open (ITreeFolder.AnnounceExpanded).
         var deletedWasEmpty = DeletedFolder.Children.Count == 0;
         TreeRows.Arrange(DeletedFolder.Children, deletedRows);
         DeletedFolder.ShowCount(deletedRows.Count);
@@ -491,54 +468,15 @@ public sealed class ProductTree : IDisposable
             DeletedFolder.AnnounceExpanded();
         }
 
+        // The screen's load makes every folder empty and fills it after, since the categories come in before the products.
         foreach (var (root, wanted) in layout)
         {
-            var shown = Shown(wanted);
-            var added = TreeRows.Arrange(root.Children, shown);
-            List<ProductFolderNode> filled = [];
-            foreach (var (folder, rows) in wanted)
-            {
-                if (folder.Children.Count == 0 && rows.Count > 0)
-                {
-                    filled.Add(folder);
-                }
-
-                TreeRows.Arrange(folder.Children, rows);
-                folder.ShowCount(rows.Count);
-            }
-
-            root.ShowCount(wanted.Sum(f => f.Rows.Count));
-
-            // Every match shows. The folders stay open once the search is cleared, as they would in a file explorer.
-            if (isFiltered)
-            {
-                root.IsExpanded = true;
-                foreach (var folder in shown.Cast<ProductFolderNode>())
-                {
-                    folder.IsExpanded = true;
-                }
-            }
-
-            // The tree is told again about a folder shown again, and one that has just got its first rows: it can't open a
-            // folder with nothing in it, and doesn't look at it again when rows arrive. The screen's load makes every
-            // folder empty and fills it after, since the categories come in before the products.
-            if (emptyRoots.Contains(root) && root.Children.Count > 0 && root.IsExpanded)
-            {
-                root.AnnounceExpanded();
-            }
-
-            foreach (var folder in added.Cast<ProductFolderNode>().Union(filled).Where(f => f.IsExpanded))
-            {
-                folder.AnnounceExpanded();
-            }
+            TreeRows.LayTopFolder(root, wanted, isFiltered);
         }
 
         _isFilled = true;
 
-        List<ProductTreeNode> RowsOf(IEnumerable<Product> inFolder) => [.. inFolder.Select(p => _leaves[p.Id])];
-
-        List<ProductTreeNode> Shown(List<(ProductFolderNode Folder, List<ProductTreeNode> Rows)> wanted) =>
-            [.. wanted.Where(f => !isFiltered || f.Rows.Count > 0).Select(f => f.Folder)];
+        List<ProductTreeNode> RowsOf(IEnumerable<Product> inFolder) => [.. _leaves.RowsOf(inFolder)];
     }
 
     private sealed class StageFolders(ProductFolderNode uncategorized)

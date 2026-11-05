@@ -33,7 +33,7 @@ public closed class RawMaterialTreeNode : ReactiveObject
 /// Products list does (ProductFolderNode).
 
 /// </summary>
-public sealed class RawMaterialFolderNode : RawMaterialTreeNode, IListFolder
+public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<RawMaterialTreeNode>
 {
     private RawMaterialFolderNode(RawMaterialType type, int? categoryId, RawMaterialCategoryType? categoryType, string title)
     {
@@ -124,11 +124,12 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, IListFolder
         }
     }
 
-    /// <summary>
-    /// Tells the tree again whether the folder is open, for a folder shown again after a search hid it, or one that was
-    /// empty when it opened and has rows now (ProductFolderNode.AnnounceExpanded says why).
-    /// </summary>
+    /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
     internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+
+    void ITreeFolder<RawMaterialTreeNode>.ShowCount(int count) => ShowCount(count);
+
+    void ITreeFolder<RawMaterialTreeNode>.AnnounceExpanded() => AnnounceExpanded();
 }
 
 /// <summary>
@@ -168,7 +169,7 @@ public sealed class RawMaterialLeafNode(RawMaterial rawMaterial) : RawMaterialTr
 /// </summary>
 public sealed class RawMaterialTree : IDisposable
 {
-    private readonly Dictionary<int, RawMaterialLeafNode> _leaves = [];
+    private readonly TreeLeaves<RawMaterial, RawMaterialLeafNode> _leaves = new(m => m.Id, m => new RawMaterialLeafNode(m), (leaf, m) => leaf.RawMaterial = m);
 
     /// <summary>Every category's folder, shown or not, by category id: each is in its own type's folder.</summary>
     private readonly Dictionary<int, RawMaterialFolderNode> _categoryFolders = [];
@@ -196,7 +197,7 @@ public sealed class RawMaterialTree : IDisposable
     public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The material's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
-    public RawMaterialLeafNode? Find(int rawMaterialId) => _leaves.GetValueOrDefault(rawMaterialId);
+    public RawMaterialLeafNode? Find(int rawMaterialId) => _leaves.Find(rawMaterialId);
 
     /// <summary>The type's folder.</summary>
     public RawMaterialFolderNode TypeFolder(RawMaterialType type) => Roots.Single(r => r.Type == type);
@@ -302,22 +303,7 @@ public sealed class RawMaterialTree : IDisposable
             .ToList();
         var categoryIds = allCategories.Select(c => c.Id).ToHashSet();
 
-        foreach (var material in materials)
-        {
-            if (_leaves.TryGetValue(material.Id, out var leaf))
-            {
-                leaf.RawMaterial = material;
-            }
-            else
-            {
-                _leaves[material.Id] = new RawMaterialLeafNode(material);
-            }
-        }
-
-        foreach (var gone in _leaves.Keys.Except(materials.Select(m => m.Id)).ToList())
-        {
-            _leaves.Remove(gone);
-        }
+        _leaves.Merge(materials);
 
         foreach (var category in allCategories)
         {
@@ -349,67 +335,20 @@ public sealed class RawMaterialTree : IDisposable
                 .Select(c => (Folder: _categoryFolders[c.Id], Rows: RowsOf(byCategory[c.Id].Where(m => m.Type == root.Type))))
                 .ToList());
 
-        // The top-level folders with nothing in them yet: on the screen showing at startup, the tree binds before the first
-        // load has filled them, and holds them closed however they're set (see below).
-        var emptyRoots = Roots.Where(r => r.Children.Count == 0).ToHashSet();
-
         // Everything leaving the tree goes before anything arrives, so a material moving from one folder to another is
         // never in both at once.
         foreach (var (root, wanted) in layout)
         {
-            TreeRows.RemoveMissing(root.Children, Shown(wanted));
-            foreach (var (folder, rows) in wanted)
-            {
-                TreeRows.RemoveMissing(folder.Children, rows);
-            }
+            TreeRows.RemoveLeaving(root.Children, wanted, isFiltered);
         }
 
         foreach (var (root, wanted) in layout)
         {
-            var shown = Shown(wanted);
-            var added = TreeRows.Arrange(root.Children, shown);
-            List<RawMaterialFolderNode> filled = [];
-            foreach (var (folder, rows) in wanted)
-            {
-                if (folder.Children.Count == 0 && rows.Count > 0)
-                {
-                    filled.Add(folder);
-                }
-
-                TreeRows.Arrange(folder.Children, rows);
-                folder.ShowCount(rows.Count);
-            }
-
-            root.ShowCount(wanted.Sum(f => f.Rows.Count));
-
-            // Every match shows. The folders stay open once the search is cleared, as they would in a file explorer.
-            if (isFiltered)
-            {
-                root.IsExpanded = true;
-                foreach (var folder in shown.Cast<RawMaterialFolderNode>())
-                {
-                    folder.IsExpanded = true;
-                }
-            }
-
-            // The tree is told again about a folder shown again, and one that has just got its first rows: it can't open a
-            // folder with nothing in it, and doesn't look at it again when rows arrive (ProductTree.Refresh says more).
-            if (emptyRoots.Contains(root) && root.Children.Count > 0 && root.IsExpanded)
-            {
-                root.AnnounceExpanded();
-            }
-
-            foreach (var folder in added.Cast<RawMaterialFolderNode>().Union(filled).Where(f => f.IsExpanded))
-            {
-                folder.AnnounceExpanded();
-            }
+            TreeRows.LayTopFolder(root, wanted, isFiltered);
         }
 
         _isFilled = true;
 
-        List<RawMaterialTreeNode> RowsOf(IEnumerable<RawMaterial> inFolder) => [.. inFolder.Select(m => _leaves[m.Id])];
-
-        List<RawMaterialTreeNode> Shown(List<(RawMaterialFolderNode Folder, List<RawMaterialTreeNode> Rows)> wanted) =>
-            [.. wanted.Where(f => !isFiltered || f.Rows.Count > 0).Select(f => f.Folder)];
+        List<RawMaterialTreeNode> RowsOf(IEnumerable<RawMaterial> inFolder) => [.. _leaves.RowsOf(inFolder)];
     }
 }
