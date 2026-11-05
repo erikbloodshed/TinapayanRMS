@@ -801,7 +801,7 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 - **`ShowFailure(exception, context)`**, for a failure that code catches itself, such as a read nothing awaits.
 - **`RunWithConfirmationAsync(message, action)`**, which asks through the `ConfirmDelete` interaction first.
 - **`ExportToExcelAsync(title)`**, which asks the view to write its grids to a workbook through the `ExportToExcel` interaction, and says where the file went. See [Exporting to Excel](#exporting-to-excel).
-- **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back. Code that reacts to user edits skips while either is set (`IsBusyApplying`).
+- **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back. Code that reacts to user edits skips while either is set (`IsBusyApplying`). The Products screen needs that less (2026-11-05): a pick there is its setter's (`SelectedProduct` feeds `_picks`; the section form's setters feed `ModePicks`, `RolePicks`, `SourcePicks` and `LinkTargetPicks`), and a load or restore writes the picks quietly (`RepointSelection`, `ShowRole`, `ShowSource`, `RestorePicks`), so what reacts to a pick never sees them and needs no guard. Write a new pick reaction against those streams, not `WhenAnyValue`.
 - A logger for the concrete class (`logger.ForContext(GetType())`).
 
 A command that deletes, or does anything else that can't be undone, goes through `RunWithConfirmationAsync`. A command that saves runs inside `RunSafelyAsync`, and runs its validator first. A command that only changes the form in memory isn't wrapped.

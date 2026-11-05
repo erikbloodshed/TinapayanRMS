@@ -314,11 +314,35 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     private Product? _selectedProduct;
+
+    /// <summary>
+    /// Each product picked, by the user or for them (Open, a clone made, Save's reload), nothing picked included: what
+    /// loads a product into the form. Fed by <see cref="SelectedProduct"/>'s setter alone, starting with nothing picked.
+    /// </summary>
+    private readonly BehaviorSubject<Product?> _picks = new(null);
+
+    /// <summary>
+    /// The product the form is about. Setting it is a pick, which loads that product into the form (_picks); a load that
+    /// only finds a fresh copy of it re-points it quietly (<see cref="RepointSelection"/>), leaving the form and whatever's
+    /// typed into it alone.
+    /// </summary>
     public Product? SelectedProduct
     {
         get => _selectedProduct;
-        set => this.RaiseAndSetIfChanged(ref _selectedProduct, value);
+        set
+        {
+            if (EqualityComparer<Product?>.Default.Equals(_selectedProduct, value))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _selectedProduct, value);
+            _picks.OnNext(value);
+        }
     }
+
+    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
+    private void RepointSelection(Product? fresh) => this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
 
     /// <summary>A product <see cref="OpenProduct"/> was asked for before the list held it, for LoadCommand to open once it does.</summary>
     private int? _productToOpen;
@@ -1005,13 +1029,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => AreDetailsReady && !IsBusyApplying,
             (settled, now) => settled.SavesSameAs(now));
 
-        // Every selection-driven subscription skips while LoadCommand merges in fresh data, which only
-        // re-points a selection at its refreshed copy; the form, recipe and unsaved edits stay as-is.
+        // A pick loads the product into the form, in these three steps, in this order. Only a pick does (_picks): a load
+        // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
         // Another product's name and price land in the form ahead of its details, so its history goes first, as
         // ClearDetailsForAnother would take it anyway: measured against the previous product's saved form, they read
         // as unsaved changes, and Save lit up until the details arrived — a flicker on every pick.
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is not null && !IsBusyApplying)
+        _picks
+            .Where(product => product is not null)
             .Subscribe(product =>
             {
                 if (product!.Id != _detailProductId)
@@ -1022,21 +1046,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 LoadIntoForm(product);
             });
 
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(_ => !IsBusyApplying)
-            .Subscribe(ResetDetails);
+        _picks.Subscribe(ResetDetails);
 
-        // A newer selection cancels an older one still loading; one that fails shows why, and the next pick loads as usual.
-        LoadLatest(this.WhenAnyValue(x => x.SelectedProduct).Where(_ => !IsBusyApplying), LoadProductDetailAsync);
+        // A newer pick cancels an older one still loading; one that fails shows why, and the next pick loads as usual.
+        LoadLatest(_picks, LoadProductDetailAsync);
 
         this.WhenAnyValue(x => x.SelectedRecipeTab)
             .Subscribe(RecipeTabPicked);
 
         // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies. The form starts
-        // again empty in its new way, which is nothing to save yet, as StartAddingUsage's fresh form isn't.
-        this.WhenAnyValue(x => x.UsageForm.EditingUsageMode)
-            .Skip(1)
-            .Where(_ => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage)
+        // again empty in its new way, which is nothing to save yet, as StartAddingUsage's fresh form isn't. Picks only
+        // (ProductUsageForm.ModePicks and the rest): an undo putting the form back, or the options rebuilt, isn't one.
+        UsageForm.ModePicks
+            .Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage)
             .Subscribe(_ =>
             {
                 StartUsageFormMode();
@@ -1110,24 +1132,20 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             });
 
         LoadLatest(
-            this.WhenAnyValue(x => x.UsageForm.EditingUsageSource)
-                .Skip(1)
-                .Where(_ => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
+            UsageForm.SourcePicks.Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
             LoadUsageSourceAsync);
 
         // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
         LoadLatest(
-            this.WhenAnyValue(x => x.UsageForm.ChangeLinkTarget)
-                .Skip(1)
-                .Where(target => target is not null && UsageForm.IsChangingLink && !IsBusyApplying)
+            UsageForm.LinkTargetPicks
+                .Where(target => target is not null && UsageForm.IsChangingLink)
                 .Select(target => target!),
             ChangeLinkAsync);
 
         // The add form's piece size starts as its role has it (StartingPieceSize), so it follows a role picked, or a
         // copy's taken, while it's still what the role before started it at: neither figure typed.
-        this.WhenAnyValue(x => x.UsageForm.EditingUsageRole)
-            .Buffer(2, 1)
-            .Where(roles => !IsBusyApplying && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage && IsPieceSizeAsStarted(roles[0]))
+        UsageForm.RolePicks
+            .Where(pick => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage && IsPieceSizeAsStarted(pick.Before))
             .Subscribe(_ => StartPieceSize());
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
@@ -1319,7 +1337,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 // into their recipes as they're saved now, which it reads again when it next shows them.
                 Scaling.TakeLoaded(bomLines.ToLookup(l => l.IngredientId));
 
-                SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
+                RepointSelection(Products.FirstOrDefault(p => p.Id == selectedId));
                 if (SelectedProduct is not null)
                 {
                     ShowUpdatedAt(SelectedProduct.UpdatedAt);
@@ -1337,9 +1355,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 RefreshLinkableOptions();
 
                 // An add form opened before the roles were loaded takes the first role it can have, as it would have.
-                UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
-                    ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null);
-                UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
+                UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
+                    ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null));
+                UsageForm.ShowSource(UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey));
                 PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
 
                 UsageForm.Recompute();
@@ -2232,7 +2250,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             _productCache.AddOrUpdate(moved);
             if (SelectedProduct is { } selected && moved.FirstOrDefault(p => p.Id == selected.Id) is { } fresh)
             {
-                SelectedProduct = fresh;
+                RepointSelection(fresh);
             }
 
             if (onForm is not null)
@@ -4188,7 +4206,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         if (UsageForm.EditingUsageSource is { } picked && !UsageForm.LinkableSubAssemblies.Contains(picked))
         {
-            UsageForm.EditingUsageSource = null;
+            UsageForm.ShowSource(null);
         }
 
         RefreshFormRoleOptions();
@@ -4208,7 +4226,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UsageForm.FormRoleOptions.MergeFrom(
             [.. Roles.Where(r => r.IsPackaging ? UsageForm.IsAddingUsage && !HasPackaging : !IsEditingComposite || r.IsProductOwned)],
             r => r.Id);
-        UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
+        UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId));
     }
 
     /// <summary>
@@ -4927,5 +4945,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _printRequests.Dispose();
         _versionReads.Dispose();
         _markupChecks.Dispose();
+        _picks.Dispose();
+        UsageForm.Dispose();
     }
 }

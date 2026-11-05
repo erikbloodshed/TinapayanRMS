@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Subjects;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -18,7 +19,7 @@ namespace TinapayanRMS.UI.ViewModels;
 /// <param name="findPackagingMaterial">A packaging material as the screen last loaded it.</param>
 /// <param name="costBasis">The screen's cost basis, buffered or not, which a new row is priced at.</param>
 public sealed class ProductUsageForm(
-    Func<int, RawMaterial?> findIngredient, Func<int, RawMaterial?> findPackagingMaterial, Func<CostBasis> costBasis) : ReactiveObject
+    Func<int, RawMaterial?> findIngredient, Func<int, RawMaterial?> findPackagingMaterial, Func<CostBasis> costBasis) : ReactiveObject, IDisposable
 {
     /// <summary>
     /// The roles the form offers: every recipe role, as a recipe can have several sub-assemblies in one, told apart by
@@ -147,8 +148,35 @@ public sealed class ProductUsageForm(
     public LinkableSubAssemblyOption? ChangeLinkTarget
     {
         get => _changeLinkTarget;
-        set => this.RaiseAndSetIfChanged(ref _changeLinkTarget, value);
+        set
+        {
+            if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_changeLinkTarget, value))
+            {
+                this.RaiseAndSetIfChanged(ref _changeLinkTarget, value);
+                _linkTargetPicks.OnNext(value);
+            }
+        }
     }
+
+    // Each pick the form's pickers make, or the screen makes for the user (opening a form, Open from Sub-Assemblies):
+    // what the screen reacts to. Fed by the setters alone, so an undo putting the form back (RestoreMode, RestorePicks)
+    // and the option lists being rebuilt (ShowRole, ShowSource) change what shows without anything reacting.
+    private readonly Subject<UsageFormMode> _modePicks = new();
+    private readonly Subject<(SubAssemblyRole? Before, SubAssemblyRole? After)> _rolePicks = new();
+    private readonly Subject<LinkableSubAssemblyOption?> _sourcePicks = new();
+    private readonly Subject<LinkableSubAssemblyOption?> _linkTargetPicks = new();
+
+    /// <summary>Each way picked for the add form to take its sub-assembly: the form starts again empty in it (the screen's StartUsageFormMode).</summary>
+    public IObservable<UsageFormMode> ModePicks => _modePicks;
+
+    /// <summary>Each role picked, with the one before it: the piece size follows while it's still the one the role before started it at.</summary>
+    public IObservable<(SubAssemblyRole? Before, SubAssemblyRole? After)> RolePicks => _rolePicks;
+
+    /// <summary>Each sub-assembly or packaging picked to link or copy: its lines load into the form (the screen's LoadUsageSourceAsync).</summary>
+    public IObservable<LinkableSubAssemblyOption?> SourcePicks => _sourcePicks;
+
+    /// <summary>Each sub-assembly picked to link instead of the one linked: the section relinks to it (the screen's ChangeLinkAsync).</summary>
+    public IObservable<LinkableSubAssemblyOption?> LinkTargetPicks => _linkTargetPicks;
 
     /// <summary>
     /// The form edits one of the product's own that isn't already on its way to the Sub-Assemblies screen, so Move to
@@ -186,7 +214,14 @@ public sealed class ProductUsageForm(
     public UsageFormMode EditingUsageMode
     {
         get => _editingUsageMode;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageMode, value);
+        set
+        {
+            if (_editingUsageMode != value)
+            {
+                this.RaiseAndSetIfChanged(ref _editingUsageMode, value);
+                _modePicks.OnNext(value);
+            }
+        }
     }
 
     private bool _isFormEditingLines = true;
@@ -256,7 +291,15 @@ public sealed class ProductUsageForm(
     public SubAssemblyRole? EditingUsageRole
     {
         get => _editingUsageRole;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageRole, value);
+        set
+        {
+            var before = _editingUsageRole;
+            if (!EqualityComparer<SubAssemblyRole?>.Default.Equals(before, value))
+            {
+                this.RaiseAndSetIfChanged(ref _editingUsageRole, value);
+                _rolePicks.OnNext((before, value));
+            }
+        }
     }
 
     private string? _editingUsageName;
@@ -275,7 +318,14 @@ public sealed class ProductUsageForm(
     public LinkableSubAssemblyOption? EditingUsageSource
     {
         get => _editingUsageSource;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageSource, value);
+        set
+        {
+            if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_editingUsageSource, value))
+            {
+                this.RaiseAndSetIfChanged(ref _editingUsageSource, value);
+                _sourcePicks.OnNext(value);
+            }
+        }
     }
 
     private IngredientLineRow? _selectedFormLine;
@@ -502,6 +552,13 @@ public sealed class ProductUsageForm(
         this.RaisePropertyChanged(nameof(EditingUsageMode));
     }
 
+    /// <summary>The role picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so nothing follows.</summary>
+    internal void ShowRole(SubAssemblyRole? role) => this.RaiseAndSetIfChanged(ref _editingUsageRole, role, nameof(EditingUsageRole));
+
+    /// <summary>The source picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so the form keeps its lines.</summary>
+    internal void ShowSource(LinkableSubAssemblyOption? source) =>
+        this.RaiseAndSetIfChanged(ref _editingUsageSource, source, nameof(EditingUsageSource));
+
     /// <summary>Puts the role, source and name back, once the option lists they come from are rebuilt.</summary>
     internal void RestorePicks(SubAssemblyRole? role, LinkableSubAssemblyOption? source, string? name)
     {
@@ -540,5 +597,13 @@ public sealed class ProductUsageForm(
         this.RaisePropertyChanged(nameof(HasFormAddIns));
         this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
         this.RaisePropertyChanged(nameof(FormAddInsBadgeText));
+    }
+
+    public void Dispose()
+    {
+        _modePicks.Dispose();
+        _rolePicks.Dispose();
+        _sourcePicks.Dispose();
+        _linkTargetPicks.Dispose();
     }
 }
