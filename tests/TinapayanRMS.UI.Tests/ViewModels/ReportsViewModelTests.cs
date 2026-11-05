@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// own that read a sub-assembly's stored totals as the usage's batch. The add-in figures were worked out for that copy
 /// and are unchanged, so the two pricings agree.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// it whether Save has anything to write, which is measured against the same snapshots. Steps are recorded by
 /// bracketing a change with BeginUndoStep/EndUndoStep, which is what the Controls/ behaviours do.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

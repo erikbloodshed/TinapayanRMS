@@ -12,7 +12,7 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Reports' Cost Drivers and Margin Erosion, worked out from products and versions as saved.</summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// The unit of work (IUnitOfWork, SharedTransactionDbContextFactory): repositories' writes, each in a transaction of its
 /// own, made inside one run commit together or not at all, and its reads see what it has written so far.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static ProductVersionContent Recipe(string name) => new()

@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// every product linking it whose recipe it changed, with how it stood first for one with no versions yet, noted with where
 /// the change came from. A product it doesn't change gets none.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

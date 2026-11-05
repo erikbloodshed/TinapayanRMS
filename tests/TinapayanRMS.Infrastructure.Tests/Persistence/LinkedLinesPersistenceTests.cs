@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// the sub-assembly itself, on the Sub-Assemblies screen, so every product linking it follows. Without them its lines are
 /// left as they are.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static LinkedUsageDraft Linked(int subAssemblyId, decimal weightPerPiece, IReadOnlyList<RecipeLine>? lines = null, params (int IngredientId, decimal Grams)[] addIns) =>

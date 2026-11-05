@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// starts in Research and Development, and only a move (dragging it to another folder, IProductRepository.MoveAsync)
 /// changes it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ProductStagePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());

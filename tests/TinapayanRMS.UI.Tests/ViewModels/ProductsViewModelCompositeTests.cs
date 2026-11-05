@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// adds only sections in product-owned roles and its packaging; Save writes the lines, undo takes them back, and a
 /// refresh reprices them.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>

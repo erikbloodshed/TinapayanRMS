@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Print on the Products screen, on real repositories: what the Print tab shows is the product as the screen shows it,
 /// unsaved edits included, with a form left open applied first, as Save applies it (the user's choice, 2026-09-27).
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

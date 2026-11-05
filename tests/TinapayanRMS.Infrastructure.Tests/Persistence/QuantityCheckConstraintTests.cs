@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// line stored at 0 failed Reports, Print and the Recipe API for every product). The rules refuse these first, in better
 /// words, so these tests write past the repositories, as an edit outside the app would.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class QuantityCheckConstraintTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Theory]

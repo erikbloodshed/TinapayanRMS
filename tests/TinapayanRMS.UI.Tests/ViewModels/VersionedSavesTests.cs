@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// The saves that record versions (VersionedSaves), each written with its versions or not at all: a version that can't be
 /// recorded takes its save back. The versions a save records, and their notes, are in the screens' *VersionTests.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private const string Refused = "Simulated: the version couldn't be written.";

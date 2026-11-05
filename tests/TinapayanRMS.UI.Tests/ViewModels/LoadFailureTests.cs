@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// pick ended the screen's selection subscription for good (no later pick loaded anything, and Save did nothing, with no
 /// word of why), and a failed load or an unexpected failure in a save closed the app.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

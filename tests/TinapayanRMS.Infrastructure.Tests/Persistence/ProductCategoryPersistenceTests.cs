@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Product categories (Breads, Cakes, …): a list of their own, apart from raw material categories, and optional on a
 /// product, so deleting one leaves its products uncategorized.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductCategoryRepository CreateRepository() => new(CreateDbContextFactory());

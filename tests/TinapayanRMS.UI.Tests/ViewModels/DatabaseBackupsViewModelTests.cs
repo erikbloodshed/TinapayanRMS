@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Settings' Database tab against real backups and restores, of a database of each test's own (ThrowawayDatabase), so
 /// a restore never touches the database the other UI tests share.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAsyncLifetime
 {
     private static CancellationToken Cancellation => TestContext.Current.CancellationToken;

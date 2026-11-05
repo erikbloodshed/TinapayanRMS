@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// the first time, how the product stood before), the History tab shows each one priced then and today with what
 /// changed in it, a note typed there is saved, and Restore puts a version into the form as unsaved edits Undo takes back.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class ProductsViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

@@ -14,7 +14,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// from the order the lines are handed over in and read back in that order, then by Id: a sub-assembly's lines, a
 /// packaging set's, a made ingredient's BOM, a product's packaging and a linked usage's add-ins.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateSubAssemblyRepository() => new(CreateDbContextFactory());

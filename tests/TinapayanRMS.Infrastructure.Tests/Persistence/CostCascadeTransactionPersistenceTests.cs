@@ -19,7 +19,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// good. Unlinking a product's packaging is one transaction too. And Settings' Recalculate Costs puts right a stored cost
 /// changed outside the app.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

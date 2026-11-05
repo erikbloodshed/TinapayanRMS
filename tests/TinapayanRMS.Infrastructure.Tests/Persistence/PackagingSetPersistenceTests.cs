@@ -16,7 +16,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Saved and deleted on the Sub-Assemblies screen, kept apart from recipes, and linked by a product's packaging,
 /// one set per piece.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class PackagingSetPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());

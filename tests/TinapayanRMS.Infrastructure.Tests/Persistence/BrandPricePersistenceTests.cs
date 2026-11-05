@@ -8,7 +8,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);

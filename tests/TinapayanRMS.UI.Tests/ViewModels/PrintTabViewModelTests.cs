@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Products list, or all products, print as they're saved, in the list's order (the user's choices, 2026-09-27). And a
 /// saved product read for a set is the same printout the Products screen gives once it's opened.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.D)]
 public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

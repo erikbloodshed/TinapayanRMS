@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// source's own included, at the source's piece sizes, so it follows every change made there. Its packaging isn't
 /// carried over. Its costing is copied, as a clone's is.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class ProductVariantPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());

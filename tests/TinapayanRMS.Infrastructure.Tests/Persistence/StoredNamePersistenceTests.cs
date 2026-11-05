@@ -13,7 +13,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Names go in without spaces at either end, however they're written. PostgreSQL's collation counts a space at the end, so
 /// "Pandesal " beside "Pandesal" got past the unique index (found 2026-11-03), where SQL Server's had ignored it.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.C)]
 public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository Products() => new(CreateDbContextFactory());

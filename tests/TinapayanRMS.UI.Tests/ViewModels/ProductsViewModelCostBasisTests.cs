@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// costs and their true ones, the rows, sections, packaging, a composite's products and the printout alike. It's no
 /// edit, so there's nothing to undo or save, and it stays put from one product to the next.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.A)]
 public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]

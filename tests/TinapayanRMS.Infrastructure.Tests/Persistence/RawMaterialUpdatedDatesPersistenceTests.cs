@@ -15,7 +15,7 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// a cascade doesn't touch the save date. The cost date is stamped by the DbContext from what actually changed,
 /// so every path that writes a cost counts, not just the ones a repository remembers to stamp.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>The clock every save here stamps from, moved on between saves, so each date is one the test can name.</summary>

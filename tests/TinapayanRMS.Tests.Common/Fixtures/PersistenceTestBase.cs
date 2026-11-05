@@ -14,12 +14,13 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 /// plumbing (and the Respawn reset before each test) is identical across every one of
 /// them, so it lives here once instead of being retyped per file.
 ///
-/// Deliberately does NOT carry [Collection(DatabaseCollection.Name)] itself — that
-/// attribute must stay on each concrete test class. xUnit's collection/fixture-sharing
-/// discovery is not guaranteed to honor an attribute declared only on a base class, and
-/// getting that wrong would silently break the Respawn-reset isolation this whole
-/// hierarchy exists to guarantee (tests could then run in parallel against the shared
-/// database instead of being serialized into one collection).
+/// Deliberately does NOT carry a [Collection] itself — the attribute must stay on each
+/// concrete test class: [Collection(DatabaseCollection.Name)], or in UI.Tests and
+/// Infrastructure.Tests one of DatabaseCollection.A to D, each with a database of its own
+/// (2026-11-05). xUnit's collection/fixture-sharing discovery is not guaranteed to honor an
+/// attribute declared only on a base class, and getting that wrong would silently break the
+/// Respawn-reset isolation this whole hierarchy exists to guarantee (tests could then run in
+/// parallel against one database instead of one at a time in its collection).
 /// </summary>
 public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncLifetime
 {

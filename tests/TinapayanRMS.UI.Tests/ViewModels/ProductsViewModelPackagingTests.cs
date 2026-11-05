@@ -21,7 +21,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// product's) — and gets a Packaging tab only then. Make a Copy on a linked tab makes it the product's own; Delete
 /// Sub-Assembly takes it out. Save writes the link and the lines together.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[Collection(DatabaseCollection.B)]
 public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
