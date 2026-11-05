@@ -333,24 +333,27 @@ public sealed class SavedProductReader(
         }
 
         var costing = detail.Costing;
-        var costs = new ProductCostSummary(
+        var costs = new ProductCostSummary(new ProductCostInputs
+        {
+            Parts =
             [
                 .. detail.Components.Select(c => (c.LineName, c.CostAt(basis))),
                 .. sections.Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
             ],
-            product.QuantityRequired,
-            [.. packagingLines.Select(l => l.CostPerUnit)],
-            costing?.LaborPercent ?? 0m,
-            costing?.OverheadPercent ?? 0m,
-            costing?.AdministrativePercent ?? 0m,
-            costing?.MarginPercent ?? 0m,
-            costing?.VatPercent ?? 0m,
-            product.CurrentPrice,
-            product.IsComposite,
-            product.IsComposite && sections.Count > 0,
-            product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
-            detail.WastagePercent,
-            detail.PriceRoundingStep);
+            QuantityRequired = product.QuantityRequired,
+            PackagingCosts = [.. packagingLines.Select(l => l.CostPerUnit)],
+            ComponentPackaging = product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
+            LaborPercent = costing?.LaborPercent ?? 0m,
+            OverheadPercent = costing?.OverheadPercent ?? 0m,
+            AdministrativePercent = costing?.AdministrativePercent ?? 0m,
+            MarginPercent = costing?.MarginPercent ?? 0m,
+            VatPercent = costing?.VatPercent ?? 0m,
+            WastagePercent = detail.WastagePercent,
+            PriceRoundingStep = detail.PriceRoundingStep,
+            CurrentPrice = product.CurrentPrice,
+            IsComposite = product.IsComposite,
+            HasOwnSections = product.IsComposite && sections.Count > 0,
+        });
 
         return new SavedProduct(
             product,

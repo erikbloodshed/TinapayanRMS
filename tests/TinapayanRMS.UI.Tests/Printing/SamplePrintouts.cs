@@ -12,6 +12,16 @@ internal static class SamplePrintouts
     /// </summary>
     public static readonly System.Windows.Size A4Printable = new(793.7 - 94.49 - 94.49, 1122.52 - 94.49 - 94.49);
 
+    /// <summary>The samples' costing: 25% labor, 10% overhead, 5% administrative, a 30% markup and 12% VAT.</summary>
+    public static readonly ProductCostInputs Percentages = new()
+    {
+        LaborPercent = 25m,
+        OverheadPercent = 10m,
+        AdministrativePercent = 5m,
+        MarginPercent = 30m,
+        VatPercent = 12m,
+    };
+
     public static ProductPrintout WithLines(int lineCount, string? saveNote = null) => new(
         "Ube Roll",
         "Breads",
@@ -36,7 +46,7 @@ internal static class SamplePrintouts
                 HasPieceSize: true),
         ],
         new PrintedPackaging(null, [new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m)], 30m),
-        new ProductCostSummary([("Dough", 2.5m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 60m));
+        new ProductCostSummary(Percentages with { Parts = [("Dough", 2.5m)], PackagingCosts = [30m], CurrentPrice = 60m }));
 
     /// <summary>
     /// A composite, Pasalubong Box: 6 Ensaymada at 2.50 of recipe each and 4 Cheese Rolls at 5.00, 35.00 between them, and
@@ -48,7 +58,13 @@ internal static class SamplePrintouts
         CostUnitCaption = "Per unit",
         Sections = [],
         Components = [new PrintedComponent("Ensaymada", 6, 2.50m, 15m), new PrintedComponent("Cheese Roll", 4, 5m, 20m)],
-        Costs = new ProductCostSummary([("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true),
+        Costs = new ProductCostSummary(Percentages with
+        {
+            Parts = [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)],
+            PackagingCosts = [30m],
+            CurrentPrice = 120m,
+            IsComposite = true,
+        }),
     };
 
     /// <summary>
@@ -115,7 +131,7 @@ internal static class SamplePrintouts
                     NowBatchCost = section.BatchCost - 1m,
                 },
             ],
-            Simulation = new PrintedSimulation(new ProductCostSummary([("Dough", 2m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 60m), [FlourRise]),
+            Simulation = new PrintedSimulation(new ProductCostSummary(Percentages with { Parts = [("Dough", 2m)], PackagingCosts = [30m], CurrentPrice = 60m }), [FlourRise]),
         };
     }
 

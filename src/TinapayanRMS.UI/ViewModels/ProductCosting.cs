@@ -152,33 +152,16 @@ public sealed class ProductCosting : ReactiveObject
         _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent);
 
     /// <summary>
-    /// The cost summary from the recipe's figures, as the screen has them now, and the percentages as typed. A composite's
-    /// <paramref name="parts"/> are its products' lines, then its own sections; <paramref name="componentPackaging"/> is its
-    /// products' packaging when it takes theirs, else null.
+    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now, at the
+    /// percentages as typed here.
     /// </summary>
-    public void Recompute(
-        IReadOnlyList<(string Name, decimal CostPerPiece)> parts,
-        int quantityRequired,
-        IReadOnlyList<decimal> packaging,
-        decimal? currentPrice,
-        bool isComposite,
-        bool hasOwnSections,
-        decimal? componentPackaging,
-        decimal wastagePercent,
-        decimal priceRoundingStep = 0m) =>
-        Costs = new ProductCostSummary(
-            parts,
-            quantityRequired,
-            packaging,
-            EditingLaborPercent,
-            EditingOverheadPercent,
-            EditingAdministrativePercent,
-            EditingMarginPercent,
-            EditingVatPercent,
-            currentPrice,
-            isComposite,
-            hasOwnSections,
-            componentPackaging,
-            wastagePercent,
-            priceRoundingStep);
+    public void Recompute(ProductCostInputs recipe) =>
+        Costs = new ProductCostSummary(recipe with
+        {
+            LaborPercent = EditingLaborPercent,
+            OverheadPercent = EditingOverheadPercent,
+            AdministrativePercent = EditingAdministrativePercent,
+            MarginPercent = EditingMarginPercent,
+            VatPercent = EditingVatPercent,
+        });
 }

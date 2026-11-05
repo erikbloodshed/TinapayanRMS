@@ -4569,16 +4569,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         decimal? componentPackaging = IsEditingComposite && EditingIncludesComponentPackaging
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
-        Costing.Recompute(
-            [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
-            EditingQuantityRequired,
-            [.. Packaging.LineEdits.Select(l => l.CostPerUnit)],
-            EditingCurrentPrice,
-            IsEditingComposite,
-            IsEditingComposite && UsageEdits.Count > 0,
-            componentPackaging,
-            EditingCategory?.WastagePercent ?? _wastagePercent,
-            _priceRoundingStep);
+        Costing.Recompute(new ProductCostInputs
+        {
+            Parts = [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
+            QuantityRequired = EditingQuantityRequired,
+            PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit)],
+            ComponentPackaging = componentPackaging,
+            WastagePercent = EditingCategory?.WastagePercent ?? _wastagePercent,
+            PriceRoundingStep = _priceRoundingStep,
+            CurrentPrice = EditingCurrentPrice,
+            IsComposite = IsEditingComposite,
+            HasOwnSections = IsEditingComposite && UsageEdits.Count > 0,
+        });
     }
 
     /// <summary>

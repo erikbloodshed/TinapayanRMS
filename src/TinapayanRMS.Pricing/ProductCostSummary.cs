@@ -12,72 +12,58 @@ namespace TinapayanRMS.Pricing;
 /// </summary>
 public sealed class ProductCostSummary
 {
-    public static ProductCostSummary Empty { get; } = new([], 1, [], 0m, 0m, 0m, 0m, 0m, null);
+    public static ProductCostSummary Empty { get; } = new(new ProductCostInputs());
 
-    /// <param name="wastagePercent">
-    /// The shop-wide Wastage % (CostingDefaults.WastagePercent): a share of <see cref="SubAssemblies"/> added on top, for
-    /// what's lost making it. A composite's products bring their recipe cost before theirs, so it's added once, here.
-    /// </param>
-
-    /// <param name="usages">
-    /// Each sub-assembly in the recipe, in recipe order: its name and its cost per piece. For a composite, each product it
-    /// holds: "Ensaymada × 6", and what the six bring in recipe cost, then its own sections.
-    /// </param>
-    /// <param name="packagingCosts">Its own packaging lines, each for one whole sellable unit.</param>
-    /// <param name="isComposite">The product is a composite, whose recipe is the products it holds.</param>
-    /// <param name="hasSections">A composite also has sections of its own (a topping, a filling), which its labels name too.</param>
-    /// <param name="componentPackaging">
-    /// What a composite's products bring in packaging, when it includes theirs (Product.IncludesComponentPackaging): it
-    /// joins the packaging, so labor, overhead and administrative don't go on it. Null when it doesn't include them.
-    /// </param>
-    public ProductCostSummary(
-        IReadOnlyList<(string Name, decimal CostPerPiece)> usages,
-        int quantityRequired,
-        IReadOnlyList<decimal> packagingCosts,
-        decimal laborPercent,
-        decimal overheadPercent,
-        decimal administrativePercent,
-        decimal marginPercent,
-        decimal vatPercent,
-        decimal? currentPrice,
-        bool isComposite = false,
-        bool hasSections = false,
-        decimal? componentPackaging = null,
-        decimal wastagePercent = 0m,
-        decimal priceRoundingStep = 0m)
+    /// <summary>
+    /// Works the summary out from <paramref name="inputs"/>. The wastage, labor, overhead and administrative costs are each a
+    /// percentage of the recipe cost alone; a composite's products' packaging joins its packaging, so none of them go on it.
+    /// </summary>
+    public ProductCostSummary(ProductCostInputs inputs)
     {
-        PriceRoundingStep = priceRoundingStep;
-        IReadOnlyList<decimal> usageCostsPerPiece = [.. usages.Select(u => u.CostPerPiece)];
-        IsComposite = isComposite;
-        HasSections = hasSections;
+        Inputs = inputs;
+        var quantityRequired = inputs.QuantityRequired;
+        IReadOnlyList<decimal> usageCostsPerPiece = [.. inputs.Parts.Select(u => u.CostPerPiece)];
+        PriceRoundingStep = inputs.PriceRoundingStep;
+        IsComposite = inputs.IsComposite;
+        HasSections = inputs.HasOwnSections;
         QuantityRequired = quantityRequired;
         SubAssemblies = usageCostsPerPiece.Sum() * quantityRequired;
-        OwnPackaging = packagingCosts.Sum();
-        ComponentPackaging = componentPackaging;
-        Packaging = OwnPackaging + (componentPackaging ?? 0m);
-        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, [.. packagingCosts, componentPackaging ?? 0m]);
-        WastagePercent = wastagePercent;
-        Wastage = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, wastagePercent);
-        LaborPercent = laborPercent;
-        OverheadPercent = overheadPercent;
-        AdministrativePercent = administrativePercent;
-        Labor = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, laborPercent);
-        Overhead = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, overheadPercent);
-        Administrative = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, administrativePercent);
-        MarginPercent = marginPercent;
-        VatPercent = vatPercent;
+        OwnPackaging = inputs.PackagingCosts.Sum();
+        ComponentPackaging = inputs.ComponentPackaging;
+        Packaging = OwnPackaging + (inputs.ComponentPackaging ?? 0m);
+        Material = ProductRules.CalculateMaterialCost(usageCostsPerPiece, quantityRequired, [.. inputs.PackagingCosts, inputs.ComponentPackaging ?? 0m]);
+        WastagePercent = inputs.WastagePercent;
+        Wastage = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.WastagePercent);
+        LaborPercent = inputs.LaborPercent;
+        OverheadPercent = inputs.OverheadPercent;
+        AdministrativePercent = inputs.AdministrativePercent;
+        Labor = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.LaborPercent);
+        Overhead = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.OverheadPercent);
+        Administrative = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.AdministrativePercent);
+        MarginPercent = inputs.MarginPercent;
+        VatPercent = inputs.VatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
-            SubAssemblies, Packaging, laborPercent, overheadPercent, administrativePercent, marginPercent, vatPercent, wastagePercent);
-        CurrentPrice = currentPrice;
-        CurrentMarkupPercent = currentPrice is { } price
-            ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, vatPercent)
+            SubAssemblies,
+            Packaging,
+            inputs.LaborPercent,
+            inputs.OverheadPercent,
+            inputs.AdministrativePercent,
+            inputs.MarginPercent,
+            inputs.VatPercent,
+            inputs.WastagePercent);
+        CurrentPrice = inputs.CurrentPrice;
+        CurrentMarkupPercent = inputs.CurrentPrice is { } price
+            ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, inputs.VatPercent)
             : null;
-        SubAssemblyLines = [.. usages.Select(u =>
+        SubAssemblyLines = [.. inputs.Parts.Select(u =>
         {
             var cost = u.CostPerPiece * quantityRequired;
             return new SubAssemblyCostLine(u.Name, cost, CostingRules.PercentOf(cost, SellingPrice));
         })];
     }
+
+    /// <summary>What the summary was worked out from.</summary>
+    public ProductCostInputs Inputs { get; }
 
     /// <summary>How many finished pieces this unit holds: 1 for a product sold by the piece.</summary>
     public int QuantityRequired { get; }

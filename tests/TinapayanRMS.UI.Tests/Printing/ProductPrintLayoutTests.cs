@@ -82,8 +82,14 @@ public class ProductPrintLayoutTests
         var printout = SamplePrintouts.Composite() with
         {
             Components = [new PrintedComponent("Ensaymada", 6, 2.50m, 24m, 1.50m), new PrintedComponent("Cheese Roll", 4, 5m, 20m, 0m)],
-            Costs = new ProductCostSummary(
-                [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true, componentPackaging: 9m),
+            Costs = new ProductCostSummary(SamplePrintouts.Percentages with
+            {
+                Parts = [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m)],
+                PackagingCosts = [30m],
+                ComponentPackaging = 9m,
+                CurrentPrice = 120m,
+                IsComposite = true,
+            }),
         };
 
         var texts = AllTexts(new ProductPrintLayout(printout, includeRecipe: true, includeCosting: true, A4));
@@ -106,8 +112,14 @@ public class ProductPrintLayoutTests
         var printout = composite with
         {
             Sections = [topping],
-            Costs = new ProductCostSummary(
-                [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m), ("Topping", 2.5m)], 1, [30m], 25m, 10m, 5m, 30m, 12m, 120m, isComposite: true, hasSections: true),
+            Costs = new ProductCostSummary(SamplePrintouts.Percentages with
+            {
+                Parts = [("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m), ("Topping", 2.5m)],
+                PackagingCosts = [30m],
+                CurrentPrice = 120m,
+                IsComposite = true,
+                HasOwnSections = true,
+            }),
         };
 
         var texts = AllTexts(new ProductPrintLayout(printout, includeRecipe: true, includeCosting: true, A4));
