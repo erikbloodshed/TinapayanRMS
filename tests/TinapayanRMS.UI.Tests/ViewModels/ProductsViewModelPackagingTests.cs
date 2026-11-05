@@ -28,7 +28,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     // A product whose packaging links come round in a loop, as only an edit outside the app can leave them, failed every
     // product's read with it. It opens now, showing no packaging, and says so (2026-11-05).
     [Fact]
-    public async Task A_product_whose_packaging_links_come_round_in_a_loop_opens_with_a_notice()
+    public Task A_product_whose_packaging_links_come_round_in_a_loop_opens_with_a_notice() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
         var bigId = await AddProductAsync("Ensaymada");
@@ -49,10 +49,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.ErrorMessage.Should().Be(PackagingLinkRules.LinkedRoundInALoopText("Ensaymada"));
         viewModel.Packaging.LineEdits.Should().BeEmpty();
         viewModel.Costing.Costs.Packaging.Should().Be(0m);
-    }
+    });
 
     [Fact]
-    public async Task A_new_packaging_is_added_in_the_Packaging_role_and_saved_as_the_products_own_lines()
+    public Task A_new_packaging_is_added_in_the_Packaging_role_and_saved_as_the_products_own_lines() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
@@ -90,10 +90,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var line = await dbContext.PackagingLines.SingleAsync(Cancellation);
         (line.PackagingMaterialId, line.QtyPerUnit).Should().Be((boxId, 1m));
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
-    }
+    });
 
     [Fact]
-    public async Task The_form_shows_under_a_sub_assemblys_tab_or_New_Sub_Assemblys_and_the_packaging_under_its_own()
+    public Task The_form_shows_under_a_sub_assemblys_tab_or_New_Sub_Assemblys_and_the_packaging_under_its_own() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
@@ -119,10 +119,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
         (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
-    }
+    });
 
     [Fact]
-    public async Task Linking_a_packaging_set_shows_its_lines_read_only_and_Save_writes_the_link()
+    public Task Linking_a_packaging_set_shows_its_lines_read_only_and_Save_writes_the_link() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -161,10 +161,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await WaitUntilSettledAsync(() => viewModel.Packaging.LineEdits.Count == 2, () => $"lines={viewModel.Packaging.LineEdits.Count}");
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue("the reload shows the saved link");
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
-    }
+    });
 
     [Fact]
-    public async Task Copying_another_products_packaging_makes_it_this_products_own()
+    public Task Copying_another_products_packaging_makes_it_this_products_own() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -189,10 +189,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.PackagingLines.SingleAsync(l => l.ProductId == copyId, Cancellation)).QtyPerUnit.Should().Be(3m);
         (await dbContext.PackagingLines.SingleAsync(l => l.ProductId == sourceId, Cancellation)).QtyPerUnit.Should().Be(2m, "the source is untouched");
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
-    }
+    });
 
     [Fact]
-    public async Task Make_a_Copy_on_a_linked_Packaging_tab_unlinks_it_on_Save_and_keeps_its_lines()
+    public Task Make_a_Copy_on_a_linked_Packaging_tab_unlinks_it_on_Save_and_keeps_its_lines() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -220,10 +220,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var line = await dbContext.PackagingLines.SingleAsync(Cancellation);
         (line.ProductId, line.PackagingMaterialId, line.QtyPerUnit).Should().Be((productId, boxId, 1m),
             "the lines the link showed are written even though they match what was loaded");
-    }
+    });
 
     [Fact]
-    public async Task Move_to_Sub_Assemblies_on_the_Packaging_tab_saves_its_lines_as_a_set_and_links_it()
+    public Task Move_to_Sub_Assemblies_on_the_Packaging_tab_saves_its_lines_as_a_set_and_links_it() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -257,10 +257,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.SubAssemblyPackagingLines.SingleAsync(Cancellation)).QtyPerSet.Should().Be(2m);
         (await dbContext.PackagingLinks.SingleAsync(Cancellation)).LinkedSubAssemblyId.Should().Be(set.Id);
         (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
-    }
+    });
 
     [Fact]
-    public async Task Undoing_Move_to_Sub_Assemblies_on_the_Packaging_tab_keeps_its_lines_the_products_own_and_stops_offering_Save()
+    public Task Undoing_Move_to_Sub_Assemblies_on_the_Packaging_tab_keeps_its_lines_the_products_own_and_stops_offering_Save() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -281,10 +281,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         // Taking the packaging out takes the move with it.
         await viewModel.RemoveUsageCommand.Execute();
         viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Move_to_Sub_Assemblies_with_no_packaging_lines_is_refused_with_a_message()
+    public Task Move_to_Sub_Assemblies_with_no_packaging_lines_is_refused_with_a_message() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -297,10 +297,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.ErrorMessage.Should().Contain("at least one");
         viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
         viewModel.Packaging.CanMovePackaging.Should().BeTrue();
-    }
+    });
 
     [Fact]
-    public async Task Delete_Sub_Assembly_on_the_Packaging_tab_takes_out_the_lines_or_the_link()
+    public Task Delete_Sub_Assembly_on_the_Packaging_tab_takes_out_the_lines_or_the_link() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -333,10 +333,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await using var dbContext = CreateDbContext();
         (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
-    }
+    });
 
     [Fact]
-    public async Task Packaging_is_offered_to_link_or_copy_only_while_the_product_has_none()
+    public Task Packaging_is_offered_to_link_or_copy_only_while_the_product_has_none() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -365,7 +365,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
         viewModel.UsageForm.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
-    }
+    });
 
     /// <summary>Ensaymada, with one <paramref name="boxId"/> a piece as its own packaging, open on its Packaging tab.</summary>
     private async Task<ProductsViewModel> OpenWithOwnPackagingAsync(int boxId)

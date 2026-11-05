@@ -44,7 +44,7 @@ public class FolderStateWriterTests
     }
 
     [Fact]
-    public async Task ExpansionChanged_SettledChanges_WritesTheLastOnceAfterThem()
+    public Task ExpansionChanged_SettledChanges_WritesTheLastOnceAfterThem() => StaThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
         using var changed = new Subject<RxVoid>();
@@ -52,7 +52,7 @@ public class FolderStateWriterTests
         using var writer = new FolderStateWriter(store, Key, changed, () => [.. open]);
 
         // Expand All opens several in a row: one write, of where they ended up.
-        foreach (var folder in new[] { "Production", "Production/12", "Production/Uncategorized" })
+        foreach (var folder in (string[])["Production", "Production/12", "Production/Uncategorized"])
         {
             open.Add(folder);
             changed.OnNext(RxVoid.Default);
@@ -61,10 +61,10 @@ public class FolderStateWriterTests
         await WaitForAsync(() => store.WriteCount > 0);
         store.ReadList(Key).Should().Equal("Production", "Production/12", "Production/Uncategorized");
         store.WriteCount.Should().Be(1);
-    }
+    });
 
     [Fact]
-    public async Task ExpansionChanged_BackAsItWas_WritesNothing()
+    public Task ExpansionChanged_BackAsItWas_WritesNothing() => StaThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
         using var changed = new Subject<RxVoid>();
@@ -80,7 +80,7 @@ public class FolderStateWriterTests
         writer.Dispose();
 
         store.WriteCount.Should().Be(0);
-    }
+    });
 
     private static async Task WaitForAsync(Func<bool> condition)
     {

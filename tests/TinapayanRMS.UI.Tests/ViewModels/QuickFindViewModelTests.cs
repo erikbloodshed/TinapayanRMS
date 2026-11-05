@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Every_screens_records_are_found_by_name_and_say_what_they_are()
+    public Task Every_screens_records_are_found_by_name_and_say_what_they_are() => StaThread.RunAsync(async () =>
     {
         var ubeId = await AddIngredientAsync("Ube Halaya");
         var fillingId = await AddRecipeAsync("Ube Filling", [(ubeId, 500m)]);
@@ -31,10 +31,10 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         find.Results[1].Group.Should().Be("Base", "a sub-assembly's role");
         find.SelectedResult.Should().Be(find.Results[0]);
         find.ResultsNote.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_deleted_product_isnt_found()
+    public Task A_deleted_product_isnt_found() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");
         var gone = await AddProductAsync("Pandesal Old");
@@ -45,7 +45,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         find.Query = "pandesal";
 
         find.Results.Select(r => (r.Screen, r.Name)).Should().Equal((AppScreen.Products, "Pandesal"));
-    }
+    });
 
     [Fact]
     public void Every_word_is_matched_ignoring_case_and_accents_with_the_closest_names_first()
@@ -67,7 +67,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     [Fact]
-    public async Task Nothing_typed_or_nothing_found_says_so()
+    public Task Nothing_typed_or_nothing_found_says_so() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");
         var find = Create();
@@ -79,7 +79,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         find.Results.Should().BeEmpty();
         find.SelectedResult.Should().BeNull();
         find.ResultsNote.Should().Contain("\"zzz\"");
-    }
+    });
 
     private QuickFindViewModel Create()
     {

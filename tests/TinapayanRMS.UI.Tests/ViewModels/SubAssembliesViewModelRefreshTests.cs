@@ -24,7 +24,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task One_Save_writes_a_new_standalone_sub_assembly_and_selects_it()
+    public Task One_Save_writes_a_new_standalone_sub_assembly_and_selects_it() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
@@ -54,10 +54,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.BatchWeight.Should().Be(200m);
         viewModel.HeaderTitle.Should().Be("Chocolate Glaze");
         viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(200m);
-    }
+    });
 
     [Fact]
-    public async Task Saving_without_lines_is_refused_with_a_message()
+    public Task Saving_without_lines_is_refused_with_a_message() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
         var viewModel = CreateViewModel();
@@ -68,10 +68,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.ErrorMessage.Should().Be("Add the ingredients that go into Chocolate Glaze, in grams.");
         viewModel.Rows.Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task Reloading_keeps_unsaved_lines_and_reprices_them()
+    public Task Reloading_keeps_unsaved_lines_and_reprices_them() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
@@ -96,10 +96,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(300m, "an unsaved edit survives the refresh");
         viewModel.BatchCost.Should().Be(30m, "the line is priced at sugar's new cost");
         viewModel.SelectedRow!.Name.Should().Be("Glaze");
-    }
+    });
 
     [Fact]
-    public async Task Deleting_a_linked_one_is_refused_and_the_form_shows_who_uses_it()
+    public Task Deleting_a_linked_one_is_refused_and_the_form_shows_who_uses_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -128,10 +128,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.ErrorMessage.Should().StartWith("Cream Loaf links Glaze.");
         viewModel.Rows.Should().ContainSingle();
-    }
+    });
 
     [Fact]
-    public async Task OpenSubAssembly_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it()
+    public Task OpenSubAssembly_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -158,10 +158,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
         viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
         viewModel.VisibleRows.Should().Contain(viewModel.SelectedRow);
-    }
+    });
 
     [Fact]
-    public async Task OpenByName_opens_the_sub_assembly_a_name_means_best_as_the_Vim_command_line_asks()
+    public Task OpenByName_opens_the_sub_assembly_a_name_means_best_as_the_Vim_command_line_asks() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -176,10 +176,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
         viewModel.OpenByName("fondant").Should().BeFalse();
         await WaitUntilSettledAsync(() => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
-    }
+    });
 
     [Fact]
-    public async Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set()
+    public Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
         await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
@@ -221,10 +221,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.PackagingLines.Single().BaseUnitAbbreviation.Should().Be("pc");
         viewModel.SetCost.Should().Be(66m);
         viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
-    }
+    });
 
     [Fact]
-    public async Task Copy_starts_a_new_one_with_the_same_role_and_lines_and_Save_adds_it_beside_the_original()
+    public Task Copy_starts_a_new_one_with_the_same_role_and_lines_and_Save_adds_it_beside_the_original() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough");
         var glazeRoleId = await AddRoleAsync("Glaze", sortOrder: 2);
@@ -263,10 +263,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == originalId).CountAsync(Cancellation);
         lines.Should().Be(2, "the original is left as it was");
         (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == viewModel.SelectedRow.Id, Cancellation)).Should().Be(2);
-    }
+    });
 
     [Fact]
-    public async Task A_copys_name_is_one_no_other_sub_assembly_has()
+    public Task A_copys_name_is_one_no_other_sub_assembly_has() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -283,10 +283,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
-    }
+    });
 
     [Fact]
-    public async Task Copying_a_packaging_set_copies_its_materials()
+    public Task Copying_a_packaging_set_copies_its_materials() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
         var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
@@ -327,10 +327,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
-    }
+    });
 
     [Fact]
-    public async Task New_Product_asks_for_a_product_linking_the_picked_sub_assembly_once_its_changes_are_saved()
+    public Task New_Product_asks_for_a_product_linking_the_picked_sub_assembly_once_its_changes_are_saved() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -357,10 +357,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         requested.Should().Equal(glazeId);
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task New_Product_is_not_offered_for_a_packaging_set()
+    public Task New_Product_is_not_offered_for_a_packaging_set() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
@@ -389,7 +389,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow = viewModel.Rows.Single();
 
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("a packaging set isn't a recipe");
-    }
+    });
 
     private SubAssembliesViewModel CreateViewModel()
     {
@@ -432,7 +432,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
     }
 
     [Fact]
-    public async Task A_typed_percentage_is_saved_and_reopens_as_typed()
+    public Task A_typed_percentage_is_saved_and_reopens_as_typed() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -456,10 +456,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var water = viewModel.Lines.Single(l => l.Ingredient!.Id == waterId);
         water.Grams.Should().Be(625m);
         water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
-    }
+    });
 
     [Fact]
-    public async Task Unticking_the_base_switches_the_lines_to_absolute_percentages()
+    public Task Unticking_the_base_switches_the_lines_to_absolute_percentages() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -480,5 +480,5 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.FormulaBaseCaption.Should().StartWith("Absolute %");
         viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(75m, "1,500 g of the 2,000 g batch");
         viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(25m);
-    }
+    });
 }

@@ -14,7 +14,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task A_material_is_its_share_of_a_products_material_cost_wherever_it_is_in_the_recipe()
+    public Task A_material_is_its_share_of_a_products_material_cost_wherever_it_is_in_the_recipe() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, flourId, sugarId, syrupId) = await AddEnsaymadaAsync();
         var shares = CreateShares();
@@ -23,10 +23,10 @@ public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestB
         (await shares.ReadAsync(flourId, [ensaymadaId], Cancellation))[ensaymadaId].Should().BeApproximately(45m / 54m, 0.0000001m);
         (await shares.ReadAsync(syrupId, [ensaymadaId], Cancellation))[ensaymadaId].Should().BeApproximately(9m / 54m, 0.0000001m);
         (await shares.ReadAsync(sugarId, [ensaymadaId], Cancellation))[ensaymadaId].Should().BeApproximately(9m / 54m, 0.0000001m, "sugar is in it through the syrup");
-    }
+    });
 
     [Fact]
-    public async Task A_composite_is_priced_with_all_the_products_it_holds_even_those_without_the_material()
+    public Task A_composite_is_priced_with_all_the_products_it_holds_even_those_without_the_material() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, flourId, _, _) = await AddEnsaymadaAsync();
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.10m);
@@ -44,7 +44,7 @@ public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestB
 
         shares[boxId].Should().BeApproximately(0.90m / 11.08m, 0.0000001m);
         MaterialCostShares.Text(shares[boxId]).Should().Be("8.1% of materials");
-    }
+    });
 
     [Fact]
     public void A_share_reads_as_a_percentage_of_materials()

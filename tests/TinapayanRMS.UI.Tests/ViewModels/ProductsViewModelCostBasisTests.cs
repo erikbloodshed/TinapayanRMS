@@ -24,7 +24,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Unbuffered_prices_the_whole_screen_at_the_true_costs_and_changes_nothing_about_the_product()
+    public Task Unbuffered_prices_the_whole_screen_at_the_true_costs_and_changes_nothing_about_the_product() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
@@ -60,10 +60,10 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.CostBasis.Should().Be(CostBasis.Buffered);
-    }
+    });
 
     [Fact]
-    public async Task Rows_an_undo_puts_back_are_priced_unbuffered_too()
+    public Task Rows_an_undo_puts_back_are_priced_unbuffered_too() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
@@ -75,10 +75,10 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.UsageForm.FormLines.Single().Should().Match<IngredientLineRow>(r => r.Grams == 1000m && r.CostBasis == CostBasis.Unbuffered);
         viewModel.UsageForm.FormLines.Single().Cost.Should().Be(40m);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(2.00m);
-    }
+    });
 
     [Fact]
-    public async Task Unbuffered_stays_on_for_the_next_product_picked()
+    public Task Unbuffered_stays_on_for_the_next_product_picked() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var doughRoleId = await RoleIdAsync("Dough");
@@ -95,10 +95,10 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.IsUnbuffered.Should().BeTrue();
         viewModel.UsageForm.FormLines.Single().CostBasis.Should().Be(CostBasis.Unbuffered);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
-    }
+    });
 
     [Fact]
-    public async Task A_composites_products_bring_their_unbuffered_recipe_costs()
+    public Task A_composites_products_bring_their_unbuffered_recipe_costs() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
@@ -120,7 +120,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     /// <summary>
     /// Ensaymada: a Dough of 1,000 g of flour, 0.05 a gram buffered and 0.04 true, 50 g a piece (2.50 buffered, 2.00
@@ -129,7 +129,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     // Every cost on the screen is at buffered costs, and a purchased material's is a fixed amount that rising prices can
     // pass: the product was then priced under what it cost with nothing here to say so (2026-11-05).
     [Fact]
-    public async Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost()
+    public Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
@@ -153,7 +153,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         (await OpenAsync(productId)).BelowCostText.Should().Be(
             "Prices have risen past the buffered costs of Flour and Gift Box, so this product is priced under what they cost. "
             + "Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.");
-    }
+    });
 
     private async Task<int> AddEnsaymadaAsync()
     {

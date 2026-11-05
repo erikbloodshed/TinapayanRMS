@@ -26,7 +26,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Saving_a_sub_assemblys_lines_records_a_version_of_each_product_using_it()
+    public Task Saving_a_sub_assemblys_lines_records_a_version_of_each_product_using_it() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
@@ -56,10 +56,10 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         GramsOf(pack[0]).Should().Be(450m);
 
         (await versions.GetForProductAsync(ensaymadaId, Cancellation)).Should().BeEmpty("Ensaymada's dough is its own");
-    }
+    });
 
     [Fact]
-    public async Task Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost()
+    public Task Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
@@ -82,10 +82,10 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         {
             dbContext.SubAssemblyLines.Single(l => l.SubAssemblyId == doughId).Grams.Should().Be(500m, "No keeps it unsaved");
         }
-    }
+    });
 
     [Fact]
-    public async Task A_rename_records_no_version()
+    public Task A_rename_records_no_version() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
@@ -99,10 +99,10 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         viewModel.SuccessMessage.Should().Be("House Dough was saved.");
         (await new ProductVersionRepository(CreateDbContextFactory()).GetForProductAsync(pandesalId, Cancellation))
             .Should().BeEmpty("a sub-assembly's name isn't part of a product's recipe");
-    }
+    });
 
     [Fact]
-    public async Task Recording_the_products_a_sub_assembly_changes_takes_as_many_commands_for_six_as_for_two()
+    public Task Recording_the_products_a_sub_assembly_changes_takes_as_many_commands_for_six_as_for_two() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
@@ -117,7 +117,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         forTwo.Recorded.Should().HaveCount(2);
         forSix.Recorded.Should().HaveCount(6);
         forSix.Commands.Should().Be(forTwo.Commands, "the versions are written together, not a product at a time");
-    }
+    });
 
     private async Task LinkProductsAsync(int subAssemblyId, string name, int count)
     {

@@ -34,7 +34,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     [Fact]
-    public async Task A_category_folder_prints_its_products_in_the_lists_order_under_its_title()
+    public Task A_category_folder_prints_its_products_in_the_lists_order_under_its_title() => StaThread.RunAsync(async () =>
     {
         var (breads, _) = await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
@@ -46,10 +46,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco");
         tab.PrintSet.Products.Should().OnlyContain(p => p.SaveNote == null, "a set prints as saved");
         tab.Note.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Uncategorized_and_a_stage_hold_what_the_list_files_under_them()
+    public Task Uncategorized_and_a_stage_hold_what_the_list_files_under_them() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
@@ -62,10 +62,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Title.Should().Be("Research and Development");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
-    }
+    });
 
     [Fact]
-    public async Task All_products_print_Production_first_folder_by_folder()
+    public Task All_products_print_Production_first_folder_by_folder() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
@@ -76,10 +76,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.PrintSet!.Title.Should().Be("All Products");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf", "Test Bread");
         tab.Scopes.Select(s => s.Label).Should().Equal("This product", "All products");
-    }
+    });
 
     [Fact]
-    public async Task A_folder_asked_for_is_offered_beside_This_product_and_All_products_in_place_of_the_last()
+    public Task A_folder_asked_for_is_offered_beside_This_product_and_All_products_in_place_of_the_last() => StaThread.RunAsync(async () =>
     {
         var (breads, cakes) = await AddCatalogueAsync();
         var tab = CreatePrintTab(await OpenProductsAsync());
@@ -89,10 +89,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
 
         tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Cakes · Production", "All products");
         tab.SelectedScope.Label.Should().Be("Cakes · Production");
-    }
+    });
 
     [Fact]
-    public async Task A_set_prints_the_open_product_as_saved_and_says_so_while_This_product_has_its_edits()
+    public Task A_set_prints_the_open_product_as_saved_and_says_so_while_This_product_has_its_edits() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
         var products = await OpenProductsAsync("Cheese Roll");
@@ -112,10 +112,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.PrintSet.Products.Single().Costs.CurrentPrice.Should().Be(45m);
         tab.PrintSet.Products.Single().SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
         tab.Note.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_saved_product_reads_as_the_Products_screen_shows_it_once_opened()
+    public Task A_saved_product_reads_as_the_Products_screen_shows_it_once_opened() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -137,10 +137,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
 
         saved.Should().BeEquivalentTo(screen);
         saved.Costs.SellingPrice.Should().BePositive();
-    }
+    });
 
     [Fact]
-    public async Task Unbuffered_a_set_prints_at_the_true_costs_as_This_product_does_and_says_so()
+    public Task Unbuffered_a_set_prints_at_the_true_costs_as_This_product_does_and_says_so() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
@@ -163,10 +163,10 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         (saved.Costs.SubAssemblies, saved.Costs.Packaging).Should().Be((2.00m, 25m));
         saved.Should().BeEquivalentTo(screen, o => o.Excluding(p => p.PrintedAt));
         tab.Note.Should().BeNull("the open product has no edits: the switch isn't one");
-    }
+    });
 
     [Fact]
-    public async Task A_saved_composite_reads_as_the_Products_screen_shows_it_once_opened()
+    public Task A_saved_composite_reads_as_the_Products_screen_shows_it_once_opened() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -190,7 +190,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         saved.Components.Should().HaveCount(2);
         saved.Costs.SubAssemblies.Should().Be(35m);
         saved.Costs.Packaging.Should().Be(30m);
-    }
+    });
 
     /// <summary>
     /// Two categories and five products: Production's Breads (Pan de Coco, Cheese Roll), Cakes (Mocha Roll) and Uncategorized

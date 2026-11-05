@@ -17,7 +17,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Cost_drivers_rank_the_purchased_materials_by_what_the_products_in_Production_spend_on_them()
+    public Task Cost_drivers_rank_the_purchased_materials_by_what_the_products_in_Production_spend_on_them() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -36,20 +36,20 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         rows[0].LargestIn.Should().Be("Pandesal", "it's all flour");
         rows[0].LargestShare.Should().BeApproximately(100m, 0.0000001m);
         rows[^1].CumulativeShare.Should().BeApproximately(100m, 0.0000001m, "every peso of these products' material cost is a purchased material's");
-    }
+    });
 
     [Fact]
-    public async Task Cost_drivers_leave_out_products_not_in_Production()
+    public Task Cost_drivers_leave_out_products_not_in_Production() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         await AddProductWithSubAssemblyAsync("Test Bun", doughRoleId, [(flourId, 1000m)], weightPerPiece: 10m);
 
         (await AnalyseCostDriversAsync()).Should().BeEmpty("a product still in Research and Development isn't counted");
-    }
+    });
 
     [Fact]
-    public async Task Margin_erosion_compares_each_products_markup_then_with_now()
+    public Task Margin_erosion_compares_each_products_markup_then_with_now() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -84,7 +84,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         row.HasDropped.Should().BeTrue();
         (await new ProductVersionRepository(CreateDbContextFactory()).GetLatestAsOfAsync(monthAgo.AddDays(-1), Cancellation))
             .Should().BeEmpty("there was no version before it");
-    }
+    });
 
     private async Task<IReadOnlyList<CostDriverRow>> AnalyseCostDriversAsync()
     {

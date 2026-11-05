@@ -25,11 +25,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Products_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads()
+    public Task Products_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
-        foreach (var name in new[] { "Almond Bread", "Banana Bread", "Cheese Bread" })
+        foreach (var name in (string[])["Almond Bread", "Banana Bread", "Cheese Bread"])
         {
             await AddProductWithSubAssemblyAsync(name, roleId, [new RecipeLine(flourId, 1000m)]);
         }
@@ -51,17 +51,17 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             () => viewModel.SelectedProduct = Named("Cheese Bread"),
             () => viewModel.AreDetailsReady && viewModel.EditingName == "Cheese Bread" && viewModel.UsageEdits.Count == 1);
         viewModel.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
-    }
+    });
 
     // While a picked product's details are on their way the form still holds the product before's, which a Save would
     // write under the new one's name. Typing then isn't an unsaved change (the history records nothing until they come),
     // so Save stays off, rather than on and doing nothing as a review of the code had read it (2026-11-05).
     [Fact]
-    public async Task Products_Save_stays_off_while_the_picked_products_details_are_on_their_way()
+    public Task Products_Save_stays_off_while_the_picked_products_details_are_on_their_way() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
-        foreach (var name in new[] { "Almond Bread", "Banana Bread" })
+        foreach (var name in (string[])["Almond Bread", "Banana Bread"])
         {
             await AddProductWithSubAssemblyAsync(name, roleId, [new RecipeLine(flourId, 1000m)]);
         }
@@ -84,13 +84,13 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         factory.Hold = null;
         hold.SetResult();
         await PickAsync(() => { }, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
-    }
+    });
 
     [Fact]
-    public async Task Raw_materials_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads()
+    public Task Raw_materials_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var ids = new List<int>();
-        foreach (var name in new[] { "Butter", "Flour", "Sugar" })
+        foreach (var name in (string[])["Butter", "Flour", "Sugar"])
         {
             var id = await AddIngredientAsync(name);
             await SetPriceAsync(id, unitId: null, price: 0.05m);
@@ -111,14 +111,14 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         factory.Fail = false;
         await PickAsync(() => viewModel.SelectedRawMaterial = WithId(ids[2]), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Sub_assemblies_a_pick_that_fails_to_load_leaves_a_blank_form_and_the_next_pick_loads()
+    public Task Sub_assemblies_a_pick_that_fails_to_load_leaves_a_blank_form_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
-        foreach (var name in new[] { "Almond", "Banana", "Cheese" })
+        foreach (var name in (string[])["Almond", "Banana", "Cheese"])
         {
             await AddProductWithSubAssemblyAsync(name, roleId, [new RecipeLine(flourId, 1000m)]);
         }
@@ -143,10 +143,10 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await PickAsync(() => viewModel.SelectedRow = Named("Cheese Dough"), () => viewModel.EditingName == "Cheese Dough" && viewModel.Lines.Count == 1,
             () => $"name={viewModel.EditingName} lines={viewModel.Lines.Count} row={viewModel.SelectedRow?.Name} error={viewModel.ErrorMessage}");
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Reports_a_load_that_fails_says_so_and_the_next_one_reads_the_reports()
+    public Task Reports_a_load_that_fails_says_so_and_the_next_one_reads_the_reports() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
@@ -162,10 +162,10 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.ProductCosts.Should().ContainSingle().Which.ProductName.Should().Be("Pandesal");
-    }
+    });
 
     [Fact]
-    public async Task A_save_that_fails_says_why_and_doesnt_throw()
+    public Task A_save_that_fails_says_why_and_doesnt_throw() => StaThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         ReactiveUIBootstrapper.EnsureInitialized();
@@ -183,12 +183,12 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
-    }
+    });
 
     // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaited the move
     // to another tab, so a read that failed there was lost: the click did nothing, with no word of why (2026-11-04).
     [Fact]
-    public async Task Products_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    public Task Products_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -210,10 +210,10 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await viewModel.LoadCommand.Execute();
         await PickAsync(() => { }, () => viewModel.AreDetailsReady);
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
-    }
+    });
 
     [Fact]
-    public async Task Raw_materials_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    public Task Raw_materials_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
@@ -234,10 +234,10 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         factory.Fail = false;
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
-    }
+    });
 
     [Fact]
-    public async Task Sub_assemblies_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays()
+    public Task Sub_assemblies_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -257,14 +257,14 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         factory.Fail = false;
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
-    }
+    });
 
     // A record opened by the Vim command line's :e name, which nothing awaits.
     [Fact]
-    public async Task A_question_that_cant_be_asked_says_so_and_stays()
+    public Task A_question_that_cant_be_asked_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var ids = new List<int>();
-        foreach (var name in new[] { "Butter", "Flour" })
+        foreach (var name in (string[])["Butter", "Flour"])
         {
             var id = await AddIngredientAsync(name);
             await SetPriceAsync(id, unitId: null, price: 0.05m);
@@ -283,7 +283,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ErrorMessage.Should().Contain("The question couldn't be asked.");
         viewModel.SelectedRawMaterial!.Id.Should().Be(ids[0], "it stays on the form it was asked to leave");
         viewModel.EditingName.Should().Be("Salted Butter");
-    }
+    });
 
     private static async Task PickAsync(Action pick, Func<bool> settled, Func<string>? describe = null)
     {

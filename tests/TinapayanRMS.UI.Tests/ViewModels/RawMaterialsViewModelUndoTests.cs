@@ -23,7 +23,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Undoing_a_name_edit_puts_it_back()
+    public Task Undoing_a_name_edit_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -36,10 +36,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         viewModel.TryRedo().Should().BeTrue();
         viewModel.EditingName.Should().Be("Renamed");
-    }
+    });
 
     [Fact]
-    public async Task Undoing_an_alternative_units_edit_keeps_its_id_so_Save_updates_it()
+    public Task Undoing_an_alternative_units_edit_keeps_its_id_so_Save_updates_it() => StaThread.RunAsync(async () =>
     {
         // RawMaterialUnitRow writes straight through into the stored RawMaterialUnit, and Save hands those very
         // entities to the repository — a unit that lost its id would be saved as a new one and the stored one deleted.
@@ -60,10 +60,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var unit = await dbContext.RawMaterialUnits.SingleAsync(u => u.RawMaterialId == materialId, Cancellation);
         unit.Id.Should().Be(savedUnitId, "the stored unit was updated, not deleted and recreated");
         unit.BaseUnitsPerUnit.Should().Be(25000m);
-    }
+    });
 
     [Fact]
-    public async Task Undoing_a_removed_alternative_unit_puts_it_back()
+    public Task Undoing_a_removed_alternative_unit_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
         viewModel.SelectedUnitRow = viewModel.UnitRows[0];
@@ -73,10 +73,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         viewModel.TryUndo().Should().BeTrue();
         viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(25000m);
-    }
+    });
 
     [Fact]
-    public async Task Undoing_a_brand_price_puts_the_row_back_as_it_was()
+    public Task Undoing_a_brand_price_puts_the_row_back_as_it_was() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -97,10 +97,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var restored = viewModel.BrandPriceRows.Should().ContainSingle().Subject;
         restored.Brand.Should().Be("Baker's Best");
         restored.Price.Should().Be(1200m);
-    }
+    });
 
     [Fact]
-    public async Task Undo_leaves_what_Save_writes_alone()
+    public Task Undo_leaves_what_Save_writes_alone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, materialId) = await OpenPurchasedIngredientAsync();
 
@@ -113,10 +113,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == materialId, Cancellation)).Name
             .Should().Be("Flour", "a change undone and a change never made come to the same thing");
-    }
+    });
 
     [Fact]
-    public async Task A_step_that_changes_nothing_is_not_recorded()
+    public Task A_step_that_changes_nothing_is_not_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
         var recorder = (IUndoRecorder)viewModel;
@@ -127,10 +127,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         Edit(viewModel, () => viewModel.EditingName = "Flour");
         viewModel.History.CanUndo.Should().BeFalse("it was retyped to the name it already had");
-    }
+    });
 
     [Fact]
-    public async Task The_history_goes_when_the_form_stops_being_the_one_it_recorded()
+    public Task The_history_goes_when_the_form_stops_being_the_one_it_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -150,10 +150,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
         viewModel.History.CanUndo.Should().BeFalse("a new material has no history of its own");
-    }
+    });
 
     [Fact]
-    public async Task A_step_taken_before_the_details_arrive_is_not_recorded()
+    public Task A_step_taken_before_the_details_arrive_is_not_recorded() => StaThread.RunAsync(async () =>
     {
         // The brand prices and the BOM land a moment after the pick, which is what AreDetailsReady describes. A step
         // taken in that window holds empty grids, so undoing it would put them back over the details that arrived.
@@ -174,10 +174,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.History.CanUndo.Should().BeFalse("nothing typed before the details arrived is worth a step");
         viewModel.TryUndo().Should().BeFalse();
         viewModel.BrandPriceRows.Should().ContainSingle("the brand prices that arrived are still showing");
-    }
+    });
 
     [Fact]
-    public async Task Undoing_an_add_in_edit_puts_the_headers_totals_back()
+    public Task Undoing_an_add_in_edit_puts_the_headers_totals_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
         viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% weight loss");
@@ -194,10 +194,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.TryRedo().Should().BeTrue();
         viewModel.BomTotalWeight.Should().Be(485m);
         viewModel.BomTotalCost.Should().Be(55m);
-    }
+    });
 
     [Fact]
-    public async Task Undoing_another_sub_assembly_picked_puts_the_recipe_and_its_totals_back()
+    public Task Undoing_another_sub_assembly_picked_puts_the_recipe_and_its_totals_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
 
@@ -210,10 +210,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base");
         viewModel.BomTotalWeight.Should().Be(970m);
         viewModel.History.IsDirty.Should().BeFalse("it's back as it was saved");
-    }
+    });
 
     [Fact]
-    public async Task Undoing_a_weight_loss_edit_puts_the_headers_yield_back()
+    public Task Undoing_a_weight_loss_edit_puts_the_headers_yield_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
 
@@ -224,10 +224,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.TryUndo().Should().BeTrue();
         viewModel.EditingWeightLossPercent.Should().Be(3m);
         viewModel.BomTotalWeight.Should().Be(970m);
-    }
+    });
 
     [Fact]
-    public async Task Save_is_not_offered_until_the_form_is_changed()
+    public Task Save_is_not_offered_until_the_form_is_changed() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -237,10 +237,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
 
         (await CanSave(viewModel)).Should().BeTrue();
-    }
+    });
 
     [Fact]
-    public async Task Save_stops_being_offered_once_the_change_is_taken_back()
+    public Task Save_stops_being_offered_once_the_change_is_taken_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
         Edit(viewModel, () => viewModel.UnitRows[0].BaseUnitsPerUnit = 50000m);
@@ -249,10 +249,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.TryUndo().Should().BeTrue();
 
         (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
-    }
+    });
 
     [Fact]
-    public async Task Save_stops_being_offered_once_it_has_written()
+    public Task Save_stops_being_offered_once_it_has_written() => StaThread.RunAsync(async () =>
     {
         var (viewModel, materialId) = await OpenPurchasedIngredientAsync();
         Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
@@ -264,10 +264,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
             () => $"ready={viewModel.AreDetailsReady}, selected={viewModel.SelectedRawMaterial?.Id}");
 
         (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
-    }
+    });
 
     [Fact]
-    public async Task Save_is_not_offered_on_a_blank_new_form()
+    public Task Save_is_not_offered_on_a_blank_new_form() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -276,10 +276,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         Edit(viewModel, () => viewModel.EditingName = "Bread Flour");
         (await CanSave(viewModel)).Should().BeTrue();
-    }
+    });
 
     [Fact]
-    public async Task A_cell_still_open_keeps_Save_offered()
+    public Task A_cell_still_open_keeps_Save_offered() => StaThread.RunAsync(async () =>
     {
         // What's typed into a cell doesn't reach the row until the edit ends, and the click that saves is the
         // click that ends it - a Save disabled under the cursor would swallow it.
@@ -291,10 +291,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         recorder.IsEditPending = false;
         (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
-    }
+    });
 
     [Fact]
-    public async Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with()
+    public Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with() => StaThread.RunAsync(async () =>
     {
         await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
 
@@ -302,10 +302,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await viewModel.LoadCommand.Execute();
 
         (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
-    }
+    });
 
     [Fact]
-    public async Task Showing_the_tab_again_is_not_something_to_save()
+    public Task Showing_the_tab_again_is_not_something_to_save() => StaThread.RunAsync(async () =>
     {
         // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
@@ -313,7 +313,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await viewModel.LoadCommand.Execute();
 
         (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
-    }
+    });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
     private static async Task<bool> CanSave(RawMaterialsViewModel viewModel) =>
@@ -330,7 +330,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
     /// <summary>A saved purchased ingredient with one alternative unit (a 25 kg bag), open in the form.</summary>
     [Fact]
-    public async Task Re_apply_Target_types_the_buffer_last_typed_again_once_a_price_has_worn_it_down()
+    public Task Re_apply_Target_types_the_buffer_last_typed_again_once_a_price_has_worn_it_down() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -354,10 +354,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.IsBufferOffTarget.Should().BeFalse();
         viewModel.TryUndo().Should().BeTrue("it's one step to take back");
         viewModel.EditingBufferedCost.Should().Be(0.055m);
-    }
+    });
 
     [Fact]
-    public async Task Cost_From_costs_the_material_at_the_brand_picked_and_undoing_it_puts_the_buffer_box_back()
+    public Task Cost_From_costs_the_material_at_the_brand_picked_and_undoing_it_puts_the_buffer_box_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
@@ -392,7 +392,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingPreferredBrand.Should().BeNull();
         viewModel.EditingCostBufferPercent.Should().Be(10m);
         raised.Should().Contain(nameof(RawMaterialsViewModel.TypedCostBufferPercent), "the Cost Buffer % box shows it");
-    }
+    });
 
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenPurchasedIngredientAsync()
     {

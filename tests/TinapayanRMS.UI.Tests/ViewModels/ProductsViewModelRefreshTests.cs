@@ -28,7 +28,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Reloading_updates_usage_costs_changed_on_another_tab_and_keeps_the_selection_and_unsaved_costing()
+    public Task Reloading_updates_usage_costs_changed_on_another_tab_and_keeps_the_selection_and_unsaved_costing() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
@@ -64,10 +64,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Costing.Costs.Material.Should().Be(3.6m);
         var (expectedBaseCost, _, _) = CostingRules.CalculateSellingPrice(3.6m, 0m, 5m, 0m, 0m, 0m, 0m);
         viewModel.Costing.Costs.BaseCost.Should().Be(expectedBaseCost);
-    }
+    });
 
     [Fact]
-    public async Task Picking_another_product_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them()
+    public Task Picking_another_product_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
@@ -107,10 +107,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             (await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == cheeseRollId).Select(u => u.SubAssemblyId).ToListAsync(Cancellation))
                 .Should().Equal(cheeseFillingId);
         }
-    }
+    });
 
     [Fact]
-    public async Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it()
+    public Task One_Save_writes_a_new_product_with_a_sub_assembly_made_in_it() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
@@ -176,10 +176,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             .Which.Usage.SubAssemblyId.Should().BeGreaterThan(0);
         viewModel.ShowLinks.Should().BeTrue();
         viewModel.LastUpdatedText.Should().NotBe("—");
-    }
+    });
 
     [Fact]
-    public async Task Packaging_lines_are_typed_into_the_table_in_each_materials_base_unit_and_saved()
+    public Task Packaging_lines_are_typed_into_the_table_in_each_materials_base_unit_and_saved() => StaThread.RunAsync(async () =>
     {
         int boxId, ribbonId;
         await using (var dbContext = CreateDbContext())
@@ -253,10 +253,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.Packaging.LineEdits.Count}");
         viewModel.Packaging.LineEdits.Single(l => l.PackagingMaterialId == ribbonId).QtyPerUnit.Should().Be(30m);
         viewModel.Costing.Costs.Packaging.Should().Be(6.6m);
-    }
+    });
 
     [Fact]
-    public async Task A_packaging_line_saved_in_another_unit_shows_in_that_unit_with_what_it_comes_to_in_base_units()
+    public Task A_packaging_line_saved_in_another_unit_shows_in_that_unit_with_what_it_comes_to_in_base_units() => StaThread.RunAsync(async () =>
     {
         var productId = await AddProductAsync("Gift loaf");
         int rollId;
@@ -293,11 +293,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         line.BaseQty.Should().Be(20m, "0.02 of a 1,000 cm roll is 20 cm");
         line.BaseUnitAbbreviation.Should().Be("cm");
         viewModel.Costing.Costs.Packaging.Should().Be(0.4m, "20 cm at ₱0.02, as before");
-    }
+    });
 
 
     [Fact]
-    public async Task Saving_again_before_the_reload_arrives_keeps_a_new_section_only_once()
+    public Task Saving_again_before_the_reload_arrives_keeps_a_new_section_only_once() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -319,10 +319,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(Cancellation)).Should().Equal("Pandesal Dough");
-    }
+    });
 
     [Fact]
-    public async Task Make_a_Copy_of_a_section_saved_from_this_product_is_kept_under_the_next_number()
+    public Task Make_a_Copy_of_a_section_saved_from_this_product_is_kept_under_the_next_number() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -349,10 +349,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.WeightPerPiece.Should().Be(50m);
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single().Header.Should().Be("Dough");
         (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "the sub-assembly it was a copy of is left as it was");
-    }
+    });
 
     [Fact]
-    public async Task Copy_an_existing_one_takes_its_role_and_lines_but_not_its_name()
+    public Task Copy_an_existing_one_takes_its_role_and_lines_but_not_its_name() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling");
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -378,10 +378,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblies.OrderBy(s => s.Id).Select(s => s.Name).ToListAsync(Cancellation))
             .Should().Equal("Cheese Roll Filling: Cheese", "Ube Roll Filling");
-    }
+    });
 
     [Fact]
-    public async Task Sections_in_one_role_saved_from_this_product_read_by_their_own_names_on_its_tabs()
+    public Task Sections_in_one_role_saved_from_this_product_read_by_their_own_names_on_its_tabs() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
@@ -402,10 +402,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // "Cheese Roll Filling" goes by its role alone, "Cheese Roll Filling: Ube" by Ube, and Ube Bun's by its whole name.
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header)
             .Should().Equal("Filling: Ube Bun Filling", "Filling", "Filling: Ube");
-    }
+    });
 
     [Fact]
-    public async Task A_products_own_section_is_edited_in_its_recipe_and_Save_rewrites_it_in_place()
+    public Task A_products_own_section_is_edited_in_its_recipe_and_Save_rewrites_it_in_place() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -433,10 +433,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         saved.IsOwned.Should().BeTrue();
         viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(saved);
         (await SubAssemblyTotalsAsync(fillingId)).TotalWeight.Should().Be(150m);
-    }
+    });
 
     [Fact]
-    public async Task Save_has_the_saved_product_showing_with_its_form_open_by_the_time_it_returns()
+    public Task Save_has_the_saved_product_showing_with_its_form_open_by_the_time_it_returns() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -463,10 +463,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(saved);
         viewModel.UsageForm.FormLines.Select(l => l.Grams).Should().Equal(100m, 50m);
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_new_section_in_a_product_owned_role_is_the_products_own_after_Save()
+    public Task A_new_section_in_a_product_owned_role_is_the_products_own_after_Save() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -489,10 +489,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.IsFormEditingLines.Should().BeTrue();
         viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Usage.Should().BeSameAs(viewModel.UsageEdits.Single());
         (await new SubAssemblyRepository(CreateDbContextFactory()).GetStandaloneAsync(Cancellation)).Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task Another_products_own_is_offered_to_copy_but_not_to_link()
+    public Task Another_products_own_is_offered_to_copy_but_not_to_link() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -511,10 +511,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
         viewModel.UsageForm.LinkableSubAssemblies.Where(o => !o.IsPackaging).Select(o => o.DisplayName)
             .Should().Equal("Cheese Roll Filling: Cheese — Cheese Roll (Filling)");
-    }
+    });
 
     [Fact]
-    public async Task A_role_made_product_owned_in_Settings_turns_a_linked_section_into_the_products_own_on_coming_back()
+    public Task A_role_made_product_owned_in_Settings_turns_a_linked_section_into_the_products_own_on_coming_back() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling");
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -538,10 +538,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.EditingUsage.Should().BeSameAs(usage);
         viewModel.UsageForm.IsFormEditingLines.Should().BeTrue("the form opens on it again, its lines the product's now");
         viewModel.History.IsDirty.Should().BeFalse("nothing was typed");
-    }
+    });
 
     [Fact]
-    public async Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch()
+    public Task A_typed_yield_is_kept_and_the_weight_per_piece_follows_the_batch() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
@@ -573,10 +573,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.AuthoredField.Should().Be(UsageAuthoredField.Yield);
         usage.AuthoredValue.Should().Be(30m);
         (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1500m);
-    }
+    });
 
     [Fact]
-    public async Task The_pieces_share_out_the_whole_batch_and_the_wastage_goes_on_the_costing()
+    public Task The_pieces_share_out_the_whole_batch_and_the_wastage_goes_on_the_costing() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -595,14 +595,14 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Costing.Costs.WastagePercent.Should().Be(3m, "nothing is saved in Settings yet");
         viewModel.Costing.Costs.Wastage.Should().Be(0.09m);
         viewModel.Costing.Costs.BaseCost.Should().Be(3.09m);
-    }
+    });
 
     /// <summary>
     /// The wastage is the shop's, not the product's: one changed in Settings reprices a product already open on the
     /// screen's next load, and isn't an edit of it.
     /// </summary>
     [Fact]
-    public async Task A_wastage_changed_in_Settings_reprices_the_open_product_on_the_next_load()
+    public Task A_wastage_changed_in_Settings_reprices_the_open_product_on_the_next_load() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -620,10 +620,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Costing.Costs.Wastage.Should().Be(0.3m, "10% of the ₱3 a piece takes");
         viewModel.Costing.Costs.BaseCost.Should().Be(3.3m);
         viewModel.History.IsDirty.Should().BeFalse("the shop's wastage isn't an edit of the product");
-    }
+    });
 
     [Fact]
-    public async Task A_category_with_its_own_wastage_prices_the_product_put_in_it_at_once()
+    public Task A_category_with_its_own_wastage_prices_the_product_put_in_it_at_once() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -644,7 +644,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.EditingCategory = viewModel.Categories.Single(c => c.Name == "Cakes");
         viewModel.Costing.Costs.WastagePercent.Should().Be(3m, "Cakes leaves it to the shop-wide one");
-    }
+    });
 
     /// <summary>
     /// A section made in a product-owned role is written for the one piece it goes into, so its form starts at a yield
@@ -652,7 +652,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     /// follows the lines as they're typed and after it's saved, being the yield that's kept.
     /// </summary>
     [Fact]
-    public async Task A_section_added_in_a_product_owned_role_starts_at_a_yield_of_1_and_its_weight_per_piece_follows_the_batch()
+    public Task A_section_added_in_a_product_owned_role_starts_at_a_yield_of_1_and_its_weight_per_piece_follows_the_batch() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough");
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 2, isProductOwned: true);
@@ -687,7 +687,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
         usage.AuthoredField.Should().Be(UsageAuthoredField.Yield, "so the weight per piece goes on following the lines");
         usage.AuthoredValue.Should().Be(1m);
-    }
+    });
 
     /// <summary>
     /// The starting yield of 1 is the role's, not an entry: it follows the role while neither figure is typed, a form
@@ -695,7 +695,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     /// stays whatever the role becomes.
     /// </summary>
     [Fact]
-    public async Task The_starting_yield_of_1_follows_the_role_until_a_piece_size_is_typed()
+    public Task The_starting_yield_of_1_follows_the_role_until_a_piece_size_is_typed() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
         await AddRoleAsync("Dough", sortOrder: 2);
@@ -737,7 +737,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.Single(r => r.Name == "Topping");
         viewModel.UsageForm.EditingUsageWeightPerPiece.Should().Be(15m);
         viewModel.UsageForm.EditingUsageYield.Should().Be(0m, "the weight is the figure kept, and there's no batch to work a yield out from");
-    }
+    });
 
     /// <summary>
     /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructureCard), and the way it carries is what the
@@ -745,7 +745,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     /// that form instead of opening a second one, and the whole add is one undo step.
     /// </summary>
     [Fact]
-    public async Task Add_Sub_Assembly_opens_the_form_in_the_way_its_drop_down_asked_for_and_changes_it_in_place()
+    public Task Add_Sub_Assembly_opens_the_form_in_the_way_its_drop_down_asked_for_and_changes_it_in_place() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         await AddRoleAsync("Filling", sortOrder: 2, isProductOwned: true);
@@ -794,10 +794,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.TryUndo().Should().BeTrue();
         viewModel.RecipeTabs.Should().NotContain(viewModel.AddSubAssemblyTab, "the add went with its tab in one step");
         viewModel.UsageForm.IsUsageFormOpen.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_linked_sub_assembly_follows_its_changes_and_Make_a_Copy_saves_a_new_one_the_product_links()
+    public Task A_linked_sub_assembly_follows_its_changes_and_Make_a_Copy_saves_a_new_one_the_product_links() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
@@ -858,10 +858,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         miniUsage.SubAssembly!.Name.Should().Be("Cream Loaf Mini Dough");
         (await SubAssemblyTotalsAsync(miniUsage.SubAssemblyId)).TotalWeight.Should().Be(1250m);
         miniUsage.AuthoredValue.Should().Be(30m);
-    }
+    });
 
     [Fact]
-    public async Task A_linked_sections_lines_are_edited_in_the_product_and_Save_writes_them_to_the_sub_assembly_after_asking()
+    public Task A_linked_sections_lines_are_edited_in_the_product_and_Save_writes_them_to_the_sub_assembly_after_asking() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -921,10 +921,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).OrderBy(l => l.SortOrder).Select(l => l.IngredientId).ToListAsync(Cancellation))
                 .Should().Equal(flourId, butterId);
         }
-    }
+    });
 
     [Fact]
-    public async Task Changing_a_link_relinks_the_section_keeping_its_piece_size_and_the_add_ins_the_new_recipe_lacks()
+    public Task Changing_a_link_relinks_the_section_keeping_its_piece_size_and_the_add_ins_the_new_recipe_lacks() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -976,10 +976,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.SubAssemblyId.Should().Be(richId);
         usage.AuthoredValue.Should().Be(30m);
         (await dbContext.SubAssemblies.CountAsync(s => s.Id == houseId, Cancellation)).Should().Be(1, "the old one stays on the Sub-Assemblies screen");
-    }
+    });
 
     [Fact]
-    public async Task Unlink_makes_a_linked_section_the_products_own_in_a_role_that_isnt_product_owned()
+    public Task Unlink_makes_a_linked_section_the_products_own_in_a_role_that_isnt_product_owned() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -1024,10 +1024,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         (await subAssemblies.GetStandaloneAsync(Cancellation)).Select(s => s.Name).Should()
             .Equal(["House Dough"], "the one it was linked to stays on the Sub-Assemblies screen, and the copy isn't there");
         (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "as it was");
-    }
+    });
 
     [Fact]
-    public async Task Move_to_Sub_Assemblies_puts_the_products_own_there_with_what_was_typed_and_links_it()
+    public Task Move_to_Sub_Assemblies_puts_the_products_own_there_with_what_was_typed_and_links_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -1067,10 +1067,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var moved = await new SubAssemblyRepository(CreateDbContextFactory()).GetStandaloneAsync(Cancellation);
         moved.Should().ContainSingle().Which.Id.Should().Be(fillingId);
         (await SubAssemblyTotalsAsync(fillingId)).TotalWeight.Should().Be(120m);
-    }
+    });
 
     [Fact]
-    public async Task Move_to_In_House_asks_for_a_name_and_Made_category_and_Save_moves_the_section_to_Sub_Assemblies_and_makes_the_ingredient_from_it()
+    public Task Move_to_In_House_asks_for_a_name_and_Made_category_and_Save_moves_the_section_to_Sub_Assemblies_and_makes_the_ingredient_from_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -1123,10 +1123,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         saved.Lines.Select(l => (l.Ingredient.Name, l.Grams)).Should().Equal(("Cheese", 120m), ("Milk", 50m));
         saved.CostPerPieceAt(CostBasis.Buffered).Should().BeApproximately(costPerPiece, 0.000001m, "it costs what it did");
         viewModel.Ingredients.Should().Contain(m => m.Name == "Cheese Filling" && m.Source == RawMaterialSource.Made && m.SubAssemblyId == fillingId);
-    }
+    });
 
     [Fact]
-    public async Task Move_to_In_House_needs_a_Made_category_and_a_name_no_ingredient_has()
+    public Task Move_to_In_House_needs_a_Made_category_and_a_name_no_ingredient_has() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling", isProductOwned: true);
         var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
@@ -1157,10 +1157,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().Be("There's already a raw material named 'cheese'. Give the made ingredient its own name.");
         viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("nothing changed");
-    }
+    });
 
     [Fact]
-    public async Task Removing_a_sub_assembly_another_product_links_leaves_it_there()
+    public Task Removing_a_sub_assembly_another_product_links_leaves_it_there() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -1179,10 +1179,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageEdits.Should().BeEmpty();
         (await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetForProductAsync(miniId, Cancellation))
             .Should().ContainSingle(u => u.SubAssemblyId == doughId, "the dough stays on the Sub-Assemblies screen, linked where it was");
-    }
+    });
 
     [Fact]
-    public async Task The_recipe_tabs_are_each_sub_assembly_in_recipe_order_then_Packaging()
+    public Task The_recipe_tabs_are_each_sub_assembly_in_recipe_order_then_Packaging() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1208,10 +1208,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
         viewModel.UsageForm.EditingUsage.Should().BeSameAs(((SubAssemblyRecipeTab)viewModel.RecipeTabs[0]).Usage, "a sub-assembly's tab is the form that edits it");
-    }
+    });
 
     [Fact]
-    public async Task The_costing_summary_breaks_the_sub_assemblies_down_one_by_one_per_sellable_unit()
+    public Task The_costing_summary_breaks_the_sub_assemblies_down_one_by_one_per_sellable_unit() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1238,10 +1238,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             .Equal([("Dough", 5m), ("Filling", 4.8m)], "₱2.50 of dough and ₱2.40 of filling a piece, in recipe order");
         costs.SubAssemblyLines.Sum(l => l.Cost).Should().Be(costs.SubAssemblies);
         costs.SubAssemblyLines.Should().AllSatisfy(l => l.Share.Should().Be(CostingRules.PercentOf(l.Cost, costs.SellingPrice)));
-    }
+    });
 
     [Fact]
-    public async Task A_role_reordered_in_Settings_moves_its_tab_on_the_next_refresh()
+    public Task A_role_reordered_in_Settings_moves_its_tab_on_the_next_refresh() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1271,10 +1271,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
 
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Dough");
-    }
+    });
 
     [Fact]
-    public async Task Adding_sub_assemblies_out_of_role_order_still_sorts_their_tabs_by_role()
+    public Task Adding_sub_assemblies_out_of_role_order_still_sorts_their_tabs_by_role() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1302,10 +1302,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // Dough sorts before Filling regardless of which was typed in first, and it's the tab showing.
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
-    }
+    });
 
     [Fact]
-    public async Task OpenProduct_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_the_product()
+    public Task OpenProduct_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_the_product() => StaThread.RunAsync(async () =>
     {
         var creamLoafId = await AddProductAsync("Cream Loaf");
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -1329,10 +1329,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct!.Id.Should().Be(ensaymadaId);
         viewModel.SearchText.Should().BeEmpty("a search hiding the product is cleared, so the list shows the row picked");
         viewModel.VisibleProducts.Should().Contain(viewModel.SelectedProduct);
-    }
+    });
 
     [Fact]
-    public async Task StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link()
+    public Task StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -1367,10 +1367,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await using var dbContext = CreateDbContext();
         var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == viewModel.SelectedProduct.Id, Cancellation);
         usage.SubAssemblyId.Should().Be(doughId, "the product links the sub-assembly, not a copy of it");
-    }
+    });
 
     [Fact]
-    public async Task OpenByName_opens_the_product_a_name_means_best_as_the_Vim_command_line_asks()
+    public Task OpenByName_opens_the_product_a_name_means_best_as_the_Vim_command_line_asks() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Ube Cheese Pandesal");
         var pandesalId = await AddProductAsync("Pandesal");
@@ -1382,10 +1382,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "the name typed in full beats one that only holds it");
         viewModel.OpenByName("croissant").Should().BeFalse();
         viewModel.SelectedProduct!.Id.Should().Be(pandesalId, "nothing matching leaves the product open");
-    }
+    });
 
     [Fact]
-    public async Task A_role_changed_on_the_Sub_Assemblies_screen_moves_its_tab_to_where_the_new_role_sorts()
+    public Task A_role_changed_on_the_Sub_Assemblies_screen_moves_its_tab_to_where_the_new_role_sorts() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1414,14 +1414,14 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Topping");
-    }
+    });
 
     /// <summary>
     /// The piece size isn't a requirement (2026-09-20, at the user's request): a section goes into the recipe, and
     /// saves, before how much of it a piece takes is known. It just costs nothing per piece until one is typed.
     /// </summary>
     [Fact]
-    public async Task A_sub_assembly_goes_in_and_saves_before_its_piece_size_is_known()
+    public Task A_sub_assembly_goes_in_and_saves_before_its_piece_size_is_known() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
@@ -1462,10 +1462,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered) == 2.5m, () => $"cost per piece={viewModel.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered)}");
-    }
+    });
 
     [Fact]
-    public async Task A_second_sub_assembly_in_a_role_needs_a_name_and_the_tabs_then_read_by_their_names()
+    public Task A_second_sub_assembly_in_a_role_needs_a_name_and_the_tabs_then_read_by_their_names() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1521,9 +1521,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await reloaded.RemoveUsageCommand.Execute();
         reloaded.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough");
         reloaded.UsageEdits.Single().Name.Should().Be("Ube", "it keeps its name, for when another joins it");
-    }
+    });
     [Fact]
-    public async Task Save_leaves_the_Add_Sub_Assembly_form_alone_when_nothing_was_entered_in_it()
+    public Task Save_leaves_the_Add_Sub_Assembly_form_alone_when_nothing_was_entered_in_it() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -1548,10 +1548,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // The reload shows the saved product's tabs — none — and the New Sub-Assembly tab, with nothing in it, goes.
         viewModel.RecipeTabs.Should().BeEmpty();
         viewModel.SelectedRecipeTab.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Revert_reads_the_product_back_as_it_was_saved_and_drops_a_sub_assembly_being_added()
+    public Task Revert_reads_the_product_back_as_it_was_saved_and_drops_a_sub_assembly_being_added() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Filling", sortOrder: 2);
@@ -1593,10 +1593,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(Cancellation)).Name.Should().Be("Ube Roll");
         (await dbContext.ProductSubAssemblyUsages.CountAsync(Cancellation)).Should().Be(1);
-    }
+    });
 
     [Fact]
-    public async Task Add_Sub_Assembly_opens_a_New_Sub_Assembly_tab_that_goes_once_another_tab_shows()
+    public Task Add_Sub_Assembly_opens_a_New_Sub_Assembly_tab_that_goes_once_another_tab_shows() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1668,10 +1668,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping", "Packaging");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0]);
-    }
+    });
 
     [Fact]
-    public async Task Editing_a_sub_assembly_opens_the_form_in_its_tab_which_stays_through_a_refresh_and_Save()
+    public Task Editing_a_sub_assembly_opens_the_form_in_its_tab_which_stays_through_a_refresh_and_Save() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
@@ -1713,10 +1713,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.EditingUsage.Should().BeSameAs(savedTab.Usage, "the tab has nothing else to show, so its form is open on it");
         savedTab.Usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(5.4m, "15 g a piece of a 100 g, ₱36 batch");
         savedTab.Header.Should().Be("Filling");
-    }
+    });
 
     [Fact]
-    public async Task Deleting_the_sub_assembly_showing_shows_the_next_tab_and_cancelling_an_add_goes_back()
+    public Task Deleting_the_sub_assembly_showing_shows_the_next_tab_and_cancelling_an_add_goes_back() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -1757,10 +1757,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         viewModel.UsageForm.IsUsageFormOpen.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_standalone_sub_assembly_is_offered_to_link_and_shows_where_its_from()
+    public Task A_standalone_sub_assembly_is_offered_to_link_and_shows_where_its_from() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Glaze");
@@ -1799,10 +1799,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         saved.ProductId.Should().Be(productId);
         saved.SubAssemblyId.Should().Be(glazeId);
         saved.AuthoredValue.Should().Be(5m);
-    }
+    });
 
     [Fact]
-    public async Task The_header_title_follows_the_name_as_it_is_typed()
+    public Task The_header_title_follows_the_name_as_it_is_typed() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -1810,10 +1810,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.EditingName = "Cheese roll";
         viewModel.HeaderTitle.Should().Be("Cheese roll", "the header follows the name as it's typed");
-    }
+    });
 
     [Fact]
-    public async Task Save_puts_the_product_in_the_picked_category_which_shows_again_when_it_is_selected_and_New_clears_it()
+    public Task Save_puts_the_product_in_the_picked_category_which_shows_again_when_it_is_selected_and_New_clears_it() => StaThread.RunAsync(async () =>
     {
         await AddProductCategoryAsync("Breads");
         var cakesId = await AddProductCategoryAsync("Cakes");
@@ -1839,10 +1839,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.SelectedProduct = viewModel.Products.Single();
         viewModel.EditingCategory!.Name.Should().Be("Cakes");
-    }
+    });
 
     [Fact]
-    public async Task A_product_saved_without_a_category_is_uncategorized()
+    public Task A_product_saved_without_a_category_is_uncategorized() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -1854,10 +1854,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().BeNull("a category is optional");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(Cancellation)).CategoryId.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task The_current_price_shows_the_markup_it_earns_as_it_is_typed_and_Save_keeps_it()
+    public Task The_current_price_shows_the_markup_it_earns_as_it_is_typed_and_Save_keeps_it() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         await SetVatAsync(12m);
@@ -1895,10 +1895,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.SelectedProduct = viewModel.Products.Single();
         viewModel.EditingCurrentPrice.Should().Be(7m);
-    }
+    });
 
     [Fact]
-    public async Task Each_metric_s_value_follows_its_percentage_and_a_value_typed_sets_the_percentage_Save_keeps()
+    public Task Each_metric_s_value_follows_its_percentage_and_a_value_typed_sets_the_percentage_Save_keeps() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Filling");
@@ -1934,10 +1934,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var costing = await dbContext.CostingParameters.SingleAsync(Cancellation);
         (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent)
             .Should().Be((25m, 15m, 10m, 25m));
-    }
+    });
 
     [Fact]
-    public async Task Reloading_keeps_the_picked_category_and_shows_a_rename_made_in_Settings()
+    public Task Reloading_keeps_the_picked_category_and_shows_a_rename_made_in_Settings() => StaThread.RunAsync(async () =>
     {
         var cakesId = await AddProductCategoryAsync("Cakes");
         var viewModel = CreateViewModel();
@@ -1950,11 +1950,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.EditingCategory!.Name.Should().Be("Cakes & Tortes", "the unsaved pick points at the refreshed category");
         viewModel.Categories.Select(c => c.Name).Should().Equal("Cakes & Tortes");
-    }
+    });
 
     // Nothing awaits this: the picker starts it, from the keyboard or the focus leaving.
     [Fact]
-    public async Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works()
+    public Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         var failing = true;
@@ -1979,10 +1979,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.CommitCategoryTextAsync();
 
         viewModel.EditingCategory!.Name.Should().Be("Pastries");
-    }
+    });
 
     [Fact]
-    public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_picks_it_for_the_product()
+    public Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_picks_it_for_the_product() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? promptedWith = null;
@@ -2005,10 +2005,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.Categories.Select(c => c.Name).Should().Equal("Pastries");
         await using var dbContext = CreateDbContext();
         (await dbContext.ProductCategories.SingleAsync(Cancellation)).Name.Should().Be("Pastries");
-    }
+    });
 
     [Fact]
-    public async Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking()
+    public Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking() => StaThread.RunAsync(async () =>
     {
         await AddProductCategoryAsync("Breads");
         var viewModel = CreateViewModel();
@@ -2026,10 +2026,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         prompted.Should().BeFalse();
         viewModel.EditingCategory!.Name.Should().Be("Breads");
-    }
+    });
 
     [Fact]
-    public async Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had()
+    public Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had() => StaThread.RunAsync(async () =>
     {
         await AddProductCategoryAsync("Breads");
         var viewModel = CreateViewModel();
@@ -2052,10 +2052,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingCategory!.Name.Should().Be("Breads");
         viewModel.CategorySearchText.Should().Be("Breads");
         viewModel.Categories.Should().ContainSingle("nothing was added");
-    }
+    });
 
     [Fact]
-    public async Task The_lists_row_and_the_picked_product_follow_each_other_and_a_folder_picked_leaves_the_product()
+    public Task The_lists_row_and_the_picked_product_follow_each_other_and_a_folder_picked_leaves_the_product() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
@@ -2085,10 +2085,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await viewModel.NewCommand.Execute();
         viewModel.SelectedTreeNode.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Dragging_the_product_on_the_form_to_another_folder_saves_the_move_and_leaves_nothing_else_to_save()
+    public Task Dragging_the_product_on_the_form_to_another_folder_saves_the_move_and_leaves_nothing_else_to_save() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
         var cakesId = await AddProductCategoryAsync("Cakes");
@@ -2124,10 +2124,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingName.Should().Be("Mamon");
         viewModel.EditingCategory!.Name.Should().Be("Cakes", "no undo takes back a move that's saved");
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Dragging_another_product_leaves_the_form_as_it_is()
+    public Task Dragging_another_product_leaves_the_form_as_it_is() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
@@ -2151,10 +2151,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingCategory!.Name.Should().Be("Breads");
         viewModel.History.CanUndo.Should().BeTrue();
         viewModel.History.IsDirty.Should().BeTrue();
-    }
+    });
 
     [Fact]
-    public async Task Create_Variant_makes_a_product_that_links_the_sources_own_with_no_packaging_and_shows_it()
+    public Task Create_Variant_makes_a_product_that_links_the_sources_own_with_no_packaging_and_shows_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough", isProductOwned: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -2194,10 +2194,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // The badge opens the source, where the dough is kept.
         await viewModel.OpenLinkedSourceCommand.Execute(usage);
         viewModel.SelectedProduct!.Id.Should().Be(sourceId);
-    }
+    });
 
     [Fact]
-    public async Task A_new_product_starts_with_the_costing_defaults_and_its_first_Save_keeps_them()
+    public Task A_new_product_starts_with_the_costing_defaults_and_its_first_Save_keeps_them() => StaThread.RunAsync(async () =>
     {
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
             new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m },
@@ -2217,10 +2217,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await using var dbContext = CreateDbContext();
         var costing = await dbContext.CostingParameters.SingleAsync(c => c.Product!.Name == "Pandesal", Cancellation);
         (costing.LaborPercent, costing.MarginPercent).Should().Be((25m, 40m));
-    }
+    });
 
     [Fact]
-    public async Task Changed_defaults_reach_an_untouched_new_product_but_not_a_typed_one_or_a_saved_product()
+    public Task Changed_defaults_reach_an_untouched_new_product_but_not_a_typed_one_or_a_saved_product() => StaThread.RunAsync(async () =>
     {
         var defaultsRepository = new CostingDefaultsRepository(CreateDbContextFactory());
         var productId = await AddProductAsync("Cheese roll");
@@ -2246,7 +2246,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         // New starts from the latest defaults.
         await viewModel.NewCommand.Execute();
         (viewModel.Costing.EditingLaborPercent, viewModel.Costing.Costs.VatPercent).Should().Be((30m, 12m));
-    }
+    });
 
     private async Task<int> AddProductCategoryAsync(string name)
     {
@@ -2258,7 +2258,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task A_name_with_spaces_round_it_is_saved_and_shown_without_them()
+    public Task A_name_with_spaces_round_it_is_saved_and_shown_without_them() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -2272,10 +2272,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("what's showing is what was saved");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(Cancellation)).Name.Should().Be("Pandesal");
-    }
+    });
 
     [Fact]
-    public async Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it()
+    public Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it() => StaThread.RunAsync(async () =>
     {
         await SaveProductAsync("Pandesal", null);
         var viewModel = CreateViewModel();
@@ -2288,7 +2288,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().Be(Failure.DuplicateNameText);
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.CountAsync(Cancellation)).Should().Be(1);
-    }
+    });
 
     /// <summary>A product with nothing but its name and category, saved through the repository, which files it in Research and Development.</summary>
     private Task<int> SaveProductAsync(string name, int? categoryId) =>
@@ -2392,7 +2392,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Leaving_a_sub_assemblys_tab_applies_its_form_and_a_refused_one_keeps_the_tab()
+    public Task Leaving_a_sub_assemblys_tab_applies_its_form_and_a_refused_one_keeps_the_tab() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -2444,10 +2444,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedRecipeTab = filling;
         viewModel.SelectedRecipeTab.Should().BeSameAs(filling);
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Merely_showing_a_sub_assemblys_tab_leaves_the_recipe_as_it_was()
+    public Task Merely_showing_a_sub_assemblys_tab_leaves_the_recipe_as_it_was() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Filling");
         var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.24m);
@@ -2467,7 +2467,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().BeNull();
         tab.Usage.Should().BeSameAs(usage, "a form nothing was typed into is applied to nothing");
         viewModel.UsageForm.IsUsageFormOpen.Should().BeFalse("Packaging has no sub-assembly form");
-    }
+    });
 
     /// <summary>Cream Loaf owns a 1,000 g / ₱50 Dough; a second product links it. Returns the linker, the dough and ube.</summary>
     private async Task<(int LinkerId, int DoughId, int UbeId, int FlourId)> SeedLinkableDoughAsync()
@@ -2492,7 +2492,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Add_ins_go_into_a_linked_usages_batch_and_its_cost_per_piece()
+    public Task Add_ins_go_into_a_linked_usages_batch_and_its_cost_per_piece() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
@@ -2522,10 +2522,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await using var dbContext = CreateDbContext();
         var saved = await dbContext.UsageAddInLines.AsNoTracking().Where(l => l.Usage!.ProductId == linkerId).ToListAsync(Cancellation);
         saved.Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 20m));
-    }
+    });
 
     [Fact]
-    public async Task A_linked_recipes_add_ins_table_always_shows_and_its_badge_counts_the_add_ins()
+    public Task A_linked_recipes_add_ins_table_always_shows_and_its_badge_counts_the_add_ins() => StaThread.RunAsync(async () =>
     {
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
@@ -2571,10 +2571,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Contain("Flour");
-    }
+    });
 
     [Fact]
-    public async Task Picking_another_product_from_a_sub_assemblys_tab_opens_on_its_first_sub_assembly()
+    public Task Picking_another_product_from_a_sub_assemblys_tab_opens_on_its_first_sub_assembly() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -2611,10 +2611,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling");
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.RecipeTabs[0], "the Dough's tab comes first and shows, not the Packaging the strip was left on");
-    }
+    });
 
     [Fact]
-    public async Task Picking_another_product_keeps_the_recipe_tabs_and_opens_the_form_on_its_first_section()
+    public Task Picking_another_product_keeps_the_recipe_tabs_and_opens_the_form_on_its_first_section() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -2666,10 +2666,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.RecipeTabs.Should().Equal(ubeBreadTabs);
         viewModel.UsageForm.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Flour", 1000m)]);
         viewModel.UsageForm.EditingUsageWeightPerPiece.Should().Be(50m);
-    }
+    });
 
     [Fact]
-    public async Task An_add_in_already_in_the_linked_recipe_is_refused_on_the_spot()
+    public Task An_add_in_already_in_the_linked_recipe_is_refused_on_the_spot() => StaThread.RunAsync(async () =>
     {
         var (linkerId, _, _, flourId) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
@@ -2682,10 +2682,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().NotBeNull();
         viewModel.ErrorMessage.Should().Contain("Flour").And.Contain("Cream Loaf Dough");
         viewModel.UsageEdits.Should().BeEmpty("nothing goes into the recipe until the form is put right");
-    }
+    });
 
     [Fact]
-    public async Task Make_a_Copy_folds_the_add_ins_into_the_new_sections_lines()
+    public Task Make_a_Copy_folds_the_add_ins_into_the_new_sections_lines() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
@@ -2703,10 +2703,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         copy.Lines.Select(l => (l.Ingredient.Id, l.Grams)).Should().Equal([(flourId, 1000m), (ubeId, 20m)]);
         copy.TotalWeight.Should().Be(1020m, "the batch it was showing is the batch it keeps");
         copy.CostPerPieceAt(CostBasis.Buffered).Should().Be(66m * 30m / 1020m);
-    }
+    });
 
     [Fact]
-    public async Task Saving_twice_with_no_change_leaves_a_linked_usages_add_ins_alone()
+    public Task Saving_twice_with_no_change_leaves_a_linked_usages_add_ins_alone() => StaThread.RunAsync(async () =>
     {
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var viewModel = CreateViewModel();
@@ -2729,10 +2729,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         AddInIdAsync().Should().Be(before, "a recipe that didn't change isn't rewritten — the draft is compared field by field, not by record equality");
-    }
+    });
 
     [Fact]
-    public async Task A_repriced_add_in_ingredient_reaches_the_usage_on_a_refresh()
+    public Task A_repriced_add_in_ingredient_reaches_the_usage_on_a_refresh() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
@@ -2760,10 +2760,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.TotalCostAt(CostBasis.Buffered).Should().Be(82m, "1000*0.05 + 20*1.60 — the add-in is repriced like any other line");
         usage.CostPerPieceAt(CostBasis.Buffered).Should().Be(82m * 30m / 1020m);
         viewModel.UsageForm.FormAddIns.Single().Cost.Should().Be(32m, "the form's own table is repriced in place, not refilled");
-    }
+    });
 
     [Fact]
-    public async Task Ticking_a_line_as_the_base_is_saved_and_reads_as_a_hundred_percent()
+    public Task Ticking_a_line_as_the_base_is_saved_and_reads_as_a_hundred_percent() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -2805,10 +2805,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             .ToListAsync(Cancellation);
         lines.Single(l => l.IngredientId == flourId).IsFormulaBase.Should().BeTrue();
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Make_a_Copy_keeps_the_linked_recipes_base()
+    public Task Make_a_Copy_keeps_the_linked_recipes_base() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -2840,10 +2840,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         copy.IsNew.Should().BeTrue();
         copy.Lines.Single(l => l.Ingredient.Id == flourId).IsFormulaBase.Should().BeTrue("the copy is the same formula");
         copy.Lines.Single(l => l.Ingredient.Id == waterId).IsFormulaBase.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Add_ins_take_their_percentage_from_the_linked_recipes_base()
+    public Task Add_ins_take_their_percentage_from_the_linked_recipes_base() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -2868,10 +2868,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         // 20 g of ube on the recipe's 1,000 g of flour is 2% — not 100% of its own 20 g.
         viewModel.UsageForm.FormAddIns.Single().Percent.Should().Be(2m);
-    }
+    });
 
     [Fact]
-    public async Task With_no_base_a_linked_recipe_and_its_add_ins_read_as_shares_of_the_whole_batch()
+    public Task With_no_base_a_linked_recipe_and_its_add_ins_read_as_shares_of_the_whole_batch() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.05m);
@@ -2896,10 +2896,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.UsageFormBaseCaption.Should().StartWith("Absolute %");
         viewModel.UsageForm.FormLines.Single().Percent.Should().Be(90m);
         viewModel.UsageForm.FormAddIns.Single().Percent.Should().Be(10m);
-    }
+    });
 
     [Fact]
-    public async Task A_typed_percentage_is_saved_and_follows_the_flour_while_typed_grams_stay_put()
+    public Task A_typed_percentage_is_saved_and_follows_the_flour_while_typed_grams_stay_put() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -2945,5 +2945,5 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         lines.Single(l => l.IngredientId == waterId).AuthoredBakersPercent.Should().Be(65m);
         lines.Single(l => l.IngredientId == eggsId).Grams.Should().Be(100m);
         lines.Single(l => l.IngredientId == eggsId).AuthoredBakersPercent.Should().BeNull();
-    }
+    });
 }

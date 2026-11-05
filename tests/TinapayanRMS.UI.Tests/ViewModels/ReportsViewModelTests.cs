@@ -56,7 +56,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
     }
 
     [Fact]
-    public async Task The_product_cost_summary_counts_a_linked_usages_add_ins()
+    public Task The_product_cost_summary_counts_a_linked_usages_add_ins() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var roleId = await AddRoleAsync("Dough");
@@ -82,10 +82,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         plain.BaseCost.Should().Be(5m, "100 g of a ₱50, 1,000 g batch");
         ube.BaseCost.Should().Be(66m * 100m / 1020m, "100 g of the ₱66, 1,020 g batch the ube makes it");
         ube.BaseCost.Should().BeGreaterThan(plain.BaseCost, "the ube is real money and has to reach the summary");
-    }
+    });
 
     [Fact]
-    public async Task The_product_cost_summary_breaks_the_base_cost_into_its_parts()
+    public Task The_product_cost_summary_breaks_the_base_cost_into_its_parts() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -126,10 +126,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         ensaymada.OverheadCost.Should().Be(0.25m, "10% of the ingredients, not the packaging");
         ensaymada.AdministrativeCost.Should().Be(0.125m, "5% of the ingredients");
         ensaymada.BaseCost.Should().Be(33.575m, "the six parts added up");
-    }
+    });
 
     [Fact]
-    public async Task The_price_summary_shows_each_purchased_materials_latest_price_and_its_change_per_gram()
+    public Task The_price_summary_shows_each_purchased_materials_latest_price_and_its_change_per_gram() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");
         var kilogramId = await AddKilogramUnitAsync(flourId);
@@ -148,10 +148,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var salt = viewModel.RawMaterialPrices.Should().ContainSingle(r => r.Name == "Salt").Subject;
         salt.Price.Should().BeNull("salt has never been priced");
         salt.ChangePercent.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_product_cost_row_asks_for_its_own_product_to_be_opened()
+    public Task A_product_cost_row_asks_for_its_own_product_to_be_opened() => StaThread.RunAsync(async () =>
     {
         var pandesalId = await AddProductAsync("Pandesal");
         await AddProductAsync("Ensaymada");
@@ -168,10 +168,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         }
 
         opened.Should().Equal(pandesalId);
-    }
+    });
 
     [Fact]
-    public async Task A_price_summary_row_asks_for_its_own_raw_material_to_be_opened()
+    public Task A_price_summary_row_asks_for_its_own_raw_material_to_be_opened() => StaThread.RunAsync(async () =>
     {
         await AddIngredientAsync("Flour");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -187,10 +187,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         }
 
         opened.Should().Equal(sugarId);
-    }
+    });
 
     [Fact]
-    public async Task An_export_says_where_its_workbook_was_saved()
+    public Task An_export_says_where_its_workbook_was_saved() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? asked = null;
@@ -205,10 +205,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         asked.Should().Be(ReportsViewModel.ProductCostSummaryTitle, "the View picks the grid by the title, and the file is named after it");
         viewModel.SuccessMessage.Should().Be(@"Saved Product Cost Summary 2026-10-03.xlsx in C:\Reports.");
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Each_tab_exports_its_own_table()
+    public Task Each_tab_exports_its_own_table() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? asked = null;
@@ -221,10 +221,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         await viewModel.ExportRawMaterialPricesCommand.Execute();
 
         asked.Should().Be(ReportsViewModel.RawMaterialPriceSummaryTitle);
-    }
+    });
 
     [Fact]
-    public async Task A_cancelled_export_says_nothing()
+    public Task A_cancelled_export_says_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.ExportToExcel.RegisterHandler(interaction => interaction.SetOutput(null));
@@ -233,10 +233,10 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         viewModel.SuccessMessage.Should().BeNull();
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_workbook_that_cant_be_written_says_why()
+    public Task A_workbook_that_cant_be_written_says_why() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.ExportToExcel.RegisterHandler(_ =>
@@ -246,5 +246,5 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         viewModel.ErrorMessage.Should().Be(Failure.FileInUseText);
         viewModel.SuccessMessage.Should().BeNull();
-    }
+    });
 }

@@ -25,7 +25,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task A_materials_menu_moves_it_to_another_category_of_its_type_and_offers_rename_and_delete()
+    public Task A_materials_menu_moves_it_to_another_category_of_its_type_and_offers_rename_and_delete() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
@@ -43,10 +43,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
         moveTo.Select(i => i.Header).Should().Equal(["Dry Goods", "Flour"], "only its own type's categories");
         moveTo.Single(i => i.Header == "Flour").IsEnabled.Should().BeFalse("it's in that folder already");
-    }
+    });
 
     [Fact]
-    public async Task Move_to_saves_at_once_says_so_and_Undo_on_the_notice_puts_it_back()
+    public Task Move_to_saves_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
@@ -67,10 +67,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Should().ContainSingle();
         viewModel.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
         (await viewModel.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Several_materials_picked_move_together_and_the_one_showing_stays_on_the_form()
+    public Task Several_materials_picked_move_together_and_the_one_showing_stays_on_the_form() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
@@ -96,10 +96,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.MoveNotice.Should().Be("Moved 2 materials to Ingredients › Dry Goods", "Sugar was there already");
         viewModel.SelectedTreeMaterials.Select(l => l.RawMaterial.Id).Should().Equal(breadFlourId, cakeFlourId, sugarId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
-    }
+    });
 
     [Fact]
-    public async Task Ingredients_and_packaging_picked_together_have_nowhere_to_move()
+    public Task Ingredients_and_packaging_picked_together_have_nowhere_to_move() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
@@ -110,10 +110,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.SelectedTreeNodes.Add(viewModel.RawMaterialTree.Find(cakeBoxId)!);
 
         viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(cakeBoxId)).Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task A_move_of_the_material_showing_moves_its_Category_picker_and_leaves_what_else_is_typed_to_save()
+    public Task A_move_of_the_material_showing_moves_its_Category_picker_and_leaves_what_else_is_typed_to_save() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
@@ -133,10 +133,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingCostBufferPercent.Should().Be(0m);
         viewModel.EditingCategory!.Id.Should().Be(dryGoodsId, "no undo takes back a move that's saved");
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Rename_on_the_material_showing_saves_the_name_and_leaves_what_else_is_typed_to_save()
+    public Task Rename_on_the_material_showing_saves_the_name_and_leaves_what_else_is_typed_to_save() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -167,10 +167,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.EditingName.Should().Be("Strong Flour", "no undo takes back a rename that's saved");
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_rename_to_a_name_in_use_is_refused_and_says_why()
+    public Task A_rename_to_a_name_in_use_is_refused_and_says_why() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -182,10 +182,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.ErrorMessage.Should().Be("That name is already in use.");
         viewModel.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Bread Flour");
-    }
+    });
 
     [Fact]
-    public async Task New_Here_starts_a_material_of_the_folders_type_in_its_category_that_Save_files_there()
+    public Task New_Here_starts_a_material_of_the_folders_type_in_its_category_that_Save_files_there() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
@@ -211,10 +211,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Select(l => l.Title).Should().Equal("Rye Flour");
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id));
         (await CategoryOfAsync(viewModel.SelectedRawMaterial.Id)).Should().Be(flourId);
-    }
+    });
 
     [Fact]
-    public async Task The_type_and_list_menus_add_materials_and_categories_and_open_or_close_every_folder()
+    public Task The_type_and_list_menus_add_materials_and_categories_and_open_or_close_every_folder() => StaThread.RunAsync(async () =>
     {
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
@@ -239,10 +239,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
         viewModel.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
-    }
+    });
 
     [Fact]
-    public async Task New_Category_adds_a_folder_in_its_type_and_picks_it()
+    public Task New_Category_adds_a_folder_in_its_type_and_picks_it() => StaThread.RunAsync(async () =>
     {
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var viewModel = await LoadedViewModelAsync();
@@ -279,10 +279,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         asked.Message.Should().Be("A folder in Ingredients, for made ingredients only.");
         viewModel.Categories.Should().ContainSingle(c => c.Name == "In-House" && c.Type == RawMaterialCategoryType.Made);
         viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "In-House"), "a Made category's folder is among the ingredient ones");
-    }
+    });
 
     [Fact]
-    public async Task A_Made_categorys_folder_starts_made_ingredients_and_takes_only_them()
+    public Task A_Made_categorys_folder_starts_made_ingredients_and_takes_only_them() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var inHouseId = await AddCategoryAsync("In-House", RawMaterialCategoryType.Made);
@@ -317,10 +317,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.EditingCategory.Should().BeNull();
         viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("Flour");
-    }
+    });
 
     [Fact]
-    public async Task Rename_Category_renames_its_folder_and_the_picker_follows()
+    public Task Rename_Category_renames_its_folder_and_the_picker_follows() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -339,10 +339,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flours").Materials.Should().ContainSingle();
         viewModel.EditingCategory!.Name.Should().Be("Flours");
         viewModel.History.IsDirty.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Delete_Category_is_greyed_while_a_material_is_in_it_and_deletes_an_empty_one_once_asked()
+    public Task Delete_Category_is_greyed_while_a_material_is_in_it_and_deletes_an_empty_one_once_asked() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Dairy", RawMaterialCategoryType.Ingredient);
@@ -371,10 +371,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         question.Should().Be("Delete the 'Dairy' category? It holds no materials. This can't be undone.");
         viewModel.Categories.Select(c => c.Name).Should().Equal("Flour");
         TitlesIn(viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
-    }
+    });
 
     [Fact]
-    public async Task Delete_on_a_material_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it()
+    public Task Delete_on_a_material_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -398,10 +398,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.RawMaterials.Should().BeEmpty();
         viewModel.SelectedRawMaterial.Should().BeNull();
         viewModel.EditingName.Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task F2_and_Del_do_what_the_menu_shows_for_the_one_row_picked()
+    public Task F2_and_Del_do_what_the_menu_shows_for_the_one_row_picked() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Dairy", RawMaterialCategoryType.Ingredient);
@@ -424,10 +424,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.SelectedTreeNode = breadFlour;
         viewModel.SelectedTreeNodes.Add(viewModel.RawMaterialTree.Find(cakeFlourId)!);
         viewModel.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
-    }
+    });
 
     [Fact]
-    public async Task Picking_a_row_picks_its_material_and_one_opened_from_elsewhere_is_picked_alone()
+    public Task Picking_a_row_picks_its_material_and_one_opened_from_elsewhere_is_picked_alone() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -447,10 +447,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.SelectedTreeNodes.Should().Equal(viewModel.RawMaterialTree.Find(ryeFlourId)!);
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(ryeFlourId));
-    }
+    });
 
     [Fact]
-    public async Task Undoing_a_move_back_into_a_category_deleted_since_is_refused_and_says_why()
+    public Task Undoing_a_move_back_into_a_category_deleted_since_is_refused_and_says_why() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
@@ -463,10 +463,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.ErrorMessage.Should().Be("The category to move it to no longer exists.");
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
-    }
+    });
 
     [Fact]
-    public async Task The_folders_left_open_open_again_next_time()
+    public Task The_folders_left_open_open_again_next_time() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
@@ -489,7 +489,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded = true;
         next.Dispose();
         store.ReadList(RawMaterialsViewModel.OpenFoldersKey).Should().Contain($"Packaging/{boxesId}");
-    }
+    });
 
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
 
@@ -504,7 +504,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Fact]
-    public async Task Picking_another_material_over_unsaved_changes_asks_and_Cancel_stays_on_them()
+    public Task Picking_another_material_over_unsaved_changes_asks_and_Cancel_stays_on_them() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -521,12 +521,12 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(breadFlourId), "the list goes back to the row showing");
         viewModel.EditingName.Should().Be("Strong Bread Flour");
         viewModel.History.IsDirty.Should().BeTrue();
-    }
+    });
 
     [Theory]
     [InlineData(UnsavedChangesAnswer.Save, "Strong Bread Flour")]
     [InlineData(UnsavedChangesAnswer.DontSave, "Bread Flour")]
-    public async Task Picking_another_material_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName)
+    public Task Picking_another_material_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -543,10 +543,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.EditingName.Should().Be("Cake Flour");
         (await NameOfAsync(breadFlourId)).Should().Be(savedName);
-    }
+    });
 
     [Fact]
-    public async Task New_over_unsaved_changes_asks_and_Cancel_keeps_them()
+    public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -559,10 +559,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         asked.Should().ContainSingle();
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
         viewModel.EditingName.Should().Be("Strong Bread Flour");
-    }
+    });
 
     [Fact]
-    public async Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved()
+    public Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -577,11 +577,11 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
             () => $"name={viewModel.EditingName}");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
         (await NameOfAsync(breadFlourId)).Should().Be("Bread Flour");
-    }
+    });
 
     // No puts a new material back blank. What's typed into it next has to count, or it's lost with no question asked.
     [Fact]
-    public async Task What_is_typed_after_no_on_a_new_material_counts_as_unsaved()
+    public Task What_is_typed_after_no_on_a_new_material_counts_as_unsaved() => StaThread.RunAsync(async () =>
     {
         var viewModel = await LoadedViewModelAsync();
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
@@ -595,11 +595,11 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.History.IsDirty.Should().BeTrue();
         await viewModel.ResolveUnsavedChangesAsync(revert: false);
         asked.Should().HaveCount(2);
-    }
+    });
 
     // A second click on the way somewhere while the question's still up: it stays, and isn't asked twice.
     [Fact]
-    public async Task A_second_question_while_one_is_up_is_turned_away()
+    public Task A_second_question_while_one_is_up_is_turned_away() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -621,7 +621,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         answer.SetResult(UnsavedChangesAnswer.DontSave);
         (await first).Should().BeTrue("the first is still answered");
-    }
+    });
 
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
     private static List<string> AnswerUnsavedChanges(RawMaterialsViewModel viewModel, UnsavedChangesAnswer answer)

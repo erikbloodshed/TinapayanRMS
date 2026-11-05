@@ -25,7 +25,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Reloading_keeps_the_selection_and_unsaved_edits_and_adds_a_unit_of_measure_created_on_another_tab()
+    public Task Reloading_keeps_the_selection_and_unsaved_edits_and_adds_a_unit_of_measure_created_on_another_tab() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -48,10 +48,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.UnitRows.Single().Unit.UnitOfMeasure.Should().BeSameAs(pickedUnit, "the grid's unit cell still finds the unit it shows");
         viewModel.EditingName.Should().Be("Flour (unsaved rename)");
         viewModel.UnitsOfMeasure.Select(u => u.Name).Should().Equal("bag", "sack");
-    }
+    });
 
     [Fact]
-    public async Task OpenRawMaterial_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it()
+    public Task OpenRawMaterial_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -76,10 +76,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
         viewModel.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
-    }
+    });
 
     [Fact]
-    public async Task OpenByName_opens_the_material_a_name_means_best_as_the_Vim_command_line_asks()
+    public Task OpenByName_opens_the_material_a_name_means_best_as_the_Vim_command_line_asks() => StaThread.RunAsync(async () =>
     {
         await AddIngredientAsync("Brown Sugar");
         var sugarId = await AddIngredientAsync("Sugar");
@@ -91,10 +91,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId, "the name typed in full beats one that only holds it");
         viewModel.OpenByName("salt").Should().BeFalse();
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
-    }
+    });
 
     [Fact]
-    public async Task Reloading_shows_a_unit_renamed_on_another_tab_without_reloading_the_form()
+    public Task Reloading_shows_a_unit_renamed_on_another_tab_without_reloading_the_form() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var flourId = await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -112,11 +112,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var row = viewModel.UnitRows.Should().ContainSingle().Subject;
         (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
         viewModel.EditingName.Should().Be("Flour (unsaved rename)", "re-pointing the selection must not reload the form");
-    }
+    });
 
 
     [Fact]
-    public async Task A_second_pick_before_the_first_ones_details_arrive_shows_only_its_own()
+    public Task A_second_pick_before_the_first_ones_details_arrive_shows_only_its_own() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -145,10 +145,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         viewModel.RecipeLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
-    }
+    });
 
     [Fact]
-    public async Task Picking_another_material_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them()
+    public Task Picking_another_material_keeps_the_previous_details_until_its_own_arrive_and_Save_waits_for_them() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -177,10 +177,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialBrandPrices.Where(p => p.RawMaterialId == sugarId).Select(p => p.Price).ToListAsync(Cancellation))
             .Should().Equal([0.09m], "the Save did nothing");
-    }
+    });
 
     [Fact]
-    public async Task Unsaved_units_survive_a_reload_and_show_a_unit_renamed_on_another_tab()
+    public Task Unsaved_units_survive_a_reload_and_show_a_unit_renamed_on_another_tab() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour");
@@ -199,11 +199,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
         viewModel.BrandPriceRows.Should().ContainSingle().Which.Should().BeSameAs(brand, "the unsaved brand stays");
         viewModel.PurchaseUnitOptions.Single(o => o.Key == brand.UnitKey).Abbreviation.Should().Be("bg", "the unit picked stays picked");
-    }
+    });
 
 
     [Fact]
-    public async Task One_save_adds_a_new_material_with_its_alternative_units_and_a_price_in_one_of_them()
+    public Task One_save_adds_a_new_material_with_its_alternative_units_and_a_price_in_one_of_them() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
@@ -237,10 +237,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.HeaderCostUnitText.Should().Be("bag", "the header's costs are in the Per unit, the dearest brand's");
         viewModel.CurrentCostText.Should().Be("1,250.00");
         viewModel.CanChangeTypeAndSource.Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_save_is_confirmed_until_the_next_action_and_confirmed_again_by_the_next_save()
+    public Task A_save_is_confirmed_until_the_next_action_and_confirmed_again_by_the_next_save() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -262,11 +262,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Bread Flour was saved.", "it names the material as saved");
-    }
+    });
 
 
     [Fact]
-    public async Task Picking_a_new_purchase_unit_adds_it_as_an_alternative_unit_and_one_save_saves_it_with_the_price()
+    public Task Picking_a_new_purchase_unit_adds_it_as_an_alternative_unit_and_one_save_saves_it_with_the_price() => StaThread.RunAsync(async () =>
     {
         await SeedUnitOfMeasureAsync("bag", "bag");
         var sackId = await SeedUnitOfMeasureAsync("sack", "sk");
@@ -311,11 +311,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (reloaded.UnitKey, reloaded.Quantity).Should().Be((sackId, 25000m));
         reloaded.CanTypeQuantity.Should().BeFalse("a saved unit's multiplier is corrected in Alternative Units");
         viewModel.CurrentCostText.Should().Be("1,500.00", "a 25 kg sack's worth, the Per unit");
-    }
+    });
 
 
     [Fact]
-    public async Task Picking_another_purchase_unit_takes_back_the_one_added_there()
+    public Task Picking_another_purchase_unit_takes_back_the_one_added_there() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var sackId = await SeedUnitOfMeasureAsync("sack", "sk");
@@ -333,11 +333,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         brand.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         viewModel.UnitRows.Should().BeEmpty("the unit was only there for the brand");
         brand.Quantity.Should().Be(1m);
-    }
+    });
 
 
     [Fact]
-    public async Task A_saved_units_quantity_is_read_only_and_each_new_unit_picked_on_a_brand_is_added()
+    public Task A_saved_units_quantity_is_read_only_and_each_new_unit_picked_on_a_brand_is_added() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
@@ -362,11 +362,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         sack.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         pack.UnitKey = sackId;
         viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "sack"], "the unit added for a brand can still be swapped for another");
-    }
+    });
 
 
     [Fact]
-    public async Task Saving_a_unit_added_for_a_brand_without_its_quantity_saves_nothing()
+    public Task Saving_a_unit_added_for_a_brand_without_its_quantity_saves_nothing() => StaThread.RunAsync(async () =>
     {
         await SeedUnitOfMeasureAsync("sack", "sk");
         await SeedCategoryAsync("Dry goods");
@@ -384,10 +384,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.UnitRows.Should().ContainSingle().Which.UnitName.Should().Be("sack", "the edits stay to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Leaving_a_purchased_material_while_on_price_history_goes_back_to_cost_setup()
+    public Task Leaving_a_purchased_material_while_on_price_history_goes_back_to_cost_setup() => StaThread.RunAsync(async () =>
     {
         await SeedPurchasedIngredientAsync("Flour");
         var viewModel = CreateViewModel();
@@ -401,10 +401,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.ShowPriceHistory.Should().BeFalse("a new material has no price history");
         viewModel.SelectedDetailsTab.Should().Be(0, "a hidden tab can't stay the one showing");
-    }
+    });
 
     [Fact]
-    public async Task Used_By_lists_the_picked_materials_products_follows_other_tabs_and_opens_one_on_a_tile()
+    public Task Used_By_lists_the_picked_materials_products_follows_other_tabs_and_opens_one_on_a_tile() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour");
@@ -433,10 +433,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.UsedBy.Should().BeEmpty("a new material isn't used by anything");
         viewModel.UsedByText.Should().Be("No product uses it yet.");
-    }
+    });
 
     [Fact]
-    public async Task A_rejected_save_saves_nothing_and_keeps_every_edit()
+    public Task A_rejected_save_saves_nothing_and_keeps_every_edit() => StaThread.RunAsync(async () =>
     {
         await SeedPurchasedIngredientAsync("Flour");
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -463,10 +463,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
         (await dbContext.RawMaterialBrandPrices.AnyAsync(Cancellation)).Should().BeFalse();
         (await dbContext.RawMaterialPriceHistories.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_name_with_spaces_round_it_is_saved_and_shown_without_them()
+    public Task A_name_with_spaces_round_it_is_saved_and_shown_without_them() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await SeedCategoryAsync("Sugars");
@@ -483,10 +483,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.History.IsDirty.Should().BeFalse("what's showing is what was saved");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(Cancellation)).Name.Should().Be("Brown Sugar");
-    }
+    });
 
     [Fact]
-    public async Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it()
+    public Task A_name_taken_but_for_a_space_at_the_end_is_refused_and_not_saved_beside_it() => StaThread.RunAsync(async () =>
     {
         await SeedPurchasedIngredientAsync("Flour");
         var viewModel = CreateViewModel();
@@ -500,10 +500,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().Be("That name is already in use.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.CountAsync(Cancellation)).Should().Be(1);
-    }
+    });
 
     [Fact]
-    public async Task Leaving_the_name_field_flags_a_name_already_taken()
+    public Task Leaving_the_name_field_flags_a_name_already_taken() => StaThread.RunAsync(async () =>
     {
         await SeedPurchasedIngredientAsync("Flour");
         var viewModel = CreateViewModel();
@@ -515,10 +515,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CheckNameAvailability();
 
         viewModel.ErrorMessage.Should().Be("That name is already in use.");
-    }
+    });
 
     [Fact]
-    public async Task Leaving_the_name_field_does_not_flag_the_materials_own_name_and_clears_once_fixed()
+    public Task Leaving_the_name_field_does_not_flag_the_materials_own_name_and_clears_once_fixed() => StaThread.RunAsync(async () =>
     {
         await SeedPurchasedIngredientAsync("Flour");
         await SeedPurchasedIngredientAsync("Sugar");
@@ -539,11 +539,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingName = "Cake Flour";
         viewModel.CheckNameAvailability();
         viewModel.ErrorMessage.Should().BeNull("the name is free again, so the message it raised clears itself");
-    }
+    });
 
 
     [Fact]
-    public async Task Saving_a_price_in_an_alternative_unit_records_the_unit_and_prices_the_ingredient_per_gram()
+    public Task Saving_a_price_in_an_alternative_unit_records_the_unit_and_prices_the_ingredient_per_gram() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
@@ -563,10 +563,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.PriceHistory.Single().CostPerBaseUnit.Should().Be(0.06m);
         viewModel.SelectedRawMaterial!.CostPerBaseUnit.Should().Be(0.06m);
         (viewModel.BrandPriceRows.Single().UnitKey, viewModel.BrandPriceRows.Single().Price).Should().Be((packId, 60m));
-    }
+    });
 
     [Fact]
-    public async Task The_material_is_costed_at_the_dearest_brand_and_the_summary_says_which()
+    public Task The_material_is_costed_at_the_dearest_brand_and_the_summary_says_which() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var packId = await SeedUnitOfMeasureAsync("pack", "pack");
@@ -587,10 +587,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostPerBaseUnit.Should().Be(0.04m);
         (viewModel.PriceHistory.Single().Brand, viewModel.PriceHistory.Single().UnitName).Should().Be(("Wellington", "pack"));
-    }
+    });
 
     [Fact]
-    public async Task Removing_a_brand_takes_back_the_unit_added_for_it()
+    public Task Removing_a_brand_takes_back_the_unit_added_for_it() => StaThread.RunAsync(async () =>
     {
         await SeedUnitOfMeasureAsync("sack", "sk");
         var viewModel = CreateViewModel();
@@ -606,10 +606,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Should().BeEmpty();
         viewModel.UnitRows.Should().BeEmpty("the unit was only there for the brand");
         viewModel.PurchaseCostText.Should().Be("—");
-    }
+    });
 
     [Fact]
-    public async Task Save_refuses_a_brand_priced_twice_in_the_same_unit()
+    public Task Save_refuses_a_brand_priced_twice_in_the_same_unit() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -625,10 +625,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().Be("'Bounty' is priced twice in the same unit. Remove one.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_made_ingredients_sub_assembly_and_add_ins_are_saved_with_the_rest_and_add_ins_left_alone_by_a_save_that_did_not_touch_them()
+    public Task A_made_ingredients_sub_assembly_and_add_ins_are_saved_with_the_rest_and_add_ins_left_alone_by_a_save_that_did_not_touch_them() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -660,10 +660,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.ErrorMessage.Should().BeNull();
         (await AddInIdAsync()).Should().Be(addInId, "untouched add-ins aren't sent, so the line isn't replaced");
-    }
+    });
 
     [Fact]
-    public async Task A_made_ingredient_needs_a_sub_assembly_picked_before_it_saves()
+    public Task A_made_ingredient_needs_a_sub_assembly_picked_before_it_saves() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         await SeedPurchasedIngredientAsync("Sugar");
@@ -679,10 +679,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().Be("Pick the sub-assembly it's made from.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(m => m.Name == "Simple Syrup", Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task The_recipe_card_lists_only_recipes_and_opens_the_picked_one_on_Sub_Assemblies()
+    public Task The_recipe_card_lists_only_recipes_and_opens_the_picked_one_on_Sub_Assemblies() => StaThread.RunAsync(async () =>
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
         var recipeId = await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
@@ -704,10 +704,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.OpenSubAssemblyCommand.Execute();
 
         opened.Should().Equal(recipeId);
-    }
+    });
 
     [Fact]
-    public async Task A_picked_sub_assembly_shows_as_a_badge_and_only_Edit_brings_the_picker_back()
+    public Task A_picked_sub_assembly_shows_as_a_badge_and_only_Edit_brings_the_picker_back() => StaThread.RunAsync(async () =>
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
         await AddRecipeAsync("Syrup Base", [(sugarId, 1000m)]);
@@ -739,10 +739,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
         (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true));
         viewModel.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
-    }
+    });
 
     [Fact]
-    public async Task The_add_in_picker_leaves_out_the_made_ingredient_being_edited()
+    public Task The_add_in_picker_leaves_out_the_made_ingredient_being_edited() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -763,10 +763,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.AddInOptions.Should().NotContain(m => m.Name == "Simple Syrup", "a made ingredient can't be an add-in of itself");
         viewModel.AddInOptions.Should().Contain(m => m.Name == "Sugar");
-    }
+    });
 
     [Fact]
-    public async Task A_self_referencing_add_in_is_refused_and_nothing_else_is_saved()
+    public Task A_self_referencing_add_in_is_refused_and_nothing_else_is_saved() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -798,10 +798,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(20m, "the unrelated edit wasn't saved either");
         (await dbContext.IngredientAddInLines.CountAsync(Cancellation)).Should().Be(1, "the bad line was never persisted");
-    }
+    });
 
     [Fact]
-    public async Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_3_percent()
+    public Task A_made_ingredient_left_at_the_default_weight_loss_saves_with_3_percent() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         await SeedCategoryAsync("Syrups");
@@ -822,10 +822,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(3m);
-    }
+    });
 
     [Fact]
-    public async Task The_header_shows_a_made_ingredients_yield_and_bom_cost_and_its_buffered_cost_follows_them()
+    public Task The_header_shows_a_made_ingredients_yield_and_bom_cost_and_its_buffered_cost_follows_them() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         var sugarId = await SeedCostedIngredientAsync("Sugar", costPerGram: 0.10m, bufferedCostPerGram: 0.11m);
@@ -870,10 +870,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             "the tiles are the two sides of the buffered cost the cascade saved");
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(0m, "a made ingredient carries no buffer of its own");
         viewModel.BufferedCostText.Should().Be("0.2500");
-    }
+    });
 
     [Fact]
-    public async Task A_purchased_materials_header_keeps_showing_its_saved_buffered_cost()
+    public Task A_purchased_materials_header_keeps_showing_its_saved_buffered_cost() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedCostedIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.0525m);
         var viewModel = CreateViewModel();
@@ -886,10 +886,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BufferedCostText.Should().Be("0.0525", "only a made ingredient's follows the form");
         viewModel.BomTotalWeight.Should().Be(0m, "it has no BOM");
         viewModel.BomTotalCost.Should().Be(0m);
-    }
+    });
 
     [Fact]
-    public async Task A_component_repriced_elsewhere_reaches_the_header_totals_on_the_next_load()
+    public Task A_component_repriced_elsewhere_reaches_the_header_totals_on_the_next_load() => StaThread.RunAsync(async () =>
     {
         var sugarId = await SeedCostedIngredientAsync("Sugar", costPerGram: 0.10m, bufferedCostPerGram: 0.11m);
         var syrupId = await SeedMadeIngredientAsync("Simple Syrup", (sugarId, 1000m));
@@ -913,10 +913,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BomTotalCost.Should().Be(220m, "the refreshed component is what the rows point at");
         viewModel.BomTotalWeight.Should().Be(1000m, "seeded with no weight loss");
         viewModel.BufferedCostText.Should().Be("0.2200");
-    }
+    });
 
     [Fact]
-    public async Task The_last_updated_tile_is_the_day_the_cost_last_moved_not_the_day_it_was_saved()
+    public Task The_last_updated_tile_is_the_day_the_cost_last_moved_not_the_day_it_was_saved() => StaThread.RunAsync(async () =>
     {
         var saved = new DateTime(2026, 9, 18, 15, 4, 0, DateTimeKind.Unspecified);
         var costMoved = new DateTime(2026, 9, 21, 9, 30, 0, DateTimeKind.Unspecified);
@@ -935,10 +935,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
         viewModel.LastUpdatedText.Should().Be("Sep 21, 2026", "the tile is one date, the day its cost changed, with no time");
-    }
+    });
 
     [Fact]
-    public async Task The_last_updated_tile_falls_back_to_a_dash_for_a_material_whose_cost_has_never_moved()
+    public Task The_last_updated_tile_falls_back_to_a_dash_for_a_material_whose_cost_has_never_moved() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         var viewModel = CreateViewModel();
@@ -947,10 +947,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await WaitUntilSettledAsync(() => viewModel.AreDetailsReady, () => "details never arrived");
         viewModel.LastUpdatedText.Should().Be("—", "it was seeded straight into the database and has never been priced");
-    }
+    });
 
     [Fact]
-    public async Task A_cleared_weight_loss_box_saves_as_0_percent()
+    public Task A_cleared_weight_loss_box_saves_as_0_percent() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         await SeedCategoryAsync("Syrups");
@@ -970,11 +970,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Name == "Simple Syrup", Cancellation)).WeightLossPercent.Should().Be(0m);
-    }
+    });
 
 
     [Fact]
-    public async Task New_after_an_unsaved_new_material_starts_with_no_units_price_or_bom_lines()
+    public Task New_after_an_unsaved_new_material_starts_with_no_units_price_or_bom_lines() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Sugar");
@@ -996,10 +996,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Should().BeEmpty();
         viewModel.PurchaseCostText.Should().Be("—");
         viewModel.AddInEdits.Should().BeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task The_usage_example_converts_the_quantity_to_grams_and_costs_it()
+    public Task The_usage_example_converts_the_quantity_to_grams_and_costs_it() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         var flourId = await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -1021,10 +1021,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ExampleResult.BaseUnitAbbreviation.Should().Be("g");
         viewModel.ExampleResult.CostPerBaseUnit.Should().Be(0.05m);
         viewModel.ExampleResult.TotalCost.Should().Be(2500m);
-    }
+    });
 
     [Fact]
-    public async Task A_cost_buffer_is_saved_with_the_material_as_a_fixed_buffered_cost_that_prices_dont_move()
+    public Task A_cost_buffer_is_saved_with_the_material_as_a_fixed_buffered_cost_that_prices_dont_move() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -1105,10 +1105,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(10m, "the next new material starts at Settings' default again");
         viewModel.EditingBufferedCost.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_kilogram_of_an_ingredient_is_1000_grams_as_its_picked_and_isnt_typed()
+    public Task A_kilogram_of_an_ingredient_is_1000_grams_as_its_picked_and_isnt_typed() => StaThread.RunAsync(async () =>
     {
         var kilogramId = await SeedUnitOfMeasureAsync("kilogram", "kg");
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -1130,10 +1130,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         brand.Quantity.Should().Be(1000m);
         brand.CanTypeQuantity.Should().BeFalse();
         viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
-    }
+    });
 
     [Fact]
-    public async Task A_length_unit_of_packaging_measured_in_a_length_is_fixed_as_its_picked_and_saved_that_way()
+    public Task A_length_unit_of_packaging_measured_in_a_length_is_fixed_as_its_picked_and_saved_that_way() => StaThread.RunAsync(async () =>
     {
         var millimeterId = await SeedUnitOfMeasureAsync("millimeter", "mm");
         var meterId = await SeedUnitOfMeasureAsync("meter", "m");
@@ -1177,10 +1177,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             .Select(u => new { u.UnitOfMeasure!.Name, u.BaseUnitsPerUnit })
             .ToListAsync(Cancellation);
         saved.Select(u => (u.Name, u.BaseUnitsPerUnit)).Should().BeEquivalentTo([("meter", 1000m), ("inch", 25.4m)]);
-    }
+    });
 
     [Fact]
-    public async Task An_unsaved_materials_buffered_cost_per_base_unit_is_shown_to_four_places()
+    public Task An_unsaved_materials_buffered_cost_per_base_unit_is_shown_to_four_places() => StaThread.RunAsync(async () =>
     {
         // A new material's Per unit starts on the base unit, where the cost is a fraction of a centavo: ₱0.0525/g
         // rounded to the centavo would read as ₱0.05/g, under the percent just typed.
@@ -1205,10 +1205,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
         viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
         viewModel.PurchaseBufferedCostText.Should().Be("1,312.50/bag is 5% over the dearest brand's 1,250.00/bag.");
-    }
+    });
 
     [Fact]
-    public async Task A_saved_buffered_cost_rounded_to_four_places_doesnt_read_as_under_an_unchanged_dearest_brand()
+    public Task A_saved_buffered_cost_rounded_to_four_places_doesnt_read_as_under_an_unchanged_dearest_brand() => StaThread.RunAsync(async () =>
     {
         var boxId = await SeedUnitOfMeasureAsync("box", "box");
         await SeedCategoryAsync("Dry goods");
@@ -1242,10 +1242,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // A real rise still warns.
         reopened.BrandPriceRows.Single().Price = 171m;
         reopened.BufferedCostWarningText.Should().NotBeEmpty();
-    }
+    });
 
     [Fact]
-    public async Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_only_rounded_for_show()
+    public Task The_buffered_cost_is_typed_in_the_picked_unit_kept_per_base_unit_unrounded_and_only_rounded_for_show() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -1271,10 +1271,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.DeleteUnitCommand.Execute();
         viewModel.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram");
         viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
-    }
+    });
 
     [Fact]
-    public async Task Each_brands_buffer_percent_is_the_buffered_cost_over_its_own_price()
+    public Task Each_brands_buffer_percent_is_the_buffered_cost_over_its_own_price() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1318,10 +1318,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBufferedCostInUnit = 4m;
         viewModel.EditingBufferedCost.Should().Be(4m);
         viewModel.EditingCostBufferPercent.Should().Be(100m, "₱4.00 is 166.67% over ₱1.50, more than the box allows");
-    }
+    });
 
     [Fact]
-    public async Task Selecting_a_saved_material_shows_its_price_with_its_buffer_on_top()
+    public Task Selecting_a_saved_material_shows_its_price_with_its_buffer_on_top() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         await using (var dbContext = CreateDbContext())
@@ -1342,10 +1342,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var brand = viewModel.BrandPriceRows.Single();
         (brand.UnitKey, brand.Price, brand.BufferPercent).Should().Be((PurchaseUnitChoice.BaseUnitKey, 930m, 5m));
         viewModel.PurchaseCostText.Should().Be("930.0000");
-    }
+    });
 
     [Fact]
-    public async Task A_cleared_cost_buffer_box_saves_as_0_percent()
+    public Task A_cleared_cost_buffer_box_saves_as_0_percent() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1361,10 +1361,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(Cancellation)).CostBufferPercent.Should().Be(0m);
-    }
+    });
 
     [Fact]
-    public async Task The_usage_example_shows_the_calculated_cost_the_buffer_and_the_buffered_cost()
+    public Task The_usage_example_shows_the_calculated_cost_the_buffer_and_the_buffered_cost() => StaThread.RunAsync(async () =>
     {
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         await using (var dbContext = CreateDbContext())
@@ -1386,10 +1386,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ExampleResult!.TotalCost.Should().Be(10m);
         viewModel.ExampleResult.BufferPercent.Should().Be(5m);
         viewModel.ExampleResult.BufferedTotalCost.Should().Be(10.5m);
-    }
+    });
 
     [Fact]
-    public async Task A_new_material_switched_to_packaging_drops_the_ingredient_only_fields_and_saves_its_own_base_unit()
+    public Task A_new_material_switched_to_packaging_drops_the_ingredient_only_fields_and_saves_its_own_base_unit() => StaThread.RunAsync(async () =>
     {
         await MadeCategoryIdAsync();
         await SeedPurchasedIngredientAsync("Flour");
@@ -1432,10 +1432,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SavedBaseUnitText.Should().Be("piece (pc)");
         viewModel.CanChangeTypeAndSource.Should().BeFalse("the type is fixed once saved");
         viewModel.Ingredients.Should().NotContain(box, "the BOM component picker lists ingredients only");
-    }
+    });
 
     [Fact]
-    public async Task A_new_material_starts_at_Settings_cost_buffer_and_an_untouched_one_follows_it_when_it_changes()
+    public Task A_new_material_starts_at_Settings_cost_buffer_and_an_untouched_one_follows_it_when_it_changes() => StaThread.RunAsync(async () =>
     {
         var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
         await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 7.5m }, Cancellation);
@@ -1462,10 +1462,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
         viewModel.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
-    }
+    });
 
     [Fact]
-    public async Task New_starts_a_purchased_ingredient_with_the_other_pickers_empty_and_the_numbers_kept()
+    public Task New_starts_a_purchased_ingredient_with_the_other_pickers_empty_and_the_numbers_kept() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -1496,10 +1496,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ExampleQuantity.Should().Be(3m, "the usage example's quantity stays");
         viewModel.ShowPurchaseSetup.Should().BeTrue("a new purchased material can be priced before it's saved");
         viewModel.BaseUnitAbbreviation.Should().Be("g");
-    }
+    });
 
     [Fact]
-    public async Task Saving_a_new_material_with_its_name_and_category_still_empty_saves_nothing()
+    public Task Saving_a_new_material_with_its_name_and_category_still_empty_saves_nothing() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1511,11 +1511,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().Be("Every raw material needs a name. Category is required.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
 
     [Fact]
-    public async Task A_price_typed_before_a_purchase_unit_is_picked_is_refused_rather_than_dropped()
+    public Task A_price_typed_before_a_purchase_unit_is_picked_is_refused_rather_than_dropped() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1533,10 +1533,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Should().ContainSingle("the edits stay to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Deleting_a_material_leaves_an_empty_form()
+    public Task Deleting_a_material_leaves_an_empty_form() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -1556,10 +1556,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BrandPriceRows.Should().BeEmpty();
         viewModel.ExampleRawMaterial.Should().BeNull();
         viewModel.CanChangeTypeAndSource.Should().BeTrue("the form is a new material now");
-    }
+    });
 
     [Fact]
-    public async Task The_category_picker_lists_just_the_categories_with_no_Add_New_row()
+    public Task The_category_picker_lists_just_the_categories_with_no_Add_New_row() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         await SeedCategoryAsync("Butter");
@@ -1567,10 +1567,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         viewModel.CategoryOptions.Select(c => c.Name).Should().Equal("Butter", "Dry goods");
-    }
+    });
 
     [Fact]
-    public async Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking()
+    public Task Typing_a_listed_categorys_name_picks_it_whatever_its_case_without_asking() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1588,11 +1588,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         prompted.Should().BeFalse("it's a category already");
         viewModel.EditingCategory!.Name.Should().Be("Dry goods");
-    }
+    });
 
     // Nothing awaits this: the picker starts it, from the keyboard or the focus leaving.
     [Fact]
-    public async Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works()
+    public Task A_prompt_for_a_new_category_that_fails_says_so_and_the_next_one_works() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         var failing = true;
@@ -1617,10 +1617,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.CommitCategoryTextAsync();
 
         viewModel.EditingCategory!.Name.Should().Be("Dry goods");
-    }
+    });
 
     [Fact]
-    public async Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_files_the_material_under_it()
+    public Task Typing_a_name_that_isnt_a_category_asks_to_add_it_and_files_the_material_under_it() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         string? promptedWith = null;
@@ -1643,10 +1643,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.Categories.Select(c => c.Name).Should().Equal("Spices");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialCategories.SingleAsync(Cancellation)).Name.Should().Be("Spices");
-    }
+    });
 
     [Fact]
-    public async Task A_name_changed_in_the_prompt_to_a_listed_category_picks_that_one_rather_than_adding_it_again()
+    public Task A_name_changed_in_the_prompt_to_a_listed_category_picks_that_one_rather_than_adding_it_again() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Spices");
         var viewModel = CreateViewModel();
@@ -1660,10 +1660,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingCategory!.Name.Should().Be("Spices");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Categories.Should().ContainSingle("nothing was added");
-    }
+    });
 
     [Fact]
-    public async Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had()
+    public Task Cancelling_the_new_category_prompt_puts_back_the_category_the_picker_had() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1686,10 +1686,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.CategorySearchText.Should().Be("Dry goods", "the picker shows the category again, not what was typed");
         viewModel.Categories.Should().ContainSingle("nothing was added");
         viewModel.ErrorMessage.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Leaving_the_picker_empty_or_on_its_own_category_asks_nothing()
+    public Task Leaving_the_picker_empty_or_on_its_own_category_asks_nothing() => StaThread.RunAsync(async () =>
     {
         await SeedCategoryAsync("Dry goods");
         var viewModel = CreateViewModel();
@@ -1713,10 +1713,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         prompted.Should().BeFalse();
         viewModel.EditingCategory.Should().BeNull("deleting the picker's text leaves the material with no category");
-    }
+    });
 
     [Fact]
-    public async Task A_unit_typed_into_the_grid_names_itself_and_is_offered_as_a_purchase_unit_straight_away()
+    public Task A_unit_typed_into_the_grid_names_itself_and_is_offered_as_a_purchase_unit_straight_away() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bg");
         await SeedCategoryAsync("Dry goods");
@@ -1739,12 +1739,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         row.BaseUnitsPerUnit = 20000m;
         brand.Quantity.Should().Be(20000m);
         viewModel.PurchaseCostText.Should().Be("0.0500");
-    }
+    });
 
     [Theory]
     [InlineData(false, true, "Pick a unit for every alternative unit, or remove the empty row.")]
     [InlineData(true, false, "Enter how many g are in one bag (Alternative Units).")]
-    public async Task Save_refuses_a_half_filled_unit_row_and_saves_nothing(bool pickUnit, bool typeMultiplier, string message)
+    public Task Save_refuses_a_half_filled_unit_row_and_saves_nothing(bool pickUnit, bool typeMultiplier, string message) => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -1773,10 +1773,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.UnitRows.Should().ContainSingle("the row stays to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task Save_refuses_the_same_unit_typed_twice()
+    public Task Save_refuses_the_same_unit_typed_twice() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedCategoryAsync("Dry goods");
@@ -1794,10 +1794,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().Be("This material already has that unit.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
-    }
+    });
 
     [Fact]
-    public async Task A_saved_units_multiplier_corrected_in_the_grid_is_saved()
+    public Task A_saved_units_multiplier_corrected_in_the_grid_is_saved() => StaThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -1811,7 +1811,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialUnits.SingleAsync(Cancellation)).BaseUnitsPerUnit.Should().Be(20000m);
-    }
+    });
 
     private RawMaterialsViewModel CreateViewModel()
     {
@@ -1855,7 +1855,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     /// committed. Only Save writes it.
     /// </summary>
     [Fact]
-    public async Task A_purchase_unit_later_made_the_base_unit_is_priced_in_the_base_unit_and_saves()
+    public Task A_purchase_unit_later_made_the_base_unit_is_priced_in_the_base_unit_and_saves() => StaThread.RunAsync(async () =>
     {
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
         await AddPackagingCategoryAsync("Boxes");
@@ -1882,7 +1882,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialUnits.CountAsync(Cancellation)).Should().Be(0);
         (await dbContext.RawMaterialBrandPrices.SingleAsync(Cancellation)).Should().BeEquivalentTo(new { UnitId = (int?)null, Price = 5m });
-    }
+    });
 
     private static BrandPriceRow AddBrandPrice(RawMaterialsViewModel viewModel, string? brand, string unitName, decimal price)
     {

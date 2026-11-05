@@ -22,7 +22,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task Print_shows_the_product_as_the_screen_shows_it()
+    public Task Print_shows_the_product_as_the_screen_shows_it() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -55,10 +55,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.Packaging!.Lines.Should().Equal(new PrintedPackagingLine("Gift Box", 1m, "pc", 30m, 30m));
         printout.Costs.Should().BeSameAs(viewModel.Costing.Costs, "the costing is the Costing tab's");
         printout.Scaling.Should().BeNull("the Recipe tab was showing");
-    }
+    });
 
     [Fact]
-    public async Task Print_on_the_Scaling_tab_prints_the_recipe_scaled_and_on_another_tab_its_recipe_and_costing_again()
+    public Task Print_on_the_Scaling_tab_prints_the_recipe_scaled_and_on_another_tab_its_recipe_and_costing_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
         viewModel.EditingQuantityRequired = 8;
@@ -77,10 +77,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         // The Print tab, shown again with the Recipe tab showing on Products, follows it.
         viewModel.SelectedDetailsTab = ProductsViewModel.RecipeTab;
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Scaling.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Print_applies_a_line_typed_into_the_open_form_and_notes_the_unsaved_change()
+    public Task Print_applies_a_line_typed_into_the_open_form_and_notes_the_unsaved_change() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
         viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue();
@@ -96,10 +96,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         // Applying it was one step, which Undo takes back.
         viewModel.TryUndo().Should().BeTrue();
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
-    }
+    });
 
     [Fact]
-    public async Task A_form_a_rule_refuses_shows_why_and_nothing_opens()
+    public Task A_form_a_rule_refuses_shows_why_and_nothing_opens() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
         viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
@@ -111,10 +111,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.ErrorMessage.Should().Contain("Sugar", "a line with no grams can't go into the recipe");
         requests.Should().Be(0, "the Print tab doesn't open");
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
-    }
+    });
 
     [Fact]
-    public async Task The_Print_tab_shown_again_has_the_edits_made_on_Products_since()
+    public Task The_Print_tab_shown_again_has_the_edits_made_on_Products_since() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
         (await PrintAsync(viewModel)).SaveNote.Should().BeNull();
@@ -126,10 +126,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.ProductName.Should().Be("Ube Roll Deluxe");
         printout.Sections.Single().Lines.Select(l => (l.Ingredient, l.Grams)).Should().Equal(("Flour", 1000m), ("Sugar", 250m));
         printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
-    }
+    });
 
     [Fact]
-    public async Task A_form_refused_when_the_Print_tab_is_shown_again_leaves_its_pages_and_says_why()
+    public Task A_form_refused_when_the_Print_tab_is_shown_again_leaves_its_pages_and_says_why() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
         await PrintAsync(viewModel);
@@ -139,10 +139,10 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         problem.Should().Contain("Sugar");
         viewModel.ErrorMessage.Should().Be(problem, "Products shows it too, for when it's next shown");
-    }
+    });
 
     [Fact]
-    public async Task A_new_product_prints_as_not_saved_yet()
+    public Task A_new_product_prints_as_not_saved_yet() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -154,7 +154,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.SaveNote.Should().Be(ProductPrintout.NotSavedNote);
         printout.Sections.Should().BeEmpty();
         printout.Packaging.Should().BeNull();
-    }
+    });
 
     /// <summary>Runs Print, then asks for the printout as the main window's Print tab does once Print has asked for it.</summary>
     private static async Task<ProductPrintout> PrintAsync(ProductsViewModel viewModel)

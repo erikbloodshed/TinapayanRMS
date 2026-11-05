@@ -25,7 +25,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 public class ProductsViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Fact]
-    public async Task The_first_Save_records_how_the_product_was_and_how_it_is()
+    public Task The_first_Save_records_how_the_product_was_and_how_it_is() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
 
@@ -38,10 +38,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         versions[1].Note.Should().Be(ProductVersionRules.BaselineNote);
         GramsOf(versions[1]).Should().Be(100m, "the first is the product as it stood before this Save");
         GramsOf(versions[0]).Should().Be(50m);
-    }
+    });
 
     [Fact]
-    public async Task A_rename_alone_records_no_new_version()
+    public Task A_rename_alone_records_no_new_version() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
 
@@ -52,10 +52,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         (await VersionsAsync(seeded.ProductId)).Should().ContainSingle("only how it stood before the first Save: no recipe or price changed");
-    }
+    });
 
     [Fact]
-    public async Task A_price_change_records_a_version()
+    public Task A_price_change_records_a_version() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
 
@@ -65,10 +65,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var latest = (await VersionsAsync(seeded.ProductId))[0];
         latest.Number.Should().Be(2);
         ProductVersionContent.FromJson(latest.Content).CurrentPrice.Should().Be(25m);
-    }
+    });
 
     [Fact]
-    public async Task The_History_tab_shows_each_version_then_and_today_and_what_changed()
+    public Task The_History_tab_shows_each_version_then_and_today_and_what_changed() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -98,10 +98,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.SelectedRow = first;
         viewModel.VersionHistory.CompareWith = VersionComparison.Current;
         viewModel.VersionHistory.Changes.Should().Equal("Topping: Sugar 100 g → 50 g");
-    }
+    });
 
     [Fact]
-    public async Task A_version_keeps_the_wastage_it_was_priced_with_and_today_takes_the_wastage_now()
+    public Task A_version_keeps_the_wastage_it_was_priced_with_and_today_takes_the_wastage_now() => StaThread.RunAsync(async () =>
     {
         // Both versions are saved at the 3% wastage nothing in Settings gives.
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -119,10 +119,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         latest.BaseCostThen.Should().Be(5.15m);
         latest.BaseCostToday.Should().Be(5.5m);
         viewModel.VersionHistory.Changes.Should().Equal(["Topping: Sugar 100 g → 50 g"], "the wastage is the shop's, not a change of the product");
-    }
+    });
 
     [Fact]
-    public async Task A_version_can_be_compared_with_any_other()
+    public Task A_version_can_be_compared_with_any_other() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
@@ -156,10 +156,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         history.CompareWith.Should().Be(VersionComparison.With(third));
         history.Clear();
         history.CompareWith.Should().Be(VersionComparison.Previous);
-    }
+    });
 
     [Fact]
-    public async Task Restore_puts_a_version_into_the_form_as_unsaved_edits_and_Undo_takes_it_back()
+    public Task Restore_puts_a_version_into_the_form_as_unsaved_edits_and_Undo_takes_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         var toppingId = viewModel.UsageEdits.Single().SubAssemblyId;
@@ -196,10 +196,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         versions.Select(v => v.Number).Should().Equal(3, 2, 1);
         ProductVersionRules.IsSameRecipe(ProductVersionContent.FromJson(versions[0].Content), ProductVersionContent.FromJson(versions[2].Content))
             .Should().BeTrue("the restored version saved again is the first one's recipe and price");
-    }
+    });
 
     [Fact]
-    public async Task Print_on_the_History_tab_prints_the_version_picked_at_its_costs_then()
+    public Task Print_on_the_History_tab_prints_the_version_picked_at_its_costs_then() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -218,10 +218,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         printout.Sections.Should().ContainSingle();
         printout.Costs.BaseCost.Should().Be(10m, "100 g of sugar at its cost then, 0.10 a gram");
         viewModel.UsageForm.FormLines.Single().Grams.Should().Be(50m, "printing a version leaves the form as it is");
-    }
+    });
 
     [Fact]
-    public async Task Print_on_the_History_tab_with_no_version_picked_says_so()
+    public Task Print_on_the_History_tab_with_no_version_picked_says_so() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
         await OpenHistoryAsync(viewModel, rows: 0);
@@ -229,10 +229,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await viewModel.PrintCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Pick a version in the History tab's table to print it.");
-    }
+    });
 
     [Fact]
-    public async Task Restore_links_a_linked_sub_assembly_again_as_it_is_now()
+    public Task Restore_links_a_linked_sub_assembly_again_as_it_is_now() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -259,10 +259,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         dough.AuthoredValue.Should().Be(50m, "the piece size is the product's own, and comes back");
         dough.Lines.Single().Grams.Should().Be(800m, "a version's lines are never written into a sub-assembly others may share");
         viewModel.SuccessMessage.Should().Contain("House Dough has changed on Sub-Assemblies since");
-    }
+    });
 
     [Fact]
-    public async Task A_version_saved_from_another_tab_shows_when_History_is_shown_again()
+    public Task A_version_saved_from_another_tab_shows_when_History_is_shown_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -275,10 +275,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 3);
 
         viewModel.VersionHistory.Rows[0].CurrentPrice.Should().Be(30m);
-    }
+    });
 
     [Fact]
-    public async Task Saving_lines_another_product_shares_records_a_version_of_that_product_too()
+    public Task Saving_lines_another_product_shares_records_a_version_of_that_product_too() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -299,10 +299,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         creamLoaf.Select(v => v.Note).Should().Equal("Changed when Cream Loaf Mini was saved", ProductVersionRules.BaselineNote);
         ProductVersionContent.FromJson(creamLoaf[0].Content).Sections.Single().Lines.Should().HaveCount(2);
         (await VersionsAsync(miniId)).Should().HaveCount(2, "its own Save records it as ever: how it was, and how it is");
-    }
+    });
 
     [Fact]
-    public async Task A_version_recorded_from_another_screen_shows_when_the_screen_is_shown_again()
+    public Task A_version_recorded_from_another_screen_shows_when_the_screen_is_shown_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -322,10 +322,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             () => viewModel.VersionHistory.Rows.Count == 3,
             () => $"rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
         viewModel.VersionHistory.Rows[0].Note.Should().Be("From elsewhere");
-    }
+    });
 
     [Fact]
-    public async Task A_clone_or_a_variant_starts_its_history_with_where_it_came_from()
+    public Task A_clone_or_a_variant_starts_its_history_with_where_it_came_from() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -356,10 +356,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 28m);
         await viewModel.SaveCommand.Execute();
         (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
-    }
+    });
 
     [Fact]
-    public async Task Picking_another_product_while_History_shows_reads_its_versions_and_the_first_ones_again_on_the_way_back()
+    public Task Picking_another_product_while_History_shows_reads_its_versions_and_the_first_ones_again_on_the_way_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -380,10 +380,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             () => viewModel.VersionHistory.ProductId == seeded.ProductId && viewModel.VersionHistory.Rows.Count == 2,
             () => $"showing={viewModel.VersionHistory.ProductId}, rows={viewModel.VersionHistory.Rows.Count}, error={viewModel.ErrorMessage}");
         viewModel.SelectedDetailsTab.Should().Be(ProductsViewModel.HistoryTab);
-    }
+    });
 
     [Fact]
-    public async Task Restoring_a_version_the_same_as_the_saved_product_leaves_nothing_to_save()
+    public Task Restoring_a_version_the_same_as_the_saved_product_leaves_nothing_to_save() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -396,10 +396,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.History.IsDirty.Should().BeFalse("closing the section's form on the way isn't a change to save");
-    }
+    });
 
     [Fact]
-    public async Task Restore_is_refused_while_an_ingredient_it_needs_is_gone()
+    public Task Restore_is_refused_while_an_ingredient_it_needs_is_gone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         var butterId = await AddIngredientAsync("Butter", costPerGram: 0.3m);
@@ -422,10 +422,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle("nothing changed");
         viewModel.History.CanUndo.Should().BeFalse();
         _ = seeded;
-    }
+    });
 
     [Fact]
-    public async Task A_note_typed_into_a_version_is_saved()
+    public Task A_note_typed_into_a_version_is_saved() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
@@ -438,10 +438,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             () => $"note={viewModel.VersionHistory.Rows[0].Note}, error={viewModel.ErrorMessage}");
 
         (await VersionsAsync(seeded.ProductId))[0].Note.Should().Be("New price for October");
-    }
+    });
 
     [Fact]
-    public async Task A_Save_of_the_products_own_figures_reads_none_of_the_products_sharing_its_dough()
+    public Task A_Save_of_the_products_own_figures_reads_none_of_the_products_sharing_its_dough() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
         var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
@@ -457,7 +457,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var alone = await CommandsSavingPriceAsync(ensaymadaId);
 
         shared.Should().Be(alone, "a new price changes no other product, so the three sharing Pandesal's dough aren't read");
-    }
+    });
 
     /// <summary>
     /// The commands a Save of a new current price takes, with the product's History tab hidden: its own, and those of the

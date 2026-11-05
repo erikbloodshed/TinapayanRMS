@@ -26,7 +26,7 @@ public sealed class AutomaticBackupsTests : IDisposable
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     [Fact]
-    public async Task The_days_backup_is_copied_to_the_second_folder_and_only_the_newest_automatic_ones_are_kept_there()
+    public Task The_days_backup_is_copied_to_the_second_folder_and_only_the_newest_automatic_ones_are_kept_there() => StaThread.RunAsync(async () =>
     {
         var copies = Directory.CreateDirectory(Path.Combine(_root, "usb")).FullName;
         var today = new DateTime(2026, 10, 29, 9, 0, 0);
@@ -48,10 +48,10 @@ public sealed class AutomaticBackupsTests : IDisposable
         File.Exists(Path.Combine(copies, manual)).Should().BeTrue();
         File.Exists(Path.Combine(copies, "notes.txt")).Should().BeTrue();
         automatic.LastCopyProblem.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task A_second_folder_that_isnt_there_is_passed_over_and_said()
+    public Task A_second_folder_that_isnt_there_is_passed_over_and_said() => StaThread.RunAsync(async () =>
     {
         var automatic = Create(Path.Combine(_root, "unplugged"));
 
@@ -59,7 +59,7 @@ public sealed class AutomaticBackupsTests : IDisposable
 
         backup.Should().NotBeNull("the backup itself is still taken");
         automatic.LastCopyProblem.Should().Contain("wasn't there");
-    }
+    });
 
     [Fact]
     public void The_second_folder_is_kept_for_the_user_and_cleared_with_nothing()
@@ -74,7 +74,7 @@ public sealed class AutomaticBackupsTests : IDisposable
     }
 
     [Fact]
-    public async Task A_copys_problem_is_still_said_after_a_restart_until_the_folder_changes()
+    public Task A_copys_problem_is_still_said_after_a_restart_until_the_folder_changes() => StaThread.RunAsync(async () =>
     {
         var viewState = new InMemoryViewStateStore();
         var automatic = new AutomaticBackups(new FileBackups(BackupsFolder()), viewState, new LoggerConfiguration().CreateLogger())
@@ -88,10 +88,10 @@ public sealed class AutomaticBackupsTests : IDisposable
 
         restarted.CopyFolder = null;
         restarted.LastCopyProblem.Should().BeNull("Stop Copying leaves no folder to have a problem with");
-    }
+    });
 
     [Fact]
-    public async Task A_backup_that_cant_be_taken_says_why_and_stays_said_after_a_restart()
+    public Task A_backup_that_cant_be_taken_says_why_and_stays_said_after_a_restart() => StaThread.RunAsync(async () =>
     {
         var viewState = new InMemoryViewStateStore();
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
@@ -103,10 +103,10 @@ public sealed class AutomaticBackupsTests : IDisposable
         automatic.LastBackupProblem.Should().Contain("wasn't taken").And.Contain("no password supplied");
         new AutomaticBackups(backups, viewState, new LoggerConfiguration().CreateLogger()).LastBackupProblem
             .Should().Be(automatic.LastBackupProblem, "a restart mustn't make it look as if backups are fine");
-    }
+    });
 
     [Fact]
-    public async Task The_next_backup_that_goes_through_clears_the_problem()
+    public Task The_next_backup_that_goes_through_clears_the_problem() => StaThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
         var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
@@ -117,21 +117,21 @@ public sealed class AutomaticBackupsTests : IDisposable
         await automatic.RunAsync(Today.AddHours(1), Cancellation);
 
         automatic.LastBackupProblem.Should().BeNull();
-    }
+    });
 
     [Theory]
     [InlineData(1)]
     [InlineData(2.9)]
-    public async Task A_failure_with_a_recent_backup_there_interrupts_no_one(double daysOld)
+    public Task A_failure_with_a_recent_backup_there_interrupts_no_one(double daysOld) => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: Today.AddDays(-daysOld));
         await automatic.RunAsync(Today, Cancellation);
 
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().BeNull("the next check may well put it right, and the Database tab says so meanwhile");
-    }
+    });
 
     [Fact]
-    public async Task A_failure_with_the_newest_backup_grown_old_says_so_and_why()
+    public Task A_failure_with_the_newest_backup_grown_old_says_so_and_why() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: new DateTime(2026, 10, 20, 8, 0, 0));
         await automatic.RunAsync(Today, Cancellation);
@@ -139,19 +139,19 @@ public sealed class AutomaticBackupsTests : IDisposable
         var warning = await automatic.OverdueWarningAsync(Today, Cancellation);
 
         warning.Should().Contain("October 20, 2026").And.Contain("isn't backed up").And.Contain("no password supplied");
-    }
+    });
 
     [Fact]
-    public async Task A_failure_with_no_backup_at_all_says_so()
+    public Task A_failure_with_no_backup_at_all_says_so() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: null);
         await automatic.RunAsync(Today, Cancellation);
 
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().Contain("no backup").And.Contain("no password supplied");
-    }
+    });
 
     [Fact]
-    public async Task The_warning_comes_once_a_run_however_many_hourly_checks_fail()
+    public Task The_warning_comes_once_a_run_however_many_hourly_checks_fail() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: null);
         await automatic.RunAsync(Today, Cancellation);
@@ -160,20 +160,20 @@ public sealed class AutomaticBackupsTests : IDisposable
         await automatic.RunAsync(Today.AddHours(1), Cancellation);
 
         (await automatic.OverdueWarningAsync(Today.AddHours(1), Cancellation)).Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task An_old_backup_is_no_reason_to_warn_when_todays_went_through()
+    public Task An_old_backup_is_no_reason_to_warn_when_todays_went_through() => StaThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Newest = Backup(Today.AddDays(-30)) };
         var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
         await automatic.RunAsync(Today, Cancellation);
 
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task The_Database_tab_shows_why_the_last_backup_wasnt_taken()
+    public Task The_Database_tab_shows_why_the_last_backup_wasnt_taken() => StaThread.RunAsync(async () =>
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
@@ -185,7 +185,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         await automatic.RunAsync(Today, Cancellation);
 
         viewModel.BackupProblemText.Should().Contain("no password supplied");
-    }
+    });
 
     private string BackupsFolder() => Directory.CreateDirectory(Path.Combine(_root, "backups")).FullName;
 

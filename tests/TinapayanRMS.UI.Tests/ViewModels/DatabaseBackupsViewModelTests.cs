@@ -47,7 +47,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     }
 
     [Fact]
-    public async Task Back_Up_Now_lists_the_new_backup_picked_and_says_so()
+    public Task Back_Up_Now_lists_the_new_backup_picked_and_says_so() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -62,10 +62,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         viewModel.SelectedBackup.Should().BeSameAs(row);
         viewModel.SuccessMessage.Should().Be($"Backed up to {Path.GetFileName(row.Backup.Path)}.");
         viewModel.BusyText.Should().BeNull();
-    }
+    });
 
     [Fact]
-    public async Task Copy_to_puts_the_picked_backup_where_the_user_chose()
+    public Task Copy_to_puts_the_picked_backup_where_the_user_chose() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.BackUpNowCommand.Execute();
@@ -88,10 +88,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         {
             File.Delete(destination);
         }
-    }
+    });
 
     [Fact]
-    public async Task A_restore_the_user_declines_changes_nothing()
+    public Task A_restore_the_user_declines_changes_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await AddCategoryAsync("Breads");
@@ -110,10 +110,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
         _restarts.Should().BeEmpty();
         _backups.List().Should().ContainSingle("no safety backup is taken for a restore that doesn't happen");
-    }
+    });
 
     [Fact]
-    public async Task A_restore_puts_the_backup_back_and_restarts_the_app()
+    public Task A_restore_puts_the_backup_back_and_restarts_the_app() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await AddCategoryAsync("Breads");
@@ -126,10 +126,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryNamesAsync()).Should().Equal("Breads");
         _restarts.Should().ContainSingle().Which.Should().StartWith("Restored the backup taken ").And.EndWith("TinapayanRMS restarts now.");
-    }
+    });
 
     [Fact]
-    public async Task A_file_that_isnt_a_backup_is_refused_and_its_copy_removed()
+    public Task A_file_that_isnt_a_backup_is_refused_and_its_copy_removed() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         var notABackup = Path.Combine(Path.GetTempPath(), $"prices {Guid.NewGuid():N}.backup");
@@ -148,10 +148,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         {
             File.Delete(notABackup);
         }
-    }
+    });
 
     [Fact]
-    public async Task Choosing_no_file_does_nothing()
+    public Task Choosing_no_file_does_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.ChooseBackupFile.RegisterHandler(interaction => interaction.SetOutput(null));
@@ -160,7 +160,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
 
         viewModel.ErrorMessage.Should().BeNull();
         _backups.List().Should().BeEmpty();
-    }
+    });
 
     private DatabaseBackupsViewModel CreateViewModel()
     {

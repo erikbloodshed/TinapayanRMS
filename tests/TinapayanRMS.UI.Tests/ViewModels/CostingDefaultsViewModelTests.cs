@@ -28,7 +28,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     }
 
     [Fact]
-    public async Task Save_keeps_the_percentages_and_Load_reads_them_back()
+    public Task Save_keeps_the_percentages_and_Load_reads_them_back() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -55,10 +55,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         reloaded.EditingCostBufferPercent.Should().Be(8m);
         reloaded.EditingPriceRounding.Should().Be(new PriceRoundingOption(0.25m, "Up to the next 0.25"));
         reloaded.PriceRoundingOptions[0].Label.Should().Be("None", "rounding is off until it's chosen");
-    }
+    });
 
     [Fact]
-    public async Task Load_shows_a_cost_buffer_of_10_percent_before_anything_is_saved_and_Save_refuses_one_over_100()
+    public Task Load_shows_a_cost_buffer_of_10_percent_before_anything_is_saved_and_Save_refuses_one_over_100() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.EditingCostBufferPercent = 50m;
@@ -71,10 +71,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().Be("Cost buffer must be at least 0 and at most 100 percent.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).CostBufferPercent.Should().Be(10m);
-    }
+    });
 
     [Fact]
-    public async Task Load_files_new_products_in_Production_before_anything_is_saved_and_offers_both_stages()
+    public Task Load_files_new_products_in_Production_before_anything_is_saved_and_offers_both_stages() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
@@ -83,10 +83,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.EditingNewProductStage.Should().Be(ProductStage.Production);
         viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Research and Development");
-    }
+    });
 
     [Fact]
-    public async Task Load_shows_a_wastage_of_3_percent_before_anything_is_saved()
+    public Task Load_shows_a_wastage_of_3_percent_before_anything_is_saved() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         viewModel.EditingWastagePercent = 9m;
@@ -94,10 +94,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
 
         viewModel.EditingWastagePercent.Should().Be(3m);
-    }
+    });
 
     [Fact]
-    public async Task Save_refuses_a_wastage_over_100_percent_and_saves_nothing()
+    public Task Save_refuses_a_wastage_over_100_percent_and_saves_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -107,10 +107,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().Be("The wastage must be from 0% to 100%.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).WastagePercent.Should().Be(3m);
-    }
+    });
 
     [Fact]
-    public async Task Save_refuses_a_negative_percentage_and_saves_nothing()
+    public Task Save_refuses_a_negative_percentage_and_saves_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
@@ -120,10 +120,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().Be("The VAT percentage can't be negative.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).VatPercent.Should().Be(0m);
-    }
+    });
 
     [Fact]
-    public async Task Recalculate_costs_puts_right_a_cost_changed_outside_the_app_and_says_how_many()
+    public Task Recalculate_costs_puts_right_a_cost_changed_outside_the_app_and_says_how_many() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var syrupId = await AddMadeIngredientAsync("Syrup", [(flourId, 1000m)]);
@@ -141,7 +141,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         await using var check = CreateDbContext();
         (await check.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).BufferedCostPerBaseUnit
             .Should().Be(0.05m, "₱50 of flour over the 1,000 g it makes");
-    }
+    });
 
     [Theory]
     [InlineData(0, "Costs recalculated: every one was already up to date.")]

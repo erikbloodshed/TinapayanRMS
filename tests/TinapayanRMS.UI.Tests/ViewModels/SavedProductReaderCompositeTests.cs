@@ -83,7 +83,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
     }
 
     [Fact]
-    public async Task A_composite_at_its_products_percentages_prices_at_exactly_what_they_do()
+    public Task A_composite_at_its_products_percentages_prices_at_exactly_what_they_do() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 1), (cheeseRoll.Id, 2));
@@ -105,10 +105,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         composite.Costs.Wastage.Should().Be(single.Costs.Wastage + 2 * roll.Costs.Wastage);
         composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
         composite.Costs.SellingPrice.Should().Be(26.026m);
-    }
+    });
 
     [Fact]
-    public async Task A_products_packaging_stays_out_of_a_composite_and_a_composite_inside_another_brings_its_products()
+    public Task A_products_packaging_stays_out_of_a_composite_and_a_composite_inside_another_brings_its_products() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -134,10 +134,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
             new PrintedComponent("Pasalubong Box", 2, 10m, 20m),
             new PrintedComponent("Ensaymada", 1, 2.50m, 2.50m));
         printout.Costs.PartsTitle.Should().Be("Products (ingredients)");
-    }
+    });
 
     [Fact]
-    public async Task A_composites_topping_adds_to_its_recipe_cost_and_comes_with_it_into_another_composite()
+    public Task A_composites_topping_adds_to_its_recipe_cost_and_comes_with_it_into_another_composite() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 3, isProductOwned: true);
@@ -164,10 +164,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         var printout = boxed.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
         printout.Components.Should().HaveCount(2);
         printout.Sections.Select(s => s.Name).Should().Equal("Topping");
-    }
+    });
 
     [Fact]
-    public async Task What_a_product_brings_is_read_by_id_and_a_product_thats_gone_is_left_out()
+    public Task What_a_product_brings_is_read_by_id_and_a_product_thats_gone_is_left_out() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 2), (cheeseRoll.Id, 1));
@@ -181,10 +181,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
             [ensaymada.Id] = new(2.50m, 2.00m, 0m, 0m),
             [box.Id] = new(10m, 8m, 12m, 12m),
         });
-    }
+    });
 
     [Fact]
-    public async Task A_composite_including_its_products_packaging_adds_it_to_its_own_and_to_a_composite_holding_it()
+    public Task A_composite_including_its_products_packaging_adds_it_to_its_own_and_to_a_composite_holding_it() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -215,10 +215,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         partied.Costs.ComponentPackaging.Should().Be(31.50m, "2 boxes of 15.00, and 1.50");
         partied.Costs.OwnPackaging.Should().Be(0m);
         partied.ToPrintout(new DateTime(2026, 9, 30, 9, 0, 0)).Costs.Packaging.Should().Be(31.50m);
-    }
+    });
 
     [Fact]
-    public async Task A_composite_including_its_products_packaging_at_their_percentages_prices_at_exactly_what_they_do()
+    public Task A_composite_including_its_products_packaging_at_their_percentages_prices_at_exactly_what_they_do() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -232,10 +232,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         // Packaging passes straight through in both, so the products' prices, bag and all, add up to the composite's.
         composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
         composite.Costs.Packaging.Should().Be(1.50m);
-    }
+    });
 
     [Fact]
-    public async Task A_composite_read_unbuffered_brings_its_products_at_their_true_costs_and_its_printout_says_so()
+    public Task A_composite_read_unbuffered_brings_its_products_at_their_true_costs_and_its_printout_says_so() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 1), (cheeseRoll.Id, 2));
@@ -249,10 +249,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         var printout = composite.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
         printout.CostBasis.Should().Be(CostBasis.Unbuffered);
         printout.Components!.Select(c => c.Cost).Should().Equal(2.00m, 8m);
-    }
+    });
 
     [Fact]
-    public async Task A_product_read_unbuffered_prices_its_sections_at_their_true_costs()
+    public Task A_product_read_unbuffered_prices_its_sections_at_their_true_costs() => StaThread.RunAsync(async () =>
     {
         var (ensaymada, _) = await AddTwoProductsAsync();
 
@@ -262,7 +262,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         buffered.Costs.SubAssemblies.Should().Be(2.50m);
         unbuffered.Costs.SubAssemblies.Should().Be(2.00m, "50 g of a 1,000 g batch of flour at 0.04 a gram");
         unbuffered.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0)).Sections.Single().CostPerPiece.Should().Be(2.00m);
-    }
+    });
 
     private SavedProductReader CreateReader()
     {
