@@ -14,8 +14,11 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 /// </summary>
 public sealed record ProductVersionContent
 {
-    /// <summary>The shape written today. A later change of shape bumps it, so an old snapshot can still be read.</summary>
-    public const int CurrentSchema = 1;
+    /// <summary>
+    /// The shape written today. A later change of shape bumps it, so an old snapshot can still be read. 2 (2026-11-05):
+    /// each section keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name.
+    /// </summary>
+    public const int CurrentSchema = 2;
 
     public int Schema { get; init; } = CurrentSchema;
 
@@ -91,6 +94,10 @@ public sealed record VersionCosting(
 /// One sub-assembly in the recipe, as the product used it: its own (<see cref="IsOwn"/>) or linked, at the product's piece
 /// size, with the sub-assembly's lines as they were then and the product's own add-ins on top.
 /// </summary>
+/// <param name="Label">
+/// What it went by beside its role in the recipe, "Cheese"; null for one that went by its role alone, and in a snapshot
+/// from before schema 2, which read it from <paramref name="SubAssemblyName"/> instead (<see cref="LabelIn"/>).
+/// </param>
 public sealed record VersionSection(
     int SubAssemblyId,
     string SubAssemblyName,
@@ -99,7 +106,16 @@ public sealed record VersionSection(
     UsageAuthoredField AuthoredField,
     decimal AuthoredValue,
     IReadOnlyList<VersionLine> Lines,
-    IReadOnlyList<VersionAddIn> AddIns);
+    IReadOnlyList<VersionAddIn> AddIns,
+    string? Label = null)
+{
+    /// <summary>
+    /// What it went by beside its role in <paramref name="productName"/>'s recipe: its <see cref="Label"/>, or in a
+    /// snapshot from before schema 2, what its name gives (SubAssemblyRules.SectionLabel).
+    /// </summary>
+    public string? LabelIn(string productName, int schema) =>
+        schema >= 2 ? Label : SubAssemblyRules.SectionLabel(SubAssemblyName, productName, Role.Name);
+}
 
 public sealed record VersionRole(int Id, string Name, int SortOrder, bool IsPackaging, bool IsProductOwned);
 

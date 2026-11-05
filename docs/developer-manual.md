@@ -479,7 +479,7 @@ PER PRODUCT
 | `IngredientAddInLine` | One of a made ingredient's own add-ins, in grams | Ingredients only, each once, none its sub-assembly already has (`IngredientBomRules.EnsureValidAddIns`). Cascades with the made ingredient. |
 | `IngredientBomLine` (read model) | One component of a made ingredient, in grams: its sub-assembly's lines, then its add-ins | A made ingredient can't be made from a packaging set or a product's own (`SubAssemblyRules.EnsureLinkableByMadeIngredient`), and its BOM can't contain it, directly or through others (`IngredientBomRules.EnsureNotInOwnRecipe`, `EnsureNoCycle`). |
 | `SubAssemblyRole` | Dough, Filling, Topping, Packaging, … | The starting roles are seeded by migrations, and are edited in Settings. The Packaging role (`IsPackaging`) can't be deleted, and nothing clears its flag. |
-| `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. It stores `TotalWeight` and `TotalCost`, and can't be deleted while a product links it. |
+| `SubAssembly` | A recipe, or a packaging set | Names are unique. A null `OwnerProductId` means standalone. A product's own keeps its label in that product's recipe in `SectionName`, and its name is made from that, the product's name and the role's. It stores `TotalWeight` and `TotalCost`, and can't be deleted while a product links it. |
 | `SubAssemblyLine` | An ingredient in a recipe, in grams | Grams are always stored. `AuthoredBakersPercent` records a percentage the user typed instead. |
 | `SubAssemblyPackagingLine` | A packaging material in a packaging set | Costed on read. |
 | `Product` | A sellable product | Names are unique, deleted products' included. `IsComposite` is fixed once saved. `QuantityRequired` is at least 1, and exactly 1 for a composite. Deleting one only stamps `DeletedAt` (a soft delete): see [Deleted products](#deleted-products). |
@@ -734,6 +734,8 @@ await using (var transaction = await dbContext.Database.BeginOrJoinTransactionAs
 ### Migrations
 
 Migrations come only from `dotnet ef migrations add`. Never write or edit one by hand. (The SQL Server migrations, some with hand-added data-conversion SQL from before this rule, were replaced by one `InitialCreate` for PostgreSQL on 2026-10-21.)
+
+**Data a schema change needs goes in a data upgrade, not the migration.** [DataUpgrades](../src/TinapayanRMS.Infrastructure/Upgrades/DataUpgrades.cs) lists one-time changes to the data, oldest first, each a name and a method on the DbContext. EF Core's seeding hook (`UseSeeding` and `UseAsyncSeeding`, set in `TinapayanRMSDbContext.Configure`) runs the ones a database hasn't had after the migrations and inside their transaction, whenever a database is migrated: by `dotnet ef database update`, by a restored backup being brought up to date, and by the test fixtures. Each is recorded in `data_upgrades` and never made again. Each names the migration whose schema it needs, and waits until that's applied, so a database migrated back to an earlier migration skips it; it runs against the schema the migrations leave, so it can't read a column a later migration drops. Add one to the end of the list, never change one that has run, and test it in `DataUpgradesTests`.
 
 1. Change the entity, its configuration, and its `Columns` list.
 2. `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure`.
@@ -1091,7 +1093,7 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 | Project | What it tests | Needs |
 |---|---|---|
 | `ApplicationCore.Tests` | `Rules/` and `Validators/`, as pure functions | Nothing |
-| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
+| `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Upgrades/` (`DataUpgradesTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
 | `Pricing.Tests` | `SavedProductReaderBulkTests` and `SavedProductSectionNameTests` on real repositories; `ProductCostSummaryTests` and `TriedPriceChangeTests` without a database | PostgreSQL for the first two |
 | `UI.Tests` | `ViewModels/` on real repositories, `Controls/` in off-screen grids, `Printing/`, `Converters/`, `CompositionRootTests`, `AppStartupTests`, `SingleInstanceGuardTests` | PostgreSQL; the licence key for the tests that build Syncfusion controls |
 | `Mcp.Tests` | `Tools/` (`CostingToolsTests`): the tools read through the server's read-only connection, priced as the screens price, and the connection refusing a write | PostgreSQL |

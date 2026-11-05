@@ -69,7 +69,9 @@ public sealed class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbCo
             await SubAssemblyRepository.ResyncOwnedNamesAsync(
                 dbContext,
                 owned,
-                s => SubAssemblyRules.OwnedNameAfterRename(s.Name, s.OwnerProduct!.Name, oldName, s.OwnerProduct.Name, role.Name),
+                s => SubAssemblyRules.IsNamedAfter(s.Name, s.OwnerProduct!.Name, oldName, s.SectionName)
+                    ? SubAssemblyRules.StandaloneNameFor(s.OwnerProduct.Name, role.Name, s.SectionName)
+                    : s.Name,
                 cancellationToken);
         }
 

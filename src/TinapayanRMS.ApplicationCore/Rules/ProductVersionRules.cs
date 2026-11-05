@@ -80,9 +80,9 @@ public static class ProductVersionRules
         return changes;
     }
 
-    /// <summary>What a section is called in a change: its role, and its label when it has one, "Filling: Ube".</summary>
-    public static string SectionTitle(VersionSection section, string productName) =>
-        SubAssemblyRules.SectionLabel(section.SubAssemblyName, productName, section.Role.Name) is { } label
+    /// <summary>What a section of <paramref name="content"/> is called in a change: its role, and its label when it has one, "Filling: Ube".</summary>
+    public static string SectionTitle(VersionSection section, ProductVersionContent content) =>
+        section.LabelIn(content.ProductName, content.Schema) is { } label
             ? $"{section.Role.Name}: {label}"
             : section.Role.Name;
 
@@ -109,8 +109,8 @@ public static class ProductVersionRules
 
         foreach (var section in unpairedNew)
         {
-            var title = SectionTitle(section, newer.ProductName);
-            var match = unpairedOld.FirstOrDefault(o => o.Role.Id == section.Role.Id && SectionTitle(o, older.ProductName) == title);
+            var title = SectionTitle(section, newer);
+            var match = unpairedOld.FirstOrDefault(o => o.Role.Id == section.Role.Id && SectionTitle(o, older) == title);
             if (match is not null)
             {
                 unpairedOld.Remove(match);
@@ -127,11 +127,11 @@ public static class ProductVersionRules
         {
             if (now is null)
             {
-                changes.Add($"{SectionTitle(was!, older.ProductName)} removed");
+                changes.Add($"{SectionTitle(was!, older)} removed");
                 continue;
             }
 
-            var title = SectionTitle(now, newer.ProductName);
+            var title = SectionTitle(now, newer);
             if (was is null)
             {
                 // A linked one's name is in its title already when it isn't named after the product ("Dough: Basic Dough").

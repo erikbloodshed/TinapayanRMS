@@ -21,7 +21,7 @@ public partial class SubAssemblyEntityType
             "TinapayanRMS.Domain.Entities.SubAssembly",
             typeof(SubAssembly),
             baseEntityType,
-            propertyCount: 6,
+            propertyCount: 7,
             navigationCount: 2,
             foreignKeyCount: 2,
             unnamedIndexCount: 3,
@@ -64,6 +64,16 @@ public partial class SubAssemblyEntityType
             sentinel: 0);
         roleId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         roleId.AddAnnotation("Relational:ColumnName", "role_id");
+
+        var sectionName = runtimeEntityType.AddProperty(
+            "SectionName",
+            typeof(string),
+            propertyInfo: typeof(SubAssembly).GetProperty("SectionName", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(SubAssembly).GetField("<SectionName>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            maxLength: 100);
+        sectionName.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        sectionName.AddAnnotation("Relational:ColumnName", "section_name");
 
         var totalCost = runtimeEntityType.AddProperty(
             "TotalCost",

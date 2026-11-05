@@ -89,7 +89,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         await ProductSubAssemblyUsageRepository.SetRecipeAsync(
             dbContext,
             newProduct.Id,
-            asVariant ? VariantRecipe(usages, addInsByUsage) : DerivedRecipe(source.Name, usages, ownLines, addInsByUsage),
+            asVariant ? VariantRecipe(usages, addInsByUsage) : DerivedRecipe(usages, ownLines, addInsByUsage),
             linksOthersOwn: asVariant,
             cancellationToken);
 
@@ -131,11 +131,10 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
 
     /// <summary>
     /// The new product's recipe, at the source's piece sizes: its own copy of each of the source's own
-    /// sub-assemblies (lines, role, and what it goes by there, named after the new product by SetRecipeAsync), and a
+    /// sub-assemblies (lines, role, and its section name there, named after the new product by SetRecipeAsync), and a
     /// link to every one the source links, with the source's add-ins on it as the new product's own.
     /// </summary>
     private static RecipeDraft DerivedRecipe(
-        string sourceName,
         List<ProductSubAssemblyUsage> usages,
         ILookup<int, SubAssemblyLine> ownLines,
         ILookup<int, UsageAddInLine> addInsByUsage)
@@ -157,7 +156,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                     ],
                     usage.AuthoredField,
                     usage.AuthoredValue,
-                    SubAssemblyRules.SectionLabel(subAssembly.Name, sourceName, subAssembly.Role!.Name))
+                    subAssembly.SectionName)
                 {
                     // Its own whatever its role: the source's may have been unlinked in a role that isn't product-owned.
                     Placement = new SectionPlacement.ProductsOwn(),

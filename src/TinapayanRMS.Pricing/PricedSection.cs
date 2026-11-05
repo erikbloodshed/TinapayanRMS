@@ -98,7 +98,7 @@ public sealed record PricedSection(
         IReadOnlyList<SectionLine> sectionAddIns =
             [.. addIns.Select(a => new SectionLine(IngredientOf(a.IngredientId, a.Ingredient), a.Grams))];
         var roleName = role?.Name ?? string.Empty;
-        var label = SubAssemblyRules.NormalizeName(SubAssemblyRules.SectionLabel(subAssembly.Name, productName, roleName));
+        var label = SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, usage.ProductId, productName, roleName));
         return new PricedSection(
             subAssembly.Id,
             role,

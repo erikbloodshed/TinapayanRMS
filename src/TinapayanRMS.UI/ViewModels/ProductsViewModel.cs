@@ -3265,7 +3265,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 section.AuthoredField,
                 section.AuthoredValue,
                 linkedName: null,
-                name: SubAssemblyRules.SectionLabel(section.SubAssemblyName, content.ProductName, section.Role.Name),
+                name: section.LabelIn(content.ProductName, content.Schema),
                 isOwn: section.IsOwn && !keepsId));
         }
 
@@ -4433,7 +4433,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     edit.AuthoredField,
                     edit.AuthoredValue,
                     linkedName: null,
-                    name: SectionLabelOf(saved.Name, role));
+                    name: saved.SectionName);
             }
             else if (edit.IsLinked || (edit.IsOwned && saved is not null && !isOwnNow))
             {

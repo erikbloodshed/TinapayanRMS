@@ -355,6 +355,62 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
     }
 
     [Fact]
+    public async Task A_products_own_keeps_its_section_name_and_a_numbered_name_follows_a_rename()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 2);
+        var cheeseId = await AddIngredientAsync("Cheese");
+
+        // "Cheese Roll Filling" is taken on the Sub-Assemblies screen, so the product's own plain one is numbered.
+        await CreateSubAssemblyRepository().SaveStandaloneAsync(
+            new SubAssembly { Name = "Cheese Roll Filling", RoleId = doughRoleId }, [(cheeseId, 50m)], Cancellation);
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [Own(fillingRoleId, [(cheeseId, 100m)]), Own(fillingRoleId, [(cheeseId, 80m)], sectionName: "Ube")], []));
+
+        (await OwnAsync(productId)).Select(s => (s.Name, s.SectionName)).Should().Equal(
+            ("Cheese Roll Filling 2", null), ("Cheese Roll Filling: Ube", "Ube"));
+
+        await CreateProductRepository().RenameAsync(productId, "Cheese Bun", Cancellation);
+
+        var own = await OwnAsync(productId);
+        own.Select(s => (s.Name, s.SectionName)).Should().Equal(("Cheese Bun Filling", (string?)null), ("Cheese Bun Filling: Ube", "Ube"));
+
+        // A label changed in the recipe renames the section after it.
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [Own(fillingRoleId, [(cheeseId, 100m)], id: own[0].Id), Own(fillingRoleId, [(cheeseId, 80m)], id: own[1].Id, sectionName: "Purple Yam")], []));
+
+        (await OwnAsync(productId)).Select(s => (s.Name, s.SectionName)).Should().Equal(
+            ("Cheese Bun Filling", (string?)null), ("Cheese Bun Filling: Purple Yam", "Purple Yam"));
+    }
+
+    [Fact]
+    public async Task A_role_made_product_owned_and_back_takes_and_gives_the_section_name_its_name_has()
+    {
+        var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
+        var cheeseId = await AddIngredientAsync("Cheese");
+        var productId = await AddProductAsync("Cheese Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], sectionName: "Cheese")], []));
+        var id = await SubAssemblyIdAsync(productId, fillingRoleId);
+
+        await SetProductOwnedAsync(fillingRoleId, false);
+
+        var released = (await FindAsync(id))!;
+        (released.OwnerProductId, released.SectionName, released.Name).Should().Be(((int?)null, (string?)null, "Cheese Roll Filling: Cheese"));
+
+        await SetProductOwnedAsync(fillingRoleId, true);
+
+        var adopted = (await FindAsync(id))!;
+        (adopted.OwnerProductId, adopted.SectionName).Should().Be(((int?)productId, (string?)"Cheese"));
+    }
+
+    private async Task<List<SubAssembly>> OwnAsync(int productId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.SubAssemblies.AsNoTracking().Where(s => s.OwnerProductId == productId).OrderBy(s => s.Id).ToListAsync(Cancellation);
+    }
+
+    [Fact]
     public async Task Making_a_role_product_owned_gives_each_product_the_ones_only_it_uses_with_its_add_ins_merged()
     {
         var fillingRoleId = await AddRoleAsync("Filling");

@@ -1,3 +1,4 @@
+using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 
@@ -134,25 +135,54 @@ public static class SubAssemblyRules
     }
 
     /// <summary>
-    /// A product's own sub-assembly's name once its product or its role is renamed: one named after them
-    /// (<see cref="StandaloneNameFor"/>) is named after the new ones, keeping its own part, so "Cheese Roll Filling: Cheese"
-    /// becomes "Cheese Bun Filling: Cheese". One named otherwise, as a sub-assembly from the Sub-Assemblies screen a
-    /// product came to own keeps its name, is left as it is. Not yet unique.
+    /// The section name a product's own sub-assembly is saved with in <paramref name="roleName"/>
+    /// (SubAssembly.SectionName): <paramref name="sectionName"/> trimmed, or null when that's nothing or just the role's
+    /// name, which its name leaves out too (<see cref="StandaloneNameFor"/>).
     /// </summary>
-    public static string OwnedNameAfterRename(string name, string oldProductName, string oldRoleName, string newProductName, string newRoleName)
+    public static string? StoredSectionName(string? sectionName, string roleName) =>
+        NormalizeName(sectionName) is { } section && !string.Equals(section, roleName.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? section
+            : null;
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is the name a product's own section is saved under (<see cref="StandaloneNameFor"/>,
+    /// numbered by <see cref="UniqueStandaloneName"/> when that was taken), so it's named after its product and role again
+    /// when either is renamed. One named otherwise, such as a sub-assembly from the Sub-Assemblies screen a product came
+    /// to own, keeps its name.
+    /// </summary>
+    public static bool IsNamedAfter(string name, string productName, string roleName, string? sectionName)
     {
-        var oldBase = StandaloneNameFor(oldProductName, oldRoleName, null);
+        var expected = StandaloneNameFor(productName, roleName, sectionName);
         var trimmed = name.Trim();
-        if (string.Equals(trimmed, oldBase, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(trimmed, Numbered(expected, 1), StringComparison.OrdinalIgnoreCase))
         {
-            return StandaloneNameFor(newProductName, newRoleName, null);
+            return true;
         }
 
-        var prefix = oldBase + ": ";
-        return trimmed.Length > prefix.Length && trimmed.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-            ? StandaloneNameFor(newProductName, newRoleName, trimmed[prefix.Length..])
-            : name;
+        // Numbered, "Cheese Roll Filling 2", and cut short when the whole wouldn't have fitted, as UniqueStandaloneName makes it.
+        var space = trimmed.LastIndexOf(' ');
+        return space > 0
+            && int.TryParse(trimmed.AsSpan(space + 1), NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+            && number >= 2
+            && string.Equals(trimmed, Numbered(expected, number), StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// What <paramref name="subAssembly"/> goes by beside its role in product <paramref name="productId"/>'s recipe: the
+    /// section name it's saved with when it's that product's own, else what its name gives there (<see cref="SectionLabel"/>).
+    /// </summary>
+    public static string? LabelIn(SubAssembly subAssembly, int productId, string? productName, string roleName) =>
+        subAssembly.OwnerProductId == productId
+            ? NormalizeName(subAssembly.SectionName)
+            : SectionLabel(subAssembly.Name, productName, roleName);
+
+    /// <summary>
+    /// The section name a product's own sub-assembly saved before section names were stored (2026-11-05) goes by: its
+    /// label as it was read from its name then (<see cref="SectionLabel"/>), with "Cheese Roll Filling 2", numbered when
+    /// "Cheese Roll Filling" was taken, read as no name rather than as all of it. For that one-time upgrade only.
+    /// </summary>
+    public static string? SectionNameFromSavedName(string name, string productName, string roleName) =>
+        IsNamedAfter(name, productName, roleName, null) ? null : StoredSectionName(SectionLabel(name, productName, roleName), roleName);
 
     /// <summary>The Packaging role holds packaging sets from the Sub-Assemblies screen, so it's never product-owned.</summary>
     public static void EnsureProductOwnedAllowed(SubAssemblyRole role)
@@ -240,16 +270,26 @@ public static class SubAssemblyRules
     public static string UniqueStandaloneName(string name, IReadOnlyCollection<string> taken)
     {
         var names = taken.Select(n => n.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var trimmed = name.Trim();
         for (var n = 1; ; n++)
         {
-            var suffix = n == 1 ? string.Empty : $" {n}";
-            var stem = trimmed.Length + suffix.Length > MaxNameLength ? trimmed[..(MaxNameLength - suffix.Length)].TrimEnd() : trimmed;
-            if (!names.Contains(stem + suffix))
+            var candidate = Numbered(name, n);
+            if (!names.Contains(candidate))
             {
-                return stem + suffix;
+                return candidate;
             }
         }
+    }
+
+    /// <summary>
+    /// <paramref name="name"/> as <see cref="UniqueStandaloneName"/> tries it the <paramref name="number"/>th time: as it is
+    /// first, then "name 2", "name 3", …, cut so the whole fits <see cref="MaxNameLength"/>.
+    /// </summary>
+    private static string Numbered(string name, int number)
+    {
+        var trimmed = name.Trim();
+        var suffix = number == 1 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $" {number}");
+        var stem = trimmed.Length + suffix.Length > MaxNameLength ? trimmed[..(MaxNameLength - suffix.Length)].TrimEnd() : trimmed;
+        return stem + suffix;
     }
 
     /// <summary>
@@ -257,7 +297,7 @@ public static class SubAssemblyRules
     /// that role: its name, less the "Cheese Roll Filling: " it was saved under by that product
     /// (<see cref="StandaloneNameFor"/>), so its tab reads "Filling: Cheese"; and nothing when it's just "Cheese Roll
     /// Filling", which was saved from that product without a name of its own, so it goes by its role alone there, as it
-    /// did before it was saved.
+    /// did before it was saved. A product's own goes by its stored section name instead (<see cref="LabelIn"/>).
     /// </summary>
     public static string? SectionLabel(string subAssemblyName, string? productName, string roleName)
     {

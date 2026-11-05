@@ -180,7 +180,7 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         [
             .. recipe.New.Select(n => (n.RoleId, roles[n.RoleId].Name, SubAssemblyRules.NormalizeName(n.SectionName))),
             .. recipe.Linked.Select(l => linkedSubAssemblies[l.SubAssemblyId])
-                .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.SectionLabel(s.Name, productName, s.Role.Name))),
+                .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.LabelIn(s, productId, productName, s.Role.Name))),
         ]);
 
         // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have: its lines as this save
@@ -266,18 +266,20 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         {
             var stored = existingOwned[section.Id];
             var role = roles[section.RoleId];
-            var label = SubAssemblyRules.SectionLabel(stored.Name, productName, stored.Role!.Name);
-            if (stored.RoleId != section.RoleId
-                || !string.Equals(label, SubAssemblyRules.NormalizeName(section.SectionName), StringComparison.Ordinal))
+            var sectionName = SubAssemblyRules.StoredSectionName(section.SectionName, role.Name);
+            if (stored.RoleId != section.RoleId || !string.Equals(stored.SectionName, sectionName, StringComparison.Ordinal))
             {
-                renames.Add((stored, SubAssemblyRules.StandaloneNameFor(productName, role.Name, section.SectionName)));
+                renames.Add((stored, SubAssemblyRules.StandaloneNameFor(productName, role.Name, sectionName)));
             }
 
             // Read before RoleId changes: the tracked Role isn't moved over to the new one until SaveChanges. One moved to
             // the Sub-Assemblies screen (MovesToSubAssemblies, or to In-House) goes there whatever its role, keeping its name, and is linked below.
-            var wasRoleProductOwned = stored.Role.IsProductOwned;
+            var wasRoleProductOwned = stored.Role!.IsProductOwned;
             stored.RoleId = section.RoleId;
             stored.OwnerProductId = !section.MovesToSubAssemblies && (role.IsProductOwned || !wasRoleProductOwned) ? productId : null;
+
+            // Its section name is its product's; on the Sub-Assemblies screen it goes by its name.
+            stored.SectionName = stored.OwnerProductId is null ? null : sectionName;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -306,7 +308,13 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                     SectionPlacement.ProductsOwn => true,
                     SectionPlacement.MoveToSubAssemblies or SectionPlacement.MoveToInHouse => false,
                 };
-                subAssembly = new SubAssembly { Name = name, RoleId = section.RoleId, OwnerProductId = isOwn ? productId : null };
+                subAssembly = new SubAssembly
+                {
+                    Name = name,
+                    RoleId = section.RoleId,
+                    OwnerProductId = isOwn ? productId : null,
+                    SectionName = isOwn ? SubAssemblyRules.StoredSectionName(section.SectionName, role.Name) : null,
+                };
                 dbContext.SubAssemblies.Add(subAssembly);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }

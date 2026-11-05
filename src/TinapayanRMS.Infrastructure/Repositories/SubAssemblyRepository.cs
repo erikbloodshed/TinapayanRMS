@@ -441,7 +441,7 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
                 [
                     .. recipe.Select(u => u.SubAssemblyId == subAssemblyId
                         ? (roleId, roleName, (string?)SubAssemblyRules.SectionLabel(name, u.Product!.Name, roleName))
-                        : (u.SubAssembly!.RoleId, u.SubAssembly.Role!.Name, SubAssemblyRules.SectionLabel(u.SubAssembly.Name, u.Product!.Name, u.SubAssembly.Role.Name))),
+                        : (u.SubAssembly!.RoleId, u.SubAssembly.Role!.Name, SubAssemblyRules.LabelIn(u.SubAssembly, u.ProductId, u.Product!.Name, u.SubAssembly.Role.Name))),
                 ],
                 $"{recipe.First().Product!.Name}, which links this sub-assembly,");
         }
@@ -504,8 +504,9 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
 
     /// <summary>
     /// A role made product-owned: each of its sub-assemblies on the Sub-Assemblies screen that exactly one product uses
-    /// becomes that product's own, keeping its name. The product's add-ins on it go into its lines, after its own, since
-    /// the recipe is the product's alone now (an add-in is never one of its ingredients: ProductRules.EnsureValidAddIns).
+    /// becomes that product's own, keeping its name and the label it went by there as its section name. The product's
+    /// add-ins on it go into its lines, after its own, since the recipe is the product's alone now (an add-in is never one
+    /// of its ingredients: ProductRules.EnsureValidAddIns).
     /// </summary>
     internal static async Task AdoptSingleUseAsync(TinapayanRMSDbContext dbContext, int roleId, CancellationToken cancellationToken)
     {
@@ -521,6 +522,11 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
             .Where(u => ids.Contains(u.SubAssemblyId))
             .ToDictionaryAsync(u => u.SubAssemblyId, cancellationToken);
         List<int> usageIds = [.. usages.Values.Select(u => u.Id)];
+        List<int> productIds = [.. usages.Values.Select(u => u.ProductId).Distinct()];
+        var productNames = await dbContext.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Name, cancellationToken);
+        var roleName = await dbContext.SubAssemblyRoles.Where(r => r.Id == roleId).Select(r => r.Name).FirstAsync(cancellationToken);
         var addIns = (await dbContext.UsageAddInLines
                 .AsNoTracking()
                 .Where(l => usageIds.Contains(l.UsageId))
@@ -532,6 +538,8 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
         {
             var usage = usages[subAssembly.Id];
             subAssembly.OwnerProductId = usage.ProductId;
+            subAssembly.SectionName = SubAssemblyRules.StoredSectionName(
+                SubAssemblyRules.SectionLabel(subAssembly.Name, productNames[usage.ProductId], roleName), roleName);
 
             if (addIns[usage.Id].Any())
             {
@@ -557,10 +565,11 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
 
     /// <summary>
     /// A role no longer product-owned: every sub-assembly products own in it goes to the Sub-Assemblies screen, and its
-    /// product links it from there. Its name already is one no other has.
+    /// product links it from there, where it goes by its name. Its name already is one no other has.
     /// </summary>
     internal static Task ReleaseOwnedAsync(TinapayanRMSDbContext dbContext, int roleId, CancellationToken cancellationToken) =>
         dbContext.SubAssemblies
             .Where(s => s.RoleId == roleId && s.OwnerProductId != null)
-            .ExecuteUpdateAsync(set => set.SetProperty(s => s.OwnerProductId, (int?)null), cancellationToken);
+            .ExecuteUpdateAsync(
+                set => set.SetProperty(s => s.OwnerProductId, (int?)null).SetProperty(s => s.SectionName, (string?)null), cancellationToken);
 }

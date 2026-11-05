@@ -161,13 +161,57 @@ public class SubAssemblyRulesTests
         numbered.Should().Be(new string('a', 95) + " Do 2");
     }
 
+    [Theory]
+    [InlineData("Cheese Roll Filling: Cheese", "Cheese", true)]
+    [InlineData("cheese roll filling", null, true)]
+    [InlineData("Cheese Roll Filling 2", null, true)]
+    [InlineData("Cheese Roll Filling: Cheese 3", "Cheese", true)]
+    [InlineData("Cheese Roll Filling 1", null, false)]
+    [InlineData("Cheese Roll Filling: Cheese", null, false)]
+    [InlineData("Pan de Coco", null, false)]
+    public void IsNamedAfter_knows_a_name_made_from_the_product_role_and_section_numbered_or_not(string name, string? sectionName, bool isNamedAfter) =>
+        SubAssemblyRules.IsNamedAfter(name, "Cheese Roll", "Filling", sectionName).Should().Be(isNamedAfter);
+
     [Fact]
-    public void OwnedNameAfterRename_follows_the_product_or_role_it_was_named_after()
+    public void IsNamedAfter_knows_a_name_cut_short_to_fit_numbered_or_not()
     {
-        SubAssemblyRules.OwnedNameAfterRename("Cheese Roll Filling: Cheese", "Cheese Roll", "Filling", "Cheese Bun", "Filling").Should().Be("Cheese Bun Filling: Cheese");
-        SubAssemblyRules.OwnedNameAfterRename("cheese roll filling", "Cheese Roll", "Filling", "Cheese Roll", "Stuffing").Should().Be("Cheese Roll Stuffing");
-        SubAssemblyRules.OwnedNameAfterRename("Pan de Coco", "Coco Bun", "Filling", "Coco Roll", "Filling").Should().Be("Pan de Coco", "one not named after them keeps its name");
+        var product = new string('a', 95);
+        var name = SubAssemblyRules.StandaloneNameFor(product, "Dough", null);
+        var alone = SubAssemblyRules.UniqueStandaloneName(name, []);
+        var numbered = SubAssemblyRules.UniqueStandaloneName(name, [alone]);
+
+        SubAssemblyRules.IsNamedAfter(alone, product, "Dough", null).Should().BeTrue($"{alone} is the name cut to fit");
+        SubAssemblyRules.IsNamedAfter(numbered, product, "Dough", null).Should().BeTrue($"{numbered} is the name numbered and cut");
     }
+
+    [Fact]
+    public void StoredSectionName_drops_nothing_and_the_roles_own_name()
+    {
+        SubAssemblyRules.StoredSectionName("  Cheese ", "Filling").Should().Be("Cheese");
+        SubAssemblyRules.StoredSectionName("   ", "Filling").Should().BeNull();
+        SubAssemblyRules.StoredSectionName("filling", "Filling").Should().BeNull("its name leaves the role's name out too");
+    }
+
+    [Fact]
+    public void LabelIn_reads_a_products_own_by_its_section_name_and_any_other_by_its_name()
+    {
+        var own = new SubAssembly { Name = "Cheese Roll Filling 2", OwnerProductId = 7, SectionName = null };
+        var named = new SubAssembly { Name = "Cheese Roll Filling: Cheese", OwnerProductId = 7, SectionName = "Cheese" };
+        var linked = new SubAssembly { Name = "Cheese Roll Filling: Ube", OwnerProductId = null };
+
+        SubAssemblyRules.LabelIn(own, 7, "Cheese Roll", "Filling").Should().BeNull("a number its name was given isn't its label");
+        SubAssemblyRules.LabelIn(named, 7, "Cheese Roll", "Filling").Should().Be("Cheese");
+        SubAssemblyRules.LabelIn(named, 8, "Cheese Bun", "Filling").Should().Be("Cheese Roll Filling: Cheese", "a variant linking it reads its name");
+        SubAssemblyRules.LabelIn(linked, 7, "Cheese Roll", "Filling").Should().Be("Ube");
+    }
+
+    [Theory]
+    [InlineData("Cheese Roll Filling", null)]
+    [InlineData("Cheese Roll Filling: Cheese", "Cheese")]
+    [InlineData("Cheese Roll Filling 2", null)]
+    [InlineData("Pan de Coco", "Pan de Coco")]
+    public void SectionNameFromSavedName_reads_the_label_its_name_gave_without_a_number(string name, string? sectionName) =>
+        SubAssemblyRules.SectionNameFromSavedName(name, "Cheese Roll", "Filling").Should().Be(sectionName);
 
     [Fact]
     public void EnsureLinkable_refuses_a_products_own_and_names_whose_it_is()

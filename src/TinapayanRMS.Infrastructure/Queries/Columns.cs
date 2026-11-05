@@ -25,7 +25,7 @@ internal static class Columns
         [typeof(RawMaterialPriceHistory)] = ["id", "raw_material_id", "date", "unit_id", "brand", "price"],
         [typeof(IngredientAddInLine)] = ["id", "ingredient_id", "add_in_ingredient_id", "grams", "sort_order"],
         [typeof(SubAssemblyRole)] = ["id", "name", "sort_order", "is_packaging", "is_product_owned"],
-        [typeof(SubAssembly)] = ["id", "name", "role_id", "owner_product_id", "total_weight", "total_cost"],
+        [typeof(SubAssembly)] = ["id", "name", "role_id", "owner_product_id", "total_weight", "total_cost", "section_name"],
         [typeof(SubAssemblyLine)] = ["id", "sub_assembly_id", "ingredient_id", "grams", "is_formula_base", "authored_bakers_percent", "sort_order"],
         [typeof(SubAssemblyPackagingLine)] = ["id", "sub_assembly_id", "packaging_material_id", "unit_id", "qty_per_set", "sort_order"],
         [typeof(ProductCategory)] = ["id", "name", "wastage_percent"],
@@ -42,6 +42,7 @@ internal static class Columns
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],
         [typeof(PriceScenarioLine)] = ["id", "price_scenario_id", "raw_material_id", "change_percent", "new_price", "sort_order"],
+        [typeof(Upgrades.DataUpgrade)] = ["id", "applied_at"],
     };
 
     /// <summary><typeparamref name="T"/>'s columns qualified by <paramref name="alias"/>, for a SELECT list.</summary>

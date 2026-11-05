@@ -408,8 +408,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
     }
 
     /// <summary>
-    /// Its own sub-assemblies are named after it, "Cheese Roll Filling: Cheese": they take its new name. Run on the
-    /// caller's context, which should hold a transaction.
+    /// Its own sub-assemblies named after it, "Cheese Roll Filling: Cheese", numbered or not, take its new name
+    /// (SubAssemblyRules.IsNamedAfter); one named otherwise keeps its name. Run on the caller's context, which should hold
+    /// a transaction.
     /// </summary>
     private static async Task ResyncOwnedNamesAsync(
         TinapayanRMSDbContext dbContext, int productId, string oldName, string newName, CancellationToken cancellationToken)
@@ -426,7 +427,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await SubAssemblyRepository.ResyncOwnedNamesAsync(
             dbContext,
             owned,
-            s => SubAssemblyRules.OwnedNameAfterRename(s.Name, oldName, s.Role!.Name, newName, s.Role.Name),
+            s => SubAssemblyRules.IsNamedAfter(s.Name, oldName, s.Role!.Name, s.SectionName)
+                ? SubAssemblyRules.StandaloneNameFor(newName, s.Role.Name, s.SectionName)
+                : s.Name,
             cancellationToken);
     }
 }

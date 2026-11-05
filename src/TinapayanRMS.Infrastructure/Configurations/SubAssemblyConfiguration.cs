@@ -10,6 +10,7 @@ public sealed class SubAssemblyConfiguration : IEntityTypeConfiguration<SubAssem
     {
         // Products pick sub-assemblies by name, so every one has a name no other has.
         builder.Property(s => s.Name).HasMaxLength(100).IsRequired();
+        builder.Property(s => s.SectionName).HasMaxLength(100);
         builder.HasIndex(s => s.Name).IsUnique();
 
         // Restrict, not Cascade: this is also how "a role can't be deleted while any

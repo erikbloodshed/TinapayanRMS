@@ -36,6 +36,14 @@ public sealed class SubAssembly
 
     public Product? OwnerProduct { get; set; }
 
+    /// <summary>
+    /// A product's own sub-assembly's label in that product's recipe ("Cheese" for "Cheese Roll Filling: Cheese"), or null
+    /// for one that goes by its role alone. Its <see cref="Name"/> is made from it, the product's name and the role's
+    /// (SubAssemblyRules.StandaloneNameFor), so the label is never read back out of the name. Always null for one kept on
+    /// the Sub-Assemblies screen, whose label in a recipe comes from its name (SubAssemblyRules.SectionLabel).
+    /// </summary>
+    public string? SectionName { get; set; }
+
     /// <summary>Stored, not computed: the sum of its lines' Grams. Refreshed whenever its lines are saved.</summary>
     public decimal TotalWeight { get; set; }
 

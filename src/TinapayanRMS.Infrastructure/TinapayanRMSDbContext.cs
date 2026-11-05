@@ -1,6 +1,7 @@
 ﻿using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Infrastructure.Upgrades;
 
 namespace TinapayanRMS.Infrastructure;
 
@@ -30,17 +31,24 @@ public sealed class TinapayanRMSDbContext : DbContext
     /// <summary>
     /// Points <paramref name="options"/> at PostgreSQL with snake_case table and column names. The app, `dotnet ef` and
     /// the tests all come through here, so none of them can disagree with the names the Dapper reads are written against.
-    /// The server is PostgreSQL 18, and Npgsql 11 otherwise writes its SQL for 16.
+    /// The server is PostgreSQL 18, and Npgsql 11 otherwise writes its SQL for 16. Migrating a database also makes the
+    /// data upgrades it hasn't had yet (DataUpgrades).
     /// </summary>
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString) =>
-        options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
+        WithDataUpgrades(options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention());
 
     /// <summary>
     /// The same, on <paramref name="connection"/>, which a context made with them uses but never closes: the connection a
     /// unit of work's contexts share (SharedTransactionDbContextFactory).
     /// </summary>
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, DbConnection connection) =>
-        options.UseNpgsql(connection, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention();
+        WithDataUpgrades(options.UseNpgsql(connection, npgsql => npgsql.SetPostgresVersion(18, 0)).UseSnakeCaseNamingConvention());
+
+    /// <summary>EF Core's seeding hook, which Migrate runs after the migrations and inside their transaction: the data upgrades.</summary>
+    private static DbContextOptionsBuilder WithDataUpgrades(DbContextOptionsBuilder options) =>
+        options
+            .UseSeeding((context, _) => Upgrades.DataUpgrades.Run(context))
+            .UseAsyncSeeding((context, _, cancellationToken) => Upgrades.DataUpgrades.RunAsync(context, cancellationToken));
 
     /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
     public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>
@@ -95,6 +103,9 @@ public sealed class TinapayanRMSDbContext : DbContext
     public DbSet<PriceScenario> PriceScenarios => Set<PriceScenario>();
 
     public DbSet<PriceScenarioLine> PriceScenarioLines => Set<PriceScenarioLine>();
+
+    /// <summary>The data upgrades this database has had (DataUpgrades).</summary>
+    public DbSet<DataUpgrade> DataUpgrades => Set<DataUpgrade>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

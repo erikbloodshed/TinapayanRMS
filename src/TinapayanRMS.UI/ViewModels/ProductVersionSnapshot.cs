@@ -1,4 +1,5 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -43,7 +44,8 @@ public static class ProductVersionSnapshot
                 usage.AuthoredField,
                 usage.AuthoredValue,
                 [.. lines.Select(l => new VersionLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                [.. addIns.Select(a => new VersionAddIn(a.IngredientId, a.Grams))]));
+                [.. addIns.Select(a => new VersionAddIn(a.IngredientId, a.Grams))],
+                SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name))));
         }
 
         // As the Packaging tab shows them: a line saved as pieces per unit is its quantity per unit.
@@ -145,6 +147,7 @@ public static class ProductVersionSnapshot
                     RoleId = role.Id,
                     Role = role,
                     OwnerProductId = section.IsOwn ? productId : null,
+                    SectionName = section.IsOwn ? section.LabelIn(content.ProductName, content.Schema) : null,
                 },
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,

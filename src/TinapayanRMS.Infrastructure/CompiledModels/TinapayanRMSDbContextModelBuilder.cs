@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("7c9bb09f-4e9a-4536-af68-bc2e1fca6362"), entityTypeCount: 23)
+        : base(skipDetectChanges: false, modelId: new Guid("162b089f-cf0a-400d-aee7-c7a0eeaaf849"), entityTypeCount: 24)
     {
     }
 
@@ -41,6 +41,7 @@ public partial class TinapayanRMSDbContextModel
         var subAssemblyRole = SubAssemblyRoleEntityType.Create(this);
         var unitOfMeasure = UnitOfMeasureEntityType.Create(this);
         var usageAddInLine = UsageAddInLineEntityType.Create(this);
+        var dataUpgrade = DataUpgradeEntityType.Create(this);
 
         CostingParametersEntityType.CreateForeignKey1(costingParameters, product);
         IngredientAddInLineEntityType.CreateForeignKey1(ingredientAddInLine, rawMaterial);
@@ -102,6 +103,7 @@ public partial class TinapayanRMSDbContextModel
         SubAssemblyRoleEntityType.CreateAnnotations(subAssemblyRole);
         UnitOfMeasureEntityType.CreateAnnotations(unitOfMeasure);
         UsageAddInLineEntityType.CreateAnnotations(usageAddInLine);
+        DataUpgradeEntityType.CreateAnnotations(dataUpgrade);
 
         AddAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False");
         AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);

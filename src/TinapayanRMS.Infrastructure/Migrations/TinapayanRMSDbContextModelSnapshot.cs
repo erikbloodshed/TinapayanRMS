@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261103142633_QuantityAndPercentChecks";
+    public override string LastMigrationId => "20261105040552_StoreSectionNames";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -936,6 +936,12 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer")
                     .HasColumnName("role_id");
 
+                b.Property<string>("SectionName")
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("section_name")
+                    .UseCollation("case_insensitive");
+
                 b.Property<decimal>("TotalCost")
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
@@ -1227,6 +1233,24 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     {
                         t.HasCheckConstraint("CK_UsageAddInLines_Grams", "grams > 0");
                     });
+            });
+
+        modelBuilder.Entity("TinapayanRMS.Infrastructure.Upgrades.DataUpgrade", b =>
+            {
+                b.Property<string>("Id")
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("id")
+                    .UseCollation("case_insensitive");
+
+                b.Property<DateTime>("AppliedAt")
+                    .HasColumnType("timestamp without time zone")
+                    .HasColumnName("applied_at");
+
+                b.HasKey("Id")
+                    .HasName("pk_data_upgrades");
+
+                b.ToTable("data_upgrades");
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingParameters", b =>
