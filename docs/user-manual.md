@@ -596,11 +596,12 @@ Right-click menus:
 - **A product**:
   - **Promote to Production** or **Send Back to Research and Development**
   - **Move to** (any stage and category)
+  - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
   - **Rename…** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
   - **Delete** (Del)
 
-  With several products picked, the menu offers to promote or move them all.
+  With several products picked, the menu offers to promote or move them all, or to apply the costing defaults to them all.
 - **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
 - **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
 - **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**. These are also buttons under the search box. Each button shows only its icon; point at it to see its name.

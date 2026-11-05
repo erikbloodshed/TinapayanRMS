@@ -774,6 +774,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> MoveProductsCommand { get; }
 
+    /// <summary>
+    /// Sets the costing of the products picked in the list (or the one its menu was opened on) to Settings' costing
+    /// defaults, once it's confirmed, recording a version of each one it changes (VersionedSaves.ApplyCostingAsync).
+    /// </summary>
+    public ReactiveCommand<IReadOnlyList<Product>, RxVoid> ApplyCostingDefaultsCommand { get; }
+
     /// <summary>Undo on the list's notice bar: puts the products the last move took back where they were.</summary>
     public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
 
@@ -959,7 +965,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => EditingIncludesComponentPackaging,
             (ex, text) => ShowFailure(ex, text));
         _versionedSaves = new VersionedSaves(
-            unitOfWork, productRepository, versionRepository, _savedProducts, new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
+            unitOfWork,
+            productRepository,
+            versionRepository,
+            costingParametersRepository,
+            _savedProducts,
+            new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
@@ -1469,6 +1480,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).
         MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
             moves => RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)));
+        ApplyCostingDefaultsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<Product>>(ApplyCostingDefaultsAsync);
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
@@ -2214,6 +2226,74 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         await Task.Yield();
         SyncTreeSelection();
         await OpenProductAsync(productId);
+    }
+
+    /// <summary>
+    /// Applies Settings' costing defaults (labor, overhead, administrative and markup) to <paramref name="products"/>, once
+    /// it's confirmed. The product the form shows, when it's one of them, has its unsaved changes saved or thrown away
+    /// first, and shows its new costing after.
+    /// </summary>
+    private async Task ApplyCostingDefaultsAsync(IReadOnlyList<Product> products)
+    {
+        if (products.Count == 0 || (products.Any(p => p.Id == _detailProductId) && !await ResolveUnsavedChangesAsync(revert: true)))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var defaults = await Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+            var question = $"Set the costing of {ProductNames(products)} to the costing defaults: labor {defaults.LaborPercent:0.##}%, overhead "
+                + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarginPercent:0.##}%?"
+                + "\n\nA version is recorded of each one this changes.";
+            if (!await ConfirmDelete.Handle(question))
+            {
+                return;
+            }
+
+            var costing = new CostingParameters
+            {
+                LaborPercent = defaults.LaborPercent,
+                OverheadPercent = defaults.OverheadPercent,
+                AdministrativePercent = defaults.AdministrativePercent,
+                MarginPercent = defaults.MarginPercent,
+            };
+            var changed = await Task.Run(() => _versionedSaves.ApplyCostingAsync(
+                [.. products.Select(p => p.Id)], costing, DateTime.Now, CancellationToken.None));
+            await LoadCommand.Execute();
+
+            // The product the form shows reads its new costing, as after its own Save.
+            if (_detailProductId is { } openId && products.Any(p => p.Id == openId)
+                && await Task.Run(() => _productRepository.GetByIdAsync(openId, CancellationToken.None)) is { } open)
+            {
+                var detail = await Task.Run(() => _savedProducts.ReadDetailAsync(openId, CancellationToken.None));
+                History.Clear();
+                ShowSavedProduct(open, detail);
+                if (SelectedDetailsTab == HistoryTab)
+                {
+                    RequestVersions(force: true);
+                }
+                else
+                {
+                    VersionHistory.Clear();
+                }
+            }
+
+            SuccessMessage = changed.Count == 0
+                ? $"{ProductNames(products)} already {(products.Count == 1 ? "has" : "have")} the costing defaults."
+                : $"The costing defaults were applied to {ProductNames(changed)}, with a version of each.";
+        });
+
+        static string ProductNames<T>(IReadOnlyList<T> items) where T : notnull
+        {
+            List<string> names = [.. items.Select(i => i is Product p ? p.Name : i.ToString()!)];
+            return names.Count switch
+            {
+                1 => names[0],
+                <= 5 => $"{string.Join(", ", names[..^1])} and {names[^1]}",
+                _ => $"{string.Join(", ", names.Take(4))} and {names.Count - 4} more",
+            };
+        }
     }
 
     private async Task MoveProductsAsync(IReadOnlyList<ProductMove> moves, bool isUndo)
@@ -4816,6 +4896,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private const string DeleteGlyph = "";
     private const string RestoreGlyph = "";
     private const string PrintGlyph = "";
+    private const string CostingGlyph = "";
 
     /// <summary>
     /// The menu a right-click opens on the list (ProductListCard): on <paramref name="node"/>'s row, which the View picks
@@ -4863,6 +4944,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             Glyph = MoveGlyph,
             Items = [MoveToStage(ProductStage.Production), MoveToStage(ProductStage.ResearchAndDevelopment)],
+        });
+        items.Add(new($"Apply Costing Defaults{(isOne ? string.Empty : $" to {products.Count} Products")}…", ApplyCostingDefaultsCommand, products)
+        {
+            Glyph = CostingGlyph,
         });
 
         if (isOne)

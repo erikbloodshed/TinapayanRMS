@@ -41,6 +41,28 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
     }
 
     [Fact]
+    public async Task ApplyCosting_changes_and_versions_only_the_products_not_at_it_already()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [new RecipeLine(flourId, 400m)]);
+        var costings = new CostingParametersRepository(CreateDbContextFactory());
+        await costings.SetAsync(ensaymadaId, 35m, 25m, 15m, 60m, Cancellation);
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+
+        var changed = await CreateSaves().ApplyCostingAsync([pandesalId, ensaymadaId], defaults, DateTime.Now, Cancellation);
+
+        changed.Should().Equal(["Pandesal"], "Ensaymada had the defaults already");
+        var pandesal = (await costings.GetForProductAsync(pandesalId, Cancellation))!;
+        (pandesal.LaborPercent, pandesal.OverheadPercent, pandesal.AdministrativePercent, pandesal.MarginPercent).Should().Be((35m, 25m, 15m, 60m));
+        var versions = new ProductVersionRepository(CreateDbContextFactory());
+        (await versions.GetForProductAsync(pandesalId, Cancellation)).Select(v => v.Note)
+            .Should().Equal(VersionedSaves.CostingDefaultsNote, ProductVersionRules.BaselineNote);
+        (await versions.GetForProductAsync(ensaymadaId, Cancellation)).Should().BeEmpty("nothing about it changed");
+    }
+
+    [Fact]
     public async Task SaveProduct_whose_version_is_refused_saves_nothing()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -117,7 +139,8 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
             new SubAssemblyLineRepository(factory),
             productRepository,
             new CostingDefaultsRepository(factory));
-        return new VersionedSaves(CreateUnitOfWork(), productRepository, versions, reader, new ProductVersionRecorder(reader, productRepository, versions));
+        return new VersionedSaves(
+            CreateUnitOfWork(), productRepository, versions, new CostingParametersRepository(factory), reader, new ProductVersionRecorder(reader, productRepository, versions));
     }
 
     /// <summary>The real version repository, except that every version it's asked to write is refused, as a database might.</summary>

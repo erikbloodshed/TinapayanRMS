@@ -25,7 +25,12 @@ public static class VersionRecorders
         var versionRepository = new ProductVersionRepository(factory);
         var reader = Reader(factory, productRepository);
         return new VersionedSaves(
-            unitOfWork, productRepository, versionRepository, reader, new ProductVersionRecorder(reader, productRepository, versionRepository));
+            unitOfWork,
+            productRepository,
+            versionRepository,
+            new CostingParametersRepository(factory),
+            reader,
+            new ProductVersionRecorder(reader, productRepository, versionRepository));
     }
 
     private static SavedProductReader Reader(IDbContextFactory<TinapayanRMSDbContext> factory, ProductRepository productRepository) => new(

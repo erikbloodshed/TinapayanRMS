@@ -25,9 +25,47 @@ public sealed class VersionedSaves(
     IUnitOfWork unitOfWork,
     IProductRepository productRepository,
     IProductVersionRepository versionRepository,
+    ICostingParametersRepository costingParametersRepository,
     SavedProductReader savedProducts,
     ProductVersionRecorder versionRecorder)
 {
+    /// <summary>How the Products list's Apply Costing Defaults notes the version it records.</summary>
+    public const string CostingDefaultsNote = "Costing defaults applied";
+
+    /// <summary>
+    /// The Products list's Apply Costing Defaults: each of <paramref name="productIds"/> whose costing isn't
+    /// <paramref name="costing"/>'s labor, overhead, administrative and markup percentages already takes them, gets a
+    /// version noted <see cref="CostingDefaultsNote"/> (with how it stood before, for one with no versions yet) and is stamped
+    /// as saved now, all in one unit of work. One with no costing saved counts as all zero. Returns the names of the ones it
+    /// changed, in the order given.
+    /// </summary>
+    public Task<IReadOnlyList<string>> ApplyCostingAsync(
+        IReadOnlyList<int> productIds, CostingParameters costing, DateTime savedAt, CancellationToken cancellationToken) =>
+        unitOfWork.RunAsync<IReadOnlyList<string>>(async () =>
+        {
+            var wanted = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
+            List<string> changed = [];
+            foreach (var productId in productIds)
+            {
+                var current = await costingParametersRepository.GetForProductAsync(productId, cancellationToken);
+                if ((current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarginPercent ?? 0m) == wanted
+                    || await productRepository.GetByIdAsync(productId, cancellationToken) is not { } product)
+                {
+                    continue;
+                }
+
+                await RecordVersionBeforeHistoryAsync(productId, savedAt, cancellationToken);
+                await costingParametersRepository.SetAsync(
+                    productId, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, cancellationToken);
+                var detail = await savedProducts.ReadDetailAsync(productId, cancellationToken);
+                await versionRepository.AddAsync(productId, ProductVersionSnapshot.From(product, detail), savedAt, CostingDefaultsNote, cancellationToken);
+                await productRepository.UpdateAsync(product, cancellationToken);
+                changed.Add(product.Name);
+            }
+
+            return changed;
+        }, cancellationToken);
+
     /// <summary>
     /// The Products screen's Save (IProductRepository.SaveAsync), with its versions: for a saved product with none yet, how
     /// it stood until now first; then the product as saved, unless its recipe and price are its latest version's; and,

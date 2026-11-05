@@ -37,7 +37,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         var menu = viewModel.TreeMenuFor(leaf);
 
-        Headers(menu).Should().Equal("Promote to Production", "Move to", "Rename…", "Clone…", "Create Variant…", "Delete");
+        Headers(menu).Should().Equal("Promote to Production", "Move to", "Apply Costing Defaults…", "Rename…", "Clone…", "Create Variant…", "Delete");
         menu.Single(i => i.Header == "Rename…").Gesture.Should().Be("F2");
         menu.Single(i => i.Header == "Delete").Gesture.Should().Be("Del");
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
@@ -94,7 +94,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         var menu = viewModel.TreeMenuFor(tree.Find(pandesalId));
 
-        Headers(menu).Should().Equal("Promote 2 Products to Production", "Send 1 Product Back to Research and Development", "Move 3 Products to");
+        Headers(menu).Should().Equal(
+            "Promote 2 Products to Production", "Send 1 Product Back to Research and Development", "Move 3 Products to", "Apply Costing Defaults to 3 Products…");
         await RunAsync(menu[0]);
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -104,6 +105,36 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.MoveNotice.Should().Be("Moved 2 products to Production › Breads");
         viewModel.SelectedTreeProducts.Select(l => l.Product.Id).Should().Equal(mamonId, pandesalId, sansRivalId);
         viewModel.SelectedProduct!.Id.Should().Be(mamonId);
+    }
+
+    [Fact]
+    public async Task Apply_Costing_Defaults_sets_the_products_picked_to_them_once_confirmed_and_the_one_showing_follows()
+    {
+        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
+            new CostingDefaults { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m }, Cancellation);
+        var mamonId = await SaveProductAsync("Mamon", null);
+        var pandesalId = await SaveProductAsync("Pandesal", null);
+        var viewModel = await OpenedViewModelAsync(mamonId);
+        string? asked = null;
+        viewModel.ConfirmDelete.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(true);
+        });
+        viewModel.SelectedTreeNodes.Add(viewModel.ProductTree.Find(pandesalId)!);
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.Find(pandesalId)).Single(i => i.Header == "Apply Costing Defaults to 2 Products…"));
+
+        viewModel.ErrorMessage.Should().BeNull();
+        asked.Should().StartWith("Set the costing of Mamon and Pandesal to the costing defaults: labor 35%, overhead 25%, administrative 15% and markup 60%?");
+        viewModel.SuccessMessage.Should().Be("The costing defaults were applied to Mamon and Pandesal, with a version of each.");
+        await WaitUntilSettledAsync(
+            () => viewModel.AreDetailsReady && viewModel.Costing.EditingMarginPercent == 60m,
+            () => $"ready={viewModel.AreDetailsReady}, markup={viewModel.Costing.EditingMarginPercent}");
+        viewModel.Costing.EditingLaborPercent.Should().Be(35m, "the product showing reads its new costing");
+        viewModel.HasUnsavedChanges.Should().BeFalse("its new costing is how it's saved");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.CostingParameters.Where(c => c.ProductId == pandesalId).Select(c => c.MarginPercent).SingleAsync(Cancellation)).Should().Be(60m);
     }
 
     [Fact]
@@ -739,6 +770,9 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         {
             case ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> move:
                 await move.Execute((IReadOnlyList<ProductMove>)item.Parameter!);
+                break;
+            case ReactiveCommand<IReadOnlyList<Product>, RxVoid> onProducts:
+                await onProducts.Execute((IReadOnlyList<Product>)item.Parameter!);
                 break;
             case ReactiveCommand<ProductLeafNode, RxVoid> onProduct:
                 await onProduct.Execute((ProductLeafNode)item.Parameter!);
