@@ -26,4 +26,14 @@ public class SubAssemblyRoleValidatorTests
         _validator.Validate(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true }).IsValid.Should().BeFalse();
         _validator.Validate(new SubAssemblyRole { Name = "Filling", IsProductOwned = true }).IsValid.Should().BeTrue();
     }
+
+    [Fact]
+    public void Names_the_packaging_role_by_its_own_name_as_the_save_does()
+    {
+        // The validator had its own copy of the message, which called every such role "the Packaging role".
+        var result = _validator.Validate(new SubAssemblyRole { Name = "Boxes", IsPackaging = true, IsProductOwned = true });
+
+        result.Errors.Should().ContainSingle().Which.ErrorMessage
+            .Should().Be("The Boxes role holds packaging sets from the Sub-Assemblies screen, so it can't be product-owned.");
+    }
 }

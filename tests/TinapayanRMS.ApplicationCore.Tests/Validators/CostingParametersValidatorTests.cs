@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 
@@ -30,5 +31,24 @@ public class CostingParametersValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(-1, 0, 0, 0)]
+    [InlineData(0, 0, 0, -1)]
+    public void Says_what_saving_would(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent)
+    {
+        var saving = () => CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, marginPercent);
+
+        var result = _validator.Validate(new CostingParameters
+        {
+            LaborPercent = laborPercent,
+            OverheadPercent = overheadPercent,
+            AdministrativePercent = administrativePercent,
+            MarginPercent = marginPercent,
+        });
+
+        result.Errors.Should().ContainSingle().Which.ErrorMessage
+            .Should().Be(saving.Should().Throw<BusinessRuleException>().Which.Message);
     }
 }

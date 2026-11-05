@@ -535,7 +535,7 @@ Three layers check the same rules, each for a different reason.
 
 | Layer | Where | What it gives | On failure |
 |---|---|---|---|
-| Form pre-checks | FluentValidation validators in `ApplicationCore/Validators`, which a ViewModel runs before it saves | An immediate, friendly message | `ErrorMessage` is set, and nothing reaches the repository |
+| Form pre-checks | FluentValidation validators in `ApplicationCore/Validators`, which a ViewModel runs before it saves. A check a repository enforces is the rule itself, run through `RuleValidation.Satisfies`; only a check with no rule behind it (a pick the form must make) is written in the validator | An immediate message, in the rule's own words | `ErrorMessage` is set, and nothing reaches the repository |
 | Business rules (the authority) | Static `*Rules` methods, which the repositories call before they write anything destructive | The real guarantee, whichever code path writes | A `BusinessRuleException`, whose message `RunSafelyAsync` shows exactly as written |
 | The database (a backstop) | Unique indexes, check constraints and `Restrict` foreign keys, in `Infrastructure/Configurations` | Integrity even if a code path forgets a check | A `DbUpdateException` or a `PostgresException`, which [Failure](../src/TinapayanRMS.Infrastructure/Services/Failure.cs) puts plainly by PostgreSQL's error code (SQLSTATE): "That name is already in use.", "This item is currently in use elsewhere and can't be deleted.", and so on |
 
@@ -1273,7 +1273,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 2. Configure it in the entity's `*Configuration` class if conventions aren't enough: a length, precision, conversion, default or check constraint.
 3. Add the column to its entity's list in `Infrastructure/Queries/Columns.cs`. `ColumnsTests` fails until you do.
 4. Copy it in the repository's write path: the `UpdateAsync` that loads and then applies, and the field copy at the top of the aggregate `SaveAsync`, if there is one.
-5. Add any rule it needs to the right `*Rules` class (and its tests), and to the validator if a form edits it.
+5. Add any rule it needs to the right `*Rules` class (and its tests), and run it from the validator (`Satisfies`) if a form edits it.
 6. Generate, read and apply the migration, and regenerate the compiled model (see [Migrations](#migrations)).
 7. In the ViewModel, add the editing property, its load and save mapping, and its place in the form snapshot (so undo and the dirty check include it). Bind it in the view.
 8. Add tests: rules, persistence, and the ViewModel.
@@ -1294,7 +1294,7 @@ Respawn picks up the new table by itself.
 
 1. Add a static method to the right `*Rules` class in ApplicationCore. Keep it pure, and make it throw `BusinessRuleException` with a message a user can act on.
 2. Call it from the repository's write path, before anything is deleted or written.
-3. If a form can break the rule, mirror it in the entity's validator for an immediate message.
+3. If a form can break the rule, run it from the entity's validator for an immediate message: `RuleFor(x => x.Field).Satisfies(SomeRules.EnsureSomething)`. Don't write the check again in the validator: two copies drift apart, as the costing percentages' and the packaging role's messages had (fixed 2026-11-05).
 4. If the database can enforce it, add a check constraint or unique index as a backstop, which needs a migration.
 5. Test it in `ApplicationCore.Tests/Rules`, and test the write path that calls it in `Infrastructure.Tests/Persistence`.
 

@@ -255,7 +255,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.EditingName = string.Empty;
         await viewModel.SaveCommand.Execute();
-        viewModel.ErrorMessage.Should().Be("Name is required.");
+        viewModel.ErrorMessage.Should().Be("Every raw material needs a name.");
         viewModel.SuccessMessage.Should().BeNull("an error replaces the confirmation");
 
         viewModel.EditingName = "Bread Flour";
@@ -1508,7 +1508,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.SaveCommand.Execute();
 
-        viewModel.ErrorMessage.Should().Be("Name is required. Category is required.");
+        viewModel.ErrorMessage.Should().Be("Every raw material needs a name. Category is required.");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
     }

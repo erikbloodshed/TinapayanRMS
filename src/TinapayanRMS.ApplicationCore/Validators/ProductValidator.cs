@@ -1,8 +1,13 @@
 using FluentValidation;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Validators;
 
+/// <summary>
+/// The Products screen's pre-check before a Save: the name and one-unit rules ProductRepository runs (RuleValidation), and
+/// the checks only the form needs.
+/// </summary>
 public sealed class ProductValidator : AbstractValidator<Product>
 {
     /// <summary>The longest description the Products table holds (ProductConfiguration).</summary>
@@ -10,17 +15,14 @@ public sealed class ProductValidator : AbstractValidator<Product>
 
     public ProductValidator()
     {
-        RuleFor(p => p.Name).NotEmpty().WithMessage("Name is required.");
+        RuleFor(p => p.Name).Satisfies(name => ProductRules.StoredName(name ?? string.Empty));
         RuleFor(p => p.Description)
             .MaximumLength(MaxDescriptionLength)
             .WithMessage($"The description can be at most {MaxDescriptionLength} characters.");
         RuleFor(p => p.QuantityRequired)
             .GreaterThanOrEqualTo(1)
             .WithMessage("A product has to hold at least one piece. Enter 1 for one sold by the piece.");
-        RuleFor(p => p.QuantityRequired)
-            .Equal(1)
-            .When(p => p.IsComposite)
-            .WithMessage("A composite product is one sellable unit. Say how many of each product go in on its Products table instead.");
+        RuleFor(p => p).Satisfies(p => CompositeProductRules.EnsureOneUnit(p.IsComposite, p.QuantityRequired));
         RuleFor(p => p.CurrentPrice)
             .GreaterThanOrEqualTo(0m)
             .When(p => p.CurrentPrice is not null)

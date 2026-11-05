@@ -9,6 +9,9 @@ public class RawMaterialValidatorTests
 {
     private readonly RawMaterialValidator _validator = new();
 
+    /// <summary>What the Raw Materials screen shows: each failure's message (the rule's own, for one RawMaterialRepository runs).</summary>
+    private static IEnumerable<string> Messages(FluentValidation.Results.ValidationResult result) => result.Errors.Select(e => e.ErrorMessage);
+
     [Fact]
     public void Accepts_a_valid_purchased_ingredient()
     {
@@ -51,7 +54,7 @@ public class RawMaterialValidatorTests
             WeightLossPercent = 20m,
         });
 
-        result.Errors.Select(e => e.ErrorMessage).Should().Contain("Pick the sub-assembly it's made from.");
+        Messages(result).Should().Contain("Pick the sub-assembly it's made from.");
     }
 
     [Fact]
@@ -80,7 +83,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.Name));
+        Messages(result).Should().Contain("Every raw material needs a name.");
     }
 
     [Fact]
@@ -94,7 +97,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.CategoryId));
+        Messages(result).Should().Contain("Category is required.");
     }
 
     [Fact]
@@ -122,7 +125,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.WeightLossPercent));
+        Messages(result).Should().Contain("A made ingredient needs a weight loss percent.");
     }
 
     [Fact]
@@ -137,7 +140,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.WeightLossPercent));
+        Messages(result).Should().Contain("A purchased material has no weight loss percent.");
     }
 
     [Fact]
@@ -152,7 +155,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.BaseUnitId));
+        Messages(result).Should().Contain("An ingredient's base unit is always the gram.");
     }
 
     [Theory]
@@ -169,8 +172,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(e => e.PropertyName == nameof(RawMaterial.BaseUnitId))
-            .Which.ErrorMessage.Should().Be("Base unit is required.");
+        Messages(result).Should().ContainSingle().Which.Should().Be("A packaging material needs a base unit.");
     }
 
     [Theory]
@@ -188,7 +190,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().ContainSingle(e => e.PropertyName == nameof(RawMaterial.CostBufferPercent));
+        Messages(result).Should().ContainSingle().Which.Should().Be("Cost buffer must be at least 0 and at most 100 percent.");
     }
 
     [Fact]
@@ -220,7 +222,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.Source));
+        Messages(result).Should().Contain("Only an ingredient can be made or linked; packaging is always purchased.");
     }
 
     private static RawMaterial EggWhite(int? linkedToId = 1, decimal? weightShare = 70m, decimal? costShare = 30m) => new()
@@ -248,27 +250,30 @@ public class RawMaterialValidatorTests
         var result = _validator.Validate(EggWhite(linkedToId: linkedToId));
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.LinkedToId) && e.ErrorMessage == "Pick the ingredient it's linked to.");
+        Messages(result).Should().Contain("Pick the ingredient it's linked to.");
     }
+
+    private const string WeightShareText = "Weight share must be above 0 and at most 100 percent.";
+    private const string CostShareText = "Cost share must be above 0 and at most 100 percent.";
 
     public static TheoryData<decimal?, decimal?, string> SharesMissingOrOutOfRange => new()
     {
-        { null, 30m, nameof(RawMaterial.WeightSharePercent) },
-        { 0m, 30m, nameof(RawMaterial.WeightSharePercent) },
-        { 101m, 30m, nameof(RawMaterial.WeightSharePercent) },
-        { 70m, null, nameof(RawMaterial.CostSharePercent) },
-        { 70m, -1m, nameof(RawMaterial.CostSharePercent) },
-        { 70m, 100.5m, nameof(RawMaterial.CostSharePercent) },
+        { null, 30m, WeightShareText },
+        { 0m, 30m, WeightShareText },
+        { 101m, 30m, WeightShareText },
+        { 70m, null, CostShareText },
+        { 70m, -1m, CostShareText },
+        { 70m, 100.5m, CostShareText },
     };
 
     [Theory]
     [MemberData(nameof(SharesMissingOrOutOfRange))]
-    public void Rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare, string propertyName)
+    public void Rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare, string expected)
     {
         var result = _validator.Validate(EggWhite(weightShare: weightShare, costShare: costShare));
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == propertyName);
+        Messages(result).Should().Contain(expected);
     }
 
     [Fact]
@@ -285,8 +290,7 @@ public class RawMaterialValidatorTests
         });
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.LinkedToId));
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.WeightSharePercent));
+        Messages(result).Should().Contain("Only a linked ingredient is linked to another.");
     }
 
     [Fact]
@@ -299,6 +303,6 @@ public class RawMaterialValidatorTests
         var result = _validator.Validate(packaging);
 
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == nameof(RawMaterial.Source));
+        Messages(result).Should().Contain("Only an ingredient can be made or linked; packaging is always purchased.");
     }
 }
