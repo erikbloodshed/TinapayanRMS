@@ -21,6 +21,7 @@ internal static class DataUpgrades
     private static readonly IReadOnlyList<(string Id, string Migration, Func<TinapayanRMSDbContext, CancellationToken, Task> Run)> All =
     [
         ("2026-11-05 section names", MigrationId<_20261105040552_StoreSectionNames>(), SectionNamesUpgrade.RunAsync),
+        ("2026-11-05 target buffers", MigrationId<RawMaterialTargetCostBuffer>(), TargetBuffersUpgrade.RunAsync),
     ];
 
     /// <summary>The migration that made data_upgrades, which no upgrade can be recorded without.</summary>

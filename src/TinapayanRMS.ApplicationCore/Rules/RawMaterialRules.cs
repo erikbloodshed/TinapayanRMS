@@ -366,8 +366,9 @@ public static class RawMaterialRules
         (bufferedCost / cost - 1) * 100m;
 
     /// <summary>
-    /// The buffer percent a purchased material is meant to have (2026-10-29): the one last typed for it, or for one saved
-    /// before that was kept, its buffer percent as last saved.
+    /// The buffer percent a purchased material is meant to have (2026-10-29): the one last typed for it, which every
+    /// purchased material has (stored with each save, and given once on 2026-11-05 to the ones saved before targets were
+    /// kept: TargetBuffersUpgrade). A made or linked ingredient has none, and reads as its buffer.
     /// </summary>
     public static decimal TargetBufferPercentOf(RawMaterial material) => material.TargetCostBufferPercent ?? material.CostBufferPercent;
 

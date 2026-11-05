@@ -160,7 +160,6 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
             material.BufferedCostPerBaseUnit = bufferedCost;
             material.CostBufferPercent = target;
-            material.TargetCostBufferPercent = target;
             material.UpdatedAt = dbContext.LocalNow();
             reapplied.Add(material.Id);
         }
@@ -176,18 +175,22 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         return reapplied.Count;
     }
 
-    /// <summary>A purchased material's target buffer as it's stored, refused out of range; none for a made or linked one, which has no buffer of its own to type.</summary>
     /// <summary>A purchased material's preferred brand as it's saved (trimmed, null for the dearest); none for any other.</summary>
     private static string? StoredPreferredBrand(RawMaterialSource source, string? brand) =>
         source == RawMaterialSource.Purchased ? RawMaterialRules.NormalizeBrand(brand) : null;
 
-    private static decimal? StoredTarget(RawMaterialSource source, decimal? target)
+    /// <summary>
+    /// A material's target buffer as it's stored: for a purchased one, the target given, refused out of range, or else its
+    /// buffer, so every purchased material has one; none for a made or linked one, which has no buffer of its own to type.
+    /// </summary>
+    private static decimal? StoredTarget(RawMaterialSource source, decimal? target, decimal costBufferPercent)
     {
-        if (source != RawMaterialSource.Purchased || target is not { } percent)
+        if (source != RawMaterialSource.Purchased)
         {
             return null;
         }
 
+        var percent = target ?? costBufferPercent;
         RawMaterialRules.EnsureValidCostBuffer(percent);
         return percent;
     }
@@ -375,7 +378,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         await EnsureCategoryMatchesAsync(dbContext, material, cancellationToken);
         var inheritedBuffer = await EnsureValidLinkAsync(dbContext, material, cancellationToken);
         material.CostBufferPercent = RawMaterialRules.StoredCostBufferPercent(material.Source, inheritedBuffer, material.CostBufferPercent);
-        material.TargetCostBufferPercent = StoredTarget(material.Source, material.TargetCostBufferPercent);
+        material.TargetCostBufferPercent = StoredTarget(material.Source, material.TargetCostBufferPercent, material.CostBufferPercent);
         material.PreferredBrand = StoredPreferredBrand(material.Source, material.PreferredBrand);
 
         material.BufferedCostPerBaseUnit = material.Source == RawMaterialSource.Purchased
@@ -571,7 +574,8 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         var costBufferPercent = RawMaterialRules.StoredCostBufferPercent(existing.Source, inheritedBuffer, material.CostBufferPercent);
         var bufferChanged = existing.CostBufferPercent != costBufferPercent;
         existing.CostBufferPercent = costBufferPercent;
-        existing.TargetCostBufferPercent = StoredTarget(existing.Source, material.TargetCostBufferPercent) ?? existing.TargetCostBufferPercent;
+        existing.TargetCostBufferPercent = StoredTarget(
+            existing.Source, material.TargetCostBufferPercent ?? existing.TargetCostBufferPercent, existing.CostBufferPercent);
         existing.PreferredBrand = StoredPreferredBrand(existing.Source, material.PreferredBrand);
         // None sent (0) is worked out afresh from the cost and the percent, as for a first price.
         // Stored to the column's places, so a buffered cost sent again unchanged compares equal and doesn't cascade.

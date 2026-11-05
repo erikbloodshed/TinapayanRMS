@@ -1,5 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -81,6 +83,57 @@ public class TargetCostBufferPersistenceTests(DatabaseFixture fixture) : Persist
         var unpricedId = await AddIngredientAsync("Salt");
 
         (await CreateRepository().ReapplyTargetBuffersAsync([atTargetId, unpricedId], Cancellation)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_purchased_material_saved_without_a_target_takes_its_buffer_as_one()
+    {
+        var categoryId = await IngredientCategoryIdAsync();
+        var saltId = await CreateRepository().SaveAsync(
+            new RawMaterial { Name = "Salt", Type = RawMaterialType.Ingredient, CategoryId = categoryId, CostBufferPercent = 12m },
+            [],
+            brandPrices: null,
+            addIns: null,
+            Cancellation);
+
+        (await TargetOfAsync(saltId)).Should().Be(12m);
+    }
+
+    [Fact]
+    public async Task A_save_without_a_target_keeps_the_one_the_material_has()
+    {
+        var categoryId = await IngredientCategoryIdAsync();
+        var repository = CreateRepository();
+        var saltId = await repository.SaveAsync(
+            new RawMaterial { Name = "Salt", Type = RawMaterialType.Ingredient, CategoryId = categoryId, CostBufferPercent = 10m, TargetCostBufferPercent = 10m },
+            [],
+            brandPrices: null,
+            addIns: null,
+            Cancellation);
+
+        await repository.SaveAsync(
+            new RawMaterial { Id = saltId, Name = "Salt", Type = RawMaterialType.Ingredient, CategoryId = categoryId, CostBufferPercent = 7m },
+            [],
+            brandPrices: null,
+            addIns: null,
+            Cancellation);
+
+        (await TargetOfAsync(saltId)).Should().Be(10m, "the buffer drifted, and the target is what Re-apply Target puts back");
+    }
+
+    private async Task<int> IngredientCategoryIdAsync()
+    {
+        await using var dbContext = CreateDbContext();
+        var category = new RawMaterialCategory { Name = "Seasonings" };
+        dbContext.RawMaterialCategories.Add(category);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return category.Id;
+    }
+
+    private async Task<decimal?> TargetOfAsync(int materialId)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.RawMaterials.Where(m => m.Id == materialId).Select(m => m.TargetCostBufferPercent).SingleAsync(Cancellation);
     }
 
     private async Task SetTargetAsync(int materialId, decimal target)

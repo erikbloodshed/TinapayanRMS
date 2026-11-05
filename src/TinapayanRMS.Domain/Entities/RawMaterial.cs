@@ -78,10 +78,10 @@ public sealed class RawMaterial
     public decimal CostBufferPercent { get; set; }
 
     /// <summary>
-    /// Purchased only: the buffer percent last typed for it, 0 to 100 (2026-10-29), which <see cref="CostBufferPercent"/> drifts
-    /// from as prices change, since the buffered cost stays fixed. What Re-apply Target puts back on top of the dearest brand.
-    /// Null for one saved before it was kept, which takes <see cref="CostBufferPercent"/> as it was last saved instead
-    /// (RawMaterialRules.TargetBufferPercentOf), and for a made or linked ingredient.
+    /// Purchased only, and set for every one: the buffer percent last typed for it, 0 to 100 (2026-10-29), which
+    /// <see cref="CostBufferPercent"/> drifts from as prices change, since the buffered cost stays fixed. What Re-apply
+    /// Target puts back on top of the dearest brand. A save without one stores the buffer, and the ones saved before
+    /// targets were kept were given theirs once (TargetBuffersUpgrade, 2026-11-05). Null for a made or linked ingredient.
     /// </summary>
     public decimal? TargetCostBufferPercent { get; set; }
 
