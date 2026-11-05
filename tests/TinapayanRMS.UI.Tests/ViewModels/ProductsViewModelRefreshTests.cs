@@ -755,7 +755,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == miniId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == miniId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == miniId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
 
         // Link: the tab opens with the form already linking, and its title says so in place of the picker that used to.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
@@ -810,7 +810,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         // Link Cream Loaf's dough into the mini, at its own weight.
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == miniId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == miniId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == miniId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
         viewModel.UsageForm.IsFormEditingLines.Should().BeFalse("a link's lines are the Sub-Assemblies screen's");
         viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.Single(o => !o.IsPackaging);
@@ -1430,7 +1430,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
 
         // A section with its lines but neither figure of its piece size: it applies, with nothing refused.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
@@ -2499,7 +2499,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
 
         await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
 
@@ -2531,7 +2531,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
 
         // A picked recipe to link: its add-ins table shows under it, empty, and the badge says so.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
@@ -2675,7 +2675,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
 
         await LinkWithUbeAsync(viewModel, flourId, addInGrams: 100m, weightPerPiece: 30m);
 
@@ -2692,7 +2692,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
         await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
 
         await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
@@ -2712,7 +2712,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
         await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
@@ -2739,7 +2739,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == linkerId);
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == linkerId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
         await LinkWithUbeAsync(viewModel, ubeId, addInGrams: 20m, weightPerPiece: 30m);
         await viewModel.SaveCommand.Execute();
         await WaitUntilSettledAsync(() => viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");

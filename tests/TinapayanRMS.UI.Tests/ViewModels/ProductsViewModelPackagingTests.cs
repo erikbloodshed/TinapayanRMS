@@ -105,7 +105,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var productId = await AddProductAsync("Ensaymada");
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single();
-        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId, () => $"selected={viewModel.SelectedProduct?.Id}");
+        await WaitUntilSettledAsync(() => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
         viewModel.RecipeTabs.Should().BeEmpty();
 
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
