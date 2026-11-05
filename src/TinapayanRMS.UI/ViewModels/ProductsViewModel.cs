@@ -510,40 +510,24 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The add/edit sub-assembly form: the section it edits or adds, its fields and tables, and what it shows.</summary>
     public ProductUsageForm UsageForm { get; }
 
-    private int _scalingUnits = 1;
-    /// <summary>
-    /// How many sellable units the Scaling tab scales the recipe to: boxes for a Box of 8, pieces for a product sold by
-    /// the piece. At least 1. It isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it
-    /// is from one product to the next until the app closes, as <see cref="CostBasis"/> does.
-    /// </summary>
-    public int ScalingUnits
-    {
-        get => _scalingUnits;
-        set => this.RaiseAndSetIfChanged(ref _scalingUnits, Math.Max(1, value));
-    }
+    /// <summary>The Scaling tab: the recipe as the form holds it, scaled to a number of sellable units.</summary>
+    public ProductScaling Scaling { get; }
 
-    private IReadOnlyList<ScalingRow> _scalingRows = [];
-    /// <summary>The Scaling tab's tree: the recipe scaled to <see cref="ScalingUnits"/>, worked out while the tab shows (RefreshScaling).</summary>
-    public IReadOnlyList<ScalingRow> ScalingRows
+    /// <summary>What the Scaling tab scales: the recipe as the form holds it (as the Costing tab takes it), and a composite's products.</summary>
+    private ScalingInput ScalingInputNow()
     {
-        get => _scalingRows;
-        private set => this.RaiseAndSetIfChanged(ref _scalingRows, value);
-    }
-
-    private decimal _scalingTotalCost;
-    /// <summary>What everything in <see cref="ScalingRows"/> costs, the extra pieces whole batches make included.</summary>
-    public decimal ScalingTotalCost
-    {
-        get => _scalingTotalCost;
-        private set => this.RaiseAndSetIfChanged(ref _scalingTotalCost, value);
-    }
-
-    private string _scalingPiecesText = string.Empty;
-    /// <summary>What <see cref="ScalingUnits"/> comes to in pieces, "= 160 pieces", when a unit holds more than one; empty otherwise.</summary>
-    public string ScalingPiecesText
-    {
-        get => _scalingPiecesText;
-        private set => this.RaiseAndSetIfChanged(ref _scalingPiecesText, value);
+        List<ProductComponentRow> components = IsEditingComposite
+            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
+            : [];
+        return new ScalingInput(
+            new ScalingRecipe(
+                [.. UsageEdits.Select(u => u.ToPriced())],
+                [.. Packaging.LineEdits.Select(l => l.ToPriced())],
+                [.. components.Select(r => (r.Product!, r.Quantity!.Value))],
+                EditingQuantityRequired,
+                IsEditingComposite && EditingIncludesComponentPackaging),
+            _detailProductId,
+            [.. components.Select(r => r.Product!)]);
     }
 
     /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
@@ -567,101 +551,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         }
     }
-
-    private IReadOnlyList<RawMaterial> _scalingIngredients = [];
-    /// <summary>
-    /// The ingredients the recipe takes, wherever they are in it (RecipeScaler.IngredientsOf): what the Scaling tab's "from
-    /// what you have" picker offers (2026-10-29).
-    /// </summary>
-    public IReadOnlyList<RawMaterial> ScalingIngredients
-    {
-        get => _scalingIngredients;
-        private set => this.RaiseAndSetIfChanged(ref _scalingIngredients, value);
-    }
-
-    private RawMaterial? _scalingHaveIngredient;
-    /// <summary>The ingredient there's a limited amount of, which the units it's enough for are worked out from. Not saved.</summary>
-    public RawMaterial? ScalingHaveIngredient
-    {
-        get => _scalingHaveIngredient;
-        set
-        {
-            if (ReferenceEquals(_scalingHaveIngredient, value))
-            {
-                return;
-            }
-
-            this.RaiseAndSetIfChanged(ref _scalingHaveIngredient, value);
-            var previous = ScalingHaveUnit;
-            ScalingHaveUnits = IngredientAmountUnit.For(value);
-            ScalingHaveUnit = ScalingHaveUnits.FirstOrDefault(u => u.Name == previous?.Name) ?? ScalingHaveUnits[0];
-        }
-    }
-
-    private IReadOnlyList<IngredientAmountUnit> _scalingHaveUnits = IngredientAmountUnit.For(null);
-    /// <summary>What the amount can be typed in: grams, and the ingredient's own units (a kilo, a bag, a tray).</summary>
-    public IReadOnlyList<IngredientAmountUnit> ScalingHaveUnits
-    {
-        get => _scalingHaveUnits;
-        private set => this.RaiseAndSetIfChanged(ref _scalingHaveUnits, value);
-    }
-
-    private IngredientAmountUnit? _scalingHaveUnit = IngredientAmountUnit.Gram;
-    public IngredientAmountUnit? ScalingHaveUnit
-    {
-        get => _scalingHaveUnit;
-        set => this.RaiseAndSetIfChanged(ref _scalingHaveUnit, value);
-    }
-
-    private decimal? _scalingHaveAmount;
-    /// <summary>How much of <see cref="ScalingHaveIngredient"/> there is, in <see cref="ScalingHaveUnit"/>.</summary>
-    public decimal? ScalingHaveAmount
-    {
-        get => _scalingHaveAmount;
-        set => this.RaiseAndSetIfChanged(ref _scalingHaveAmount, value);
-    }
-
-    private int _scalingHaveMakes;
-    /// <summary>The most sellable units the amount there is makes (RecipeScaler.UnitsFrom); 0 for none, or nothing asked.</summary>
-    public int ScalingHaveMakes
-    {
-        get => _scalingHaveMakes;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _scalingHaveMakes, value);
-            this.RaisePropertyChanged(nameof(ScaleToHaveLabel));
-            this.RaisePropertyChanged(nameof(HasScalingHaveMakes));
-        }
-    }
-
-    /// <summary>Whether the amount there is makes any: Scale to only shows when it does.</summary>
-    public bool HasScalingHaveMakes => _scalingHaveMakes > 0;
-
-    /// <summary>The button that scales the tab to <see cref="ScalingHaveMakes"/>: "Scale to 12".</summary>
-    public string ScaleToHaveLabel => $"Scale to {ScalingHaveMakes:#,0}";
-
-    private string _scalingHaveText = string.Empty;
-    /// <summary>What the amount there is makes, "Makes 12 (uses 2,400 g of the 2,500 g)", or why it makes none; empty with nothing asked.</summary>
-    public string ScalingHaveText
-    {
-        get => _scalingHaveText;
-        private set => this.RaiseAndSetIfChanged(ref _scalingHaveText, value);
-    }
-
-    /// <summary>Sets the Scaling tab's Sellable Units to what the amount there is makes.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ScaleToHaveCommand { get; }
-
-    /// <summary>Every made ingredient's BOM lines, by made ingredient, read with every LoadCommand: what the Scaling tab opens a made ingredient into.</summary>
-    private ILookup<int, IngredientBomLine> _bomLines = Array.Empty<IngredientBomLine>().ToLookup(l => l.IngredientId);
-
-    /// <summary>
-    /// The products a composite holds, as saved, for the Scaling tab to open into their recipes: read when the tab first
-    /// needs them (ReadMissingScalingProducts), and again after every LoadCommand and for each product opened.
-    /// </summary>
-    private readonly Dictionary<int, (Product Product, ProductDetail Detail)> _scalingProducts = [];
-
-    /// <summary>Products whose recipe the Scaling tab is reading, so each is read once however often it's asked for.</summary>
-    private readonly HashSet<int> _readingScalingProducts = [];
 
     /// <summary>The products other than this one that use <paramref name="subAssemblyId"/>, by name.</summary>
     private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> usedBy) =>
@@ -964,6 +853,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => CostBasis,
             () => EditingIncludesComponentPackaging,
             (ex, text) => ShowFailure(ex, text));
+        Scaling = new ProductScaling(
+            ScalingInputNow,
+            () => Ingredients.ToDictionary(i => i.Id),
+            () => CostBasis,
+            _savedProducts,
+            (ex, text) => ShowFailure(ex, text));
         _versionedSaves = new VersionedSaves(
             unitOfWork,
             productRepository,
@@ -1043,18 +938,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The Scaling tab is worked out while it shows, and again as anything it scales changes: every change to the
         // recipe, the packaging, a composite's products, the quantity required or the cost basis gives new Costs.
-        this.WhenAnyValue(x => x.Costing.Costs, x => x.ScalingUnits, x => x.SelectedDetailsTab)
-            .Where(_ => SelectedDetailsTab == ScalingTab)
-            .Subscribe(_ => RefreshScaling());
+        this.WhenAnyValue(x => x.SelectedDetailsTab).Subscribe(tab => Scaling.IsShowing = tab == ScalingTab);
+        this.WhenAnyValue(x => x.Costing.Costs).Subscribe(_ => Scaling.Refresh());
         // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
         LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
 
-        this.WhenAnyValue(x => x.ScalingHaveIngredient, x => x.ScalingHaveUnit, x => x.ScalingHaveAmount)
-            .Where(_ => SelectedDetailsTab == ScalingTab)
-            .Subscribe(_ => RefreshScaling());
-        ScaleToHaveCommand = ReactiveCommand.Create(
-            () => { ScalingUnits = ScalingHaveMakes; },
-            this.WhenAnyValue(x => x.ScalingHaveMakes).Select(units => units > 0));
 
         _showLinks =this.WhenAnyValue(x => x.SelectedProduct)
             .Select(product => product is not null)
@@ -1397,8 +1285,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
                 // The Scaling tab opens made ingredients into their BOMs as they are now, and a composite's products
                 // into their recipes as they're saved now, which it reads again when it next shows them.
-                _bomLines = bomLines.ToLookup(l => l.IngredientId);
-                _scalingProducts.Clear();
+                Scaling.TakeLoaded(bomLines.ToLookup(l => l.IngredientId));
 
                 SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
                 if (SelectedProduct is not null)
@@ -2424,7 +2311,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // A composite's lines, and what its products were read to bring, are that composite's.
         ComponentsTable.Clear();
-        _scalingProducts.Clear();
+        Scaling.Forget();
         _savedRecipe = new RecipeDraft([], []);
         Costing.Load(null);
         RefreshLinkableOptions();
@@ -4526,134 +4413,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// The Scaling tab's tree: the recipe as the form holds it (as the Costing tab takes it), scaled to
-    /// <see cref="ScalingUnits"/> sellable units. A composite's products are scaled from their saved recipes, which are read
-    /// the first time they're needed; until then each reads "Reading…".
-    /// </summary>
-    private void RefreshScaling()
-    {
-        List<ProductComponentRow> components = IsEditingComposite
-            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
-            : [];
-        ReadMissingScalingProducts(components.Select(r => r.Product!));
-
-        var recipe = new ScalingRecipe(
-            [.. UsageEdits.Select(u => u.ToPriced())],
-            [.. Packaging.LineEdits.Select(l => l.ToPriced())],
-            [.. components.Select(r => (r.Product!, r.Quantity!.Value))],
-            EditingQuantityRequired,
-            IsEditingComposite && EditingIncludesComponentPackaging);
-        var scaler = new RecipeScaler(_bomLines, Ingredients.ToDictionary(i => i.Id), ScalingProductAt, CostBasis);
-        ScalingRows = scaler.Scale(recipe, ScalingUnits, _detailProductId);
-        ScalingTotalCost = ScalingRows.Sum(r => r.Cost);
-        ScalingPiecesText = EditingQuantityRequired > 1
-            ? $"= {RecipeScalingRules.PiecesFor(ScalingUnits, EditingQuantityRequired):#,0} pieces"
-            : string.Empty;
-        RefreshScalingFromHave(scaler, recipe);
-    }
-
-    /// <summary>
-    /// The Scaling tab's "from what you have" (2026-10-29): the ingredients the recipe takes, kept picked while it still
-    /// takes it, and how many sellable units the amount typed of it makes.
-    /// </summary>
-    private void RefreshScalingFromHave(RecipeScaler scaler, ScalingRecipe recipe)
-    {
-        var ingredients = scaler.IngredientsOf(recipe, _detailProductId);
-        if (!ingredients.Select(i => i.Id).SequenceEqual(ScalingIngredients.Select(i => i.Id)))
-        {
-            ScalingIngredients = ingredients;
-        }
-
-        if (ScalingHaveIngredient is { } picked && ingredients.FirstOrDefault(i => i.Id == picked.Id) is var kept && !ReferenceEquals(kept, picked))
-        {
-            ScalingHaveIngredient = kept;
-        }
-
-        if (ScalingHaveIngredient is not { } ingredient || ScalingHaveAmount is not > 0m || ScalingHaveUnit is not { } unit)
-        {
-            ScalingHaveMakes = 0;
-            ScalingHaveText = string.Empty;
-            return;
-        }
-
-        var grams = ScalingHaveAmount.Value * unit.Grams;
-        var makes = scaler.UnitsFrom(recipe, _detailProductId, ingredient.Id, grams);
-        ScalingHaveMakes = makes;
-        ScalingHaveText = makes > 0
-            ? $"Makes {RecipeScaler.UnitsText(makes, EditingQuantityRequired)}, using {RecipeScaler.GramsText(scaler.GramsOf(recipe, makes, _detailProductId, ingredient.Id))} of the {RecipeScaler.GramsText(grams)}."
-            : $"Not enough for one: one takes {RecipeScaler.GramsText(scaler.GramsOf(recipe, 1m, _detailProductId, ingredient.Id))}.";
-    }
-
-    /// <summary>A product a composite holds, as saved and priced at the screen's cost basis; null while it hasn't been read.</summary>
-    private SavedProduct? ScalingProductAt(int productId) =>
-        _scalingProducts.TryGetValue(productId, out var read) ? SavedProductReader.Build(read.Product, read.Detail, CostBasis) : null;
-
-    /// <summary>
-    /// Reads the saved recipes of the products a composite holds that the Scaling tab hasn't read yet, and those of the
-    /// products any of them holds in turn: off the UI thread, once per product. The tab is worked out again when they arrive.
-    /// </summary>
-    private void ReadMissingScalingProducts(IEnumerable<Product> products)
-    {
-        List<Product> missing = [.. products.DistinctBy(p => p.Id).Where(p => !_scalingProducts.ContainsKey(p.Id) && _readingScalingProducts.Add(p.Id))];
-        if (missing.Count > 0)
-        {
-            _ = ReadScalingProductsAsync(missing);
-        }
-    }
-
-    private async Task ReadScalingProductsAsync(IReadOnlyList<Product> products)
-    {
-        List<(Product Product, ProductDetail Detail)> read = [];
-        try
-        {
-            read = await Task.Run(async () =>
-            {
-                // A composite held in the composite holds products of its own, which the same read brings with it.
-                var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
-                Dictionary<int, Product> productsRead = products.ToDictionary(p => p.Id);
-                foreach (var held in details.Values.SelectMany(d => d.Components).Select(c => c.Component.ComponentProduct!))
-                {
-                    productsRead.TryAdd(held.Id, held);
-                }
-
-                List<(Product Product, ProductDetail Detail)> found = [];
-                foreach (var product in productsRead.Values)
-                {
-                    if (details.TryGetValue(product.Id, out var detail))
-                    {
-                        found.Add((product, detail));
-                    }
-                }
-
-                return found;
-            });
-        }
-        catch (Exception ex)
-        {
-            // Nothing awaits this read, so what went wrong is shown rather than lost. The products keep reading
-            // "Reading…", and the next LoadCommand reads them again.
-            ShowFailure(ex, "Couldn't read the recipe of a product in the Products table");
-        }
-        finally
-        {
-            foreach (var product in products)
-            {
-                _readingScalingProducts.Remove(product.Id);
-            }
-        }
-
-        foreach (var (product, detail) in read)
-        {
-            _scalingProducts[product.Id] = (product, detail);
-        }
-
-        if (read.Count > 0 && SelectedDetailsTab == ScalingTab)
-        {
-            RefreshScaling();
-        }
-    }
-
-    /// <summary>
     /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
     /// the edits made here since, and the product opened here since (the user's choice, 2026-09-27). A sub-assembly form
     /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
@@ -4714,10 +4473,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         CostBasis = CostBasis,
         Scaling = SelectedDetailsTab == ScalingTab
             ? new PrintedScaling(
-                ScalingUnits,
-                EditingQuantityRequired > 1 ? RecipeScalingRules.PiecesFor(ScalingUnits, EditingQuantityRequired) : null,
-                ScalingRows,
-                ScalingTotalCost)
+                this.Scaling.Units,
+                EditingQuantityRequired > 1 ? RecipeScalingRules.PiecesFor(this.Scaling.Units, EditingQuantityRequired) : null,
+                this.Scaling.Rows,
+                this.Scaling.TotalCost)
             : null,
     };
 

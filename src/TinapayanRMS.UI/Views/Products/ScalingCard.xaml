@@ -7,7 +7,7 @@
         The recipe scaled to a number of sellable units: how many is typed at the top, and the tree under it has each
         section in the whole batches that make them, with its lines under it (a made ingredient opening into what it's
         made from), each product a composite holds scaled to its share, and the packaging. Everything is worked out by the
-        ViewModel (ScalingRows); nothing here is typed into but the quantity, which isn't saved.
+        ViewModel (Rows); nothing here is typed into but the quantity, which isn't saved.
     -->
     <DockPanel>
         <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -23,16 +23,16 @@
             <syncfusion:IntegerTextBox Grid.Column="1"
                                        Width="110"
                                        MinValue="1"
-                                       Value="{Binding ScalingUnits, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                       Value="{Binding Units, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                        ToolTip="How many to make: boxes for a Box of 8, pieces for a product sold by the piece. Only for this tab: it isn't saved." />
             <TextBlock Grid.Column="2"
                        Margin="10,0,0,0"
                        VerticalAlignment="Center"
-                       Text="{Binding ScalingPiecesText}"
+                       Text="{Binding PiecesText}"
                        Style="{StaticResource CaptionStyle}" />
 
             <TextBlock Grid.Column="4" VerticalAlignment="Center" Style="{StaticResource FormLabelStyle}" Margin="0">
-                <Run Text="Total Cost" /><Run Text="{Binding ScalingTotalCost, StringFormat='  {0:N2}', Mode=OneWay}" FontWeight="SemiBold" />
+                <Run Text="Total Cost" /><Run Text="{Binding TotalCost, StringFormat='  {0:N2}', Mode=OneWay}" FontWeight="SemiBold" />
             </TextBlock>
         </Grid>
 
@@ -52,8 +52,8 @@
 
             <TextBlock Text="From What You Have" Style="{StaticResource FormLabelStyle}" />
             <syncfusion:ComboBoxAdv Grid.Column="1"
-                                    ItemsSource="{Binding ScalingIngredients}"
-                                    SelectedItem="{Binding ScalingHaveIngredient, Mode=TwoWay}"
+                                    ItemsSource="{Binding Ingredients}"
+                                    SelectedItem="{Binding HaveIngredient, Mode=TwoWay}"
                                     DisplayMemberPath="Name"
                                     IsEditable="True"
                                     AutoCompleteMode="Suggest"
@@ -66,12 +66,12 @@
                                       NumberDecimalDigits="2"
                                       UseNullOption="True"
                                       WatermarkText="Amount"
-                                      Value="{Binding ScalingHaveAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
+                                      Value="{Binding HaveAmount, Converter={StaticResource DecimalValueConverter}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, TargetNullValue={x:Null}}" />
             <syncfusion:ComboBoxAdv Grid.Column="3"
                                     Width="90"
                                     Margin="6,0,0,0"
-                                    ItemsSource="{Binding ScalingHaveUnits}"
-                                    SelectedItem="{Binding ScalingHaveUnit, Mode=TwoWay}"
+                                    ItemsSource="{Binding HaveUnits}"
+                                    SelectedItem="{Binding HaveUnit, Mode=TwoWay}"
                                     DisplayMemberPath="Name"
                                     ToolTip="Grams, or one of the ingredient's own units." />
             <syncfusion:ButtonAdv Grid.Column="4"
@@ -79,13 +79,13 @@
                                   Label="{Binding ScaleToHaveLabel}"
                                   IconTemplate="{StaticResource ApplyIconTemplate}"
                                   Command="{Binding ScaleToHaveCommand}"
-                                  Visibility="{Binding HasScalingHaveMakes, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                  Visibility="{Binding HasHaveMakes, Converter={StaticResource BooleanToVisibilityConverter}}"
                                   ToolTip="Puts this in Sellable Units, so the table shows it." />
             <TextBlock Grid.Column="5"
                        Margin="10,0,0,0"
                        VerticalAlignment="Center"
                        TextWrapping="Wrap"
-                       Text="{Binding ScalingHaveText}"
+                       Text="{Binding HaveText}"
                        Style="{StaticResource CaptionStyle}" />
         </Grid>
 
@@ -109,7 +109,7 @@
         -->
         <syncfusion:SfTreeGrid skinManager:SfSkinManager.Theme="{skinManager:SkinManagerExtension ThemeName=Windows11Light}"
                                skinManager:SfSkinManager.SizeMode="Default"
-                               ItemsSource="{Binding ScalingRows}"
+                               ItemsSource="{Binding Rows}"
                                ChildPropertyName="Children"
                                AutoExpandMode="AllNodesExpanded"
                                ExpanderColumn="Name"

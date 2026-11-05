@@ -112,7 +112,7 @@
                     -->
                     <syncfusion:TabItemExt Header="Scaling" CanClose="False">
                         <Border Padding="12">
-                            <p:ScalingCard />
+                            <p:ScalingCard DataContext="{Binding Scaling}" />
                         </Border>
                     </syncfusion:TabItemExt>
 

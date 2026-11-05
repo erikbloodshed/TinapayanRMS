@@ -62,7 +62,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
         viewModel.EditingQuantityRequired = 8;
-        viewModel.ScalingUnits = 5;
+        viewModel.Scaling.Units = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
 
         var printout = await PrintAsync(viewModel);
@@ -71,7 +71,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.Scaling.Should().NotBeNull();
         var scaling = printout.Scaling!;
         (scaling.Units, scaling.Pieces, scaling.TotalCost).Should().Be((5, 40m, 100m));
-        scaling.Rows.Should().Equal(viewModel.ScalingRows, "the pages are the tab as it shows");
+        scaling.Rows.Should().Equal(viewModel.Scaling.Rows, "the pages are the tab as it shows");
         scaling.Rows.Single().Detail.Should().Be("2 batches · 40 pcs");
 
         // The Print tab, shown again with the Recipe tab showing on Products, follows it.

@@ -27,18 +27,18 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
-        viewModel.ScalingRows.Should().BeEmpty("the tab is only worked out while it shows");
+        viewModel.Scaling.Rows.Should().BeEmpty("the tab is only worked out while it shows");
 
-        viewModel.ScalingUnits = 150;
+        viewModel.Scaling.Units = 150;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
 
         // 150 pieces of a 100-piece batch: 2 batches, 1,800 g of flour and 200 g of syrup, which is 200 g of sugar.
-        var dough = viewModel.ScalingRows.Should().ContainSingle().Subject;
+        var dough = viewModel.Scaling.Rows.Should().ContainSingle().Subject;
         (dough.Name, dough.Detail, dough.AmountText).Should().Be(("Dough", "2 batches · 200 pcs (50 extra)", "2,000 g"));
         dough.Children.Select(r => (r.Name, r.AmountText)).Should().Equal(("Flour", "1,800 g"), ("Syrup", "200 g"));
         dough.Children[1].Children.Select(r => (r.Name, r.AmountText, r.Cost)).Should().Equal(("Sugar", "200 g", 18m));
-        viewModel.ScalingTotalCost.Should().Be(108m, "1,800 g of flour at 0.05 and 200 g of syrup at 0.09");
-        viewModel.ScalingPiecesText.Should().BeEmpty("a unit is one piece");
+        viewModel.Scaling.TotalCost.Should().Be(108m, "1,800 g of flour at 0.05 and 200 g of syrup at 0.09");
+        viewModel.Scaling.PiecesText.Should().BeEmpty("a unit is one piece");
         viewModel.History.IsDirty.Should().BeFalse("the number to scale to isn't an edit");
     });
 
@@ -47,14 +47,14 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
-        viewModel.ScalingUnits = 20;
+        viewModel.Scaling.Units = 20;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
-        viewModel.ScalingRows.Single().Detail.Should().Be("1 batch · 100 pcs (80 extra)");
+        viewModel.Scaling.Rows.Single().Detail.Should().Be("1 batch · 100 pcs (80 extra)");
 
         viewModel.EditingQuantityRequired = 8;
 
-        viewModel.ScalingRows.Single().Detail.Should().Be("2 batches · 200 pcs (40 extra)", "20 boxes of 8 are 160 pieces");
-        viewModel.ScalingPiecesText.Should().Be("= 160 pieces");
+        viewModel.Scaling.Rows.Single().Detail.Should().Be("2 batches · 200 pcs (40 extra)", "20 boxes of 8 are 160 pieces");
+        viewModel.Scaling.PiecesText.Should().Be("= 160 pieces");
     });
 
     [Fact]
@@ -73,15 +73,15 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
             Cancellation);
         var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
 
-        viewModel.ScalingUnits = 5;
+        viewModel.Scaling.Units = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
         await WaitUntilSettledAsync(
-            () => viewModel.ScalingRows.Count == 2 && viewModel.ScalingRows.All(r => r.Detail != RecipeScaler.ReadingText),
-            () => string.Join(", ", viewModel.ScalingRows.Select(r => $"{r.Name}: {r.Detail}")));
+            () => viewModel.Scaling.Rows.Count == 2 && viewModel.Scaling.Rows.All(r => r.Detail != RecipeScaler.ReadingText),
+            () => string.Join(", ", viewModel.Scaling.Rows.Select(r => $"{r.Name}: {r.Detail}")));
 
-        viewModel.ScalingRows.Select(r => (r.Name, r.Detail)).Should().Equal(("Ensaymada × 6", "30 pcs"), ("Cheese Roll × 4", "20 pcs"));
-        viewModel.ScalingRows[0].Children.Single().Detail.Should().Be("1 batch · 100 pcs (70 extra)");
-        viewModel.ScalingRows[1].Children.Single().Detail.Should().Be("2 batches · 20 pcs", "10 of 100 g from a 1,000 g batch");
+        viewModel.Scaling.Rows.Select(r => (r.Name, r.Detail)).Should().Equal(("Ensaymada × 6", "30 pcs"), ("Cheese Roll × 4", "20 pcs"));
+        viewModel.Scaling.Rows[0].Children.Single().Detail.Should().Be("1 batch · 100 pcs (70 extra)");
+        viewModel.Scaling.Rows[1].Children.Single().Detail.Should().Be("2 batches · 20 pcs", "10 of 100 g from a 1,000 g batch");
     });
 
     [Fact]
@@ -92,15 +92,15 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", await RoleIdAsync("Dough"), [(flourId, 1000m)], weightPerPiece: 100m);
         var viewModel = await OpenAsync(productId);
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
-        viewModel.ScalingUnits = 25;
+        viewModel.Scaling.Units = 25;
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
         await WaitUntilSettledAsync(
             () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
-        viewModel.ScalingUnits.Should().Be(25);
-        viewModel.ScalingRows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
+        viewModel.Scaling.Units.Should().Be(25);
+        viewModel.Scaling.Rows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
     });
 
     [Fact]
@@ -110,29 +110,29 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         var viewModel = await OpenAsync(productId);
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
 
-        viewModel.ScalingIngredients.Select(i => i.Name).Should().Equal("Flour", "Syrup", "Sugar");
+        viewModel.Scaling.Ingredients.Select(i => i.Name).Should().Equal("Flour", "Syrup", "Sugar");
 
         // 900 g of flour a batch of 100: 2,000 g covers 2 batches, so 200, not 222.
-        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[0];
-        viewModel.ScalingHaveAmount = 2000m;
-        viewModel.ScalingHaveMakes.Should().Be(200);
-        viewModel.ScalingHaveText.Should().Be("Makes 200 pcs, using 1,800 g of the 2,000 g.");
+        viewModel.Scaling.HaveIngredient = viewModel.Scaling.Ingredients[0];
+        viewModel.Scaling.HaveAmount = 2000m;
+        viewModel.Scaling.HaveMakes.Should().Be(200);
+        viewModel.Scaling.HaveText.Should().Be("Makes 200 pcs, using 1,800 g of the 2,000 g.");
 
         // Sugar is in the syrup: 100 g a batch.
-        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[2];
-        viewModel.ScalingHaveAmount = 150m;
-        viewModel.ScalingHaveMakes.Should().Be(100);
+        viewModel.Scaling.HaveIngredient = viewModel.Scaling.Ingredients[2];
+        viewModel.Scaling.HaveAmount = 150m;
+        viewModel.Scaling.HaveMakes.Should().Be(100);
 
-        viewModel.ScalingHaveIngredient = viewModel.ScalingIngredients[0];
-        viewModel.ScalingHaveAmount = 500m;
-        viewModel.ScalingHaveMakes.Should().Be(0);
-        viewModel.ScalingHaveText.Should().Be("Not enough for one: one takes 900 g.");
-        (await viewModel.ScaleToHaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.Scaling.HaveIngredient = viewModel.Scaling.Ingredients[0];
+        viewModel.Scaling.HaveAmount = 500m;
+        viewModel.Scaling.HaveMakes.Should().Be(0);
+        viewModel.Scaling.HaveText.Should().Be("Not enough for one: one takes 900 g.");
+        (await viewModel.Scaling.ScaleToHaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
 
-        viewModel.ScalingHaveAmount = 2000m;
-        await viewModel.ScaleToHaveCommand.Execute();
-        viewModel.ScalingUnits.Should().Be(200);
-        viewModel.ScalingRows.Single().Detail.Should().Be("2 batches · 200 pcs");
+        viewModel.Scaling.HaveAmount = 2000m;
+        await viewModel.Scaling.ScaleToHaveCommand.Execute();
+        viewModel.Scaling.Units.Should().Be(200);
+        viewModel.Scaling.Rows.Single().Detail.Should().Be("2 batches · 200 pcs");
         viewModel.History.IsDirty.Should().BeFalse("none of it is an edit");
     });
 
