@@ -13,7 +13,7 @@ This manual is for developers who build, maintain or extend the app. It explains
 | [PLAN.md](../PLAN.md) and [docs/plan/](plan/) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade and conventions in PLAN.md; each main screen's design notes, the Syncfusion notes and the build plan in `docs/plan/` |
 | [CLAUDE.md](../CLAUDE.md) | AI coding agents | The commands and rules an agent needs before it changes the code |
 
-PLAN.md is long: an overview ("At a glance"), then about 800 lines of very long bullets. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts moved to `docs/plan/` on 2026-10-28 and are still part of it.
+PLAN.md is long: an overview ("At a glance"), then about 650 lines of long bullets, describing the app as it is now. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts are in `docs/plan/` and are still part of it; the build plan's dated log there holds the history.
 
 ## Contents
 
