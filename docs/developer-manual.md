@@ -184,6 +184,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | One test project | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests` |
 | One test class | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --filter-class "*UnitConversionRulesTests"` |
 | One test | `dotnet test --project tests/TinapayanRMS.UI.Tests --filter-method "*Declining_the_question_saves_nothing"` |
+| Only the test projects your changes reach (see [Running fewer tests while developing](#running-fewer-tests-while-developing)) | `powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1` |
+| One class again each time you save, by hot reload | `powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"` |
 | Coverage (a Cobertura report in `TestResults/`) | `dotnet test --solution TinapayanRMS.slnx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml` |
 | Add a migration | `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure` |
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
@@ -195,7 +197,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Run the Recipe API (see [The Recipe API](#the-recipe-api)), then try it | `dotnet run --project src/TinapayanRMS.RecipeApi`, then `curl http://localhost:5290/api/v1/mixes` |
 | Install the Recipe API for this Windows user, starting at sign-in (in an administrator PowerShell to let the LAN in) | `powershell -ExecutionPolicy Bypass -File scripts/Install-RecipeApi.ps1` |
 
-The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead.
+The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead. A test project run directly (`dotnet run`, or its `.exe`) runs on it too, with the same options (`UseMicrosoftTestingPlatformRunner` in `tests/Directory.Build.props`, 2026-11-05); before, that ran xUnit's own console runner, whose options are `-class` and `-xml`.
 
 Close any copy of the app you have running before you build. A running app locks its own output files.
 
@@ -1096,6 +1098,14 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 | `RecipeApi.Tests` | `Endpoints/` (`RecipeApiTests`): each endpoint served in memory on the API's read-only connection, the key when one is set, and the connection refusing a write | PostgreSQL |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
 
+### Running fewer tests while developing
+
+The whole suite takes 4 to 6 minutes on this PC. While you work, two scripts run less of it (2026-11-05). Before a commit or a merge, run it all: both pick by project or by name, so they can miss a test of something a change reaches some other way.
+
+- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the UI runs `UI.Tests` alone (about 3 minutes, where all of them take 4 to 6); one to `Pricing` runs Pricing, UI, Mcp and RecipeApi's tests; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the UI's `appsettings.json` reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran".
+- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter, a XAML file) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class` or `-Method`, not both; with neither, the whole project runs after each save. Stop it with Ctrl+C.
+- **Don't run a project two ways at once.** A watcher holds its project's build, so a `dotnet build` of it fails on locked files, and it uses the project's test databases, so a second run would reset them under its tests. `Test-Changed.ps1` and `Watch-Tests.ps1` refuse to start while that project's tests are running already.
+- **Both hand `dotnet` the repo's path as your terminal spells it.** The build records each project's folder with its drive letter's case, so `C:\…` after `c:\…` would recompile every project (see "Build configuration").
 ### The database fixtures
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.

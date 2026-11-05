@@ -15,6 +15,8 @@ dotnet build TinapayanRMS.slnx
 dotnet test --solution TinapayanRMS.slnx                                          # all tests
 dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --filter-class "*UnitConversionRulesTests"
 dotnet test --project tests/TinapayanRMS.UI.Tests --filter-method "*SomeTestName"
+powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1               # only the test projects your changes reach (-List, -Class, -Since)
+powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*X*" # rerun a class on each save, by hot reload
 dotnet run --project src/TinapayanRMS.UI                                          # the build needs SYNCFUSION_LICENSE_KEY
 dotnet run --project src/TinapayanRMS.RecipeApi                                   # the Recipe API, http://localhost:5290/api/v1
 
@@ -24,6 +26,7 @@ dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infras
 dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels
 ```
 
+- **While developing, run what a change reaches:** `scripts/Test-Changed.ps1` picks the test projects from the project references (a UI change runs `UI.Tests` alone). The full suite still decides when work is done. Neither script runs while that project's tests already are, as both would reset its test databases: stop any `Watch-Tests.ps1` first.
 - **Migrations come only from `dotnet ef migrations add`.** Never write or edit one by hand. `TinapayanRMSDbContextFactory` provides the design-time DbContext.
 - **The app runs on a compiled EF Core model** (`Infrastructure/CompiledModels/`, found by EF without a `UseModel` call). Regenerate it with `dotnet ef dbcontext optimize` (above) after any model change, and never edit it by hand. `CompiledModelTests` fail while it's stale.
 - **Work counts as done** when the solution builds, all tests pass, and any new migration applies cleanly to the local database. A change users can see (a screen, button, field, rule or cost formula) also updates the user manual, `docs/user-manual.md`, in the same change. A change to anything the developer manual, `docs/developer-manual.md`, describes (the setup, commands, solution layout, architecture, a pattern or convention, or a type or file it names) also updates it in the same change.
