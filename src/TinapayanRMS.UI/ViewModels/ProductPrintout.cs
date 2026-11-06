@@ -167,7 +167,7 @@ public sealed record PrintedSection(
             ? SubAssemblyRules.CalculateBakersPercent(grams, formulaBase)
             : SubAssemblyRules.CalculateAbsolutePercent(grams, section.TotalWeight);
         PrintedLine Line(SectionLine line) =>
-            new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis), line.IsFormulaBase);
+            new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis));
 
         return new(
             section.SectionName,
@@ -185,12 +185,14 @@ public sealed record PrintedSection(
     }
 }
 
-/// <summary>One ingredient of a section, or one of the product's add-ins on a linked one.</summary>
+/// <summary>
+/// One ingredient of a section, or one of the product's add-ins on a linked one. Whether it's part of the formula's base
+/// isn't printed: the recipe tab's Base column stays on the screen.
+/// </summary>
 /// <param name="Percent">Its share of the formula, in the section's <see cref="PrintedSection.PercentHeader"/>; null for an empty batch.</param>
 /// <param name="CostPerGram">The ingredient's cost per gram (buffered, unless the printout isn't), as the recipe form's Cost/g column shows it.</param>
 /// <param name="Cost">What it adds to the batch's cost, at <paramref name="CostPerGram"/>.</param>
-/// <param name="IsFormulaBase">Part of the formula's 100% base, usually the flour.</param>
-public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost, bool IsFormulaBase)
+public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Percent, decimal CostPerGram, decimal Cost)
 {
     /// <summary>On the Price Simulator report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowCost { get; init; }

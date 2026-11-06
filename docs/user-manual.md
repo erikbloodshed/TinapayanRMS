@@ -843,6 +843,7 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it prints the version picked there, at its costs then (see [History tab](#history-tab)).
 
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
+- Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
 - **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
 - The preview's own controls set the printer, paper, orientation and margins.
 

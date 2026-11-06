@@ -42,7 +42,7 @@ public class ProductPrintManagerTests
     public void The_pages_embed_only_subsets_of_their_fonts_as_Microsoft_Print_to_PDF_needs() => StaThread.RunLicensed(() =>
     {
         // A formula base's tick, typed as ✓, came from Segoe UI Emoji, which the pages then embedded whole (8 MB), and
-        // Microsoft Print to PDF's filter gave up on them: the PDF came out empty. The tick is drawn now.
+        // Microsoft Print to PDF's filter gave up on them: the PDF came out empty. The pages keep to what Segoe UI has.
         using var manager = new ProductPrintManager(SamplePrintouts.WithLines(15));
         var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.xps");
         try

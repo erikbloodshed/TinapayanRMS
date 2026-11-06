@@ -35,7 +35,7 @@ internal static class SamplePrintouts
                 "Dough",
                 "Variety Bread Dough, from Sub-Assemblies",
                 "Baker's %",
-                [.. Enumerable.Range(1, lineCount).Select(i => new PrintedLine($"Ingredient {i}", 100m, 10m, CostPerGram: 0.05m, 5m, IsFormulaBase: i == 1))],
+                [.. Enumerable.Range(1, lineCount).Select(i => new PrintedLine($"Ingredient {i}", 100m, 10m, CostPerGram: 0.05m, 5m))],
                 [],
                 TotalWeight: 100m * lineCount,
                 TotalPercent: 10m * lineCount,
