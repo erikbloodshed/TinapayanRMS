@@ -7,8 +7,8 @@ namespace TinapayanRMS.UI.Tests.Printing;
 internal static class SamplePrintouts
 {
     /// <summary>
-    /// Syncfusion's default page (PrintSettingsBase), A4 less 2.5 cm margins, in device-independent pixels: what the page
-    /// leaves for the printout, worked out as ProductPrintManager.PrintableSize works it out.
+    /// A4 (ProductPrintManager.A4, Syncfusion's own starting page) less its 2.5 cm margins, in device-independent pixels:
+    /// what the page leaves for the printout, worked out as ProductPrintManager.PrintableSize works it out.
     /// </summary>
     public static readonly System.Windows.Size A4Printable = new(793.7 - 94.49 - 94.49, 1122.52 - 94.49 - 94.49);
 

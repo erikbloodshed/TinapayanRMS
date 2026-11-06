@@ -1030,7 +1030,7 @@ The Products screen prints a product, its scaled recipe, or a whole folder of pr
 2. A **`ProductPrintout`** (immutable records, in `ViewModels/ProductPrintout.cs`) holds what's printed. It's taken from the screen as shown, unsaved edits included, or from `SavedProductReader` for a set of saved products.
 3. **`ProductPrintLayout`** builds the page content in code, as blocks.
 4. **`PrintPagination`** is pure: it splits the blocks into pages, keeps headings with what follows them, and continues a long table under "(continued)".
-5. **`ProductPrintManager`**, a subclass of Syncfusion's `PrintManager`, lays the printout out again whenever the paper, margins or orientation change. It overrides `PrintDocument` to print on the printer's own ticket and to report errors, which the base class swallows.
+5. **`ProductPrintManager`**, a subclass of Syncfusion's `PrintManager`, lays the printout out again whenever the paper, margins or orientation change. It starts on the paper it's given: the Print tab and `PrintPreviewWindow` give it `ProductPrintManager.DefaultPrinterPaper()`, the Windows default printer's, and the tests a fixed `ProductPrintManager.A4`. It overrides `PrintDocument` to print on the printer's own ticket and to report errors, which the base class swallows.
 6. Syncfusion's **`PrintPreview`** pane shows the pages. `PrintPaneFit` and `PrintPaneTemplates.xaml` fit the pane to the app's 14 px text. The window must be themed before the pane goes into it.
 
 ### Exporting to Excel

@@ -29,8 +29,9 @@ public sealed partial class PrintPreviewWindow : AppWindow
         Heading.Text = $"Print: {Title}";
         SfSkinManager.SetTheme(this, theme);
 
-        // Both go with the window: disposed when it closes.
-        var manager = new ProductPrintManager(set);
+        // Both go with the window: disposed when it closes. It starts on the default printer's paper, as the pane starts on
+        // that printer.
+        var manager = new ProductPrintManager(set, ProductPrintManager.DefaultPrinterPaper());
         var preview = new PrintPreview(manager);
         PrintPaneFit.Apply(preview);
         PreviewHost.Content = preview;

@@ -56,8 +56,8 @@ public sealed partial class ProductPrintView : UserControl, IDisposable
         }
 
         // The main window is themed before any of this, so the pane comes into a themed tree: the order it needs
-        // (PrintPreviewThemeOrderTests).
-        _manager = new ProductPrintManager(set);
+        // (PrintPreviewThemeOrderTests). It starts on the default printer's paper, as the pane starts on that printer.
+        _manager = new ProductPrintManager(set, ProductPrintManager.DefaultPrinterPaper());
         _preview = new PrintPreview(_manager);
         PrintPaneFit.Apply(_preview);
         PreviewHost.Content = _preview;
