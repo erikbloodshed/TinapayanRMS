@@ -5,7 +5,6 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
 using AwesomeAssertions;
-using Syncfusion.SfSkinManager;
 using Syncfusion.Windows.Shared.Printing;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
@@ -78,42 +77,9 @@ public class PrintPaneFitTests
 
     private static void WithPane(Action<PrintPreview> check) => WithPane((preview, _) => check(preview));
 
-    /// <summary>Opens a fitted pane over a printout in a themed window off-screen, runs <paramref name="check"/>, and closes it.</summary>
-    private static void WithPane(Action<PrintPreview, ProductPrintManager> check) => StaThread.RunThemed(() =>
-    {
-        using var manager = new ProductPrintManager(SamplePrintouts.WithLines(10));
-        var host = new ContentControl();
-        var window = new Window
-        {
-            Content = host,
-            Width = 1200,
-            Height = 760,
-            Left = -20000,
-            Top = -20000,
-            WindowStartupLocation = WindowStartupLocation.Manual,
-            ShowActivated = false,
-            ShowInTaskbar = false,
-        };
-        try
-        {
-            // Themed first, then the pane, as it comes into the themed main window (PrintPreviewThemeOrderTests).
-            SfSkinManager.SetTheme(window, new Theme("Windows11Light"));
-            var preview = new PrintPreview(manager);
-            PrintPaneFit.Apply(preview);
-            host.Content = preview;
+    private static void WithPane(Action<PrintPreview, ProductPrintManager> check) => OffscreenPrintPane.Run(ProductPrintManager.A4, check);
 
-            window.Show();
-            OffscreenGrid.Pump();
-            check(preview, manager);
-        }
-        finally
-        {
-            window.Close();
-        }
-    });
-
-    private static PrintOptionsControl Options(PrintPreview preview) =>
-        (PrintOptionsControl)preview.Template.FindName("PART_PrintOptionsControl", preview);
+    private static PrintOptionsControl Options(PrintPreview preview) => OffscreenPrintPane.Options(preview);
 
     /// <summary>What <paramref name="text"/> takes on one line in <paramref name="element"/>'s font.</summary>
     private static (string Text, double Width, double Height) Needs(Control element, string text) =>

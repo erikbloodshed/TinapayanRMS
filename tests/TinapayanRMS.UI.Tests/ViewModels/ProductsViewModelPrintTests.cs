@@ -46,8 +46,8 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.SaveNote.Should().BeNull("nothing was changed since it was saved");
 
         printout.Sections.Select(s => s.Name).Should().Equal("Dough", "Filling");
-        printout.Sections[0].Lines.Should().Equal(new PrintedLine("Flour", 1000m, 100m, CostPerGram: 0.05m, 50m, IsFormulaBase: false));
-        printout.Sections[1].Lines.Should().Equal(new PrintedLine("Sugar", 200m, 100m, CostPerGram: 0.09m, 18m, IsFormulaBase: false));
+        printout.Sections[0].Lines.Should().Equal(new PrintedLine("Flour", 1000m, 100m, CostPerGram: 0.05m, 50m));
+        printout.Sections[1].Lines.Should().Equal(new PrintedLine("Sugar", 200m, 100m, CostPerGram: 0.09m, 18m));
         (printout.Sections[0].WeightPerPiece, printout.Sections[0].Yield).Should().Be((50m, 20m));
 
         printout.Packaging.Should().NotBeNull();

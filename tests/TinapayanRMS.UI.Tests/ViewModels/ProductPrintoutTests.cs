@@ -41,10 +41,10 @@ public class ProductPrintoutTests
         section.Source.Should().BeNull("the section is the product's own");
         section.PercentHeader.Should().Be("Baker's %");
         section.Lines.Should().Equal(
-            new PrintedLine("Bread Flour", 700m, 70m, CostPerGram: 0.05m, 35m, IsFormulaBase: true),
-            new PrintedLine("Cake Flour", 300m, 30m, CostPerGram: 0.06m, 18m, IsFormulaBase: true),
-            new PrintedLine("Water", 650m, 65m, CostPerGram: 0m, 0m, IsFormulaBase: false),
-            new PrintedLine("Salt", 20m, 2m, CostPerGram: 0.02m, 0.4m, IsFormulaBase: false));
+            new PrintedLine("Bread Flour", 700m, 70m, CostPerGram: 0.05m, 35m),
+            new PrintedLine("Cake Flour", 300m, 30m, CostPerGram: 0.06m, 18m),
+            new PrintedLine("Water", 650m, 65m, CostPerGram: 0m, 0m),
+            new PrintedLine("Salt", 20m, 2m, CostPerGram: 0.02m, 0.4m));
         section.AddIns.Should().BeEmpty();
         (section.TotalWeight, section.TotalPercent, section.BatchCost).Should().Be((1670m, (decimal?)167m, 53.4m));
     }
@@ -67,7 +67,7 @@ public class ProductPrintoutTests
         var section = PrintedSection.From(usage.ToPriced(), CostBasis.Buffered);
 
         section.Source.Should().Be("Variety Bread Dough, from Sub-Assemblies");
-        section.AddIns.Should().Equal(new PrintedLine("Ube Flavouring", 20m, 2m, CostPerGram: 0.5m, 10m, IsFormulaBase: false));
+        section.AddIns.Should().Equal(new PrintedLine("Ube Flavouring", 20m, 2m, CostPerGram: 0.5m, 10m));
         (section.TotalWeight, section.TotalPercent, section.BatchCost).Should().Be((1620m, (decimal?)162m, 60m), "the add-ins are part of the batch");
     }
 

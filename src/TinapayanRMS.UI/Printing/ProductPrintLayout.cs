@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -39,8 +38,9 @@ public sealed class ProductPrintLayout
 
     // A table's columns: its first takes what the page has left, and each figure a fixed width.
     // Without the costing, the recipe's tables leave out their cost columns: nothing on the pages is a cost.
-    private static readonly GridLength[] RecipeColumns = [new(1, GridUnitType.Star), new(80), new(72), new(100), new(80), new(44)];
-    private static readonly GridLength[] RecipeColumnsWithoutCosts = [new(1, GridUnitType.Star), new(90), new(80), new(44)];
+    // A recipe table has no Base column: the recipe tab's ticks aren't printed.
+    private static readonly GridLength[] RecipeColumns = [new(1, GridUnitType.Star), new(80), new(72), new(100), new(80)];
+    private static readonly GridLength[] RecipeColumnsWithoutCosts = [new(1, GridUnitType.Star), new(90), new(80)];
     private static readonly GridLength[] PackagingColumns = [new(1, GridUnitType.Star), new(70), new(64), new(90), new(90)];
     private static readonly GridLength[] PackagingColumnsWithoutCosts = [new(1, GridUnitType.Star), new(70), new(64)];
     private static readonly GridLength[] ComponentColumns = [new(1, GridUnitType.Star), new(70), new(100), new(90)];
@@ -53,7 +53,7 @@ public sealed class ProductPrintLayout
 
     // The Price Simulator report's: its tables have a Cost Now column after their cost, and its costing sets today's
     // figures beside the simulated ones.
-    private static readonly GridLength[] RecipeColumnsWithNow = [new(1, GridUnitType.Star), new(70), new(64), new(84), new(72), new(72), new(40)];
+    private static readonly GridLength[] RecipeColumnsWithNow = [new(1, GridUnitType.Star), new(70), new(64), new(84), new(72), new(72)];
     private static readonly GridLength[] PackagingColumnsWithNow = [new(1, GridUnitType.Star), new(60), new(56), new(84), new(80), new(80)];
     private static readonly GridLength[] ComponentColumnsWithNow = [new(1, GridUnitType.Star), new(60), new(90), new(80), new(80)];
     private static readonly GridLength[] ComponentColumnsWithPackagingAndNow = [new(1, GridUnitType.Star), new(50), new(84), new(96), new(80), new(80)];
@@ -358,10 +358,10 @@ public sealed class ProductPrintLayout
     /// A recipe table's cells: its cost per gram and cost only while the costing is printed, and on the Price Simulator report its
     /// cost now after them.
     /// </summary>
-    private T[] RecipeCells<T>(T ingredient, T grams, T percent, T costPerGram, T cost, T now, T isBase) =>
-        !_includeCosting ? [ingredient, grams, percent, isBase]
-        : _nowColumn ? [ingredient, grams, percent, costPerGram, cost, now, isBase]
-        : [ingredient, grams, percent, costPerGram, cost, isBase];
+    private T[] RecipeCells<T>(T ingredient, T grams, T percent, T costPerGram, T cost, T now) =>
+        !_includeCosting ? [ingredient, grams, percent]
+        : _nowColumn ? [ingredient, grams, percent, costPerGram, cost, now]
+        : [ingredient, grams, percent, costPerGram, cost];
 
     /// <summary>A packaging table's cells: its unit cost and cost only while the costing is printed, and on the Price Simulator report its cost now.</summary>
     private T[] PackagingCells<T>(T material, T qty, T unit, T unitCost, T cost, T now) =>
@@ -441,7 +441,7 @@ public sealed class ProductPrintLayout
     {
         Add(repeat => SectionHeading(section.Name, section.Source, repeat), keepWithNext: true, table: table, repeats: true);
         Add(
-            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost/g", "Cost", "Cost Now", "Base"), isLastCentred: true),
+            _ => HeaderRow(RecipeTable, RecipeCells("Ingredient", "Grams", section.PercentHeader, "Cost/g", "Cost", "Cost Now")),
             keepWithNext: true,
             table: table,
             repeats: true);
@@ -455,7 +455,7 @@ public sealed class ProductPrintLayout
         }
 
         Add(
-            _ => TotalRow(RecipeTable, RecipeCells("Total", Grams(section.TotalWeight), Percent(section.TotalPercent), string.Empty, Money(section.BatchCost), section.NowBatchCost is { } now ? Money(now) : string.Empty, string.Empty)),
+            _ => TotalRow(RecipeTable, RecipeCells("Total", Grams(section.TotalWeight), Percent(section.TotalPercent), string.Empty, Money(section.BatchCost), section.NowBatchCost is { } now ? Money(now) : string.Empty)),
             keepWithNext: true,
             table: table);
         Add(_ => Caption(PieceSizeText(section, withCost: _includeCosting)), table: table);
@@ -473,8 +473,7 @@ public sealed class ProductPrintLayout
                     Figure(Percent(line.Percent)),
                     Figure(UnitMoney(line.CostPerGram), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
                     Figure(Money(line.Cost), foreground: Moved(line.NowCost), weight: MovedWeight(line.NowCost)),
-                    Figure(line.NowCost is { } now ? Money(now) : string.Empty, foreground: _muted),
-                    Tick(line.IsFormulaBase))),
+                    Figure(line.NowCost is { } now ? Money(now) : string.Empty, foreground: _muted))),
                 keepWithNext: keepLastWithNext && i == lines.Count - 1,
                 table: table);
         }
@@ -765,16 +764,14 @@ public sealed class ProductPrintLayout
 
     /// <summary>
     /// A table's header row, on a band: its first heading on the left over the names, the others on the right over their
-    /// figures, or centred over a column of ticks (<paramref name="isLastCentred"/>).
+    /// figures.
     /// </summary>
-    private Border HeaderRow(GridLength[] columns, string[] headings, bool isLastCentred = false) =>
+    private Border HeaderRow(GridLength[] columns, string[] headings) =>
         Row(
             columns,
             [.. headings.Select((heading, i) => i == 0
                 ? Label(heading, SmallSize, _muted, FontWeights.SemiBold)
-                : isLastCentred && i == headings.Length - 1
-                    ? Mark(heading, SmallSize, _muted, FontWeights.SemiBold)
-                    : Figure(heading, SmallSize, _muted, FontWeights.SemiBold, wrap: true))],
+                : Figure(heading, SmallSize, _muted, FontWeights.SemiBold, wrap: true))],
             _band,
             rule: false);
 
@@ -934,7 +931,7 @@ public sealed class ProductPrintLayout
     // Rows and cells.
 
     /// <summary>A table row: <paramref name="cells"/> in <paramref name="columns"/>, the same widths in every row of the table, so they line up.</summary>
-    private Border Row(GridLength[] columns, IReadOnlyList<FrameworkElement> cells, Brush? background = null, bool rule = true)
+    private Border Row(GridLength[] columns, TextBlock[] cells, Brush? background = null, bool rule = true)
     {
         var grid = new Grid();
         foreach (var width in columns)
@@ -942,7 +939,7 @@ public sealed class ProductPrintLayout
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
         }
 
-        for (var i = 0; i < cells.Count; i++)
+        for (var i = 0; i < cells.Length; i++)
         {
             Grid.SetColumn(cells[i], i);
             grid.Children.Add(cells[i]);
@@ -989,46 +986,6 @@ public sealed class ProductPrintLayout
         var figure = Text(text, size, foreground, weight, TextAlignment.Right, wrap);
         figure.Margin = CellPadding;
         return figure;
-    }
-
-    /// <summary>
-    /// A formula-base line's tick, as the recipe tab's Base column shows it: drawn, not typed. Segoe UI has no ✓, and WPF
-    /// takes the one it falls back to from Segoe UI Emoji, which printing embeds whole (8 MB) and Microsoft Print to PDF
-    /// can't print: its PDF came out empty.
-    /// </summary>
-    private FrameworkElement Tick(bool isFormulaBase) =>
-        isFormulaBase
-            ? new Path
-            {
-                Data = TickShape,
-                Stroke = _text,
-                StrokeThickness = 1.4,
-                StrokeLineJoin = PenLineJoin.Round,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Round,
-                Width = 10,
-                Height = 8,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            }
-            : new Border();
-
-    /// <summary>A tick in a 10 × 8 box. Frozen, so pages built on any thread can share it.</summary>
-    private static readonly Geometry TickShape = FrozenGeometry("M 1,4.5 L 3.8,7.2 L 9,1.2");
-
-    private static Geometry FrozenGeometry(string data)
-    {
-        var geometry = Geometry.Parse(data);
-        geometry.Freeze();
-        return geometry;
-    }
-
-    /// <summary>Text centred in its column: the header over the ticks.</summary>
-    private TextBlock Mark(string text, double size = BodySize, Brush? foreground = null, FontWeight? weight = null)
-    {
-        var mark = Text(text, size, foreground, weight, TextAlignment.Center);
-        mark.Margin = CellPadding;
-        return mark;
     }
 
     /// <summary>A line of print. Left empty, it's for runs of its own to be added to.</summary>

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,17 +18,72 @@ namespace TinapayanRMS.UI.Printing;
 /// pages one at a time as it scrolls (PrintPreviewPanel), and printing asks for every page again for page controls of its
 /// own.
 /// </summary>
-public sealed class ProductPrintManager(ProductPrintSet printSet) : PrintManager(new PrintSettingsBase())
+public sealed class ProductPrintManager : PrintManager
 {
+    /// <summary>
+    /// A4, Syncfusion's own starting page (PrintSettingsBase), in device-independent pixels: the paper when Windows has no
+    /// default printer to ask.
+    /// </summary>
+    public static readonly Size A4 = new(793.7, 1122.52);
+
     private ProductPrintLayout? _layout;
 
+    /// <summary><paramref name="printSet"/>, laid out on <paramref name="paper"/> until another is picked in the pane.</summary>
+    /// <param name="paper">
+    /// The paper the pane starts on, portrait whichever way it's given: <see cref="DefaultPrinterPaper"/> in the app. The
+    /// pane picks the printer's paper nearest it in its paper list.
+    /// </param>
+    public ProductPrintManager(ProductPrintSet printSet, Size paper)
+        : base(PortraitSettings(paper))
+    {
+        _printSet = printSet;
+
+        // The page itself starts on the paper too, not only the settings: the pane's paper list picks the paper nearest the
+        // page as soon as the pane is made, before the settings are copied into the page (InitializeProperties), and the
+        // page starts as A4. Otherwise the list showed A4 over pages laid out on the paper.
+        PageWidth = PrintSettings.PageWidth;
+        PageHeight = PrintSettings.PageHeight;
+    }
+
     /// <summary>One product on its own.</summary>
-    public ProductPrintManager(ProductPrintout printout)
-        : this(ProductPrintSet.Of(printout))
+    public ProductPrintManager(ProductPrintout printout, Size paper)
+        : this(ProductPrintSet.Of(printout), paper)
     {
     }
 
-    private ProductPrintSet _printSet = printSet;
+    /// <summary>
+    /// The paper of Windows' default printer, as its printing preferences set it (its user ticket, else its own default):
+    /// the printer the pane starts on, and the ticket a job goes out on (<see cref="JobTicket"/>). <see cref="A4"/> when
+    /// there's no default printer, the print spooler can't be reached, or the ticket names no size.
+    /// </summary>
+    public static Size DefaultPrinterPaper()
+    {
+        try
+        {
+            using var server = new LocalPrintServer();
+            using var queue = server.DefaultPrintQueue;
+            if (queue is not null
+                && (queue.UserPrintTicket ?? queue.DefaultPrintTicket)?.PageMediaSize is { Width: double width and > 0, Height: double height and > 0 })
+            {
+                return new Size(width, height);
+            }
+        }
+        catch (Exception ex) when (ex is PrintSystemException or Win32Exception or InvalidOperationException)
+        {
+            Log.Warning(ex, "The default printer's paper couldn't be read; the print pane starts on A4");
+        }
+
+        return A4;
+    }
+
+    // Syncfusion's settings with the page set to the paper, portrait, and its own 2.5 cm margins.
+    private static PrintSettingsBase PortraitSettings(Size paper) => new()
+    {
+        PageWidth = Math.Min(paper.Width, paper.Height),
+        PageHeight = Math.Max(paper.Width, paper.Height),
+    };
+
+    private ProductPrintSet _printSet;
     /// <summary>
     /// What's printed. The Print tab hands over a new one each time it's shown or a different choice is made, and the pane
     /// lays it out again on the paper, margins and orientation already picked.

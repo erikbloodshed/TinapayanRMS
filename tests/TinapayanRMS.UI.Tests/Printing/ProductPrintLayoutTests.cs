@@ -25,7 +25,7 @@ public class ProductPrintLayoutTests
         layout.PageCount.Should().BeGreaterThan(1);
         var body = Body(layout.BuildPage(2));
         Texts(body[0]).Single().Should().StartWith("Dough (continued)");
-        Texts(body[1]).Should().Equal("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost", "Base");
+        Texts(body[1]).Should().Equal("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost");
     });
 
     [Fact]
@@ -54,8 +54,7 @@ public class ProductPrintLayoutTests
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(2), includeRecipe: true, includeCosting: false, A4));
 
-        texts.Should().ContainInConsecutiveOrder("Ingredient", "Grams", "Baker's %", "Base");
-        texts.Should().ContainInConsecutiveOrder("Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"));
+        texts.Should().ContainInConsecutiveOrder("Ingredient", "Grams", "Baker's %", "Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"), "Ingredient 2");
         texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Gift Box", Figure(1m, "N1"), "pc");
         texts.Should().NotContain(t => t.Contains("Cost", StringComparison.Ordinal), "no cost heading or cost per piece");
         texts.Should().NotContain([Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(10m, "N2"), Figure(30m, "N4"), Figure(30m, "N2")], "no line's, batch's or box's cost");
@@ -353,10 +352,10 @@ public class ProductPrintLayoutTests
 
         texts.Should().Contain(t => t.EndsWith(" · Per piece · Simulated prices", StringComparison.Ordinal));
         texts.Should().ContainInConsecutiveOrder("Price Changes Applied", "Raw Material", "Per", "Current Price", "Change %", "New Price", "Bread Flour");
-        texts.Should().ContainInConsecutiveOrder("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost", "Cost Now", "Base");
-        texts.Should().ContainInConsecutiveOrder("Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(4m, "N2"));
-        texts.Should().ContainInConsecutiveOrder("Ingredient 2", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), string.Empty);
-        texts.Should().ContainInConsecutiveOrder("Total", Figure(200m, "N1"), Figure(20m, "N1"), string.Empty, Figure(10m, "N2"), Figure(9m, "N2"), string.Empty);
+        texts.Should().ContainInConsecutiveOrder("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost", "Cost Now", "Ingredient 1");
+        texts.Should().ContainInConsecutiveOrder("Ingredient 1", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(4m, "N2"), "Ingredient 2");
+        texts.Should().ContainInConsecutiveOrder("Ingredient 2", Figure(100m, "N1"), Figure(10m, "N1"), Figure(0.05m, "N4"), Figure(5m, "N2"), string.Empty, "Total");
+        texts.Should().ContainInConsecutiveOrder("Total", Figure(200m, "N1"), Figure(20m, "N1"), string.Empty, Figure(10m, "N2"), Figure(9m, "N2"));
         texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Unit Cost", "Cost", "Cost Now", "Gift Box", Figure(1m, "N1"), "pc", Figure(30m, "N4"), Figure(30m, "N4"), string.Empty);
 
         texts.Should().ContainInConsecutiveOrder("Base Cost", Figure(sample.Costs.BaseCost, "N2"), $"Now {Figure(sample.Simulation!.Now.BaseCost, "N2")}");

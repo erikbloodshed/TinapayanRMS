@@ -25,7 +25,7 @@ public class PrintPreviewThemeOrderTests
     [Fact]
     public void A_pane_opens_in_a_window_themed_before_it_comes_in_and_throws_in_one_themed_after() => StaThread.RunThemed(() =>
     {
-        using (var manager = new ProductPrintManager(SamplePrintouts.WithLines(10)))
+        using (var manager = new ProductPrintManager(SamplePrintouts.WithLines(10), ProductPrintManager.A4))
         {
             var host = new ContentControl();
             var window = OffscreenWindow(host);
@@ -45,7 +45,7 @@ public class PrintPreviewThemeOrderTests
             }
         }
 
-        using (var manager = new ProductPrintManager(SamplePrintouts.WithLines(10)))
+        using (var manager = new ProductPrintManager(SamplePrintouts.WithLines(10), ProductPrintManager.A4))
         {
             var window = OffscreenWindow(new ContentControl { Content = new PrintPreview(manager) });
             try
