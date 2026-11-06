@@ -409,6 +409,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
     public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired, IsEditingComposite);
 
+    /// <summary>The Costing Summary's price row: "Suggested Selling Price per Piece", or "… per Unit of 8 Pieces".</summary>
+    public string SuggestedSellingPriceLabel => ProductPrintout.SuggestedSellingPriceLabelFor(CostUnitCaption);
+
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
     public string MaterialCostTooltip => (IsEditingComposite
         ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
@@ -1161,6 +1164,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Subscribe(_ =>
             {
                 this.RaisePropertyChanged(nameof(CostUnitCaption));
+                this.RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
                 this.RaisePropertyChanged(nameof(MaterialCostTooltip));
                 this.RaisePropertyChanged(nameof(MetricBaseTooltip));
             });

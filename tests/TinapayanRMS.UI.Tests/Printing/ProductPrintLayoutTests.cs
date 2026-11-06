@@ -238,7 +238,7 @@ public class ProductPrintLayoutTests
         var costing = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(3), includeRecipe: false, includeCosting: true, A4));
 
         recipe.Should().Contain("Recipe").And.Contain("Ingredient 1").And.NotContain(t => t.StartsWith("Costing", StringComparison.Ordinal));
-        costing.Should().Contain("Costing (Per piece)").And.Contain("Total Selling Price (Per piece)").And.NotContain("Recipe").And.NotContain("Ingredient 1");
+        costing.Should().Contain("Costing (Per piece)").And.Contain("Suggested Selling Price per Piece").And.NotContain("Recipe").And.NotContain("Ingredient 1");
     });
 
     [Test]
@@ -365,6 +365,8 @@ public class ProductPrintLayoutTests
         texts.Should().ContainInConsecutiveOrder("Component", "Now", "Simulated", "Change", "% of Price");
         texts.Should().ContainInConsecutiveOrder("Dough", Figure(2m, "N2"), Figure(2.5m, "N2"), "+0.50");
         texts.Should().ContainInConsecutiveOrder("Packaging", Figure(30m, "N2"), Figure(30m, "N2"), "—");
+        texts.Should().ContainInConsecutiveOrder(
+            "Suggested Selling Price per Piece", Figure(sample.Simulation.Now.SellingPrice, "N2"), Figure(sample.Costs.SellingPrice, "N2"));
     });
 
     [Test]

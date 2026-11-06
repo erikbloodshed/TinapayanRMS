@@ -72,6 +72,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.IsEditingSingle.Should().BeFalse("Quantity Required's box shows only for a product of sub-assemblies");
         viewModel.HeaderTitle.Should().Be("New composite product");
         viewModel.CostUnitCaption.Should().Be("Per unit");
+        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit");
         viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.IsComponentsShowing.Should().BeTrue();

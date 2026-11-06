@@ -73,6 +73,24 @@ public sealed record ProductPrintout(
     public static string CostUnitCaptionFor(int quantityRequired, bool isComposite = false) =>
         isComposite ? "Per unit" : quantityRequired <= 1 ? "Per piece" : $"Per unit of {quantityRequired} pieces";
 
+    /// <summary>The costing's price row, on the Costing tab and on paper: <see cref="SuggestedSellingPriceLabelFor"/> of <see cref="CostUnitCaption"/>.</summary>
+    public string SuggestedSellingPriceLabel => SuggestedSellingPriceLabelFor(CostUnitCaption);
+
+    /// <summary>
+    /// The costing's price row, named for the unit a <see cref="CostUnitCaptionFor"/> caption names, in title case: "Per
+    /// piece" gives "Suggested Selling Price per Piece", "Per unit of 8 pieces" "… per Unit of 8 Pieces", a composite's "Per
+    /// unit" "… per Unit".
+    /// </summary>
+    public static string SuggestedSellingPriceLabelFor(string costUnitCaption) =>
+        "Suggested Selling Price "
+        + string.Join(' ', costUnitCaption.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(TitleCaseWord));
+
+    // "per" and "of" stay lower case, as a title has them; every other word starts with a capital.
+    private static string TitleCaseWord(string word, int index) =>
+        index == 0 || word.Equals("of", StringComparison.OrdinalIgnoreCase)
+            ? word.ToLowerInvariant()
+            : char.ToUpperInvariant(word[0]) + word[1..];
+
     /// <summary>When a product was last saved, as its header says it: "Sep 14, 2026, 6:27 PM", or "—" for never since it was added.</summary>
     public static string LastUpdatedTextFor(DateTime? updatedAt) =>
         updatedAt?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.CurrentCulture) ?? "—";

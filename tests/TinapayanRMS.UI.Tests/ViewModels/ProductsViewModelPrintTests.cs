@@ -61,7 +61,12 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     public Task Print_on_the_Scaling_tab_prints_the_recipe_scaled_and_on_another_tab_its_recipe_and_costing_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
+        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Piece");
+        var changed = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         viewModel.EditingQuantityRequired = 8;
+        changed.Should().Contain(nameof(ProductsViewModel.SuggestedSellingPriceLabel));
+        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit of 8 Pieces", "the Costing Summary's price row follows the quantity");
         viewModel.Scaling.Units = 5;
         viewModel.SelectedDetailsTab = ProductsViewModel.ScalingTab;
 

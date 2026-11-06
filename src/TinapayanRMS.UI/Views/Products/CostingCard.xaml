@@ -317,7 +317,7 @@
                 -->
                 <Border Grid.Row="11" Grid.ColumnSpan="3" Margin="0,8,0,0" CornerRadius="6" Background="{StaticResource AccentSoftBrush}" />
                 <TextBlock Grid.Row="11"
-                           Text="{Binding CostUnitCaption, StringFormat='Total Selling Price ({0})'}"
+                           Text="{Binding SuggestedSellingPriceLabel}"
                            Style="{StaticResource LabelCellStyle}"
                            FontWeight="SemiBold"
                            Margin="8,16,8,8" />

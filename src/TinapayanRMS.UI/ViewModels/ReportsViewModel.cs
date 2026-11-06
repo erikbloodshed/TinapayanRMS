@@ -54,7 +54,7 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// <summary>The six costs before it added up: ingredients, wastage, packaging, labor, overhead and administrative.</summary>
     public decimal BaseCost => costs.BaseCost;
 
-    /// <summary>The selling price the costing works out, the Costing tab's Total Selling Price: a suggestion beside <see cref="CurrentPrice"/>.</summary>
+    /// <summary>The selling price the costing works out, the Costing tab's Suggested Selling Price: a suggestion beside <see cref="CurrentPrice"/>.</summary>
     public decimal SuggestedPrice => costs.SellingPrice;
 
     /// <summary>
