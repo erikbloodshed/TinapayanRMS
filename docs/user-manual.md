@@ -149,6 +149,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
+- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Minimized and opened again from the taskbar, it comes back at the size it had, maximized or not.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at, until you close the app. A tab with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
 - **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.

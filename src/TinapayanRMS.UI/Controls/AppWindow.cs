@@ -52,6 +52,8 @@ public class AppWindow : ChromelessWindow
     /// UseNativeChrome gives the window a WindowChrome whose resize band ChromelessWindow binds to its own
     /// ResizeBorderThickness. That's 0 here, since it's also the width of the border the theme draws. A local value
     /// replaces the binding, so Windows resizes from a band as wide as a normal window's frame while no border is drawn.
+    /// It's also where the window takes the fixes for its size coming back from the taskbar (ChromelessWindowMinMax) and,
+    /// for a CenterScreen one, for where it opens (StartupCentering): WPF has placed it, and it hasn't shown yet.
     /// </summary>
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -65,6 +67,9 @@ public class AppWindow : ChromelessWindow
         base.OnSourceInitialized(e);
 
         ChromelessWindowDpi.LetWpfHandleDpiChanges(this);
+
+        // After base, so its hook comes before ChromelessWindow's.
+        ChromelessWindowMinMax.AnswerWhileOffScreen(this);
         RestoreRendering.UseSoftwareWhileRestoring(this);
 
         if (System.Windows.Shell.WindowChrome.GetWindowChrome(this) is { } chrome)
@@ -79,6 +84,8 @@ public class AppWindow : ChromelessWindow
         var round = DwmCornerRound;
         _ = DwmSetWindowAttribute(hwnd, DwmWindowCornerPreference, ref round, sizeof(int));
         _ = SetWindowRgn(hwnd, IntPtr.Zero, true);
+
+        StartupCentering.CenterOnMonitor(this);
     }
 
     private const int DwmWindowCornerPreference = 33;
