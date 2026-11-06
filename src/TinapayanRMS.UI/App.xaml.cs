@@ -56,6 +56,10 @@ public sealed partial class App : Application
 
     static App()
     {
+        // Syncfusion's controls report which of them the app uses to Syncfusion, over HTTPS, from the first theme
+        // registration on. Off before any Syncfusion type is touched.
+        Syncfusion.Telemetry.Telemetry.Disable();
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .WriteTo.File(
