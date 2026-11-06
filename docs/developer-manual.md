@@ -105,7 +105,7 @@ You'll be productive sooner if you're comfortable with the following.
 | FluentValidation | `AbstractValidator<T>` | `ApplicationCore/Validators` |
 | .NET Generic Host and DI | `HostBuilder`, service lifetimes | `CompositionRoot.cs` |
 | Serilog | The static `Log.Logger`, `ForContext` | Logging |
-| xUnit v3 on Microsoft.Testing.Platform | Facts, theories, fixtures, collections | `tests/` |
+| TUnit on Microsoft.Testing.Platform | `[Test]`, `[Arguments]` and `[MethodDataSource]`, `[Before(Test)]` hooks, keyed `[ClassDataSource]` fixtures, `[NotInParallel]` | `tests/` |
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
 | Respawn | Resetting a database between tests | The test fixtures |
 | MSBuild | `Directory.Build.props`, Central Package Management | The build |
@@ -182,8 +182,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Run | `dotnet run --project src/TinapayanRMS.UI` |
 | All tests | `dotnet test --solution TinapayanRMS.slnx` |
 | One test project | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests` |
-| One test class | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --filter-class "*UnitConversionRulesTests"` |
-| One test | `dotnet test --project tests/TinapayanRMS.UI.Tests --filter-method "*Declining_the_question_saves_nothing"` |
+| One test class | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --treenode-filter "/*/*/UnitConversionRulesTests/*"` |
+| One test | `dotnet test --project tests/TinapayanRMS.UI.Tests --treenode-filter "/*/*/*/Declining_the_question_saves_nothing"` |
 | Only the test projects your changes reach (see [Running fewer tests while developing](#running-fewer-tests-while-developing)) | `powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1` |
 | One class again each time you save, by hot reload | `powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"` |
 | Coverage (a Cobertura report in `TestResults/`) | `dotnet test --solution TinapayanRMS.slnx --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml` |
@@ -198,7 +198,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Make the database role the Recipe API reads as, which can't write (once per PC, as the user the API runs as) | `powershell -ExecutionPolicy Bypass -File scripts/New-DatabaseReader.ps1` |
 | Install the Recipe API for this Windows user, starting at sign-in (in an administrator PowerShell to let the LAN in), reading as that role | `powershell -ExecutionPolicy Bypass -File scripts/Install-RecipeApi.ps1 -ReadOnlyUser tinapayanrms_reader` |
 
-The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use the `--filter-*` options and `--coverage` instead. A test project run directly (`dotnet run`, or its `.exe`) runs on it too, with the same options (`UseMicrosoftTestingPlatformRunner` in `tests/Directory.Build.props`, 2026-11-05); before, that ran xUnit's own console runner, whose options are `-class` and `-xml`.
+The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use TUnit's `--treenode-filter` and `--coverage` instead. The filter is a path, `/assembly/namespace/class/test`, where `*` matches any characters within a part and `(A)|(B)` either name: `/*/*/*Products*/*` is every test of every class with Products in its name. A test project is a platform executable of its own (TUnit.Engine makes it one), so one run directly (`dotnet run`, or its `.exe`) takes the same options.
 
 Close any copy of the app you have running before you build. A running app locks its own output files.
 
@@ -264,7 +264,7 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 ### Build configuration
 
 - [Directory.Build.props](../Directory.Build.props) sets `net11.0`, `ImplicitUsings`, `Nullable`, the `WindowsTargetFramework` property, `AnalysisLevel` `latest-recommended` (the SDK's built-in analyzers at their Recommended rule set), and .NET 11's runtime async (`<Features>$(Features);runtime-async=on</Features>`): `async` methods run on the runtime's own support rather than as compiler-made state machines, so a decompiled assembly shows no `<…>d__` class for one, only for iterators. It's still opt-in in the RC3 SDK. Delete the line to go back. It also leaves the commit out of every build but `dotnet publish`'s (`EnableSourceControlManagerQueries` and `EnableSourceLink` are off unless `_IsPublishing`, 2026-11-04). The SDK otherwise puts the commit's hash into every assembly's version and Source Link file, so the first build after any commit, even one that changed only docs, recompiled every project. A published copy still says which commit it was built from: `1.0.0+<hash>`, its file's Product version. The build also writes each project's folder, drive letter's case and all, into a file the compiler reads (`build_property.ProjectDir`, in `obj/.../<Project>.GeneratedMSBuildEditorConfig.editorconfig`), so a build from `c:\…` after one from `C:\…`, or the other way, recompiles every project too.
-- [tests/Directory.Build.props](../tests/Directory.Build.props) imports it. It gives every project whose name ends in `.Tests` the xUnit v3, AwesomeAssertions, test SDK and coverage packages, and a global `using Xunit`.
+- [tests/Directory.Build.props](../tests/Directory.Build.props) imports it. It gives every project whose name ends in `.Tests` the TUnit.Engine, AwesomeAssertions, coverage and hot reload packages, and compiles [tests/HotReloadReruns.cs](../tests/HotReloadReruns.cs) (see [Running fewer tests while developing](#running-fewer-tests-while-developing)) and [tests/TestRunSettings.cs](../tests/TestRunSettings.cs) into each, the second a `[Before(TestDiscovery)]` hook that runs at most as many tests at once as the PC has processors and turns off the HTML report and its JSON. TUnit's own limit is twice the processors, and that many tests beside the chains that run one at a time (the backup tests, the off-screen grids) slowed the whole suite from under 5 minutes to over 6 on this PC; `--maximum-parallel-tests` or `TUNIT_MAX_PARALLEL_TESTS` overrides the limit. TUnit writes the report to `TestResults/` on every run unless told not to (20 MB for Infrastructure.Tests) while recording every traced call, each SQL command Npgsql sends included. Set them back to `true` there for one. TUnit adds `using TUnit.Core;` itself. `Tests.Common` takes only `TUnit.Core`, for the hook and fixture interfaces: `TUnit.Engine` would make it a test executable.
 - [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core, Microsoft.Extensions and Syncfusion versions are the `EFCoreVersion`, `MicrosoftExtensionsVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, held at `EFCoreVersion` so every project gets one EF Core. `EFCore.NamingConventions` has no .NET 11 release yet, and its 10.0.1 asks for EF Core 10. It works on EF Core 11 (the snake_case names, the model-changes check and the compiled model all hold), so move it to its 11.x when there is one. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
 - [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere. The files in `CompiledModels/` carry their own `<auto-generated />` header, so the analyzers skip them too.
 - Warnings aren't treated as errors, but the build is kept free of them.
@@ -1102,17 +1102,18 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 
 The whole suite takes 4 to 6 minutes on this PC. While you work, two scripts run less of it (2026-11-05). Before a commit or a merge, run it all: both pick by project or by name, so they can miss a test of something a change reaches some other way.
 
-- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the UI runs `UI.Tests` alone (about 3 minutes, where all of them take 4 to 6); one to `Pricing` runs Pricing, UI, Mcp and RecipeApi's tests; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the UI's `appsettings.json` reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran".
-- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter, a XAML file) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class` or `-Method`, not both; with neither, the whole project runs after each save. Stop it with Ctrl+C.
+- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the UI runs `UI.Tests` alone (about 3 minutes, where all of them take 4 to 6); one to `Pricing` runs Pricing, UI, Mcp and RecipeApi's tests; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the UI's `appsettings.json` reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran" (it passes `--ignore-exit-code 8`, the platform's exit code for that).
+- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter, a XAML file) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class`, `-Method` or both, which it joins into one `--treenode-filter`; with neither, the whole project runs after each save. Hot reload runs the tests again in the same test session, and TUnit 1.81.0 completes the session's dynamic test queue at the end of every run, so the second run's completion threw and every run after the first reported a failure of TUnit's own, "ChannelClosedException: The channel has been closed." [tests/HotReloadReruns.cs](../tests/HotReloadReruns.cs), compiled into every test project, works around it: under hot reload only (`TESTINGPLATFORM_HOTRELOAD_ENABLED`), a `[BeforeEvery(Test)]` hook gives that queue a new channel when the run before completed it, reaching it through TUnit's internals by name. If the failure comes back after a TUnit upgrade, TUnit has renamed what it reaches for; if TUnit fixes it, delete the file. Stop it with Ctrl+C.
 - **Don't run a project two ways at once.** A watcher holds its project's build, so a `dotnet build` of it fails on locked files, and it uses the project's test databases, so a second run would reset them under its tests. `Test-Changed.ps1` and `Watch-Tests.ps1` refuse to start while that project's tests are running already.
 - **Both hand `dotnet` the repo's path as your terminal spells it.** The build records each project's folder with its drive letter's case, so `C:\…` after `c:\…` would recompile every project (see "Build configuration").
 ### The database fixtures
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
-- **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder, because xUnit only finds a collection definition in the tests' own assembly. Each `DatabaseFixture` is one line that names its database. xUnit makes a collection fixture once for each collection, and `DatabaseFixtureBase` gives the first one of a run the name as it is and the next ones the name with `_2`, `_3` and so on, so each collection has a database of its own.
-- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test. It provides `CreateDbContext()`, `CreateDbContextFactory()` (the app's own `SharedTransactionDbContextFactory`, optionally on a `TestClock`), `CreateUnitOfWork()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
+- **`DatabaseFixture`** and **`DatabaseCollection`** are defined in each project's own `Fixtures/` folder. Each `DatabaseFixture` is one line that names its database; `DatabaseCollection` holds the collections' keys. TUnit makes one fixture for each key a keyed `[ClassDataSource]` names, and initializes it (`IAsyncInitializer`) before its first test. `DatabaseFixtureBase` gives the first one of a run the name as it is and the next ones the name with `_2`, `_3` and so on, so each collection has a database of its own.
+- **[PersistenceTestBase](../tests/TinapayanRMS.Tests.Common/Fixtures/PersistenceTestBase.cs)** resets the database before each test, in a `[Before(Test)]` hook. It provides `CreateDbContext()`, `CreateDbContextFactory()` (the app's own `SharedTransactionDbContextFactory`, optionally on a `TestClock`), `CreateUnitOfWork()`, the test's `Cancellation` token, and seeding helpers such as `AddIngredientAsync`, `AddRoleAsync`, `AddProductAsync`, `AddProductWithSubAssemblyAsync`, `SetPriceAsync` and `SeedUnitOfMeasureAsync`. With nothing saved in Settings, every product is priced with the 3% default wastage; a test whose figures are about something else calls `WithoutWastageAsync()` (or `SetWastageAsync`) before the screen or reader reads it.
 - **[ThrowawayDatabase](../tests/TinapayanRMS.Tests.Common/Fixtures/ThrowawayDatabase.cs)** is a migrated database of one test's own on the same server (`tinapayanrms_test_backup_` and eight characters of a GUID), dropped when the test is done. The backup tests restore over it, which would put every other test out of the shared database.
-- **Every concrete test class must carry `[Collection(DatabaseCollection.Name)]`**, or in `UI.Tests` and `Infrastructure.Tests` one of `DatabaseCollection.A` to `D`. It's deliberately left off the base class: xUnit isn't guaranteed to honour it there, and without it tests could run in parallel against one database. The four are balanced by how long their classes take, so put a new class in the one with least in it (`Infrastructure.Tests`' A is `DatabaseBackupsTests`' alone). A class's own tests always run one at a time.
+- **Every concrete test class must carry `[NotInParallel(DatabaseCollection.Name)]` and `[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]`**, or in `UI.Tests` and `Infrastructure.Tests` one of `DatabaseCollection.A` to `D` in both. The first keeps the collection's tests from running at once against its database; the second hands the class that collection's fixture, and without it TUnit can't construct the class. The four are balanced by how long their classes take, so put a new class in the one with least in it (`Infrastructure.Tests`' A is `DatabaseBackupsTests`' alone).
+- **TUnit runs every other test in parallel, a class's own tests included.** Each test gets a new instance of its class, so its fields are its own, but a static, a file, a window or a database it shares with another test needs a `[NotInParallel]` key they share.
 
 ### Writing tests
 
@@ -1126,7 +1127,7 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class CostingRulesTests
 {
-    [Fact]
+    [Test]
     public void CalculateSellingPrice_adds_the_markup_then_the_VAT()
     {
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
@@ -1151,10 +1152,11 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductCategoryRenamePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task Renaming_a_category_changes_only_its_name()
     {
         var repository = new ProductCategoryRepository(CreateDbContextFactory());
@@ -1172,7 +1174,8 @@ public class ProductCategoryRenamePersistenceTests(DatabaseFixture fixture) : Pe
 A ViewModel test builds the ViewModel on real repositories, stands in for the dialogs, and drives its commands. Abridged from [SubAssemblyRolesViewModelTests](../tests/TinapayanRMS.UI.Tests/ViewModels/SubAssemblyRolesViewModelTests.cs):
 
 ```csharp
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRolesViewModel CreateViewModel(bool confirm)
@@ -1184,7 +1187,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         return viewModel;
     }
 
-    [Fact]
+    [Test]
     public async Task Declining_the_question_saves_nothing()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -1202,17 +1205,17 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
 
 Some loads start from a selection, with nothing to await. A test waits for the screen to settle with [Settle](../tests/TinapayanRMS.UI.Tests/Fixtures/Settle.cs): `await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady)` awaits the screen's `WhenIdleAsync` (everything it started has finished, and its results are on the screen), then requires the condition, failing at once if it doesn't hold. `Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = …, condition)` picks first. Don't poll for a condition: a test then waits as long as the polling does, and can pass on a moment that doesn't last. Only something on a timer, which isn't the screen's work, polls, with `Settle.EventuallyAsync` (the folders written to the view state half a second after a change).
 
-A theory's `decimal` values with decimals go in `TheoryData`, written as `decimal` literals (`0.0525m`), with `[MemberData]`, never in `[InlineData]`. An attribute can't hold a `decimal`, so `[InlineData(0.0525)]` passes a `double`, which since .NET 11 arrives as 0.0524999999999999980571097069. Whole numbers are safe in `[InlineData]`. See `StandardUnitRulesTests`:
+A data-driven test's `decimal` values with decimals come from a `[MethodDataSource]` method, written as `decimal` literals (`0.0525m`), never from `[Arguments]`. An attribute can't hold a `decimal`, so `[Arguments(0.0525)]` passes a `double`, which since .NET 11 arrives as 0.0524999999999999980571097069. Whole numbers are safe in `[Arguments]`. The method returns one value, or a tuple for several parameters; a row holding something mutable, such as an array, is a `Func<…>` that builds it afresh for its test (TUnit0046). See `StandardUnitRulesTests`:
 
 ```csharp
-public static TheoryData<string, string, decimal> MassUnits => new()
-{
-    { "pound", "lb", 453.5924m },
-    { "ounce", "oz", 28.3495m },
-};
+public static IEnumerable<(string, string, decimal)> MassUnits() =>
+[
+    ("pound", "lb", 453.5924m),
+    ("ounce", "oz", 28.3495m),
+];
 
-[Theory]
-[MemberData(nameof(MassUnits))]
+[Test]
+[MethodDataSource(nameof(MassUnits))]
 public void A_mass_unit_of_an_ingredient_is_fixed_in_grams(string name, string abbreviation, decimal grams)
 ```
 
@@ -1225,7 +1228,7 @@ A test that creates WPF objects runs on an STA thread:
 - `VersionRecorders.Create(factory)` (in Tests.Common's `Fixtures/`) builds a `ProductVersionRecorder` over real repositories, and `CreateSaves` the `VersionedSaves` over one, for a test that constructs `SubAssembliesViewModel` or tests the saves themselves (`Pricing.Tests/Versions`).
 - `FailingDbContextFactory` (in UI.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
 - `SqlCommandCounter` (also in UI.Tests' `Fixtures/`) counts the SQL commands sent from where it's started (the activities Npgsql reports on its `Npgsql` ActivitySource): for a test that a read's round trips don't grow with what it reads. Work started in the background from there counts too, so after a ViewModel command read `await counter.SettledAsync()` (no new command for 300 ms), not `Commands`: a load's background reads, such as the Products list's below-markup flags, are often still going when the command returns.
-- `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Every test class that builds a real `SfDataGrid` or `SfTreeGrid`, themed ones included, carries `[Collection(OffscreenGridCollection.Name)]`, so they run one at a time: their windows competed for focus, and Syncfusion keeps whether the current cell has been validated in one static flag for the whole process, so a grid beside an edit could make its commit skip writing the value.
+- `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Every test class that builds a real `SfDataGrid` or `SfTreeGrid`, themed ones included, carries `[NotInParallel(OffscreenGridCollection.Name)]`, so they run one at a time: their windows competed for focus, and Syncfusion keeps whether the current cell has been validated in one static flag for the whole process, so a grid beside an edit could make its commit skip writing the value.
 
 ### Naming
 
@@ -1361,7 +1364,8 @@ Respawn picks up the new table by itself.
 | The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
 | The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |
 | An AI assistant's TinapayanRMS tools give figures from before your change | The MCP server is still running the build it started with | Restart it (`/mcp` in Claude Code). It builds again as it starts |
-| `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--filter-class`, `--filter-method` and `--coverage` |
+| `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--treenode-filter "/*/*/<class>/<test>"` and `--coverage` |
+| A test passes alone but fails now and then in a full run | TUnit runs it beside another test, even one of its own class, that shares something with it | Give them a shared `[NotInParallel]` key |
 | Some UI tests are reported as skipped | No licence key | Set `SYNCFUSION_LICENSE_KEY` |
 | A binding silently does nothing | A binding error | Check the Debug build's log for `WPF binding` warnings |
 | Every `SfDataGrid` suddenly looks unthemed | An `SfTreeGrid` is themed through its window | Theme it locally |
@@ -1431,7 +1435,7 @@ Each tool takes a product or material by its name, or by a part of it that names
 - Dapper: <https://github.com/DapperLib/Dapper>
 - FluentValidation: <https://docs.fluentvalidation.net/>
 - Syncfusion WPF: <https://help.syncfusion.com/wpf/welcome-to-syncfusion-essential-wpf>
-- xUnit: <https://xunit.net/>
+- TUnit: <https://tunit.dev/>
 - Respawn: <https://github.com/jbogard/Respawn>
 - Serilog: <https://serilog.net/>
 - Catppuccin palette: <https://catppuccin.com/palette>

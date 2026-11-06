@@ -12,7 +12,7 @@ public class ObservableRowTests
 
     public ObservableRowTests() => _row.PropertyChanged += (_, e) => _changed.Add(e.PropertyName);
 
-    [Fact]
+    [Test]
     public void A_new_value_is_kept_and_said_by_its_property_name()
     {
         _row.Quantity = 2;
@@ -21,7 +21,7 @@ public class ObservableRowTests
         _changed.Should().Equal(nameof(Row.Quantity));
     }
 
-    [Fact]
+    [Test]
     public void The_value_it_holds_already_says_nothing()
     {
         _row.Quantity = 2;
@@ -32,7 +32,7 @@ public class ObservableRowTests
         _changed.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void What_follows_from_it_can_be_said_too()
     {
         _row.RaiseTotal();

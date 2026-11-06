@@ -16,10 +16,10 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// beside the filter control, since SfSkinManager themes the grid's controls only once it meets a grid. The first check
 /// fails once Syncfusion's theme stops fixing the width, when the fix stops mattering.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class CheckboxFilterFillTests
 {
-    [Fact]
+    [Test]
     public void The_list_of_values_fills_the_pop_up_where_the_theme_fixes_it_at_188px() => StaThread.RunThemed(() =>
     {
         var filterControl = new GridFilterControl();

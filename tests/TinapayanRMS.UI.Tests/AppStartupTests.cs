@@ -18,7 +18,7 @@ public class AppStartupTests
     private readonly List<int> _exitCodes = [];
     private readonly List<LogEvent> _logged = [];
 
-    [Fact]
+    [Test]
     public void A_start_that_goes_through_says_nothing_and_stays_open()
     {
         var started = false;
@@ -32,7 +32,7 @@ public class AppStartupTests
         _logged.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_start_that_fails_says_why_and_closes_the_app()
     {
         var cause = new FileNotFoundException("The configuration file 'appsettings.json' was not found and is not optional.");
@@ -46,7 +46,7 @@ public class AppStartupTests
         said.Should().NotContain("still running").And.NotContain("Excel");
     }
 
-    [Fact]
+    [Test]
     public void A_start_that_fails_is_logged_with_its_exception_before_anything_is_shown()
     {
         var cause = new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration value.");
@@ -65,7 +65,7 @@ public class AppStartupTests
         logged.Exception.Should().BeSameAs(cause);
     }
 
-    [Fact]
+    [Test]
     public void Only_the_first_line_of_the_failure_is_shown()
     {
         var said = AppStartup.FailureText(new InvalidOperationException("The cause." + Environment.NewLine + "   at Somewhere()"), LogFolder);
@@ -73,9 +73,9 @@ public class AppStartupTests
         said.Should().Contain("The cause.").And.NotContain("Somewhere");
     }
 
-    [Theory]
-    [InlineData(1, "1 update hasn't been applied")]
-    [InlineData(3, "3 updates haven't been applied")]
+    [Test]
+    [Arguments(1, "1 update hasn't been applied")]
+    [Arguments(3, "3 updates haven't been applied")]
     public void A_database_behind_this_version_says_by_how_much_and_what_to_do(int count, string expected) =>
         AppStartup.PendingMigrationsText(count).Should().Contain(expected).And.Contain("dotnet ef database update");
 

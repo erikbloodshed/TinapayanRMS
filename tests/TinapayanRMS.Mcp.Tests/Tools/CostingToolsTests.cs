@@ -24,7 +24,8 @@ namespace TinapayanRMS.Mcp.Tests.Tools;
 /// costed as the Products screen and Reports cost it, a price change reaches what the Price Simulator screen's would, and
 /// what the screens refuse is refused with a message the model can act on.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>
@@ -69,7 +70,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
 
     private sealed record Bakery(int MeringueId, int PandesalId, int BoxId);
 
-    [Fact]
+    [Test]
     public async Task A_products_costing_is_what_the_Products_screen_reads()
     {
         var bakery = await AddBakeryAsync();
@@ -95,7 +96,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
             new ComponentCosting("Pandesal", 1, 2.50m, 2.50m, null));
     }
 
-    [Fact]
+    [Test]
     public async Task Listing_products_finds_them_by_part_of_their_name_and_prices_each()
     {
         await AddBakeryAsync();
@@ -106,7 +107,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         (await CreateTools().ListProductsAsync(cancellationToken: Cancellation)).Should().HaveCount(3);
     }
 
-    [Fact]
+    [Test]
     public async Task A_name_that_names_no_product_or_several_is_refused_with_what_it_could_mean()
     {
         await AddBakeryAsync();
@@ -117,7 +118,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
             .Should().ThrowAsync<McpException>().WithMessage("\"e\" is in the names of 2 products: Meringue, Pandesal. Give the full name.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_rise_in_egg_reaches_the_linked_egg_white_its_product_and_the_composite_holding_it()
     {
         await AddBakeryAsync();
@@ -135,7 +136,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         simulation.Products[1].SimulatedBaseCost.Should().BeApproximately(3.16m, 0.0000001m, "the box holds two meringues");
     }
 
-    [Fact]
+    [Test]
     public async Task Products_a_change_doesnt_reach_are_listed_only_when_asked_for_and_unchanged()
     {
         await AddBakeryAsync();
@@ -149,7 +150,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         simulation.Products[^1].Should().Be(pandesal, "the most moved come first");
     }
 
-    [Fact]
+    [Test]
     public async Task A_material_with_no_price_yet_takes_a_new_price_as_its_first()
     {
         await AddBakeryAsync();
@@ -160,21 +161,21 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         simulation.Products.Select(p => (p.Name, p.SimulatedBaseCost)).Should().Equal(("Pandesal", 3.00m), ("Party Box", 3.60m));
     }
 
-    public static TheoryData<PriceChangeInput[], string> RefusedChanges => new()
-    {
-        { [new("Custard", NewPrice: 1m)], "Custard is made in-house*" },
-        { [new("Egg White", NewPrice: 1m)], "Egg White is linked to another ingredient*" },
-        { [new("Egg", NewPrice: 1m, ChangePercent: 5m)], "Egg: give either its new price or its change in percent, not both or neither." },
-        { [new("Egg")], "Egg: give either its new price or its change in percent, not both or neither." },
-        { [new("Egg", ChangePercent: 5m), new("egg", NewPrice: 1m)], "Egg is changed more than once. Give it one change." },
-        { [new("Flour", ChangePercent: 5m)], $"Flour: {PriceChangeRules.NoPriceToChangeText}" },
-        { [new("Egg", ChangePercent: -100m)], PriceChangeRules.FallTooFarText },
-        { [new("Egg", NewPrice: 0m)], PriceChangeRules.NewPriceTooLowText },
-        { [], "Give at least one price change." },
-    };
+    public static IEnumerable<Func<(PriceChangeInput[], string)>> RefusedChanges() =>
+    [
+        () => ([new("Custard", NewPrice: 1m)], "Custard is made in-house*"),
+        () => ([new("Egg White", NewPrice: 1m)], "Egg White is linked to another ingredient*"),
+        () => ([new("Egg", NewPrice: 1m, ChangePercent: 5m)], "Egg: give either its new price or its change in percent, not both or neither."),
+        () => ([new("Egg")], "Egg: give either its new price or its change in percent, not both or neither."),
+        () => ([new("Egg", ChangePercent: 5m), new("egg", NewPrice: 1m)], "Egg is changed more than once. Give it one change."),
+        () => ([new("Flour", ChangePercent: 5m)], $"Flour: {PriceChangeRules.NoPriceToChangeText}"),
+        () => ([new("Egg", ChangePercent: -100m)], PriceChangeRules.FallTooFarText),
+        () => ([new("Egg", NewPrice: 0m)], PriceChangeRules.NewPriceTooLowText),
+        () => ([], "Give at least one price change."),
+    ];
 
-    [Theory]
-    [MemberData(nameof(RefusedChanges))]
+    [Test]
+    [MethodDataSource(nameof(RefusedChanges))]
     public async Task What_the_Price_Simulator_screen_refuses_is_refused_with_its_reason(PriceChangeInput[] changes, string message)
     {
         await AddBakeryAsync();
@@ -183,7 +184,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
             .Should().ThrowAsync<McpException>().WithMessage(message);
     }
 
-    [Fact]
+    [Test]
     public async Task The_servers_connection_reads_but_refuses_every_write()
     {
         await AddBakeryAsync();
@@ -195,7 +196,7 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         refused.WithInnerException<PostgresException>().Which.SqlState.Should().Be(PostgresErrorCodes.ReadOnlySqlTransaction);
     }
 
-    [Fact]
+    [Test]
     public void Decimals_are_written_to_six_places()
     {
         var listing = new ProductListing("Pandesal", "Breads", "Production", false, 1, 3.3271741114058355437703554377m, 5.96m, 6m, 5m, null, true);

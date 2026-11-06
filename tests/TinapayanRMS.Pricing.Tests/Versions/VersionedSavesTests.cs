@@ -15,12 +15,13 @@ namespace TinapayanRMS.Pricing.Tests.Versions;
 /// The saves that record versions (VersionedSaves), each written with its versions or not at all: a version that can't be
 /// recorded takes its save back. The versions a save records, and their notes, are in the screens' *VersionTests.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private const string Refused = "Simulated: the version couldn't be written.";
 
-    [Fact]
+    [Test]
     public async Task SaveProduct_records_how_it_stood_then_the_product_as_saved()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -40,7 +41,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         versions.Select(v => ProductVersionContent.FromJson(v.Content).CurrentPrice).Should().Equal(7m, priceBefore);
     }
 
-    [Fact]
+    [Test]
     public async Task ApplyCosting_changes_and_versions_only_the_products_not_at_it_already()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -62,7 +63,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         (await versions.GetForProductAsync(ensaymadaId, Cancellation)).Should().BeEmpty("nothing about it changed");
     }
 
-    [Fact]
+    [Test]
     public async Task SaveProduct_whose_version_is_refused_saves_nothing()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -84,7 +85,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         (await versions.GetForProductAsync(pandesalId, Cancellation)).Should().HaveCount(versionCount);
     }
 
-    [Fact]
+    [Test]
     public async Task SaveSubAssembly_whose_products_versions_are_refused_saves_nothing()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -105,7 +106,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         lines.Single().Grams.Should().Be(500m);
     }
 
-    [Fact]
+    [Test]
     public async Task MakeProductFrom_whose_first_version_is_refused_makes_nothing()
     {
         var doughRoleId = await AddRoleAsync("Dough");

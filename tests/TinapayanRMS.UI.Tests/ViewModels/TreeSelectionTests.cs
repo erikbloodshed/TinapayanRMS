@@ -9,7 +9,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// </summary>
 public class TreeSelectionTests
 {
-    [Fact]
+    [Test]
     public void Pick_SeveralPicked_LeavesThatRowAlone()
     {
         var selection = new TreeSelection();
@@ -21,7 +21,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().Equal("Butter");
     }
 
-    [Fact]
+    [Test]
     public void Pick_Null_PicksNothing()
     {
         var selection = new TreeSelection();
@@ -32,7 +32,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void Pick_TheRowAlreadyPickedAlone_ChangesNothing()
     {
         var selection = new TreeSelection();
@@ -45,7 +45,7 @@ public class TreeSelectionTests
         changes.Should().Be(0, "the tree is mid-change when a click's pick comes back to it");
     }
 
-    [Fact]
+    [Test]
     public void BringFirst_ARowPickedWithOthers_MovesItFirstAndKeepsTheOthers()
     {
         var selection = new TreeSelection();
@@ -58,7 +58,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().Equal("Butter", "Flour", "Sugar");
     }
 
-    [Fact]
+    [Test]
     public void BringFirst_ARowNotPicked_PicksItAlone()
     {
         var selection = new TreeSelection();
@@ -70,7 +70,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().Equal("Butter");
     }
 
-    [Fact]
+    [Test]
     public void BringFirst_Null_PicksNothing()
     {
         var selection = new TreeSelection();
@@ -81,7 +81,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void BringFirst_ARowAlreadyFirst_ChangesNothing()
     {
         var selection = new TreeSelection();
@@ -96,7 +96,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().Equal("Flour", "Sugar");
     }
 
-    [Fact]
+    [Test]
     public void BringFirst_WhileChanging_IsSyncing()
     {
         var selection = new TreeSelection();
@@ -110,7 +110,7 @@ public class TreeSelectionTests
         selection.IsSyncing.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Restore_PicksAgainOnlyTheRowsStillListedAndNotPicked()
     {
         var selection = new TreeSelection();
@@ -121,7 +121,7 @@ public class TreeSelectionTests
         selection.Nodes.Should().Equal("Sugar", "Flour");
     }
 
-    [Fact]
+    [Test]
     public void Restore_WhileChanging_IsSyncing()
     {
         var selection = new TreeSelection();
@@ -134,7 +134,7 @@ public class TreeSelectionTests
         selection.IsSyncing.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Quietly_Nested_StaysSyncingUntilTheOuterChangeEnds()
     {
         var selection = new TreeSelection();
@@ -150,7 +150,7 @@ public class TreeSelectionTests
         selection.IsSyncing.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Quietly_AChangeThatThrows_StopsSyncing()
     {
         var selection = new TreeSelection();

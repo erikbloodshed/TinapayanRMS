@@ -9,10 +9,11 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Find (Ctrl+K): every raw material, standalone sub-assembly and product by name, best first.</summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Every_screens_records_are_found_by_name_and_say_what_they_are() => StaThread.RunAsync(async () =>
     {
         var ubeId = await AddIngredientAsync("Ube Halaya");
@@ -33,7 +34,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         find.ResultsNote.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_deleted_product_isnt_found() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");
@@ -47,7 +48,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         find.Results.Select(r => (r.Screen, r.Name)).Should().Equal((AppScreen.Products, "Pandesal"));
     });
 
-    [Fact]
+    [Test]
     public void Every_word_is_matched_ignoring_case_and_accents_with_the_closest_names_first()
     {
         QuickFindResult[] records =
@@ -66,7 +67,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         QuickFindViewModel.Match(records, "   ").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public Task Nothing_typed_or_nothing_found_says_so() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");

@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Tests.Vim;
 /// editing). The keys are raised on the grid as the keyboard raises them on the element that has it: a letter as text
 /// input, Esc as a key press. On, they move and act; off, the grid does what it always did.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class VimKeysGridTests
 {
     public sealed class Line
@@ -29,7 +29,7 @@ public class VimKeysGridTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void J_and_k_move_the_current_cell_down_and_up_a_line()
     {
         RunWithVimKeys(() => LinesGrid(lineCount: 3), grid =>
@@ -46,7 +46,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void G_goes_to_the_last_line_not_a_filler_row_and_gg_back_to_the_first()
     {
         RunWithVimKeys(() => LinesGrid(lineCount: 3), grid =>
@@ -65,7 +65,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Zero_and_dollar_go_to_the_first_and_last_column()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -80,7 +80,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_letter_that_isnt_a_key_of_ours_starts_no_edit()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -94,7 +94,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void With_the_keys_off_a_letter_starts_an_edit_as_it_always_did()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -109,7 +109,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void I_starts_an_edit_and_Esc_ends_it_keeping_what_was_typed()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -130,7 +130,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void O_types_a_new_line_on_the_add_row_and_Esc_adds_it()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -150,7 +150,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Capital_o_types_a_new_line_put_in_above_the_current_one()
     {
         RunWithVimKeys(
@@ -181,7 +181,7 @@ public class VimKeysGridTests
             });
     }
 
-    [Fact]
+    [Test]
     public void Dd_deletes_the_line()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -199,7 +199,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Esc_drops_a_half_typed_sequence()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -216,7 +216,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_mode_shows_Insert_while_a_cell_is_typed_into_and_Normal_after()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -231,7 +231,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Insert_lasts_from_cell_to_cell_so_a_digit_on_the_next_cell_starts_typing_until_Esc()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -261,7 +261,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Esc_on_a_cell_not_being_typed_into_takes_Insert_back_to_Normal()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -285,7 +285,7 @@ public class VimKeysGridTests
     /// Normal-mode key. The filter control is put in the heading as Syncfusion's own funnel click does (GridHeaderCellControl's
     /// OpenFilterPopUp), with its pop-up left shut, since one opened from an off-screen grid is moved onto a real screen.
     /// </summary>
-    [Fact]
+    [Test]
     public void A_letter_types_in_a_column_filters_search_box()
     {
         RunWithVimKeys(FilteredGrid, grid =>
@@ -304,7 +304,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Ctrl_r_then_equals_types_the_answer_to_a_sum_into_the_cell()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -332,7 +332,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_answer_is_rounded_to_the_decimals_the_cell_takes()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -346,7 +346,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_sum_that_cant_be_worked_out_keeps_the_line_up_saying_why()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -365,7 +365,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Esc_puts_the_sum_away_leaving_the_cell_as_it_was()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -383,7 +383,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Between_cells_in_Insert_the_answer_begins_the_cells_edit()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>
@@ -402,7 +402,7 @@ public class VimKeysGridTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Another_character_after_ctrl_r_is_dropped()
     {
         RunWithVimKeys(() => LinesGrid(), grid =>

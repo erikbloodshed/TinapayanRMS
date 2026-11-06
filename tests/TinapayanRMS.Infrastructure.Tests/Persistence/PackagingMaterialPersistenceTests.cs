@@ -8,7 +8,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
@@ -22,7 +23,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         return category.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_material_can_be_added_and_read_back_with_its_base_unit()
     {
         var categoryId = await SeedCategoryAsync();
@@ -46,7 +47,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         packagingMaterial.CostPerBaseUnit.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public async Task GetAllAsync_and_GetByIdAsync_include_the_units_largest_first_with_their_unit_of_measure()
     {
         var categoryId = await SeedCategoryAsync();
@@ -82,13 +83,13 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         }
     }
 
-    [Fact]
+    [Test]
     public async Task GetByIdAsync_returns_null_for_a_nonexistent_packaging_material()
     {
         (await CreateRepository().GetByIdAsync(999_999, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_renames_a_packaging_material_and_preserves_its_cost()
     {
         var categoryId = await SeedCategoryAsync();
@@ -111,7 +112,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         updated.CostPerBaseUnit.Should().Be(0.045m);
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_can_change_the_base_unit_while_nothing_is_measured_in_it()
     {
         var categoryId = await SeedCategoryAsync();
@@ -127,7 +128,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         (await repository.GetAllAsync(Cancellation)).Single().BaseUnit!.Abbreviation.Should().Be("in");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_changing_the_base_unit_once_the_material_has_an_alternative_unit()
     {
         var categoryId = await SeedCategoryAsync();
@@ -146,7 +147,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_changing_the_base_unit_once_the_material_is_priced()
     {
         var categoryId = await SeedCategoryAsync();
@@ -163,7 +164,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_a_nonexistent_packaging_material()
     {
         var categoryId = await SeedCategoryAsync();
@@ -181,7 +182,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_the_packaging_material_with_its_units_and_prices()
     {
         var categoryId = await SeedCategoryAsync();
@@ -204,7 +205,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         (await dbContext.RawMaterialPriceHistories.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_packaging_material_without_a_base_unit()
     {
         var categoryId = await SeedCategoryAsync();
@@ -214,7 +215,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*base unit*");
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_made_packaging_material()
     {
         var categoryId = await SeedCategoryAsync();
@@ -233,7 +234,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging is always purchased*");
     }
 
-    [Fact]
+    [Test]
     public async Task The_database_rejects_a_made_packaging_material_even_past_the_repository()
     {
         // A check constraint backs RawMaterialRules.EnsureFieldsMatchType up.
@@ -256,7 +257,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
             .WithMessage("*CK_RawMaterials_OnlyIngredientsAreMade*");
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_packaging_material_names_are_rejected()
     {
         var categoryId = await SeedCategoryAsync();

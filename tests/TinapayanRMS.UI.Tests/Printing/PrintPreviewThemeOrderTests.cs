@@ -22,7 +22,7 @@ public class PrintPreviewThemeOrderTests
     /// SfSkinManager keeps the theme's dictionaries it loads for the thread that loaded them, and a window themed on
     /// another thread then can't read them.
     /// </summary>
-    [Fact]
+    [Test]
     public void A_pane_opens_in_a_window_themed_before_it_comes_in_and_throws_in_one_themed_after() => StaThread.RunThemed(() =>
     {
         using (var manager = new ProductPrintManager(SamplePrintouts.WithLines(10), ProductPrintManager.A4))

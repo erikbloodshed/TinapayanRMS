@@ -18,10 +18,11 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// can't leave the stored costs above it stale. Unlinking a product's packaging is one transaction too. And Settings' Recalculate Costs puts right a stored cost
 /// changed outside the app.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task A_price_whose_cascade_fails_is_not_saved_either()
     {
         var (flourId, syrupId) = await SeedFlourAndSyrupAsync();
@@ -37,7 +38,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).CostPerBaseUnit.Should().Be(0.05m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_sub_assembly_line_edit_whose_made_ingredients_cascade_fails_is_not_saved_either()
     {
         var (flourId, syrupId) = await SeedFlourAndSyrupAsync();
@@ -60,7 +61,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).CostPerBaseUnit.Should().Be(0.05m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_save_whose_cascade_fails_leaves_the_material_as_it_was()
     {
         var (_, syrupId) = await SeedFlourAndSyrupAsync();
@@ -80,7 +81,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         stored.CostPerBaseUnit.Should().Be(0.05m);
     }
 
-    [Fact]
+    [Test]
     public async Task Unlinking_packaging_whose_lines_fail_to_save_keeps_the_link()
     {
         var (smallId, bigId) = await SeedSmallLinkedToBigsPackagingAsync();
@@ -93,7 +94,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
         link!.LinkedProductId.Should().Be(bigId, "the link stays until the lines it showed are saved in its place");
     }
 
-    [Fact]
+    [Test]
     public async Task Unlinking_packaging_gives_the_product_the_lines_it_showed()
     {
         var (smallId, _) = await SeedSmallLinkedToBigsPackagingAsync();
@@ -105,7 +106,7 @@ public class CostCascadeTransactionPersistenceTests(DatabaseFixture fixture) : P
             .Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
     }
 
-    [Fact]
+    [Test]
     public async Task Recalculate_costs_puts_right_stored_costs_changed_outside_the_app_and_says_how_many()
     {
         var (_, syrupId) = await SeedFlourAndSyrupAsync();

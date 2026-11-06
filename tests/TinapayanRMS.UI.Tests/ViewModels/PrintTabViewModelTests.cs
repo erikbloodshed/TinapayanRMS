@@ -19,10 +19,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Products list, or all products, print as they're saved, in the list's order. And a
 /// saved product read for a set is the same printout the Products screen gives once it's opened.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public void Each_choice_reads_as_its_label()
     {
         // What a screen reader says for the dropdown's choice. A record case's own ToString would say "Folder { Label = … }".
@@ -32,7 +33,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         scopes.Select(s => s.Label).Should().NotContain(label => label.Contains('{'));
     }
 
-    [Fact]
+    [Test]
     public Task A_category_folder_prints_its_products_in_the_lists_order_under_its_title() => StaThread.RunAsync(async () =>
     {
         var (breads, _) = await AddCatalogueAsync();
@@ -47,7 +48,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.Note.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Uncategorized_and_a_stage_hold_what_the_list_files_under_them() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
@@ -63,7 +64,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
     });
 
-    [Fact]
+    [Test]
     public Task All_products_print_Production_first_folder_by_folder() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
@@ -77,7 +78,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.Scopes.Select(s => s.Label).Should().Equal("This product", "All products");
     });
 
-    [Fact]
+    [Test]
     public Task A_folder_asked_for_is_offered_beside_This_product_and_All_products_in_place_of_the_last() => StaThread.RunAsync(async () =>
     {
         var (breads, cakes) = await AddCatalogueAsync();
@@ -90,7 +91,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.SelectedScope.Label.Should().Be("Cakes · Production");
     });
 
-    [Fact]
+    [Test]
     public Task A_set_prints_the_open_product_as_saved_and_says_so_while_This_product_has_its_edits() => StaThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
@@ -113,7 +114,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.Note.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_saved_product_reads_as_the_Products_screen_shows_it_once_opened() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -138,7 +139,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         saved.Costs.SellingPrice.Should().BePositive();
     });
 
-    [Fact]
+    [Test]
     public Task Unbuffered_a_set_prints_at_the_true_costs_as_This_product_does_and_says_so() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -164,7 +165,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         tab.Note.Should().BeNull("the open product has no edits: the switch isn't one");
     });
 
-    [Fact]
+    [Test]
     public Task A_saved_composite_reads_as_the_Products_screen_shows_it_once_opened() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

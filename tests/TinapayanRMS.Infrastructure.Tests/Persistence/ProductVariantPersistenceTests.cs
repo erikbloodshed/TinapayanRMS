@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// source's own included, at the source's piece sizes, so it follows every change made there. Its packaging isn't
 /// carried over. Its costing is copied, as a clone's is.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductVariantPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());
@@ -62,7 +63,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         return (sourceId, await SubAssemblyIdAsync(sourceId, fillingRoleId), fillingRoleId, flourId);
     }
 
-    [Fact]
+    [Test]
     public async Task Links_every_sub_assembly_the_source_uses_its_own_included_at_its_piece_sizes_with_its_add_ins()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -113,7 +114,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
             .Should().HaveCount(3, "the source's recipe is untouched");
     }
 
-    [Fact]
+    [Test]
     public async Task Follows_changes_made_to_the_source_recipe()
     {
         var (sourceId, fillingId, fillingRoleId, flourId) = await AddSourceWithOwnFillingAsync();
@@ -126,7 +127,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1500m, "the variant reads the source's filling as it is now");
     }
 
-    [Fact]
+    [Test]
     public async Task Keeps_its_links_through_a_later_save_of_its_own_recipe()
     {
         var (sourceId, fillingId, _, flourId) = await AddSourceWithOwnFillingAsync();
@@ -143,7 +144,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         (await SubAssemblyTotalsAsync(usage.SubAssemblyId)).TotalWeight.Should().Be(1200m);
     }
 
-    [Fact]
+    [Test]
     public async Task Can_not_link_the_sources_own_again_once_it_has_dropped_it()
     {
         var (sourceId, fillingId, _, _) = await AddSourceWithOwnFillingAsync();
@@ -155,7 +156,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         await relink.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Ensaymada Big's own, so it can't be linked*");
     }
 
-    [Fact]
+    [Test]
     public async Task The_source_can_not_drop_its_own_while_a_variant_links_it()
     {
         var (sourceId, fillingId, _, _) = await AddSourceWithOwnFillingAsync();
@@ -172,7 +173,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         (await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task The_source_can_not_be_deleted_while_a_variant_links_its_own()
     {
         var (sourceId, _, _, _) = await AddSourceWithOwnFillingAsync();
@@ -186,9 +187,9 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         await deletePermanently.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada Small links Ensaymada Big Filling.*");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public async Task Has_no_packaging_whatever_the_source_has(bool sourceLinksSet)
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -211,7 +212,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         (await CreatePackagingLineRepository().GetEffectiveForProductAsync(variantId, Cancellation)).Should().BeEmpty("nor copied");
     }
 
-    [Fact]
+    [Test]
     public async Task Copies_the_quantity_required_costing_and_details()
     {
         var sourceId = await AddProductAsync("Ensaymada Big");
@@ -246,7 +247,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         costing.LaborPercent.Should().Be(5m);
     }
 
-    [Fact]
+    [Test]
     public async Task Keeps_two_sections_in_one_role_apart_by_their_names()
     {
         var roleId = await AddRoleAsync("Filling", isProductOwned: true);

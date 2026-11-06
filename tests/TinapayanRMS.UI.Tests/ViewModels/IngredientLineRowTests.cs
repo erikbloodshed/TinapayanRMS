@@ -14,7 +14,7 @@ public class IngredientLineRowTests
 
     private static readonly Dictionary<int, RawMaterial> IngredientsById = new() { [Flour.Id] = Flour, [Sugar.Id] = Sugar };
 
-    [Fact]
+    [Test]
     public void Switched_to_unbuffered_a_row_is_priced_at_its_ingredients_true_cost()
     {
         var butter = new RawMaterial { Id = 3, Name = "Butter", CostPerBaseUnit = 0.40m, BufferedCostPerBaseUnit = 0.44m };
@@ -30,7 +30,7 @@ public class IngredientLineRowTests
         changed.Should().Contain([nameof(IngredientLineRow.CostPerGram), nameof(IngredientLineRow.Cost)]);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_points_a_picked_row_at_its_ingredient_which_prices_it()
     {
         var row = new IngredientLineRow { IngredientId = Sugar.Id, Grams = 200m };
@@ -41,7 +41,7 @@ public class IngredientLineRowTests
         row.Cost.Should().Be(18m);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_swaps_in_the_refreshed_copy_of_an_ingredient()
     {
         var row = new IngredientLineRow(Flour, 1000m);
@@ -53,7 +53,7 @@ public class IngredientLineRowTests
         row.Cost.Should().Be(60m);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_keeps_an_ingredient_the_screen_no_longer_lists()
     {
         var row = new IngredientLineRow(Flour, 1000m);
@@ -63,7 +63,7 @@ public class IngredientLineRowTests
         row.Ingredient.Should().BeSameAs(Flour);
     }
 
-    [Fact]
+    [Test]
     public void A_new_row_with_a_lookup_prices_itself_as_its_ingredient_and_grams_are_entered()
     {
         var row = new IngredientLineRow(id => IngredientsById.GetValueOrDefault(id));
@@ -82,7 +82,7 @@ public class IngredientLineRowTests
         row.Cost.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void A_new_row_leaves_its_grams_and_percentage_empty_until_typed()
     {
         var row = new IngredientLineRow(id => IngredientsById.GetValueOrDefault(id), baseWeight: 1000m) { IngredientId = Sugar.Id };
@@ -98,7 +98,7 @@ public class IngredientLineRowTests
         row.Percent.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_leaves_out_a_blank_add_row()
     {
         var lines = IngredientLineRow.CompleteLines([new IngredientLineRow(Flour, 1000m), new IngredientLineRow()], "Bread Dough");
@@ -106,7 +106,7 @@ public class IngredientLineRowTests
         lines.Should().Equal((Flour, 1000m, false, (decimal?)null));
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_refuses_grams_without_an_ingredient()
     {
         var act = () => IngredientLineRow.CompleteLines([new IngredientLineRow { Grams = 150m }], "Bread Dough");
@@ -114,7 +114,7 @@ public class IngredientLineRowTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Pick the ingredient for the 150 g line of Bread Dough, or delete that line.");
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_refuses_an_ingredient_without_grams()
     {
         var row = new IngredientLineRow { IngredientId = Sugar.Id };
@@ -125,7 +125,7 @@ public class IngredientLineRowTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_refuses_grams_cleared_back_to_empty()
     {
         var row = new IngredientLineRow(Sugar, 100m) { Grams = null };
@@ -135,7 +135,7 @@ public class IngredientLineRowTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_refuses_an_ingredient_on_two_rows()
     {
         var act = () => IngredientLineRow.CompleteLines([new IngredientLineRow(Sugar, 100m), new IngredientLineRow(Sugar, 50m)], "Bread Dough");
@@ -156,7 +156,7 @@ public class IngredientLineRowTests
         return (flour, water, eggRow, rows);
     }
 
-    [Fact]
+    [Test]
     public void Typing_a_percentage_works_out_the_grams_and_keeps_the_percentage()
     {
         var (_, water, _, _) = DoughWithTypedFigures();
@@ -167,7 +167,7 @@ public class IngredientLineRowTests
         water.AuthoredBakersPercent.Should().Be(65m);
     }
 
-    [Fact]
+    [Test]
     public void Typing_grams_lets_a_typed_percentage_go()
     {
         var (_, water, _, _) = DoughWithTypedFigures();
@@ -178,7 +178,7 @@ public class IngredientLineRowTests
         water.Percent.Should().Be(70m);
     }
 
-    [Fact]
+    [Test]
     public void A_line_typed_as_a_percentage_follows_the_base_and_one_typed_in_grams_doesnt()
     {
         var (flour, water, eggs, rows) = DoughWithTypedFigures();
@@ -192,7 +192,7 @@ public class IngredientLineRowTests
         eggs.Percent.Should().Be(5m);
     }
 
-    [Fact]
+    [Test]
     public void Ticking_a_line_typed_as_a_percentage_makes_it_a_base_line_given_in_grams()
     {
         var (_, water, _, rows) = DoughWithTypedFigures();
@@ -204,7 +204,7 @@ public class IngredientLineRowTests
         water.Grams.Should().Be(650m, "ticking it changes what the percentages are read against, not how much there is");
     }
 
-    [Fact]
+    [Test]
     public void A_percentage_cant_be_typed_on_a_base_line_or_without_a_base()
     {
         var (flour, _, _, _) = DoughWithTypedFigures();
@@ -220,7 +220,7 @@ public class IngredientLineRowTests
         loose.Percent.Should().Be(100m, "the only line is the whole batch");
     }
 
-    [Fact]
+    [Test]
     public void With_no_base_each_line_reads_as_its_share_of_the_whole_batch()
     {
         var butter = new IngredientLineRow(Flour, 150m);
@@ -235,7 +235,7 @@ public class IngredientLineRowTests
         IngredientLineRow.PercentHeader(1000m).Should().Be("Baker's %");
     }
 
-    [Fact]
+    [Test]
     public void With_no_base_a_typed_percentage_keeps_its_grams_and_comes_back_with_the_base()
     {
         var (flour, water, _, rows) = DoughWithTypedFigures();
@@ -254,7 +254,7 @@ public class IngredientLineRowTests
         water.Grams.Should().Be(1300m, "its 65% waited for a base to come back");
     }
 
-    [Fact]
+    [Test]
     public void Restore_puts_back_a_typed_percentage_that_is_waiting_for_a_base()
     {
         // The state the public setters can't express: a percentage was typed, then the base was unticked, so
@@ -274,7 +274,7 @@ public class IngredientLineRowTests
         row.Grams.Should().Be(1300m, "its 65% waited for a base to come back");
     }
 
-    [Fact]
+    [Test]
     public void Restore_keeps_a_row_that_is_only_half_filled_in()
     {
         // An ingredient picked and no grams typed yet is a legitimate row (CompleteLines exists for it), and
@@ -289,7 +289,7 @@ public class IngredientLineRowTests
         row.Cost.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void Restore_keeps_a_row_with_no_ingredient_at_all()
     {
         var row = IngredientLineRow.Restore(
@@ -301,7 +301,7 @@ public class IngredientLineRowTests
         row.Grams.Should().Be(120m);
     }
 
-    [Fact]
+    [Test]
     public void Restore_keeps_the_base_tick_without_losing_the_grams()
     {
         var row = IngredientLineRow.Restore(
@@ -313,7 +313,7 @@ public class IngredientLineRowTests
         row.CanTypeBakersPercent.Should().BeFalse("a base line is 100% by definition");
     }
 
-    [Fact]
+    [Test]
     public void A_restored_row_prices_itself_when_its_ingredient_is_picked_again()
     {
         var row = IngredientLineRow.Restore(

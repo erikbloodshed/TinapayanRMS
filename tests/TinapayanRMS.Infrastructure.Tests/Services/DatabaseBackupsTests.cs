@@ -22,10 +22,11 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// folder of its own under ProgramData, set up as the app's is. In the database collection, so they run one at a time with the other database tests: a restore
 /// clears every pooled connection.
 /// </summary>
-[Collection(DatabaseCollection.A)]
-public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifetime
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDisposable
 {
-    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
 
     private readonly string _folder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "TinapayanRMS", "Test Backups", Guid.NewGuid().ToString("N"));
@@ -33,7 +34,8 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     private ThrowawayDatabase _database = null!;
     private DatabaseBackups _backups = null!;
 
-    public async ValueTask InitializeAsync()
+    [Before(Test)]
+    public async Task CreateDatabaseAsync()
     {
         _database = await ThrowawayDatabase.CreateAsync(fixture.ConnectionString, Cancellation);
         _backups = new DatabaseBackups(_database.CreateDbContextFactory(), _folder);
@@ -49,7 +51,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         }
     }
 
-    [Fact]
+    [Test]
     [SupportedOSPlatform("windows")]
     public async Task A_backup_is_written_to_a_folder_every_windows_user_can_use()
     {
@@ -62,7 +64,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
                 && (rule.FileSystemRights & FileSystemRights.Modify) == FileSystemRights.Modify);
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_is_written_to_the_folder_and_listed()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
@@ -74,7 +76,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         _backups.List().Should().ContainSingle().Which.Path.Should().Be(backup.Path);
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_leaves_only_itself_in_the_folder()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
@@ -86,7 +88,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     /// What another Windows user, or a lost pgpass.conf, comes to. Asked to prompt, pg_dump waits on a console nobody can see
     /// for ever; this one's timeout only keeps a regression from hanging the test run, as it would hang the app's backups.
     /// </summary>
-    [Fact]
+    [Test]
     public async Task With_no_password_to_be_had_a_backup_fails_at_once_and_says_why()
     {
         var noPassword = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Passfile = Path.Combine(_folder, "no such file.conf") };
@@ -99,7 +101,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
     }
 
     /// <summary>pg_dump waits for as long as a table it needs is held, and nothing else ends that wait. What it left isn't a backup, and it holds no one up.</summary>
-    [Fact]
+    [Test]
     public async Task A_tool_that_hangs_is_stopped_and_lets_the_next_backup_through()
     {
         var today = new DateTime(2026, 10, 3, 8, 0, 0);
@@ -121,7 +123,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         backups.List().Should().ContainSingle().Which.Path.Should().Be(next!.Path);
     }
 
-    [Fact]
+    [Test]
     public async Task A_partial_file_isnt_a_backup_its_name_isnt_reused_and_it_goes_once_its_old()
     {
         Directory.CreateDirectory(_folder);
@@ -144,7 +146,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         File.Exists(stillBeingWritten).Should().BeTrue("another copy of the app may still be writing it");
     }
 
-    [Fact]
+    [Test]
     public async Task A_copy_that_doesnt_finish_leaves_the_file_it_would_replace_as_it_was()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
@@ -171,7 +173,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         }
     }
 
-    [Fact]
+    [Test]
     public async Task The_newest_backup_is_the_one_just_taken()
     {
         (await _backups.NewestAsync(Cancellation)).Should().BeNull("there are none yet");
@@ -182,7 +184,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await _backups.NewestAsync(Cancellation))!.Path.Should().Be(newest!.Path);
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_says_which_database_it_is_of_and_when_it_was_taken()
     {
         // The listing gives the time to the second.
@@ -195,7 +197,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         header.TakenAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.Now);
     }
 
-    [Fact]
+    [Test]
     public async Task A_restore_puts_the_data_back_as_it_was_after_a_safety_backup()
     {
         await AddCategoryAsync("Breads");
@@ -214,7 +216,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
     }
 
-    [Fact]
+    [Test]
     public async Task A_restored_database_carries_on_numbering_where_the_backup_left_off()
     {
         await AddCategoryAsync("Breads");
@@ -227,7 +229,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
     }
 
-    [Fact]
+    [Test]
     public async Task Two_backups_taken_straight_after_each_other_are_two_files_and_neither_overwrites_the_other()
     {
         await AddCategoryAsync("Breads");
@@ -242,7 +244,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await CategoryNamesAsync()).Should().Equal(["Breads"], "the first backup still holds what it was taken with");
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_from_an_earlier_version_is_brought_up_to_date()
     {
         string[] migrations;
@@ -251,7 +253,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
             migrations = [.. dbContext.Database.GetMigrations()];
         }
 
-        Assert.SkipWhen(migrations.Length < 2, "There's only one migration so far, so no earlier version of the database to back up.");
+        Skip.When(migrations.Length < 2, "There's only one migration so far, so no earlier version of the database to back up.");
         await using (var dbContext = _database.CreateDbContext())
         {
             await dbContext.GetService<IMigrator>().MigrateAsync(migrations[^2], cancellationToken: Cancellation);
@@ -272,7 +274,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         }
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_from_a_later_version_is_refused_and_nothing_changes()
     {
         await AddCategoryAsync("Breads");
@@ -289,7 +291,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await dbContext.Database.GetAppliedMigrationsAsync(Cancellation)).Should().NotContain("99991231000000_FromTheFuture");
     }
 
-    [Fact]
+    [Test]
     public async Task The_daily_backup_is_taken_once_a_day()
     {
         var today = new DateTime(2026, 10, 3, 8, 0, 0);
@@ -304,7 +306,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         tomorrow.Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task Only_the_newest_fourteen_automatic_backups_are_kept()
     {
         Directory.CreateDirectory(_folder);
@@ -323,7 +325,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         File.Exists(manual.Path).Should().BeTrue("only automatic backups are ever deleted");
     }
 
-    [Fact]
+    [Test]
     public async Task A_file_that_isnt_a_backup_is_refused_before_anything_changes()
     {
         await AddCategoryAsync("Breads");
@@ -347,7 +349,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         }
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_copied_out_and_back_in_restores()
     {
         await AddCategoryAsync("Breads");
@@ -372,7 +374,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         }
     }
 
-    [Fact]
+    [Test]
     public async Task A_backup_of_another_database_restores_over_this_one()
     {
         await AddCategoryAsync("Breads");
@@ -391,7 +393,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncLifeti
         (await CategoryNamesAsync()).Should().Equal("From the other computer");
     }
 
-    [Fact]
+    [Test]
     public async Task Copying_a_backup_onto_itself_leaves_it_whole()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);

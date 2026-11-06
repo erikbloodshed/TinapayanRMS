@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.Printing;
 /// </summary>
 public class ProductPrintManagerTests
 {
-    [Fact]
+    [Test]
     public void The_print_document_holds_each_page_of_the_layout_in_a_page_control() => StaThread.RunLicensed(() =>
     {
         using var manager = new ProductPrintManager(SamplePrintouts.WithLines(80), ProductPrintManager.A4);
@@ -39,14 +39,14 @@ public class ProductPrintManagerTests
     });
 
     /// <summary>Two papers every printer lists: A4, Syncfusion's own starting page, and US Letter, a common default.</summary>
-    public static TheoryData<string, double, double> Papers => new()
-    {
-        { "A4", 793.7, 1122.52 },
-        { "Letter", 816, 1056 },
-    };
+    public static IEnumerable<(string, double, double)> Papers() =>
+    [
+        ("A4", 793.7, 1122.52),
+        ("Letter", 816, 1056),
+    ];
 
-    [Theory]
-    [MemberData(nameof(Papers))]
+    [Test]
+    [MethodDataSource(nameof(Papers))]
     public void The_pane_starts_on_the_paper_given_and_picks_it_in_the_printers_paper_list(string paper, double width, double height) =>
         OffscreenPrintPane.Run(new Size(width, height), (preview, manager) =>
         {
@@ -60,7 +60,7 @@ public class ProductPrintManagerTests
             picked.Size.Height.Should().BeApproximately(height, 1);
         });
 
-    [Fact]
+    [Test]
     public void A_paper_given_sideways_starts_the_page_portrait() => StaThread.RunLicensed(() =>
     {
         using var manager = new ProductPrintManager(SamplePrintouts.WithLines(3), new Size(1056, 816));
@@ -71,7 +71,7 @@ public class ProductPrintManagerTests
         manager.PageHeight.Should().Be(1056);
     });
 
-    [Fact]
+    [Test]
     public void The_default_printers_paper_is_the_one_WPFs_own_print_dialog_starts_on() => StaThread.RunLicensed(() =>
     {
         // PrintDialog takes Windows' default printer and its user ticket, else its default one, as its own PrintTicket.
@@ -80,7 +80,7 @@ public class ProductPrintManagerTests
         ProductPrintManager.DefaultPrinterPaper().Should().Be(new Size(ticket.Width!.Value, ticket.Height!.Value));
     });
 
-    [Fact]
+    [Test]
     public void The_pages_embed_only_subsets_of_their_fonts_as_Microsoft_Print_to_PDF_needs() => StaThread.RunLicensed(() =>
     {
         // A formula base's tick, typed as ✓, came from Segoe UI Emoji, which the pages then embedded whole (8 MB), and
@@ -109,7 +109,7 @@ public class ProductPrintManagerTests
         }
     });
 
-    [Fact]
+    [Test]
     public void Leaving_the_costing_out_lays_the_pages_out_again_without_it() => StaThread.RunLicensed(() =>
     {
         // A recipe that fills most of the first page, so the costing, kept together, takes a page of its own.
@@ -124,7 +124,7 @@ public class ProductPrintManagerTests
         manager.GetPrintDocument().Pages.Should().ContainSingle();
     });
 
-    [Fact]
+    [Test]
     public void A_scaled_recipe_offers_only_its_costs_and_clearing_them_keeps_the_recipe_ticked_for_the_next_printout() => StaThread.RunLicensed(() =>
     {
         using var manager = new ProductPrintManager(SamplePrintouts.WithLines(3), ProductPrintManager.A4) { IncludeRecipe = false };

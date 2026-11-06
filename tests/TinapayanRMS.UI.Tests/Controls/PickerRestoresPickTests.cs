@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// PickerRestoresPick: a picker emptied while bound to a value that can't be empty shows that value again once the
 /// keyboard leaves it, as Raw Materials' Type does when its text is deleted.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class PickerRestoresPickTests
 {
     private static readonly string[] Notes = ["Bread", "Cake"];
@@ -59,7 +59,7 @@ public class PickerRestoresPickTests
         private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 
-    [Fact]
+    [Test]
     public void A_picker_emptied_shows_its_value_again_once_the_keyboard_leaves()
     {
         RunWithPicker(nameof(Form.Kind), Enum.GetValues<Kind>(), (before, picker, box, form) =>
@@ -78,7 +78,7 @@ public class PickerRestoresPickTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_picker_emptied_and_left_follows_a_value_set_to_the_same_again()
     {
         RunWithPicker(nameof(Form.Kind), Enum.GetValues<Kind>(), (before, picker, box, form) =>
@@ -96,7 +96,7 @@ public class PickerRestoresPickTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_picker_whose_value_can_be_empty_stays_empty()
     {
         RunWithPicker(nameof(Form.Note), Notes, (before, picker, box, form) =>

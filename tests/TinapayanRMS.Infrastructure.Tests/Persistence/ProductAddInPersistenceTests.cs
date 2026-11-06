@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// not the sub-assembly, so two products linking the same dough each keep their own and neither moves the
 /// dough's stored batch. Written with the rest of the recipe (ProductRepository.SaveAsync).
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductAddInPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductSubAssemblyUsageRepository CreateUsageRepository() => new(CreateDbContextFactory());
@@ -36,7 +37,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         return (ownerId, linkerId, doughId, flourId);
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_a_linked_usage_writes_its_add_ins_against_that_usage()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
@@ -52,7 +53,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (addIn.Ingredient!.Name, addIn.Ingredient.BufferedCostPerBaseUnit).Should().Be(("Ube Flavour", 0.8m), "an add-in is costed from its ingredient on read");
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_the_recipe_again_replaces_the_add_ins_and_drops_the_ones_removed()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
@@ -66,7 +67,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         addIns.Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 25m));
     }
 
-    [Fact]
+    [Test]
     public async Task Two_products_linking_the_same_sub_assembly_each_keep_their_own_add_ins()
     {
         var (_, miniId, doughId, _) = await SeedLinkedDoughAsync();
@@ -81,7 +82,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (await AddInsAsync(otherId)).Select(l => (l.IngredientId, l.Grams)).Should().Equal((pandanId, 5m));
     }
 
-    [Fact]
+    [Test]
     public async Task Add_ins_leave_the_linked_sub_assemblys_own_batch_alone()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
@@ -94,7 +95,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == doughId, Cancellation)).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task An_add_in_already_in_the_linked_recipe_is_refused_before_anything_is_deleted()
     {
         var (_, linkerId, doughId, flourId) = await SeedLinkedDoughAsync();
@@ -109,7 +110,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (await AddInsAsync(linkerId)).Select(l => l.IngredientId).Should().Equal(ubeId);
     }
 
-    [Fact]
+    [Test]
     public async Task Taking_a_linked_sub_assembly_out_of_the_recipe_takes_its_add_ins_with_it()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
@@ -122,7 +123,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (await AddInsAsync(linkerId)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_the_product_permanently_takes_its_usages_add_ins_with_it()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();
@@ -135,7 +136,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
         (await dbContext.UsageAddInLines.CountAsync(Cancellation)).Should().Be(0, "Products → usages → add-ins cascades all the way down");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_used_only_as_an_add_in_cant_be_deleted()
     {
         var (_, linkerId, doughId, _) = await SeedLinkedDoughAsync();

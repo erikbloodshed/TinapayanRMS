@@ -24,7 +24,7 @@ public class SubAssemblyTreeTests
 
     private static IEnumerable<string> TitlesIn(SubAssemblyFolderNode folder) => folder.Children.Select(c => c.Title);
 
-    [Fact]
+    [Test]
     public void Each_role_has_a_folder_in_the_roles_order_holding_its_sub_assemblies_in_the_lists_order()
     {
         var tree = new SubAssemblyTree();
@@ -43,7 +43,7 @@ public class SubAssemblyTreeTests
         tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the list first shows every sub-assembly");
     }
 
-    [Fact]
+    [Test]
     public void A_search_shows_only_the_folders_holding_a_match_and_opens_them()
     {
         var tree = new SubAssemblyTree(new FolderMemory([Key(Dough), Key(Filling)]));
@@ -62,7 +62,7 @@ public class SubAssemblyTreeTests
         tree.Folder(Filling.Id)!.IsExpanded.Should().BeFalse("the search didn't show it");
     }
 
-    [Fact]
+    [Test]
     public void A_sub_assembly_keeps_its_row_through_a_refresh_and_takes_it_to_its_new_role()
     {
         var tree = new SubAssemblyTree();
@@ -76,7 +76,7 @@ public class SubAssemblyTreeTests
         tree.Folder(Dough.Id)!.SubAssemblies.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_renamed_role_keeps_its_folder_a_reordered_one_moves_and_a_deleted_ones_goes()
     {
         var tree = new SubAssemblyTree();
@@ -93,7 +93,7 @@ public class SubAssemblyTreeTests
         tree.Folder(Filling.Id).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_drop_moves_a_recipe_only_into_another_recipe_role_and_a_set_nowhere()
     {
         var tree = new SubAssemblyTree();
@@ -112,7 +112,7 @@ public class SubAssemblyTreeTests
         SubAssemblyTree.MoveTo(null, pandesal.SubAssembly).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void Several_sub_assemblies_move_together_leaving_out_those_that_would_not_move()
     {
         SubAssembly[] subAssemblies =
@@ -126,7 +126,7 @@ public class SubAssemblyTreeTests
         SubAssemblyTree.MovesTo(Packaging, subAssemblies).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_folder_with_its_first_rows_is_announced_open_again()
     {
         var tree = new SubAssemblyTree();
@@ -146,7 +146,7 @@ public class SubAssemblyTreeTests
         announced.Should().Be(1, "it had rows already");
     }
 
-    [Fact]
+    [Test]
     public void The_folders_closed_are_what_is_remembered_and_a_tree_never_refreshed_keeps_what_it_was_given()
     {
         var tree = new SubAssemblyTree(new FolderMemory([Key(Filling), "99"]));
@@ -158,7 +158,7 @@ public class SubAssemblyTreeTests
         tree.Folder(Dough.Id)!.IsExpanded.Should().BeTrue("a folder not left closed opens");
     }
 
-    [Fact]
+    [Test]
     public void Expand_All_and_Collapse_All_open_or_close_every_folder()
     {
         var tree = new SubAssemblyTree();

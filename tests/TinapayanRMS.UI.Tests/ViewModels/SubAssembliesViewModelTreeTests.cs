@@ -22,10 +22,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// itself, and what each item does, run as the menu runs it. A recipe only moves between recipe roles, and a packaging set
 /// stays in the Packaging role.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task A_sub_assemblys_menu_moves_it_to_another_recipe_role_and_offers_rename_and_delete() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -46,7 +47,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         moveTo.Single(i => i.Header == "Dough").IsEnabled.Should().BeFalse("it's in that folder already");
     });
 
-    [Fact]
+    [Test]
     public Task A_packaging_set_has_nowhere_to_move_and_nor_has_one_picked_with_a_recipe() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -64,7 +65,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.TreeMenuFor(set).Should().BeEmpty();
     });
 
-    [Fact]
+    [Test]
     public Task A_drop_moves_recipes_onto_another_roles_folder_and_gives_the_first_back_to_bring_into_view() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -86,7 +87,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
     });
 
-    [Fact]
+    [Test]
     public Task Move_to_saves_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -110,7 +111,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         (await viewModel.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Several_picked_move_together_and_the_one_showing_stays_on_the_form() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -139,7 +140,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedRow!.Id.Should().Be(halayaId);
     });
 
-    [Fact]
+    [Test]
     public Task A_move_of_the_one_showing_moves_its_Role_picker_and_leaves_what_else_is_typed_to_save() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -162,7 +163,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task A_refused_move_says_why_and_moves_nothing() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -189,7 +190,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         (await RoleOfAsync(glazeId)).Should().Be(fillingRoleId);
     });
 
-    [Fact]
+    [Test]
     public Task Rename_on_the_one_showing_saves_the_name_and_leaves_what_else_is_typed_to_save() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -225,7 +226,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task A_rename_to_a_name_in_use_is_refused_and_says_why() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -240,7 +241,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Halaya");
     });
 
-    [Fact]
+    [Test]
     public Task New_Here_starts_a_sub_assembly_in_the_folders_role_that_Save_files_there() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -266,7 +267,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Find(viewModel.SelectedRow!.Id));
     });
 
-    [Fact]
+    [Test]
     public Task The_folder_and_list_menus_add_sub_assemblies_and_roles_and_open_or_close_every_folder() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -288,7 +289,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SubAssemblyTree.Roots.Should().OnlyContain(f => f.IsExpanded);
     });
 
-    [Fact]
+    [Test]
     public Task New_Role_adds_a_folder_after_the_others_and_picks_it() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -310,7 +311,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Roots[0]);
     });
 
-    [Fact]
+    [Test]
     public Task Rename_Role_renames_its_folder_keeps_it_product_owned_and_the_picker_follows() => StaThread.RunAsync(async () =>
     {
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
@@ -332,7 +333,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Delete_Role_is_greyed_while_a_sub_assembly_is_in_it_and_deletes_an_empty_one_once_asked() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -364,7 +365,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough");
     });
 
-    [Fact]
+    [Test]
     public Task Delete_on_a_sub_assembly_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -391,7 +392,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName.Should().BeEmpty();
     });
 
-    [Fact]
+    [Test]
     public Task Make_In_House_Ingredient_makes_one_from_the_recipe_which_stays_on_the_list_and_lists_it_under_Used_By() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
@@ -424,7 +425,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         opened.Should().Equal(made.Id);
     });
 
-    [Fact]
+    [Test]
     public Task Make_In_House_Ingredient_leaves_a_recipe_a_product_uses_and_the_product_as_they_are() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
@@ -458,7 +459,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         (await dbContext.ProductVersions.AnyAsync(v => v.ProductId == productId, Cancellation)).Should().BeFalse("nothing about Ube Bun changed");
     });
 
-    [Fact]
+    [Test]
     public Task Make_In_House_Ingredient_waits_for_the_forms_changes_and_needs_a_Made_category() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1);
@@ -485,7 +486,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
 
-    [Fact]
+    [Test]
     public Task F2_and_Del_do_what_the_menu_shows_for_the_one_row_picked() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -508,7 +509,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
-    [Fact]
+    [Test]
     public Task Picking_a_row_picks_its_sub_assembly_and_one_opened_from_elsewhere_is_picked_alone() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -531,7 +532,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Find(spanishId));
     });
 
-    [Fact]
+    [Test]
     public Task The_folders_left_closed_stay_closed_next_time_and_a_new_role_opens() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -568,7 +569,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(subAssemblyId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == role);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
-    [Fact]
+    [Test]
     public Task Picking_another_sub_assembly_over_unsaved_changes_asks_and_Cancel_stays_on_them() => StaThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
@@ -588,9 +589,9 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeTrue();
     });
 
-    [Theory]
-    [InlineData(UnsavedChangesAnswer.Save, "Sweeter Dough")]
-    [InlineData(UnsavedChangesAnswer.DontSave, "Sweet Dough")]
+    [Test]
+    [Arguments(UnsavedChangesAnswer.Save, "Sweeter Dough")]
+    [Arguments(UnsavedChangesAnswer.DontSave, "Sweet Dough")]
     public Task Picking_another_sub_assembly_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => StaThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
@@ -609,7 +610,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         (await NameOfAsync(sweetId)).Should().Be(savedName);
     });
 
-    [Fact]
+    [Test]
     public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => StaThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
@@ -625,7 +626,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName.Should().Be("Sweeter Dough");
     });
 
-    [Fact]
+    [Test]
     public Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved() => StaThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
@@ -642,7 +643,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
     // No puts a new sub-assembly back blank. What's typed into it next has to count, or it's lost with no question asked.
-    [Fact]
+    [Test]
     public Task What_is_typed_after_no_on_a_new_sub_assembly_counts_as_unsaved() => StaThread.RunAsync(async () =>
     {
         var viewModel = await LoadedViewModelAsync();

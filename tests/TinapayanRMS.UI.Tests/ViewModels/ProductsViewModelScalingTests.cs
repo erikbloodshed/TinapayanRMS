@@ -18,10 +18,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// worked out while the tab shows and again as the form changes, made ingredients opening into their saved BOMs and a
 /// composite's products into their saved recipes. The number isn't part of the product.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductsViewModelScalingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task The_tab_scales_the_recipe_in_whole_batches_and_opens_a_made_ingredient_into_its_bom() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -41,7 +42,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("the number to scale to isn't an edit");
     });
 
-    [Fact]
+    [Test]
     public Task A_change_to_the_quantity_required_rescales_the_tab() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -56,7 +57,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.Scaling.PiecesText.Should().Be("= 160 pieces");
     });
 
-    [Fact]
+    [Test]
     public Task A_composites_products_open_into_their_saved_recipes() => StaThread.RunAsync(async () =>
     {
         var ensaymadaId = await AddEnsaymadaAsync();
@@ -83,7 +84,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.Scaling.Rows[1].Children.Single().Detail.Should().Be("2 batches · 20 pcs", "10 of 100 g from a 1,000 g batch");
     });
 
-    [Fact]
+    [Test]
     public Task The_number_to_scale_to_stays_for_the_next_product_picked() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -102,7 +103,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.Scaling.Rows.Single().Detail.Should().Be("3 batches · 30 pcs (5 extra)");
     });
 
-    [Fact]
+    [Test]
     public Task An_amount_of_one_ingredient_makes_the_most_units_whose_whole_batches_it_covers() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -135,7 +136,7 @@ public class ProductsViewModelScalingTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("none of it is an edit");
     });
 
-    [Fact]
+    [Test]
     public void An_amount_is_typed_in_grams_or_one_of_the_ingredients_own_units()
     {
         var flour = new RawMaterial

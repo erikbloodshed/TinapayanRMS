@@ -11,7 +11,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// </summary>
 public class FolderMemoryTests
 {
-    [Fact]
+    [Test]
     public void With_nothing_kept_a_folder_starts_as_its_list_says()
     {
         using var memory = new FolderMemory();
@@ -20,7 +20,7 @@ public class FolderMemoryTests
         memory.Track(new Folder("Deleted"), startsOpen: false).IsExpanded.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Every_folder_starts_open_but_those_left_closed_one_new_since_included()
     {
         using var memory = new FolderMemory(closedKeys: ["b"], openKeys: ["a"]);
@@ -32,7 +32,7 @@ public class FolderMemoryTests
             "what was kept decides: it wasn't closed when the list was left");
     }
 
-    [Fact]
+    [Test]
     public void The_folders_a_list_kept_open_before_open_again_and_the_rest_start_closed()
     {
         using var memory = new FolderMemory(openKeys: ["a"]);
@@ -41,7 +41,7 @@ public class FolderMemoryTests
         memory.Track(new Folder("b")).IsExpanded.Should().BeFalse("it wasn't left open");
     }
 
-    [Fact]
+    [Test]
     public void The_closed_folders_are_what_is_kept_and_until_the_list_is_filled_what_was_kept_before()
     {
         using var memory = new FolderMemory(["c", "a"]);
@@ -55,7 +55,7 @@ public class FolderMemoryTests
         memory.ClosedKeys(folders, isFilled: true).Should().Equal("a", "b");
     }
 
-    [Fact]
+    [Test]
     public void A_list_that_kept_its_open_folders_has_no_closed_ones_to_keep_until_it_is_filled()
     {
         using var memory = new FolderMemory(openKeys: ["a"]);
@@ -65,7 +65,7 @@ public class FolderMemoryTests
         memory.ClosedKeys(folders, isFilled: true).Should().Equal("b");
     }
 
-    [Fact]
+    [Test]
     public void With_nothing_kept_the_folders_that_start_closed_are_what_a_list_left_untouched_keeps()
     {
         using var memory = new FolderMemory();
@@ -75,7 +75,7 @@ public class FolderMemoryTests
         memory.ClosedKeys(folders, isFilled: true).Should().Equal(["Deleted"], "so nothing is written for a list nobody touched");
     }
 
-    [Fact]
+    [Test]
     public void A_folder_opened_or_closed_is_reported_and_one_announced_unchanged_is_not()
     {
         using var memory = new FolderMemory();
@@ -91,7 +91,7 @@ public class FolderMemoryTests
         reports.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public void Read_takes_the_closed_folders_kept_and_failing_those_the_open_ones()
     {
         var store = new InMemoryViewStateStore();

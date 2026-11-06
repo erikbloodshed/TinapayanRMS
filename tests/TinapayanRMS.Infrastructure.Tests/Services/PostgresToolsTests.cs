@@ -15,9 +15,9 @@ public sealed class PostgresToolsTests
 {
     private static readonly NpgsqlConnectionStringBuilder Connection = new("Host=localhost;Username=tinapayanrms");
 
-    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
 
-    [Fact]
+    [Test]
     public async Task A_tool_that_succeeds_returns_what_it_wrote()
     {
         var output = await new PostgresTools(null).RunAsync("pg_dump", Connection, ["--schema-only", "--dbname", "postgres"], Cancellation);
@@ -25,7 +25,7 @@ public sealed class PostgresToolsTests
         output.Should().Contain("PostgreSQL database dump");
     }
 
-    [Fact]
+    [Test]
     public async Task A_tool_that_fails_throws_what_it_wrote()
     {
         var notABackup = Path.Combine(Path.GetTempPath(), $"not a backup {Guid.NewGuid():N}.backup");
@@ -43,7 +43,7 @@ public sealed class PostgresToolsTests
         }
     }
 
-    [Fact]
+    [Test]
     public async Task A_cancelled_run_throws()
     {
         var run = () => new PostgresTools(null).RunAsync("pg_dump", Connection, ["--version"], new CancellationToken(canceled: true));
@@ -52,7 +52,7 @@ public sealed class PostgresToolsTests
     }
 
     // Backups:ToolsFolder, for tools somewhere the search doesn't look.
-    [Fact]
+    [Test]
     public void The_folder_set_in_the_settings_is_looked_in_first_and_the_path_last()
     {
         var configured = Path.Combine(Path.GetTempPath(), "Tools", "PostgreSQL");
@@ -64,14 +64,14 @@ public sealed class PostgresToolsTests
         folders.TakeLast(path.Length).Should().Equal(path);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
     public void A_blank_folder_counts_as_none_set(string configured) =>
         PostgresTools.CandidateFolders(configured).Should().Equal(PostgresTools.CandidateFolders(null));
 
     // A folder set that has no tools in it, such as one left over from an old install, isn't the end of it.
-    [Fact]
+    [Test]
     public async Task A_folder_set_without_the_tools_falls_back_on_the_search()
     {
         var empty = Directory.CreateTempSubdirectory("no-postgres-tools-").FullName;

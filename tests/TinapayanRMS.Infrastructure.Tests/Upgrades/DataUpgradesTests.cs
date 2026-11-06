@@ -11,10 +11,11 @@ namespace TinapayanRMS.Infrastructure.Tests.Upgrades;
 /// The one-time changes to the data a schema change needs (DataUpgrades): made once on a database as it's migrated, in
 /// order, and recorded so they're never made again.
 /// </summary>
-[Collection(DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
 public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task Migrating_a_database_makes_the_upgrades_it_hasnt_had_and_records_them()
     {
         await using var dbContext = CreateDbContext();
@@ -24,7 +25,7 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers"]);
     }
 
-    [Fact]
+    [Test]
     public async Task The_section_names_upgrade_reads_each_products_own_label_from_its_name_once()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -70,7 +71,7 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         (await SectionNameOfAsync(namedId)).Should().Be("Purple Yam");
     }
 
-    [Fact]
+    [Test]
     public async Task The_target_buffers_upgrade_gives_each_purchased_material_without_one_its_buffer_once()
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.055m);

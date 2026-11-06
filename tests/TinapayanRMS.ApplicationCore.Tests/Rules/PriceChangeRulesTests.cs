@@ -6,7 +6,7 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class PriceChangeRulesTests
 {
-    [Fact]
+    [Test]
     public void A_change_in_percent_and_a_new_price_follow_from_each_other()
     {
         PriceChangeRules.NewPrice(1250m, 10m).Should().Be(1375m);
@@ -15,7 +15,7 @@ public class PriceChangeRulesTests
         PriceChangeRules.ChangePercent(1250m, 1000m).Should().Be(-20m);
     }
 
-    [Fact]
+    [Test]
     public void The_price_to_keep_a_markup_moves_with_the_base_cost_and_earns_the_same_markup()
     {
         // ₱10 on a ₱6 base cost, the base cost up 10% to ₱6.60: ₱11 keeps the markup, VAT and all.
@@ -28,14 +28,14 @@ public class PriceChangeRulesTests
             .Should().BeApproximately(CostingRules.CalculateMarkupPercentFromPrice(6m, 10m, vat), 0.0000001m);
     }
 
-    [Fact]
+    [Test]
     public void There_is_no_price_to_keep_a_markup_without_a_current_price_or_a_base_cost()
     {
         PriceChangeRules.PriceToKeepMarkup(null, 6m, 6.6m).Should().BeNull();
         PriceChangeRules.PriceToKeepMarkup(10m, 0m, 6.6m).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_fall_of_100_percent_or_more_and_a_price_of_nothing_are_refused()
     {
         var all = () => PriceChangeRules.EnsureValidChange(-100m);
@@ -47,7 +47,7 @@ public class PriceChangeRulesTests
         nothing.Should().Throw<BusinessRuleException>().WithMessage(PriceChangeRules.NewPriceTooLowText);
     }
 
-    [Fact]
+    [Test]
     public void A_priced_materials_cost_and_buffered_cost_move_by_the_same_factor()
     {
         // Flour at 1,250 a 25 kg sack: 0.05 a gram, held at a buffered 0.06. Up 10% to 1,375.
@@ -56,7 +56,7 @@ public class PriceChangeRulesTests
         PriceChangeRules.CostsAfter(flour, 1250m, 1375m, 25000m).Should().Be((0.055m, 0.066m));
     }
 
-    [Fact]
+    [Test]
     public void A_material_with_no_price_is_priced_as_its_first_price_would_be()
     {
         var flour = new RawMaterial { CostBufferPercent = 10m };

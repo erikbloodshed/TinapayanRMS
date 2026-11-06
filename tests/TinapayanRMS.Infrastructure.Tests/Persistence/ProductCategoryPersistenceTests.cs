@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Product categories (Breads, Cakes, …): a list of their own, apart from raw material categories, and optional on a
 /// product, so deleting one leaves its products uncategorized.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductCategoryRepository CreateRepository() => new(CreateDbContextFactory());
@@ -29,7 +30,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         return (await repository.GetAllAsync(Cancellation)).Single(c => c.Name == name);
     }
 
-    [Fact]
+    [Test]
     public async Task A_categorys_own_wastage_is_kept_read_for_its_products_and_held_to_0_to_100()
     {
         var repository = CreateRepository();
@@ -54,7 +55,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         await tooMuch.Should().ThrowAsync<BusinessRuleException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ProductCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
     {
         var repository = CreateRepository();
@@ -70,7 +71,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         updated.Name.Should().Be("Breads");
     }
 
-    [Fact]
+    [Test]
     public async Task ProductCategoryRepository_GetAllAsync_orders_by_name()
     {
         await SeedCategoryAsync("Pastries");
@@ -82,7 +83,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         names.Should().Equal("Breads", "Cakes", "Pastries");
     }
 
-    [Fact]
+    [Test]
     public async Task ProductCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
     {
         var act = () => CreateRepository().UpdateAsync(new ProductCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
@@ -90,7 +91,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_product_category_names_are_rejected()
     {
         await SeedCategoryAsync("Cakes");
@@ -100,7 +101,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_category_can_share_a_name_with_a_raw_material_category()
     {
         await using (var dbContext = CreateDbContext())
@@ -114,7 +115,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().NotThrowAsync("the two lists are separate");
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_saves_a_products_category_and_reads_it_back_with_the_product()
     {
         var cakes = await SeedCategoryAsync("Cakes");
@@ -129,7 +130,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         (await repository.GetAllAsync(Cancellation)).Should().ContainSingle().Which.Category!.Name.Should().Be("Cakes");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_needs_no_category_and_can_be_taken_out_of_one()
     {
         var cakes = await SeedCategoryAsync("Cakes");
@@ -144,7 +145,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         (await repository.GetByIdAsync(id, Cancellation))!.CategoryId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_only_a_recipe_keeps_the_products_category()
     {
         var breads = await SeedCategoryAsync("Breads");
@@ -159,7 +160,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         (await CreateProductRepository().GetByIdAsync(productId, Cancellation))!.CategoryId.Should().Be(breads.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_category_leaves_its_products_uncategorized()
     {
         var cakes = await SeedCategoryAsync("Cakes");
@@ -174,7 +175,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         product.CategoryId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_goes_in_its_sources_category()
     {
         var cakes = await SeedCategoryAsync("Cakes");

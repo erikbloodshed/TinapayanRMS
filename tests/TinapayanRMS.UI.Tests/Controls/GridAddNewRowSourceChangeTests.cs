@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// lines. The screen listens to the collection too, as ProductsViewModel does: with the grid as the only
 /// listener, ObservableCollection lets the nested add through.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridAddNewRowSourceChangeTests
 {
     public sealed class Line
@@ -25,7 +25,7 @@ public class GridAddNewRowSourceChangeTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void Refilling_the_lines_under_an_open_add_row_drops_the_add_row()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -42,7 +42,7 @@ public class GridAddNewRowSourceChangeTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Adding_a_line_under_an_open_add_row_drops_the_add_row()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -58,7 +58,7 @@ public class GridAddNewRowSourceChangeTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_line_typed_into_the_add_row_is_still_added_by_the_grid()
     {
         OffscreenGrid.Run(LinesGrid, grid =>

@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// from the order the lines are handed over in and read back in that order, then by Id: a sub-assembly's lines, a
 /// packaging set's, a made ingredient's BOM, a product's packaging and a linked usage's add-ins.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateSubAssemblyRepository() => new(CreateDbContextFactory());
@@ -46,7 +47,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
     private async Task<IReadOnlyList<SubAssemblyLine>> SubAssemblyLinesAsync(int subAssemblyId) =>
         await new SubAssemblyLineRepository(CreateDbContextFactory()).GetForSubAssembliesAsync([subAssemblyId], Cancellation);
 
-    [Fact]
+    [Test]
     public async Task A_sub_assemblys_lines_come_back_in_the_order_they_were_saved_in()
     {
         var (id, roleId, flourId, sugarId, saltId) = await SaveDoughAsync();
@@ -59,7 +60,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         lines.Select(l => l.SortOrder).Should().Equal(0, 1, 2);
     }
 
-    [Fact]
+    [Test]
     public async Task Lines_are_read_in_their_stored_order_rather_than_the_order_their_rows_were_added_in()
     {
         var (id, _, flourId, sugarId, saltId) = await SaveDoughAsync();
@@ -73,7 +74,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         (await SubAssemblyLinesAsync(id)).Select(l => l.IngredientId).Should().Equal(saltId, sugarId, flourId);
     }
 
-    [Fact]
+    [Test]
     public async Task Lines_saved_before_they_had_an_order_keep_the_order_they_were_added_in()
     {
         var (id, _, flourId, sugarId, saltId) = await SaveDoughAsync();
@@ -88,7 +89,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         (await SubAssemblyLinesAsync(id)).Select(l => l.IngredientId).Should().Equal(flourId, sugarId, saltId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_sets_lines_come_back_in_the_order_they_were_saved_in()
     {
         var roleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -107,7 +108,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         lines.Select(l => l.SortOrder).Should().Equal(0, 1, 2);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredients_bom_comes_back_in_its_sub_assemblys_order_then_its_add_ins()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -126,7 +127,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         lines.Select(l => (l.IsAddIn, l.SortOrder)).Should().Equal((false, 0), (false, 1), (false, 2), (true, 0), (true, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_packaging_lines_come_back_in_the_order_they_were_saved_in()
     {
         var productId = await AddProductAsync("Ensaymada");
@@ -144,7 +145,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         lines.Select(l => l.SortOrder).Should().Equal(0, 1, 2);
     }
 
-    [Fact]
+    [Test]
     public async Task A_linked_usages_add_ins_come_back_in_the_order_they_were_saved_in()
     {
         var (doughId, _, _, _, _) = await SaveDoughAsync();

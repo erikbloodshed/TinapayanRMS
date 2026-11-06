@@ -70,7 +70,7 @@ public class UndoHistoryTests
         }
     }
 
-    [Fact]
+    [Test]
     public void Each_step_hands_back_the_settled_form_as_it_stood_when_the_step_was_taken()
     {
         // As Products rebases its settled form when another section's form opens: the step moves it, and the undo
@@ -95,7 +95,7 @@ public class UndoHistoryTests
         settledAtUndo.Should().Be("copy", "the settled form as it stood when the undo stepped off it");
     }
 
-    [Fact]
+    [Test]
     public void Nothing_to_undo_on_a_form_that_has_not_been_changed()
     {
         var form = new Form();
@@ -105,7 +105,7 @@ public class UndoHistoryTests
         form.Undo().Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Undo_puts_back_the_value_before_the_last_change()
     {
         var form = new Form();
@@ -119,7 +119,7 @@ public class UndoHistoryTests
         form.Undo().Should().BeFalse("there was nothing before that");
     }
 
-    [Fact]
+    [Test]
     public void Redo_returns_exactly_what_the_undo_stepped_off()
     {
         var form = new Form();
@@ -132,7 +132,7 @@ public class UndoHistoryTests
         form.Redo().Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_change_after_an_undo_leaves_nothing_to_redo()
     {
         var form = new Form();
@@ -147,7 +147,7 @@ public class UndoHistoryTests
         form.Redo().Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_step_that_changes_nothing_is_not_recorded()
     {
         var form = new Form();
@@ -165,7 +165,7 @@ public class UndoHistoryTests
         form.History.CanUndo.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_step_ended_with_a_rebase_is_measured_from_it_but_puts_back_where_it_began()
     {
         // The form's text stands for "the user's part:the part that isn't". Only a change to the
@@ -188,7 +188,7 @@ public class UndoHistoryTests
         form.Value.Should().Be("a:y");
     }
 
-    [Fact]
+    [Test]
     public void RewriteAll_carries_a_change_saved_from_outside_the_form_into_every_step()
     {
         // As Products does for a product dragged into another category: the form's text stands for "name:category", and
@@ -215,7 +215,7 @@ public class UndoHistoryTests
         form.Value.Should().Be("c:cakes");
     }
 
-    [Fact]
+    [Test]
     public void Opening_a_step_settles_the_one_already_open()
     {
         var form = new Form();
@@ -234,7 +234,7 @@ public class UndoHistoryTests
         form.Value.Should().Be("");
     }
 
-    [Fact]
+    [Test]
     public void Nothing_is_recorded_while_the_screen_says_it_cannot()
     {
         var form = new Form { CanRecord = false };
@@ -244,7 +244,7 @@ public class UndoHistoryTests
         form.History.CanUndo.Should().BeFalse("a load or a restore writing to the form isn't the user's change");
     }
 
-    [Fact]
+    [Test]
     public void The_oldest_step_goes_once_the_depth_is_passed()
     {
         var form = new Form(depth: 3);
@@ -261,7 +261,7 @@ public class UndoHistoryTests
         form.History.CanUndo.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Clear_throws_both_stacks_away()
     {
         var form = new Form();
@@ -275,7 +275,7 @@ public class UndoHistoryTests
         form.History.CanRedo.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Nothing_to_save_until_the_form_has_been_settled_and_then_changed()
     {
         var form = new Form();
@@ -288,7 +288,7 @@ public class UndoHistoryTests
         form.History.IsDirty.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_form_typed_back_to_what_it_was_settled_with_has_nothing_to_save()
     {
         var form = new Form();
@@ -301,7 +301,7 @@ public class UndoHistoryTests
         form.History.CanUndo.Should().BeTrue("both changes are still steps to take back");
     }
 
-    [Fact]
+    [Test]
     public void Stepping_back_to_the_settled_form_leaves_nothing_to_save()
     {
         var form = new Form();
@@ -316,7 +316,7 @@ public class UndoHistoryTests
         form.History.IsDirty.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void What_a_save_wrote_becomes_the_form_there_is_nothing_to_save_against()
     {
         var form = new Form();
@@ -334,7 +334,7 @@ public class UndoHistoryTests
         form.History.IsDirty.Should().BeFalse("'one' is what was saved");
     }
 
-    [Fact]
+    [Test]
     public void A_form_being_loaded_has_nothing_to_save_however_far_it_has_got()
     {
         var form = new Form();
@@ -348,7 +348,7 @@ public class UndoHistoryTests
         form.History.IsDirty.Should().BeFalse("nothing is the user's until the screen says the form has landed");
     }
 
-    [Fact]
+    [Test]
     public void An_edit_the_form_has_not_seen_yet_keeps_Save_offered()
     {
         var form = new Form();
@@ -363,7 +363,7 @@ public class UndoHistoryTests
         form.History.IsDirty.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsDirty_tells_the_Save_button_when_it_changes()
     {
         var form = new Form();
@@ -379,7 +379,7 @@ public class UndoHistoryTests
         raised.Should().Contain(nameof(UndoHistory<string>.IsDirty));
     }
 
-    [Fact]
+    [Test]
     public void CanUndo_and_CanRedo_tell_the_buttons_when_they_change()
     {
         var form = new Form();

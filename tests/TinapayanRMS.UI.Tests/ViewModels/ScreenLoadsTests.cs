@@ -21,7 +21,7 @@ public class ScreenLoadsTests
         return load;
     }
 
-    [Fact]
+    [Test]
     public void A_load_asked_for_while_the_screens_last_runs_follows_it_once()
     {
         var loads = new ScreenLoads<string>(_ => true);
@@ -38,7 +38,7 @@ public class ScreenLoadsTests
         _started.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public void One_asked_for_by_a_screen_left_meanwhile_waits_for_its_next_showing()
     {
         var showing = true;
@@ -55,7 +55,7 @@ public class ScreenLoadsTests
         _started.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public void A_load_that_fails_lets_the_next_showing_load()
     {
         var loads = new ScreenLoads<string>(_ => true);
@@ -67,7 +67,7 @@ public class ScreenLoadsTests
         _started.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public void Different_screens_load_side_by_side()
     {
         var loads = new ScreenLoads<string>(_ => true);

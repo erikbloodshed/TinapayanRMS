@@ -20,10 +20,10 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// GroupDisplayElements.GetItemAt during layout closes the app. Drawn,
 /// the padding is never in the grid's rows, and it still has to keep to the space the rows leave.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridFillerRowsGroupedTests
 {
-    [Fact]
+    [Test]
     public void Expanding_every_group_at_once_takes_away_the_padding_that_no_longer_fits()
     {
         OffscreenGrid.Run(MaterialList, grid =>

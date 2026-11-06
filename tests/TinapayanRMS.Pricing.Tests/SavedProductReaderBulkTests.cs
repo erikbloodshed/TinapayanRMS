@@ -14,10 +14,11 @@ namespace TinapayanRMS.Pricing.Tests;
 /// Many products read at once (SavedProductReader.ReadDetailsAsync and ReadAllAsync), as Reports and Print
 /// read them: the round trips don't grow with the number of products, and each product comes out as it would read alone.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task Reading_every_product_takes_as_many_queries_for_ten_products_as_for_three()
     {
         var setup = await SetUpAsync();
@@ -46,7 +47,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         forTen.Should().BeLessThan(15);
     }
 
-    [Fact]
+    [Test]
     public async Task Each_product_read_with_the_others_comes_out_as_it_reads_alone()
     {
         var setup = await SetUpAsync();
@@ -65,7 +66,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         }
     }
 
-    [Fact]
+    [Test]
     public async Task Products_that_link_the_same_packaging_each_show_it()
     {
         var setup = await SetUpAsync();
@@ -86,7 +87,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         details[tinyId].PackagingLink!.LinkedProduct!.Name.Should().Be("Small", "the banner names the product it links, not the end of the chain");
     }
 
-    [Fact]
+    [Test]
     public async Task A_composite_read_with_others_brings_the_products_it_holds_in_with_it()
     {
         var setup = await SetUpAsync();
@@ -107,7 +108,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
             .Should().Equal((breadIds[0], 2.5m), (breadIds[1], 2.5m));
     }
 
-    [Fact]
+    [Test]
     public async Task Composites_holding_each_other_are_read_with_the_loop_cut_and_said_of_and_the_rest_as_usual()
     {
         var setup = await SetUpAsync();
@@ -141,7 +142,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         all.Select(p => p.Product.Name).Should().Contain(["Bread 1", "Bread 2", "Box A", "Box B"], "one loop no longer fails every product's read");
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_chain_that_comes_round_again_shows_no_packaging_and_is_said_of_rather_than_failing_the_read()
     {
         var setup = await SetUpAsync();
@@ -166,7 +167,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         await copying.Should().ThrowAsync<BusinessRuleException>().WithMessage(PackagingLinkRules.LoopText);
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_whose_category_sets_its_own_wastage_is_priced_with_it_and_the_rest_with_the_shop_wides()
     {
         var setup = await SetUpAsync();

@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// A product's version history (ProductVersion): numbered per product, recorded only when the recipe or price differs
 /// from the latest, with a note that can be changed, and gone with the product when it's deleted for good.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductVersionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductVersionRepository CreateRepository() => new(CreateDbContextFactory());
@@ -39,7 +40,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         Materials = [new VersionMaterial(1, "Bread Flour", RawMaterialType.Ingredient, null, 0.05m, 0.055m, [])],
     };
 
-    [Fact]
+    [Test]
     public async Task Versions_are_numbered_per_product_and_read_newest_first()
     {
         var pandesalId = await AddProductAsync("Pandesal");
@@ -59,7 +60,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.HasAnyAsync(pandesalId, Cancellation)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task The_same_recipe_and_price_as_the_latest_records_nothing()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -73,7 +74,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         repriced!.Number.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task Many_products_are_recorded_at_once_each_after_its_own_latest_with_a_baseline_for_one_with_none()
     {
         var pandesalId = await AddProductAsync("Pandesal");
@@ -106,7 +107,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForProductAsync(unchangedId, Cancellation)).Should().ContainSingle("its recipe is the latest's");
     }
 
-    [Fact]
+    [Test]
     public async Task A_note_too_long_refuses_every_draft_with_it()
     {
         var pandesalId = await AddProductAsync("Pandesal");
@@ -124,7 +125,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.HasAnyAsync(pandesalId, Cancellation)).Should().BeFalse("nothing is written unless every draft is");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_with_no_versions_has_none()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -133,7 +134,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await CreateRepository().GetForProductAsync(productId, Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_note_is_changed_trimmed_and_taken_away()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -146,7 +147,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await CreateRepository().GetForProductAsync(productId, Cancellation)).Single().Note.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task A_note_too_long_is_refused()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -157,7 +158,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_version_of_a_product_that_doesnt_exist_is_refused()
     {
         var act = () => CreateRepository().AddAsync(9999, Recipe(500m), DateTime.Now, null, Cancellation);
@@ -165,7 +166,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_in_the_Deleted_folder_keeps_its_history_and_one_deleted_for_good_takes_it()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -180,7 +181,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await dbContext.ProductVersions.CountAsync(Cancellation)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task Two_versions_of_a_product_cant_share_a_number()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -193,7 +194,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await act.Should().ThrowAsync<DbUpdateException>()).WithInnerException<PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task The_products_reading_a_sub_assembly_are_those_linking_it_and_those_whose_packaging_reads_theirs()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -234,7 +235,7 @@ public class ProductVersionPersistenceTests(DatabaseFixture fixture) : Persisten
         (await products.GetProductsReadingAsync([], [], Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_loop_of_packaging_links_added_outside_the_app_ends_and_still_finds_the_products_reading_it()
     {
         var bagId = await AddProductAsync("Gift Bag");

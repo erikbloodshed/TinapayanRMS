@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using AwesomeAssertions;
 using TinapayanRMS.UI.Tests.Fixtures;
 using TinapayanRMS.UI.ViewModels;
@@ -9,6 +10,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// showing screen is a field, and showing another turns back as a tab picked does when that would leave unsaved changes. A
 /// form's question is answered by <see cref="FakeForm"/>, which the screens' own tests answer for real.
 /// </summary>
+[SuppressMessage("Usage", "TUnit0018", Justification = "Each test sets its own fakes' state: TUnit makes a new instance for each test, so none is shared.")]
 public class ScreenNavigatorTests
 {
     private readonly NavigationHistory _history = new();
@@ -73,7 +75,7 @@ public class ScreenNavigatorTests
 
     // A link from one screen to a record on another
 
-    [Fact]
+    [Test]
     public Task A_link_opens_the_record_before_it_shows_the_screen() => StaThread.RunAsync(async () =>
     {
         await _navigator.OpenOnAsync(AppScreen.Products, () => Opens("opened the record"));
@@ -81,7 +83,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("opened the record", "showed Products");
     });
 
-    [Fact]
+    [Test]
     public Task A_link_with_nothing_unsaved_asks_nothing() => StaThread.RunAsync(async () =>
     {
         await _navigator.OpenOnAsync(AppScreen.Products, () => Opens("opened the record"));
@@ -89,7 +91,7 @@ public class ScreenNavigatorTests
         _rawMaterials.Questions.Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task A_link_asks_about_the_screen_left_and_goes_on_once_its_answered() => StaThread.RunAsync(async () =>
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -104,7 +106,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("asked Raw Materials, revert True", "opened the record", "showed Products");
     });
 
-    [Fact]
+    [Test]
     public Task A_link_cancelled_opens_nothing_and_stays() => StaThread.RunAsync(async () =>
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -116,7 +118,7 @@ public class ScreenNavigatorTests
         _showing.Should().Be(AppScreen.RawMaterials);
     });
 
-    [Fact]
+    [Test]
     public Task A_link_the_other_screen_stays_on_doesnt_show_it() => StaThread.RunAsync(async () =>
     {
         await _navigator.OpenOnAsync(AppScreen.Products, () => Task.FromResult(false));
@@ -124,7 +126,7 @@ public class ScreenNavigatorTests
         _showing.Should().Be(AppScreen.RawMaterials);
     });
 
-    [Fact]
+    [Test]
     public Task A_link_between_screens_with_the_same_form_asks_nothing() => StaThread.RunAsync(async () =>
     {
         _showing = AppScreen.Products;
@@ -138,7 +140,7 @@ public class ScreenNavigatorTests
 
     // Nothing awaits a move, so what fails in one has to be said: it used to reach a warning in the log, and the click did nothing.
 
-    [Fact]
+    [Test]
     public Task A_link_whose_question_fails_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var failure = new InvalidOperationException("The question couldn't be asked.");
@@ -152,7 +154,7 @@ public class ScreenNavigatorTests
         _events.Should().NotContain("opened the record");
     });
 
-    [Fact]
+    [Test]
     public Task A_link_whose_open_fails_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var failure = new InvalidOperationException("The record couldn't be opened.");
@@ -163,7 +165,7 @@ public class ScreenNavigatorTests
         _showing.Should().Be(AppScreen.RawMaterials);
     });
 
-    [Fact]
+    [Test]
     public Task A_link_whose_screen_cant_be_shown_says_so() => StaThread.RunAsync(async () =>
     {
         _showFails = new InvalidOperationException("The screen couldn't be built.");
@@ -175,7 +177,7 @@ public class ScreenNavigatorTests
 
     // Back and Forward
 
-    [Fact]
+    [Test]
     public void Back_with_nowhere_to_go_says_so()
     {
         _navigator.GoBack().Should().BeFalse();
@@ -183,7 +185,7 @@ public class ScreenNavigatorTests
         _showing.Should().Be(AppScreen.RawMaterials);
     }
 
-    [Fact]
+    [Test]
     public void Back_and_forward_move_between_the_screens_visited()
     {
         Show(AppScreen.Products);
@@ -195,7 +197,7 @@ public class ScreenNavigatorTests
         _showing.Should().Be(AppScreen.Products);
     }
 
-    [Fact]
+    [Test]
     public void Back_isnt_recorded_as_a_new_step()
     {
         Show(AppScreen.Products);
@@ -206,7 +208,7 @@ public class ScreenNavigatorTests
         _history.CanGoBack.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_move_by_the_tab_strip_remembers_the_record_left()
     {
         _rawMaterialOpen = 42;
@@ -216,7 +218,7 @@ public class ScreenNavigatorTests
         _history.BackTarget.Should().Be(new ScreenVisit(AppScreen.RawMaterials, 42));
     }
 
-    [Fact]
+    [Test]
     public void Back_reopens_the_record_the_screen_had_open()
     {
         _rawMaterialOpen = 42;
@@ -229,7 +231,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("opened material 42", "showed RawMaterials");
     }
 
-    [Fact]
+    [Test]
     public void Back_reopens_nothing_when_the_record_is_already_open()
     {
         Show(AppScreen.Products);
@@ -240,7 +242,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("showed RawMaterials");
     }
 
-    [Fact]
+    [Test]
     public void Back_doesnt_throw_unsaved_changes_away_on_the_screen_it_returns_to()
     {
         _showing = AppScreen.Products;
@@ -257,7 +259,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("showed Products");
     }
 
-    [Fact]
+    [Test]
     public void Back_asks_about_the_screen_left_and_a_cancel_leaves_the_history_where_it_was()
     {
         Show(AppScreen.Products);
@@ -272,7 +274,7 @@ public class ScreenNavigatorTests
         _history.CanGoForward.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Back_takes_the_step_once_the_screen_left_is_answered()
     {
         Show(AppScreen.Products);
@@ -289,7 +291,7 @@ public class ScreenNavigatorTests
         _history.CanGoForward.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public Task Back_goes_nowhere_until_the_question_is_answered() => StaThread.RunAsync(async () =>
     {
         Show(AppScreen.Products);
@@ -308,13 +310,13 @@ public class ScreenNavigatorTests
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (_showing != AppScreen.RawMaterials && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(10, TestContext.Current.CancellationToken);
+            await Task.Delay(10, TestContext.Current!.Execution.CancellationToken);
         }
 
         _showing.Should().Be(AppScreen.RawMaterials);
     });
 
-    [Fact]
+    [Test]
     public void Back_whose_question_fails_says_so_and_stays()
     {
         var failure = new InvalidOperationException("The question couldn't be asked.");
@@ -331,7 +333,7 @@ public class ScreenNavigatorTests
 
     // A tab picked, which MainWindow has already turned back
 
-    [Fact]
+    [Test]
     public void A_tab_picked_with_unsaved_changes_is_told_which_form_it_would_leave()
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -339,11 +341,11 @@ public class ScreenNavigatorTests
         _navigator.UnsavedChangesLeft(AppScreen.RawMaterials, AppScreen.Products).Should().BeSameAs(_rawMaterials);
     }
 
-    [Theory]
-    [InlineData(AppScreen.Products, AppScreen.Print, true)]
-    [InlineData(AppScreen.Print, AppScreen.Products, true)]
-    [InlineData(AppScreen.Products, AppScreen.RawMaterials, false)]
-    [InlineData(AppScreen.Reports, AppScreen.Products, false)]
+    [Test]
+    [Arguments(AppScreen.Products, AppScreen.Print, true)]
+    [Arguments(AppScreen.Print, AppScreen.Products, true)]
+    [Arguments(AppScreen.Products, AppScreen.RawMaterials, false)]
+    [Arguments(AppScreen.Reports, AppScreen.Products, false)]
     public void A_tab_picked_leaves_nothing_on_the_same_form_or_with_nothing_unsaved(AppScreen from, AppScreen to, bool isUnsaved)
     {
         _products.HasUnsavedChanges = isUnsaved;
@@ -351,7 +353,7 @@ public class ScreenNavigatorTests
         _navigator.UnsavedChangesLeft(from, to).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public Task After_asking_goes_on_once_the_form_is_answered_putting_it_back_on_no() => StaThread.RunAsync(async () =>
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -361,7 +363,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("asked Raw Materials, revert True", "moved");
     });
 
-    [Fact]
+    [Test]
     public Task After_asking_goes_nowhere_on_a_cancel() => StaThread.RunAsync(async () =>
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -372,7 +374,7 @@ public class ScreenNavigatorTests
         _events.Should().NotContain("moved");
     });
 
-    [Fact]
+    [Test]
     public Task After_asking_says_so_when_what_follows_fails() => StaThread.RunAsync(async () =>
     {
         var failure = new InvalidOperationException("The tab couldn't be shown.");
@@ -385,7 +387,7 @@ public class ScreenNavigatorTests
 
     // Closing the app
 
-    [Fact]
+    [Test]
     public void Closing_only_asks_when_something_is_unsaved()
     {
         _navigator.HasUnsavedChanges.Should().BeFalse();
@@ -395,7 +397,7 @@ public class ScreenNavigatorTests
         _navigator.HasUnsavedChanges.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public Task Closing_with_nothing_unsaved_closes_without_a_question() => StaThread.RunAsync(async () =>
     {
         await _navigator.CloseAfterAskingAsync(() => _events.Add("closed"));
@@ -403,7 +405,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("closed");
     });
 
-    [Fact]
+    [Test]
     public Task Closing_asks_the_screen_showing_first_and_shows_each_as_its_asked_about() => StaThread.RunAsync(async () =>
     {
         _showing = AppScreen.Products;
@@ -427,7 +429,7 @@ public class ScreenNavigatorTests
 
     // No leaves a form unsaved, for the app to close over. Found in the real app: No to the first of two asked about the
     // second with the first still showing, then about the first again.
-    [Fact]
+    [Test]
     public Task Closing_asks_each_form_once_when_no_leaves_it_unsaved() => StaThread.RunAsync(async () =>
     {
         _showing = AppScreen.Products;
@@ -440,7 +442,7 @@ public class ScreenNavigatorTests
         _products.Questions.Should().Be(1);
     });
 
-    [Fact]
+    [Test]
     public Task Closing_asks_about_a_form_two_screens_share_once() => StaThread.RunAsync(async () =>
     {
         _showing = AppScreen.Print;
@@ -452,7 +454,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("asked Products, revert False", "closed");
     });
 
-    [Fact]
+    [Test]
     public Task Closing_cancelled_stays_open_and_asks_nothing_further() => StaThread.RunAsync(async () =>
     {
         _rawMaterials.HasUnsavedChanges = true;
@@ -464,7 +466,7 @@ public class ScreenNavigatorTests
         _events.Should().Equal("asked Raw Materials, revert False");
     });
 
-    [Fact]
+    [Test]
     public Task Closing_cancelled_asks_again_the_next_time_and_when_a_tab_is_picked() => StaThread.RunAsync(async () =>
     {
         _showing = AppScreen.Products;
@@ -477,7 +479,7 @@ public class ScreenNavigatorTests
         _navigator.UnsavedChangesLeft(AppScreen.Products, AppScreen.Reports).Should().BeSameAs(_products, "No only held for that close, which stopped");
     });
 
-    [Fact]
+    [Test]
     public Task Closing_that_fails_says_so_and_stays_open() => StaThread.RunAsync(async () =>
     {
         var failure = new InvalidOperationException("The question couldn't be asked.");
@@ -490,7 +492,7 @@ public class ScreenNavigatorTests
         _events.Should().NotContain("closed");
     });
 
-    [Fact]
+    [Test]
     public Task Closing_says_so_when_the_close_itself_fails() => StaThread.RunAsync(async () =>
     {
         var failure = new InvalidOperationException("The window wouldn't close.");

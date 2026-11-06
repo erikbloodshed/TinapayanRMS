@@ -6,19 +6,19 @@ namespace TinapayanRMS.UI.Tests.Vim;
 /// <summary>VimKeySequence: typed characters into Vim actions, holding the first of a two-key sequence.</summary>
 public class VimKeySequenceTests
 {
-    [Theory]
-    [InlineData('j', VimAction.Down)]
-    [InlineData('k', VimAction.Up)]
-    [InlineData('h', VimAction.Left)]
-    [InlineData('l', VimAction.Right)]
-    [InlineData('G', VimAction.Last)]
-    [InlineData('$', VimAction.LineEnd)]
-    [InlineData('0', VimAction.LineStart)]
-    [InlineData('f', VimAction.Hints)]
-    [InlineData(':', VimAction.CommandLine)]
-    [InlineData('?', VimAction.CheatSheet)]
-    [InlineData('/', VimAction.Search)]
-    [InlineData('u', VimAction.Undo)]
+    [Test]
+    [Arguments('j', VimAction.Down)]
+    [Arguments('k', VimAction.Up)]
+    [Arguments('h', VimAction.Left)]
+    [Arguments('l', VimAction.Right)]
+    [Arguments('G', VimAction.Last)]
+    [Arguments('$', VimAction.LineEnd)]
+    [Arguments('0', VimAction.LineStart)]
+    [Arguments('f', VimAction.Hints)]
+    [Arguments(':', VimAction.CommandLine)]
+    [Arguments('?', VimAction.CheatSheet)]
+    [Arguments('/', VimAction.Search)]
+    [Arguments('u', VimAction.Undo)]
     public void A_single_key_is_its_action_at_once(char key, VimAction action)
     {
         var sequence = new VimKeySequence();
@@ -27,12 +27,12 @@ public class VimKeySequenceTests
         sequence.Pending.Should().Be('\0');
     }
 
-    [Theory]
-    [InlineData("gg", VimAction.First)]
-    [InlineData("gt", VimAction.NextTab)]
-    [InlineData("gT", VimAction.PreviousTab)]
-    [InlineData("dd", VimAction.Delete)]
-    [InlineData("cc", VimAction.Change)]
+    [Test]
+    [Arguments("gg", VimAction.First)]
+    [Arguments("gt", VimAction.NextTab)]
+    [Arguments("gT", VimAction.PreviousTab)]
+    [Arguments("dd", VimAction.Delete)]
+    [Arguments("cc", VimAction.Change)]
     public void A_two_key_sequence_waits_for_its_second_key(string keys, VimAction action)
     {
         var sequence = new VimKeySequence();
@@ -43,7 +43,7 @@ public class VimKeySequenceTests
         sequence.Pending.Should().Be('\0');
     }
 
-    [Fact]
+    [Test]
     public void A_second_key_that_makes_no_sequence_drops_both_as_Vim_does()
     {
         var sequence = new VimKeySequence();
@@ -54,7 +54,7 @@ public class VimKeySequenceTests
         sequence.Feed('j').Should().Be(VimAction.Down, "the next key starts afresh");
     }
 
-    [Fact]
+    [Test]
     public void Clear_drops_a_half_typed_sequence_and_says_whether_there_was_one()
     {
         var sequence = new VimKeySequence();
@@ -66,7 +66,7 @@ public class VimKeySequenceTests
         sequence.Feed('d').Should().Be(VimAction.None, "a d after the clear starts a new dd");
     }
 
-    [Fact]
+    [Test]
     public void A_key_that_means_nothing_is_none_and_leaves_nothing_pending()
     {
         var sequence = new VimKeySequence();

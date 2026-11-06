@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// What the Sub-Assemblies list saves at once, without the form's Save: sub-assemblies dragged or moved into another role
 /// (MoveAsync), and one renamed from its menu (RenameAsync). Each changes that one thing, through the checks Save makes.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());
@@ -21,7 +22,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
     private Task<int> SaveStandaloneAsync(string name, int roleId, int ingredientId, decimal grams = 100m) =>
         CreateRepository().SaveStandaloneAsync(new SubAssembly { Name = name, RoleId = roleId }, [(ingredientId, grams)], Cancellation);
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_gives_several_sub_assemblies_a_role_in_one_save_changing_nothing_else()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -39,7 +40,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         (await SubAssemblyTotalsAsync(moved[0].Id)).Should().Be((100m, 20m), "a role costs nothing");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_refuses_a_recipe_into_the_Packaging_role_and_moves_none()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -55,7 +56,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         (await RoleIdsAsync()).Should().OnlyContain(id => id == doughRoleId, "the first refusal moves none");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_checks_each_move_against_the_ones_before_it_where_a_recipe_links_both()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -81,7 +82,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         (await RoleIdsAsync()).Should().BeEquivalentTo([fillingRoleId, doughRoleId], "the first refusal moves none");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_refuses_a_role_that_no_longer_exists()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -93,7 +94,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("Every sub-assembly needs a role, and that role must still exist.");
     }
 
-    [Fact]
+    [Test]
     public async Task RenameAsync_changes_only_the_name_and_refuses_one_in_use()
     {
         var doughRoleId = await AddRoleAsync("Dough");

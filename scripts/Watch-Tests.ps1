@@ -12,6 +12,10 @@
     Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
     about 3 minutes for UI.Tests.
 
+    Hot reload runs the tests again in the same test session, which TUnit 1.81.0 doesn't expect: without
+    tests/HotReloadReruns.cs, every run after the first also reported a failure of TUnit's own ("ChannelClosedException:
+    The channel has been closed."). If that comes back after a TUnit upgrade, see that file.
+
     While it runs it holds the project's build and uses its test databases, so stop it before building or testing that
     project another way: a second run would reset the databases under this one's tests. Test-Changed.ps1 refuses to run
     it meanwhile.
@@ -20,11 +24,11 @@
     The test project: UI, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or without .Tests).
 
 .PARAMETER Class
-    Only classes whose name matches, as dotnet test's --filter-class: "*ProductsViewModelRefreshTests".
+    Only classes whose name matches, with * for any characters: "*ProductsViewModelRefreshTests".
 
 .PARAMETER Method
-    Only tests whose name matches, as dotnet test's --filter-method: "*keeps_the_selection*". Give a class or a method,
-    not both: together they ran nothing.
+    Only tests whose name matches: "*keeps_the_selection*". With -Class too, only those tests of those classes. Both go
+    into one --treenode-filter.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"
@@ -52,25 +56,21 @@ if (-not (Test-Path -LiteralPath $path)) {
     Write-Output "There's no test project $name. The test projects: $known."
     exit 1
 }
-if ($Class -and $Method) {
-    Write-Output 'Give -Class or -Method, not both: together they ran no tests.'
-    exit 1
-}
-
 $running = Get-Process -Name $name -ErrorAction SilentlyContinue
 if ($running) {
     Write-Output "$name is running already (process $($running[0].Id)). Stop it first: both would reset the same test databases."
     exit 1
 }
 
+# TUnit's tree-node filter is /assembly/namespace/class/test, and (a)|(b) matches either.
+function Join-Patterns([string[]]$Patterns) {
+    if (-not $Patterns) { '*' } elseif ($Patterns.Count -eq 1) { $Patterns[0] } else { ($Patterns | ForEach-Object { "($_)" }) -join '|' }
+}
+
 $arguments = @()
-foreach ($pattern in $Class) {
-    $arguments += '--filter-class', $pattern
-}
-foreach ($pattern in $Method) {
-    $arguments += '--filter-method', $pattern
-}
-if ($arguments.Count -eq 0) {
+if ($Class -or $Method) {
+    $arguments += '--treenode-filter', "/*/*/$(Join-Patterns $Class)/$(Join-Patterns $Method)"
+} else {
     Write-Output "No -Class or -Method, so every test in $name runs after each change."
 }
 

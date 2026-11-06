@@ -9,7 +9,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
@@ -23,7 +24,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         return category.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task A_purchased_ingredient_can_be_added_and_read_back()
     {
         var categoryId = await SeedCategoryAsync();
@@ -44,7 +45,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         ingredient.Units.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_can_be_added_with_a_weight_loss_percent()
     {
         var categoryId = await SeedCategoryAsync();
@@ -65,7 +66,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         ingredient.WeightLossPercent.Should().Be(20m);
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_made_ingredient_without_a_weight_loss_percent()
     {
         var categoryId = await SeedCategoryAsync();
@@ -82,7 +83,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_changing_an_ingredients_source()
     {
         var categoryId = await SeedCategoryAsync();
@@ -105,7 +106,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task GetAllAsync_and_GetByIdAsync_include_the_units_largest_first_with_their_unit_of_measure()
     {
         var categoryId = await SeedCategoryAsync();
@@ -139,13 +140,13 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         }
     }
 
-    [Fact]
+    [Test]
     public async Task GetByIdAsync_returns_null_for_a_nonexistent_ingredient()
     {
         (await CreateRepository().GetByIdAsync(999_999, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_renames_a_purchased_ingredient_and_preserves_its_CostPerGram()
     {
         var categoryId = await SeedCategoryAsync();
@@ -174,7 +175,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         updated.Units.Should().ContainSingle("a rename leaves the units alone");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_a_nonexistent_ingredient()
     {
         var categoryId = await SeedCategoryAsync();
@@ -193,7 +194,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_the_ingredient()
     {
         var categoryId = await SeedCategoryAsync();
@@ -215,7 +216,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_an_ingredient_along_with_its_units_and_the_prices_recorded_in_them()
     {
         // Price history references the ingredient (Cascade) and one of its units (Restrict), and
@@ -235,7 +236,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await dbContext.RawMaterialPriceHistories.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_an_ingredient_with_a_base_unit_since_it_is_always_the_gram()
     {
         var categoryId = await SeedCategoryAsync();
@@ -252,7 +253,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*gram*");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_turning_an_ingredient_into_packaging()
     {
         var categoryId = await SeedCategoryAsync();
@@ -268,7 +269,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*type*");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_and_a_packaging_material_cannot_share_a_name()
     {
         var categoryId = await SeedCategoryAsync();
@@ -288,7 +289,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task The_database_rejects_an_ingredient_with_a_base_unit_even_past_the_repository()
     {
         // A check constraint backs RawMaterialRules.EnsureFieldsMatchType up.
@@ -303,7 +304,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             .WithMessage("*CK_RawMaterials_BaseUnitMatchesType*");
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_ingredient_names_are_rejected()
     {
         var categoryId = await SeedCategoryAsync();

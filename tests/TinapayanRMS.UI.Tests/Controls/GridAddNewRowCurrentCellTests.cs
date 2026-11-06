@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// Right and Tab each left no cell current. Ctrl+Z back to no brands on Raw Materials' Purchase Cost Setup, or another
 /// material with none, with the add row's cell current.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridAddNewRowCurrentCellTests
 {
     public sealed class Line
@@ -28,7 +28,7 @@ public class GridAddNewRowCurrentCellTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void Removing_every_line_while_the_add_row_is_current_leaves_one_current_cell_on_the_add_row()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -52,13 +52,13 @@ public class GridAddNewRowCurrentCellTests
         });
     }
 
-    [Theory]
-    [InlineData(Key.Left, 1, 0, true)]
-    [InlineData(Key.Right, 0, 1, true)]
-    [InlineData(Key.Tab, 0, 1, true)]
-    [InlineData(Key.Left, 1, 0, false)]
-    [InlineData(Key.Right, 0, 1, false)]
-    [InlineData(Key.Tab, 0, 1, false)]
+    [Test]
+    [Arguments(Key.Left, 1, 0, true)]
+    [Arguments(Key.Right, 0, 1, true)]
+    [Arguments(Key.Tab, 0, 1, true)]
+    [Arguments(Key.Left, 1, 0, false)]
+    [Arguments(Key.Right, 0, 1, false)]
+    [Arguments(Key.Tab, 0, 1, false)]
     public void A_key_after_every_line_is_removed_moves_along_the_add_row(Key key, int from, int to, bool clear)
     {
         // The grid's current cell index is left where the last line was, below the add row; the next key must still

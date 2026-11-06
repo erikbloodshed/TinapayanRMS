@@ -9,7 +9,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
@@ -50,7 +51,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
     private Task<int> SeedProductAsync(string name) => AddProductAsync(name);
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_sub_assembly_in_use_by_a_product_is_blocked()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -63,9 +64,9 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Theory]
-    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
-    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    [Test]
+    [Arguments(PackagingLineAuthoredField.QtyPerUnit)]
+    [Arguments(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
     public async Task SetLinesAsync_refuses_a_line_of_0_by_saying_so_rather_than_dividing_by_it(PackagingLineAuthoredField authoredField)
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -78,7 +79,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("A packaging line's quantity must be positive.");
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_stores_a_line_entered_in_one_of_the_materials_units()
     {
         var categoryId = await SeedPackagingCategoryAsync("Ribbons");
@@ -99,7 +100,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         line.PackagingMaterial!.Units.Should().ContainSingle("the Products editor needs the material's units");
     }
 
-    [Fact]
+    [Test]
     public async Task GetForProductAsync_reads_each_line_with_its_materials_details_and_its_own_unit()
     {
         var ribbonsId = await SeedPackagingCategoryAsync("Ribbons");
@@ -125,7 +126,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         lines[1].PackagingMaterial!.Units.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_a_unit_that_belongs_to_another_material()
     {
         var categoryId = await SeedPackagingCategoryAsync("Ribbons");
@@ -153,7 +154,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         return unit.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_stores_lines_and_derives_the_reciprocal_field()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -177,7 +178,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         line.PackagingMaterial!.BaseUnit!.Id.Should().Be(pieceId);
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_the_same_packaging_material_twice()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -194,7 +195,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_packaging_material_in_use_by_a_product_is_blocked()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -212,7 +213,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_cascades_to_its_usages_lines_and_costing_parameters()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -235,7 +236,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task CostingParametersRepository_GetForProductAsync_returns_null_before_any_are_set()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -243,7 +244,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task CostingParametersRepository_SetAsync_upserts_a_single_row()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -262,7 +263,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         (await dbContext.CostingParameters.CountAsync(c => c.ProductId == productId, Cancellation)).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task CostingParametersRepository_SetAsync_rejects_negative_values()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -272,7 +273,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task CostingParametersRepository_SetAsync_rejects_a_negative_administrative_cost()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -282,7 +283,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_AddAsync_GetAllAsync_GetByIdAsync_and_UpdateAsync_round_trip_a_product()
     {
         var repository = CreateProductRepository();
@@ -303,7 +304,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         (await repository.GetByIdAsync(added.Id, Cancellation))!.Name.Should().Be("Special Ensaymada Big");
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_stores_the_description_and_stamps_each_save()
     {
         var repository = CreateProductRepository();
@@ -330,7 +331,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         updated.UpdatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_stores_the_current_price_and_clears_it()
     {
         var repository = CreateProductRepository();
@@ -346,13 +347,13 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         (await repository.GetByIdAsync(product.Id, Cancellation))!.CurrentPrice.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_GetByIdAsync_returns_null_for_a_nonexistent_product()
     {
         (await CreateProductRepository().GetByIdAsync(999_999, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ProductRepository_UpdateAsync_rejects_a_nonexistent_product()
     {
         var act = () => CreateProductRepository().UpdateAsync(new Product { Id = 999_999, Name = "Ghost" }, Cancellation);
@@ -360,7 +361,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_a_nonexistent_product()
     {
         var categoryId = await SeedPackagingCategoryAsync("Boxes");
@@ -375,7 +376,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_an_ingredient_on_a_packaging_line()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -397,7 +398,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Butter' is an ingredient*");
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_a_nonexistent_packaging_material()
     {
         var productId = await SeedProductAsync("Ensaymada");
@@ -410,7 +411,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task RenameAsync_changes_the_name_and_nothing_else()
     {
         var clock = new TestClock(new DateTime(2026, 10, 1, 9, 0, 0));
@@ -433,7 +434,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
         renamed.UpdatedAt.Should().Be(clock.Now, "a rename is a change to the product");
     }
 
-    [Fact]
+    [Test]
     public async Task RenameAsync_to_another_products_name_is_refused()
     {
         var repository = CreateProductRepository();

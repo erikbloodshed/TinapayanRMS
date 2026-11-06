@@ -8,7 +8,7 @@ public class RawMaterialCategoryValidatorTests
 {
     private readonly RawMaterialCategoryValidator _validator = new();
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_category()
     {
         var result = _validator.Validate(new RawMaterialCategory { Name = "Flour" });
@@ -16,7 +16,7 @@ public class RawMaterialCategoryValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_name()
     {
         var result = _validator.Validate(new RawMaterialCategory { Name = "" });

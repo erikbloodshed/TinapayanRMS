@@ -20,7 +20,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// -> a product's live-read packaging cost) needs no propagation code of its own, since
 /// nothing in it is stored redundantly.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateIngredientRepository() => new(CreateDbContextFactory());
@@ -59,7 +60,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         return subAssemblyId;
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_on_an_ingredient_used_directly_in_a_sub_assembly_reaches_its_cost()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
@@ -77,7 +78,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(180m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_ripples_through_an_ingredient_BOM_chain_into_a_sub_assembly()
     {
         // sugar -> syrup (made) -> Custard sub-assembly, which uses syrup directly.
@@ -97,7 +98,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(90m); // 500g @ 0.18/g
     }
 
-    [Fact]
+    [Test]
     public async Task A_weight_loss_percent_edit_ripples_into_every_sub_assembly_using_that_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
@@ -125,7 +126,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(100m); // 1000g @ 0.10/g
     }
 
-    [Fact]
+    [Test]
     public async Task A_line_edit_on_the_sub_assembly_a_made_ingredient_is_made_from_ripples_into_every_sub_assembly_using_it()
     {
         // sugar -> Syrup Base (sub-assembly) -> syrup (made) -> Custard sub-assembly. Syrup Base gains water.
@@ -142,7 +143,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(22.5m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_on_a_made_ingredients_add_in_ripples_into_every_sub_assembly_using_it_and_leaves_its_own_sub_assembly_alone()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
@@ -166,7 +167,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(baseId)).TotalCost.Should().Be(baseCost, "an add-in is the made ingredient's, never its sub-assembly's");
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_reaches_every_sub_assembly_that_uses_the_ingredient()
     {
         var categoryId = await SeedCategoryAsync("Fillings");
@@ -183,7 +184,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(caramelId)).TotalCost.Should().Be(36m); // 200 * 0.18
     }
 
-    [Fact]
+    [Test]
     public async Task A_sub_assembly_with_multiple_ingredients_is_costed_at_every_lines_current_cost_not_just_the_changed_one()
     {
         var categoryId = await SeedCategoryAsync("Dough");
@@ -203,7 +204,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(98m); // 800*0.10 + 200*0.09
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_live_read_cost_reflects_an_ingredient_price_change_with_no_product_level_propagation()
     {
         // Proves a product needs no propagation code of its own: its sections are costed from
@@ -234,7 +235,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await ReadUsageCostPerPieceAsync()).Should().Be(1.8m); // sugar doubled -> usage cost doubled, with zero product-level code involved
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_reaches_a_linked_usages_add_in_with_nothing_stored_to_propagate()
     {
         // Add-ins are the third branch that needs no propagation code. They hang off the usage, and their
@@ -279,7 +280,7 @@ public class ReactiveCostCascadeTests(DatabaseFixture fixture) : PersistenceTest
         (await SubAssemblyTotalsAsync(doughId)).Should().Be((1000m, 50m), "the ube is the linking product's own; the dough is Cream Loaf's");
     }
 
-    [Fact]
+    [Test]
     public async Task The_packaging_branch_needs_no_propagation_code_a_price_change_is_visible_immediately_on_read()
     {
         int materialId;

@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// a cascade doesn't touch the save date. The cost date is stamped by the DbContext from what actually changed,
 /// so every path that writes a cost counts, not just the ones a repository remembers to stamp.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>The clock every save here stamps from, moved on between saves, so each date is one the test can name.</summary>
@@ -46,7 +47,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         return await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == id, Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_material_is_stamped_as_saved_but_has_no_cost_date_until_it_costs_something()
     {
         var categoryId = await SeedCategoryAsync();
@@ -59,7 +60,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         flour.CostUpdatedAt.Should().BeNull("it has no price yet, so its cost has never moved");
     }
 
-    [Fact]
+    [Test]
     public async Task A_first_price_stamps_the_cost_date_and_a_save_that_leaves_the_cost_alone_moves_only_the_save_date()
     {
         var categoryId = await SeedCategoryAsync();
@@ -79,7 +80,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         renamed.CostUpdatedAt.Should().Be(priced.CostUpdatedAt, "nothing about its cost changed");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_price_stamps_the_cost_date_without_touching_the_save_date()
     {
         var categoryId = await SeedCategoryAsync();
@@ -97,7 +98,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         repriced.UpdatedAt.Should().Be(priced.UpdatedAt, "a price isn't a save of the material");
     }
 
-    [Fact]
+    [Test]
     public async Task A_components_price_change_stamps_the_made_ingredients_cost_date_through_the_cascade()
     {
         var categoryId = await SeedCategoryAsync();
@@ -120,7 +121,7 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
         syrupAfter.UpdatedAt.Should().Be(syrupBefore.UpdatedAt, "nobody saved the syrup");
     }
 
-    [Fact]
+    [Test]
     public async Task A_cascade_that_leaves_a_cost_where_it_was_leaves_its_cost_date_alone()
     {
         var categoryId = await SeedCategoryAsync();

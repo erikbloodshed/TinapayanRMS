@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.Printing;
 /// </summary>
 public class PrintPaneFitTests
 {
-    [Fact]
+    [Test]
     public void The_settings_column_is_wider_and_every_dropdown_shows_its_choice_in_an_item_that_fits_its_text() => WithPane(preview =>
     {
         var root = (Grid)VisualTreeHelper.GetChild(preview, 0);
@@ -33,7 +33,7 @@ public class PrintPaneFitTests
         }
     });
 
-    [Fact]
+    [Test]
     public void No_text_in_the_settings_or_the_page_box_is_cut_off() => WithPane(preview =>
     {
         foreach (var text in Descendants<TextBlock>(Options(preview)).Where(t => t.IsVisible))
@@ -52,7 +52,7 @@ public class PrintPaneFitTests
         pageBox.ActualHeight.Should().BeGreaterThanOrEqualTo(Needs(pageBox, "12").Height, "the page number fits its box");
     });
 
-    [Fact]
+    [Test]
     public void The_page_stays_at_the_panes_zoom_when_it_is_laid_out_again() => WithPane((preview, manager) =>
     {
         var area = (PrintPreviewAreaControl)preview.Template.FindName("PART_PrintPreviewAreaControl", preview);

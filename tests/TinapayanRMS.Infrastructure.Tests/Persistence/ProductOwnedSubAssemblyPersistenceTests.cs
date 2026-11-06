@@ -16,7 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// hands each of its sub-assemblies one product uses to that product, and one made not product-owned hands them back
 /// to the Sub-Assemblies screen; clones and variants get copies of their own.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateSubAssemblyRepository() => new(CreateDbContextFactory());
@@ -57,7 +58,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await CreateRoleRepository().UpdateAsync(role, Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_section_in_a_product_owned_role_is_the_products_own_and_not_on_the_Sub_Assemblies_screen()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -76,7 +77,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public async Task An_own_section_is_rewritten_in_place_and_taking_it_out_deletes_it()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -100,7 +101,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await dbContext.SubAssemblyLines.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Own_sections_names_follow_their_names_and_two_can_swap_in_one_save()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -127,7 +128,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Should().HaveCount(2, "the same two, renamed");
     }
 
-    [Fact]
+    [Test]
     public async Task An_own_section_moved_to_a_role_that_isnt_product_owned_goes_to_the_Sub_Assemblies_screen_linked()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -145,7 +146,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(id);
     }
 
-    [Fact]
+    [Test]
     public async Task An_unlinked_section_is_the_products_own_in_a_role_that_isnt_product_owned_and_stays_so_wherever_it_moves()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -178,7 +179,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         moved.Name.Should().Be("Cheese Roll Topping");
     }
 
-    [Fact]
+    [Test]
     public async Task An_own_section_moved_to_the_Sub_Assemblies_screen_keeps_its_name_and_the_product_links_it()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -212,7 +213,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await FindAsync(fillingId))!.OwnerProductId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task An_unlinked_section_moved_back_to_the_Sub_Assemblies_screen_is_linked_there()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -227,7 +228,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(doughId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_section_moved_to_the_Sub_Assemblies_screen_goes_there_in_a_product_owned_role()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -239,7 +240,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Filling", null));
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_gets_its_own_copy_of_a_section_the_source_unlinked()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -256,7 +257,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         dough.OwnerProductId.Should().Be(cloneId);
     }
 
-    [Fact]
+    [Test]
     public async Task Renaming_a_role_that_isnt_product_owned_renames_the_own_ones_named_after_it()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -271,7 +272,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Bread Dough", productId));
     }
 
-    [Fact]
+    [Test]
     public async Task Another_products_own_can_be_copied_but_not_linked()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -292,7 +293,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Filling: Cheese", ownerId), ("Cheese Bun Filling", otherId));
     }
 
-    [Fact]
+    [Test]
     public async Task The_Sub_Assemblies_screens_save_and_delete_refuse_a_products_own()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -308,7 +309,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         await delete.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own*");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_takes_its_own_and_leaves_what_it_links()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -323,7 +324,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Dough", null));
     }
 
-    [Fact]
+    [Test]
     public async Task Renaming_a_product_renames_its_own_but_not_what_it_links()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -353,7 +354,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await repository.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Cheese Twist");
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_own_keeps_its_section_name_and_a_numbered_name_follows_a_rename()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -383,7 +384,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
             ("Cheese Bun Filling", (string?)null), ("Cheese Bun Filling: Purple Yam", "Purple Yam"));
     }
 
-    [Fact]
+    [Test]
     public async Task A_role_made_product_owned_and_back_takes_and_gives_the_section_name_its_name_has()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -409,7 +410,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         return await dbContext.SubAssemblies.AsNoTracking().Where(s => s.OwnerProductId == productId).OrderBy(s => s.Id).ToListAsync(Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task Making_a_role_product_owned_gives_each_product_the_ones_only_it_uses_with_its_add_ins_merged()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -442,7 +443,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await RoleAsync(fillingRoleId)).IsProductOwned.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task Making_a_role_no_longer_product_owned_sends_its_own_ones_to_the_Sub_Assemblies_screen_still_used()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -459,7 +460,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Single().SubAssemblyId.Should().Be(id);
     }
 
-    [Fact]
+    [Test]
     public async Task Renaming_a_product_owned_role_renames_the_ones_named_after_it()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -474,7 +475,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         (await SubAssembliesAsync()).Select(s => s.Name).Should().Equal("Cheese Roll Stuffing: Cheese");
     }
 
-    [Fact]
+    [Test]
     public async Task The_Packaging_role_cant_be_product_owned()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -490,7 +491,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
     }
 
     // A variant links the source's own instead (ProductVariantPersistenceTests).
-    [Fact]
+    [Test]
     public async Task A_clone_gets_its_own_copy_of_the_sources_own_and_links_what_it_links()
     {
         var doughRoleId = await AddRoleAsync("Dough");

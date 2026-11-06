@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// RawMaterialRepository.SaveAsync, the Raw Materials screen's one Save: a material with its alternative
 /// units, a new price and its BOM, written in one transaction.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
@@ -44,7 +45,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
     private static RawMaterialUnit Unit(int unitOfMeasureId, decimal baseUnitsPerUnit, int id = 0) =>
         new() { Id = id, UnitOfMeasureId = unitOfMeasureId, BaseUnitsPerUnit = baseUnitsPerUnit };
 
-    [Fact]
+    [Test]
     public async Task A_new_purchased_ingredient_is_saved_with_its_units_and_a_price_in_one_of_them()
     {
         var categoryId = await SeedCategoryAsync();
@@ -66,7 +67,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         price.Price.Should().Be(1250m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_preferred_brand_costs_the_material_and_what_its_made_into_and_dropping_it_goes_back_to_the_dearest()
     {
         var categoryId = await SeedCategoryAsync();
@@ -92,7 +93,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
             .Should().Equal("Gold", "Kingbake");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_packaging_material_is_saved_with_its_base_unit_a_unit_and_a_price()
     {
         var categoryId = await SeedCategoryAsync();
@@ -108,7 +109,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         saved.CostPerBaseUnit.Should().Be(0.045m, "₱45 a 1,000 cm roll");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_made_ingredient_is_saved_with_its_sub_assembly_and_add_ins_and_costed_from_them()
     {
         var categoryId = await SeedCategoryAsync();
@@ -126,7 +127,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
             .Should().Equal((sugarId, 1000m, false), (vanillaId, 100m, true));
     }
 
-    [Fact]
+    [Test]
     public async Task Nothing_is_saved_when_the_bom_is_rejected_after_the_material_and_its_units()
     {
         var categoryId = await SeedCategoryAsync();
@@ -149,7 +150,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Nothing_is_saved_when_the_price_is_in_a_unit_the_material_does_not_have()
     {
         var categoryId = await SeedCategoryAsync();
@@ -164,7 +165,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task An_update_renames_corrects_a_multiplier_removes_a_unit_and_adds_one()
     {
         var categoryId = await SeedCategoryAsync();
@@ -190,7 +191,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         (await repository.GetByIdAsync(syrupId, Cancellation))!.CostPerBaseUnit.Should().Be(0.1m, "the made ingredient using sugar is recomputed");
     }
 
-    [Fact]
+    [Test]
     public async Task Removing_a_unit_a_price_is_in_is_rejected_and_undoes_the_rest_of_the_save()
     {
         var categoryId = await SeedCategoryAsync();
@@ -206,7 +207,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
         flour.Units.Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task The_units_are_checked_as_the_save_leaves_them()
     {
         var categoryId = await SeedCategoryAsync();
@@ -227,7 +228,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
             .Should().Equal((bagId, 50000m), (cupId, 120m));
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_without_add_ins_leaves_a_made_ingredients_add_ins_alone()
     {
         var categoryId = await SeedCategoryAsync();

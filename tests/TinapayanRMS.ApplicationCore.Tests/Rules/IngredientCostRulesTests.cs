@@ -7,7 +7,7 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class IngredientCostRulesTests
 {
-    [Fact]
+    [Test]
     public void A_made_ingredient_rolls_up_its_lines_true_and_buffered_after_its_weight_loss()
     {
         var flour = Purchased(1, 0.05m, 0.055m);
@@ -21,7 +21,7 @@ public class IngredientCostRulesTests
         costs.Should().Be(new IngredientCosts(0.075m, 0.0825m, 0m));
     }
 
-    [Fact]
+    [Test]
     public void A_linked_ingredient_takes_its_share_of_both_costs_and_the_buffer_percent()
     {
         var egg = Purchased(1, 0.014m, 0.0154m, bufferPercent: 10m);
@@ -34,7 +34,7 @@ public class IngredientCostRulesTests
         costs.CostBufferPercent.Should().Be(10m);
     }
 
-    [Fact]
+    [Test]
     public void A_link_missing_its_shares_is_worked_out_as_a_made_one_with_no_lines()
     {
         var broken = new RawMaterial { Id = 2, Source = RawMaterialSource.Linked, LinkedToId = 1 };
@@ -42,7 +42,7 @@ public class IngredientCostRulesTests
         IngredientCostRules.Recompute(broken, [], _ => throw new InvalidOperationException("Not read")).Should().Be(new IngredientCosts(0m, 0m, 0m));
     }
 
-    [Fact]
+    [Test]
     public void Dependencies_are_bom_components_and_links_together()
     {
         var dependencies = IngredientCostRules.Dependencies(
@@ -54,7 +54,7 @@ public class IngredientCostRulesTests
         dependencies[3].Should().Equal(2, 4);
     }
 
-    [Fact]
+    [Test]
     public void Reprice_reaches_everything_that_depends_on_a_change_in_order_and_touches_nothing_given()
     {
         // Egg → egg white (linked) → custard (made from white and sugar); syrup is made from sugar alone.
@@ -84,7 +84,7 @@ public class IngredientCostRulesTests
         egg.CostPerBaseUnit.Should().Be(0.014m);
     }
 
-    [Fact]
+    [Test]
     public void Reprice_follows_a_link_to_a_link()
     {
         var egg = Purchased(1, 0.014m, 0.014m);
@@ -98,7 +98,7 @@ public class IngredientCostRulesTests
         copies[2].CostPerBaseUnit.Should().Be(RawMaterialRules.StoredCost(0.028m * 30m / 70m));
     }
 
-    [Fact]
+    [Test]
     public void A_change_reaches_the_material_and_everything_made_or_cut_from_it_and_nothing_else()
     {
         // Egg → egg white (linked) → custard (made from white and sugar); syrup is made from sugar alone.

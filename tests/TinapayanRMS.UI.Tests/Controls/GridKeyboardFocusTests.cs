@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// GridKeyboardFocus: no dotted focus rectangle round a whole grid, and a grid tabbed into gets a current cell on a row
 /// (PlaceCurrentCell), so the keyboard is on a cell, never on the bare grid.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridKeyboardFocusTests
 {
     public sealed class Line
@@ -23,7 +23,7 @@ public class GridKeyboardFocusTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void A_loaded_grid_draws_no_focus_rectangle()
     {
         GridKeyboardFocus.Register();
@@ -31,7 +31,7 @@ public class GridKeyboardFocusTests
         OffscreenGrid.Run(() => LinesGrid(), grid => grid.FocusVisualStyle.Should().BeNull());
     }
 
-    [Fact]
+    [Test]
     public void A_lines_table_without_a_current_cell_gets_one_on_its_first_line()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -45,7 +45,7 @@ public class GridKeyboardFocusTests
         });
     }
 
-    [Fact]
+    [Test]
     public void An_empty_lines_table_gets_its_current_cell_on_the_add_row()
     {
         OffscreenGrid.Run(() => LinesGrid(lineCount: 0), grid =>
@@ -58,7 +58,7 @@ public class GridKeyboardFocusTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_current_cell_already_there_is_kept()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -74,7 +74,7 @@ public class GridKeyboardFocusTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_list_that_opens_rows_is_given_no_row_when_none_is_selected()
     {
         // Selecting a row of the Sub-Assemblies list opens it in the form, which merely tabbing past mustn't do.

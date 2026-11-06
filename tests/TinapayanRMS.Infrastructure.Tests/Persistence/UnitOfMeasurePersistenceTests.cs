@@ -8,7 +8,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private UnitOfMeasureRepository CreateRepository() => new(CreateDbContextFactory());
@@ -22,7 +23,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         return category.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_and_GetAllAsync_round_trip_a_custom_unit()
     {
         var repository = CreateRepository();
@@ -33,7 +34,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         units.Should().Contain(u => u.Name == "bag" && u.Abbreviation == "bag");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_renames_a_unit()
     {
         var repository = CreateRepository();
@@ -47,7 +48,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         updated.Abbreviation.Should().Be("sk");
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_lowercases_a_name_with_an_uppercase_letter()
     {
         var repository = CreateRepository();
@@ -57,7 +58,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "bag");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_lowercases_a_name_with_an_uppercase_letter()
     {
         var repository = CreateRepository();
@@ -69,7 +70,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         (await repository.GetAllAsync(Cancellation)).Should().Contain(u => u.Name == "sack");
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_a_nonexistent_unit()
     {
         var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = 999_999, Name = "ghost", Abbreviation = "gh" }, Cancellation);
@@ -77,7 +78,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_an_unused_unit()
     {
         var repository = CreateRepository();
@@ -89,7 +90,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         (await repository.GetAllAsync(Cancellation)).Should().NotContain(u => u.Id == unit.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_unit_that_is_in_use_is_blocked()
     {
         var repository = CreateRepository();
@@ -117,7 +118,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_unit_names_are_rejected()
     {
         var repository = CreateRepository();
@@ -128,7 +129,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_unit_abbreviations_are_rejected()
     {
         var repository = CreateRepository();

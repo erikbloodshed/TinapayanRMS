@@ -16,7 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sub-assembly, which stays as it is, in a Made category with no weight loss, so nothing's cost moves. Refused, either
 /// writes nothing.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static NewSubAssemblyDraft Section(
@@ -53,7 +54,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         return await dbContext.RawMaterialCategories.Where(c => c.Name == name).Select(c => c.Id).SingleAsync(Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task An_own_section_moves_to_Sub_Assemblies_as_it_is_and_a_made_ingredient_is_made_from_it()
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
@@ -80,7 +81,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         (usage.SubAssemblyId, usage.AuthoredValue).Should().Be((toppingId, 30m), "the product links it at the same piece size");
     }
 
-    [Fact]
+    [Test]
     public async Task A_section_made_in_the_same_save_can_move_to_In_House()
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -100,7 +101,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         filling.CostPerBaseUnit.Should().Be(0.2m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_name_another_raw_material_has_or_another_section_takes_is_refused_and_nothing_is_written()
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
@@ -123,7 +124,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         await ShouldBeAsSeededAsync(toppingId);
     }
 
-    [Fact]
+    [Test]
     public async Task Only_a_Made_category_takes_it_and_nothing_is_written_otherwise()
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
@@ -141,7 +142,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         await ShouldBeAsSeededAsync(toppingId);
     }
 
-    [Fact]
+    [Test]
     public async Task Moving_to_In_House_takes_a_section_to_Sub_Assemblies_whatever_its_role()
     {
         var (productId, toppingRoleId, toppingId, lines) = await SeedToppingAsync();
@@ -161,7 +162,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
             .Should().Equal("Butter Icing", "House Dough");
     }
 
-    [Fact]
+    [Test]
     public async Task A_recipe_on_the_Sub_Assemblies_screen_has_a_made_ingredient_made_from_it_and_stays_as_it_is()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -181,7 +182,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         (await LinesAsync(custardId)).Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase)).Should().Equal((milkId, 500m, true), (eggId, 100m, false));
     }
 
-    [Fact]
+    [Test]
     public async Task A_recipe_a_product_uses_is_left_as_it_is_with_the_products_piece_size_and_add_ins()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -207,7 +208,7 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.UsageAddInLines.Select(a => new { a.IngredientId, a.Grams }).SingleAsync(Cancellation)).Should().Be(new { IngredientId = cheeseId, Grams = 50m });
     }
 
-    [Fact]
+    [Test]
     public async Task The_Sub_Assemblies_screens_move_refuses_a_set_a_products_own_a_taken_name_and_a_category_that_isnt_Made_and_writes_nothing()
     {
         var (_, _, toppingId, _) = await SeedToppingAsync();

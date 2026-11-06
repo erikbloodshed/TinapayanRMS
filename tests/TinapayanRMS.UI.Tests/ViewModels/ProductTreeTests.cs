@@ -33,19 +33,19 @@ public class ProductTreeTests
 
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);
 
-    [Theory]
-    [InlineData("Breads", ProductIcon.Breads)]
-    [InlineData("Loaves", ProductIcon.Loaves)]
-    [InlineData("Cakes", ProductIcon.Cakes)]
-    [InlineData("Pastries", ProductIcon.Pastries)]
-    [InlineData(" pastries ", ProductIcon.Pastries)]
-    [InlineData("Rolls", ProductIcon.Rolls)]
-    [InlineData("Cookies", ProductIcon.None)]
+    [Test]
+    [Arguments("Breads", ProductIcon.Breads)]
+    [Arguments("Loaves", ProductIcon.Loaves)]
+    [Arguments("Cakes", ProductIcon.Cakes)]
+    [Arguments("Pastries", ProductIcon.Pastries)]
+    [Arguments(" pastries ", ProductIcon.Pastries)]
+    [Arguments("Rolls", ProductIcon.Rolls)]
+    [Arguments("Cookies", ProductIcon.None)]
     public void A_products_icon_is_its_categorys(string category, ProductIcon kind) =>
         new ProductLeafNode(ProductOf(1, "Pandesal", ProductStage.Production, new ProductCategory { Id = 9, Name = category }))
             .IconKind.Should().Be(kind);
 
-    [Fact]
+    [Test]
     public void A_composite_has_its_own_icon_whatever_its_category_one_without_a_category_has_none_and_a_folder_never_does()
     {
         var composite = ProductOf(1, "Pasalubong Box", ProductStage.Production, Breads);
@@ -67,7 +67,7 @@ public class ProductTreeTests
         leaf.IconKind.Should().Be(ProductIcon.Cakes);
     }
 
-    [Fact]
+    [Test]
     public void The_stages_are_the_top_level_folders_Production_first_then_Deleted()
     {
         var tree = new ProductTree();
@@ -81,7 +81,7 @@ public class ProductTreeTests
         tree.DeletedFolder.IsExpanded.Should().BeFalse("it starts closed");
     }
 
-    [Fact]
+    [Test]
     public void The_Deleted_folder_holds_the_deleted_products_by_name_whatever_their_stage_and_category()
     {
         var tree = new ProductTree();
@@ -100,7 +100,7 @@ public class ProductTreeTests
         tree.Find(1)!.IsDeleted.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_product_deleted_or_restored_keeps_its_row_which_moves_to_and_from_the_Deleted_folder()
     {
         var tree = new ProductTree();
@@ -121,7 +121,7 @@ public class ProductTreeTests
         Folder(tree, ProductStage.Production, "Cakes").Children.Should().Equal(leaf);
     }
 
-    [Fact]
+    [Test]
     public void A_search_opens_the_Deleted_folder_on_its_matches()
     {
         var tree = new ProductTree();
@@ -133,7 +133,7 @@ public class ProductTreeTests
         tree.DeletedFolder.IsExpanded.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_deleted_product_moves_nowhere_and_nothing_moves_into_the_Deleted_folder()
     {
         var tree = new ProductTree();
@@ -146,7 +146,7 @@ public class ProductTreeTests
         ProductTree.MoveTo(tree.Find(2), pandesal).Should().BeNull("dropped on a deleted product is dropped in Deleted");
     }
 
-    [Fact]
+    [Test]
     public void Each_stage_holds_every_category_by_name_then_Uncategorized_and_each_folder_its_products()
     {
         var tree = new ProductTree();
@@ -172,7 +172,7 @@ public class ProductTreeTests
         TitlesIn(Folder(tree, ProductStage.ResearchAndDevelopment, "Uncategorized")).Should().Equal("Test Loaf");
     }
 
-    [Fact]
+    [Test]
     public void A_search_shows_only_the_folders_holding_a_match()
     {
         var tree = new ProductTree();
@@ -183,7 +183,7 @@ public class ProductTreeTests
         TitlesIn(Root(tree, ProductStage.ResearchAndDevelopment)).Should().BeEmpty("the stages always show, even with no match");
     }
 
-    [Fact]
+    [Test]
     public void Every_folder_starts_open_but_Deleted_and_a_search_opens_the_folders_it_shows()
     {
         var tree = new ProductTree();
@@ -203,7 +203,7 @@ public class ProductTreeTests
         Folder(tree, ProductStage.Production, "Cakes").IsExpanded.Should().BeFalse("the search didn't show it");
     }
 
-    [Fact]
+    [Test]
     public void A_folder_shows_the_open_folder_glyph_only_while_it_is_open_on_its_rows()
     {
         const string folderGlyph = "";
@@ -230,7 +230,7 @@ public class ProductTreeTests
         cakes.Glyph.Should().Be(openFolderGlyph, "a product moved in fills it");
     }
 
-    [Fact]
+    [Test]
     public void An_open_folder_a_search_hid_tells_the_tree_it_is_open_when_it_shows_again()
     {
         var tree = new ProductTree();
@@ -251,7 +251,7 @@ public class ProductTreeTests
         told.Should().Contain(nameof(ProductFolderNode.IsExpanded), "the tree doesn't read it for a folder shown again unless told");
     }
 
-    [Fact]
+    [Test]
     public void An_open_folder_that_gets_its_first_product_tells_the_tree_it_is_open()
     {
         // As the screen loads: the categories arrive first, so each folder is made empty, and its products after.
@@ -270,7 +270,7 @@ public class ProductTreeTests
         breadsTold.Should().NotContain(nameof(ProductFolderNode.IsExpanded), "a closed one has nothing to tell");
     }
 
-    [Fact]
+    [Test]
     public void Refresh_keeps_every_node_and_takes_a_fresh_copy_of_a_product_into_its_row()
     {
         var tree = new ProductTree();
@@ -290,7 +290,7 @@ public class ProductTreeTests
         Folder(tree, ProductStage.Production, "Bread").Should().BeSameAs(folder, "a renamed category keeps its folder");
     }
 
-    [Fact]
+    [Test]
     public void A_product_moved_to_another_stage_and_category_takes_its_row_to_the_new_folder()
     {
         var tree = new ProductTree();
@@ -308,7 +308,7 @@ public class ProductTreeTests
         arrivedWhileStillInOld.Should().BeFalse("a row leaves its old folder before it arrives in the new one");
     }
 
-    [Fact]
+    [Test]
     public void A_deleted_category_takes_its_folders_and_its_products_go_to_Uncategorized()
     {
         var tree = new ProductTree();
@@ -320,7 +320,7 @@ public class ProductTreeTests
         TitlesIn(Folder(tree, ProductStage.Production, "Uncategorized")).Should().Equal("Mamon");
     }
 
-    [Fact]
+    [Test]
     public void A_category_read_with_a_product_but_not_yet_listed_still_gets_its_folder()
     {
         var tree = new ProductTree();
@@ -330,7 +330,7 @@ public class ProductTreeTests
         TitlesIn(Folder(tree, ProductStage.Production, "Cakes")).Should().Equal("Mamon");
     }
 
-    [Fact]
+    [Test]
     public void A_product_no_longer_listed_loses_its_row()
     {
         var tree = new ProductTree();
@@ -342,7 +342,7 @@ public class ProductTreeTests
         Folder(tree, ProductStage.Production, "Breads").Children.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void MoveTo_a_category_folder_files_the_product_under_its_stage_and_category()
     {
         var tree = new ProductTree();
@@ -355,7 +355,7 @@ public class ProductTreeTests
             .Should().Be(new ProductMove(1, ProductStage.ResearchAndDevelopment, null));
     }
 
-    [Fact]
+    [Test]
     public void MoveTo_a_stage_folder_changes_only_the_stage()
     {
         var tree = new ProductTree();
@@ -365,7 +365,7 @@ public class ProductTreeTests
         ProductTree.MoveTo(Root(tree, ProductStage.Production), mamon).Should().Be(new ProductMove(1, ProductStage.Production, Breads.Id));
     }
 
-    [Fact]
+    [Test]
     public void MoveTo_another_product_files_it_in_that_products_folder()
     {
         var tree = new ProductTree();
@@ -376,7 +376,7 @@ public class ProductTreeTests
         ProductTree.MoveTo(tree.Find(2), mamon).Should().Be(new ProductMove(1, ProductStage.Production, Cakes.Id));
     }
 
-    [Fact]
+    [Test]
     public void MoveTo_where_the_product_is_already_or_nowhere_is_no_move()
     {
         var tree = new ProductTree();
@@ -390,7 +390,7 @@ public class ProductTreeTests
         ProductTree.MoveTo(null, mamon).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void Each_folder_counts_the_products_it_shows_and_each_stage_all_of_its_own()
     {
         var tree = new ProductTree();
@@ -416,7 +416,7 @@ public class ProductTreeTests
         Root(tree, ProductStage.Production).ProductCount.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void Expand_All_opens_every_folder_in_the_stage_and_Collapse_All_closes_them_but_leaves_the_stage_open()
     {
         var tree = new ProductTree();
@@ -441,7 +441,7 @@ public class ProductTreeTests
         tree.DeletedFolder.IsExpanded.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void The_folders_left_closed_start_closed_and_the_rest_open_a_category_new_since_included()
     {
         var first = new ProductTree();
@@ -468,7 +468,7 @@ public class ProductTreeTests
         next.ClosedFolderKeys().Should().Equal(closedFolders);
     }
 
-    [Fact]
+    [Test]
     public void An_empty_Refresh_as_the_screen_makes_its_tree_keeps_what_was_kept()
     {
         // The screen refreshes its tree, empty, as it's made, and a screen made but never loaded is disposed with the app.
@@ -484,7 +484,7 @@ public class ProductTreeTests
         openKept.ClosedFolderKeys().Should().Contain($"Production/{Cakes.Id}").And.NotContain($"Production/{Breads.Id}");
     }
 
-    [Fact]
+    [Test]
     public void A_folder_opened_or_closed_is_reported()
     {
         var tree = new ProductTree();
@@ -500,7 +500,7 @@ public class ProductTreeTests
         reports.Should().Be(3, "a folder made since reports too");
     }
 
-    [Fact]
+    [Test]
     public void MovesTo_several_products_leaves_out_the_ones_there_already()
     {
         var tree = new ProductTree();

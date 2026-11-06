@@ -134,7 +134,7 @@ public static class StaThread
     {
         var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.Process)
             ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.User);
-        Assert.SkipWhen(licenseKey is null, "SYNCFUSION_LICENSE_KEY isn't set, and an unlicensed Syncfusion control shows a dialog.");
+        Skip.When(licenseKey is null, "SYNCFUSION_LICENSE_KEY isn't set, and an unlicensed Syncfusion control shows a dialog.");
         return licenseKey;
     }
 }

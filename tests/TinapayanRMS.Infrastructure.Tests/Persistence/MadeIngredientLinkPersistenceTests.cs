@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// A made ingredient is made from a sub-assembly, the one place its recipe is written, with add-ins of its own and its
 /// weight loss on top. Its bill of materials is read from the two.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private IngredientBomLineRepository CreateBomRepository() => new(CreateDbContextFactory());
@@ -44,7 +45,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await CreateRepository().SaveAsync(made, [], brandPrices: null, addIns, Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_is_costed_from_its_sub_assemblys_lines_less_its_weight_loss()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -57,7 +58,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.075m);
     }
 
-    [Fact]
+    [Test]
     public async Task Its_add_ins_go_into_the_batch_on_top_of_the_recipe_and_the_recipe_stays_as_it_is()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -77,7 +78,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await SubAssemblyTotalsAsync(recipeId)).TotalWeight.Should().Be(1000m);
     }
 
-    [Fact]
+    [Test]
     public async Task GetForIngredientAsync_returns_the_recipes_lines_then_the_add_ins_with_their_components()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -92,7 +93,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
             .Should().Equal(("Water", 500m, false), ("Sugar", 1000m, false), ("Ube Flavor", 20m, true));
     }
 
-    [Fact]
+    [Test]
     public async Task GetAllAsync_returns_every_boms_lines_in_their_order()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -108,7 +109,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
             .Should().Equal((syrupId, 800m));
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_change_ripples_through_a_three_level_chain()
     {
         // sugar -> syrup -> caramel, each made ingredient made from a recipe holding the one before it.
@@ -126,7 +127,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await GetIngredientAsync(caramelId)).CostPerBaseUnit.Should().Be(0.18m);
     }
 
-    [Fact]
+    [Test]
     public async Task Changing_the_sub_assemblys_lines_reprices_the_made_ingredient_and_what_uses_it()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -142,7 +143,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await SubAssemblyTotalsAsync(toppingId)).TotalCost.Should().Be(4.5m);
     }
 
-    [Fact]
+    [Test]
     public async Task Editing_weight_loss_percent_recomputes_CostPerGram_from_the_current_recipe()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -157,7 +158,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.1m);
     }
 
-    [Fact]
+    [Test]
     public async Task Making_it_from_another_sub_assembly_reprices_it()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -173,7 +174,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await GetIngredientAsync(syrupId)).CostPerBaseUnit.Should().Be(0.045m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_line_that_closes_a_loop_through_another_made_ingredient_is_refused_and_nothing_changes()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -189,7 +190,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
             .Should().Equal([sugarId], "the refused lines roll back with their save");
     }
 
-    [Fact]
+    [Test]
     public async Task The_made_ingredient_as_a_line_of_its_own_sub_assembly_is_refused_by_name()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -201,7 +202,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
             .WithMessage("Simple Syrup is made from Simple Syrup Base, so it can't be one of Simple Syrup Base's ingredients.");
     }
 
-    [Fact]
+    [Test]
     public async Task An_add_in_its_recipe_already_has_is_refused()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -212,7 +213,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Sugar is already in Simple Syrup Base*");
     }
 
-    [Fact]
+    [Test]
     public async Task An_add_in_that_closes_a_loop_is_refused()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -225,7 +226,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Should().NotContain(l => l.IsAddIn);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_without_a_sub_assembly_is_refused()
     {
         var made = new RawMaterial
@@ -241,7 +242,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Pick the sub-assembly it's made from.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_own_sub_assembly_or_a_packaging_set_is_refused()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -273,7 +274,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         (await check.RawMaterials.AnyAsync(m => m.Name == "Simple Syrup", Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Its_sub_assembly_cant_be_deleted_while_it_is_made_from_it()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -286,7 +287,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Simple Syrup is made from Simple Syrup Base, so it can't be deleted*");
     }
 
-    [Fact]
+    [Test]
     public async Task Its_sub_assembly_lists_it_as_made_from_it()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -297,7 +298,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         madeFrom[await RecipeIdOfAsync(syrupId)].Should().Equal(new MadeIngredientUse(syrupId, "Simple Syrup"));
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_component_ingredient_that_is_in_use_is_blocked()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");
@@ -312,7 +313,7 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_the_made_ingredient_takes_its_add_ins_and_leaves_its_sub_assembly()
     {
         var sugarId = await SeedPurchasedIngredientAsync("Sugar");

@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sub-assemblies and the ones it links), its packaging lines and its costing in one transaction, so a
 /// part that's rejected saves none of it.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
@@ -45,7 +46,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         return box.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task SaveAsync_saves_a_new_product_with_its_recipe_packaging_and_costing_at_once()
     {
         var doughRoleId = await AddRoleAsync("Dough", 1);
@@ -86,7 +87,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         costing.AdministrativePercent.Should().Be(3.5m);
     }
 
-    [Fact]
+    [Test]
     public async Task SaveAsync_leaves_the_parts_it_isnt_sent_alone()
     {
         var fillingRoleId = await AddRoleAsync("Filling", 1);
@@ -110,7 +111,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation))!.LaborPercent.Should().Be(5m);
     }
 
-    [Fact]
+    [Test]
     public async Task SaveAsync_saves_nothing_when_a_part_is_rejected()
     {
         var fillingRoleId = await AddRoleAsync("Filling", 1);
@@ -142,7 +143,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateCostingParametersRepository().GetForProductAsync(productId, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task SaveAsync_adds_no_product_or_sub_assembly_when_a_part_of_a_new_one_is_rejected()
     {
         var fillingRoleId = await AddRoleAsync("Filling", 1);
@@ -163,7 +164,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await dbContext.SubAssemblies.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task A_sub_assembly_a_product_saved_is_edited_on_the_Sub_Assemblies_screen_and_every_product_linking_it_follows()
     {
         var doughRoleId = await AddRoleAsync("Dough", 1);

@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// callback, which closes the app. Drawn, the padding can't touch the current
 /// cell, and these pin that it doesn't. (The add row's current cell when its lines go is GridAddNewRowCurrentCellTests'.)
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridFillerRowsCurrentCellTests
 {
     public sealed class Line
@@ -25,9 +25,9 @@ public class GridFillerRowsCurrentCellTests
         public decimal Grams { get; set; }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public void Replacing_the_lines_after_one_was_selected_does_not_crash(bool hasAddRow)
     {
         // Found by fuzzing: selecting a line puts the current cell on its row, and clearing the lines leaves the grid
@@ -52,7 +52,7 @@ public class GridFillerRowsCurrentCellTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Removing_the_line_the_current_cell_is_on_does_not_crash()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -70,7 +70,7 @@ public class GridFillerRowsCurrentCellTests
         });
     }
 
-    [Fact]
+    [Test]
     public void More_padding_under_the_last_line_leaves_the_current_cell_on_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>

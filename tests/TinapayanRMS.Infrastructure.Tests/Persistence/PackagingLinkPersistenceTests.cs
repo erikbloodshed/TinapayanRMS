@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Derived products: a packaging link reads through to another product's packaging, and a clone is an
 /// independent copy — its own copy of every sub-assembly, with no links.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
@@ -50,7 +51,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         return box.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinkAsync_makes_the_packaging_resolve_through_the_linked_product()
     {
         var boxId = await SeedBoxAsync();
@@ -66,7 +67,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await CreatePackagingLinkRepository().GetForProductAsync(smallId, Cancellation))!.LinkedProduct!.Name.Should().Be("Big");
     }
 
-    [Fact]
+    [Test]
     public async Task GetEffectiveForProductAsync_resolves_through_a_chain_of_two_links()
     {
         var boxId = await SeedBoxAsync();
@@ -82,7 +83,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await CreatePackagingLineRepository().GetEffectiveForProductAsync(cId, Cancellation)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinkAsync_rejects_a_self_link_and_a_cycle()
     {
         var aId = await AddProductAsync("A");
@@ -97,7 +98,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         await cycle.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinkAsync_can_repoint_an_existing_link_to_a_different_product()
     {
         var boxId = await SeedBoxAsync();
@@ -118,7 +119,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.PackagingLinks.CountAsync(l => l.ProductId == derivedId, Cancellation)).Should().Be(1, "still one link, not two");
     }
 
-    [Fact]
+    [Test]
     public async Task RemoveLinkAsync_materializes_the_packaging_it_showed_then_unlinks()
     {
         var boxId = await SeedBoxAsync();
@@ -135,7 +136,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
             .Should().ContainSingle(l => l.UnitsPerPackagingUnit == 6m, "it owns a copy of what it showed a moment ago");
     }
 
-    [Fact]
+    [Test]
     public async Task RemoveLinkAsync_on_unlinked_packaging_is_a_no_op()
     {
         var productId = await AddProductAsync("Solo");
@@ -145,7 +146,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().NotThrowAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task SetLinesAsync_rejects_editing_linked_packaging()
     {
         var boxId = await SeedBoxAsync();
@@ -159,7 +160,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_whose_packaging_another_product_links_is_refused()
     {
         var bigId = await AddProductAsync("Big");
@@ -171,7 +172,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Small links this product's packaging*");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_cascades_to_its_own_packaging_link()
     {
         var bigId = await AddProductAsync("Big");
@@ -184,7 +185,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await links.GetForProductAsync(smallId, Cancellation)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ProductCloner_CloneAsync_links_the_sources_sub_assemblies_and_copies_its_packaging_and_costing()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -243,7 +244,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation)).Should().Contain(u => u.SubAssemblyId == linkedDoughId);
     }
 
-    [Fact]
+    [Test]
     public async Task ProductCloner_CloneAsync_links_two_sub_assemblies_in_one_role_each_going_by_its_name()
     {
         var roleId = await AddRoleAsync("Dough");

@@ -6,7 +6,7 @@ namespace TinapayanRMS.Pricing.Tests.Versions;
 /// <summary>What a save adds to its message for the versions it recorded of other products.</summary>
 public class ProductVersionRecorderTests
 {
-    [Fact]
+    [Test]
     public void The_message_names_up_to_three_products_and_counts_the_rest()
     {
         ProductVersionRecorder.RecordedMessage([]).Should().BeNull();

@@ -8,23 +8,23 @@ public class BrandPriceValidatorTests
 {
     private readonly RawMaterialBrandPriceValidator _validator = new();
 
-    [Theory]
-    [InlineData(90)]
-    [InlineData(1)]
+    [Test]
+    [Arguments(90)]
+    [Arguments(1)]
     public void Accepts_a_positive_price(decimal price)
     {
         _validator.Validate(new RawMaterialBrandPrice { Price = price }).IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-5)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-5)]
     public void Rejects_a_non_positive_price(decimal price)
     {
         _validator.Validate(new RawMaterialBrandPrice { Price = price }).IsValid.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_brand_past_the_column_length()
     {
         var brand = new string('x', RawMaterialBrandPriceValidator.MaxBrandLength + 1);

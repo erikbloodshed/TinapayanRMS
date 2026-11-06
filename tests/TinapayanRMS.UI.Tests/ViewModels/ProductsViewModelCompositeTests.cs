@@ -23,7 +23,8 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// adds only sections in product-owned roles and its packaging; Save writes the lines, undo takes them back, and a
 /// refresh reprices them.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>
@@ -58,7 +59,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         return row;
     }
 
-    [Fact]
+    [Test]
     public Task A_new_composite_opens_on_its_Products_table_with_no_Quantity_Required_and_adds_only_product_owned_sections_and_packaging() => StaThread.RunAsync(async () =>
     {
         await AddTwoProductsAsync();
@@ -98,7 +99,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.AddSubAssemblyTab.Header.Should().Be("New Sub-Assembly");
     });
 
-    [Fact]
+    [Test]
     public Task Products_typed_into_the_table_price_the_composite_at_their_recipe_cost_and_Save_writes_them() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -142,7 +143,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task A_topping_over_the_whole_composite_adds_to_its_recipe_cost_on_a_tab_after_its_Products() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
@@ -198,7 +199,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Save_refuses_a_composite_of_one_product_or_with_a_line_half_filled_in() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -222,7 +223,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
     // A composite holding itself, through the products in it, can only come of an edit outside the app. Its read mustn't be
     // refused, taking every product's with it (the list's, Reports', the servers'): it opens and says so, and Save still
     // refuses the loop.
-    [Fact]
+    [Test]
     public Task A_composite_that_holds_itself_opens_with_a_notice_and_Save_still_refuses_the_loop() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -247,7 +248,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             "Party Tray can't go into Pasalubong Box: it already contains Pasalubong Box, so Pasalubong Box would end up containing itself.");
     });
 
-    [Fact]
+    [Test]
     public Task The_product_picker_leaves_out_the_composite_itself_and_every_composite_holding_it() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, doughRoleId) = await AddTwoProductsAsync();
@@ -280,7 +281,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single().Usage.RoleId.Should().Be(doughRoleId);
     });
 
-    [Fact]
+    [Test]
     public Task A_lines_edit_is_one_undo_step_and_Save_is_offered_only_while_the_lines_differ() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -318,7 +319,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentsTable.ComponentEdits.Should().HaveCount(2);
     });
 
-    [Fact]
+    [Test]
     public Task Including_each_products_packaging_adds_it_to_the_composites_packaging_as_one_undo_step_and_Save_keeps_it() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -409,7 +410,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             .SetLinesAsync(productId, [(materialId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
     }
 
-    [Fact]
+    [Test]
     public Task A_refresh_reprices_the_lines_as_their_products_now_are_without_counting_as_an_edit() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, doughRoleId) = await AddTwoProductsAsync();
@@ -429,7 +430,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse("a product repriced elsewhere isn't this product's change");
     });
 
-    [Fact]
+    [Test]
     public Task A_product_a_composite_holds_isnt_deleted_and_the_message_names_the_composite() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -445,7 +446,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.Products.Should().Contain(p => p.Id == ensaymadaId);
     });
 
-    [Fact]
+    [Test]
     public Task A_composites_printout_has_its_products_table_and_its_costing_per_unit() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
@@ -465,7 +466,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         printout.Costs.SubAssemblies.Should().Be(35m);
     });
 
-    [Fact]
+    [Test]
     public Task The_lists_menus_offer_a_new_composite_product_where_they_offer_a_new_product() => StaThread.RunAsync(async () =>
     {
         await AddTwoProductsAsync();

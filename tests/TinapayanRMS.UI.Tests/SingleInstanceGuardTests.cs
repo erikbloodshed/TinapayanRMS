@@ -18,7 +18,7 @@ public class SingleInstanceGuardTests
 
     private readonly string _name = $"TinapayanRMS.Tests.{Guid.NewGuid():N}";
 
-    [Fact]
+    [Test]
     public void The_first_copy_gets_the_app()
     {
         using var copy = new Copy(_name);
@@ -26,7 +26,7 @@ public class SingleInstanceGuardTests
         copy.HasApp.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_second_copy_doesnt_get_the_app()
     {
         using var open = new Copy(_name);
@@ -35,7 +35,7 @@ public class SingleInstanceGuardTests
         second.HasApp.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_closed_leaves_the_app_free()
     {
         var open = new Copy(_name);
@@ -46,7 +46,7 @@ public class SingleInstanceGuardTests
         next.HasApp.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_crashed_leaves_the_app_free()
     {
         var open = new Copy(_name);
@@ -57,7 +57,7 @@ public class SingleInstanceGuardTests
         next.HasApp.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void The_open_copy_comes_forward_when_asked()
     {
         using var open = new Copy(_name);
@@ -77,7 +77,7 @@ public class SingleInstanceGuardTests
     }
 
     // As the app does, once its window shows: it wasn't listening yet when it was first asked.
-    [Fact]
+    [Test]
     public void A_copy_still_starting_is_waited_for()
     {
         using var open = new Copy(_name);
@@ -88,7 +88,7 @@ public class SingleInstanceGuardTests
     }
 
     // A frozen copy still hears: it's the pool thread that does. Only its UI thread can say it came forward.
-    [Fact]
+    [Test]
     public void A_copy_that_only_hears_the_request_hasnt_answered()
     {
         using var open = new Copy(_name);
@@ -102,7 +102,7 @@ public class SingleInstanceGuardTests
         second.HasApp.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_never_listens_is_reported_once_patience_runs_out()
     {
         using var open = new Copy(_name);
@@ -113,7 +113,7 @@ public class SingleInstanceGuardTests
         second.HasApp.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_closes_while_asked_leaves_the_app_to_the_one_asking()
     {
         var open = new Copy(_name);
@@ -127,7 +127,7 @@ public class SingleInstanceGuardTests
         third.HasApp.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_crashes_while_asked_leaves_the_app_to_the_one_asking()
     {
         var open = new Copy(_name);
@@ -141,7 +141,7 @@ public class SingleInstanceGuardTests
         third.HasApp.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_that_took_over_lets_go_when_it_closes()
     {
         var open = new Copy(_name);
@@ -156,21 +156,21 @@ public class SingleInstanceGuardTests
     }
 
     // Each answer wakes only one of them, so each has to have asked for its own.
-    [Fact]
+    [Test]
     public async Task Copies_started_together_are_each_answered()
     {
         using var open = new Copy(_name);
         open.Guard.Listen(open.Guard.CameForward);
         var others = Enumerable.Range(0, 4).Select(_ => new Copy(_name)).ToList();
 
-        var outcomes = await Task.WhenAll(others.Select(other => Task.Run(() => other.Ask(Plenty), TestContext.Current.CancellationToken)));
+        var outcomes = await Task.WhenAll(others.Select(other => Task.Run(() => other.Ask(Plenty), TestContext.Current!.Execution.CancellationToken)));
         others.ForEach(other => other.Dispose());
 
         outcomes.Should().AllBeEquivalentTo(SingleInstanceOutcome.CameForward);
     }
 
     // What a copy running as an administrator looks like from one that isn't: it's there, and Windows refuses to open it.
-    [Fact]
+    [Test]
     public void A_copy_out_of_reach_is_reported_rather_than_thrown()
     {
         var security = new MutexSecurity();
@@ -185,7 +185,7 @@ public class SingleInstanceGuardTests
 
     // What a copy does as it starts, all the way through (App.OnStartup)
 
-    [Fact]
+    [Test]
     public void A_copy_starting_with_the_app_free_says_nothing()
     {
         using var copy = new Copy(_name, claim: false);
@@ -196,7 +196,7 @@ public class SingleInstanceGuardTests
         said.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_copy_starting_with_the_app_open_closes_without_a_word_once_that_one_comes_forward()
     {
         using var open = new Copy(_name);
@@ -210,7 +210,7 @@ public class SingleInstanceGuardTests
     }
 
     // The message waits on an answer, and the copy only comes forward after: in front, it would cover the message.
-    [Fact]
+    [Test]
     public void A_copy_starting_with_another_build_open_says_where_that_runs_from_before_it_comes_forward()
     {
         const string Elsewhere = @"C:\Published\TinapayanRMS.UI.exe";
@@ -237,7 +237,7 @@ public class SingleInstanceGuardTests
         Volatile.Read(ref asked).Should().BeGreaterThan(0);
     }
 
-    [Fact]
+    [Test]
     public void A_copy_starting_with_a_frozen_one_open_says_so_rather_than_vanish()
     {
         using var open = new Copy(_name);
@@ -249,7 +249,7 @@ public class SingleInstanceGuardTests
         said.Should().Equal((SingleInstanceGuard.NotAnsweringText, MessageBoxImage.Warning));
     }
 
-    [Fact]
+    [Test]
     public void A_copy_starting_as_the_open_one_closes_carries_on_without_a_word()
     {
         var open = new Copy(_name);
@@ -262,7 +262,7 @@ public class SingleInstanceGuardTests
         said.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void Closing_is_safe_whether_or_not_it_ever_had_the_app()
     {
         using var open = new Copy(_name);
@@ -279,22 +279,22 @@ public class SingleInstanceGuardTests
         closing.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(SingleInstanceOutcome.NotAnswering, SingleInstanceGuard.NotAnsweringText)]
-    [InlineData(SingleInstanceOutcome.OutOfReach, SingleInstanceGuard.OutOfReachText)]
-    [InlineData(SingleInstanceOutcome.CameForward, null)]
-    [InlineData(SingleInstanceOutcome.Claimed, null)]
+    [Test]
+    [Arguments(SingleInstanceOutcome.NotAnswering, SingleInstanceGuard.NotAnsweringText)]
+    [Arguments(SingleInstanceOutcome.OutOfReach, SingleInstanceGuard.OutOfReachText)]
+    [Arguments(SingleInstanceOutcome.CameForward, null)]
+    [Arguments(SingleInstanceOutcome.Claimed, null)]
     public void Only_a_copy_that_couldnt_be_brought_forward_is_mentioned(SingleInstanceOutcome outcome, string? text) =>
         SingleInstanceGuard.TextOf(outcome).Should().Be(text);
 
-    [Theory]
-    [InlineData(@"C:\Dev\TinapayanRMS.UI.exe", @"C:\Published\TinapayanRMS.UI.exe", @"C:\Published\TinapayanRMS.UI.exe")]
-    [InlineData(@"C:\Dev\TinapayanRMS.UI.exe", @"c:\dev\TINAPAYANRMS.UI.EXE", null)]
-    [InlineData(@"C:\Dev\TinapayanRMS.UI.exe", null, null)]
+    [Test]
+    [Arguments(@"C:\Dev\TinapayanRMS.UI.exe", @"C:\Published\TinapayanRMS.UI.exe", @"C:\Published\TinapayanRMS.UI.exe")]
+    [Arguments(@"C:\Dev\TinapayanRMS.UI.exe", @"c:\dev\TINAPAYANRMS.UI.EXE", null)]
+    [Arguments(@"C:\Dev\TinapayanRMS.UI.exe", null, null)]
     public void A_copy_is_elsewhere_only_when_its_path_is_known_to_be_another(string mine, string? theirs, string? elsewhere) =>
         SingleInstanceGuard.ElsewhereThan(mine, [theirs]).Should().Be(elsewhere);
 
-    [Fact]
+    [Test]
     public void Being_elsewhere_says_where() =>
         SingleInstanceGuard.ElsewhereText(@"C:\Published\TinapayanRMS.UI.exe").Should().Contain(@"C:\Published\TinapayanRMS.UI.exe");
 

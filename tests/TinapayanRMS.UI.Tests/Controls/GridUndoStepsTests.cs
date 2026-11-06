@@ -17,7 +17,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// offered only while an edit is pending or the lines have changed, as the screens offer theirs. A line typed on the add
 /// row and saved with a click on Save, the add row still open, is added (Products' add-ins).
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridUndoStepsTests
 {
     public sealed class Line
@@ -51,7 +51,7 @@ public class GridUndoStepsTests
         public void Refresh() => save.IsEnabled = _isEditPending || lines.Count != 2;
     }
 
-    [Fact]
+    [Test]
     public void Clicking_Save_with_a_line_typed_on_the_add_row_adds_the_line_and_keeps_Save_offered()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -69,7 +69,7 @@ public class GridUndoStepsTests
         });
     }
 
-    [Fact]
+    [Test]
     public void An_add_row_dropped_after_its_cell_was_left_is_no_longer_pending()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -86,7 +86,7 @@ public class GridUndoStepsTests
         });
     }
 
-    [Fact]
+    [Test]
     public void An_add_row_left_untouched_is_not_pending()
     {
         OffscreenGrid.Run(LinesGrid, grid =>

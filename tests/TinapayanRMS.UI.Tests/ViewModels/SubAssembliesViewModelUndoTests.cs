@@ -17,10 +17,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// it whether Save has anything to write, which is measured against the same snapshots. Steps are recorded by
 /// bracketing a change with BeginUndoStep/EndUndoStep, which is what the Controls/ behaviours do.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Undoing_a_grams_edit_puts_the_line_and_the_totals_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -41,7 +42,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.Lines[0].Grams.Should().Be(500m);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_keeps_a_typed_percentage_that_is_waiting_for_a_base_to_come_back() => StaThread.RunAsync(async () =>
     {
         // The same trap as on Products: a percentage typed, then the base unticked, so nothing can be typed into
@@ -62,7 +63,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.Lines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_removed_line_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -76,7 +77,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.BatchWeight.Should().Be(1200m);
     });
 
-    [Fact]
+    [Test]
     public Task Undo_leaves_what_Save_writes_alone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, subAssemblyId) = await OpenSavedSubAssemblyAsync();
@@ -96,7 +97,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalWeight.Should().Be(1200m);
     });
 
-    [Fact]
+    [Test]
     public Task A_step_that_changes_nothing_is_not_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -110,7 +111,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.History.CanUndo.Should().BeFalse("it was retyped to the figure it already had");
     });
 
-    [Fact]
+    [Test]
     public Task The_history_goes_when_the_form_stops_being_the_one_it_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -132,7 +133,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.History.CanUndo.Should().BeFalse("a new sub-assembly has no history of its own");
     });
 
-    [Fact]
+    [Test]
     public Task Scale_makes_the_batch_weigh_what_is_typed_as_one_step_to_save_or_undo() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -150,7 +151,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Scale_can_make_the_base_weigh_what_is_typed_and_says_when_nothing_is_ticked() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -170,7 +171,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.Lines[1].Percent.Should().Be(20m);
     });
 
-    [Fact]
+    [Test]
     public Task Save_is_not_offered_until_the_form_is_changed() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -184,7 +185,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Save_stops_being_offered_once_the_change_is_taken_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -196,7 +197,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
     });
 
-    [Fact]
+    [Test]
     public Task Save_stops_being_offered_once_it_has_written() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -208,7 +209,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
     });
 
-    [Fact]
+    [Test]
     public Task Save_is_not_offered_on_a_blank_new_form() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
@@ -220,7 +221,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task A_cell_still_open_keeps_Save_offered() => StaThread.RunAsync(async () =>
     {
         // What's typed into a cell doesn't reach the line until the edit ends, and the click that saves is the
@@ -235,7 +236,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
     });
 
-    [Fact]
+    [Test]
     public Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with() => StaThread.RunAsync(async () =>
     {
         // The screen's real opening order: the form is blank before the roles exist, and the load then gives it
@@ -249,7 +250,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Showing_the_tab_again_is_not_something_to_save() => StaThread.RunAsync(async () =>
     {
         // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.

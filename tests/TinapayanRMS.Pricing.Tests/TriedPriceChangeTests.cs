@@ -11,7 +11,7 @@ public class TriedPriceChangeTests
 
     private static readonly PurchaseUnit Sack = new("sack", 25_000m, 1_250m);
 
-    [Fact]
+    [Test]
     public void A_change_in_percent_works_out_the_new_price_and_moves_both_costs_by_it()
     {
         var tried = TriedPriceChange.Of(Flour, Sack, changePercent: 10m, newPrice: null, percentTyped: true)!;
@@ -19,7 +19,7 @@ public class TriedPriceChangeTests
         (tried.NewPrice, tried.ChangePercent, tried.Cost, tried.BufferedCost).Should().Be((1_375m, (decimal?)10m, 0.055m, 0.0605m));
     }
 
-    [Fact]
+    [Test]
     public void A_new_price_works_out_the_change_in_percent()
     {
         var tried = TriedPriceChange.Of(Flour, Sack, changePercent: null, newPrice: 1_000m, percentTyped: false)!;
@@ -27,7 +27,7 @@ public class TriedPriceChangeTests
         (tried.NewPrice, tried.ChangePercent, tried.Cost, tried.BufferedCost).Should().Be((1_000m, (decimal?)-20m, 0.04m, 0.044m));
     }
 
-    [Fact]
+    [Test]
     public void A_material_with_no_price_yet_is_costed_from_the_new_price_with_its_buffer_on_top()
     {
         var tried = TriedPriceChange.Of(Flour, Sack with { Price = null }, changePercent: null, newPrice: 500m, percentTyped: false)!;
@@ -35,14 +35,14 @@ public class TriedPriceChangeTests
         (tried.ChangePercent, tried.Cost, tried.BufferedCost).Should().Be(((decimal?)null, 0.02m, 0.022m));
     }
 
-    [Fact]
+    [Test]
     public void Nothing_typed_yet_tries_nothing()
     {
         TriedPriceChange.Of(Flour, Sack, changePercent: null, newPrice: null, percentTyped: true).Should().BeNull();
         TriedPriceChange.Of(Flour, Sack, changePercent: null, newPrice: null, percentTyped: false).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_percentage_on_a_material_with_no_price_a_fall_of_100_percent_and_a_price_of_0_are_refused()
     {
         var noPrice = () => TriedPriceChange.Of(Flour, Sack with { Price = null }, 10m, null, percentTyped: true);

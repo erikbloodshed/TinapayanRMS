@@ -13,7 +13,7 @@ public class DerivedUpdatesTests
 
     private void Batch() => _ran.Add("batch");
 
-    [Fact]
+    [Test]
     public void An_update_outside_a_batch_runs_at_once()
     {
         _updates.Run(Costs);
@@ -22,7 +22,7 @@ public class DerivedUpdatesTests
         _ran.Should().Equal("costs", "costs");
     }
 
-    [Fact]
+    [Test]
     public void Updates_asked_for_in_a_batch_run_once_each_when_it_ends_in_the_order_first_asked()
     {
         _updates.Batch(() =>
@@ -38,7 +38,7 @@ public class DerivedUpdatesTests
         _updates.IsBatching.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Nested_batches_run_their_updates_as_the_outermost_ends()
     {
         _updates.Batch(() =>
@@ -50,7 +50,7 @@ public class DerivedUpdatesTests
         _ran.Should().Equal("costs");
     }
 
-    [Fact]
+    [Test]
     public void Writes_that_throw_drop_the_updates_they_held_and_leave_no_batch_open()
     {
         var act = () => _updates.Batch(() =>

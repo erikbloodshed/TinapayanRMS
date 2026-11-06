@@ -26,10 +26,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 ///
 /// The last few cover whether Save has anything to write, which is measured against the same snapshots.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Undoing_a_grams_edit_puts_the_line_and_the_costs_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -52,7 +53,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageForm.FormLines.Single().Grams.Should().Be(500m);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_keeps_a_typed_percentage_that_is_waiting_for_a_base_to_come_back() => StaThread.RunAsync(async () =>
     {
         // The state a restore through the public setters loses silently: a percentage typed, then the base
@@ -79,7 +80,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageForm.FormLines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_grams_edit_leaves_another_lines_typed_percentage_alone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoLineProductAsync();
@@ -93,7 +94,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageForm.FormLines[1].IsPercentTyped.Should().BeTrue("the figure it keeps is still the typed percentage");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_puts_back_a_line_that_was_only_half_filled_in() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
@@ -109,7 +110,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         added.Grams.Should().BeNull("it was half filled in, and that's how it comes back");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_removed_line_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoLineProductAsync();
@@ -122,7 +123,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageForm.FormLines.Should().HaveCount(2);
     });
 
-    [Fact]
+    [Test]
     public Task Undo_leaves_what_Save_compares_against_alone() => StaThread.RunAsync(async () =>
     {
         // The direct test that the baselines weren't restored: a change undone must leave the database exactly
@@ -141,7 +142,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         lines.Should().ContainSingle().Which.Grams.Should().Be(1000m);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_quantity_required_change_puts_the_figure_and_the_costing_back() => StaThread.RunAsync(async () =>
     {
         // Quantity Required multiplies every cost on the screen, so an undo has to put both back: the typed
@@ -159,7 +160,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.Costing.Costs.Material.Should().Be(costPerPiece);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_section_applied_by_leaving_its_tab_does_not_apply_it_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
@@ -180,7 +181,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedRecipeTab.Should().BeSameAs(filling, "the undo takes back the change, not where you navigated to");
     });
 
-    [Fact]
+    [Test]
     public Task Moving_between_the_recipe_tabs_is_not_something_to_undo() => StaThread.RunAsync(async () =>
     {
         // Leaving a tab applies its form, which closes it, and a form closed isn't an edit: only the section it
@@ -196,7 +197,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse("clicking through the sections changes nothing");
     });
 
-    [Fact]
+    [Test]
     public Task A_step_left_open_across_a_change_of_tab_records_nothing() => StaThread.RunAsync(async () =>
     {
         // WPF selects a tab as it takes the cursor, before the field it takes it from hears so: the field's step
@@ -223,7 +224,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse("the change of tab was never a step of its own");
     });
 
-    [Fact]
+    [Test]
     public Task A_tab_change_after_an_undo_still_applies_the_form_it_leaves() => StaThread.RunAsync(async () =>
     {
         // Guards the bookkeeping a restore does by hand: RecipeTabShown is skipped while the tab is put back,
@@ -247,7 +248,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(80m);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Add_Sub_Assembly_takes_its_tab_away_and_puts_the_previous_form_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -265,7 +266,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.UsageForm.FormLines.Should().HaveCount(linesBefore, "the form the add replaced is back with its lines");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_removed_section_puts_it_back_with_its_tab() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
@@ -281,7 +282,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().HaveCount(2, "the tabs follow the sections");
     });
 
-    [Fact]
+    [Test]
     public Task The_tabs_stay_in_step_with_the_sections_across_an_undo() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
@@ -301,7 +302,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.RecipeTabs.Should().Contain(viewModel.SelectedRecipeTab!);
     });
 
-    [Fact]
+    [Test]
     public Task A_step_that_changes_nothing_is_not_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -317,7 +318,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task A_refused_apply_records_nothing() => StaThread.RunAsync(async () =>
     {
         // Two sections in one role and neither named: the apply is refused, and a refusal changes only the
@@ -336,7 +337,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().Be(stepsBefore, "a refusal changed nothing to take back");
     });
 
-    [Fact]
+    [Test]
     public Task A_refresh_in_the_middle_of_a_step_is_not_an_edit() => StaThread.RunAsync(async () =>
     {
         // A LoadCommand landing between a field taking the cursor and losing it swaps in freshly priced
@@ -352,7 +353,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse("nothing the user did changed");
     });
 
-    [Fact]
+    [Test]
     public Task The_history_goes_when_the_form_stops_being_the_one_it_recorded() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -374,7 +375,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.CanUndo.Should().BeFalse("a new product has no history of its own");
     });
 
-    [Fact]
+    [Test]
     public Task Revert_throws_the_history_away_with_everything_else_since_the_Save() => StaThread.RunAsync(async () =>
     {
         // Revert reads the product back from the database, so the steps recorded against the form it replaced
@@ -398,7 +399,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.TryUndo().Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Revert_on_a_product_that_was_never_saved_empties_the_form() => StaThread.RunAsync(async () =>
     {
         // The other branch: nothing is selected, so there is nothing to read back and a new product goes back
@@ -424,7 +425,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await dbContext.Products.SingleAsync(p => p.Id == seeded.ProductId, Cancellation)).Name.Should().Be("Ube Roll");
     });
 
-    [Fact]
+    [Test]
     public Task Revert_turned_down_at_the_prompt_leaves_the_form_and_its_history_alone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -440,7 +441,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName.Should().Be("Ube Roll");
     });
 
-    [Fact]
+    [Test]
     public Task Save_is_not_offered_until_the_form_is_changed() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -454,7 +455,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Moving_between_the_recipe_tabs_is_not_something_to_save() => StaThread.RunAsync(async () =>
     {
         // Each tab opens its section's form over the previous one, so the form holds different values without
@@ -477,10 +478,10 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Theory]
-    [InlineData(UsageFormMode.New)]
-    [InlineData(UsageFormMode.Link)]
-    [InlineData(UsageFormMode.Copy)]
+    [Test]
+    [Arguments(UsageFormMode.New)]
+    [Arguments(UsageFormMode.Link)]
+    [Arguments(UsageFormMode.Copy)]
     public Task Opening_the_add_form_is_not_something_to_save(UsageFormMode mode) => StaThread.RunAsync(async () =>
     {
         // Link and Copy start the form again in their way after the tab opens it in New (the EditingUsageMode
@@ -507,7 +508,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Save_stops_being_offered_once_the_change_is_taken_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -519,7 +520,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
     });
 
-    [Fact]
+    [Test]
     public Task Save_stops_being_offered_once_it_has_written() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -534,7 +535,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
     });
 
-    [Fact]
+    [Test]
     public Task A_cell_still_open_keeps_Save_offered() => StaThread.RunAsync(async () =>
     {
         // What's typed into a cell doesn't reach the line until the edit ends, and the click that saves is the
@@ -549,7 +550,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
     });
 
-    [Fact]
+    [Test]
     public Task Save_is_not_offered_on_the_blank_form_the_screen_opens_with() => StaThread.RunAsync(async () =>
     {
         // The screen's real opening order: the blank form is costed at nothing before the defaults exist, and the
@@ -565,7 +566,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Showing_the_tab_again_is_not_something_to_save() => StaThread.RunAsync(async () =>
     {
         // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
@@ -576,7 +577,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Unlink_puts_the_link_back_and_redo_unlinks_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, doughId) = await OpenLinkedDoughProductAsync();
@@ -598,7 +599,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Move_to_Sub_Assemblies_keeps_it_the_products_own_and_stops_offering_Save() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1, isProductOwned: true);
@@ -624,7 +625,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Move_to_In_House_keeps_its_lines_and_stops_offering_Save() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 1, isProductOwned: true);
@@ -651,7 +652,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Make_a_Copy_stops_offering_Save() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenLinkedDoughProductAsync();
@@ -665,7 +666,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeFalse("opening the copy's form moved what Save measures against, and the undo moves it back");
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_to_a_form_with_typing_not_yet_applied_still_offers_Save() => StaThread.RunAsync(async () =>
     {
         // The other half of taking the settled form back from when the step was taken: it's the form as the

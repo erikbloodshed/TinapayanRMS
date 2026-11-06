@@ -41,14 +41,14 @@ public class ProductVersionRulesTests
     private static readonly ProductVersionContent Base = Pandesal(
         DoughSection(new VersionLine(Flour, 500m, true, null), new VersionLine(Sugar, 50m, false, null)));
 
-    [Fact]
+    [Test]
     public void A_version_has_no_changes_from_itself()
     {
         ProductVersionRules.Changes(Base, Base).Should().BeEmpty();
         ProductVersionRules.IsSameRecipe(Base, Base).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Materials_costs_name_and_line_order_are_not_changes()
     {
         var later = Base with
@@ -61,7 +61,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.IsSameRecipe(Base, later).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_line_changed_added_and_removed_are_each_listed()
     {
         var later = Pandesal(DoughSection(new VersionLine(Flour, 450m, true, null), new VersionLine(Salt, 10m, false, null)));
@@ -72,7 +72,7 @@ public class ProductVersionRulesTests
             "Dough: Sugar removed");
     }
 
-    [Fact]
+    [Test]
     public void An_add_in_changed_added_and_removed_are_each_listed()
     {
         static ProductVersionContent WithAddIns(params VersionAddIn[] addIns) => Pandesal(
@@ -89,7 +89,7 @@ public class ProductVersionRulesTests
             "Dough: add-in Salt removed");
     }
 
-    [Fact]
+    [Test]
     public void The_piece_size_is_listed()
     {
         var later = Base with
@@ -100,14 +100,14 @@ public class ProductVersionRulesTests
         ProductVersionRules.Changes(Base, later).Should().Equal("Dough: weight per piece 60 g → 55 g");
     }
 
-    [Fact]
+    [Test]
     public void The_shop_wide_wastage_isnt_part_of_a_versions_recipe()
     {
         // It's the shop's, set in Settings, like a material's price: a change of it alone records no version.
         ProductVersionRules.IsSameRecipe(Base with { WastagePercent = 3m }, Base with { WastagePercent = 5m }).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_section_rewritten_as_a_new_one_of_the_products_own_is_the_same_section()
     {
         var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, [new VersionLine(Sugar, 30m, false, null)], []);
@@ -117,7 +117,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.IsSameRecipe(before, after).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_section_added_and_removed_are_listed_by_role()
     {
         var own = new VersionSection(7, "Pandesal Filling", true, Filling, UsageAuthoredField.Yield, 1m, [new VersionLine(Sugar, 30m, false, null)], []);
@@ -127,7 +127,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.Changes(withFilling, Base).Should().Equal("Filling removed");
     }
 
-    [Fact]
+    [Test]
     public void Price_quantity_packaging_and_costing_are_listed()
     {
         var later = Base with
@@ -145,7 +145,7 @@ public class ProductVersionRulesTests
             "Markup %: 30 → 35");
     }
 
-    [Fact]
+    [Test]
     public void A_packaging_line_added_and_removed_are_each_listed()
     {
         var unpacked = Base with { PackagingLines = [] };
@@ -154,7 +154,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.Changes(unpacked, Base).Should().Equal("Packaging: Paper Bag added, 1 pc");
     }
 
-    [Fact]
+    [Test]
     public void A_packaging_link_is_listed_by_what_it_links()
     {
         var linked = Base with { PackagingLink = new VersionPackagingLink(null, 50, "Gift Box Set") };
@@ -163,7 +163,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.Changes(linked, Base).Should().Equal("Packaging: now the product's own (was linked to Gift Box Set)");
     }
 
-    [Fact]
+    [Test]
     public void The_shops_vat_and_wastage_are_shop_changes_not_the_products()
     {
         // Base is a snapshot from before VAT was the shop's: its costing kept the product's own 12%.
@@ -181,7 +181,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.ShopChanges(later, later).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void No_costing_saved_is_the_same_as_all_zero()
     {
         var none = Base with { Costing = null };
@@ -190,7 +190,7 @@ public class ProductVersionRulesTests
         ProductVersionRules.IsSameRecipe(none, zero).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void A_composites_products_are_listed_by_name()
     {
         var box = new ProductVersionContent
@@ -210,7 +210,7 @@ public class ProductVersionRulesTests
             "Products: Cheese Roll removed");
     }
 
-    [Fact]
+    [Test]
     public void A_snapshot_reads_back_as_it_was_written()
     {
         var read = ProductVersionContent.FromJson(Base.ToJson());
@@ -221,13 +221,13 @@ public class ProductVersionRulesTests
         read.Sections.Single().AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
     }
 
-    [Fact]
+    [Test]
     public void A_snapshot_keeps_the_wastage_it_was_priced_with()
     {
         ProductVersionContent.FromJson((Base with { WastagePercent = 3m }).ToJson()).WastagePercent.Should().Be(3m);
     }
 
-    [Fact]
+    [Test]
     public void A_snapshot_saved_with_shrinkage_before_there_was_wastage_still_reads()
     {
         // An older snapshot has a ShrinkagePercent on each section and no WastagePercent: the one is ignored, and
@@ -241,7 +241,7 @@ public class ProductVersionRulesTests
         read.WastagePercent.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_snapshot_that_cant_be_read_is_refused()
     {
         var act = () => ProductVersionContent.FromJson("{ not json");
@@ -249,16 +249,16 @@ public class ProductVersionRulesTests
         act.Should().Throw<BusinessRuleException>();
     }
 
-    [Theory]
-    [InlineData(null, null)]
-    [InlineData("   ", null)]
-    [InlineData("  Cheaper butter ", "Cheaper butter")]
+    [Test]
+    [Arguments(null, null)]
+    [Arguments("   ", null)]
+    [Arguments("  Cheaper butter ", "Cheaper butter")]
     public void A_note_is_trimmed_and_blank_is_none(string? note, string? stored)
     {
         ProductVersionRules.NormalizeNote(note).Should().Be(stored);
     }
 
-    [Fact]
+    [Test]
     public void A_note_too_long_is_refused()
     {
         var act = () => ProductVersionRules.NormalizeNote(new string('a', ProductVersionRules.MaxNoteLength + 1));
