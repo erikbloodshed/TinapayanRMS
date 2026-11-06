@@ -17,9 +17,9 @@ public class PackagingLineRowTests
     /// Recipe API). The database refuses one now (CK_PackagingLines_AuthoredQuantity), so this is only ever an edit from
     /// before it or outside it, which should cost nothing and be there to put right.
     /// </summary>
-    [Theory]
-    [InlineData(PackagingLineAuthoredField.QtyPerUnit)]
-    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
+    [Test]
+    [Arguments(PackagingLineAuthoredField.QtyPerUnit)]
+    [Arguments(PackagingLineAuthoredField.UnitsPerPackagingUnit)]
     public void A_saved_line_with_a_quantity_of_0_reads_as_costing_nothing(PackagingLineAuthoredField authoredField)
     {
         var row = PackagingLineRow.FromSaved(new PackagingLine { PackagingMaterial = Box(), AuthoredField = authoredField, QtyPerUnit = 0m, UnitsPerPackagingUnit = 0m });
@@ -54,7 +54,7 @@ public class PackagingLineRowTests
         BufferedCostPerBaseUnit = 30m,
     };
 
-    [Fact]
+    [Test]
     public void Switched_to_unbuffered_a_row_reprices_its_units_and_its_line_and_keeps_its_unit()
     {
         var row = new PackagingLineRow(Ribbon(), 2m, unitId: 7);
@@ -75,7 +75,7 @@ public class PackagingLineRowTests
         (row.UnitCost, row.CostPerUnit).Should().Be((50m, 100m));
     }
 
-    [Fact]
+    [Test]
     public void A_row_offers_its_materials_base_unit_first_then_its_alternative_units()
     {
         var ribbon = Ribbon();
@@ -89,7 +89,7 @@ public class PackagingLineRowTests
         row.UnitId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_quantity_in_an_alternative_unit_converts_to_base_units_and_is_costed_through_them()
     {
         var row = new PackagingLineRow(Ribbon(), 1m, unitId: 7);
@@ -102,7 +102,7 @@ public class PackagingLineRowTests
         row.CostPerUnit.Should().Be(50m, "1 roll is 1,000 cm at ₱0.05");
     }
 
-    [Fact]
+    [Test]
     public void UnitCost_is_what_one_of_the_picked_unit_costs_not_the_lines_total()
     {
         // Two rolls: UnitCost stays what ONE roll costs, while CostPerUnit (the line's total) is for both.
@@ -112,7 +112,7 @@ public class PackagingLineRowTests
         row.CostPerUnit.Should().Be(100m, "2 rolls are 2,000 cm at ₱0.05");
     }
 
-    [Fact]
+    [Test]
     public void Picking_a_unit_reprices_the_row_without_the_quantity_changing()
     {
         var row = new PackagingLineRow(Ribbon(), 2m);
@@ -128,7 +128,7 @@ public class PackagingLineRowTests
         row.CostPerUnit.Should().Be(100m, "2 rolls are 2,000 cm at ₱0.05");
     }
 
-    [Fact]
+    [Test]
     public void A_material_without_the_row_s_unit_puts_the_row_back_in_its_base_unit()
     {
         var box = Box();
@@ -145,7 +145,7 @@ public class PackagingLineRowTests
         onlyOption.UnitCost.Should().Be(30m);
     }
 
-    [Fact]
+    [Test]
     public void Resolve_keeps_the_unit_when_it_swaps_in_a_refreshed_copy_of_the_material()
     {
         var row = new PackagingLineRow(Ribbon(), 1m, unitId: 7);
@@ -160,7 +160,7 @@ public class PackagingLineRowTests
         row.CostPerUnit.Should().Be(60m, "1,000 cm at the new ₱0.06");
     }
 
-    [Fact]
+    [Test]
     public void CompleteLines_carries_each_rows_unit()
     {
         var ribbon = Ribbon();

@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.Tests.Exporting;
 /// sort and filter, with only its shown columns, its figures as numbers at full precision, and none of GridFillerRows'
 /// padding.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class ExcelExportTests
 {
     public sealed class Row
@@ -30,7 +30,7 @@ public class ExcelExportTests
         public string Note { get; init; } = string.Empty;
     }
 
-    [Fact]
+    [Test]
     public void A_grid_is_written_sorted_filtered_and_with_its_shown_columns()
     {
         OffscreenGrid.Run(CostsGrid, grid =>
@@ -55,7 +55,7 @@ public class ExcelExportTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Figures_are_numbers_at_full_precision_shown_with_the_columns_decimals()
     {
         OffscreenGrid.Run(CostsGrid, grid => WithSavedWorkbook([new ExcelSheet("Costs", grid)], workbook =>
@@ -71,7 +71,7 @@ public class ExcelExportTests
         }));
     }
 
-    [Fact]
+    [Test]
     public void A_picker_column_is_written_as_the_name_it_shows_not_its_id()
     {
         OffscreenGrid.Run(PickerGrid, grid => WithSavedWorkbook([new ExcelSheet("Changes", grid)], workbook =>
@@ -82,7 +82,7 @@ public class ExcelExportTests
         }));
     }
 
-    [Fact]
+    [Test]
     public void Each_sheet_is_named_as_asked()
     {
         OffscreenGrid.Run(CostsGrid, grid => WithSavedWorkbook(
@@ -90,7 +90,7 @@ public class ExcelExportTests
             workbook => workbook.Worksheets.Select(sheet => sheet.Name).Should().Equal("Products", "Price Changes")));
     }
 
-    [Fact]
+    [Test]
     public void A_file_open_elsewhere_is_left_as_it_was()
     {
         OffscreenGrid.Run(CostsGrid, grid =>
@@ -115,17 +115,17 @@ public class ExcelExportTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_suggested_name_says_what_and_when()
     {
         ExcelExport.SuggestedFileName("Product Cost Summary", new DateTime(2026, 10, 3)).Should().Be("Product Cost Summary 2026-10-03.xlsx");
     }
 
-    [Theory]
-    [InlineData(0, "#,##0")]
-    [InlineData(1, "#,##0.0")]
-    [InlineData(2, "#,##0.00")]
-    [InlineData(4, "#,##0.0000")]
+    [Test]
+    [Arguments(0, "#,##0")]
+    [Arguments(1, "#,##0.0")]
+    [Arguments(2, "#,##0.00")]
+    [Arguments(4, "#,##0.0000")]
     public void A_figure_keeps_its_columns_decimals_with_a_thousands_separator(int decimals, string format)
     {
         ExcelExport.NumberFormat(decimals).Should().Be(format);

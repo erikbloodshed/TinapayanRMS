@@ -20,10 +20,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// mustn't end the screen's selection subscription for good (no later pick would load anything, and Save would do
 /// nothing, with no word of why), and a failed load or an unexpected failure in a save mustn't close the app.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Products_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -55,7 +56,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     // While a picked product's details are on their way the form still holds the product before's, which a Save would
     // write under the new one's name. Typing then isn't an unsaved change (the history records nothing until they come),
     // so Save stays off, rather than on and doing nothing.
-    [Fact]
+    [Test]
     public Task Products_Save_stays_off_while_the_picked_products_details_are_on_their_way() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -85,7 +86,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
     });
 
-    [Fact]
+    [Test]
     public Task Raw_materials_a_pick_that_fails_to_load_says_so_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var ids = new List<int>();
@@ -112,7 +113,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ErrorMessage.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Sub_assemblies_a_pick_that_fails_to_load_leaves_a_blank_form_and_the_next_pick_loads() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -144,7 +145,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ErrorMessage.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Reports_a_load_that_fails_says_so_and_the_next_one_reads_the_reports() => StaThread.RunAsync(async () =>
     {
         await AddProductAsync("Pandesal");
@@ -163,7 +164,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ProductCosts.Should().ContainSingle().Which.ProductName.Should().Be("Pandesal");
     });
 
-    [Fact]
+    [Test]
     public Task A_save_that_fails_says_why_and_doesnt_throw() => StaThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
@@ -186,7 +187,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaits the move
     // to another tab, so a read that failed there would be lost: the click would do nothing, with no word of why.
-    [Fact]
+    [Test]
     public Task Products_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -211,7 +212,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
-    [Fact]
+    [Test]
     public Task Raw_materials_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -235,7 +236,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
-    [Fact]
+    [Test]
     public Task Sub_assemblies_a_form_that_cant_be_read_back_on_leaving_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -259,7 +260,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     });
 
     // A record opened by the Vim command line's :e name, which nothing awaits.
-    [Fact]
+    [Test]
     public Task A_question_that_cant_be_asked_says_so_and_stays() => StaThread.RunAsync(async () =>
     {
         var ids = new List<int>();

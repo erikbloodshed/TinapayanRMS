@@ -4,16 +4,16 @@ namespace TinapayanRMS.Pricing.Tests;
 
 public class ProductCostSummaryTests
 {
-    public static TheoryData<decimal, bool> CurrentPrices => new()
-    {
-        { 26.00m, false },
-        { 25.99m, true },
-        { 25.9999m, false },
-        { 30.00m, false },
-    };
+    public static IEnumerable<(decimal, bool)> CurrentPrices() =>
+    [
+        (26.00m, false),
+        (25.99m, true),
+        (25.9999m, false),
+        (30.00m, false),
+    ];
 
-    [Theory]
-    [MemberData(nameof(CurrentPrices))]
+    [Test]
+    [MethodDataSource(nameof(CurrentPrices))]
     public void A_current_price_is_short_of_the_target_markup_when_it_earns_less_as_shown(decimal price, bool isShort)
     {
         // A base cost of 20.00 and a target markup of 30%, no VAT: 26.00 earns exactly 30%, and 25.9999 rounds to it.
@@ -22,7 +22,7 @@ public class ProductCostSummaryTests
         costs.IsBelowTargetMarkup.Should().Be(isShort);
     }
 
-    [Fact]
+    [Test]
     public void The_selling_price_is_also_shown_rounded_up_when_rounding_is_set()
     {
         // 20.00 at a 30% markup, no VAT: 26.00 exactly, and 26.01 for 20.0077, which rounds up to 26.25 on quarters.
@@ -36,7 +36,7 @@ public class ProductCostSummaryTests
         exact.RoundedSellingPriceText.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void No_current_price_is_never_short() =>
         Summary(20m).IsBelowTargetMarkup.Should().BeFalse();
 

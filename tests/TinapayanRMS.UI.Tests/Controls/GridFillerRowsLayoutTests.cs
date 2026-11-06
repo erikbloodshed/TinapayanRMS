@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// GridFillerRows draws its empty rows without adding any to the grid, and keeps them to the space under the grid's rows
 /// in the same layout pass as the grid changes: no settle delay, and never a row over the grid's own.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridFillerRowsLayoutTests
 {
     public sealed class Line
@@ -23,7 +23,7 @@ public class GridFillerRowsLayoutTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void A_short_table_is_padded_with_drawn_rows_and_none_added_to_the_grid()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -33,7 +33,7 @@ public class GridFillerRowsLayoutTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Lines_added_or_removed_change_the_padding_in_the_same_layout_pass()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -54,7 +54,7 @@ public class GridFillerRowsLayoutTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Rows_that_outgrow_the_grid_leave_no_padding()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -71,7 +71,7 @@ public class GridFillerRowsLayoutTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_grid_resized_is_padded_to_its_new_height_at_once()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -88,7 +88,7 @@ public class GridFillerRowsLayoutTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_hidden_grid_is_left_alone_and_padded_for_what_changed_when_it_is_shown_again()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -111,7 +111,7 @@ public class GridFillerRowsLayoutTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Turned_off_it_leaves_the_grid_as_it_was()
     {
         OffscreenGrid.Run(LinesGrid, grid =>

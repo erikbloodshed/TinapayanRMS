@@ -9,16 +9,16 @@ public class InverseBooleanConverterTests
 {
     private static readonly InverseBooleanConverter Converter = new();
 
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
+    [Test]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
     public void A_column_is_ticked_while_it_isnt_hidden(bool isHidden, bool isChecked) =>
         Converter.Convert(isHidden, typeof(bool?), null!, CultureInfo.InvariantCulture).Should().Be(isChecked);
 
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(null, true)]
+    [Test]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
+    [Arguments(null, true)]
     public void Unticking_a_column_hides_it(bool? isChecked, bool isHidden) =>
         Converter.ConvertBack(isChecked, typeof(bool), null!, CultureInfo.InvariantCulture).Should().Be(isHidden);
 }

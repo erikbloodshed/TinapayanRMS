@@ -13,10 +13,11 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Reports' Cost Drivers and Margin Erosion, worked out from products and versions as saved.</summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Cost_drivers_rank_the_purchased_materials_by_what_the_products_in_Production_spend_on_them() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -38,7 +39,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         rows[^1].CumulativeShare.Should().BeApproximately(100m, 0.0000001m, "every peso of these products' material cost is a purchased material's");
     });
 
-    [Fact]
+    [Test]
     public Task Cost_drivers_leave_out_products_not_in_Production() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -48,7 +49,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         (await AnalyseCostDriversAsync()).Should().BeEmpty("a product still in Research and Development isn't counted");
     });
 
-    [Fact]
+    [Test]
     public Task Margin_erosion_compares_each_products_markup_then_with_now() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

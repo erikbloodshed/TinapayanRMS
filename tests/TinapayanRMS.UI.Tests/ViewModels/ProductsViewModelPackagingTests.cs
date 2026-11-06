@@ -21,12 +21,13 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// product's) — and gets a Packaging tab only then. Make a Copy on a linked tab makes it the product's own; Delete
 /// Sub-Assembly takes it out. Save writes the link and the lines together.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     // A product whose packaging links come round in a loop, as only an edit outside the app can leave them, mustn't fail
     // every product's read with it. It opens, showing no packaging, and says so.
-    [Fact]
+    [Test]
     public Task A_product_whose_packaging_links_come_round_in_a_loop_opens_with_a_notice() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
@@ -50,7 +51,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.Packaging.Should().Be(0m);
     });
 
-    [Fact]
+    [Test]
     public Task A_new_packaging_is_added_in_the_Packaging_role_and_saved_as_the_products_own_lines() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -91,7 +92,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task The_form_shows_under_a_sub_assemblys_tab_or_New_Sub_Assemblys_and_the_packaging_under_its_own() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -120,7 +121,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
     });
 
-    [Fact]
+    [Test]
     public Task Linking_a_packaging_set_shows_its_lines_read_only_and_Save_writes_the_link() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -162,7 +163,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
     });
 
-    [Fact]
+    [Test]
     public Task Copying_another_products_packaging_makes_it_this_products_own() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -190,7 +191,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task Make_a_Copy_on_a_linked_Packaging_tab_unlinks_it_on_Save_and_keeps_its_lines() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -221,7 +222,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             "the lines the link showed are written even though they match what was loaded");
     });
 
-    [Fact]
+    [Test]
     public Task Move_to_Sub_Assemblies_on_the_Packaging_tab_saves_its_lines_as_a_set_and_links_it() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -258,7 +259,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_Move_to_Sub_Assemblies_on_the_Packaging_tab_keeps_its_lines_the_products_own_and_stops_offering_Save() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -282,7 +283,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Move_to_Sub_Assemblies_with_no_packaging_lines_is_refused_with_a_message() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -298,7 +299,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.CanMovePackaging.Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Delete_Sub_Assembly_on_the_Packaging_tab_takes_out_the_lines_or_the_link() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -334,7 +335,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task Packaging_is_offered_to_link_or_copy_only_while_the_product_has_none() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);

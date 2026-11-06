@@ -10,10 +10,11 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>What a raw material makes up of each product's material cost, for Raw Materials' Used By tiles.</summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task A_material_is_its_share_of_a_products_material_cost_wherever_it_is_in_the_recipe() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, flourId, sugarId, syrupId) = await AddEnsaymadaAsync();
@@ -25,7 +26,7 @@ public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestB
         (await shares.ReadAsync(sugarId, [ensaymadaId], Cancellation))[ensaymadaId].Should().BeApproximately(9m / 54m, 0.0000001m, "sugar is in it through the syrup");
     });
 
-    [Fact]
+    [Test]
     public Task A_composite_is_priced_with_all_the_products_it_holds_even_those_without_the_material() => StaThread.RunAsync(async () =>
     {
         var (ensaymadaId, flourId, _, _) = await AddEnsaymadaAsync();
@@ -46,7 +47,7 @@ public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestB
         MaterialCostShares.Text(shares[boxId]).Should().Be("8.1% of materials");
     });
 
-    [Fact]
+    [Test]
     public void A_share_reads_as_a_percentage_of_materials()
     {
         MaterialCostShares.Text(0.38m).Should().Be("38% of materials");

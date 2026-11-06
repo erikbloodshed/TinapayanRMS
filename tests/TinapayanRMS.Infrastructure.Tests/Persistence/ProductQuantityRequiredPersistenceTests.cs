@@ -16,7 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// for one whole unit. A "Box of 8" is a variant of the single with a quantity of 8 and a packaging set of
 /// its own, not a pack row hanging off it.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateProductRepository() => new(CreateDbContextFactory());
@@ -46,7 +47,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         return material.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_saved_without_one_holds_a_single_piece()
     {
         var id = await CreateProductRepository().SaveAsync(
@@ -55,7 +56,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         (await CreateProductRepository().GetByIdAsync(id, Cancellation))!.QuantityRequired.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task Saves_and_reads_back_a_quantity_of_more_than_one_piece()
     {
         var repository = CreateProductRepository();
@@ -72,7 +73,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         (await repository.GetByIdAsync(id, Cancellation))!.QuantityRequired.Should().Be(12);
     }
 
-    [Fact]
+    [Test]
     public async Task A_quantity_of_no_pieces_is_refused_by_the_database()
     {
         // CK_Products_QuantityRequired, beside the rule ProductValidator applies on the screen.
@@ -83,7 +84,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_and_a_variant_both_take_the_sources_quantity()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -103,7 +104,7 @@ public class ProductQuantityRequiredPersistenceTests(DatabaseFixture fixture) : 
         (await repository.GetByIdAsync(variantId, Cancellation))!.QuantityRequired.Should().Be(8);
     }
 
-    [Fact]
+    [Test]
     public async Task A_boxed_variant_costs_its_pieces_by_the_quantity_plus_one_whole_packaging_set()
     {
         // The worked example from the rework: Ensaymada at 10 g of a 1,000 g / P50 dough is P0.50 of recipe a

@@ -18,12 +18,12 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// grid is themed on its own (SfSkinManager.Theme set on it), which keeps its dictionaries in its own resources. The
 /// second half fails once Syncfusion's dictionary stops carrying the generic styles, when the local theme stops mattering.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class TreeGridThemeScopeTests
 {
     private sealed record Row(string Name);
 
-    [Fact]
+    [Test]
     public void A_tree_grid_themed_on_its_own_leaves_the_data_grids_themed_and_one_inheriting_the_theme_doesnt() => StaThread.RunThemed(() =>
     {
         var themed = DataGridCellBorder(treeGrid: null);
@@ -37,7 +37,7 @@ public class TreeGridThemeScopeTests
     /// body text (App.ThemeSettings) as its header cells do: they inherit the grid's own FontSize, which is 12. ScalingCard
     /// sets its grid's FontSize to 14.
     /// </summary>
-    [Fact]
+    [Test]
     public void A_tree_grid_themed_on_its_own_sizes_its_cells_text_by_its_own_font_size() => StaThread.RunThemed(() =>
     {
         var (cell, header) = CellFontSizes(gridFontSize: null);

@@ -11,7 +11,7 @@ public class NavigationHistoryTests
 {
     public NavigationHistoryTests() => ReactiveUIBootstrapper.EnsureInitialized();
 
-    [Fact]
+    [Test]
     public void Back_and_Forward_walk_the_screens_with_the_record_each_had_open_as_it_was_left()
     {
         var history = new NavigationHistory();
@@ -36,7 +36,7 @@ public class NavigationHistoryTests
         history.GoForward(new ScreenVisit(AppScreen.Products, 2)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void BackTarget_and_ForwardTarget_say_where_a_step_would_go_without_taking_it()
     {
         var history = new NavigationHistory();
@@ -54,7 +54,7 @@ public class NavigationHistoryTests
         history.ForwardTarget.Should().Be(new ScreenVisit(AppScreen.SubAssemblies, 7));
     }
 
-    [Fact]
+    [Test]
     public void A_screen_changed_after_going_back_drops_what_Forward_held()
     {
         var history = new NavigationHistory();
@@ -69,7 +69,7 @@ public class NavigationHistoryTests
         history.GoBack(new ScreenVisit(AppScreen.Reports, null)).Should().Be(new ScreenVisit(AppScreen.RawMaterials, 4));
     }
 
-    [Fact]
+    [Test]
     public void A_move_to_the_screen_already_showing_is_not_a_step()
     {
         var history = new NavigationHistory();
@@ -80,7 +80,7 @@ public class NavigationHistoryTests
         history.CanGoBack.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Back_keeps_only_the_latest_stops_past_its_depth()
     {
         var history = new NavigationHistory(depth: 2);
@@ -94,7 +94,7 @@ public class NavigationHistoryTests
         history.GoBack(new ScreenVisit(AppScreen.SubAssemblies, 2)).Should().BeNull("the oldest stop went when the third came");
     }
 
-    [Fact]
+    [Test]
     public void CanGoBack_and_CanGoForward_are_raised_as_they_change()
     {
         var history = new NavigationHistory();

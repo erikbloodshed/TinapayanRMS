@@ -21,10 +21,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// every product linking it whose recipe it changed, with how it stood first for one with no versions yet, noted with where
 /// the change came from. A product it doesn't change gets none.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Saving_a_sub_assemblys_lines_records_a_version_of_each_product_using_it() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -57,7 +58,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         (await versions.GetForProductAsync(ensaymadaId, Cancellation)).Should().BeEmpty("Ensaymada's dough is its own");
     });
 
-    [Fact]
+    [Test]
     public Task Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -83,7 +84,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         }
     });
 
-    [Fact]
+    [Test]
     public Task A_rename_records_no_version() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -100,7 +101,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
             .Should().BeEmpty("a sub-assembly's name isn't part of a product's recipe");
     });
 
-    [Fact]
+    [Test]
     public Task Recording_the_products_a_sub_assembly_changes_takes_as_many_commands_for_six_as_for_two() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");

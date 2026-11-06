@@ -14,25 +14,19 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 /// plumbing (and the Respawn reset before each test) is identical across every one of
 /// them, so it lives here once instead of being retyped per file.
 ///
-/// Deliberately does NOT carry a [Collection] itself — the attribute must stay on each
-/// concrete test class: [Collection(DatabaseCollection.Name)], or in UI.Tests and
-/// Infrastructure.Tests one of DatabaseCollection.A to D, each with a database of its own.
-/// xUnit's collection/fixture-sharing discovery is not guaranteed to honor an
-/// attribute declared only on a base class, and getting that wrong would silently break the
-/// Respawn-reset isolation this whole hierarchy exists to guarantee (tests could then run in
-/// parallel against one database instead of one at a time in its collection).
+/// Each concrete test class names its collection itself, since the key differs from class to class:
+/// [NotInParallel(DatabaseCollection.Name)] and [ClassDataSource&lt;DatabaseFixture&gt;(Shared = SharedType.Keyed,
+/// Key = DatabaseCollection.Name)], or in UI.Tests and Infrastructure.Tests DatabaseCollection.A to D, each with a
+/// database of its own. Without NotInParallel the class's tests would run side by side against one database, each
+/// resetting it under the others; without the keyed ClassDataSource, TUnit has no fixture to construct it with.
 /// </summary>
-public abstract class PersistenceTestBase(DatabaseFixtureBase fixture) : IAsyncLifetime
+public abstract class PersistenceTestBase(DatabaseFixtureBase fixture)
 {
-    protected static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    protected static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
 
-    public ValueTask InitializeAsync() => new(fixture.ResetAsync());
-
-    public ValueTask DisposeAsync()
-    {
-        GC.SuppressFinalize(this);
-        return ValueTask.CompletedTask;
-    }
+    /// <summary>Empties the test database before each test.</summary>
+    [Before(Test)]
+    public Task ResetDatabaseAsync() => fixture.ResetAsync();
 
     protected TinapayanRMSDbContext CreateDbContext() =>
         new(CreateDbContextOptions());

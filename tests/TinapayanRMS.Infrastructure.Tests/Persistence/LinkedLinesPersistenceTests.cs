@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// the sub-assembly itself, on the Sub-Assemblies screen, so every product linking it follows. Without them its lines are
 /// left as they are.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static LinkedUsageDraft Linked(int subAssemblyId, decimal weightPerPiece, IReadOnlyList<RecipeLine>? lines = null, params (int IngredientId, decimal Grams)[] addIns) =>
@@ -30,7 +31,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
         return (ownerId, miniId, doughId, flourId);
     }
 
-    [Fact]
+    [Test]
     public async Task New_lines_saved_from_a_linking_product_rewrite_the_sub_assembly_for_every_product_linking_it()
     {
         var (ownerId, miniId, doughId, flourId) = await SeedSharedDoughAsync();
@@ -49,7 +50,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Should().Equal([ownerId, miniId], "both products still link the one dough");
     }
 
-    [Fact]
+    [Test]
     public async Task A_linked_usage_without_lines_leaves_the_sub_assemblys_lines_as_they_are()
     {
         var (_, miniId, doughId, flourId) = await SeedSharedDoughAsync();
@@ -61,7 +62,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Should().Equal(new { IngredientId = flourId, Grams = 1000m });
     }
 
-    [Fact]
+    [Test]
     public async Task Add_ins_are_checked_against_the_new_lines_not_the_ones_they_replace()
     {
         var (_, miniId, doughId, flourId) = await SeedSharedDoughAsync();
@@ -79,7 +80,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Should().Equal(new { IngredientId = flourId, Grams = 800m });
     }
 
-    [Fact]
+    [Test]
     public async Task Invalid_new_lines_are_refused_before_anything_is_written()
     {
         var (_, miniId, doughId, flourId) = await SeedSharedDoughAsync();

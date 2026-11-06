@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// is ₱0.09 a gram, and egg white (70% of its weight, 30% of its cost) and egg yolk (30%, 70%) are costed from
 /// it, follow it through the cascade, and together can't take more than all of it.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>Stored costs keep 4 decimal places, so a share that doesn't divide evenly is compared to within one of them.</summary>
@@ -72,7 +73,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
     private async Task<decimal> GetSubAssemblyTotalCostAsync(int id) => (await SubAssemblyTotalsAsync(id)).TotalCost;
 
-    [Fact]
+    [Test]
     public async Task Egg_white_and_yolk_are_costed_from_the_egg_by_their_shares()
     {
         var categoryId = await SeedCategoryAsync();
@@ -92,7 +93,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         yolk.BufferedCostPerBaseUnit.Should().Be(0.21m);
     }
 
-    [Fact]
+    [Test]
     public async Task Adding_a_linked_ingredient_through_AddAsync_costs_it_straight_away()
     {
         var categoryId = await SeedCategoryAsync();
@@ -104,7 +105,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetMaterialAsync(yolk.Id)).CostPerBaseUnit.Should().Be(0.21m);
     }
 
-    [Fact]
+    [Test]
     public async Task Repricing_the_egg_moves_its_parts_and_the_sub_assemblies_using_them()
     {
         var categoryId = await SeedCategoryAsync();
@@ -125,7 +126,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(126m, "450 g of yolk is 70% of a ₱180 tray");
     }
 
-    [Fact]
+    [Test]
     public async Task A_part_inherits_the_eggs_buffer_percent_on_top_of_its_share_of_the_eggs_unbuffered_cost()
     {
         var categoryId = await SeedCategoryAsync();
@@ -157,7 +158,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetMaterialAsync(yolkId)).CostBufferPercent.Should().Be(50m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_part_takes_its_share_of_the_eggs_fixed_buffered_cost_not_of_a_new_price()
     {
         var categoryId = await SeedCategoryAsync();
@@ -177,7 +178,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetMaterialAsync(yolkId)).BufferedCostPerBaseUnit.Should().Be(0.35m, "₱0.15 × 70 / 30");
     }
 
-    [Fact]
+    [Test]
     public async Task The_buffer_is_inherited_on_AddAsync_down_a_chain_of_links_and_from_a_new_link()
     {
         var categoryId = await SeedCategoryAsync();
@@ -202,7 +203,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetMaterialAsync(yolkHalf.Id)).CostBufferPercent.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public async Task Changing_a_parts_shares_or_link_reprices_it()
     {
         var categoryId = await SeedCategoryAsync();
@@ -218,7 +219,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         (await GetMaterialAsync(whiteId)).CostPerBaseUnit.Should().Be(0.08m, "₱0.12 × 40 / 60");
     }
 
-    [Fact]
+    [Test]
     public async Task A_part_that_takes_the_egg_past_all_of_its_weight_is_refused_naming_the_other_parts()
     {
         var categoryId = await SeedCategoryAsync();
@@ -240,7 +241,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         await resave.Should().NotThrowAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task A_link_to_itself_or_to_packaging_is_refused()
     {
         var categoryId = await SeedCategoryAsync();
@@ -263,7 +264,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         await toPackaging.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Egg Tray Box' is packaging*");
     }
 
-    [Fact]
+    [Test]
     public async Task Linking_a_part_to_a_made_ingredient_that_already_uses_it_is_refused_as_a_cycle()
     {
         var categoryId = await SeedCategoryAsync();
@@ -276,7 +277,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_sub_assembly_line_using_a_part_linked_to_the_made_ingredient_made_from_it_is_refused_as_a_cycle()
     {
         var categoryId = await SeedCategoryAsync();
@@ -289,7 +290,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_linked_ingredient_takes_no_price()
     {
         var categoryId = await SeedCategoryAsync();
@@ -301,7 +302,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Only a purchased material has purchase prices.");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_with_parts_linked_to_it_cant_be_deleted()
     {
         var categoryId = await SeedCategoryAsync();

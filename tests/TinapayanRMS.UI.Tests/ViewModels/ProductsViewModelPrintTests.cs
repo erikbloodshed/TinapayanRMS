@@ -17,10 +17,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Print on the Products screen, on real repositories: what the Print tab shows is the product as the screen shows it,
 /// unsaved edits included, with a form left open applied first, as Save applies it.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Print_shows_the_product_as_the_screen_shows_it() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -56,7 +57,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.Scaling.Should().BeNull("the Recipe tab was showing");
     });
 
-    [Fact]
+    [Test]
     public Task Print_on_the_Scaling_tab_prints_the_recipe_scaled_and_on_another_tab_its_recipe_and_costing_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
@@ -78,7 +79,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Scaling.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Print_applies_a_line_typed_into_the_open_form_and_notes_the_unsaved_change() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
@@ -97,7 +98,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
     });
 
-    [Fact]
+    [Test]
     public Task A_form_a_rule_refuses_shows_why_and_nothing_opens() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
@@ -112,7 +113,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
     });
 
-    [Fact]
+    [Test]
     public Task The_Print_tab_shown_again_has_the_edits_made_on_Products_since() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
@@ -127,7 +128,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
     });
 
-    [Fact]
+    [Test]
     public Task A_form_refused_when_the_Print_tab_is_shown_again_leaves_its_pages_and_says_why() => StaThread.RunAsync(async () =>
     {
         var (viewModel, sugarId) = await OpenOneSubAssemblyProductAsync();
@@ -140,7 +141,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.ErrorMessage.Should().Be(problem, "Products shows it too, for when it's next shown");
     });
 
-    [Fact]
+    [Test]
     public Task A_new_product_prints_as_not_saved_yet() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();

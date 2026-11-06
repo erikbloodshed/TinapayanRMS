@@ -16,23 +16,23 @@ public class RawMaterialRulesTests
         TargetCostBufferPercent = target,
     };
 
-    public static TheoryData<decimal, decimal, bool> BelowCostCases => new()
-    {
-        { 0.06m, 0.05m, true }, // -16.7%: prices have risen past it
-        { 0.05m, 0.05m, false }, // 0%: no buffer, but not below
-        { 0.0518888m, 0.05188m, false }, // -0.02%: a 0% buffer typed to the centavo in a 25 kg sack
-        { 0.05m, 0.055m, false },
-    };
+    public static IEnumerable<(decimal, decimal, bool)> BelowCostCases() =>
+    [
+        (0.06m, 0.05m, true), // -16.7%: prices have risen past it
+        (0.05m, 0.05m, false), // 0%: no buffer, but not below
+        (0.0518888m, 0.05188m, false), // -0.02%: a 0% buffer typed to the centavo in a 25 kg sack
+        (0.05m, 0.055m, false),
+    ];
 
-    [Theory]
-    [MemberData(nameof(BelowCostCases))]
+    [Test]
+    [MethodDataSource(nameof(BelowCostCases))]
     public void A_purchased_material_priced_past_its_buffered_cost_by_a_tenth_of_a_point_or_more_is_below_cost(
         decimal cost, decimal buffered, bool expected)
     {
         RawMaterialRules.IsBufferedBelowCost(Purchased(cost, buffered, 0m, null)).Should().Be(expected);
     }
 
-    [Fact]
+    [Test]
     public void Only_a_priced_purchased_material_can_be_below_cost()
     {
         var made = new RawMaterial { Source = RawMaterialSource.Made, CostPerBaseUnit = 0.06m, BufferedCostPerBaseUnit = 0.05m };
@@ -42,7 +42,7 @@ public class RawMaterialRulesTests
         RawMaterialRules.IsBufferedBelowCost(unpriced).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void A_buffer_worn_below_its_target_by_a_tenth_of_a_point_or_more_is_counted()
     {
         // 0.055 over 0.05 is 10%; the price up to 0.052 leaves 5.77%, under a 10% target.
@@ -52,7 +52,7 @@ public class RawMaterialRulesTests
         RawMaterialRules.CurrentBufferPercentOf(Purchased(0.052m, 0.055m, 5.77m, 10m))!.Value.Should().BeApproximately(5.7692m, 0.0001m);
     }
 
-    [Fact]
+    [Test]
     public void A_material_saved_before_targets_were_kept_takes_its_last_saved_buffer_as_its_target()
     {
         RawMaterialRules.TargetBufferPercentOf(Purchased(0.05m, 0.055m, 10m, null)).Should().Be(10m);
@@ -60,7 +60,7 @@ public class RawMaterialRulesTests
         RawMaterialRules.CurrentBufferPercentOf(Purchased(0m, 0m, 10m, 10m)).Should().BeNull("there's no price to have a buffer over");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchType_accepts_an_ingredient_with_no_base_unit()
     {
         var ingredient = new RawMaterial { Type = RawMaterialType.Ingredient, Source = RawMaterialSource.Made, WeightLossPercent = 10m };
@@ -70,7 +70,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchType_rejects_an_ingredient_with_a_base_unit_since_it_is_always_the_gram()
     {
         var ingredient = new RawMaterial { Type = RawMaterialType.Ingredient, BaseUnitId = 1 };
@@ -80,7 +80,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*gram*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchType_accepts_a_purchased_packaging_material_with_a_base_unit()
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1, Source = RawMaterialSource.Purchased };
@@ -90,9 +90,9 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0)]
+    [Test]
+    [Arguments(null)]
+    [Arguments(0)]
     public void EnsureFieldsMatchType_rejects_a_packaging_material_without_a_base_unit(int? baseUnitId)
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = baseUnitId };
@@ -102,7 +102,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*base unit*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchType_rejects_a_made_packaging_material()
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1, Source = RawMaterialSource.Made, WeightLossPercent = 0m };
@@ -112,7 +112,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*packaging is always purchased*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_accepts_a_purchased_material_with_no_weight_loss_percent()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased };
@@ -122,7 +122,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_accepts_a_made_ingredient_with_a_weight_loss_percent_and_a_sub_assembly()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Made, WeightLossPercent = 20m, SubAssemblyId = 7 };
@@ -132,7 +132,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_rejects_a_made_ingredient_without_a_sub_assembly()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Made, WeightLossPercent = 20m };
@@ -142,9 +142,9 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage("Pick the sub-assembly it's made from.");
     }
 
-    [Theory]
-    [InlineData(RawMaterialSource.Purchased)]
-    [InlineData(RawMaterialSource.Linked)]
+    [Test]
+    [Arguments(RawMaterialSource.Purchased)]
+    [Arguments(RawMaterialSource.Linked)]
     public void EnsureFieldsMatchSource_rejects_a_sub_assembly_on_an_ingredient_that_isnt_made(RawMaterialSource source)
     {
         var ingredient = new RawMaterial
@@ -161,7 +161,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage("Only a made ingredient is made from a sub-assembly.");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_rejects_a_made_ingredient_without_a_weight_loss_percent()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Made };
@@ -171,9 +171,9 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(100)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(100)]
     public void EnsureFieldsMatchSource_rejects_an_out_of_range_weight_loss_percent(decimal weightLossPercent)
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Made, WeightLossPercent = weightLossPercent };
@@ -183,7 +183,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_rejects_a_purchased_material_with_a_weight_loss_percent()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased, WeightLossPercent = 10m };
@@ -193,7 +193,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_accepts_a_linked_ingredient_with_a_link_and_both_shares()
     {
         var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 70m, CostSharePercent = 30m };
@@ -203,7 +203,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_accepts_a_part_that_is_all_of_the_weight_and_cost()
     {
         var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 100m, CostSharePercent = 100m };
@@ -213,9 +213,9 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(null, 70, 30)]
-    [InlineData(0, 70, 30)]
+    [Test]
+    [Arguments(null, 70, 30)]
+    [Arguments(0, 70, 30)]
     public void EnsureFieldsMatchSource_rejects_a_linked_ingredient_without_a_link(int? linkedToId, int weightShare, int costShare)
     {
         var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = linkedToId, WeightSharePercent = weightShare, CostSharePercent = costShare };
@@ -225,19 +225,19 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*linked to*");
     }
 
-    public static TheoryData<decimal?, decimal?> SharesMissingOrOutOfRange => new()
-    {
-        { null, 30m },
-        { 0m, 30m },
-        { -5m, 30m },
-        { 100.01m, 30m },
-        { 70m, null },
-        { 70m, 0m },
-        { 70m, 101m },
-    };
+    public static IEnumerable<(decimal?, decimal?)> SharesMissingOrOutOfRange() =>
+    [
+        (null, 30m),
+        (0m, 30m),
+        (-5m, 30m),
+        (100.01m, 30m),
+        (70m, null),
+        (70m, 0m),
+        (70m, 101m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(SharesMissingOrOutOfRange))]
+    [Test]
+    [MethodDataSource(nameof(SharesMissingOrOutOfRange))]
     public void EnsureFieldsMatchSource_rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare)
     {
         var eggWhite = new RawMaterial
@@ -253,7 +253,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*share must be above 0 and at most 100*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchSource_rejects_a_linked_ingredient_with_a_weight_loss_percent()
     {
         var eggWhite = new RawMaterial { Source = RawMaterialSource.Linked, LinkedToId = 1, WeightSharePercent = 70m, CostSharePercent = 30m, WeightLossPercent = 0m };
@@ -263,9 +263,9 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*weight loss*");
     }
 
-    [Theory]
-    [InlineData(RawMaterialSource.Purchased)]
-    [InlineData(RawMaterialSource.Made)]
+    [Test]
+    [Arguments(RawMaterialSource.Purchased)]
+    [Arguments(RawMaterialSource.Made)]
     public void EnsureFieldsMatchSource_rejects_link_fields_on_a_material_that_is_not_linked(RawMaterialSource source)
     {
         var material = new RawMaterial
@@ -280,7 +280,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Only a linked ingredient*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureFieldsMatchType_rejects_a_linked_packaging_material()
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1, Source = RawMaterialSource.Linked };
@@ -290,7 +290,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*packaging is always purchased*");
     }
 
-    [Fact]
+    [Test]
     public void LinkedCost_splits_an_eggs_cost_between_its_white_and_yolk_by_their_shares()
     {
         // ₱135 for 1,500 g is ₱0.09 a gram. White is 70% of the weight for 30% of the cost, yolk 30% for 70%.
@@ -307,13 +307,13 @@ public class RawMaterialRulesTests
         (450m * yolk).Should().Be(94.50m);
     }
 
-    [Fact]
+    [Test]
     public void LinkedCost_keeps_the_cost_per_gram_when_the_shares_match()
     {
         RawMaterialRules.LinkedCost(0.09m, weightSharePercent: 40m, costSharePercent: 40m).Should().Be(0.09m);
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLinkTarget_accepts_another_ingredient()
     {
         var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 2, linkedToId: 1, RawMaterialType.Ingredient, "Egg");
@@ -321,7 +321,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLinkTarget_rejects_a_link_to_itself()
     {
         var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 1, linkedToId: 1, RawMaterialType.Ingredient, "Egg");
@@ -329,7 +329,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*itself*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLinkTarget_rejects_a_link_to_packaging()
     {
         var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 0, linkedToId: 1, RawMaterialType.Packaging, "Egg Tray");
@@ -337,7 +337,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("'Egg Tray' is packaging*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureLinkSharesFit_accepts_parts_that_add_up_to_exactly_all_of_it()
     {
         var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 70m, 30m, [("Egg Yolk", 30m, 70m)]);
@@ -345,7 +345,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureLinkSharesFit_accepts_parts_that_leave_some_over()
     {
         // The shell is neither: 60% + 30% of the weight leaves 10%.
@@ -354,7 +354,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureLinkSharesFit_rejects_more_than_all_of_the_weight_naming_the_other_parts()
     {
         var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 75m, 30m, [("Egg Yolk", 30m, 70m)]);
@@ -363,7 +363,7 @@ public class RawMaterialRulesTests
             .WithMessage("Egg Yolk (30%) already takes 30% of Egg's weight, so Egg White can take at most 70%.");
     }
 
-    [Fact]
+    [Test]
     public void EnsureLinkSharesFit_rejects_more_than_all_of_the_cost_naming_the_other_parts()
     {
         var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg Shell", "Egg", 10m, 5m, [("Egg White", 60m, 30m), ("Egg Yolk", 30m, 70m)]);
@@ -372,7 +372,7 @@ public class RawMaterialRulesTests
             .WithMessage("Egg White (30%), Egg Yolk (70%) already take 100% of Egg's cost, so Egg Shell can take at most 0%.");
     }
 
-    [Fact]
+    [Test]
     public void EnsureTypeUnchanged_accepts_the_same_type()
     {
         var act = () => RawMaterialRules.EnsureTypeUnchanged(RawMaterialType.Packaging, RawMaterialType.Packaging);
@@ -380,7 +380,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureTypeUnchanged_rejects_a_changed_type()
     {
         var act = () => RawMaterialRules.EnsureTypeUnchanged(RawMaterialType.Ingredient, RawMaterialType.Packaging);
@@ -388,7 +388,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureSourceUnchanged_accepts_the_same_source()
     {
         var act = () => RawMaterialRules.EnsureSourceUnchanged(RawMaterialSource.Purchased, RawMaterialSource.Purchased);
@@ -396,7 +396,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureSourceUnchanged_rejects_a_changed_source()
     {
         var act = () => RawMaterialRules.EnsureSourceUnchanged(RawMaterialSource.Purchased, RawMaterialSource.Made);
@@ -404,7 +404,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureUsableInRecipes_accepts_an_ingredient_and_names_packaging_it_rejects()
     {
         RawMaterialRules.EnsureUsableInRecipes(RawMaterialType.Ingredient, "Sugar");
@@ -414,7 +414,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureUsableAsPackaging_accepts_packaging_and_names_an_ingredient_it_rejects()
     {
         RawMaterialRules.EnsureUsableAsPackaging(RawMaterialType.Packaging, "Cake Box");
@@ -424,7 +424,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("'Sugar' is an ingredient*");
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_divides_the_price_by_the_base_units_in_its_unit()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased };
@@ -434,7 +434,7 @@ public class RawMaterialRulesTests
         ingredient.CostPerBaseUnit.Should().Be(0.036m);
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_treats_a_price_with_no_unit_as_per_base_unit()
     {
         var packaging = new RawMaterial { Type = RawMaterialType.Packaging, BaseUnitId = 1 };
@@ -444,7 +444,7 @@ public class RawMaterialRulesTests
         packaging.CostPerBaseUnit.Should().Be(0.3m);
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_costs_at_the_dearest_brand_per_base_unit_and_says_which()
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased };
@@ -456,10 +456,10 @@ public class RawMaterialRulesTests
         flour.CostPerBaseUnit.Should().Be(0.04m);
     }
 
-    public static TheoryData<decimal> NewPrices => [0.08m, 0.02m];
+    public static IEnumerable<decimal> NewPrices() => [0.08m, 0.02m];
 
-    [Theory]
-    [MemberData(nameof(NewPrices))]
+    [Test]
+    [MethodDataSource(nameof(NewPrices))]
     public void ApplyBrandPrices_leaves_a_buffered_cost_it_already_has_whatever_the_new_price(decimal price)
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m, CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
@@ -470,7 +470,7 @@ public class RawMaterialRulesTests
         flour.BufferedCostPerBaseUnit.Should().Be(0.0525m, "a fixed amount, changed only by typing it or recalculating it");
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidBufferedCost_rejects_a_negative_amount_only()
     {
         RawMaterialRules.EnsureValidBufferedCost(0m);
@@ -481,14 +481,14 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
     }
 
-    public static TheoryData<CostBasis, decimal> CostsAtEachBasis => new()
-    {
-        { CostBasis.Buffered, 0.0525m },
-        { CostBasis.Unbuffered, 0.05m },
-    };
+    public static IEnumerable<(CostBasis, decimal)> CostsAtEachBasis() =>
+    [
+        (CostBasis.Buffered, 0.0525m),
+        (CostBasis.Unbuffered, 0.05m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(CostsAtEachBasis))]
+    [Test]
+    [MethodDataSource(nameof(CostsAtEachBasis))]
     public void CostPerBaseUnitAt_reads_the_buffered_or_the_true_cost(CostBasis basis, decimal expected)
     {
         var flour = new RawMaterial { CostPerBaseUnit = 0.05m, BufferedCostPerBaseUnit = 0.0525m };
@@ -496,13 +496,13 @@ public class RawMaterialRulesTests
         RawMaterialRules.CostPerBaseUnitAt(flour, basis).Should().Be(expected);
     }
 
-    [Fact]
+    [Test]
     public void FindDearestBrandPrice_takes_the_first_on_a_tie()
     {
         RawMaterialRules.FindDearestBrandPrice([(40m, 1000m), (0.04m, null)]).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public void A_preferred_brand_is_the_cost_its_dearest_unit_when_priced_in_more_than_one()
     {
         // Gold at ₱930 a 25 kg sack (0.0372/g) and ₱40 a kilo (0.04/g); Kingbake at ₱1,250 a 25 kg sack (0.05/g), the dearest.
@@ -515,7 +515,7 @@ public class RawMaterialRulesTests
         RawMaterialRules.IsBrandPriced(prices.Select(p => p.Item1), "Bakers Best").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_costs_a_material_at_its_preferred_brand()
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased, PreferredBrand = "Gold", CostBufferPercent = 10m };
@@ -527,7 +527,7 @@ public class RawMaterialRulesTests
         flour.BufferedCostPerBaseUnit.Should().Be(0.044m, "a first price puts the buffer on top of the cost it gives");
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_with_no_prices_zeroes_the_cost()
     {
         var ingredient = new RawMaterial { Source = RawMaterialSource.Purchased, CostPerBaseUnit = 0.036m, BufferedCostPerBaseUnit = 0.036m };
@@ -539,7 +539,7 @@ public class RawMaterialRulesTests
         ingredient.BufferedCostPerBaseUnit.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_puts_the_materials_buffer_on_top_of_the_buffered_cost()
     {
         var flour = new RawMaterial { Source = RawMaterialSource.Purchased, CostBufferPercent = 5m };
@@ -550,7 +550,7 @@ public class RawMaterialRulesTests
         flour.BufferedCostPerBaseUnit.Should().Be(0.0525m);
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_with_no_buffer_makes_the_buffered_cost_the_cost()
     {
         var sugar = new RawMaterial { Source = RawMaterialSource.Purchased };
@@ -560,7 +560,7 @@ public class RawMaterialRulesTests
         sugar.BufferedCostPerBaseUnit.Should().Be(sugar.CostPerBaseUnit);
     }
 
-    [Fact]
+    [Test]
     public void EnsureDistinctBrandPrices_accepts_one_brand_in_two_units()
     {
         var act = () => RawMaterialRules.EnsureDistinctBrandPrices([("Gold Medal", 1), ("Gold Medal", 2), (null, 1)]);
@@ -568,7 +568,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureDistinctBrandPrices_rejects_a_brand_twice_in_one_unit_whatever_its_case_or_spacing()
     {
         var act = () => RawMaterialRules.EnsureDistinctBrandPrices([("Gold Medal", 1), (" gold medal ", 1)]);
@@ -576,7 +576,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("'Gold Medal' is priced twice*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureDistinctBrandPrices_rejects_two_unnamed_brands_in_one_unit()
     {
         var act = () => RawMaterialRules.EnsureDistinctBrandPrices([(null, null), ("  ", null)]);
@@ -584,22 +584,22 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Two prices without a brand*");
     }
 
-    public static TheoryData<decimal, decimal, decimal> BufferedCosts => new()
-    {
-        { 10m, 0m, 10m },
-        { 10m, 5m, 10.5m },
-        { 0.05m, 5m, 0.0525m },
-        { 10m, 100m, 20m },
-    };
+    public static IEnumerable<(decimal, decimal, decimal)> BufferedCosts() =>
+    [
+        (10m, 0m, 10m),
+        (10m, 5m, 10.5m),
+        (0.05m, 5m, 0.0525m),
+        (10m, 100m, 20m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(BufferedCosts))]
+    [Test]
+    [MethodDataSource(nameof(BufferedCosts))]
     public void BufferedCost_adds_the_buffer_percent_to_the_cost(decimal cost, decimal bufferPercent, decimal expected)
     {
         RawMaterialRules.BufferedCost(cost, bufferPercent).Should().Be(expected);
     }
 
-    [Fact]
+    [Test]
     public void StoredCostBufferPercent_is_always_0_for_a_made_ingredient()
     {
         // Its components' buffers are already in its BOM rollup, and it has no buffer box on the screen, so a
@@ -607,28 +607,28 @@ public class RawMaterialRulesTests
         RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Made, inheritedBuffer: null, sent: 84.4147m).Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void StoredCostBufferPercent_takes_the_linked_to_ingredients_for_a_linked_one_and_what_was_sent_otherwise()
     {
         RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Linked, inheritedBuffer: 10m, sent: 5m).Should().Be(10m);
         RawMaterialRules.StoredCostBufferPercent(RawMaterialSource.Purchased, inheritedBuffer: null, sent: 5m).Should().Be(5m);
     }
 
-    public static TheoryData<decimal, decimal, decimal> BufferPercents => new()
-    {
-        { 930m, 976.5m, 5m },
-        { 930m, 930m, 0m },
-        { 10m, 20m, 100m },
-    };
+    public static IEnumerable<(decimal, decimal, decimal)> BufferPercents() =>
+    [
+        (930m, 976.5m, 5m),
+        (930m, 930m, 0m),
+        (10m, 20m, 100m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(BufferPercents))]
+    [Test]
+    [MethodDataSource(nameof(BufferPercents))]
     public void CostBufferPercentOf_works_out_the_buffer_from_the_buffered_cost(decimal cost, decimal bufferedCost, decimal expected)
     {
         RawMaterialRules.CostBufferPercentOf(cost, bufferedCost).Should().Be(expected);
     }
 
-    [Fact]
+    [Test]
     public void CostBufferPercentOf_undoes_BufferedCost()
     {
         var buffered = RawMaterialRules.BufferedCost(1250m, 7.5m);
@@ -636,10 +636,10 @@ public class RawMaterialRulesTests
         RawMaterialRules.CostBufferPercentOf(1250m, buffered).Should().Be(7.5m);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(5)]
-    [InlineData(100)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(5)]
+    [Arguments(100)]
     public void EnsureValidCostBuffer_accepts_0_to_100_percent(decimal bufferPercent)
     {
         var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);
@@ -647,10 +647,10 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    public static TheoryData<decimal> BuffersOutOfRange => [-1m, 100.01m];
+    public static IEnumerable<decimal> BuffersOutOfRange() => [-1m, 100.01m];
 
-    [Theory]
-    [MemberData(nameof(BuffersOutOfRange))]
+    [Test]
+    [MethodDataSource(nameof(BuffersOutOfRange))]
     public void EnsureValidCostBuffer_rejects_a_buffer_outside_0_to_100_percent(decimal bufferPercent)
     {
         var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);
@@ -658,7 +658,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("Cost buffer*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureNotTheBaseUnit_accepts_another_unit()
     {
         var act = () => RawMaterialRules.EnsureNotTheBaseUnit(baseUnitId: 1, unitOfMeasureId: 2);
@@ -666,7 +666,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureNotTheBaseUnit_rejects_the_base_unit_itself()
     {
         var act = () => RawMaterialRules.EnsureNotTheBaseUnit(baseUnitId: 1, unitOfMeasureId: 1);
@@ -674,7 +674,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureNotTheBaseUnit_accepts_any_unit_for_an_ingredient_whose_gram_is_no_unit_of_measure_row()
     {
         var act = () => RawMaterialRules.EnsureNotTheBaseUnit(baseUnitId: null, unitOfMeasureId: 1);
@@ -682,7 +682,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureUnitNotAlreadyAdded_accepts_a_unit_the_material_does_not_have_yet()
     {
         var act = () => RawMaterialRules.EnsureUnitNotAlreadyAdded(alreadyAdded: false);
@@ -690,7 +690,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureUnitNotAlreadyAdded_rejects_a_second_unit_in_the_same_unit_of_measure()
     {
         var act = () => RawMaterialRules.EnsureUnitNotAlreadyAdded(alreadyAdded: true);
@@ -698,7 +698,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*already has that unit*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureBaseUnitCanChange_accepts_a_material_with_nothing_measured_in_it_yet()
     {
         var act = () => RawMaterialRules.EnsureBaseUnitCanChange(hasUnits: false, hasPrices: false, hasLines: false);
@@ -706,10 +706,10 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, true)]
+    [Test]
+    [Arguments(true, false, false)]
+    [Arguments(false, true, false)]
+    [Arguments(false, false, true)]
     public void EnsureBaseUnitCanChange_rejects_a_material_with_units_prices_or_lines(bool hasUnits, bool hasPrices, bool hasLines)
     {
         var act = () => RawMaterialRules.EnsureBaseUnitCanChange(hasUnits, hasPrices, hasLines);
@@ -717,7 +717,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void StoredCost_rounds_to_the_20_places_a_cost_is_stored_to_as_SQL_Server_does()
     {
         // ₱170 a pack of 240, and ₱0.47 an egg of 3 g: one rounds down, one up, as the database stores them.
@@ -726,13 +726,13 @@ public class RawMaterialRulesTests
         RawMaterialRules.StoredCost(0.05m).Should().Be(0.05m, "a cost that comes out even is left as it is");
     }
 
-    [Fact]
+    [Test]
     public void StoredCost_rounds_a_half_away_from_zero()
     {
         RawMaterialRules.StoredCost(0.000000000000000000005m).Should().Be(0.00000000000000000001m);
     }
 
-    [Fact]
+    [Test]
     public void ApplyBrandPrices_sets_both_costs_as_they_are_stored()
     {
         var material = new RawMaterial { Name = "Cello Sheet", CostBufferPercent = 10m };
@@ -743,36 +743,36 @@ public class RawMaterialRulesTests
         material.BufferedCostPerBaseUnit.Should().Be(0.77916666666666666667m, "the cost with its 10% buffer on top, stored the same way");
     }
 
-    [Theory]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Ingredient)]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Ingredient)]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Made)]
-    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Packaging)]
+    [Test]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Ingredient)]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Ingredient)]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Made)]
+    [Arguments(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Packaging)]
     public void CategoryTypeFor_puts_a_made_ingredient_in_a_Made_category_and_every_other_material_in_one_of_its_type(
         RawMaterialType type, RawMaterialSource source, RawMaterialCategoryType expected)
     {
         RawMaterialRules.CategoryTypeFor(type, source).Should().Be(expected);
     }
 
-    [Theory]
-    [InlineData(RawMaterialCategoryType.Ingredient, RawMaterialType.Ingredient)]
-    [InlineData(RawMaterialCategoryType.Made, RawMaterialType.Ingredient)]
-    [InlineData(RawMaterialCategoryType.Packaging, RawMaterialType.Packaging)]
+    [Test]
+    [Arguments(RawMaterialCategoryType.Ingredient, RawMaterialType.Ingredient)]
+    [Arguments(RawMaterialCategoryType.Made, RawMaterialType.Ingredient)]
+    [Arguments(RawMaterialCategoryType.Packaging, RawMaterialType.Packaging)]
     public void MaterialTypeOf_counts_a_Made_category_among_the_ingredient_ones(RawMaterialCategoryType categoryType, RawMaterialType expected)
     {
         RawMaterialRules.MaterialTypeOf(categoryType).Should().Be(expected);
     }
 
-    [Theory]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
+    [Test]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
         "In-House is a Made category, for made ingredients only. Put this ingredient in a category for ingredients.")]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Made,
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Linked, RawMaterialCategoryType.Made,
         "In-House is a Made category, for made ingredients only. Put this ingredient in a category for ingredients.")]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Ingredient,
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Ingredient,
         "In-House is an ingredient category. Put this made ingredient in a Made category.")]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Packaging,
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Made, RawMaterialCategoryType.Packaging,
         "In-House is a packaging category. Put this made ingredient in a Made category.")]
-    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
+    [Arguments(RawMaterialType.Packaging, RawMaterialSource.Purchased, RawMaterialCategoryType.Made,
         "In-House is a Made category, for made ingredients only. Put this packaging material in a category for packaging.")]
     public void EnsureCategoryMatchesType_rejects_a_category_of_another_type_saying_where_the_material_goes(
         RawMaterialType type, RawMaterialSource source, RawMaterialCategoryType categoryType, string message)
@@ -782,11 +782,11 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage(message);
     }
 
-    [Theory]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Purchased)]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Linked)]
-    [InlineData(RawMaterialType.Ingredient, RawMaterialSource.Made)]
-    [InlineData(RawMaterialType.Packaging, RawMaterialSource.Purchased)]
+    [Test]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Purchased)]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Linked)]
+    [Arguments(RawMaterialType.Ingredient, RawMaterialSource.Made)]
+    [Arguments(RawMaterialType.Packaging, RawMaterialSource.Purchased)]
     public void EnsureCategoryMatchesType_accepts_a_category_of_the_materials_own_type(RawMaterialType type, RawMaterialSource source)
     {
         var act = () => RawMaterialRules.EnsureCategoryMatchesType(type, source, RawMaterialRules.CategoryTypeFor(type, source), "Flour");
@@ -794,7 +794,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureCategoryTypeCanChange_accepts_a_change_everything_in_the_category_fits()
     {
         var act = () => RawMaterialRules.EnsureCategoryTypeCanChange("In-House", RawMaterialCategoryType.Made, materialsThatDontFit: 0);
@@ -802,9 +802,9 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(1, RawMaterialCategoryType.Made, "Filling has 1 material that can't go in a Made category, so its type can't change. Move it to another category first.")]
-    [InlineData(7, RawMaterialCategoryType.Packaging, "Filling has 7 materials that can't go in a packaging category, so its type can't change. Move them to another category first.")]
+    [Test]
+    [Arguments(1, RawMaterialCategoryType.Made, "Filling has 1 material that can't go in a Made category, so its type can't change. Move it to another category first.")]
+    [Arguments(7, RawMaterialCategoryType.Packaging, "Filling has 7 materials that can't go in a packaging category, so its type can't change. Move them to another category first.")]
     public void EnsureCategoryTypeCanChange_rejects_a_change_that_leaves_materials_in_a_category_they_cant_go_in(
         int materialsThatDontFit, RawMaterialCategoryType newType, string message)
     {
@@ -813,18 +813,18 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage(message);
     }
 
-    [Theory]
-    [InlineData("Flour", "Flour")]
-    [InlineData("Flour ", "Flour")]
-    [InlineData("  Bread Flour  ", "Bread Flour")]
+    [Test]
+    [Arguments("Flour", "Flour")]
+    [Arguments("Flour ", "Flour")]
+    [Arguments("  Bread Flour  ", "Bread Flour")]
     public void A_name_is_stored_without_spaces_at_either_end(string name, string expected)
     {
         RawMaterialRules.StoredName(name).Should().Be(expected);
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
     public void A_name_with_nothing_but_spaces_is_refused(string name)
     {
         var act = () => RawMaterialRules.StoredName(name);
@@ -832,7 +832,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage("Every raw material needs a name.");
     }
 
-    [Fact]
+    [Test]
     public void BusinessRuleException_is_still_an_InvalidOperationException()
     {
         var act = () => RawMaterialRules.EnsureValidBrandPrice(0m);
@@ -840,7 +840,7 @@ public class RawMaterialRulesTests
         act.Should().Throw<BusinessRuleException>().Which.Should().BeAssignableTo<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void A_material_nothing_uses_can_be_deleted()
     {
         var act = () => RawMaterialRules.EnsureNotInUse("Salt", []);
@@ -848,7 +848,7 @@ public class RawMaterialRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void A_material_in_use_names_each_user_once_in_order_with_how_it_uses_it()
     {
         var act = () => RawMaterialRules.EnsureNotInUse(

@@ -7,25 +7,25 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 
 public class CollectionMergeTests
 {
-    [Fact]
+    [Test]
     public void HasSameValues_is_true_for_two_copies_of_the_same_row()
     {
         CollectionMerge.HasSameValues(Row(1, "Flour", 930m, "bag"), Row(1, "Flour", 930m, "bag")).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void HasSameValues_detects_a_changed_value()
     {
         CollectionMerge.HasSameValues(Row(1, "Flour", 930m, "bag"), Row(1, "Flour", 950m, "bag")).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void HasSameValues_detects_a_change_in_a_referenced_row()
     {
         CollectionMerge.HasSameValues(Row(1, "Flour", 930m, "bag"), Row(1, "Flour", 930m, "sack")).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void HasSameValues_is_true_when_an_owned_collection_holds_the_same_values()
     {
         var a = Row(1, "Flour", 930m, "bag");
@@ -36,7 +36,7 @@ public class CollectionMergeTests
         CollectionMerge.HasSameValues(a, b).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void HasSameValues_detects_an_added_element_in_an_owned_collection()
     {
         var withPack = Row(1, "Flour", 930m, "bag");
@@ -45,7 +45,7 @@ public class CollectionMergeTests
         CollectionMerge.HasSameValues(withPack, Row(1, "Flour", 930m, "bag")).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void HasSameValues_detects_a_change_inside_an_owned_collection_element_and_what_it_references()
     {
         var a = Row(1, "Flour", 930m, "bag");
@@ -59,7 +59,7 @@ public class CollectionMergeTests
         CollectionMerge.HasSameValues(a, resized).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Merging_into_a_cache_keeps_unchanged_rows_replaces_changed_ones_and_adds_and_removes_the_rest()
     {
         var cache = new SourceCache<TestRow, int>(r => r.Id);
@@ -77,7 +77,7 @@ public class CollectionMergeTests
         cache.Lookup(4).Value.Should().BeSameAs(butter);
     }
 
-    [Fact]
+    [Test]
     public void Merging_into_a_list_follows_the_fresh_order_and_keeps_unchanged_rows()
     {
         var flour = Row(1, "Flour", 930m, "bag");
@@ -95,7 +95,7 @@ public class CollectionMergeTests
         list[3].Should().BeSameAs(flour);
     }
 
-    [Fact]
+    [Test]
     public void Merging_into_a_list_removes_rows_that_are_gone()
     {
         var list = new ObservableCollection<TestRow> { Row(1, "Flour", 930m, "bag"), Row(2, "Sugar", 80m, "kg") };
@@ -105,7 +105,7 @@ public class CollectionMergeTests
         list.Select(r => r.Id).Should().Equal(2);
     }
 
-    [Fact]
+    [Test]
     public void Merging_by_a_key_rows_share_matches_them_in_order()
     {
         var firstDough = Row(1, "Dough", 10m, "g");

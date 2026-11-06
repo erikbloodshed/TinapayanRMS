@@ -12,12 +12,12 @@ namespace TinapayanRMS.UI.Tests.Vim;
 /// A link hint on a picker (VimKeys.FocusPicker) puts the keyboard in the box it's typed in, after a field before it,
 /// as the app's pickers are: editable, with suggestions (App's ApplyPickerDefaults).
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class VimKeysPickerTests
 {
     private static readonly string[] Categories = ["Bread", "Cake", "Pastry"];
 
-    [Fact]
+    [Test]
     public void A_hint_puts_the_keyboard_in_the_pickers_box()
     {
         RunWithPicker((before, picker) =>
@@ -29,7 +29,7 @@ public class VimKeysPickerTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_hint_still_reaches_a_picker_left_by_Shift_Tab()
     {
         RunWithPicker((before, picker) =>

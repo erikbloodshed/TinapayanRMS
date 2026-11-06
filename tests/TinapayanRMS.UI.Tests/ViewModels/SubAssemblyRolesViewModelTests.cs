@@ -15,7 +15,8 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Settings' Roles tab and its Product-owned option: shown for the role picked, saved with it, asked about first when
 /// it moves sub-assemblies (saying how many), and never offered for the Packaging role.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRolesViewModel CreateViewModel(bool confirm, List<string>? asked = null)
@@ -34,7 +35,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
     private async Task<SubAssemblyRole> RoleAsync(int id) =>
         (await new SubAssemblyRoleRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Single(r => r.Id == id);
 
-    [Fact]
+    [Test]
     public Task Ticking_Product_owned_asks_first_saying_how_many_move_and_then_saves_it() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -57,7 +58,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         (await new SubAssemblyRepository(CreateDbContextFactory()).GetByIdsAsync([fillingId], Cancellation)).Single().OwnerProductId.Should().Be(productId);
     });
 
-    [Fact]
+    [Test]
     public Task Declining_the_question_saves_nothing() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -72,7 +73,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         (await RoleAsync(fillingRoleId)).IsProductOwned.Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task A_rename_alone_isnt_asked_about() => StaThread.RunAsync(async () =>
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
@@ -89,7 +90,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         (saved.Name, saved.IsProductOwned).Should().Be(("Stuffing", true));
     });
 
-    [Fact]
+    [Test]
     public Task The_Packaging_role_cant_be_ticked_and_a_new_role_can() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -109,7 +110,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         viewModel.Roles.Single(r => r.Name == "Glaze").IsProductOwned.Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task A_new_role_goes_last() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -125,7 +126,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 2), ("Glaze", 3));
     });
 
-    [Fact]
+    [Test]
     public Task Move_Up_and_Move_Down_move_the_picked_role_and_keep_it_picked() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -152,7 +153,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeTrue();
     });
 
-    [Fact]
+    [Test]
     public Task Nothing_moves_with_no_role_picked() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -164,7 +165,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public void The_question_says_what_turning_it_off_does()
     {
         SubAssemblyRolesViewModel.OwnershipChangeMessage(new SubAssemblyRole { Name = "Topping", IsProductOwned = false }, 3)

@@ -19,14 +19,14 @@ public class ChromelessWindowMaskTests
 {
     private const int WmSize = 0x0005;
 
-    [Fact]
+    [Test]
     public void ChromelessWindow_masks_its_content_and_masks_it_again_on_a_resize()
     {
         // Why ChromelessWindowMask exists. If this starts failing, the template has lost its mask, and the helper can go.
         MaskAfterResize(removeMask: false).Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public void Remove_takes_the_mask_off_and_a_resize_does_not_put_it_back()
     {
         MaskAfterResize(removeMask: true).Should().BeNull();

@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 
 public class GridLayoutStoreTests
 {
-    [Fact]
+    [Test]
     public void A_layout_reads_back_as_it_was_written()
     {
         var viewState = new InMemoryViewStateStore();
@@ -33,7 +33,7 @@ public class GridLayoutStoreTests
         read.Filters[2].Conditions.Single().Value.Should().Be(12.5m);
     }
 
-    [Fact]
+    [Test]
     public void A_grid_never_laid_out_keeps_its_own_columns_and_has_no_sort_or_filter()
     {
         var read = new GridLayoutStore(new InMemoryViewStateStore(), "report").Read();
@@ -43,7 +43,7 @@ public class GridLayoutStoreTests
         read.Filters.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_line_it_cannot_read_is_left_out()
     {
         var viewState = new InMemoryViewStateStore(new Dictionary<string, IReadOnlyList<string>>

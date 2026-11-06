@@ -12,7 +12,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// The Price Simulator's saved scenarios: a name and its price changes, each kept as typed. Saving under a name already
 /// there replaces its changes, and deleting a material takes its changes out of every scenario.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static readonly DateTime SavedAt = new(2026, 10, 22, 9, 14, 0);
@@ -23,7 +24,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
 
     private static PriceScenarioLine Price(int materialId, decimal price) => new() { RawMaterialId = materialId, NewPrice = price };
 
-    [Fact]
+    [Test]
     public async Task A_scenario_round_trips_with_its_lines_in_order_each_as_typed()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -41,7 +42,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
             (eggId, (decimal?)10m, (decimal?)null, 1));
     }
 
-    [Fact]
+    [Test]
     public async Task Scenarios_read_newest_first_then_by_name_each_with_only_its_own_lines()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -56,7 +57,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
         scenarios.Select(s => (s.Name, s.Lines.Count)).Should().Equal(("Worst case", 2), ("Average case", 1), ("Best case", 1));
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_under_a_name_already_there_ignoring_case_replaces_its_lines_and_keeps_its_name()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -75,7 +76,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.PriceScenarioLines.CountAsync(Cancellation)).Should().Be(1, "the old lines are gone");
     }
 
-    [Fact]
+    [Test]
     public async Task A_scenario_the_rules_refuse_writes_nothing()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -88,7 +89,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await repository.GetAllAsync(Cancellation)).Single().Lines.Single().ChangePercent.Should().Be(10m);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_scenario_takes_its_lines_and_leaves_the_others()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -104,7 +105,7 @@ public class PriceScenarioPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.PriceScenarioLines.CountAsync(Cancellation)).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_raw_material_takes_its_changes_out_of_every_scenario()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);

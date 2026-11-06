@@ -20,10 +20,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// the first time, how the product stood before), the History tab shows each one priced then and today with what
 /// changed in it, a note typed there is saved, and Restore puts a version into the form as unsaved edits Undo takes back.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductsViewModelVersionTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task The_first_Save_records_how_the_product_was_and_how_it_is() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -39,7 +40,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         GramsOf(versions[0]).Should().Be(50m);
     });
 
-    [Fact]
+    [Test]
     public Task A_rename_alone_records_no_new_version() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -53,7 +54,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         (await VersionsAsync(seeded.ProductId)).Should().ContainSingle("only how it stood before the first Save: no recipe or price changed");
     });
 
-    [Fact]
+    [Test]
     public Task A_price_change_records_a_version() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -66,7 +67,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         ProductVersionContent.FromJson(latest.Content).CurrentPrice.Should().Be(25m);
     });
 
-    [Fact]
+    [Test]
     public Task The_History_tab_shows_each_version_then_and_today_and_what_changed() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
@@ -99,7 +100,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.Changes.Should().Equal("Topping: Sugar 100 g → 50 g");
     });
 
-    [Fact]
+    [Test]
     public Task A_version_keeps_the_wastage_it_was_priced_with_and_today_takes_the_wastage_now() => StaThread.RunAsync(async () =>
     {
         // Both versions are saved at the 3% wastage nothing in Settings gives.
@@ -120,7 +121,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.Changes.Should().Equal(["Topping: Sugar 100 g → 50 g"], "the wastage is the shop's, not a change of the product");
     });
 
-    [Fact]
+    [Test]
     public Task A_version_can_be_compared_with_any_other() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -157,7 +158,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         history.CompareWith.Should().Be(VersionComparison.Previous);
     });
 
-    [Fact]
+    [Test]
     public Task Restore_puts_a_version_into_the_form_as_unsaved_edits_and_Undo_takes_it_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -197,7 +198,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             .Should().BeTrue("the restored version saved again is the first one's recipe and price");
     });
 
-    [Fact]
+    [Test]
     public Task Print_on_the_History_tab_prints_the_version_picked_at_its_costs_then() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
@@ -219,7 +220,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.FormLines.Single().Grams.Should().Be(50m, "printing a version leaves the form as it is");
     });
 
-    [Fact]
+    [Test]
     public Task Print_on_the_History_tab_with_no_version_picked_says_so() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -230,7 +231,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.ErrorMessage.Should().Be("Pick a version in the History tab's table to print it.");
     });
 
-    [Fact]
+    [Test]
     public Task Restore_links_a_linked_sub_assembly_again_as_it_is_now() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -260,7 +261,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.SuccessMessage.Should().Contain("House Dough has changed on Sub-Assemblies since");
     });
 
-    [Fact]
+    [Test]
     public Task A_version_saved_from_another_tab_shows_when_History_is_shown_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -276,7 +277,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.Rows[0].CurrentPrice.Should().Be(30m);
     });
 
-    [Fact]
+    [Test]
     public Task Saving_lines_another_product_shares_records_a_version_of_that_product_too() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -300,7 +301,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         (await VersionsAsync(miniId)).Should().HaveCount(2, "its own Save records it as ever: how it was, and how it is");
     });
 
-    [Fact]
+    [Test]
     public Task A_version_recorded_from_another_screen_shows_when_the_screen_is_shown_again() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -323,7 +324,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.VersionHistory.Rows[0].Note.Should().Be("From elsewhere");
     });
 
-    [Fact]
+    [Test]
     public Task A_clone_or_a_variant_starts_its_history_with_where_it_came_from() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -357,7 +358,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
     });
 
-    [Fact]
+    [Test]
     public Task Picking_another_product_while_History_shows_reads_its_versions_and_the_first_ones_again_on_the_way_back() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -381,7 +382,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedDetailsTab.Should().Be(ProductsViewModel.HistoryTab);
     });
 
-    [Fact]
+    [Test]
     public Task Restoring_a_version_the_same_as_the_saved_product_leaves_nothing_to_save() => StaThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenToppedProductAsync();
@@ -397,7 +398,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeFalse("closing the section's form on the way isn't a change to save");
     });
 
-    [Fact]
+    [Test]
     public Task Restore_is_refused_while_an_ingredient_it_needs_is_gone() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -423,7 +424,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         _ = seeded;
     });
 
-    [Fact]
+    [Test]
     public Task A_note_typed_into_a_version_is_saved() => StaThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
@@ -439,7 +440,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         (await VersionsAsync(seeded.ProductId))[0].Note.Should().Be("New price for October");
     });
 
-    [Fact]
+    [Test]
     public Task A_Save_of_the_products_own_figures_reads_none_of_the_products_sharing_its_dough() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough");

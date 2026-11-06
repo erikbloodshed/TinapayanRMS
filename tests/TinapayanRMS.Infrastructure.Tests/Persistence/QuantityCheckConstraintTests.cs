@@ -14,14 +14,15 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// line stored at 0 would fail Reports, Print and the Recipe API for every product. The rules refuse these first, in better
 /// words, so these tests write past the repositories, as an edit outside the app would.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class QuantityCheckConstraintTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Theory]
-    [InlineData(PackagingLineAuthoredField.QtyPerUnit, 0, 5)]
-    [InlineData(PackagingLineAuthoredField.QtyPerUnit, -1, 5)]
-    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit, 5, 0)]
-    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit, 5, -1)]
+    [Test]
+    [Arguments(PackagingLineAuthoredField.QtyPerUnit, 0, 5)]
+    [Arguments(PackagingLineAuthoredField.QtyPerUnit, -1, 5)]
+    [Arguments(PackagingLineAuthoredField.UnitsPerPackagingUnit, 5, 0)]
+    [Arguments(PackagingLineAuthoredField.UnitsPerPackagingUnit, 5, -1)]
     public async Task A_packaging_lines_typed_quantity_has_to_be_positive(PackagingLineAuthoredField authored, int qtyPerUnit, int unitsPerPackagingUnit)
     {
         var line = await NewPackagingLineAsync(authored, qtyPerUnit, unitsPerPackagingUnit);
@@ -29,9 +30,9 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
         await SavingShouldBeRefusedByAsync("CK_PackagingLines_AuthoredQuantity", line);
     }
 
-    [Theory]
-    [InlineData(PackagingLineAuthoredField.UnitsPerPackagingUnit, 0, 30000)]
-    [InlineData(PackagingLineAuthoredField.QtyPerUnit, 30000, 0)]
+    [Test]
+    [Arguments(PackagingLineAuthoredField.UnitsPerPackagingUnit, 0, 30000)]
+    [Arguments(PackagingLineAuthoredField.QtyPerUnit, 30000, 0)]
     public async Task A_packaging_lines_worked_out_figure_can_round_to_0_at_the_columns_places(PackagingLineAuthoredField authored, int qtyPerUnit, int unitsPerPackagingUnit)
     {
         var line = await NewPackagingLineAsync(authored, qtyPerUnit, unitsPerPackagingUnit);
@@ -43,9 +44,9 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
         await save.Should().NotThrowAsync("1 / 30,000 is 0.0000 to 4 places, and it's the typed figure that's read");
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public async Task A_sub_assembly_lines_grams_have_to_be_positive(int grams)
     {
         var ingredientId = await AddIngredientAsync("Flour", 0.05m);
@@ -55,9 +56,9 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
             "CK_SubAssemblyLines_Grams", new SubAssemblyLine { SubAssemblyId = recipeId, IngredientId = ingredientId, Grams = grams });
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public async Task A_products_add_ins_grams_have_to_be_positive(int grams)
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -73,9 +74,9 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
         await SavingShouldBeRefusedByAsync("CK_UsageAddInLines_Grams", new UsageAddInLine { UsageId = usageId, IngredientId = ubeId, Grams = grams });
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public async Task A_made_ingredients_add_ins_grams_have_to_be_positive(int grams)
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -85,9 +86,9 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
             "CK_IngredientAddInLines_Grams", new IngredientAddInLine { IngredientId = flourId, AddInIngredientId = ubeId, Grams = grams });
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public async Task A_units_multiplier_has_to_be_positive(int baseUnitsPerUnit)
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);
@@ -98,11 +99,11 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
             new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = bagId, BaseUnitsPerUnit = baseUnitsPerUnit });
     }
 
-    [Theory]
-    [InlineData(nameof(CostingParameters.LaborPercent))]
-    [InlineData(nameof(CostingParameters.OverheadPercent))]
-    [InlineData(nameof(CostingParameters.AdministrativePercent))]
-    [InlineData(nameof(CostingParameters.MarginPercent))]
+    [Test]
+    [Arguments(nameof(CostingParameters.LaborPercent))]
+    [Arguments(nameof(CostingParameters.OverheadPercent))]
+    [Arguments(nameof(CostingParameters.AdministrativePercent))]
+    [Arguments(nameof(CostingParameters.MarginPercent))]
     public async Task A_costing_percent_cant_be_negative(string percent)
     {
         var productId = await AddProductAsync("Pandesal");
@@ -131,7 +132,7 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
         };
     }
 
-    [Fact]
+    [Test]
     public async Task The_shops_vat_cant_be_negative() =>
         await SavingShouldBeRefusedByAsync("CK_CostingDefaults_VatPercent", new CostingDefaults { VatPercent = -100m });
 

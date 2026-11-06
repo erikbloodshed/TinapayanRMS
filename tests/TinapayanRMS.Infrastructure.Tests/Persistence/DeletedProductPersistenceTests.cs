@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// back, and Delete Permanently deletes it for good. While it's deleted it still holds what it uses, and is named as
 /// deleted wherever it's in the way.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class DeletedProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());
@@ -22,7 +23,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
     private Task LinkAsync(int productId, int subAssemblyId) =>
         SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(subAssemblyId, UsageAuthoredField.WeightPerPiece, 30m)]));
 
-    [Fact]
+    [Test]
     public async Task Delete_moves_a_product_to_the_Deleted_folder_whole_and_Restore_brings_it_back()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -54,7 +55,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         restored.UpdatedAt.Should().Be(updatedAt, "a delete and a restore aren't edits");
     }
 
-    [Fact]
+    [Test]
     public async Task A_deleted_product_comes_back_uncategorized_when_its_category_has_gone()
     {
         var cakes = new ProductCategory { Name = "Cakes" };
@@ -70,7 +71,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         restored.Should().Match<Product>(p => p.Stage == ProductStage.Production && p.CategoryId == null && !p.IsDeleted);
     }
 
-    [Fact]
+    [Test]
     public async Task Delete_Permanently_deletes_a_deleted_product_for_good()
     {
         var productId = await AddProductAsync("Ensaymada");
@@ -82,7 +83,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         (await CreateRepository().GetDeletedAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_deleted_products_name_stays_taken_and_saying_so_points_to_the_Deleted_folder()
     {
         var mamonId = await AddProductAsync("Mamon");
@@ -100,7 +101,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         await save.Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
     }
 
-    [Fact]
+    [Test]
     public async Task A_deleted_product_still_holds_the_sub_assembly_it_links_named_as_deleted()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -121,7 +122,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         await subAssemblies.DeleteStandaloneAsync(glazeId, Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task A_raw_materials_Used_By_names_a_deleted_product_as_deleted()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -134,7 +135,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
             .Should().Equal(new LinkingProduct(productId, "Ensaymada (deleted)", null));
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_whose_packaging_another_links_cant_be_deleted_even_by_a_deleted_one()
     {
         var bigId = await AddProductAsync("Big");
@@ -148,7 +149,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
             .WithMessage("Small (deleted) links this product's packaging. Unlink it there first.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_deleted_product_cant_be_linked_or_put_in_a_composite()
     {
         var bigId = await AddProductAsync("Big");
@@ -169,7 +170,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         await hold.Should().ThrowAsync<InvalidOperationException>().WithMessage("Big is deleted. Restore it from the Deleted folder to put it in Pasalubong Box.");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_missing_product_or_restoring_one_is_refused()
     {
         var delete = () => CreateRepository().DeleteAsync(999, Cancellation);

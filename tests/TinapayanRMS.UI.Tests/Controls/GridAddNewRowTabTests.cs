@@ -19,7 +19,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// AutoCompleteDropDownRenderer makes the column's UpdateTrigger Explicit, so retyping it and pressing Esc leaves the line
 /// as it was.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridAddNewRowTabTests
 {
     public sealed class Product
@@ -40,7 +40,7 @@ public class GridAddNewRowTabTests
 
     private static readonly List<Product> Products = [new() { Id = 1, Name = "Hopia Ube" }, new() { Id = 2, Name = "Hopia Monggo" }];
 
-    [Fact]
+    [Test]
     public void Tab_from_the_last_cell_of_a_typed_add_row_adds_the_line_and_opens_the_next_add_row()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -60,7 +60,7 @@ public class GridAddNewRowTabTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Tab_from_an_earlier_cell_of_the_add_row_moves_along_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -77,7 +77,7 @@ public class GridAddNewRowTabTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Tab_from_an_untouched_add_row_adds_nothing()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -91,7 +91,7 @@ public class GridAddNewRowTabTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Retyping_a_line_product_writes_nothing_until_the_edit_is_committed_and_Esc_keeps_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -115,7 +115,7 @@ public class GridAddNewRowTabTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Committing_text_that_names_no_product_keeps_the_line_product_but_clearing_the_text_clears_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -139,7 +139,7 @@ public class GridAddNewRowTabTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_plan_add_row_left_untouched_is_dropped_not_added_as_a_blank_line()
     {
         // A line type whose add row Tab opens straight after a line (the Production Plan's was the first): an add row is only

@@ -17,7 +17,7 @@ public class ProductPrintLayoutTests
 {
     private static readonly Size A4 = SamplePrintouts.A4Printable;
 
-    [Fact]
+    [Test]
     public void A_recipe_too_long_for_a_page_runs_on_under_its_heading_and_header_row_again() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(SamplePrintouts.WithLines(80), includeRecipe: true, includeCosting: true, A4);
@@ -28,7 +28,7 @@ public class ProductPrintLayoutTests
         Texts(body[1]).Should().Equal("Ingredient", "Grams", "Baker's %", "Cost/g", "Cost");
     });
 
-    [Fact]
+    [Test]
     public void A_sections_lines_show_their_cost_per_gram_and_the_packagings_dont() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(1), includeRecipe: true, includeCosting: true, A4));
@@ -37,7 +37,7 @@ public class ProductPrintLayoutTests
         texts.Should().ContainInConsecutiveOrder("Material", "Qty", "Unit", "Unit Cost", "Cost");
     });
 
-    [Fact]
+    [Test]
     public void An_unbuffered_printout_says_so_under_its_title_and_over_its_costing_and_a_buffered_one_doesnt() => StaThread.Run(() =>
     {
         var buffered = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(1), includeRecipe: true, includeCosting: true, A4));
@@ -49,7 +49,7 @@ public class ProductPrintLayoutTests
         unbuffered.Should().Contain(t => t.StartsWith("Costing (", StringComparison.Ordinal) && t.Contains(ProductPrintout.UnbufferedNote, StringComparison.Ordinal));
     });
 
-    [Fact]
+    [Test]
     public void Without_the_costing_the_recipe_leaves_out_every_cost() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(2), includeRecipe: true, includeCosting: false, A4));
@@ -60,7 +60,7 @@ public class ProductPrintLayoutTests
         texts.Should().NotContain([Figure(0.05m, "N4"), Figure(5m, "N2"), Figure(10m, "N2"), Figure(30m, "N4"), Figure(30m, "N2")], "no line's, batch's or box's cost");
     });
 
-    [Fact]
+    [Test]
     public void A_composites_recipe_is_its_products_table_and_its_costing_calls_them_products() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Composite(), includeRecipe: true, includeCosting: true, A4));
@@ -75,7 +75,7 @@ public class ProductPrintLayoutTests
         texts.Should().NotContain("Sub-assemblies (ingredients)");
     });
 
-    [Fact]
+    [Test]
     public void A_composite_including_its_products_packaging_prints_a_Packaging_Cost_column_and_names_its_packaging_row() => StaThread.Run(() =>
     {
         var printout = SamplePrintouts.Composite() with
@@ -103,7 +103,7 @@ public class ProductPrintLayoutTests
         kitchen.Should().NotContain("Packaging Cost");
     });
 
-    [Fact]
+    [Test]
     public void A_composites_own_topping_prints_after_its_products_and_its_costing_names_both() => StaThread.Run(() =>
     {
         var composite = SamplePrintouts.Composite();
@@ -128,7 +128,7 @@ public class ProductPrintLayoutTests
         texts.Should().Contain(t => t.StartsWith("Labor (25% of products and sub-assemblies)", StringComparison.Ordinal));
     });
 
-    [Fact]
+    [Test]
     public void Without_the_costing_a_composites_products_table_has_no_costs_and_an_empty_one_says_so() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Composite(), includeRecipe: true, includeCosting: false, A4));
@@ -141,9 +141,9 @@ public class ProductPrintLayoutTests
         empty.Should().Contain("No products yet.");
     });
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     public void Every_pages_blocks_fit_above_its_footer(bool landscape) => StaThread.Run(() =>
     {
         var size = landscape ? new Size(A4.Height, A4.Width) : A4;
@@ -152,7 +152,7 @@ public class ProductPrintLayoutTests
         EveryPageShouldFitAboveItsFooter(layout, size);
     });
 
-    [Fact]
+    [Test]
     public void A_long_name_runs_the_footer_on_to_a_second_line_and_the_pages_still_fit_above_it() => StaThread.Run(() =>
     {
         var printout = SamplePrintouts.WithLines(80, ProductPrintout.UnsavedChangesNote);
@@ -166,7 +166,7 @@ public class ProductPrintLayoutTests
         EveryPageShouldFitAboveItsFooter(named, A4);
     });
 
-    [Fact]
+    [Test]
     public void The_footer_says_what_was_printed_and_when_whether_its_what_was_saved_and_which_page() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(
@@ -178,7 +178,7 @@ public class ProductPrintLayoutTests
             "Includes unsaved changes   Page 1 of 1");
     });
 
-    [Fact]
+    [Test]
     public void A_sets_contents_page_lists_each_product_with_the_page_it_starts_on() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(
@@ -201,7 +201,7 @@ public class ProductPrintLayoutTests
         layout.DocumentName.Should().Be("Breads · Production — Recipe and Costing");
     });
 
-    [Fact]
+    [Test]
     public void A_sets_footers_name_each_pages_product_and_count_the_pages_over_the_whole_document() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(
@@ -213,7 +213,7 @@ public class ProductPrintLayoutTests
         Texts(Footer((Grid)layout.BuildPage(3))).Should().Equal($"Ube Roll — Recipe · Printed {printed}", "Page 3 of 3");
     });
 
-    [Fact]
+    [Test]
     public void An_empty_folder_prints_one_page_saying_so() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(SamplePrintouts.Set("Cakes · Production"), includeRecipe: true, includeCosting: true, A4);
@@ -222,7 +222,7 @@ public class ProductPrintLayoutTests
         AllTexts(layout).Should().Contain("No products in Cakes · Production.").And.NotContain("Product");
     });
 
-    [Fact]
+    [Test]
     public void A_single_product_has_no_contents_page() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(SamplePrintouts.WithLines(3), includeRecipe: true, includeCosting: true, A4);
@@ -231,7 +231,7 @@ public class ProductPrintLayoutTests
         layout.StartPageOf(0).Should().Be(1);
     });
 
-    [Fact]
+    [Test]
     public void A_part_left_out_is_nowhere_on_the_pages() => StaThread.Run(() =>
     {
         var recipe = AllTexts(new ProductPrintLayout(SamplePrintouts.WithLines(3), includeRecipe: true, includeCosting: false, A4));
@@ -241,7 +241,7 @@ public class ProductPrintLayoutTests
         costing.Should().Contain("Costing (Per piece)").And.Contain("Total Selling Price (Per piece)").And.NotContain("Recipe").And.NotContain("Ingredient 1");
     });
 
-    [Fact]
+    [Test]
     public void A_scaled_recipe_prints_the_Scaling_tabs_rows_in_place_of_the_recipe_and_the_costing() => StaThread.Run(() =>
     {
         // Both parts ticked: the Scaling tab prints in place of them whatever is ticked.
@@ -259,7 +259,7 @@ public class ProductPrintLayoutTests
         Texts(Footer((Grid)layout.BuildPage(1))).First().Should().StartWith("Ube Roll — Scaling · Printed ");
     });
 
-    [Fact]
+    [Test]
     public void A_scaled_recipes_rows_sit_in_under_the_row_theyre_part_of() => StaThread.Run(() =>
     {
         var body = Body(new ProductPrintLayout(SamplePrintouts.Scaled(), includeRecipe: true, includeCosting: true, A4).BuildPage(1));
@@ -275,7 +275,7 @@ public class ProductPrintLayoutTests
         IndentOf("Packaging").Should().Be(IndentOf("Dough"));
     });
 
-    [Fact]
+    [Test]
     public void Without_its_costs_a_scaled_recipe_prints_only_the_amounts() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(SamplePrintouts.Scaled(), includeRecipe: true, includeCosting: false, A4));
@@ -286,7 +286,7 @@ public class ProductPrintLayoutTests
         texts.Should().NotContain([Figure(90m, "N2"), Figure(108m, "N2"), Figure(708m, "N2")]);
     });
 
-    [Fact]
+    [Test]
     public void A_scaled_recipe_too_long_for_a_page_runs_on_under_its_heading_and_header_row_again() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(SamplePrintouts.Scaled(extraLines: 80), includeRecipe: true, includeCosting: true, A4);
@@ -298,7 +298,7 @@ public class ProductPrintLayoutTests
         EveryPageShouldFitAboveItsFooter(layout, A4);
     });
 
-    [Fact]
+    [Test]
     public void A_scaled_section_that_doesnt_fit_whats_left_of_a_page_starts_the_next_with_the_row_naming_it() => StaThread.Run(() =>
     {
         // Each fits a page, but not both on one: the Filling goes over whole rather than starting at the foot of the first.
@@ -314,7 +314,7 @@ public class ProductPrintLayoutTests
         EveryPageShouldFitAboveItsFooter(layout, A4);
     });
 
-    [Fact]
+    [Test]
     public void A_product_sold_by_the_piece_has_no_pieces_figure_and_one_with_nothing_to_scale_says_so() => StaThread.Run(() =>
     {
         var texts = AllTexts(new ProductPrintLayout(
@@ -325,7 +325,7 @@ public class ProductPrintLayoutTests
         texts.Should().Contain("Nothing to scale yet.");
     });
 
-    [Fact]
+    [Test]
     public void A_price_simulator_report_lists_the_changes_tried_then_each_products_base_cost_now_and_with_them() => StaThread.Run(() =>
     {
         var layout = new ProductPrintLayout(SamplePrintouts.SimulationSet("Cheese Roll", "Ube Roll"), includeRecipe: true, includeCosting: true, A4);
@@ -344,7 +344,7 @@ public class ProductPrintLayoutTests
         EveryPageShouldFitAboveItsFooter(layout, A4);
     });
 
-    [Fact]
+    [Test]
     public void A_price_simulator_products_pages_have_the_changes_applied_the_moved_line_with_its_cost_now_and_the_costing_now_and_with_them() => StaThread.Run(() =>
     {
         var sample = SamplePrintouts.Simulation();
@@ -367,7 +367,7 @@ public class ProductPrintLayoutTests
         texts.Should().ContainInConsecutiveOrder("Packaging", Figure(30m, "N2"), Figure(30m, "N2"), "—");
     });
 
-    [Fact]
+    [Test]
     public void A_price_simulator_product_no_change_reaches_says_so_and_without_the_costing_the_report_prints_no_costs_or_changes() => StaThread.Run(() =>
     {
         var untouched = SamplePrintouts.SimulationSet("Ube Roll") with

@@ -14,7 +14,8 @@ using TinapayanRMS.UI.ViewModels;
 namespace TinapayanRMS.UI.Tests.ViewModels;
 
 /// <summary>Settings' Costing Defaults tab: loads what's saved, saves what's typed and picked, and refuses a negative percentage.</summary>
-[Collection(DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
 public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private CostingDefaultsViewModel CreateViewModel()
@@ -27,7 +28,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
             new LoggerConfiguration().CreateLogger());
     }
 
-    [Fact]
+    [Test]
     public Task Save_keeps_the_percentages_and_Load_reads_them_back() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -57,7 +58,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         reloaded.PriceRoundingOptions[0].Label.Should().Be("None", "rounding is off until it's chosen");
     });
 
-    [Fact]
+    [Test]
     public Task Load_shows_a_cost_buffer_of_10_percent_before_anything_is_saved_and_Save_refuses_one_over_100() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -73,7 +74,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).CostBufferPercent.Should().Be(10m);
     });
 
-    [Fact]
+    [Test]
     public Task Load_files_new_products_in_Production_before_anything_is_saved_and_offers_both_stages() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -85,7 +86,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Research and Development");
     });
 
-    [Fact]
+    [Test]
     public Task Load_shows_a_wastage_of_3_percent_before_anything_is_saved() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -96,7 +97,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingWastagePercent.Should().Be(3m);
     });
 
-    [Fact]
+    [Test]
     public Task Save_refuses_a_wastage_over_100_percent_and_saves_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -109,7 +110,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).WastagePercent.Should().Be(3m);
     });
 
-    [Fact]
+    [Test]
     public Task Save_refuses_a_negative_percentage_and_saves_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -122,7 +123,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).VatPercent.Should().Be(0m);
     });
 
-    [Fact]
+    [Test]
     public Task Recalculate_costs_puts_right_a_cost_changed_outside_the_app_and_says_how_many() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -143,10 +144,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
             .Should().Be(0.05m, "₱50 of flour over the 1,000 g it makes");
     });
 
-    [Theory]
-    [InlineData(0, "Costs recalculated: every one was already up to date.")]
-    [InlineData(1, "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.")]
-    [InlineData(2, "Costs recalculated: 2 made or linked ingredients were out of date, and are right now.")]
+    [Test]
+    [Arguments(0, "Costs recalculated: every one was already up to date.")]
+    [Arguments(1, "Costs recalculated: 1 made or linked ingredient was out of date, and is right now.")]
+    [Arguments(2, "Costs recalculated: 2 made or linked ingredients were out of date, and are right now.")]
     public void RecalculatedText_says_how_many_were_out_of_date(int ingredients, string expected)
     {
         CostingDefaultsViewModel.RecalculatedText(new CostRecalculation(ingredients)).Should().Be(expected);

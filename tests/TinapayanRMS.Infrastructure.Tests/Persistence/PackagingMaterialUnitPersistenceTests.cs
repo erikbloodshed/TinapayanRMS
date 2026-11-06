@@ -8,7 +8,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory());
@@ -37,7 +38,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         return (await dbContext.RawMaterials.AsNoTracking().SingleAsync(m => m.Id == id, Cancellation)).CostPerBaseUnit;
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_and_GetForPackagingMaterialAsync_round_trip_units_largest_first()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -53,7 +54,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
             .Should().Equal(("roll", 1000m, "10 m roll"), ("meter", 100m, null));
     }
 
-    [Fact]
+    [Test]
     public async Task A_standard_unit_of_the_base_units_kind_takes_its_fixed_multiplier_and_any_other_keeps_the_one_typed()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -85,7 +86,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         (await repository.GetForRawMaterialAsync(wrapperId, Cancellation)).Single().BaseUnitsPerUnit.Should().Be(240m);
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_the_materials_own_base_unit()
     {
         var (ribbonId, centimeterId) = await SeedRibbonAsync();
@@ -95,7 +96,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_unit_the_material_already_has()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -108,7 +109,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already has*");
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_accepts_a_third_unit()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -125,9 +126,9 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
             .Should().BeEquivalentTo([meterId, rollId, inchId], "there's no limit on alternative units");
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-10)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-10)]
     public async Task AddAsync_rejects_a_multiplier_that_is_not_positive(decimal baseUnitsPerUnit)
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -138,7 +139,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_nonexistent_material()
     {
         var rollId = await SeedUnitOfMeasureAsync("roll", "roll");
@@ -148,7 +149,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Correcting_the_multiplier_of_the_latest_prices_unit_reprices_the_material()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -166,7 +167,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         (await GetCostPerBaseUnitAsync(ribbonId)).Should().Be(0.05m); // 45 / 900 cm
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_rejects_turning_a_unit_into_the_base_unit()
     {
         var (ribbonId, centimeterId) = await SeedRibbonAsync();
@@ -181,7 +182,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_an_unused_unit()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -195,7 +196,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         (await repository.GetForRawMaterialAsync(ribbonId, Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_rejects_a_unit_a_price_is_recorded_in()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -210,7 +211,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'roll' is used by 1 purchase price*");
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_rejects_a_unit_a_packaging_line_is_entered_in()
     {
         var (ribbonId, _) = await SeedRibbonAsync();
@@ -234,7 +235,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'meter' is used by 1 packaging line*");
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_rejects_a_nonexistent_unit()
     {
         var act = () => CreateRepository().DeleteAsync(999_999, Cancellation);

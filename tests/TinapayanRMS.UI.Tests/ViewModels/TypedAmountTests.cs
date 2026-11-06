@@ -9,7 +9,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// </summary>
 public class TypedAmountTests
 {
-    [Fact]
+    [Test]
     public void An_amount_sets_the_percentage_of_the_cost_it_comes_to()
     {
         TypedAmount? typed = null;
@@ -20,7 +20,7 @@ public class TypedAmountTests
         typed.Should().Be(new TypedAmount(5m, 25m, 20m));
     }
 
-    [Fact]
+    [Test]
     public void The_percentage_is_kept_to_the_four_decimals_it_is_saved_to()
     {
         TypedAmount? typed = null;
@@ -28,7 +28,7 @@ public class TypedAmountTests
         TypedAmount.PercentFor(ref typed, 23.77m, ofCost: 134.09m, currentPercent: 0m).Should().Be(17.7269m);
     }
 
-    [Fact]
+    [Test]
     public void With_no_cost_to_take_a_percentage_of_the_percentage_stays_and_nothing_is_remembered()
     {
         TypedAmount? typed = new(1m, 5m, 20m);
@@ -37,7 +37,7 @@ public class TypedAmountTests
         typed.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void The_box_shows_what_was_typed_while_its_percentage_and_cost_stand_and_the_worked_out_amount_after()
     {
         var typed = new TypedAmount(23.77m, 17.7269m, 134.09m);

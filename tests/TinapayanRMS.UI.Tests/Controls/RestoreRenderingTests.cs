@@ -9,7 +9,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// <summary>A window drawn in software from being minimized until it has settled after a restore, and with the GPU otherwise.</summary>
 public class RestoreRenderingTests
 {
-    [Fact]
+    [Test]
     public void A_window_draws_in_software_while_minimized_and_just_after_a_restore_then_with_the_GPU() => StaThread.Run(() =>
     {
         var window = new Window

@@ -15,7 +15,7 @@ public class CompiledModelTests
 {
     private static TinapayanRMSDbContext CreateDbContext() => new(TinapayanRMSDbContext.CreateOptions("Host=unused"));
 
-    [Fact]
+    [Test]
     public void The_context_uses_the_compiled_model()
     {
         using var dbContext = CreateDbContext();
@@ -27,7 +27,7 @@ public class CompiledModelTests
     /// The entities, properties, keys, relationships, navigations and indexes. Without their annotations, which the
     /// compiled model holds in another order and without the design-time ones; the next test covers what they map to.
     /// </summary>
-    [Fact]
+    [Test]
     public void The_compiled_model_has_the_configured_entities()
     {
         using var dbContext = CreateDbContext();
@@ -42,7 +42,7 @@ public class CompiledModelTests
     /// and indexes. Listed rather than compared by the migrations differ, which needs design-time data the compiled
     /// model doesn't keep.
     /// </summary>
-    [Fact]
+    [Test]
     public void The_compiled_model_maps_the_configured_tables()
     {
         using var dbContext = CreateDbContext();

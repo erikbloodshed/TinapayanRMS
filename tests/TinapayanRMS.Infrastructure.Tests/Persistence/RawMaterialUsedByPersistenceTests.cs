@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Raw Materials' Used By (IRawMaterialRepository.GetUsedByAsync): every product a material's cost goes into, through a
 /// recipe or packaging, directly or through the made and linked ingredients, packaging sets and packaging links between.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
@@ -59,7 +60,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     private Task SetOwnPackagingAsync(int productId, int boxId) =>
         CreatePackagingLineRepository().SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_is_used_by_every_product_whose_sub_assemblies_have_it_each_once_by_name()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -89,7 +90,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(sugarId)).Should().Equal("Ensaymada");
     }
 
-    [Fact]
+    [Test]
     public async Task An_unused_material_is_used_by_nothing()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -100,7 +101,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(boxId)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_is_used_through_the_made_and_linked_ingredients_it_goes_into_however_deep()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -117,7 +118,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(custardId)).Should().Equal("Custard Cake");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_is_used_through_a_made_ingredients_add_ins()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -131,7 +132,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(vanillaId)).Should().Equal("Custard Cake");
     }
 
-    [Fact]
+    [Test]
     public async Task An_add_in_on_a_linked_usage_counts_for_the_product_that_added_it_only()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
@@ -147,7 +148,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(sugarId)).Should().Equal("Cream Loaf", "Ube Loaf");
     }
 
-    [Fact]
+    [Test]
     public async Task Packaging_is_used_through_own_lines_a_set_and_every_product_linking_them_down_the_chain()
     {
         var boxId = await AddBoxAsync("Box");
@@ -172,7 +173,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(ribbonId)).Should().Equal("Gift", "Gift Mini");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_is_used_by_every_composite_holding_a_product_it_goes_into_but_a_products_packaging_isnt()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -204,7 +205,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(giftBoxId)).Should().Equal("Pasalubong Box");
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_packaging_is_used_by_every_composite_including_its_products_packaging_however_deep()
     {
         var bagId = await AddBoxAsync("Bag");
@@ -235,7 +236,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(giftBoxId)).Should().Equal("Gift Set", "Party Package", "Pasalubong Box");
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_in_a_composites_own_topping_is_used_by_it_and_by_every_composite_holding_it()
     {
         var toppingRoleId = await AddRoleAsync("Topping", isProductOwned: true);
@@ -258,7 +259,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(icingId)).Should().Equal("Party Package", "Pasalubong Box");
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_own_packaging_lines_dont_count_while_its_packaging_links_another()
     {
         var boxId = await AddBoxAsync("Box");
@@ -274,7 +275,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(ribbonId)).Should().Equal("Big", "Small");
     }
 
-    [Fact]
+    [Test]
     public async Task A_loop_of_ingredients_added_outside_the_app_ends_and_still_finds_the_product()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -324,7 +325,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         return (flourId, bagId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_loop_of_composites_added_outside_the_app_ends_for_what_goes_into_their_recipes()
     {
         var (flourId, _) = await AddLoopOfCompositesAsync();
@@ -332,7 +333,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
     }
 
-    [Fact]
+    [Test]
     public async Task A_loop_of_composites_added_outside_the_app_ends_for_the_packaging_they_include()
     {
         var (_, bagId) = await AddLoopOfCompositesAsync();

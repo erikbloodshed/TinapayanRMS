@@ -78,7 +78,7 @@ public class RecipeScalerTests
         bool includesComponentPackaging = false) =>
         new([.. sections.Select(s => s.ToPriced())], [.. (packaging ?? []).Select(l => l.ToPriced())], components ?? [], quantityRequired, includesComponentPackaging);
 
-    [Fact]
+    [Test]
     public void A_box_of_8_scales_its_sections_in_whole_batches_and_its_packaging_by_the_box()
     {
         // 20 boxes of 8 are 160 pieces: 1.6 batches of a 100-piece dough, so 2, and 40 pieces to spare.
@@ -107,7 +107,7 @@ public class RecipeScalerTests
             ScalingRow.Line("Box", string.Empty, "20 pc", 240m));
     }
 
-    [Fact]
+    [Test]
     public void An_exact_fit_makes_no_extra_pieces()
     {
         var rows = Scaler().Scale(Recipe([EnsaymadaDough(Ingredient("Flour", 0.05m), Ingredient("Water", 0m))]), 300m, productId: null);
@@ -115,7 +115,7 @@ public class RecipeScalerTests
         rows.Should().ContainSingle().Which.Detail.Should().Be("3 batches · 300 pcs");
     }
 
-    [Fact]
+    [Test]
     public void A_linked_sections_add_ins_go_in_every_batch_after_its_lines()
     {
         var section = new ProductUsageEdit(
@@ -136,7 +136,7 @@ public class RecipeScalerTests
             ScalingRow.Line("Ube Flavouring", "add-in", "40 g", 20m));
     }
 
-    [Fact]
+    [Test]
     public void A_made_ingredient_opens_into_its_bom_scaled_to_the_grams_it_takes_to_any_depth()
     {
         // Caramel is half syrup, half cream; the syrup is 1,000 g of sugar and 500 g of water that lose 20% to make 1,200 g.
@@ -164,7 +164,7 @@ public class RecipeScalerTests
         caramelRow.Children[1].Children.Should().BeEmpty("a purchased ingredient has nothing under it");
     }
 
-    [Fact]
+    [Test]
     public void A_made_ingredient_whose_bom_holds_itself_opens_only_once()
     {
         var loop = Made("Starter", 0.01m);
@@ -178,7 +178,7 @@ public class RecipeScalerTests
         starter.Children.Should().ContainSingle().Which.Children.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void Costs_follow_the_cost_basis()
     {
         var flour = Ingredient("Flour", 0.05m, unbufferedCostPerGram: 0.04m);
@@ -188,7 +188,7 @@ public class RecipeScalerTests
         rows[0].Cost.Should().Be(24m, "600 g of flour at its true ₱0.04");
     }
 
-    [Fact]
+    [Test]
     public void A_section_without_a_piece_size_has_nothing_to_scale()
     {
         var section = new ProductUsageEdit(
@@ -200,7 +200,7 @@ public class RecipeScalerTests
         row.Children.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_composite_scales_each_product_to_its_share_with_packaging_only_where_it_takes_its_products()
     {
         // A Pasalubong Box of 6 Ensaymada and a Party Box, which holds 2 Cheese Rolls; the Pasalubong Box takes its
@@ -246,7 +246,7 @@ public class RecipeScalerTests
         rows.Sum(r => r.Cost).Should().Be(rows[0].Cost + rows[1].Cost + 250m);
     }
 
-    [Fact]
+    [Test]
     public void A_product_in_a_composite_not_read_yet_says_so()
     {
         var ensaymada = new Product { Id = 1, Name = "Ensaymada" };

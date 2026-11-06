@@ -16,7 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Saved and deleted on the Sub-Assemblies screen, kept apart from recipes, and linked by a product's packaging,
 /// one set per piece.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class PackagingSetPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());
@@ -72,7 +73,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         return material.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task Product_Save_writes_the_packaging_link_with_the_rest_and_None_takes_it_away()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -101,7 +102,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             "unlinked in the same save as its own lines are written");
     }
 
-    [Fact]
+    [Test]
     public async Task Product_Save_with_NewSet_moves_the_products_lines_to_a_set_named_after_it_and_links_it()
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -137,7 +138,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Equal(before.Select(l => (l.PackagingMaterialId, l.UnitId, l.QtyPerUnit)), "its packaging reads, and so costs, as it did");
     }
 
-    [Fact]
+    [Test]
     public async Task Product_Save_with_NewSet_moves_a_new_products_lines_on_its_first_save_and_a_taken_name_gets_the_next_number()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -158,7 +159,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Which.QtyPerSet.Should().Be(2m);
     }
 
-    [Fact]
+    [Test]
     public async Task Product_Save_with_NewSet_and_no_lines_is_refused_and_saves_nothing()
     {
         await AddRoleAsync("Packaging", isPackaging: true);
@@ -174,7 +175,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task Product_Save_refuses_a_circular_packaging_link_and_saves_nothing()
     {
         var aId = await AddProductAsync("A");
@@ -189,7 +190,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await dbContext.Products.SingleAsync(p => p.Id == aId, Cancellation)).Name.Should().Be("A", "nothing is left half saved");
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_a_set_stores_its_lines_per_set_and_leaves_its_recipe_totals_at_zero()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -208,7 +209,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Should().Equal(("Gift Box", "Boxes", "pc"), ("Ribbon", "Boxes", "cm"));
     }
 
-    [Fact]
+    [Test]
     public async Task Resaving_a_set_replaces_its_lines()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -222,7 +223,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Should().ContainSingle().Which.QtyPerSet.Should().Be(45m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_set_needs_the_packaging_role_and_packaging_materials()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -238,7 +239,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateDbContext().SubAssemblies.CountAsync(Cancellation)).Should().Be(0, "nothing is left half saved");
     }
 
-    [Fact]
+    [Test]
     public async Task A_recipe_cant_be_saved_in_the_packaging_role_and_neither_kind_can_become_the_other()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -258,7 +259,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await setToRecipe.Should().ThrowAsync<InvalidOperationException>().WithMessage("*stays in the Packaging role*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_recipe_section_cant_take_the_packaging_role()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -271,7 +272,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*for packaging sets*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_packaging_linked_to_a_set_shows_its_lines_one_set_per_piece_and_follows_it()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -297,7 +298,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "a link follows every change saved to the set");
     }
 
-    [Fact]
+    [Test]
     public async Task A_set_is_reached_through_a_chain_of_product_links()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -315,7 +316,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         line.ProductId.Should().Be(bigId, "the set's lines are shown as the product linking it");
     }
 
-    [Fact]
+    [Test]
     public async Task Relinking_switches_between_a_product_and_a_set()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -335,7 +336,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (toSet!.LinkedProductId, toSet.LinkedSubAssemblyId).Should().Be((null, setId));
     }
 
-    [Fact]
+    [Test]
     public async Task Only_a_standalone_packaging_set_can_be_linked_as_packaging()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
@@ -348,7 +349,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*only link a packaging set*");
     }
 
-    [Fact]
+    [Test]
     public async Task Unlinking_a_set_copies_its_lines_into_the_products_own()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -366,7 +367,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Select(l => (l.PackagingMaterialId, l.QtyPerUnit)).Should().BeEquivalentTo([(boxId, 1m), (ribbonId, 30m)]);
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_keeps_a_set_link_its_source_makes_directly()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -382,7 +383,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreatePackagingLineRepository().GetForProductAsync(cloneId, Cancellation)).Should().BeEmpty("the clone reads the set, it doesn't copy it");
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_copies_a_set_it_reaches_through_another_products_link()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -400,7 +401,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreatePackagingLineRepository().GetForProductAsync(cloneId, Cancellation)).Should().ContainSingle().Which.PackagingMaterialId.Should().Be(boxId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_linked_set_cant_be_deleted_and_says_which_products_link_it()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -418,7 +419,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateDbContext().SubAssemblyPackagingLines.CountAsync(Cancellation)).Should().Be(0, "its lines go with it");
     }
 
-    [Fact]
+    [Test]
     public async Task Sets_arent_offered_as_recipe_sub_assemblies_to_link_or_copy()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -431,7 +432,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetLinkableAsync(Cancellation)).Should().ContainSingle().Which.Name.Should().Be("Glaze");
     }
 
-    [Fact]
+    [Test]
     public async Task The_packaging_role_cant_be_deleted_but_other_roles_can()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -445,7 +446,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await roleRepository.GetAllAsync(Cancellation)).Should().ContainSingle().Which.IsPackaging.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_materials_base_unit_is_fixed_once_a_set_uses_it()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -462,7 +463,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_set_line_keeps_the_alternative_unit_it_was_entered_in_and_is_costed_through_it()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -488,7 +489,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
             .Should().Be(50m, "1 roll is 1,000 cm at ₱0.05");
     }
 
-    [Fact]
+    [Test]
     public async Task A_set_line_cant_be_entered_in_another_materials_unit()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -501,7 +502,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*must be one of that material's own units*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_unit_a_set_line_is_entered_in_cant_be_deleted()
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);

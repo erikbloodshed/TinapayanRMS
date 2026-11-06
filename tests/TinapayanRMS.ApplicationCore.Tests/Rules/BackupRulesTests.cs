@@ -8,11 +8,11 @@ public class BackupRulesTests
 {
     private static readonly DateTime Morning = new(2026, 10, 3, 8, 15, 12);
 
-    [Theory]
-    [InlineData(BackupKind.Manual, "TinapayanRMS_20261003_081512_manual.backup")]
-    [InlineData(BackupKind.Automatic, "TinapayanRMS_20261003_081512_auto.backup")]
-    [InlineData(BackupKind.BeforeRestore, "TinapayanRMS_20261003_081512_before-restore.backup")]
-    [InlineData(BackupKind.CopiedIn, "TinapayanRMS_20261003_081512_copied-in.backup")]
+    [Test]
+    [Arguments(BackupKind.Manual, "TinapayanRMS_20261003_081512_manual.backup")]
+    [Arguments(BackupKind.Automatic, "TinapayanRMS_20261003_081512_auto.backup")]
+    [Arguments(BackupKind.BeforeRestore, "TinapayanRMS_20261003_081512_before-restore.backup")]
+    [Arguments(BackupKind.CopiedIn, "TinapayanRMS_20261003_081512_copied-in.backup")]
     public void A_backup_is_named_by_database_time_and_kind_and_read_back(BackupKind kind, string fileName)
     {
         BackupRules.FileNameFor("TinapayanRMS", kind, Morning).Should().Be(fileName);
@@ -23,7 +23,7 @@ public class BackupRulesTests
         takenAt.Should().Be(Morning);
     }
 
-    [Fact]
+    [Test]
     public void A_name_already_taken_moves_on_a_second_at_a_time_until_its_free_and_still_reads_back()
     {
         HashSet<string> taken =
@@ -43,7 +43,7 @@ public class BackupRulesTests
             .Should().Be("TinapayanRMS_20261003_081512_manual.backup", "another kind's file in the same second is a different name");
     }
 
-    [Fact]
+    [Test]
     public void A_database_name_with_underscores_of_its_own_still_reads_back()
     {
         var fileName = BackupRules.FileNameFor("TinapayanRMS_Test_Backup_ab12cd34", BackupKind.Automatic, Morning);
@@ -54,18 +54,18 @@ public class BackupRulesTests
         takenAt.Should().Be(Morning);
     }
 
-    [Theory]
-    [InlineData("TinapayanRMS.backup")]
-    [InlineData("TinapayanRMS_before_CompositeProducts_20260929.backup")]
-    [InlineData("TinapayanRMS_20261003_081512_weekly.backup")]
-    [InlineData("TinapayanRMS_20261003_081512_manual.txt")]
-    [InlineData("TinapayanRMS_20261340_081512_manual.backup")]
+    [Test]
+    [Arguments("TinapayanRMS.backup")]
+    [Arguments("TinapayanRMS_before_CompositeProducts_20260929.backup")]
+    [Arguments("TinapayanRMS_20261003_081512_weekly.backup")]
+    [Arguments("TinapayanRMS_20261003_081512_manual.txt")]
+    [Arguments("TinapayanRMS_20261340_081512_manual.backup")]
     public void A_name_the_app_didnt_give_isnt_read_as_one_it_did(string fileName)
     {
         BackupRules.TryParse(fileName, out _, out _, out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void The_daily_backup_is_due_until_one_is_taken_that_day()
     {
         var lastNight = Backup(BackupKind.Automatic, new DateTime(2026, 10, 2, 23, 59, 0));
@@ -77,7 +77,7 @@ public class BackupRulesTests
         BackupRules.IsDailyBackupDue([lastNight], "TinapayanRMS", new DateTime(2026, 10, 2, 23, 59, 30)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Only_the_automatic_backups_beyond_the_newest_fourteen_are_deleted()
     {
         var automatic = Enumerable.Range(1, 16).Select(day => Backup(BackupKind.Automatic, new DateTime(2026, 9, day, 8, 0, 0))).ToList();
@@ -93,7 +93,7 @@ public class BackupRulesTests
         deleted.Select(b => b.TakenAt.Day).Should().Equal(2, 1);
     }
 
-    [Fact]
+    [Test]
     public void Another_databases_backups_in_the_folder_are_neither_counted_nor_deleted()
     {
         var demoToday = Backup(BackupKind.Automatic, Morning, "TinapayanRMS_Demo");
@@ -104,9 +104,9 @@ public class BackupRulesTests
         BackupRules.AutomaticToDelete([.. demoOld, demoToday], "tinapayanrms_demo").Should().HaveCount(7, "a name is matched ignoring case");
     }
 
-    [Theory]
-    [InlineData("\n")]
-    [InlineData("\r\n")]
+    [Test]
+    [Arguments("\n")]
+    [Arguments("\r\n")]
     public void A_backups_listing_says_which_database_it_is_of_and_when_it_was_taken(string newLine)
     {
         // The start of what pg_restore --list printed for a backup of the dev database, on Windows and on a Mac.
@@ -128,7 +128,7 @@ public class BackupRulesTests
         header.Should().Be(new BackupHeader("tinapayanrms", new DateTime(2026, 10, 11, 0, 6, 41)));
     }
 
-    [Fact]
+    [Test]
     public void A_time_zone_after_the_time_is_left_out()
     {
         BackupRules.TryReadArchiveListing("; Archive created at 2026-10-03 08:15:12 PST\n;     dbname: shop", out var header).Should().BeTrue();
@@ -136,18 +136,18 @@ public class BackupRulesTests
         header!.TakenAt.Should().Be(new DateTime(2026, 10, 3, 8, 15, 12));
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData(";     dbname: tinapayanrms")]
-    [InlineData("; Archive created at 2026-10-11 00:06:41")]
-    [InlineData("; Archive created at yesterday\n;     dbname: tinapayanrms")]
+    [Test]
+    [Arguments("")]
+    [Arguments(";     dbname: tinapayanrms")]
+    [Arguments("; Archive created at 2026-10-11 00:06:41")]
+    [Arguments("; Archive created at yesterday\n;     dbname: tinapayanrms")]
     public void A_listing_without_both_isnt_read(string listing)
     {
         BackupRules.TryReadArchiveListing(listing, out var header).Should().BeFalse();
         header.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_backup_from_an_earlier_version_needs_the_updates_it_lacks_in_order()
     {
         string[] known = ["01_Initial", "02_Packs", "03_Composites"];
@@ -156,7 +156,7 @@ public class BackupRulesTests
         BackupRules.UpdatesNeeded(known, known).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_backup_from_a_later_version_or_another_apps_is_refused()
     {
         string[] known = ["01_Initial", "02_Packs"];
@@ -168,7 +168,7 @@ public class BackupRulesTests
         another.Should().Throw<BusinessRuleException>().WithMessage(BackupRules.NotThisAppsText);
     }
 
-    [Fact]
+    [Test]
     public void A_file_still_being_written_isnt_read_as_a_backup()
     {
         var name = BackupRules.FileNameFor("TinapayanRMS", BackupKind.Automatic, Morning) + BackupRules.PartialSuffix;
@@ -176,7 +176,7 @@ public class BackupRulesTests
         BackupRules.TryParse(name, out _, out _, out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void The_newest_backup_is_this_databases_of_any_kind_but_one_copied_in()
     {
         var newest = Backup(BackupKind.Manual, Morning.AddDays(-1));
@@ -192,16 +192,16 @@ public class BackupRulesTests
         BackupRules.Newest([], "TinapayanRMS").Should().BeNull();
     }
 
-    [Theory]
-    [InlineData(2.9, false)]
-    [InlineData(3, true)]
-    [InlineData(20, true)]
+    [Test]
+    [Arguments(2.9, false)]
+    [Arguments(3, true)]
+    [Arguments(20, true)]
     public void A_backup_is_overdue_three_days_on(double daysOld, bool overdue)
     {
         BackupRules.IsOverdue(Backup(BackupKind.Automatic, Morning.AddDays(-daysOld)), Morning).Should().Be(overdue);
     }
 
-    [Fact]
+    [Test]
     public void Having_no_backup_at_all_is_overdue()
     {
         BackupRules.IsOverdue(null, Morning).Should().BeTrue();

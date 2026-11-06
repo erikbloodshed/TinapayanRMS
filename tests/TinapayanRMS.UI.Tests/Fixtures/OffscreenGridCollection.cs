@@ -13,10 +13,10 @@ namespace TinapayanRMS.UI.Tests.Fixtures;
 /// commit skipped the validation that writes an Explicit binding's value, and a pick never reached its row
 /// (GridAddNewRowTabTests, about one full run in three). The app has one UI thread and one edit at a time.</item>
 /// </list>
+/// Such a class carries <c>[NotInParallel(OffscreenGridCollection.Name)]</c>.
 /// </summary>
-[CollectionDefinition(Name)]
-[SuppressMessage("Naming", "CA1711", Justification = "xUnit names a collection definition class after the collection it defines.")]
-public class OffscreenGridCollection
+[SuppressMessage("Naming", "CA1711", Justification = "Named for the collection it names.")]
+public static class OffscreenGridCollection
 {
     public const string Name = "Offscreen grid";
 }

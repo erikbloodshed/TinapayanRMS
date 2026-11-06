@@ -15,7 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// GridRowInserting in a real lines table set up as the app's are (SubAssembliesView.xaml, UsageFormPanel.xaml): a blank
 /// line put in above the current one, as one undo step, with its first column opened for typing.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridRowInsertingTests
 {
     public sealed class Line
@@ -39,7 +39,7 @@ public class GridRowInsertingTests
         public void EndUndoStep() => LineCountsAtEnd.Add(lines.Count);
     }
 
-    [Fact]
+    [Test]
     public void A_line_goes_in_above_the_current_one_and_its_first_column_opens_for_typing()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -60,7 +60,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void From_the_add_row_the_line_goes_in_at_the_bottom()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -77,7 +77,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_insert_is_one_undo_step()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -95,7 +95,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_Insert_key_puts_a_line_in_while_no_cell_is_being_typed_into()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -110,7 +110,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_grid_whose_lines_cant_be_changed_right_now_is_left_alone()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -126,7 +126,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_letter_typed_straight_after_the_insert_goes_into_the_new_line_not_the_one_below_it()
     {
         // The key is queued at Input priority, ahead of anything the insert put off until later: a fast typist, or Insert
@@ -148,7 +148,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Insert_held_down_puts_in_one_line_whose_cell_takes_the_presses_after_it()
     {
         // Every press queued before any of them is handled, as a held key's repeats are.
@@ -171,7 +171,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void From_a_table_scrolled_down_the_new_line_is_in_view_whole()
     {
         // From a table scrolled to its bottom, the view mustn't jump back to the top and leave the new line half out of
@@ -196,7 +196,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_half_typed_add_row_is_added_before_the_blank_line_goes_in_under_it()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>
@@ -216,7 +216,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Lines_replaced_while_the_new_line_is_open_leave_nothing_open()
     {
         // The screen reloading its lines (another record picked, a Save) while the new line's cell is still open.
@@ -235,7 +235,7 @@ public class GridRowInsertingTests
         });
     }
 
-    [Fact]
+    [Test]
     public void In_a_sorted_view_the_line_goes_in_above_the_current_one_in_the_lines_own_order()
     {
         OffscreenGrid.Run(() => LinesGrid(), grid =>

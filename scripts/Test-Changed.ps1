@@ -21,8 +21,9 @@
     The commit to compare with: HEAD, what isn't committed yet, or main, everything this branch has changed.
 
 .PARAMETER Class
-    Only test classes whose name matches, as dotnet test's --filter-class: "*ProductsViewModel*". A project with none
-    passes with "Zero tests ran". It goes by names, so it can miss the tests of something else that uses the class.
+    Only test classes whose name matches, with * for any characters: "*ProductsViewModel*". Several are joined into one
+    --treenode-filter. A project with none passes with "Zero tests ran". It goes by names, so it can miss the tests of
+    something else that uses the class.
 
 .PARAMETER List
     Say what would run and why, and run nothing.
@@ -161,8 +162,11 @@ foreach ($pick in $selected) {
 }
 
 $arguments = @()
-foreach ($pattern in $Class) {
-    $arguments += '--filter-class', $pattern
+if ($Class) {
+    # TUnit's tree-node filter is /assembly/namespace/class/test, and (a)|(b) matches either. A project none of the
+    # classes are in runs no test, which Microsoft.Testing.Platform ends with exit code 8: that's a pass here.
+    $classes = if ($Class.Count -eq 1) { $Class[0] } else { ($Class | ForEach-Object { "($_)" }) -join '|' }
+    $arguments += '--treenode-filter', "/*/*/$classes/*", '--ignore-exit-code', '8'
 }
 
 if ($selected.Count -eq $tests.Count) {

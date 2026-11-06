@@ -10,7 +10,7 @@ public class PriceScenarioRulesTests
 
     private static PriceScenarioLine Price(int materialId, decimal price) => new() { RawMaterialId = materialId, NewPrice = price };
 
-    [Fact]
+    [Test]
     public void A_named_scenario_of_changes_typed_in_percent_or_as_new_prices_is_valid()
     {
         var valid = () => PriceScenarioRules.EnsureValid("Supplier A, Nov", [Percent(1, 10m), Price(2, 1375m), Percent(3, -99.99m)]);
@@ -18,9 +18,9 @@ public class PriceScenarioRulesTests
         valid.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
+    [Test]
+    [Arguments("")]
+    [Arguments("   ")]
     public void A_scenario_needs_a_name(string name)
     {
         var act = () => PriceScenarioRules.EnsureValid(name, [Percent(1, 10m)]);
@@ -28,7 +28,7 @@ public class PriceScenarioRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage(PriceScenarioRules.NameRequiredText);
     }
 
-    [Fact]
+    [Test]
     public void A_name_longer_than_its_column_is_refused_but_spaces_around_it_dont_count()
     {
         var tooLong = () => PriceScenarioRules.EnsureValid(new string('a', PriceScenarioRules.NameMaxLength + 1), [Percent(1, 10m)]);
@@ -38,7 +38,7 @@ public class PriceScenarioRulesTests
         padded.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void A_scenario_with_no_changes_or_a_material_twice_is_refused()
     {
         var empty = () => PriceScenarioRules.EnsureValid("Empty", []);
@@ -48,7 +48,7 @@ public class PriceScenarioRulesTests
         twice.Should().Throw<BusinessRuleException>().WithMessage(PriceScenarioRules.RepeatedMaterialText);
     }
 
-    [Fact]
+    [Test]
     public void Each_line_keeps_exactly_one_of_its_change_and_its_new_price_and_one_that_can_be()
     {
         var neither = () => PriceScenarioRules.EnsureValid("Neither", [new PriceScenarioLine { RawMaterialId = 1 }]);

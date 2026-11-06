@@ -11,10 +11,11 @@ namespace TinapayanRMS.Pricing.Tests;
 /// A saved product's sections are named for its readers (Reports, Print, the Recipe API, the MCP server) as the Products
 /// screen names them: two in one role apart by their names, "Dough" beside "Dough: Paste", and one alone by its role.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class SavedProductSectionNameTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task Two_sections_in_one_role_are_told_apart_by_name_and_one_alone_goes_by_its_role()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

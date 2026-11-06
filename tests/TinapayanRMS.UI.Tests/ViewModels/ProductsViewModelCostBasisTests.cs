@@ -19,10 +19,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// costs and their true ones, the rows, sections, packaging, a composite's products and the printout alike. It's no
 /// edit, so there's nothing to undo or save, and it stays put from one product to the next.
 /// </summary>
-[Collection(DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
 public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task Unbuffered_prices_the_whole_screen_at_the_true_costs_and_changes_nothing_about_the_product() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -61,7 +62,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.CostBasis.Should().Be(CostBasis.Buffered);
     });
 
-    [Fact]
+    [Test]
     public Task Rows_an_undo_puts_back_are_priced_unbuffered_too() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -76,7 +77,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.SubAssemblies.Should().Be(2.00m);
     });
 
-    [Fact]
+    [Test]
     public Task Unbuffered_stays_on_for_the_next_product_picked() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();
@@ -96,7 +97,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
     });
 
-    [Fact]
+    [Test]
     public Task A_composites_products_bring_their_unbuffered_recipe_costs() => StaThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -127,7 +128,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     /// </summary>
     // Every cost on the screen is at buffered costs, and a purchased material's is a fixed amount that rising prices can
     // pass: the product is then priced under what it costs, which the screen has to say.
-    [Fact]
+    [Test]
     public Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost() => StaThread.RunAsync(async () =>
     {
         var productId = await AddEnsaymadaAsync();

@@ -10,7 +10,7 @@ using TinapayanRMS.UI.Tests.Fixtures;
 namespace TinapayanRMS.UI.Tests.Controls;
 
 /// <summary>GridHeaderHeight: a grid's header row fits its text at the app's font size, where the theme's 24px cut off descenders.</summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridHeaderHeightTests
 {
     public sealed class Line
@@ -18,7 +18,7 @@ public class GridHeaderHeightTests
         public string Ingredient { get; set; } = string.Empty;
     }
 
-    [Fact]
+    [Test]
     public void At_the_apps_14px_the_header_row_grows_past_the_themes_24px()
     {
         // The theme's header cell: 3px padding above and below, a 1px bottom border.
@@ -30,7 +30,7 @@ public class GridHeaderHeightTests
         GridHeaderHeight.HeightFor(new FontFamily("Segoe UI"), 14, padding, border, lines: 2).Should().Be(45, "38px for two lines of text, 6 of padding, 1 of border");
     }
 
-    [Fact]
+    [Test]
     public void A_loaded_grid_header_is_tall_enough_for_its_text()
     {
         GridHeaderHeight.Register();
@@ -46,7 +46,7 @@ public class GridHeaderHeightTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_grid_whose_headings_wrap_has_a_header_tall_enough_for_two_lines()
     {
         GridHeaderHeight.Register();
@@ -59,7 +59,7 @@ public class GridHeaderHeightTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_grid_hidden_when_it_loads_is_fitted_when_first_shown()
     {
         GridHeaderHeight.Register();
@@ -77,7 +77,7 @@ public class GridHeaderHeightTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_header_height_set_in_xaml_is_kept()
     {
         GridHeaderHeight.Register();

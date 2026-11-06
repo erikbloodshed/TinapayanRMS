@@ -23,13 +23,13 @@ public class ColumnsTests
         return dbContext.GetService<IDesignTimeModel>().Model;
     }
 
-    [Fact]
+    [Test]
     public void Every_entity_has_a_column_list()
     {
         Columns.ByEntity.Keys.Should().BeEquivalentTo(Model.GetEntityTypes().Select(e => e.ClrType));
     }
 
-    [Fact]
+    [Test]
     public void Each_column_list_is_exactly_its_entitys_columns_with_id_first()
     {
         using var scope = new AssertionScope();

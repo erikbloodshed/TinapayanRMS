@@ -18,7 +18,7 @@ public class ChromelessWindowDpiTests
 {
     private const int WmDpiChanged = 0x02E0;
 
-    [Fact]
+    [Test]
     public void ChromelessWindow_keeps_DPI_changes_from_WPF()
     {
         // Why ChromelessWindowDpi exists. If this starts failing, Syncfusion has stopped swallowing the message, and
@@ -26,7 +26,7 @@ public class ChromelessWindowDpiTests
         WpfSeesDpiChange(letWpfHandleDpiChanges: false).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void LetWpfHandleDpiChanges_lets_WPF_rescale_the_window()
     {
         WpfSeesDpiChange(letWpfHandleDpiChanges: true).Should().BeTrue();
@@ -36,7 +36,7 @@ public class ChromelessWindowDpiTests
     {
         var licenseKey = Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.Process)
             ?? Environment.GetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", EnvironmentVariableTarget.User);
-        Assert.SkipWhen(licenseKey is null, "SYNCFUSION_LICENSE_KEY isn't set, and an unlicensed Syncfusion control shows a dialog.");
+        Skip.When(licenseKey is null, "SYNCFUSION_LICENSE_KEY isn't set, and an unlicensed Syncfusion control shows a dialog.");
 
         var dpiChanged = false;
         Exception? failure = null;

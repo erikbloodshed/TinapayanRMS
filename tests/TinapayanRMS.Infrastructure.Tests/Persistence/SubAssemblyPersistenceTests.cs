@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Sub-Assemblies screen, named after the product and their role, and linked: their lines in grams and totals, their
 /// names, links from other products, and what's kept when a section or a product goes.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRoleRepository CreateRoleRepository() => new(CreateDbContextFactory());
@@ -42,7 +43,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
     private static NewSubAssemblyDraft New(int roleId, IReadOnlyList<RecipeLine> lines, decimal weightPerPiece = 10m, string? sectionName = null) =>
         new(roleId, lines, UsageAuthoredField.WeightPerPiece, weightPerPiece, sectionName);
 
-    [Fact]
+    [Test]
     public async Task Saving_a_new_section_keeps_it_as_a_sub_assembly_named_after_the_product_and_its_role_and_links_it()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -66,7 +67,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Select(p => p.Name).Should().Equal("Pandesal");
     }
 
-    [Fact]
+    [Test]
     public async Task A_usage_can_store_a_typed_yield_instead_of_a_weight_per_piece()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -81,7 +82,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         usage.AuthoredValue.Should().Be(24m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_sections_own_name_goes_after_the_product_and_role_unless_it_is_just_the_roles()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -96,7 +97,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await SubAssemblyNamesAsync()).Should().Equal("Cheese Roll Dough", "Cheese Roll Filling: Cheese");
     }
 
-    [Fact]
+    [Test]
     public async Task A_name_already_taken_gets_the_next_number_among_every_sub_assembly_and_this_saves_own()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -114,7 +115,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await GetSubAssemblyAsync(firstId)).Name.Should().Be("Ensaymada Filling", "the one the recipe no longer uses is kept as it was");
     }
 
-    [Fact]
+    [Test]
     public async Task A_section_left_out_of_the_recipe_leaves_its_sub_assembly_and_lines_on_the_Sub_Assemblies_screen()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -129,7 +130,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await dbContext.ProductSubAssemblyUsages.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Another_product_can_link_a_sub_assembly_at_its_own_piece_size()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -147,7 +148,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Select(p => p.Name).Should().Equal("Ensaymada Big", "Ensaymada Small");
     }
 
-    [Fact]
+    [Test]
     public async Task Linking_a_nonexistent_sub_assembly_is_rejected()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -157,7 +158,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_recipe_can_have_several_sub_assemblies_in_one_role_new_and_linked_told_apart_by_name()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -189,7 +190,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await dbContext.ProductSubAssemblyUsages.CountAsync(u => u.ProductId == productId, Cancellation)).Should().Be(4);
     }
 
-    [Fact]
+    [Test]
     public async Task A_linked_section_saved_from_this_product_goes_by_its_own_name_there()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -205,7 +206,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
     }
 
-    [Fact]
+    [Test]
     public async Task Moving_a_sub_assembly_to_a_role_where_a_product_linking_it_has_one_by_its_name_is_refused()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -228,7 +229,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await GetSubAssemblyAsync(doughId)).RoleId.Should().Be(fillingRoleId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_material_on_a_line_is_rejected_and_nothing_is_saved()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -252,7 +253,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == custardId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_nonexistent_ingredient_is_rejected_and_nothing_is_saved()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -266,7 +267,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == custardId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_later_part_of_the_save_failing_rolls_back_the_sub_assembly_a_new_section_made()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -287,7 +288,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await SubAssemblyNamesAsync()).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task Renaming_the_product_leaves_the_names_of_its_sub_assemblies_alone()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -302,7 +303,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await GetSubAssemblyAsync(doughId)).Name.Should().Be("Pandesal Dough");
     }
 
-    [Fact]
+    [Test]
     public async Task A_renamed_product_names_the_sections_it_saves_with_the_rename_by_its_new_name()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -317,7 +318,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await SubAssemblyNamesAsync()).Should().Equal("Pan de Sal Dough");
     }
 
-    [Fact]
+    [Test]
     public async Task GetForSubAssembliesAsync_returns_the_lines_of_only_the_sub_assemblies_asked_for()
     {
         var fillingRoleId = await AddRoleAsync("Filling");
@@ -342,7 +343,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateLineRepository().GetForSubAssembliesAsync([], Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task GetLinkableAsync_returns_sub_assemblies_with_lines_by_name_with_their_role()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -355,7 +356,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         linkable.Select(s => (s.Name, s.Role!.Name)).Should().Equal(("Ensaymada Dough", "Dough"), ("Pandesal Dough", "Dough"));
     }
 
-    [Fact]
+    [Test]
     public async Task GetByIdsAsync_returns_the_sub_assemblies_with_their_role()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -369,7 +370,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateSubAssemblyRepository().GetByIdsAsync([], Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_keeps_the_sub_assemblies_it_used_and_their_lines()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -384,7 +385,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await dbContext.ProductSubAssemblyUsages.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_leaves_another_product_linking_its_sub_assembly_as_it_was()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -399,7 +400,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateUsageRepository().GetForProductAsync(smallId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == doughId);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_an_ingredient_that_is_in_use_by_a_sub_assembly_is_blocked()
     {
         var roleId = await AddRoleAsync("Filling");
@@ -412,7 +413,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_role_that_is_in_use_by_a_sub_assembly_is_blocked()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -426,7 +427,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_an_unused_role_succeeds()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -436,7 +437,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateRoleRepository().GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_UpdateAsync_rejects_a_nonexistent_role()
     {
         var act = () => CreateRoleRepository().UpdateAsync(new SubAssemblyRole { Id = 999_999, Name = "Ghost", SortOrder = 1 }, Cancellation);
@@ -444,7 +445,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_UpdateAsync_renames_a_role_and_keeps_its_place()
     {
         var roleId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -457,7 +458,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         updated.SortOrder.Should().Be(1, "only Move Up and Move Down change a role's place");
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_AddAsync_puts_a_new_role_last()
     {
         await AddRoleAsync("Dough", sortOrder: 1);
@@ -470,7 +471,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         all.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 4), ("Glaze", 5));
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_AddAsync_numbers_the_first_role_1()
     {
         await CreateRoleRepository().AddAsync(new SubAssemblyRole { Name = "Glaze" }, Cancellation);
@@ -478,7 +479,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await CreateRoleRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.SortOrder.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_MoveAsync_swaps_a_role_with_its_neighbour_and_numbers_them_all_again()
     {
         await AddRoleAsync("Dough", sortOrder: 2);
@@ -496,7 +497,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
             .Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
     }
 
-    [Fact]
+    [Test]
     public async Task SubAssemblyRoleRepository_MoveAsync_leaves_the_first_and_last_where_they_are()
     {
         var doughId = await AddRoleAsync("Dough", sortOrder: 1);
@@ -509,7 +510,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await roleRepository.GetAllAsync(Cancellation)).Select(r => r.Name).Should().Equal("Dough", "Filling");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_role_numbers_the_rest_again_without_a_gap()
     {
         await AddRoleAsync("Dough", sortOrder: 1);

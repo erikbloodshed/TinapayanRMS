@@ -12,7 +12,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// The unit of work (IUnitOfWork, SharedTransactionDbContextFactory): repositories' writes, each in a transaction of its
 /// own, made inside one run commit together or not at all, and its reads see what it has written so far.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static ProductVersionContent Recipe(string name) => new()
@@ -34,7 +35,7 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         Materials = [],
     };
 
-    [Fact]
+    [Test]
     public async Task Writes_made_in_a_run_that_returns_are_kept()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -51,7 +52,7 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         (await versions.GetForProductAsync(productId, Cancellation)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task A_run_that_throws_keeps_none_of_its_writes_even_those_their_repositories_committed()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -70,7 +71,7 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         (await versions.HasAnyAsync(productId, Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task A_read_in_a_run_sees_what_the_run_has_written()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -85,7 +86,7 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         nameRead.Should().Be("Pandesal Classic");
     }
 
-    [Fact]
+    [Test]
     public async Task A_run_inside_a_run_is_part_of_it()
     {
         var productId = await AddProductAsync("Pandesal");
@@ -106,7 +107,7 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal");
     }
 
-    [Fact]
+    [Test]
     public async Task After_a_run_that_threw_a_repository_writes_on_its_own_again()
     {
         var productId = await AddProductAsync("Pandesal");

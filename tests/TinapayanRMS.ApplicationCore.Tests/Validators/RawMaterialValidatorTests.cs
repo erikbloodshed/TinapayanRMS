@@ -12,7 +12,7 @@ public class RawMaterialValidatorTests
     /// <summary>What the Raw Materials screen shows: each failure's message (the rule's own, for one RawMaterialRepository runs).</summary>
     private static IEnumerable<string> Messages(FluentValidation.Results.ValidationResult result) => result.Errors.Select(e => e.ErrorMessage);
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_purchased_ingredient()
     {
         var result = _validator.Validate(new RawMaterial
@@ -26,7 +26,7 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_made_ingredient()
     {
         var result = _validator.Validate(new RawMaterial
@@ -42,7 +42,7 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_made_ingredient_without_a_sub_assembly()
     {
         var result = _validator.Validate(new RawMaterial
@@ -57,7 +57,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("Pick the sub-assembly it's made from.");
     }
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_packaging_material()
     {
         var result = _validator.Validate(new RawMaterial
@@ -71,7 +71,7 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_name()
     {
         var result = _validator.Validate(new RawMaterial
@@ -86,7 +86,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("Every raw material needs a name.");
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_category()
     {
         var result = _validator.Validate(new RawMaterial
@@ -100,7 +100,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("Category is required.");
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_made_ingredient_with_an_out_of_range_weight_loss_percent()
     {
         var result = _validator.Validate(new RawMaterial
@@ -114,7 +114,7 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_made_ingredient_without_a_weight_loss_percent()
     {
         var result = _validator.Validate(new RawMaterial
@@ -128,7 +128,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("A made ingredient needs a weight loss percent.");
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_purchased_material_with_a_weight_loss_percent()
     {
         var result = _validator.Validate(new RawMaterial
@@ -143,7 +143,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("A purchased material has no weight loss percent.");
     }
 
-    [Fact]
+    [Test]
     public void Rejects_an_ingredient_with_a_base_unit_since_it_is_always_the_gram()
     {
         var result = _validator.Validate(new RawMaterial
@@ -158,9 +158,9 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("An ingredient's base unit is always the gram.");
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0)]
+    [Test]
+    [Arguments(null)]
+    [Arguments(0)]
     public void Rejects_a_packaging_material_without_a_base_unit(int? baseUnitId)
     {
         var result = _validator.Validate(new RawMaterial
@@ -175,9 +175,9 @@ public class RawMaterialValidatorTests
         Messages(result).Should().ContainSingle().Which.Should().Be("A packaging material needs a base unit.");
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(101)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(101)]
     public void Rejects_a_cost_buffer_outside_0_to_100_percent(decimal bufferPercent)
     {
         var result = _validator.Validate(new RawMaterial
@@ -193,7 +193,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().ContainSingle().Which.Should().Be("Cost buffer must be at least 0 and at most 100 percent.");
     }
 
-    [Fact]
+    [Test]
     public void Accepts_a_cost_buffer_of_100_percent()
     {
         var result = _validator.Validate(new RawMaterial
@@ -208,7 +208,7 @@ public class RawMaterialValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_made_packaging_material()
     {
         var result = _validator.Validate(new RawMaterial
@@ -236,15 +236,15 @@ public class RawMaterialValidatorTests
         CostSharePercent = costShare,
     };
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_linked_ingredient()
     {
         _validator.Validate(EggWhite()).IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0)]
+    [Test]
+    [Arguments(null)]
+    [Arguments(0)]
     public void Rejects_a_linked_ingredient_without_a_link(int? linkedToId)
     {
         var result = _validator.Validate(EggWhite(linkedToId: linkedToId));
@@ -256,18 +256,18 @@ public class RawMaterialValidatorTests
     private const string WeightShareText = "Weight share must be above 0 and at most 100 percent.";
     private const string CostShareText = "Cost share must be above 0 and at most 100 percent.";
 
-    public static TheoryData<decimal?, decimal?, string> SharesMissingOrOutOfRange => new()
-    {
-        { null, 30m, WeightShareText },
-        { 0m, 30m, WeightShareText },
-        { 101m, 30m, WeightShareText },
-        { 70m, null, CostShareText },
-        { 70m, -1m, CostShareText },
-        { 70m, 100.5m, CostShareText },
-    };
+    public static IEnumerable<(decimal?, decimal?, string)> SharesMissingOrOutOfRange() =>
+    [
+        (null, 30m, WeightShareText),
+        (0m, 30m, WeightShareText),
+        (101m, 30m, WeightShareText),
+        (70m, null, CostShareText),
+        (70m, -1m, CostShareText),
+        (70m, 100.5m, CostShareText),
+    ];
 
-    [Theory]
-    [MemberData(nameof(SharesMissingOrOutOfRange))]
+    [Test]
+    [MethodDataSource(nameof(SharesMissingOrOutOfRange))]
     public void Rejects_a_missing_or_out_of_range_share(decimal? weightShare, decimal? costShare, string expected)
     {
         var result = _validator.Validate(EggWhite(weightShare: weightShare, costShare: costShare));
@@ -276,7 +276,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain(expected);
     }
 
-    [Fact]
+    [Test]
     public void Rejects_link_fields_on_a_purchased_ingredient()
     {
         var result = _validator.Validate(new RawMaterial
@@ -293,7 +293,7 @@ public class RawMaterialValidatorTests
         Messages(result).Should().Contain("Only a linked ingredient is linked to another.");
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_linked_packaging_material()
     {
         var packaging = EggWhite();

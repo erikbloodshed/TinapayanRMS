@@ -10,7 +10,7 @@ public class ReadOnlyConnectionTests
 {
     private const string AppConnection = "Host=localhost;Database=tinapayanrms;Username=tinapayanrms";
 
-    [Fact]
+    [Test]
     public void Every_transaction_is_read_only_as_the_apps_own_role_with_no_reader_set()
     {
         var connection = new NpgsqlConnectionStringBuilder(ReadOnlyConnection.Of(AppConnection));
@@ -20,7 +20,7 @@ public class ReadOnlyConnectionTests
         connection.Database.Should().Be("tinapayanrms");
     }
 
-    [Fact]
+    [Test]
     public void A_reader_set_is_the_role_it_connects_as_still_read_only()
     {
         var connection = new NpgsqlConnectionStringBuilder(ReadOnlyConnection.Of(AppConnection, " tinapayanrms_reader "));
@@ -30,10 +30,10 @@ public class ReadOnlyConnectionTests
         connection.Database.Should().Be("tinapayanrms", "the same database the app saves to");
     }
 
-    [Theory]
-    [InlineData(null, "tinapayanrms")]
-    [InlineData("", "tinapayanrms")]
-    [InlineData("tinapayanrms_reader", "tinapayanrms_reader")]
+    [Test]
+    [Arguments(null, "tinapayanrms")]
+    [Arguments("", "tinapayanrms")]
+    [Arguments("tinapayanrms_reader", "tinapayanrms_reader")]
     public void Apply_puts_the_read_only_connection_over_the_apps_as_the_reader_its_settings_name(string? reader, string connectsAs)
     {
         var builder = new ConfigurationBuilder().AddInMemoryCollection([

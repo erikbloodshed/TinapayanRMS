@@ -9,7 +9,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialUnitRepository CreateRepository() => new(CreateDbContextFactory());
@@ -36,7 +37,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         return (await dbContext.RawMaterials.AsNoTracking().SingleAsync(i => i.Id == ingredientId, Cancellation)).CostPerBaseUnit;
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_and_GetForIngredientAsync_round_trip_units_largest_first()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -52,7 +53,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
             .Should().Equal(("bag", 25000m, "Standard flour bag (25 kg)"), ("pack", 1000m, "Small pack (1 kg)"));
     }
 
-    [Fact]
+    [Test]
     public async Task A_kilogram_of_an_ingredient_is_saved_as_1000_grams_whatever_multiplier_was_sent()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -67,9 +68,9 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Single().BaseUnitsPerUnit.Should().Be(1000m);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-5)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-5)]
     public async Task AddAsync_rejects_a_multiplier_that_is_not_positive(decimal gramsPerUnit)
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -80,7 +81,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_unit_the_ingredient_already_has()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -93,7 +94,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already has*");
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_accepts_a_third_unit()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -110,7 +111,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
             .Should().Equal([bagId, packId, cupId], "there's no limit on alternative units, and they're listed largest first");
     }
 
-    [Fact]
+    [Test]
     public async Task The_same_unit_of_measure_can_be_an_alternative_unit_of_different_ingredients()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -124,7 +125,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForRawMaterialAsync(sugarId, Cancellation)).Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(50000m);
     }
 
-    [Fact]
+    [Test]
     public async Task AddAsync_rejects_a_nonexistent_ingredient()
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
@@ -134,7 +135,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Correcting_the_multiplier_of_the_latest_prices_unit_reprices_the_ingredient_and_everything_built_from_it()
     {
         var sugarId = await SeedIngredientAsync("Sugar");
@@ -159,7 +160,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await SubAssemblyTotalsAsync(subAssemblyId)).TotalCost.Should().Be(50m, "the sub-assembly using sugar is costed at its new cost: 500 g at 0.10/g");
     }
 
-    [Fact]
+    [Test]
     public async Task Correcting_a_multiplier_leaves_recipe_lines_and_their_totals_alone_since_they_are_in_grams()
     {
         var eggId = await SeedIngredientAsync("Egg");
@@ -185,7 +186,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await GetCostPerGramAsync(custardId)).Should().Be(0.2m);
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_an_ingredients_unit_even_while_recipes_use_the_ingredient()
     {
         var eggId = await SeedIngredientAsync("Egg");
@@ -200,7 +201,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForRawMaterialAsync(eggId, Cancellation)).Should().BeEmpty("recipe lines are in grams, never in one of its units");
     }
 
-    [Fact]
+    [Test]
     public async Task Correcting_a_multiplier_the_latest_price_is_not_in_leaves_the_cost_alone()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -220,7 +221,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await GetCostPerGramAsync(flourId)).Should().Be(0.05m);
     }
 
-    [Fact]
+    [Test]
     public async Task UpdateAsync_can_rename_the_unit_and_description_but_not_to_a_unit_the_ingredient_already_has()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -245,7 +246,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_removes_an_unused_unit()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -259,7 +260,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_rejects_a_unit_a_price_is_recorded_in()
     {
         var flourId = await SeedIngredientAsync("Flour");
@@ -275,7 +276,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
         (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task DeleteAsync_rejects_a_nonexistent_unit()
     {
         var act = () => CreateRepository().DeleteAsync(999_999, Cancellation);

@@ -21,11 +21,11 @@ public sealed class AutomaticBackupsTests : IDisposable
 
     private readonly string _root = Directory.CreateTempSubdirectory("automatic-backups-").FullName;
 
-    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
-    [Fact]
+    [Test]
     public Task The_days_backup_is_copied_to_the_second_folder_and_only_the_newest_automatic_ones_are_kept_there() => StaThread.RunAsync(async () =>
     {
         var copies = Directory.CreateDirectory(Path.Combine(_root, "usb")).FullName;
@@ -40,7 +40,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         File.WriteAllText(Path.Combine(copies, "notes.txt"), "not a backup");
         var automatic = Create(copies);
 
-        var backup = await automatic.RunAsync(today, TestContext.Current.CancellationToken);
+        var backup = await automatic.RunAsync(today, TestContext.Current!.Execution.CancellationToken);
 
         File.Exists(Path.Combine(copies, Path.GetFileName(backup!.Path))).Should().BeTrue();
         Directory.GetFiles(copies, "*" + BackupRules.Extension).Should().HaveCount(BackupRules.AutomaticBackupsKept + 1, "the oldest automatic one went, the manual one stays");
@@ -50,18 +50,18 @@ public sealed class AutomaticBackupsTests : IDisposable
         automatic.LastCopyProblem.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_second_folder_that_isnt_there_is_passed_over_and_said() => StaThread.RunAsync(async () =>
     {
         var automatic = Create(Path.Combine(_root, "unplugged"));
 
-        var backup = await automatic.RunAsync(new DateTime(2026, 10, 29, 9, 0, 0), TestContext.Current.CancellationToken);
+        var backup = await automatic.RunAsync(new DateTime(2026, 10, 29, 9, 0, 0), TestContext.Current!.Execution.CancellationToken);
 
         backup.Should().NotBeNull("the backup itself is still taken");
         automatic.LastCopyProblem.Should().Contain("wasn't there");
     });
 
-    [Fact]
+    [Test]
     public void The_second_folder_is_kept_for_the_user_and_cleared_with_nothing()
     {
         var viewState = new InMemoryViewStateStore();
@@ -73,7 +73,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         automatic.CopyFolder.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public Task A_copys_problem_is_still_said_after_a_restart_until_the_folder_changes() => StaThread.RunAsync(async () =>
     {
         var viewState = new InMemoryViewStateStore();
@@ -90,7 +90,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         restarted.LastCopyProblem.Should().BeNull("Stop Copying leaves no folder to have a problem with");
     });
 
-    [Fact]
+    [Test]
     public Task A_backup_that_cant_be_taken_says_why_and_stays_said_after_a_restart() => StaThread.RunAsync(async () =>
     {
         var viewState = new InMemoryViewStateStore();
@@ -105,7 +105,7 @@ public sealed class AutomaticBackupsTests : IDisposable
             .Should().Be(automatic.LastBackupProblem, "a restart mustn't make it look as if backups are fine");
     });
 
-    [Fact]
+    [Test]
     public Task The_next_backup_that_goes_through_clears_the_problem() => StaThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
@@ -119,9 +119,9 @@ public sealed class AutomaticBackupsTests : IDisposable
         automatic.LastBackupProblem.Should().BeNull();
     });
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2.9)]
+    [Test]
+    [Arguments(1)]
+    [Arguments(2.9)]
     public Task A_failure_with_a_recent_backup_there_interrupts_no_one(double daysOld) => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: Today.AddDays(-daysOld));
@@ -130,7 +130,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().BeNull("the next check may well put it right, and the Database tab says so meanwhile");
     });
 
-    [Fact]
+    [Test]
     public Task A_failure_with_the_newest_backup_grown_old_says_so_and_why() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: new DateTime(2026, 10, 20, 8, 0, 0));
@@ -141,7 +141,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         warning.Should().Contain("October 20, 2026").And.Contain("isn't backed up").And.Contain("no password supplied");
     });
 
-    [Fact]
+    [Test]
     public Task A_failure_with_no_backup_at_all_says_so() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: null);
@@ -150,7 +150,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().Contain("no backup").And.Contain("no password supplied");
     });
 
-    [Fact]
+    [Test]
     public Task The_warning_comes_once_a_run_however_many_hourly_checks_fail() => StaThread.RunAsync(async () =>
     {
         var automatic = CreateFailing(newestTakenAt: null);
@@ -162,7 +162,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         (await automatic.OverdueWarningAsync(Today.AddHours(1), Cancellation)).Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task An_old_backup_is_no_reason_to_warn_when_todays_went_through() => StaThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Newest = Backup(Today.AddDays(-30)) };
@@ -172,7 +172,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task The_Database_tab_shows_why_the_last_backup_wasnt_taken() => StaThread.RunAsync(async () =>
     {
         ReactiveUIBootstrapper.EnsureInitialized();

@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// uses it, naming each user, as deleting a product names what leans on it. Left to the foreign keys, the screen
 /// would say only "This item is currently in use elsewhere and can't be deleted."
 /// </summary>
-[Collection(DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
 public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
@@ -31,7 +32,7 @@ public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : Persis
         return material.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task An_unused_material_goes_with_its_prices()
     {
         var saltId = await AddIngredientAsync("Salt");
@@ -44,7 +45,7 @@ public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : Persis
         (await dbContext.RawMaterialBrandPrices.AnyAsync(p => p.RawMaterialId == saltId, Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_in_use_stays_and_the_refusal_names_each_user_and_how_it_uses_it()
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -71,7 +72,7 @@ public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : Persis
         (await dbContext.RawMaterials.CountAsync(m => m.Id == flourId || m.Id == vanillaId, Cancellation)).Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task Packaging_in_use_and_an_ingredient_others_are_linked_to_are_refused_by_name()
     {
         var boxId = await AddPackagingAsync("Box");

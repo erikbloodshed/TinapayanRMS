@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// in Settings: one row, reading as new products in Production, the costing at zero, the wastage at 3% and the buffer at
 /// 10% until first saved.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private CostingDefaultsRepository CreateRepository() => new(CreateDbContextFactory());
@@ -21,7 +22,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     private static CostingDefaults Defaults(decimal labor, decimal overhead, decimal administrative, decimal margin, decimal vat, decimal wastage = 3m) =>
         new() { LaborPercent = labor, OverheadPercent = overhead, AdministrativePercent = administrative, MarginPercent = margin, VatPercent = vat, WastagePercent = wastage };
 
-    [Fact]
+    [Test]
     public async Task GetAsync_reads_the_costing_at_zero_and_the_wastage_at_3_percent_before_anything_is_saved()
     {
         var defaults = await CreateRepository().GetAsync(Cancellation);
@@ -33,9 +34,9 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         defaults.CostBufferPercent.Should().Be(10m);
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(100)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(100)]
     public async Task SetAsync_keeps_the_cost_buffer_typed_even_none(int buffer)
     {
         await CreateRepository().SetAsync(new CostingDefaults { CostBufferPercent = buffer }, Cancellation);
@@ -43,9 +44,9 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         (await CreateRepository().GetAsync(Cancellation)).CostBufferPercent.Should().Be(buffer, "a buffer of 0 isn't left for the store default to make 10%");
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(101)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(101)]
     public async Task SetAsync_refuses_a_cost_buffer_a_material_couldnt_have(int buffer)
     {
         var act = () => CreateRepository().SetAsync(new CostingDefaults { CostBufferPercent = buffer }, Cancellation);
@@ -53,7 +54,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_keeps_the_stage_picked_for_new_products_even_Research_and_Development()
     {
         await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.ResearchAndDevelopment }, Cancellation);
@@ -64,7 +65,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         (await CreateRepository().GetAsync(Cancellation)).NewProductStage.Should().Be(ProductStage.Production);
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_keeps_the_wastage_typed_even_a_first_save_of_none()
     {
         await CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: 0m), Cancellation);
@@ -77,9 +78,9 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         (await CreateRepository().GetAsync(Cancellation)).WastagePercent.Should().Be(100m);
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(101)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(101)]
     public async Task SetAsync_refuses_a_wastage_outside_0_to_100(int wastage)
     {
         var act = () => CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: wastage), Cancellation);
@@ -87,7 +88,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_saves_one_row_and_a_second_save_updates_it()
     {
         await CreateRepository().SetAsync(Defaults(25m, 10m, 5m, 40m, 12m), Cancellation);
@@ -100,7 +101,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         (await dbContext.CostingDefaults.CountAsync(Cancellation)).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_refuses_a_negative_percentage()
     {
         var act = () => CreateRepository().SetAsync(Defaults(-1m, 0m, 0m, 0m, 0m), Cancellation);
@@ -108,7 +109,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task The_table_holds_one_row_at_most()
     {
         await using var dbContext = CreateDbContext();

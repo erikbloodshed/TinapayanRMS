@@ -7,20 +7,20 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class SubAssemblyRulesTests
 {
-    public static TheoryData<decimal, decimal, decimal, decimal> ScaledLines => new()
-    {
-        { 1000m, 1200m, 5000m, 4166.6667m },
-        { 200m, 1200m, 5000m, 833.3333m },
-        { 650m, 1000m, 2000m, 1300m },
-        { 650m, 0m, 2000m, 650m },
-    };
+    public static IEnumerable<(decimal, decimal, decimal, decimal)> ScaledLines() =>
+    [
+        (1000m, 1200m, 5000m, 4166.6667m),
+        (200m, 1200m, 5000m, 833.3333m),
+        (650m, 1000m, 2000m, 1300m),
+        (650m, 0m, 2000m, 650m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(ScaledLines))]
+    [Test]
+    [MethodDataSource(nameof(ScaledLines))]
     public void ScaledGrams_scales_a_line_by_the_batchs_factor_to_the_stored_decimals(decimal grams, decimal from, decimal to, decimal expected) =>
         SubAssemblyRules.ScaledGrams(grams, from, to).Should().Be(expected);
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_rejects_an_empty_list()
     {
         var act = () => SubAssemblyRules.EnsureValidLines([]);
@@ -28,7 +28,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_rejects_non_positive_grams()
     {
         var act = () => SubAssemblyRules.EnsureValidLines([(IngredientId: 1, Grams: 0m)]);
@@ -36,7 +36,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_rejects_the_same_ingredient_twice()
     {
         var act = () => SubAssemblyRules.EnsureValidLines(
@@ -48,7 +48,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_accepts_distinct_positive_lines()
     {
         var act = () => SubAssemblyRules.EnsureValidLines(
@@ -60,7 +60,7 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void CalculateTotals_sums_weight_and_weighted_cost()
     {
         // 800g flour @ ₱0.05/g (₱40) + 200g sugar @ ₱0.09/g (₱18).
@@ -74,7 +74,7 @@ public class SubAssemblyRulesTests
         totalCost.Should().Be(58m);
     }
 
-    [Fact]
+    [Test]
     public void CalculateTotals_with_a_single_line_matches_that_line()
     {
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(
@@ -86,7 +86,7 @@ public class SubAssemblyRulesTests
         totalCost.Should().Be(50m);
     }
 
-    [Fact]
+    [Test]
     public void EnsureSectionsDistinct_accepts_one_in_each_role_without_names()
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(1, "Dough", null), (2, "Filling", null), (3, "Topping", null)]);
@@ -94,7 +94,7 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureSectionsDistinct_accepts_several_in_one_role_told_apart_by_name_with_one_unnamed()
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(1, "Dough", null), (2, "Filling", null), (2, "Filling", "Cheese"), (2, "Filling", "Ube")]);
@@ -102,7 +102,7 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureSectionsDistinct_rejects_two_unnamed_in_one_role()
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(1, "Dough", null), (2, "Filling", null), (2, "Filling", "  ")]);
@@ -111,7 +111,7 @@ public class SubAssemblyRulesTests
             .WithMessage("This recipe has more than one Filling without a name. Name them, such as Ube and Cheese, so their tabs can be told apart.");
     }
 
-    [Fact]
+    [Test]
     public void EnsureSectionsDistinct_rejects_one_name_twice_in_a_role_whatever_its_case_and_spacing()
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(2, "Filling", "Ube"), (2, "Filling", " ube ")], "Cream Loaf");
@@ -120,7 +120,7 @@ public class SubAssemblyRulesTests
             .WithMessage("Cream Loaf has two Filling sub-assemblies called Ube. Give one of them another name.");
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidSectionName_takes_no_name_and_refuses_one_too_long()
     {
         var none = () => SubAssemblyRules.EnsureValidSectionName(null);
@@ -132,7 +132,7 @@ public class SubAssemblyRulesTests
         tooLong.Should().Throw<InvalidOperationException>().WithMessage("*keep it to 100 characters*");
     }
 
-    [Fact]
+    [Test]
     public void StandaloneNameFor_is_the_product_and_role_with_the_sections_own_name_after_them()
     {
         SubAssemblyRules.StandaloneNameFor(" Cheese Roll ", "Dough", null).Should().Be("Cheese Roll Dough");
@@ -141,7 +141,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.StandaloneNameFor("Cheese Roll", "Dough", "  ").Should().Be("Cheese Roll Dough");
     }
 
-    [Fact]
+    [Test]
     public void UniqueStandaloneName_numbers_a_name_already_taken_whatever_its_case_and_spacing()
     {
         SubAssemblyRules.UniqueStandaloneName("Cheese Roll Dough", ["Pandesal Dough"]).Should().Be("Cheese Roll Dough");
@@ -149,7 +149,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.UniqueStandaloneName("Cheese Roll Dough", ["Cheese Roll Dough", "CHEESE ROLL DOUGH 2"]).Should().Be("Cheese Roll Dough 3");
     }
 
-    [Fact]
+    [Test]
     public void UniqueStandaloneName_cuts_a_long_name_to_fit_its_number()
     {
         var longName = new string('a', 95) + " Dough";
@@ -161,18 +161,18 @@ public class SubAssemblyRulesTests
         numbered.Should().Be(new string('a', 95) + " Do 2");
     }
 
-    [Theory]
-    [InlineData("Cheese Roll Filling: Cheese", "Cheese", true)]
-    [InlineData("cheese roll filling", null, true)]
-    [InlineData("Cheese Roll Filling 2", null, true)]
-    [InlineData("Cheese Roll Filling: Cheese 3", "Cheese", true)]
-    [InlineData("Cheese Roll Filling 1", null, false)]
-    [InlineData("Cheese Roll Filling: Cheese", null, false)]
-    [InlineData("Pan de Coco", null, false)]
+    [Test]
+    [Arguments("Cheese Roll Filling: Cheese", "Cheese", true)]
+    [Arguments("cheese roll filling", null, true)]
+    [Arguments("Cheese Roll Filling 2", null, true)]
+    [Arguments("Cheese Roll Filling: Cheese 3", "Cheese", true)]
+    [Arguments("Cheese Roll Filling 1", null, false)]
+    [Arguments("Cheese Roll Filling: Cheese", null, false)]
+    [Arguments("Pan de Coco", null, false)]
     public void IsNamedAfter_knows_a_name_made_from_the_product_role_and_section_numbered_or_not(string name, string? sectionName, bool isNamedAfter) =>
         SubAssemblyRules.IsNamedAfter(name, "Cheese Roll", "Filling", sectionName).Should().Be(isNamedAfter);
 
-    [Fact]
+    [Test]
     public void IsNamedAfter_knows_a_name_cut_short_to_fit_numbered_or_not()
     {
         var product = new string('a', 95);
@@ -184,7 +184,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.IsNamedAfter(numbered, product, "Dough", null).Should().BeTrue($"{numbered} is the name numbered and cut");
     }
 
-    [Fact]
+    [Test]
     public void StoredSectionName_drops_nothing_and_the_roles_own_name()
     {
         SubAssemblyRules.StoredSectionName("  Cheese ", "Filling").Should().Be("Cheese");
@@ -192,7 +192,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.StoredSectionName("filling", "Filling").Should().BeNull("its name leaves the role's name out too");
     }
 
-    [Fact]
+    [Test]
     public void LabelIn_reads_a_products_own_by_its_section_name_and_any_other_by_its_name()
     {
         var own = new SubAssembly { Name = "Cheese Roll Filling 2", OwnerProductId = 7, SectionName = null };
@@ -205,15 +205,15 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.LabelIn(linked, 7, "Cheese Roll", "Filling").Should().Be("Ube");
     }
 
-    [Theory]
-    [InlineData("Cheese Roll Filling", null)]
-    [InlineData("Cheese Roll Filling: Cheese", "Cheese")]
-    [InlineData("Cheese Roll Filling 2", null)]
-    [InlineData("Pan de Coco", "Pan de Coco")]
+    [Test]
+    [Arguments("Cheese Roll Filling", null)]
+    [Arguments("Cheese Roll Filling: Cheese", "Cheese")]
+    [Arguments("Cheese Roll Filling 2", null)]
+    [Arguments("Pan de Coco", "Pan de Coco")]
     public void SectionNameFromSavedName_reads_the_label_its_name_gave_without_a_number(string name, string? sectionName) =>
         SubAssemblyRules.SectionNameFromSavedName(name, "Cheese Roll", "Filling").Should().Be(sectionName);
 
-    [Fact]
+    [Test]
     public void EnsureLinkable_refuses_a_products_own_and_names_whose_it_is()
     {
         var own = () => SubAssemblyRules.EnsureLinkable("Cheese Roll Filling: Cheese", "Cheese Roll");
@@ -223,7 +223,7 @@ public class SubAssemblyRulesTests
         standalone.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureLinkableByMadeIngredient_takes_only_a_recipe_kept_on_the_Sub_Assemblies_screen()
     {
         var own = () => SubAssemblyRules.EnsureLinkableByMadeIngredient("Cheese Roll Filling: Cheese", "Cheese Roll", isPackaging: false);
@@ -235,7 +235,7 @@ public class SubAssemblyRulesTests
         standalone.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureNoMadeIngredientMadeFrom_names_the_made_ingredients()
     {
         var one = () => SubAssemblyRules.EnsureNoMadeIngredientMadeFrom("Butter Icing Base", ["Butter Icing"]);
@@ -247,7 +247,7 @@ public class SubAssemblyRulesTests
         none.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureProductOwnedAllowed_refuses_only_a_product_owned_packaging_role()
     {
         var packaging = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });
@@ -257,7 +257,7 @@ public class SubAssemblyRulesTests
         filling.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void SectionLabel_is_a_sub_assemblys_name_less_the_product_and_role_it_was_saved_under_from_there()
     {
         SubAssemblyRules.SectionLabel("Cheese Roll Filling: Cheese", "Cheese Roll", "Filling").Should().Be("Cheese");
@@ -268,7 +268,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.SectionLabel("Ube Halaya", null, "Filling").Should().Be("Ube Halaya");
     }
 
-    [Fact]
+    [Test]
     public void EnsureNotLinkedElsewhere_lets_an_unlinked_sub_assembly_go()
     {
         var act = () => SubAssemblyRules.EnsureNotLinkedElsewhere("Sweet Dough", []);
@@ -276,7 +276,7 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureNotLinkedElsewhere_names_every_product_linking_it()
     {
         var one = () => SubAssemblyRules.EnsureNotLinkedElsewhere("Sweet Dough", ["Cream Loaf Mini"]);
@@ -286,7 +286,7 @@ public class SubAssemblyRulesTests
         two.Should().Throw<InvalidOperationException>().WithMessage("Cream Loaf Mini, Ube Roll link Sweet Dough.*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureStandaloneNameAvailable_accepts_a_free_name()
     {
         var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable("Chocolate Glaze", ["Sweet Dough"]);
@@ -294,7 +294,7 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void EnsureStandaloneNameAvailable_rejects_a_taken_name_whatever_its_case_and_spacing()
     {
         var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable(" sweet dough ", ["Sweet Dough"]);
@@ -302,7 +302,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'sweet dough'. Give this one its own name.");
     }
 
-    [Fact]
+    [Test]
     public void FormulaBaseWeight_adds_up_every_ticked_line()
     {
         // Two flours tick together and make 100% between them; the water doesn't count toward the base.
@@ -314,13 +314,13 @@ public class SubAssemblyRulesTests
         ]).Should().Be(1000m);
     }
 
-    [Fact]
+    [Test]
     public void FormulaBaseWeight_is_nothing_when_no_line_is_ticked()
     {
         SubAssemblyRules.FormulaBaseWeight([(Grams: 650m, IsFormulaBase: false)]).Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void CalculateBakersPercent_is_the_lines_share_of_the_base()
     {
         // 1,000 g of flour is the base, so it reads 100 and 650 g of water reads 65.
@@ -329,14 +329,14 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.CalculateBakersPercent(20m, baseWeight: 1000m).Should().Be(2m);
     }
 
-    [Fact]
+    [Test]
     public void CalculateBakersPercent_has_no_figure_when_nothing_is_the_base()
     {
         // A glaze or a filling needn't have a base; no figure is the honest answer, not zero.
         SubAssemblyRules.CalculateBakersPercent(650m, baseWeight: 0m).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void CalculateAbsolutePercent_is_the_lines_share_of_the_whole_batch()
     {
         // A 1,000 g glaze with no base: 150 g of butter is 15% of it, and the lines come to 100 between them.
@@ -345,7 +345,7 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.CalculateAbsolutePercent(150m, batchWeight: 0m).Should().BeNull("an empty batch has nothing to take a share of");
     }
 
-    [Fact]
+    [Test]
     public void GramsFromBakersPercent_is_the_percentage_of_the_base()
     {
         // 65% on 1,000 g of flour is 650 g of water.
@@ -353,14 +353,14 @@ public class SubAssemblyRulesTests
         SubAssemblyRules.GramsFromBakersPercent(1.8m, baseWeight: 1450m).Should().Be(26.1m);
     }
 
-    [Fact]
+    [Test]
     public void GramsFromBakersPercent_rounds_to_the_decimals_grams_are_stored_in()
     {
         // 2.333% of 1,015.5 g is 23.691615 g; stored grams have 4 decimals, so reopening the line gives back what was saved.
         SubAssemblyRules.GramsFromBakersPercent(2.333m, baseWeight: 1015.5m).Should().Be(23.6916m);
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_refuses_a_base_line_given_as_a_percentage()
     {
         var act = () => SubAssemblyRules.EnsureValidLines(
@@ -369,7 +369,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidLines_refuses_a_percentage_that_isnt_positive()
     {
         var act = () => SubAssemblyRules.EnsureValidLines(
@@ -381,7 +381,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidPackagingLines_accepts_distinct_positive_lines()
     {
         var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, 1m), (2, null, 30m)]);
@@ -389,9 +389,9 @@ public class SubAssemblyRulesTests
         act.Should().NotThrow();
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
     public void EnsureValidPackagingLines_rejects_a_quantity_that_isnt_positive(int qty)
     {
         var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, qty)]);
@@ -399,7 +399,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*quantity must be positive*");
     }
 
-    [Fact]
+    [Test]
     public void EnsureValidPackagingLines_rejects_no_lines_and_a_material_twice()
     {
         var none = () => SubAssemblyRules.EnsureValidPackagingLines([]);
@@ -409,9 +409,9 @@ public class SubAssemblyRulesTests
         twice.Should().Throw<InvalidOperationException>().WithMessage("*same material more than once*");
     }
 
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
+    [Test]
+    [Arguments(true, false)]
+    [Arguments(false, true)]
     public void EnsureKindUnchanged_refuses_switching_between_a_recipe_and_a_packaging_set(bool wasPackaging, bool isPackaging)
     {
         var act = () => SubAssemblyRules.EnsureKindUnchanged(wasPackaging, isPackaging);
@@ -419,7 +419,7 @@ public class SubAssemblyRulesTests
         act.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void EnsureRecipeRole_refuses_the_packaging_role_by_its_flag_not_its_name()
     {
         var renamed = () => SubAssemblyRules.EnsureRecipeRole(new SubAssemblyRole { Name = "Boxes", IsPackaging = true });

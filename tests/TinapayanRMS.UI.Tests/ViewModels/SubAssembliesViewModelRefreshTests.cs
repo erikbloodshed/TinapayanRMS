@@ -19,10 +19,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// and lines; coming back to the tab (LoadCommand) keeps unsaved lines and reprices them; Delete is refused
 /// while a product links it.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task One_Save_writes_a_new_standalone_sub_assembly_and_selects_it() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
@@ -55,7 +56,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(200m);
     });
 
-    [Fact]
+    [Test]
     public Task Saving_without_lines_is_refused_with_a_message() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
@@ -69,7 +70,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Should().BeEmpty();
     });
 
-    [Fact]
+    [Test]
     public Task Reloading_keeps_unsaved_lines_and_reprices_them() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -97,7 +98,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow!.Name.Should().Be("Glaze");
     });
 
-    [Fact]
+    [Test]
     public Task Deleting_a_linked_one_is_refused_and_the_form_shows_who_uses_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -129,7 +130,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Should().ContainSingle();
     });
 
-    [Fact]
+    [Test]
     public Task OpenSubAssembly_waits_for_a_list_not_loaded_yet_and_clears_a_search_hiding_it() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -159,7 +160,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.VisibleRows.Should().Contain(viewModel.SelectedRow);
     });
 
-    [Fact]
+    [Test]
     public Task OpenByName_opens_the_sub_assembly_a_name_means_best_as_the_Vim_command_line_asks() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -177,7 +178,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
     });
 
-    [Fact]
+    [Test]
     public Task In_the_packaging_role_the_form_saves_and_reloads_a_packaging_set() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
@@ -222,7 +223,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
     });
 
-    [Fact]
+    [Test]
     public Task Copy_starts_a_new_one_with_the_same_role_and_lines_and_Save_adds_it_beside_the_original() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough");
@@ -264,7 +265,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         (await dbContext.SubAssemblyLines.CountAsync(l => l.SubAssemblyId == viewModel.SelectedRow.Id, Cancellation)).Should().Be(2);
     });
 
-    [Fact]
+    [Test]
     public Task A_copys_name_is_one_no_other_sub_assembly_has() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -284,7 +285,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
     });
 
-    [Fact]
+    [Test]
     public Task Copying_a_packaging_set_copies_its_materials() => StaThread.RunAsync(async () =>
     {
         await AddRoleAsync("Glaze");
@@ -328,7 +329,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
     });
 
-    [Fact]
+    [Test]
     public Task New_Product_asks_for_a_product_linking_the_picked_sub_assembly_once_its_changes_are_saved() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -358,7 +359,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.ErrorMessage.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task New_Product_is_not_offered_for_a_packaging_set() => StaThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
@@ -408,7 +409,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new LoggerConfiguration().CreateLogger());
     }
 
-    [Fact]
+    [Test]
     public Task A_typed_percentage_is_saved_and_reopens_as_typed() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -435,7 +436,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
     });
 
-    [Fact]
+    [Test]
     public Task Unticking_the_base_switches_the_lines_to_absolute_percentages() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");

@@ -13,7 +13,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// (UsageFormPanel.xaml). Left to the grid, its current cell stays on the add row, a fresh one once the line is added,
 /// so the outline jumps to the row under the line being typed (Products' sub-assembly lines).
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridEditCommitTests
 {
     public sealed class Line
@@ -23,7 +23,7 @@ public class GridEditCommitTests
         public decimal Grams { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void Committing_the_add_row_on_leaving_keeps_the_current_cell_on_the_added_line()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -40,7 +40,7 @@ public class GridEditCommitTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Committing_the_add_row_for_an_undo_leaves_the_current_cell_on_the_add_row()
     {
         // Ctrl+Z commits first and then takes the line straight back out, so the cell stays where the next line is typed.

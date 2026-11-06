@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// What the Raw Materials list saves at once, without the form's Save: a material dragged or moved into another category
 /// (MoveAsync), and a material renamed from its menu (RenameAsync). Each changes that one thing and stamps UpdatedAt.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>The clock a move or rename stamps from, so the date it stamps is one the test can name.</summary>
@@ -21,7 +22,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
 
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory(_clock));
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_files_several_materials_in_one_save_changing_only_their_category()
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
@@ -43,7 +44,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         moved[0].CostUpdatedAt.Should().Be(costDateBefore, "so its cost date stays as it was added");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_refuses_a_category_of_the_other_type_and_moves_nothing()
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
@@ -58,7 +59,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         (await CategoryIdsAsync()).Should().OnlyContain(id => id == flourId);
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_files_a_made_ingredient_only_in_a_Made_category()
     {
         var fillingsId = await AddCategoryAsync("Fillings", RawMaterialCategoryType.Ingredient);
@@ -78,7 +79,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         (await CategoryIdsAsync()).Should().BeEquivalentTo([inHouseId, dryGoodsId]);
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_refuses_a_category_that_no_longer_exists()
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
@@ -89,7 +90,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("The category to move it to no longer exists.");
     }
 
-    [Fact]
+    [Test]
     public async Task RenameAsync_changes_only_the_name_and_refuses_one_in_use()
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);

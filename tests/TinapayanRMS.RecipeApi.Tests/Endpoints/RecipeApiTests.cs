@@ -28,7 +28,8 @@ namespace TinapayanRMS.RecipeApi.Tests.Endpoints;
 /// materials and product recipes TinapayanBMS plans from, who it answers, what it says when something goes wrong, and no
 /// writes.
 /// </summary>
-[Collection(DatabaseCollection.Name)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     /// <summary>
@@ -48,7 +49,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
 
     private sealed record Bakery(int FlourId, int WaterId, int PandesalId, int PandesalDoughId, int SweetDoughId);
 
-    [Fact]
+    [Test]
     public async Task Status_says_it_is_the_Recipe_API()
     {
         using var host = await StartAsync();
@@ -58,7 +59,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         status.Should().Be(new ApiStatus("TinapayanRMS", 1));
     }
 
-    [Fact]
+    [Test]
     public async Task The_mixes_are_the_sub_assemblies_with_ingredients_and_never_a_packaging_set()
     {
         var bakery = await AddBakeryAsync();
@@ -84,7 +85,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await host.GetTestClient().GetAsync($"/api/v1/mixes/{setId}", Cancellation)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task A_mixs_lines_come_in_grams_per_batch_in_the_recipes_order()
     {
         var bakery = await AddBakeryAsync();
@@ -99,7 +100,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await host.GetTestClient().GetAsync("/api/v1/mixes/999999", Cancellation)).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_comes_with_what_it_is_made_from_and_its_BOM_in_order()
     {
         var eggId = await AddIngredientAsync("Egg");
@@ -119,7 +120,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         boms.Should().Equal(new BomLineInfo(custardId, milkId, 300m, false), new BomLineInfo(custardId, eggId, 100m, false));
     }
 
-    [Fact]
+    [Test]
     public async Task A_products_recipe_comes_with_its_sections_lines_and_piece_size()
     {
         var bakery = await AddBakeryAsync();
@@ -146,7 +147,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         pandesal.Costing.SellingPrice.Should().BeGreaterThanOrEqualTo(pandesal.Costing.BaseCost);
     }
 
-    [Fact]
+    [Test]
     public async Task Every_material_comes_with_its_base_unit_buffered_cost_and_what_its_bought_in()
     {
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.08m, bufferedCostPerGram: 0.09m);
@@ -157,7 +158,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         materials.Single(m => m.Id == sugarId).Should().Be(new MaterialInfo(sugarId, "Sugar", "Ingredient", "g", 0.09m, null, 1m, null));
     }
 
-    [Fact]
+    [Test]
     public async Task Every_mix_comes_with_its_lines_at_once()
     {
         var bakery = await AddBakeryAsync();
@@ -174,7 +175,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         pandesalDough.Lines.Should().Equal(one.Lines);
     }
 
-    [Fact]
+    [Test]
     public async Task With_a_key_set_a_request_without_it_is_refused()
     {
         using var host = await StartAsync(key: "s3cret");
@@ -190,7 +191,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         with.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [Test]
     public async Task With_a_key_set_this_PC_needs_it_too_and_another_PC_gets_in_with_it()
     {
         using var host = await StartAsync(key: "s3cret");
@@ -202,10 +203,10 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
     }
 
     // ::ffff: is how Kestrel, listening on every address, reports whoever came over IPv4.
-    [Theory]
-    [InlineData("127.0.0.1")]
-    [InlineData("::1")]
-    [InlineData("::ffff:127.0.0.1")]
+    [Test]
+    [Arguments("127.0.0.1")]
+    [Arguments("::1")]
+    [Arguments("::ffff:127.0.0.1")]
     public async Task With_no_key_set_this_PC_is_answered(string address)
     {
         using var host = await StartAsync();
@@ -213,10 +214,10 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await SendFromAsync(host, address)).Response.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
 
-    [Theory]
-    [InlineData("192.168.1.20")]
-    [InlineData("::ffff:192.168.1.20")]
-    [InlineData("fe80::1")]
+    [Test]
+    [Arguments("192.168.1.20")]
+    [Arguments("::ffff:192.168.1.20")]
+    [Arguments("fe80::1")]
     public async Task With_no_key_set_another_PC_is_refused_and_told_why(string address)
     {
         using var host = await StartAsync();
@@ -227,17 +228,17 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await JsonSerializer.DeserializeAsync<ApiError>(context.Response.Body, JsonSerializerOptions.Web, Cancellation))!.Error.Should().Be(RecipeApiHost.NoKeyText);
     }
 
-    [Theory]
-    [InlineData("/api/v1/status")]
-    [InlineData("/api/v1/ingredients")]
-    [InlineData("/api/v1/boms")]
-    [InlineData("/api/v1/materials")]
-    [InlineData("/api/v1/categories")]
-    [InlineData("/api/v1/products")]
-    [InlineData("/api/v1/products/recipes")]
-    [InlineData("/api/v1/mixes")]
-    [InlineData("/api/v1/mixes/details")]
-    [InlineData("/api/v1/mixes/1")]
+    [Test]
+    [Arguments("/api/v1/status")]
+    [Arguments("/api/v1/ingredients")]
+    [Arguments("/api/v1/boms")]
+    [Arguments("/api/v1/materials")]
+    [Arguments("/api/v1/categories")]
+    [Arguments("/api/v1/products")]
+    [Arguments("/api/v1/products/recipes")]
+    [Arguments("/api/v1/mixes")]
+    [Arguments("/api/v1/mixes/details")]
+    [Arguments("/api/v1/mixes/1")]
     public async Task A_database_that_cant_be_reached_comes_back_as_a_503_saying_so(string path)
     {
         using var host = await StartAsync(connectionString: "Host=localhost;Port=1;Database=tinapayanrms;Username=tinapayanrms;Timeout=10");
@@ -248,7 +249,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await ErrorOf(response)).Should().Be(Failure.UnreachableText);
     }
 
-    [Fact]
+    [Test]
     public async Task A_timeout_comes_back_as_a_503_saying_so()
     {
         using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new TimeoutException("Execution Timeout Expired.")));
@@ -259,7 +260,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await ErrorOf(response)).Should().Be(Failure.TimedOutText);
     }
 
-    [Fact]
+    [Test]
     public async Task A_bug_comes_back_as_a_500_without_its_details()
     {
         using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new InvalidOperationException("column secret_column does not exist")));
@@ -272,10 +273,10 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
 
     // 42703 a column this version expects, 57014 a statement that ran out of time, XX000 PostgreSQL's own internal error,
     // whose words Failure would hand on and a caller shouldn't see.
-    [Theory]
-    [InlineData("42703", HttpStatusCode.ServiceUnavailable, Failure.OutOfDateText)]
-    [InlineData("57014", HttpStatusCode.ServiceUnavailable, Failure.TimedOutText)]
-    [InlineData("XX000", HttpStatusCode.InternalServerError, RecipeApiHost.UnexpectedText)]
+    [Test]
+    [Arguments("42703", HttpStatusCode.ServiceUnavailable, Failure.OutOfDateText)]
+    [Arguments("57014", HttpStatusCode.ServiceUnavailable, Failure.TimedOutText)]
+    [Arguments("XX000", HttpStatusCode.InternalServerError, RecipeApiHost.UnexpectedText)]
     public async Task What_the_server_says_comes_back_in_a_fixed_sentence(string sqlState, HttpStatusCode status, string text)
     {
         var refusal = new PostgresException("secret_column went wrong", "ERROR", "ERROR", sqlState);
@@ -287,7 +288,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await ErrorOf(response)).Should().Be(text);
     }
 
-    [Fact]
+    [Test]
     public async Task A_rules_refusal_comes_back_as_a_400_in_its_own_words()
     {
         using var host = await StartAsync(costingDefaults: new FailingCostingDefaults(new BusinessRuleException("That won't do.")));
@@ -298,7 +299,7 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
         (await ErrorOf(response)).Should().Be("That won't do.");
     }
 
-    [Fact]
+    [Test]
     public async Task Its_connection_refuses_a_write()
     {
         using var host = await StartAsync();

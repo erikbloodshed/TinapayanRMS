@@ -49,14 +49,14 @@
     <!-- ASP.NET Core ships with the .NET runtime too: the Recipe API's tests run it in memory on the same release. -->
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
-    <!-- At the Microsoft.Testing.Platform version xunit.v3 brings (2.5.1 with xunit.v3 4.0.2): move them together. It does
+    <!-- At the Microsoft.Testing.Platform version TUnit brings (2.5.2 with TUnit 1.81.0): move them together. It does
          nothing unless TESTINGPLATFORM_HOTRELOAD_ENABLED is 1, which only scripts/Watch-Tests.ps1 sets. -->
-    <PackageVersion Include="Microsoft.Testing.Extensions.HotReload" Version="2.5.1" />
+    <PackageVersion Include="Microsoft.Testing.Extensions.HotReload" Version="2.5.2" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
-    <PackageVersion Include="xunit.v3" Version="4.0.2" />
-    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.2" />
+    <!-- TUnit.Engine runs the tests, TUnit.Core has their attributes (all the shared fixtures library needs): the TUnit
+         package would add its own assertions beside AwesomeAssertions. Move both together. -->
+    <PackageVersion Include="TUnit.Core" Version="1.81.0" />
+    <PackageVersion Include="TUnit.Engine" Version="1.81.0" />
   </ItemGroup>
 </Project>

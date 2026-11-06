@@ -6,7 +6,7 @@ namespace TinapayanRMS.UI.Tests.Vim;
 /// <summary>VimKeymap: the one table the keys are read from and the cheat sheet is drawn from.</summary>
 public class VimKeymapTests
 {
-    [Fact]
+    [Test]
     public void Every_key_says_what_it_does_and_where()
     {
         VimKeymap.Bindings.Should().AllSatisfy(binding =>
@@ -16,7 +16,7 @@ public class VimKeymapTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Each_typed_key_means_one_action_wherever_it_works()
     {
         // VimKeySequence reads a key without knowing where it's typed, so its action can't depend on the place; only
@@ -26,7 +26,7 @@ public class VimKeymapTests
             .Should().AllSatisfy(group => group.Select(binding => binding.Action).Distinct().Should().ContainSingle(group.Key));
     }
 
-    [Fact]
+    [Test]
     public void No_key_both_acts_alone_and_starts_a_sequence()
     {
         var prefixes = VimKeymap.Bindings.Where(binding => binding.Keys.Length == 2).Select(binding => binding.Keys[0]).ToHashSet();
@@ -35,7 +35,7 @@ public class VimKeymapTests
             .Should().NotIntersectWith(prefixes);
     }
 
-    [Fact]
+    [Test]
     public void No_place_has_one_key_described_twice()
     {
         foreach (var context in new[] { VimContexts.Field, VimContexts.Table, VimContexts.Tree, VimContexts.Other })
@@ -44,7 +44,7 @@ public class VimKeymapTests
         }
     }
 
-    [Fact]
+    [Test]
     public void The_keys_for_a_place_come_before_those_for_anywhere()
     {
         var keys = VimKeymap.For(VimContexts.Field).ToList();

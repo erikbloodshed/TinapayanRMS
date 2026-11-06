@@ -13,12 +13,13 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// stored to 20. Compared as they are, a Save that changed nothing would read the cost as
 /// changed: it would log the same price in price history again, and move the cost's date.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
-    [Fact]
+    [Test]
     public async Task Saving_a_material_again_unchanged_logs_no_second_price_when_its_cost_doesnt_come_out_even()
     {
         var pieceId = await SeedUnitOfMeasureAsync("piece", "pc");
@@ -43,7 +44,7 @@ public class StoredCostPrecisionPersistenceTests(DatabaseFixture fixture) : Pers
         resaved.CostUpdatedAt.Should().Be(costDate, "the cost didn't move");
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_a_made_ingredient_again_unchanged_leaves_its_cost_date_alone_when_its_cost_doesnt_come_out_even()
     {
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);

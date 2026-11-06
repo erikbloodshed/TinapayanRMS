@@ -17,17 +17,18 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// says what happened, rather than one message for every DbUpdateException and another for every driver exception, a
 /// database that can't be reached among them.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public void A_rule_is_shown_in_its_own_words()
     {
         Failure.Of(new BusinessRuleException("Pick a unit for every alternative unit, or remove the empty row."))
             .Should().Be(new Failure("Pick a unit for every alternative unit, or remove the empty row.", IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public async Task A_duplicate_name_says_the_name_is_in_use()
     {
         await AddCategoryAsync("Breads");
@@ -37,7 +38,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure(Failure.DuplicateNameText, IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public async Task A_duplicate_abbreviation_says_the_abbreviation_is_in_use()
     {
         await SeedUnitOfMeasureAsync("kilogram", "kg");
@@ -47,7 +48,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Text.Should().Be("That abbreviation is already in use.");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_what_something_still_uses_says_it_is_in_use()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -66,7 +67,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure(Failure.InUseText, IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_what_refers_to_something_gone_says_so()
     {
         var failure = await FailureOfAsync(async () =>
@@ -80,7 +81,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.IsRejection.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task A_value_a_check_constraint_refuses_says_so()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -95,7 +96,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Text.Should().Be("One of the values isn't allowed, so the change wasn't saved.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_number_too_large_for_its_column_says_so_rather_than_that_the_name_is_taken()
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -111,7 +112,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Text.Should().Be("A number is too large to save.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_database_that_cant_be_reached_says_so()
     {
         var failure = await FailureOfAsync(async () =>
@@ -125,7 +126,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure(Failure.UnreachableText, IsRejection: false));
     }
 
-    [Fact]
+    [Test]
     public async Task A_database_that_cant_be_reached_by_a_query_says_so()
     {
         // Through EF Core, whose execution strategy wrapped a transient failure in an InvalidOperationException until
@@ -140,7 +141,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure(Failure.UnreachableText, IsRejection: false));
     }
 
-    [Fact]
+    [Test]
     public async Task A_save_that_clashes_with_another_says_the_database_was_busy()
     {
         await AddCategoryAsync("Breads");
@@ -165,7 +166,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure("The database was busy with another change. Try again.", IsRejection: false));
     }
 
-    [Fact]
+    [Test]
     public void A_deadlock_in_a_save_says_the_database_was_busy()
     {
         var deadlock = new PostgresException("deadlock detected", "ERROR", "ERROR", PostgresErrorCodes.DeadlockDetected);
@@ -174,7 +175,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
             .Should().Be(new Failure("The database was busy with another change. Try again.", IsRejection: false));
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_what_another_screen_deleted_says_to_open_it_again()
     {
         await AddCategoryAsync("Breads");
@@ -197,7 +198,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
             "It was changed or deleted on another screen in the meantime. Open it again, then make the change.", IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public void A_timeout_says_the_database_didnt_answer()
     {
         Failure.Of(new TimeoutException("Execution Timeout Expired.")).Should().Be(new Failure(Failure.TimedOutText, IsRejection: false));
@@ -205,7 +206,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
             .Should().Be(new Failure(Failure.TimedOutText, IsRejection: false), "Npgsql wraps a command's timeout in its own exception");
     }
 
-    [Fact]
+    [Test]
     public async Task A_file_open_in_another_program_says_to_close_it_there()
     {
         var path = Path.Combine(Path.GetTempPath(), $"TinapayanRMS failure {Guid.NewGuid():N}.xlsx");
@@ -226,7 +227,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         }
     }
 
-    [Fact]
+    [Test]
     public async Task A_file_or_folder_that_isnt_there_says_so_and_not_to_close_it_elsewhere()
     {
         var missingFile = Path.Combine(Path.GetTempPath(), $"TinapayanRMS missing {Guid.NewGuid():N}.backup");
@@ -239,7 +240,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         folder.Should().Be(new Failure(Failure.FileMissingText, IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public void Any_other_trouble_with_a_file_says_what_windows_said_and_not_to_close_it_elsewhere()
     {
         var failure = Failure.Of(new IOException("There is not enough space on the disk." + Environment.NewLine + "   at Somewhere()"));
@@ -247,7 +248,7 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
         failure.Should().Be(new Failure("Couldn't read or write the file: There is not enough space on the disk.", IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public void A_backup_tool_that_stopped_says_why_in_its_own_words()
     {
         var failure = Failure.Of(new PostgresToolException(
@@ -257,14 +258,14 @@ public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture
             "PostgreSQL's pg_dump reported a problem: pg_dump: error: connection to server failed: fe_sendauth: no password supplied", IsRejection: false));
     }
 
-    [Fact]
+    [Test]
     public void A_place_windows_wont_let_the_app_use_says_to_pick_another()
     {
         Failure.Of(new UnauthorizedAccessException(@"Access to the path 'C:\Windows\report.xlsx' is denied."))
             .Should().Be(new Failure(Failure.NoAccessText, IsRejection: true));
     }
 
-    [Fact]
+    [Test]
     public void Anything_else_is_a_bug_that_still_says_what_went_wrong()
     {
         var failure = Failure.Of(new InvalidOperationException("Sequence contains no elements" + Environment.NewLine + "   at Somewhere()"));

@@ -18,10 +18,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// The Reports summaries, read from the database. The Product Cost Summary costs every product as it's saved, through
 /// SavedProductReader, as the Products screen prices the product it opens, so the two pricings agree.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public void A_row_says_by_how_much_a_current_price_is_short_of_the_target_markup()
     {
         var row = new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 20m)], MarginPercent = 30m, CurrentPrice = 25m }));
@@ -53,7 +54,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
             new LoggerConfiguration().CreateLogger());
     }
 
-    [Fact]
+    [Test]
     public Task The_product_cost_summary_counts_a_linked_usages_add_ins() => StaThread.RunAsync(async () =>
     {
         await WithoutWastageAsync();
@@ -82,7 +83,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         ube.BaseCost.Should().BeGreaterThan(plain.BaseCost, "the ube is real money and has to reach the summary");
     });
 
-    [Fact]
+    [Test]
     public Task The_product_cost_summary_breaks_the_base_cost_into_its_parts() => StaThread.RunAsync(async () =>
     {
         var roleId = await AddRoleAsync("Dough");
@@ -126,7 +127,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         ensaymada.BaseCost.Should().Be(33.575m, "the six parts added up");
     });
 
-    [Fact]
+    [Test]
     public Task The_price_summary_shows_each_purchased_materials_latest_price_and_its_change_per_gram() => StaThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");
@@ -148,7 +149,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         salt.ChangePercent.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_product_cost_row_asks_for_its_own_product_to_be_opened() => StaThread.RunAsync(async () =>
     {
         var pandesalId = await AddProductAsync("Pandesal");
@@ -168,7 +169,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         opened.Should().Equal(pandesalId);
     });
 
-    [Fact]
+    [Test]
     public Task A_price_summary_row_asks_for_its_own_raw_material_to_be_opened() => StaThread.RunAsync(async () =>
     {
         await AddIngredientAsync("Flour");
@@ -187,7 +188,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         opened.Should().Equal(sugarId);
     });
 
-    [Fact]
+    [Test]
     public Task An_export_says_where_its_workbook_was_saved() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -205,7 +206,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         viewModel.ErrorMessage.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Each_tab_exports_its_own_table() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -221,7 +222,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         asked.Should().Be(ReportsViewModel.RawMaterialPriceSummaryTitle);
     });
 
-    [Fact]
+    [Test]
     public Task A_cancelled_export_says_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -233,7 +234,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         viewModel.ErrorMessage.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_workbook_that_cant_be_written_says_why() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();

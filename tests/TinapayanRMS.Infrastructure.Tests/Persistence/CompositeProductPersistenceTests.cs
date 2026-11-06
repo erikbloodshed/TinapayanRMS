@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// sellable units (ProductComponent), and its own packaging, saved with the rest of the product
 /// (IProductRepository.SaveAsync, the recipe's Components), cloned with it, and guarding the products it holds.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class CompositeProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());
@@ -61,7 +62,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         return material.Id;
     }
 
-    [Fact]
+    [Test]
     public async Task A_composite_saves_with_its_products_in_its_tables_order_and_reads_back_as_a_composite()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -82,7 +83,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         all.Select(c => (c.ProductId, c.ComponentProductId)).Should().Equal((boxId, ensaymadaId), (boxId, cheeseRollId));
     }
 
-    [Fact]
+    [Test]
     public async Task A_composite_needs_two_different_products_and_nothing_is_saved_without_them()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -97,7 +98,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         (await dbContext.Products.CountAsync(Cancellation)).Should().Be(1, "each refused save rolled its new product back");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_goes_on_one_line_at_a_whole_quantity()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -110,7 +111,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         await none.Should().ThrowAsync<InvalidOperationException>().WithMessage("Enter how many Cheese Roll go in*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_composite_can_hold_another_but_never_end_up_holding_itself()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -131,7 +132,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         (await HeldAsync(boxId)).Should().Equal(("Ensaymada", 6), ("Cheese Roll", 4));
     }
 
-    [Fact]
+    [Test]
     public async Task A_composites_sections_are_in_product_owned_roles_and_a_product_of_sub_assemblies_holds_no_products()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -165,7 +166,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         (await dbContext.ProductComponents.CountAsync(c => c.ProductId == ensaymadaId, Cancellation)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task A_role_a_composite_has_a_section_in_stays_product_owned_and_a_linked_one_keeps_a_product_owned_role()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -203,7 +204,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         (await dbContext.SubAssemblyRoles.SingleAsync(r => r.Id == toppingRoleId, Cancellation)).IsProductOwned.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Whether_a_product_is_a_composite_is_fixed_once_saved()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -219,7 +220,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         (await CreateRepository().GetByIdAsync(boxId, Cancellation))!.IsComposite.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task A_composite_is_one_sellable_unit_and_only_Save_adds_one()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -241,7 +242,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         await direct.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Including_the_products_packaging_saves_with_a_composite_is_copied_by_Clone_and_is_refused_for_any_other_product()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -269,7 +270,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         await direct.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_a_composite_holds_cant_be_deleted_until_its_taken_out_and_deleting_the_composite_keeps_its_products()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
@@ -301,7 +302,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         await CreateRepository().DeleteAsync(ensaymadaId, Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task Clone_and_Create_Variant_hold_the_same_products_the_variant_linking_the_topping_with_no_packaging()
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");

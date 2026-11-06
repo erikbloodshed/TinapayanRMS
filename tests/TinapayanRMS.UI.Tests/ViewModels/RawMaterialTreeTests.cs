@@ -24,7 +24,7 @@ public class RawMaterialTreeTests
 
     private static IEnumerable<string> TitlesIn(RawMaterialFolderNode folder) => folder.Children.Select(c => c.Title);
 
-    [Fact]
+    [Test]
     public void The_types_are_the_top_level_folders_Ingredients_first()
     {
         var tree = new RawMaterialTree();
@@ -33,7 +33,7 @@ public class RawMaterialTreeTests
         tree.Roots.Should().OnlyContain(r => r.IsTypeFolder && r.CategoryId == null && r.IsExpanded);
     }
 
-    [Fact]
+    [Test]
     public void Each_type_holds_its_own_categories_by_name_and_each_folder_its_materials_in_the_lists_order()
     {
         var tree = new RawMaterialTree();
@@ -57,7 +57,7 @@ public class RawMaterialTreeTests
         tree.TypeFolder(RawMaterialType.Packaging).MaterialCount.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void A_search_shows_only_the_folders_holding_a_match_and_opens_them()
     {
         var tree = new RawMaterialTree();
@@ -77,7 +77,7 @@ public class RawMaterialTreeTests
         Folder(tree, RawMaterialType.Ingredient, "Dairy").IsExpanded.Should().BeFalse("the search didn't show it");
     }
 
-    [Fact]
+    [Test]
     public void A_material_keeps_its_row_through_a_refresh_and_takes_it_to_its_new_folder()
     {
         var tree = new RawMaterialTree();
@@ -92,7 +92,7 @@ public class RawMaterialTreeTests
         Folder(tree, RawMaterialType.Ingredient, "Flour").Materials.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void A_category_whose_type_changed_moves_its_folder_to_the_other_type()
     {
         var tree = new RawMaterialTree();
@@ -106,7 +106,7 @@ public class RawMaterialTreeTests
         tree.CategoryFolder(4)!.Type.Should().Be(RawMaterialType.Packaging);
     }
 
-    [Fact]
+    [Test]
     public void A_deleted_categorys_folder_goes()
     {
         var tree = new RawMaterialTree();
@@ -118,7 +118,7 @@ public class RawMaterialTreeTests
         tree.CategoryFolder(Dairy.Id).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void A_drop_moves_a_material_only_into_another_category_of_its_own_type()
     {
         var tree = new RawMaterialTree();
@@ -137,7 +137,7 @@ public class RawMaterialTreeTests
         RawMaterialTree.MoveTo(null, breadFlour).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void Several_materials_move_together_leaving_out_those_that_would_not_move()
     {
         RawMaterial[] materials = [MaterialOf(1, "Bread Flour", Flour), MaterialOf(2, "Butter", Dairy), MaterialOf(3, "Cake Box", Boxes)];
@@ -146,7 +146,7 @@ public class RawMaterialTreeTests
         RawMaterialTree.MovesTo(Boxes, materials).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void The_folders_left_closed_start_closed_and_a_folder_with_its_first_rows_is_announced_open_again()
     {
         var tree = new RawMaterialTree(new FolderMemory(["Packaging", $"Ingredient/{Dairy.Id}"]));
@@ -167,7 +167,7 @@ public class RawMaterialTreeTests
         tree.ClosedFolderKeys().Should().Equal($"Ingredient/{Dairy.Id}", "Packaging");
     }
 
-    [Fact]
+    [Test]
     public void An_empty_Refresh_as_the_screen_makes_its_tree_keeps_what_was_kept()
     {
         var openKept = new RawMaterialTree(new FolderMemory(openKeys: ["Ingredient", $"Ingredient/{Flour.Id}"]));
@@ -178,7 +178,7 @@ public class RawMaterialTreeTests
         openKept.ClosedFolderKeys().Should().Equal($"Ingredient/{Dairy.Id}", "Packaging", $"Packaging/{Boxes.Id}");
     }
 
-    [Fact]
+    [Test]
     public void An_open_type_folder_is_announced_open_again_once_it_has_rows()
     {
         // The tree on the screen showing at startup binds to the type folders before the first load fills them, and can't
@@ -197,7 +197,7 @@ public class RawMaterialTreeTests
         announced.Should().Be(1, "it had rows already");
     }
 
-    [Fact]
+    [Test]
     public void Expand_All_and_Collapse_All_work_on_one_type_or_both()
     {
         var tree = new RawMaterialTree();

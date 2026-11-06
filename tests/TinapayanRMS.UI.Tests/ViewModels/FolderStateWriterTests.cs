@@ -15,7 +15,7 @@ public class FolderStateWriterTests
 {
     private const string Key = "Test.OpenFolders";
 
-    [Fact]
+    [Test]
     public void Dispose_NothingOpenedOrClosed_WritesNothing()
     {
         var store = new InMemoryViewStateStore();
@@ -27,7 +27,7 @@ public class FolderStateWriterTests
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
     }
 
-    [Fact]
+    [Test]
     public void Dispose_AChangeStillSettling_WritesItNow()
     {
         var store = new InMemoryViewStateStore();
@@ -43,7 +43,7 @@ public class FolderStateWriterTests
         store.WriteCount.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public Task ExpansionChanged_SettledChanges_WritesTheLastOnceAfterThem() => StaThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
@@ -63,7 +63,7 @@ public class FolderStateWriterTests
         store.WriteCount.Should().Be(1);
     });
 
-    [Fact]
+    [Test]
     public Task ExpansionChanged_BackAsItWas_WritesNothing() => StaThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
@@ -76,7 +76,7 @@ public class FolderStateWriterTests
         changed.OnNext(RxVoid.Default);
         open.Add("Production");
         changed.OnNext(RxVoid.Default);
-        await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current!.Execution.CancellationToken);
         writer.Dispose();
 
         store.WriteCount.Should().Be(0);

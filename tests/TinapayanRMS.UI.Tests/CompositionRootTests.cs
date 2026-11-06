@@ -16,7 +16,7 @@ namespace TinapayanRMS.UI.Tests;
 /// </summary>
 public class CompositionRootTests
 {
-    [Fact]
+    [Test]
     public void CreateHostBuilder_resolves_a_DbContext_from_configuration()
     {
         using var host = HostWith(new InMemoryViewStateStore());
@@ -28,7 +28,7 @@ public class CompositionRootTests
         dbContext.Database.ProviderName.Should().Be("Npgsql.EntityFrameworkCore.PostgreSQL");
     }
 
-    [Fact]
+    [Test]
     public void CreateHostBuilder_keeps_the_view_state_in_a_file()
     {
         // Resolving the store alone reads and writes nothing.
@@ -37,7 +37,7 @@ public class CompositionRootTests
         host.Services.GetRequiredService<IViewStateStore>().Should().BeOfType<JsonViewStateStore>();
     }
 
-    [Fact]
+    [Test]
     public void CreateHostBuilder_resolves_the_main_window_view_model()
     {
         using var host = HostWith(new InMemoryViewStateStore());
@@ -50,7 +50,7 @@ public class CompositionRootTests
         viewModel.Heading.Should().Be(viewModel.Title.ToUpperInvariant());
     }
 
-    [Fact]
+    [Test]
     public void CreateHostBuilder_resolves_every_screens_view_model_and_one_never_shown_writes_no_view_state()
     {
         // As the developer's own file can hold them: open folders kept before the lists kept their closed ones.

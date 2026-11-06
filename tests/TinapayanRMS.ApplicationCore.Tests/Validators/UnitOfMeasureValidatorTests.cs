@@ -8,7 +8,7 @@ public class UnitOfMeasureValidatorTests
 {
     private readonly UnitOfMeasureValidator _validator = new();
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_unit()
     {
         var result = _validator.Validate(new UnitOfMeasure { Name = "bag", Abbreviation = "bag" });
@@ -16,7 +16,7 @@ public class UnitOfMeasureValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_name()
     {
         var result = _validator.Validate(new UnitOfMeasure { Name = "", Abbreviation = "bag" });
@@ -25,7 +25,7 @@ public class UnitOfMeasureValidatorTests
         result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Name));
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_abbreviation()
     {
         var result = _validator.Validate(new UnitOfMeasure { Name = "bag", Abbreviation = "" });
@@ -34,7 +34,7 @@ public class UnitOfMeasureValidatorTests
         result.Errors.Should().Contain(e => e.PropertyName == nameof(UnitOfMeasure.Abbreviation));
     }
 
-    [Fact]
+    [Test]
     public void Accepts_a_name_with_an_uppercase_letter()
     {
         // Casing is auto-corrected by the repository (UnitOfMeasureRules.NormalizeName),

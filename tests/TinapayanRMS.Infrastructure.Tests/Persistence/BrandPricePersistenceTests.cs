@@ -8,7 +8,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
@@ -69,7 +70,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
     private static RawMaterialBrandPrice Brand(string? brand, int? unitId, decimal price) => new() { Brand = brand, UnitId = unitId, Price = price };
 
-    [Fact]
+    [Test]
     public async Task GetAllAsync_reads_every_materials_prices_with_their_units_material_by_material()
     {
         var (flourId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -87,7 +88,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         prices[2].Unit!.UnitOfMeasure!.Name.Should().Be("roll");
     }
 
-    [Fact]
+    [Test]
     public async Task A_single_brand_prices_the_ingredient_per_gram_through_its_unit()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -97,7 +98,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetMaterialAsync(ingredientId)).CostPerBaseUnit.Should().Be(0.036m); // 900 / 25,000 g
     }
 
-    [Fact]
+    [Test]
     public async Task A_price_with_no_unit_is_a_price_per_base_unit()
     {
         var (packagingMaterialId, _) = await SeedPackagingMaterialAsync();
@@ -107,7 +108,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetMaterialAsync(packagingMaterialId)).CostPerBaseUnit.Should().Be(0.05m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_material_is_priced_per_base_unit_through_its_unit()
     {
         var (packagingMaterialId, rollId) = await SeedPackagingMaterialAsync();
@@ -117,7 +118,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetMaterialAsync(packagingMaterialId)).CostPerBaseUnit.Should().Be(0.045m);
     }
 
-    [Fact]
+    [Test]
     public async Task The_ingredient_is_costed_at_the_dearest_brand_per_gram_whatever_units_they_are_in()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -130,7 +131,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         saved.Select(p => (p.Brand, p.Unit!.UnitOfMeasure!.Name, p.Price)).Should().Equal(("Gold Medal", "bag", 900m), ("Wellington", "pack", 40m));
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_cost_logs_the_dearest_brands_price_dated_today()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -141,7 +142,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (entry.Date, entry.Brand, entry.UnitId, entry.Price).Should().Be((Today, "Wellington", packId, 40m));
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_brands_that_leave_the_cost_as_it_was_logs_nothing()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -153,7 +154,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetHistoryAsync(ingredientId)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task Removing_the_dearest_brand_lowers_the_cost_and_logs_the_next_dearest()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -165,7 +166,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetHistoryAsync(ingredientId)).Select(h => (h.Brand, h.Price)).Should().Equal(("Wellington", 40m), ("Gold Medal", 900m));
     }
 
-    [Fact]
+    [Test]
     public async Task Removing_every_brand_makes_the_material_unpriced_and_logs_nothing()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -178,7 +179,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetHistoryAsync(ingredientId)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task A_brand_is_saved_trimmed_and_an_empty_one_as_none()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -189,7 +190,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         saved.Select(p => p.Brand).Should().Equal("Gold Medal", null);
     }
 
-    [Fact]
+    [Test]
     public async Task The_same_brand_can_be_priced_in_two_units()
     {
         var (ingredientId, bagId, packId) = await SeedPurchasedIngredientAsync();
@@ -199,7 +200,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await CreateBrandPriceRepository().GetForRawMaterialAsync(ingredientId, Cancellation)).Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_rejects_a_brand_priced_twice_in_the_same_unit_whatever_its_case()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -210,7 +211,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await CreateBrandPriceRepository().GetForRawMaterialAsync(ingredientId, Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_rejects_a_non_positive_price()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -220,7 +221,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*positive*");
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_rejects_a_unit_that_belongs_to_another_material()
     {
         var (ingredientId, _, _) = await SeedPurchasedIngredientAsync();
@@ -231,7 +232,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*own units*");
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_rejects_prices_for_a_made_ingredient()
     {
         var recipeId = await AddEmptyRecipeAsync();
@@ -252,7 +253,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*purchased*");
     }
 
-    [Fact]
+    [Test]
     public async Task SetAsync_rejects_a_nonexistent_material()
     {
         var act = () => SetPriceAsync(999_999, null, 0.05m);
@@ -260,7 +261,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task The_price_history_lists_newest_first_with_each_entrys_unit()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -272,7 +273,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         history.Select(h => (h.Date, h.Price, h.Unit?.UnitOfMeasure?.Name)).Should().Equal((Today, 900m, "bag"), (Today, 0.05m, null));
     }
 
-    [Fact]
+    [Test]
     public async Task The_whole_price_history_lists_each_materials_entries_together_newest_first()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -287,7 +288,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
             (ingredientId, 900m, "bag"), (ingredientId, 0.05m, null), (ribbonId, 120m, "roll"));
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_price_history_entry_leaves_the_cost_as_it_is()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();
@@ -300,7 +301,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetMaterialAsync(ingredientId)).CostPerBaseUnit.Should().Be(0.036m);
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_nonexistent_price_history_entry_is_rejected()
     {
         var act = () => new RawMaterialPriceHistoryRepository(CreateDbContextFactory()).DeleteAsync(999_999, Cancellation);
@@ -308,7 +309,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_material_cascades_to_its_brand_prices_and_price_history()
     {
         var (ingredientId, bagId, _) = await SeedPurchasedIngredientAsync();

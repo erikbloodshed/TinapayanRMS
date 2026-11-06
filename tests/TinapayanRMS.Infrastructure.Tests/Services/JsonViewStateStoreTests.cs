@@ -19,7 +19,7 @@ public sealed class JsonViewStateStoreTests : IDisposable
         }
     }
 
-    [Fact]
+    [Test]
     public void A_list_written_reads_back_the_next_time_the_app_starts()
     {
         new JsonViewStateStore(FilePath).WriteList("Products.OpenFolders", ["Production", "Production/12"]);
@@ -27,7 +27,7 @@ public sealed class JsonViewStateStoreTests : IDisposable
         new JsonViewStateStore(FilePath).ReadList("Products.OpenFolders").Should().Equal("Production", "Production/12");
     }
 
-    [Fact]
+    [Test]
     public void Writing_one_list_keeps_the_others()
     {
         var store = new JsonViewStateStore(FilePath);
@@ -40,7 +40,7 @@ public sealed class JsonViewStateStoreTests : IDisposable
         next.ReadList("B").Should().Equal("2");
     }
 
-    [Fact]
+    [Test]
     public void Nothing_written_or_a_file_that_cant_be_read_reads_as_nothing()
     {
         new JsonViewStateStore(FilePath).ReadList("Products.OpenFolders").Should().BeNull("there's no file yet");

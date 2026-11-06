@@ -3,26 +3,19 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <!-- Every test project (a name ending in .Tests). TinapayanRMS.Tests.Common is a plain library its
-       fixtures live in: referencing xunit.v3 would make it a test executable of its own. -->
+       fixtures live in: referencing TUnit.Engine would make it a test executable of its own. -->
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <IsPackable>false</IsPackable>
-    <!-- A test project run directly (dotnet run, or its .exe) runs on Microsoft.Testing.Platform, as dotnet test does,
-         rather than xUnit's own console runner (2026-11-05): its hot reload, scripts/Watch-Tests.ps1, only works there,
-         and the options are dotnet test's (filter-class, filter-method). -->
-    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
   </PropertyGroup>
 
+  <!-- TUnit.Engine makes each a Microsoft.Testing.Platform executable, run alike by dotnet test, dotnet run and its .exe. -->
   <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <PackageReference Include="AwesomeAssertions" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="Microsoft.Testing.Extensions.HotReload" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="xunit.v3" />
-    <Using Include="Xunit" />
+    <PackageReference Include="TUnit.Engine" />
+    <Compile Include="$(MSBuildThisFileDirectory)TestRunSettings.cs" Link="TestRunSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)HotReloadReruns.cs" Link="HotReloadReruns.cs" />
   </ItemGroup>
 
 </Project>

@@ -20,7 +20,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// the app types into are padded. A grid can't hold records below its add row, so there the blank one holds a blank
 /// record in the add row's place, and only what's under the add row is compared.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridFillerRowsDrawingTests
 {
     public sealed class Line
@@ -47,18 +47,18 @@ public class GridFillerRowsDrawingTests
     /// </summary>
     private const int CutRowTolerance = 4;
 
-    [Theory]
-    [InlineData(false, 96, false, false, false)]
-    [InlineData(true, 96, false, false, false)]
-    [InlineData(false, 120, false, false, false)]
-    [InlineData(true, 120, false, false, false)]
-    [InlineData(true, 96, true, false, false)]
-    [InlineData(true, 120, true, false, false)]
-    [InlineData(true, 96, false, true, false)]
-    [InlineData(true, 120, false, true, false)]
-    [InlineData(true, 96, false, false, true)]
-    [InlineData(true, 120, false, false, true)]
-    [InlineData(true, 120, true, false, true)]
+    [Test]
+    [Arguments(false, 96, false, false, false)]
+    [Arguments(true, 96, false, false, false)]
+    [Arguments(false, 120, false, false, false)]
+    [Arguments(true, 120, false, false, false)]
+    [Arguments(true, 96, true, false, false)]
+    [Arguments(true, 120, true, false, false)]
+    [Arguments(true, 96, false, true, false)]
+    [Arguments(true, 120, false, true, false)]
+    [Arguments(true, 96, false, false, true)]
+    [Arguments(true, 120, false, false, true)]
+    [Arguments(true, 120, true, false, true)]
     public void The_drawn_rows_match_blank_records(bool showRowHeader, int dpi, bool scrolled, bool resized, bool addRow) => StaThread.RunThemed(() =>
     {
         var padded = LinesGrid(showRowHeader, scrolled, blankRecords: 0, addRow);

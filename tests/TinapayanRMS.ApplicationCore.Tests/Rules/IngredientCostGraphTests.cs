@@ -5,7 +5,7 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 public class IngredientCostGraphTests
 {
-    [Fact]
+    [Test]
     public void GetDependentsInOrder_returns_empty_when_nothing_depends_on_it()
     {
         var componentIdsByIngredientId = new Dictionary<int, IReadOnlyList<int>>();
@@ -15,7 +15,7 @@ public class IngredientCostGraphTests
         order.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void GetDependentsInOrder_finds_a_direct_dependent()
     {
         // 2 (syrup) is made from 1 (sugar).
@@ -29,7 +29,7 @@ public class IngredientCostGraphTests
         order.Should().Equal(2);
     }
 
-    [Fact]
+    [Test]
     public void GetDependentsInOrder_orders_a_multi_level_chain_components_first()
     {
         // 1 sugar -> 2 syrup -> 3 caramel. Sugar's price changes: syrup must be
@@ -45,7 +45,7 @@ public class IngredientCostGraphTests
         order.Should().Equal(2, 3);
     }
 
-    [Fact]
+    [Test]
     public void GetDependentsInOrder_handles_a_diamond_without_duplicating_a_node()
     {
         // 1 (butter) is used by both 2 (ganache) and 3 (frosting), and 4 (cake) uses both.
@@ -64,7 +64,7 @@ public class IngredientCostGraphTests
         order.IndexOf(4).Should().BeGreaterThan(order.IndexOf(3));
     }
 
-    [Fact]
+    [Test]
     public void GetDependentsInOrder_ignores_made_ingredients_that_do_not_depend_on_it()
     {
         // 2 depends on 1; 4 depends on 3 — an unrelated chain that shouldn't appear.
@@ -79,7 +79,7 @@ public class IngredientCostGraphTests
         order.Should().Equal(2);
     }
 
-    [Fact]
+    [Test]
     public void InDependencyOrder_puts_each_ingredient_after_everything_in_the_set_it_is_made_from()
     {
         // 5 custard from 4 (a link to 3) and 2 syrup; 2 syrup from 1 sugar; 6 glaze from 5. Asked for in the worst order.
@@ -98,7 +98,7 @@ public class IngredientCostGraphTests
         order.IndexOf(6).Should().BeGreaterThan(order.IndexOf(5));
     }
 
-    [Fact]
+    [Test]
     public void InDependencyOrder_leaves_out_what_is_not_in_the_set_and_takes_it_as_already_right()
     {
         // 1 and 3 are purchased: not in the set, so not in the order, though 2 and 4 are made from them.
@@ -113,7 +113,7 @@ public class IngredientCostGraphTests
         order.Should().Equal(2, 4);
     }
 
-    [Fact]
+    [Test]
     public void InDependencyOrder_stops_at_a_cycle_rather_than_looping()
     {
         // A cycle is refused when a BOM or link is saved; one made outside the app mustn't hang the recompute.

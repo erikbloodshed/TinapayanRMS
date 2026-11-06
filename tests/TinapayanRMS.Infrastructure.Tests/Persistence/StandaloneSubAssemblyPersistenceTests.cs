@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// (SubAssemblyRepository), linked or copied by products, kept linked by a clone, and repriced by the ingredient
 /// cost cascade.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private SubAssemblyRepository CreateRepository() => new(CreateDbContextFactory());
@@ -34,7 +35,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
     private Task LinkAsync(int productId, int subAssemblyId, decimal weightPerPiece) =>
         SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(subAssemblyId, UsageAuthoredField.WeightPerPiece, weightPerPiece)]));
 
-    [Fact]
+    [Test]
     public async Task Saving_a_new_sub_assembly_trims_its_name_and_computes_its_totals()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -49,7 +50,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await CreateRepository().GetStandaloneAsync(Cancellation)).Should().ContainSingle().Which.Role!.Name.Should().Be("Glaze");
     }
 
-    [Fact]
+    [Test]
     public async Task Resaving_renames_moves_and_relines_it()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
@@ -67,7 +68,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
             .Should().ContainSingle().Which.Grams.Should().Be(500m);
     }
 
-    [Fact]
+    [Test]
     public async Task Two_sub_assemblies_cant_share_a_name_whether_made_here_or_saved_from_a_product()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -82,7 +83,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         await productsName.Should().ThrowAsync<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'cream loaf glaze'*");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_role_for_a_sub_assembly_is_refused_only_where_a_product_linking_it_has_one_by_its_name()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
@@ -108,7 +109,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await GetSubAssemblyAsync(glazeId)).RoleId.Should().Be(toppingRoleId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_standalone_sub_assembly_needs_a_line()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -120,7 +121,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await dbContext.SubAssemblies.AnyAsync(Cancellation)).Should().BeFalse("a rejected save rolls back");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_links_a_standalone_sub_assembly_at_its_own_piece_size_and_follows_its_lines()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -138,7 +139,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[glazeId].Select(p => p.Name).Should().Equal("Cream Loaf");
     }
 
-    [Fact]
+    [Test]
     public async Task Used_By_names_each_linking_products_category_for_its_icon()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -163,7 +164,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
             new LinkingProduct(ubeRollId, "Ube Roll", null));
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_an_unused_standalone_sub_assembly_takes_its_lines()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -177,7 +178,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await dbContext.SubAssemblyLines.AnyAsync(Cancellation)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_linked_standalone_sub_assembly_is_refused_naming_the_product()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -191,7 +192,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await GetSubAssemblyAsync(glazeId)).Name.Should().Be("Glaze");
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_product_permanently_that_links_a_standalone_sub_assembly_leaves_it()
     {
         var roleId = await AddRoleAsync("Glaze");
@@ -206,7 +207,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task Linkable_sub_assemblies_are_listed_by_name()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -219,7 +220,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         linkable.Select(s => s.Name).Should().Equal("Pandesal Dough", "Sweet Dough");
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_links_every_sub_assembly_its_source_does()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -246,7 +247,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         linkedBy[doughId].Select(p => p.Name).Should().Equal("Cream Loaf", "Cream Loaf Mini");
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_keeps_a_standalone_links_add_ins()
     {
         var glazeRoleId = await AddRoleAsync("Glaze");
@@ -270,7 +271,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
             .Should().Be(1, "the shared glaze itself is untouched");
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_keeps_the_add_ins_on_a_link_to_a_sub_assembly_another_product_saved()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -292,7 +293,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         (await SubAssemblyTotalsAsync(doughId)).TotalWeight.Should().Be(1000m, "the dough itself is untouched");
     }
 
-    [Fact]
+    [Test]
     public async Task Repricing_an_ingredient_reprices_a_standalone_sub_assembly()
     {
         var roleId = await AddRoleAsync("Glaze");

@@ -8,10 +8,11 @@ using TinapayanRMS.Tests.Common.Fixtures;
 
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public async Task UnitsOfMeasure_has_no_seeded_rows_by_default()
     {
         // Units are fully user-managed (no protected/well-known ids) -- a freshly
@@ -24,7 +25,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         units.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_category_can_be_inserted_and_read_back()
     {
         await using (var dbContext = CreateDbContext())
@@ -40,7 +41,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         }
     }
 
-    [Fact]
+    [Test]
     public async Task Duplicate_category_names_are_rejected()
     {
         await using var dbContext = CreateDbContext();
@@ -54,7 +55,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_category_is_for_ingredients_unless_saved_for_packaging_and_its_type_round_trips()
     {
         var repository = CreateRepository();
@@ -70,7 +71,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         (await repository.GetAllAsync(Cancellation)).Single(c => c.Id == flour.Id).Type.Should().Be(RawMaterialCategoryType.Packaging);
     }
 
-    [Fact]
+    [Test]
     public async Task A_material_goes_only_in_a_category_of_its_own_type()
     {
         var flour = await SeedCategoryAsync("Flour");
@@ -92,7 +93,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         (await dbContext.RawMaterials.SingleAsync(Cancellation)).CategoryId.Should().Be(boxesId);
     }
 
-    [Fact]
+    [Test]
     public async Task A_categorys_type_cant_change_while_a_material_is_in_it()
     {
         var flour = await SeedCategoryAsync("Flour");
@@ -112,7 +113,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         (await CreateRepository().GetAllAsync(Cancellation)).Single().Should().BeEquivalentTo(new { Name = "Flours", Type = RawMaterialCategoryType.Ingredient });
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_goes_only_in_a_Made_category_and_nothing_else_does()
     {
         var flour = await SeedCategoryAsync("Flour");
@@ -132,7 +133,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         (await dbContext.RawMaterials.SingleAsync(Cancellation)).CategoryId.Should().Be(inHouseId);
     }
 
-    [Fact]
+    [Test]
     public async Task An_ingredient_category_of_made_ingredients_alone_can_become_a_Made_one_and_back()
     {
         var inHouse = await SeedCategoryAsync("In-House");
@@ -147,7 +148,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
             .WithMessage("In-House has 1 material that can't go in an ingredient category, so its type can't change. Move it to another category first.");
     }
 
-    [Fact]
+    [Test]
     public async Task A_category_holding_a_purchased_ingredient_cant_become_a_Made_one()
     {
         var fillings = await SeedCategoryAsync("Fillings");
@@ -181,7 +182,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         return (await repository.GetAllAsync(Cancellation)).Single(c => c.Name == name);
     }
 
-    [Fact]
+    [Test]
     public async Task RawMaterialCategoryRepository_AddAsync_GetAllAsync_and_UpdateAsync_round_trip_a_category()
     {
         var repository = CreateRepository();
@@ -197,7 +198,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         updated.Name.Should().Be("Flours & Starches");
     }
 
-    [Fact]
+    [Test]
     public async Task RawMaterialCategoryRepository_GetAllAsync_orders_by_name()
     {
         var repository = CreateRepository();
@@ -210,7 +211,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         names.Should().Equal("Boxes", "Flour", "Ribbons");
     }
 
-    [Fact]
+    [Test]
     public async Task RawMaterialCategoryRepository_UpdateAsync_rejects_a_nonexistent_category()
     {
         var act = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
@@ -218,7 +219,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task RawMaterialCategoryRepository_DeleteAsync_removes_an_unused_category()
     {
         var repository = CreateRepository();
@@ -229,7 +230,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         (await repository.GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_category_that_an_ingredient_is_in_is_blocked()
     {
         var category = await SeedCategoryAsync("Flour");
@@ -253,7 +254,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         await act.Should().ThrowAsync<Npgsql.PostgresException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Deleting_a_category_that_a_packaging_material_is_in_is_blocked()
     {
         var category = await SeedCategoryAsync("Ribbons");

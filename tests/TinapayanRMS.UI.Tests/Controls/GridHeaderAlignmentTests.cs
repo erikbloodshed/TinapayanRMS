@@ -16,12 +16,12 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// table has them, with the theme's look kept. The grid is themed as the app's are, with the app's wrapping headings
 /// (Lines 2, a HeaderTemplate that wraps), one heading of one line beside one of two.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridHeaderAlignmentTests
 {
     public sealed record Row(string Name, decimal Price);
 
-    [Fact]
+    [Test]
     public void One_and_two_line_headings_end_at_the_bottom_of_the_header_row_with_the_themes_look() => StaThread.RunThemed(() =>
     {
         var (window, centred) = Show(bottom: false);

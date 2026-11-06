@@ -21,10 +21,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// folder and the list itself, and what each item does, run as the menu runs it. Moves and renames save at once; the
 /// notice of a move can take it back; the folders left open open again next time.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
-    [Fact]
+    [Test]
     public Task A_products_menu_moves_it_to_the_other_stage_or_any_folder_and_offers_what_else_can_be_done_with_it() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -51,7 +52,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
             .Should().Be("Send Back to Research and Development", "in Production it can only go back");
     });
 
-    [Fact]
+    [Test]
     public Task A_drop_moves_products_onto_a_folder_and_gives_the_first_back_to_bring_into_view() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -76,7 +77,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await screen.Drop([mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
     });
 
-    [Fact]
+    [Test]
     public Task Promote_saves_the_move_at_once_says_so_and_Undo_on_the_notice_puts_it_back() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -99,7 +100,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await viewModel.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Several_products_picked_move_together_and_the_one_showing_stays_on_the_form() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -131,7 +132,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedProduct!.Id.Should().Be(mamonId);
     });
 
-    [Fact]
+    [Test]
     public Task Apply_Costing_Defaults_sets_the_products_picked_to_them_once_confirmed_and_the_one_showing_follows() => StaThread.RunAsync(async () =>
     {
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
@@ -161,7 +162,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await dbContext.CostingParameters.Where(c => c.ProductId == pandesalId).Select(c => c.MarginPercent).SingleAsync(Cancellation)).Should().Be(60m);
     });
 
-    [Fact]
+    [Test]
     public Task A_folders_menu_adds_to_it_promotes_what_it_shows_and_renames_or_deletes_its_category() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -186,7 +187,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.MoveNotice.Should().Be("Moved 2 products to Production › Breads");
     });
 
-    [Fact]
+    [Test]
     public Task The_stage_and_list_menus_add_products_and_categories_and_open_or_close_every_folder() => StaThread.RunAsync(async () =>
     {
         await AddProductCategoryAsync("Breads");
@@ -210,7 +211,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ProductTree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);
     });
 
-    [Fact]
+    [Test]
     public Task New_Product_Here_starts_a_product_in_the_folders_category_that_Save_files_in_its_stage() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -252,7 +253,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (plain.Stage, plain.CategoryId).Should().Be((ProductStage.Production, (int?)null));
     });
 
-    [Fact]
+    [Test]
     public Task New_files_a_product_in_the_stage_Settings_gives_a_new_one_and_follows_it_when_it_changes() => StaThread.RunAsync(async () =>
     {
         var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
@@ -283,7 +284,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.NewProductTag.Should().Be("Goes in Research and Development");
     });
 
-    [Fact]
+    [Test]
     public Task Rename_on_the_product_showing_saves_the_name_and_leaves_what_else_is_typed_to_save() => StaThread.RunAsync(async () =>
     {
         var mamonId = await SaveProductAsync("Mamon", null);
@@ -314,7 +315,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Clone_and_Create_Variant_ask_for_the_new_products_name_and_then_show_it() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -344,7 +345,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.Products.Should().HaveCount(2, "a cancelled prompt makes nothing");
     });
 
-    [Fact]
+    [Test]
     public Task New_Category_adds_a_folder_to_both_stages_and_picks_it_where_it_was_asked() => StaThread.RunAsync(async () =>
     {
         await AddProductCategoryAsync("Breads");
@@ -366,7 +367,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads"));
     });
 
-    [Fact]
+    [Test]
     public Task Rename_Category_renames_its_folder_in_both_stages_and_the_picker_follows() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -394,7 +395,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
-    [Fact]
+    [Test]
     public Task Delete_Category_asks_first_then_leaves_its_products_uncategorized_with_nothing_on_the_form_to_save() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -425,7 +426,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.IsDirty.Should().BeFalse("the category went in the database: there's nothing to save");
     });
 
-    [Fact]
+    [Test]
     public Task Delete_on_a_product_asks_first_moves_it_to_Deleted_and_the_form_starts_afresh_only_if_it_was_showing_it() => StaThread.RunAsync(async () =>
     {
         var mamonId = await SaveProductAsync("Mamon", null);
@@ -454,7 +455,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName.Should().BeEmpty();
     });
 
-    [Fact]
+    [Test]
     public Task A_deleted_products_row_leaves_the_form_as_it_is_and_its_menu_restores_it_or_deletes_it_permanently() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -501,7 +502,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await new ProductRepository(CreateDbContextFactory()).GetByIdAsync(mamonId, Cancellation)).Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task A_deleted_product_opened_from_elsewhere_is_picked_in_the_Deleted_folder_and_a_search_finds_it_there() => StaThread.RunAsync(async () =>
     {
         var mamonId = await SaveProductAsync("Mamon", null);
@@ -522,7 +523,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         TitlesIn(viewModel.ProductTree.DeletedFolder).Should().Equal("Mamon");
     });
 
-    [Fact]
+    [Test]
     public Task F2_and_Del_do_what_the_menu_shows_for_the_one_row_picked() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -550,7 +551,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
-    [Fact]
+    [Test]
     public Task A_product_opened_from_elsewhere_is_picked_alone_in_the_list() => StaThread.RunAsync(async () =>
     {
         var mamonId = await SaveProductAsync("Mamon", null);
@@ -565,7 +566,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.ProductTree.Find(ensaymadaId));
     });
 
-    [Fact]
+    [Test]
     public Task Undoing_a_move_back_into_a_category_deleted_since_is_refused_and_says_why() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -582,7 +583,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.ResearchAndDevelopment, cakesId));
     });
 
-    [Fact]
+    [Test]
     public Task The_folders_left_closed_stay_closed_next_time_and_a_new_category_opens() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -611,7 +612,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         store.ReadList(ProductsViewModel.ClosedFoldersKey).Should().Contain($"Production/{cakesId}");
     });
 
-    [Fact]
+    [Test]
     public Task The_folders_the_list_kept_open_before_open_again_and_the_rest_start_closed() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -638,7 +639,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ProductTree.StageFolder(stage).Children.OfType<ProductFolderNode>().Single(f => f.Title == title);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
-    [Fact]
+    [Test]
     public Task A_product_whose_current_price_earns_less_than_its_target_markup_is_flagged_in_the_list() => StaThread.RunAsync(async () =>
     {
         var fillingId = await AddRoleAsync("Filling");
@@ -673,7 +674,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    [Fact]
+    [Test]
     public Task Picking_another_product_over_unsaved_changes_asks_and_Cancel_stays_on_them() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -693,9 +694,9 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.IsDirty.Should().BeTrue();
     });
 
-    [Theory]
-    [InlineData(UnsavedChangesAnswer.Save, "Mamon Tostado")]
-    [InlineData(UnsavedChangesAnswer.DontSave, "Mamon")]
+    [Test]
+    [Arguments(UnsavedChangesAnswer.Save, "Mamon Tostado")]
+    [Arguments(UnsavedChangesAnswer.DontSave, "Mamon")]
     public Task Picking_another_product_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -715,7 +716,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         (await NameOfAsync(mamonId)).Should().Be(savedName);
     });
 
-    [Fact]
+    [Test]
     public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -731,7 +732,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName.Should().Be("Mamon Tostado");
     });
 
-    [Fact]
+    [Test]
     public Task Clone_over_unsaved_changes_asks_first_and_Cancel_makes_nothing() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -749,7 +750,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName.Should().Be("Mamon Tostado");
     });
 
-    [Fact]
+    [Test]
     public Task Leaving_the_screen_without_saving_puts_the_form_back_as_it_was_saved() => StaThread.RunAsync(async () =>
     {
         var breadsId = await AddProductCategoryAsync("Breads");
@@ -768,7 +769,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     // No puts a new product back blank. What's typed into it next has to count, or it's lost with no question asked.
-    [Fact]
+    [Test]
     public Task What_is_typed_after_no_on_a_new_product_counts_as_unsaved() => StaThread.RunAsync(async () =>
     {
         var viewModel = await LoadedViewModelAsync();

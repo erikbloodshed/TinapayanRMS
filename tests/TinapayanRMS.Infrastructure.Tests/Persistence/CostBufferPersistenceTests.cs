@@ -14,7 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// rolls up the BOM tree (counted once, never stacked), and is what sub-assemblies and packaging lines
 /// are costed with.
 /// </summary>
-[Collection(DatabaseCollection.B)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
@@ -54,7 +55,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
     private async Task<decimal> GetSubAssemblyTotalCostAsync(int id) => (await SubAssemblyTotalsAsync(id)).TotalCost;
 
-    [Fact]
+    [Test]
     public async Task A_new_price_gets_the_materials_buffer_on_top_and_keeps_the_true_cost()
     {
         var categoryId = await SeedCategoryAsync();
@@ -69,7 +70,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         flour.BufferedCostPerBaseUnit.Should().Be(0.0525m);
     }
 
-    [Fact]
+    [Test]
     public async Task Changing_a_purchased_ingredients_buffer_reprices_the_sub_assemblies_using_it()
     {
         var categoryId = await SeedCategoryAsync();
@@ -87,7 +88,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(99m, "1,000 g at the buffered ₱0.099");
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_ignores_a_buffer_of_its_own_and_only_rolls_up_its_components()
     {
         var categoryId = await SeedCategoryAsync();
@@ -113,7 +114,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(110m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredients_weight_loss_still_divides_its_rollup_while_its_own_buffer_never_multiplies_it()
     {
         var categoryId = await SeedCategoryAsync();
@@ -133,7 +134,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         syrup.CostBufferPercent.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_made_ingredient_recomputed_by_the_cascade_loses_a_stale_buffer_of_its_own()
     {
         var categoryId = await SeedCategoryAsync();
@@ -159,7 +160,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         syrup.CostBufferPercent.Should().Be(0m, "the cascade normalises it away");
     }
 
-    [Fact]
+    [Test]
     public async Task A_buffer_change_on_a_component_ripples_up_through_the_made_ingredient_into_the_sub_assembly()
     {
         var categoryId = await SeedCategoryAsync();
@@ -175,7 +176,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(60m, "500 g of syrup at the buffered ₱0.12");
     }
 
-    [Fact]
+    [Test]
     public async Task A_buffer_and_a_new_price_in_the_same_save_use_the_new_buffer()
     {
         var categoryId = await SeedCategoryAsync();
@@ -189,7 +190,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         sugar.BufferedCostPerBaseUnit.Should().Be(0.15m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_packaging_materials_buffer_reaches_its_packaging_line_cost()
     {
         var categoryId = await SeedCategoryAsync();
@@ -209,7 +210,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             .Should().Be(16.5m, "half a box per piece, at the buffered ₱33");
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_price_leaves_a_priced_materials_buffered_cost_and_its_sub_assemblies_where_they_were()
     {
         var categoryId = await SeedCategoryAsync();
@@ -232,7 +233,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(132m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_typed_buffered_cost_is_saved_as_it_is_and_cascades()
     {
         var categoryId = await SeedCategoryAsync();
@@ -251,7 +252,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetSubAssemblyTotalCostAsync(custardId)).Should().Be(25.9474m);
     }
 
-    [Fact]
+    [Test]
     public async Task Removing_every_price_leaves_the_material_unpriced_and_its_next_price_works_the_buffer_out_again()
     {
         var categoryId = await SeedCategoryAsync();
@@ -265,7 +266,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await GetMaterialAsync(sugarId)).BufferedCostPerBaseUnit.Should().Be(0.22m);
     }
 
-    [Fact]
+    [Test]
     public async Task A_negative_buffered_cost_is_rejected()
     {
         var categoryId = await SeedCategoryAsync();
@@ -277,9 +278,9 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(101)]
+    [Test]
+    [Arguments(-1)]
+    [Arguments(101)]
     public async Task A_buffer_outside_0_to_100_percent_is_rejected(decimal costBufferPercent)
     {
         var categoryId = await SeedCategoryAsync();

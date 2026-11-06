@@ -19,7 +19,7 @@ public class ProductPrintoutTests
 
     private static RawMaterial Ingredient(string name, decimal costPerGram) => new() { Name = name, BufferedCostPerBaseUnit = costPerGram };
 
-    [Fact]
+    [Test]
     public void Each_line_is_a_bakers_percent_of_the_base_which_two_flours_share()
     {
         var usage = new ProductUsageEdit(
@@ -49,7 +49,7 @@ public class ProductPrintoutTests
         (section.TotalWeight, section.TotalPercent, section.BatchCost).Should().Be((1670m, (decimal?)167m, 53.4m));
     }
 
-    [Fact]
+    [Test]
     public void A_linked_sections_add_ins_are_read_against_its_recipes_base_and_it_says_where_its_from()
     {
         var usage = new ProductUsageEdit(
@@ -71,7 +71,7 @@ public class ProductPrintoutTests
         (section.TotalWeight, section.TotalPercent, section.BatchCost).Should().Be((1620m, (decimal?)162m, 60m), "the add-ins are part of the batch");
     }
 
-    [Fact]
+    [Test]
     public void With_no_base_every_line_and_add_in_is_a_share_of_the_whole_batch()
     {
         var usage = new ProductUsageEdit(
@@ -94,7 +94,7 @@ public class ProductPrintoutTests
         section.TotalPercent.Should().Be(100m);
     }
 
-    [Fact]
+    [Test]
     public void A_section_carries_its_batch_and_the_pieces_that_share_it_out()
     {
         var usage = new ProductUsageEdit(
@@ -117,7 +117,7 @@ public class ProductPrintoutTests
         section.CostPerPiece.Should().Be(usage.CostPerPieceAt(CostBasis.Buffered)).And.BeGreaterThan(0m);
     }
 
-    [Fact]
+    [Test]
     public void A_section_with_no_piece_size_says_so_and_costs_nothing_a_piece()
     {
         var usage = new ProductUsageEdit(
@@ -134,7 +134,7 @@ public class ProductPrintoutTests
         section.CostPerPiece.Should().Be(0m);
     }
 
-    [Fact]
+    [Test]
     public void Packaging_lists_each_line_in_its_unit_and_leaves_out_a_row_with_no_material()
     {
         var box = new RawMaterial

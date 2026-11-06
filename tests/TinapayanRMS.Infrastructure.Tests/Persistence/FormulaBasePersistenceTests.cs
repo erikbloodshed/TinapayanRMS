@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// be the base of one formula and an extra in another. It rides along with the lines wherever they go —
 /// saved with the recipe, read back, and carried into a copy — and never touches cost.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private async Task<IReadOnlyList<SubAssemblyLine>> LinesAsync(int subAssemblyId)
@@ -28,7 +29,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
             .ToListAsync(Cancellation);
     }
 
-    [Fact]
+    [Test]
     public async Task A_ticked_line_is_saved_and_read_back()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -49,7 +50,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task Two_flours_can_be_the_base_together()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -74,7 +75,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         lines.Where(l => l.IsFormulaBase).Sum(l => l.Grams).Should().Be(1000m, "they make 100% between them");
     }
 
-    [Fact]
+    [Test]
     public async Task The_base_leaves_the_batch_weight_and_cost_alone()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -92,7 +93,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         (await SubAssemblyTotalsAsync(doughId)).Should().Be((1000m, 50m), "a tick is a reading of the batch, not a change to it");
     }
 
-    [Fact]
+    [Test]
     public async Task A_standalone_sub_assembly_keeps_its_base()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -109,7 +110,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_keeps_the_formulas_base()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -131,7 +132,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         lines.Single(l => l.IngredientId == waterId).IsFormulaBase.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task A_typed_percentage_is_saved_and_read_back()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -154,7 +155,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         lines.Single(l => l.IngredientId == flourId).AuthoredBakersPercent.Should().BeNull("a base line is always given in grams");
     }
 
-    [Fact]
+    [Test]
     public async Task A_base_line_given_as_a_percentage_is_refused()
     {
         var roleId = await AddRoleAsync("Dough");
@@ -168,7 +169,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_keeps_which_figure_was_typed()
     {
         var roleId = await AddRoleAsync("Dough");

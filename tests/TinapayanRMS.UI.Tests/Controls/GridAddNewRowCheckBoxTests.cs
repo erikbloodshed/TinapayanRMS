@@ -18,7 +18,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// row holds no line, there to tick once one is being typed into it, and the tick goes in with the line. Hidden until the
 /// line is added, the Base of a line just typed couldn't be ticked on a new sub-assembly or product section.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class GridAddNewRowCheckBoxTests
 {
     public sealed class Line
@@ -30,7 +30,7 @@ public class GridAddNewRowCheckBoxTests
         public bool IsFormulaBase { get; set; }
     }
 
-    [Fact]
+    [Test]
     public void The_add_row_shows_no_tick_until_a_line_is_typed_into_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -44,7 +44,7 @@ public class GridAddNewRowCheckBoxTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_tick_on_a_line_being_typed_is_added_with_it()
     {
         OffscreenGrid.Run(LinesGrid, grid =>
@@ -67,7 +67,7 @@ public class GridAddNewRowCheckBoxTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_lines_keep_their_ticks_shown()
     {
         OffscreenGrid.Run(LinesGrid, grid =>

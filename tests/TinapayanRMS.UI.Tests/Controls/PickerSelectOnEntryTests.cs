@@ -12,12 +12,12 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// PickerSelectOnEntry: a picker's box selects its whole text as the keyboard enters it from outside the picker, by a
 /// click or by Tab, and not as it comes back to the box from the picker's own list.
 /// </summary>
-[Collection(OffscreenGridCollection.Name)]
+[NotInParallel(OffscreenGridCollection.Name)]
 public class PickerSelectOnEntryTests
 {
     private static readonly string[] Categories = ["Bread", "Cake", "Pastry"];
 
-    [Fact]
+    [Test]
     public void A_click_into_a_picker_gives_its_box_the_keyboard_with_the_text_selected()
     {
         RunWithPicker((before, picker, box) =>
@@ -33,7 +33,7 @@ public class PickerSelectOnEntryTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Tabbing_into_a_picker_selects_its_text()
     {
         RunWithPicker((before, picker, box) =>
@@ -49,7 +49,7 @@ public class PickerSelectOnEntryTests
         });
     }
 
-    [Fact]
+    [Test]
     public void Typing_over_a_picked_name_selected_on_entry_keeps_the_letter_typed()
     {
         RunWithPicker((before, picker, box) =>
@@ -69,7 +69,7 @@ public class PickerSelectOnEntryTests
         });
     }
 
-    [Fact]
+    [Test]
     public void A_letter_added_to_a_picked_name_stays()
     {
         RunWithPicker((before, picker, box) =>
@@ -87,7 +87,7 @@ public class PickerSelectOnEntryTests
         });
     }
 
-    [Fact]
+    [Test]
     public void The_keyboard_coming_back_from_the_pickers_list_leaves_the_text_unselected()
     {
         RunWithPicker((before, picker, box) =>

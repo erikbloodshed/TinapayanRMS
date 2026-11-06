@@ -9,7 +9,7 @@ public class BackgroundWorkTests
 {
     private readonly BackgroundWork _work = new();
 
-    [Fact]
+    [Test]
     public Task Work_is_counted_from_its_start_until_it_ends_however_it_ends() => StaThread.RunAsync(async () =>
     {
         var read = new TaskCompletionSource();
@@ -25,7 +25,7 @@ public class BackgroundWorkTests
         _work.Running.Should().Be(0);
     });
 
-    [Fact]
+    [Test]
     public Task Idle_waits_for_work_and_for_the_work_it_starts_on_the_way() => StaThread.RunAsync(async () =>
     {
         var first = new TaskCompletionSource();
@@ -54,7 +54,7 @@ public class BackgroundWorkTests
         finished.Should().Equal("first", "second");
     });
 
-    [Fact]
+    [Test]
     public Task Idle_with_nothing_running_completes_at_once() => StaThread.RunAsync(async () =>
     {
         var idle = _work.WhenIdleAsync();

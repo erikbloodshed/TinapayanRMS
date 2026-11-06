@@ -13,43 +13,43 @@ public class DecimalValueConverterTests
 {
     private static readonly DecimalValueConverter Converter = new();
 
-    public static TheoryData<double, decimal> TypedNumbers => new()
-    {
-        { 28.35, 28.35m },
-        { 6.67, 6.67m },
-        { 0.0525, 0.0525m },
-        { 453.5924, 453.5924m },
-        { 0.1, 0.1m },
-        { -12.5, -12.5m },
-        { 0, 0m },
-        { 1250, 1250m },
-        { 0.00001, 0.00001m },
-    };
+    public static IEnumerable<(double, decimal)> TypedNumbers() =>
+    [
+        (28.35, 28.35m),
+        (6.67, 6.67m),
+        (0.0525, 0.0525m),
+        (453.5924, 453.5924m),
+        (0.1, 0.1m),
+        (-12.5, -12.5m),
+        (0, 0m),
+        (1250, 1250m),
+        (0.00001, 0.00001m),
+    ];
 
-    [Theory]
-    [MemberData(nameof(TypedNumbers))]
+    [Test]
+    [MethodDataSource(nameof(TypedNumbers))]
     public void A_typed_number_goes_in_as_the_decimal_it_shows(double typed, decimal expected)
     {
         Converter.ConvertBack(typed, typeof(decimal), null, CultureInfo.InvariantCulture).Should().Be(expected);
         Converter.ConvertBack(typed, typeof(decimal?), null, CultureInfo.InvariantCulture).Should().Be(expected);
     }
 
-    [Fact]
+    [Test]
     public void An_emptied_box_leaves_its_property_empty() =>
         Converter.ConvertBack(null, typeof(decimal?), null, CultureInfo.InvariantCulture).Should().BeNull();
 
-    [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    [InlineData(1e30)]
+    [Test]
+    [Arguments(double.NaN)]
+    [Arguments(double.PositiveInfinity)]
+    [Arguments(1e30)]
     public void A_number_a_decimal_cant_hold_leaves_the_property_as_it_was(double typed) =>
         Converter.ConvertBack(typed, typeof(decimal), null, CultureInfo.InvariantCulture).Should().Be(DependencyProperty.UnsetValue);
 
-    [Fact]
+    [Test]
     public void A_property_that_isnt_a_decimal_gets_the_number_as_it_is() =>
         Converter.ConvertBack(28.35, typeof(double), null, CultureInfo.InvariantCulture).Should().Be(28.35);
 
-    [Fact]
+    [Test]
     public void A_decimal_shows_in_the_box_as_its_double()
     {
         Converter.Convert(28.35m, typeof(double?), null, CultureInfo.InvariantCulture).Should().Be(28.35);

@@ -15,7 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// starts in Research and Development, and only a move (dragging it to another folder, IProductRepository.MoveAsync)
 /// changes it.
 /// </summary>
-[Collection(DatabaseCollection.D)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductStagePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());
@@ -30,7 +31,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
     private Task<int> SaveNewAsync(string name, int? categoryId = null) =>
         CreateRepository().SaveAsync(new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
-    [Fact]
+    [Test]
     public async Task A_new_product_starts_in_research_and_development()
     {
         var id = await SaveNewAsync("Ube Cheese Pandesal");
@@ -39,7 +40,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_saved_before_stages_existed_reads_as_production()
     {
         // As the migration added the column to the products already there: the row names no stage.
@@ -51,7 +52,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.Production);
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_sets_the_stage_and_the_category_and_nothing_else()
     {
         var breads = await SeedCategoryAsync("Breads");
@@ -78,7 +79,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         moved.UpdatedAt.Should().Be(clock.Now, "a move is a change to the product");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_can_take_a_product_out_of_its_category()
     {
         var breads = await SeedCategoryAsync("Breads");
@@ -91,7 +92,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         moved.CategoryId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_rejects_a_nonexistent_product()
     {
         var act = () => CreateRepository().MoveAsync([new ProductMove(999_999, ProductStage.Production, null)], Cancellation);
@@ -99,7 +100,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public async Task Saving_a_product_keeps_its_stage()
     {
         var id = await SaveNewAsync("Pandesal");
@@ -115,7 +116,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         saved.Stage.Should().Be(ProductStage.Production);
     }
 
-    [Fact]
+    [Test]
     public async Task A_clone_starts_in_research_and_development_whatever_its_sources_stage()
     {
         var sourceId = await SaveNewAsync("Chocolate Cake");
@@ -128,7 +129,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetByIdAsync(variantId, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_moves_several_products_each_to_its_own_folder()
     {
         var breads = await SeedCategoryAsync("Breads");
@@ -146,7 +147,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (products[ensaymadaId].Stage, products[ensaymadaId].CategoryId).Should().Be((ProductStage.ResearchAndDevelopment, breads.Id), "it wasn't moved");
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_to_a_category_that_no_longer_exists_is_refused_and_moves_nothing()
     {
         var breads = await SeedCategoryAsync("Breads");
@@ -160,7 +161,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetAllAsync(Cancellation)).Should().OnlyContain(p => p.Stage == ProductStage.ResearchAndDevelopment && p.CategoryId == null);
     }
 
-    [Fact]
+    [Test]
     public async Task MoveAsync_with_a_product_that_no_longer_exists_moves_none_of_the_others()
     {
         var mamonId = await SaveNewAsync("Mamon");
@@ -172,7 +173,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetByIdAsync(mamonId, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
     }
 
-    [Fact]
+    [Test]
     public async Task A_new_product_saved_with_a_stage_goes_in_it()
     {
         var id = await CreateRepository().SaveAsync(
@@ -186,7 +187,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetByIdAsync(id, Cancellation))!.Stage.Should().Be(ProductStage.Production);
     }
 
-    [Fact]
+    [Test]
     public async Task GetByIdsAsync_reads_only_the_products_asked_for()
     {
         var breads = await SeedCategoryAsync("Breads");

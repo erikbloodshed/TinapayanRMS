@@ -7,7 +7,7 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// <summary>KeyboardSettingsViewModel: the Vim keys' box on Settings' Keyboard tab, kept for the Windows user.</summary>
 public class KeyboardSettingsViewModelTests
 {
-    [Fact]
+    [Test]
     public void The_keys_start_off_for_a_user_who_never_turned_them_on()
     {
         var store = new InMemoryViewStateStore();
@@ -16,7 +16,7 @@ public class KeyboardSettingsViewModelTests
         KeyboardSettingsViewModel.IsVimKeysSaved(store).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Ticking_the_box_keeps_the_choice_and_turns_the_keys_on_in_the_running_app()
     {
         var store = new InMemoryViewStateStore();
@@ -35,7 +35,7 @@ public class KeyboardSettingsViewModelTests
         KeyboardSettingsViewModel.IsVimKeysSaved(store).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Setting_the_box_to_what_it_already_is_writes_nothing()
     {
         var store = new InMemoryViewStateStore(new Dictionary<string, IReadOnlyList<string>> { [KeyboardSettingsViewModel.VimKeysKey] = ["on"] });

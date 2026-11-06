@@ -8,7 +8,7 @@ public class ProductCategoryValidatorTests
 {
     private readonly ProductCategoryValidator _validator = new();
 
-    [Fact]
+    [Test]
     public void Accepts_a_valid_category()
     {
         var result = _validator.Validate(new ProductCategory { Name = "Cakes" });
@@ -16,7 +16,7 @@ public class ProductCategoryValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Rejects_a_missing_name()
     {
         var result = _validator.Validate(new ProductCategory { Name = "" });

@@ -18,10 +18,11 @@ namespace TinapayanRMS.UI.Tests.ViewModels;
 /// Settings' Database tab against real backups and restores, of a database of each test's own (ThrowawayDatabase), so
 /// a restore never touches the database the other UI tests share.
 /// </summary>
-[Collection(DatabaseCollection.B)]
-public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAsyncLifetime
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
+public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAsyncDisposable
 {
-    private static CancellationToken Cancellation => TestContext.Current.CancellationToken;
+    private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
 
     private readonly string _folder = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "TinapayanRMS", "Test Backups", Guid.NewGuid().ToString("N"));
@@ -30,7 +31,8 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     private ThrowawayDatabase _database = null!;
     private DatabaseBackups _backups = null!;
 
-    public async ValueTask InitializeAsync()
+    [Before(Test)]
+    public async Task CreateDatabaseAsync()
     {
         _database = await ThrowawayDatabase.CreateAsync(fixture.ConnectionString, Cancellation);
         _backups = new DatabaseBackups(_database.CreateDbContextFactory(), _folder);
@@ -46,7 +48,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         }
     }
 
-    [Fact]
+    [Test]
     public Task Back_Up_Now_lists_the_new_backup_picked_and_says_so() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -64,7 +66,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         viewModel.BusyText.Should().BeNull();
     });
 
-    [Fact]
+    [Test]
     public Task Copy_to_puts_the_picked_backup_where_the_user_chose() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -90,7 +92,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         }
     });
 
-    [Fact]
+    [Test]
     public Task A_restore_the_user_declines_changes_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -112,7 +114,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         _backups.List().Should().ContainSingle("no safety backup is taken for a restore that doesn't happen");
     });
 
-    [Fact]
+    [Test]
     public Task A_restore_puts_the_backup_back_and_restarts_the_app() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -128,7 +130,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         _restarts.Should().ContainSingle().Which.Should().StartWith("Restored the backup taken ").And.EndWith("TinapayanRMS restarts now.");
     });
 
-    [Fact]
+    [Test]
     public Task A_file_that_isnt_a_backup_is_refused_and_its_copy_removed() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
@@ -150,7 +152,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         }
     });
 
-    [Fact]
+    [Test]
     public Task Choosing_no_file_does_nothing() => StaThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();

@@ -13,7 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Names go in without spaces at either end, however they're written. PostgreSQL's collation counts a space at the end, so
 /// "Pandesal " beside "Pandesal" would get past the unique index.
 /// </summary>
-[Collection(DatabaseCollection.C)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository Products() => new(CreateDbContextFactory());
@@ -22,7 +23,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
     private UnitOfMeasureRepository Units() => new(CreateDbContextFactory());
 
-    [Fact]
+    [Test]
     public async Task A_products_name_is_stored_without_spaces_however_its_written()
     {
         var products = Products();
@@ -37,7 +38,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await products.GetByIdAsync(id, Cancellation))!.Name.Should().Be("Pan de Sal", "a rename");
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_named_as_another_but_for_a_space_at_the_end_is_a_duplicate()
     {
         var products = Products();
@@ -49,7 +50,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await products.GetAllAsync(Cancellation)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task A_product_named_with_nothing_but_spaces_is_refused()
     {
         var products = Products();
@@ -60,7 +61,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await products.GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_materials_name_is_stored_without_spaces_however_its_written()
     {
         var categoryId = await SeedCategoryAsync();
@@ -78,7 +79,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await materials.GetByIdAsync(id, Cancellation))!.Name.Should().Be("Cake Flour", "a rename");
     }
 
-    [Fact]
+    [Test]
     public async Task A_material_named_as_another_but_for_a_space_at_the_end_is_a_duplicate()
     {
         var categoryId = await SeedCategoryAsync();
@@ -91,7 +92,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await materials.GetAllAsync(Cancellation)).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task A_material_named_with_nothing_but_spaces_is_refused()
     {
         var categoryId = await SeedCategoryAsync();
@@ -103,7 +104,7 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (await materials.GetAllAsync(Cancellation)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task A_units_name_and_abbreviation_are_stored_without_spaces_however_theyre_written()
     {
         var units = Units();
@@ -117,9 +118,9 @@ public class StoredNamePersistenceTests(DatabaseFixture fixture) : PersistenceTe
         (updated.Name, updated.Abbreviation).Should().Be(("sack", "sk"), "a saved one");
     }
 
-    [Theory]
-    [InlineData("bag ", "other")]
-    [InlineData("other", "bg ")]
+    [Test]
+    [Arguments("bag ", "other")]
+    [Arguments("other", "bg ")]
     public async Task A_unit_named_as_another_but_for_a_space_at_the_end_is_a_duplicate(string name, string abbreviation)
     {
         var units = Units();
