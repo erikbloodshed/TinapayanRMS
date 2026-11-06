@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Windows.Media.Media3D;
 
 namespace TinapayanRMS.UI.Controls;
 
@@ -12,12 +13,13 @@ namespace TinapayanRMS.UI.Controls;
 /// </summary>
 internal static class VisualTreeWalk
 {
-    /// <summary><paramref name="element"/> and everything above it, stepping out of popups as it goes.</summary>
+    /// <summary>
+    /// <paramref name="element"/> and everything above it, stepping out of popups as it goes. It may start on text
+    /// content (a Hyperlink takes the keyboard when it's clicked), which isn't in the visual tree.
+    /// </summary>
     public static IEnumerable<DependencyObject> SelfAndAncestors(DependencyObject? element)
     {
-        for (var current = element;
-             current is not null;
-             current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current))
+        for (var current = element; current is not null; current = ParentOf(current))
         {
             yield return current;
 
@@ -28,6 +30,18 @@ internal static class VisualTreeWalk
             }
         }
     }
+
+    /// <summary>
+    /// What contains <paramref name="element"/>: its visual parent, or its logical one where it has none. Text content
+    /// (a ContentElement, such as a Hyperlink or a Run) has no visual parent, and VisualTreeHelper throws on it, so it
+    /// steps to the element that holds it: its logical parent, or the text block or document hosting it.
+    /// </summary>
+    private static DependencyObject? ParentOf(DependencyObject element) => element switch
+    {
+        Visual or Visual3D => VisualTreeHelper.GetParent(element) ?? LogicalTreeHelper.GetParent(element),
+        ContentElement content => LogicalTreeHelper.GetParent(content) ?? ContentOperations.GetParent(content),
+        _ => LogicalTreeHelper.GetParent(element),
+    };
 
     /// <summary>Whether <paramref name="element"/> is inside <paramref name="container"/>.</summary>
     public static bool IsWithin(DependencyObject container, DependencyObject? element) =>
