@@ -541,7 +541,7 @@ public sealed class ProductPrintLayout
         AddCost($"Markup ({costs.MarginPercent:0.##}%)", costs.Markup, costs.MarkupShare);
         AddCost($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, costs.VatShare);
         Add(
-            _ => BandRow($"Total Selling Price ({unit})", [Money(costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%"], isTotal: true),
+            _ => BandRow(printout.SuggestedSellingPriceLabel, [Money(costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%"], isTotal: true),
             table: table,
             keepTogether: CostingGroup);
 
@@ -588,7 +588,7 @@ public sealed class ProductPrintLayout
         AddCost($"VAT ({costs.VatPercent:0.##}%)", now.Vat, costs.Vat, costs.VatShare);
         Add(
             _ => BandRow(
-                $"Total Selling Price ({unit})",
+                printout.SuggestedSellingPriceLabel,
                 [Money(now.SellingPrice), Money(costs.SellingPrice), Change(now.SellingPrice, costs.SellingPrice), costs.SellingPriceShare.ToString("N0", CultureInfo.CurrentCulture) + "%"],
                 isTotal: true),
             table: table,
@@ -794,7 +794,7 @@ public sealed class ProductPrintLayout
     }
 
     /// <summary>
-    /// The costing's Subtotal or Total Selling Price, on the accent's soft band; the total's figures in the accent. Its
+    /// The costing's Subtotal or Suggested Selling Price, on the accent's soft band; the total's figures in the accent. Its
     /// figures are an amount and its share, or on the Price Simulator report the amount now, with the changes, the change and the
     /// share.
     /// </summary>

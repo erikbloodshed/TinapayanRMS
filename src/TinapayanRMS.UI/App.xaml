@@ -218,7 +218,7 @@
             -->
             <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource LatteSkyColor}" />
             <SolidColorBrush x:Key="AccentForegroundBrush" Color="{StaticResource LatteSkyDeepColor}" />
-            <!-- The Costing Summary's Subtotal and Total Selling Price bands: the accent's Tint, a soft wash rather than a block -->
+            <!-- The Costing Summary's Subtotal and Suggested Selling Price bands: the accent's Tint, a soft wash rather than a block -->
             <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource LatteSkyTintColor}" />
             <!--
                 A neutral notice that explains rather than warns (the linked-cost preview on Raw Materials): Mauve, so it

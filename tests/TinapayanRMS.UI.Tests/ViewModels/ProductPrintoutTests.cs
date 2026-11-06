@@ -163,4 +163,15 @@ public class ProductPrintoutTests
             new PrintedPackagingLine("Ribbon", 0.5m, "roll", 50m, 25m));
         packaging.Total.Should().Be(55m);
     }
+
+    [Test]
+    [Arguments(1, false, "Per piece", "Suggested Selling Price per Piece")]
+    [Arguments(0, false, "Per piece", "Suggested Selling Price per Piece")]
+    [Arguments(8, false, "Per unit of 8 pieces", "Suggested Selling Price per Unit of 8 Pieces")]
+    [Arguments(8, true, "Per unit", "Suggested Selling Price per Unit")]
+    public void The_suggested_price_is_named_for_the_unit_the_caption_names(int quantityRequired, bool isComposite, string caption, string label)
+    {
+        ProductPrintout.CostUnitCaptionFor(quantityRequired, isComposite).Should().Be(caption);
+        ProductPrintout.SuggestedSellingPriceLabelFor(caption).Should().Be(label);
+    }
 }
