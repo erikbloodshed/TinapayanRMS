@@ -11,9 +11,13 @@
    order, with its filters and only the columns showing (the grid's own export, saved where Windows' Save dialog says). Product Cost
    Summary's Columns button chooses which columns show. Each table's filters, sort and columns are as they were left,
    kept for the Windows user (GridLayouts). Cost Buffers' Re-apply Target Buffer changes the buffered costs of the materials
-   picked, or of every one shown below target, after asking. *@
+   picked, or of every one shown below target, after asking. A tab's table is built the first time its tab is shown
+   (ContentLoad.Demand), then kept: the page opens with one table to draw, not five, each drawn twice a visit, with the
+   last visit's rows and then the new ones. A grid draws all its rows for each change to its list, so each table's rows
+   come in one change (TableRows), and none when they show the same; and each grid is in a SelfDrawn, since it draws
+   itself as they change, so the page drawing again (a button, a toast, a grid's event) doesn't draw the grids again. *@
 <section class="card tabs-card report-card">
-    <SfTab LoadOn="ContentLoad.Init" CssClass="details-tabs report-tabs">
+    <SfTab LoadOn="ContentLoad.Demand" CssClass="details-tabs report-tabs">
         <TabItems>
             <TabItem>
                 <ChildContent><TabHeader Text="@ReportsViewModel.ProductCostSummaryTitle" /></ChildContent>
@@ -28,33 +32,35 @@
                             </div>
                         </div>
                         <p class="caption">Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost, and Short By how far it falls short of the Target Markup %. Filter by product, stage or category from the funnel in its heading, and double-click a product to open it.</p>
-                        <SfGrid @ref="_productCosts" ID="report-product-costs" TValue="ProductCostRow" DataSource="ViewModel!.ProductCosts" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                                AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" ShowColumnChooser="true" AllowTextWrap="true" AllowResizing="true">
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-                            <GridTextWrapSettings WrapMode="WrapMode.Header" />
-                            <GridEvents TValue="ProductCostRow" OnRecordDoubleClick="OpenProductAsync" Created="() => RestoreAsync(_productCosts, ProductCostsKey)"
-                                        OnActionComplete="e => SaveAsync(_productCosts, ProductCostsKey, e.RequestType)" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(ProductCostRow.ProductId)" IsPrimaryKey="true" Visible="false" ShowInColumnChooser="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.ProductName)" HeaderText="Product" Width="260" ShowInColumnChooser="false" IsFrozen="true" />
-                                <GridColumn Field="@nameof(ProductCostRow.Stage)" HeaderText="Stage" Width="180" />
-                                <GridColumn Field="@nameof(ProductCostRow.Category)" HeaderText="Category" Width="140" />
-                                <GridColumn Field="@nameof(ProductCostRow.Pieces)" HeaderText="Pieces" Width="80" Format="N0" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.IngredientsCost)" HeaderText="Ingredients Cost" Format="N2" TextAlign="TextAlign.Right" Width="106" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.WastageCost)" HeaderText="Wastage Cost" Format="N2" TextAlign="TextAlign.Right" Width="96" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.PackagingCost)" HeaderText="Packaging Cost" Format="N2" TextAlign="TextAlign.Right" Width="104" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.LaborCost)" HeaderText="Labor Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.OverheadCost)" HeaderText="Overhead Cost" Format="N2" TextAlign="TextAlign.Right" Width="98" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.AdministrativeCost)" HeaderText="Admin Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.BaseCost)" HeaderText="Base Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.SuggestedPrice)" HeaderText="Suggested Price" Format="N2" TextAlign="TextAlign.Right" Width="104" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.RoundedPrice)" HeaderText="Rounded Price" Format="N2" TextAlign="TextAlign.Right" Width="98" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.CurrentPrice)" HeaderText="Current Price" Format="N2" TextAlign="TextAlign.Right" Width="92" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" Width="88" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.TargetMarkupPercent)" HeaderText="Target Markup %" Format="N2" TextAlign="TextAlign.Right" Width="96" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(ProductCostRow.ShortOfTargetMarkup)" HeaderText="Short By" Format="N2" TextAlign="TextAlign.Right" Width="84" AllowFiltering="false" />
-                            </GridColumns>
-                        </SfGrid>
+                        <SelfDrawn>
+                            <SfGrid @ref="_productCosts" ID="report-product-costs" TValue="ProductCostRow" DataSource="ViewModel!.ProductCosts" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                                    AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" ShowColumnChooser="true" AllowTextWrap="true" AllowResizing="true">
+                                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                                <GridTextWrapSettings WrapMode="WrapMode.Header" />
+                                <GridEvents TValue="ProductCostRow" OnRecordDoubleClick="OpenProductAsync" Created="() => RestoreAsync(_productCosts, ProductCostsKey)"
+                                            OnActionComplete="e => SaveAsync(_productCosts, ProductCostsKey, e.RequestType)" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(ProductCostRow.ProductId)" IsPrimaryKey="true" Visible="false" ShowInColumnChooser="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.ProductName)" HeaderText="Product" Width="260" ShowInColumnChooser="false" IsFrozen="true" />
+                                    <GridColumn Field="@nameof(ProductCostRow.Stage)" HeaderText="Stage" Width="180" />
+                                    <GridColumn Field="@nameof(ProductCostRow.Category)" HeaderText="Category" Width="140" />
+                                    <GridColumn Field="@nameof(ProductCostRow.Pieces)" HeaderText="Pieces" Width="80" Format="N0" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.IngredientsCost)" HeaderText="Ingredients Cost" Format="N2" TextAlign="TextAlign.Right" Width="106" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.WastageCost)" HeaderText="Wastage Cost" Format="N2" TextAlign="TextAlign.Right" Width="96" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.PackagingCost)" HeaderText="Packaging Cost" Format="N2" TextAlign="TextAlign.Right" Width="104" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.LaborCost)" HeaderText="Labor Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.OverheadCost)" HeaderText="Overhead Cost" Format="N2" TextAlign="TextAlign.Right" Width="98" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.AdministrativeCost)" HeaderText="Admin Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.BaseCost)" HeaderText="Base Cost" Format="N2" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.SuggestedPrice)" HeaderText="Suggested Price" Format="N2" TextAlign="TextAlign.Right" Width="104" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.RoundedPrice)" HeaderText="Rounded Price" Format="N2" TextAlign="TextAlign.Right" Width="98" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.CurrentPrice)" HeaderText="Current Price" Format="N2" TextAlign="TextAlign.Right" Width="92" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" Width="88" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.TargetMarkupPercent)" HeaderText="Target Markup %" Format="N2" TextAlign="TextAlign.Right" Width="96" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(ProductCostRow.ShortOfTargetMarkup)" HeaderText="Short By" Format="N2" TextAlign="TextAlign.Right" Width="84" AllowFiltering="false" />
+                                </GridColumns>
+                            </SfGrid>
+                        </SelfDrawn>
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -68,22 +74,24 @@
                                            Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                         </div>
                         <p class="caption">Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it. Double-click a material to open it.</p>
-                        <SfGrid @ref="_rawMaterialPrices" ID="report-raw-material-prices" TValue="RawMaterialPriceSummaryRow" DataSource="ViewModel!.RawMaterialPrices" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                                AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-                            <GridEvents TValue="RawMaterialPriceSummaryRow" OnRecordDoubleClick="OpenRawMaterialAsync" Created="() => RestoreAsync(_rawMaterialPrices, RawMaterialPricesKey)"
-                                        OnActionComplete="e => SaveAsync(_rawMaterialPrices, RawMaterialPricesKey, e.RequestType)" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Name)" HeaderText="Raw Material" Width="280" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Type)" HeaderText="Type" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Category)" HeaderText="Category" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.UnitName)" HeaderText="Unit" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Price)" HeaderText="Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.ChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.PriceDate)" HeaderText="Since" Format="MMM d, yyyy" Type="ColumnType.Date" AllowFiltering="false" />
-                            </GridColumns>
-                        </SfGrid>
+                        <SelfDrawn>
+                            <SfGrid @ref="_rawMaterialPrices" ID="report-raw-material-prices" TValue="RawMaterialPriceSummaryRow" DataSource="ViewModel!.RawMaterialPrices" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                                    AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
+                                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                                <GridEvents TValue="RawMaterialPriceSummaryRow" OnRecordDoubleClick="OpenRawMaterialAsync" Created="() => RestoreAsync(_rawMaterialPrices, RawMaterialPricesKey)"
+                                            OnActionComplete="e => SaveAsync(_rawMaterialPrices, RawMaterialPricesKey, e.RequestType)" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Name)" HeaderText="Raw Material" Width="280" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Type)" HeaderText="Type" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Category)" HeaderText="Category" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.UnitName)" HeaderText="Unit" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.Price)" HeaderText="Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.ChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(RawMaterialPriceSummaryRow.PriceDate)" HeaderText="Since" Format="MMM d, yyyy" Type="ColumnType.Date" AllowFiltering="false" />
+                                </GridColumns>
+                            </SfGrid>
+                        </SelfDrawn>
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -102,25 +110,27 @@
                             </div>
                         </div>
                         <p class="caption">Every purchased material's buffered cost against the brand it's costed at now (its Cost From brand, else the dearest). Brand prices don't move the buffered cost, so a rise wears the buffer down; Target % is the buffer last typed for it. Pick materials (Ctrl or Shift for several), or none for all shown, and Re-apply Target Buffer puts it back on top. Double-click one to open it.</p>
-                        <SfGrid @ref="_costBuffers" ID="report-cost-buffers" TValue="CostBufferRow" DataSource="ViewModel!.CostBuffers" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                                AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-                            <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
-                            <GridEvents TValue="CostBufferRow" OnRecordDoubleClick="OpenCostBufferMaterialAsync" RowSelected="SyncCostBuffersAsync" RowDeselected="SyncCostBuffersAsync"
-                                        Created="() => RestoreAsync(_costBuffers, CostBuffersKey)" OnActionComplete="e => SaveAsync(_costBuffers, CostBuffersKey, e.RequestType)" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(CostBufferRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.Name)" HeaderText="Raw Material" Width="280" />
-                                <GridColumn Field="@nameof(CostBufferRow.Type)" HeaderText="Type" />
-                                <GridColumn Field="@nameof(CostBufferRow.Category)" HeaderText="Category" />
-                                <GridColumn Field="@nameof(CostBufferRow.Per)" HeaderText="Per" Width="70" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.DearestCost)" HeaderText="Brand Cost" Format="N4" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.BufferedCost)" HeaderText="Buffered Cost" Format="N4" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.BufferPercent)" HeaderText="Buffer %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.TargetPercent)" HeaderText="Target %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostBufferRow.ShortBy)" HeaderText="Short By" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                            </GridColumns>
-                        </SfGrid>
+                        <SelfDrawn>
+                            <SfGrid @ref="_costBuffers" ID="report-cost-buffers" TValue="CostBufferRow" DataSource="ViewModel!.CostBuffers" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                                    AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
+                                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                                <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
+                                <GridEvents TValue="CostBufferRow" OnRecordDoubleClick="OpenCostBufferMaterialAsync" RowSelected="SyncCostBuffersAsync" RowDeselected="SyncCostBuffersAsync"
+                                            Created="() => RestoreAsync(_costBuffers, CostBuffersKey)" OnActionComplete="e => SaveAsync(_costBuffers, CostBuffersKey, e.RequestType)" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(CostBufferRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.Name)" HeaderText="Raw Material" Width="280" />
+                                    <GridColumn Field="@nameof(CostBufferRow.Type)" HeaderText="Type" />
+                                    <GridColumn Field="@nameof(CostBufferRow.Category)" HeaderText="Category" />
+                                    <GridColumn Field="@nameof(CostBufferRow.Per)" HeaderText="Per" Width="70" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.DearestCost)" HeaderText="Brand Cost" Format="N4" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.BufferedCost)" HeaderText="Buffered Cost" Format="N4" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.BufferPercent)" HeaderText="Buffer %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.TargetPercent)" HeaderText="Target %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostBufferRow.ShortBy)" HeaderText="Short By" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                </GridColumns>
+                            </SfGrid>
+                        </SelfDrawn>
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -134,23 +144,25 @@
                                            Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                         </div>
                         <p class="caption">The purchased materials that make up most of the products in Production's material cost, one sellable unit of each, at buffered costs: a material is counted however it gets into a product, through a made or linked ingredient too. Cumulative % adds each row to those above it, so the top few that make up most of the cost show where a price rise would hurt. Double-click a material to open it.</p>
-                        <SfGrid @ref="_costDrivers" ID="report-cost-drivers" TValue="CostDriverRow" DataSource="ViewModel!.CostDrivers" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                                AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-                            <GridEvents TValue="CostDriverRow" OnRecordDoubleClick="OpenCostDriverMaterialAsync" Created="() => RestoreAsync(_costDrivers, CostDriversKey)"
-                                        OnActionComplete="e => SaveAsync(_costDrivers, CostDriversKey, e.RequestType)" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(CostDriverRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.Name)" HeaderText="Raw Material" Width="260" />
-                                <GridColumn Field="@nameof(CostDriverRow.Category)" HeaderText="Category" />
-                                <GridColumn Field="@nameof(CostDriverRow.Products)" HeaderText="Products" Format="N0" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.CostInProducts)" HeaderText="Cost in Products" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.ShareOfAll)" HeaderText="Share %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.CumulativeShare)" HeaderText="Cumulative %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.LargestShare)" HeaderText="Largest Share %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(CostDriverRow.LargestIn)" HeaderText="Largest In" Width="220" />
-                            </GridColumns>
-                        </SfGrid>
+                        <SelfDrawn>
+                            <SfGrid @ref="_costDrivers" ID="report-cost-drivers" TValue="CostDriverRow" DataSource="ViewModel!.CostDrivers" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                                    AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">
+                                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                                <GridEvents TValue="CostDriverRow" OnRecordDoubleClick="OpenCostDriverMaterialAsync" Created="() => RestoreAsync(_costDrivers, CostDriversKey)"
+                                            OnActionComplete="e => SaveAsync(_costDrivers, CostDriversKey, e.RequestType)" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(CostDriverRow.RawMaterialId)" IsPrimaryKey="true" Visible="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.Name)" HeaderText="Raw Material" Width="260" />
+                                    <GridColumn Field="@nameof(CostDriverRow.Category)" HeaderText="Category" />
+                                    <GridColumn Field="@nameof(CostDriverRow.Products)" HeaderText="Products" Format="N0" TextAlign="TextAlign.Right" Width="90" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.CostInProducts)" HeaderText="Cost in Products" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.ShareOfAll)" HeaderText="Share %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.CumulativeShare)" HeaderText="Cumulative %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.LargestShare)" HeaderText="Largest Share %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(CostDriverRow.LargestIn)" HeaderText="Largest In" Width="220" />
+                                </GridColumns>
+                            </SfGrid>
+                        </SelfDrawn>
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -170,28 +182,30 @@
                             </div>
                         </div>
                         <p class="caption">Each product's markup at its Current Price as it stood on the day picked, its latest version saved by then at its costs then, against now. A product with no version by then, or no Current Price then or now, isn't listed. Change is in percentage points: below 0 means it earns less now. Double-click a product to open it.</p>
-                        <SfGrid @ref="_marginErosion" ID="report-margin-erosion" TValue="MarginErosionRow" DataSource="ViewModel!.MarginErosion" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                                AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowTextWrap="true" AllowResizing="true">
-                            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-                            <GridTextWrapSettings WrapMode="WrapMode.Header" />
-                            <GridEvents TValue="MarginErosionRow" OnRecordDoubleClick="OpenErodedProductAsync" Created="() => RestoreAsync(_marginErosion, MarginErosionKey)"
-                                        OnActionComplete="e => SaveAsync(_marginErosion, MarginErosionKey, e.RequestType)" />
-                            <GridColumns>
-                                <GridColumn Field="@nameof(MarginErosionRow.ProductId)" IsPrimaryKey="true" Visible="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.ProductName)" HeaderText="Product" Width="240" />
-                                <GridColumn Field="@nameof(MarginErosionRow.Stage)" HeaderText="Stage" />
-                                <GridColumn Field="@nameof(MarginErosionRow.Category)" HeaderText="Category" />
-                                <GridColumn Field="@nameof(MarginErosionRow.VersionNumber)" HeaderText="Version" Format="N0" TextAlign="TextAlign.Right" Width="80" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.VersionSavedAt)" HeaderText="Saved" Format="MMM d, yyyy" Type="ColumnType.Date" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.BaseCostThen)" HeaderText="Base Cost Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.BaseCostNow)" HeaderText="Base Cost Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.CurrentPriceThen)" HeaderText="Price Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.CurrentPriceNow)" HeaderText="Price Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.MarkupThen)" HeaderText="Markup % Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.MarkupNow)" HeaderText="Markup % Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                                <GridColumn Field="@nameof(MarginErosionRow.Change)" HeaderText="Change" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                            </GridColumns>
-                        </SfGrid>
+                        <SelfDrawn>
+                            <SfGrid @ref="_marginErosion" ID="report-margin-erosion" TValue="MarginErosionRow" DataSource="ViewModel!.MarginErosion" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                                    AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowTextWrap="true" AllowResizing="true">
+                                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                                <GridTextWrapSettings WrapMode="WrapMode.Header" />
+                                <GridEvents TValue="MarginErosionRow" OnRecordDoubleClick="OpenErodedProductAsync" Created="() => RestoreAsync(_marginErosion, MarginErosionKey)"
+                                            OnActionComplete="e => SaveAsync(_marginErosion, MarginErosionKey, e.RequestType)" />
+                                <GridColumns>
+                                    <GridColumn Field="@nameof(MarginErosionRow.ProductId)" IsPrimaryKey="true" Visible="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.ProductName)" HeaderText="Product" Width="240" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.Stage)" HeaderText="Stage" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.Category)" HeaderText="Category" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.VersionNumber)" HeaderText="Version" Format="N0" TextAlign="TextAlign.Right" Width="80" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.VersionSavedAt)" HeaderText="Saved" Format="MMM d, yyyy" Type="ColumnType.Date" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.BaseCostThen)" HeaderText="Base Cost Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.BaseCostNow)" HeaderText="Base Cost Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.CurrentPriceThen)" HeaderText="Price Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.CurrentPriceNow)" HeaderText="Price Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.MarkupThen)" HeaderText="Markup % Then" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.MarkupNow)" HeaderText="Markup % Now" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                    <GridColumn Field="@nameof(MarginErosionRow.Change)" HeaderText="Change" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                                </GridColumns>
+                            </SfGrid>
+                        </SelfDrawn>
                     </div>
                 </ContentTemplate>
             </TabItem>
@@ -217,6 +231,9 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
+
+        // The page's grids are new, with nothing picked: Cost Buffers' picks went with the grid they were made in.
+        ViewModel!.SelectedCostBuffers.Clear();
 
         // Export to Excel: the table named, as it's shown, under "<title> yyyy-MM-dd.xlsx" as the WPF app suggested, where
         // the Save dialog says. The grid makes the workbook itself, as it shows the table.

@@ -78,13 +78,14 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
         _subscriptions.Add(new Unsubscriber(() => viewModel.PropertyChanged -= OnViewModelPropertyChanged));
         WatchListsAndCommands(viewModel);
 
-        // Its parts: the ViewModels it holds for good (get-only), whose own changes the screen shows too.
+        // Its parts: the ViewModels it holds for good (get-only), whose own changes the screen shows too. A list from their
+        // namespace (TableRows) isn't one: it's watched with the other lists.
         foreach (var property in typeof(TViewModel).GetProperties())
         {
             if (!property.CanWrite
                 && property.GetIndexParameters().Length == 0
                 && property.PropertyType.Namespace == typeof(ViewModelBase).Namespace
-                && property.GetValue(viewModel) is INotifyPropertyChanged part and not ViewModelBase)
+                && property.GetValue(viewModel) is INotifyPropertyChanged part and not ViewModelBase and not INotifyCollectionChanged)
             {
                 part.PropertyChanged += OnPartPropertyChanged;
                 _subscriptions.Add(new Unsubscriber(() => part.PropertyChanged -= OnPartPropertyChanged));

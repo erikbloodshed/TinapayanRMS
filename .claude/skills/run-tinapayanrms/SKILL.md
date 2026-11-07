@@ -86,8 +86,12 @@ dotnet test --solution TinapayanRMS.slnx
 - **The page's shot leaves out the window's frame and its title bar's caption**; `window` captures them. Shots of the
   page are of the page as drawn, popups and dialogs included.
 - **A load takes a moment.** An action's shot waits 1.2 s, but the first visit to a screen after a start (a Debug build
-  compiling as it goes) can take several seconds: Reports took 10 s the first time. Shoot again before deciding nothing
-  happened, or `eval` for what should be there.
+  compiling as it goes) can take longer: Reports' first visit settles in one to two seconds. Shoot again before deciding
+  nothing happened, or `eval` for what should be there.
+- **The user may minimize the window** when it opens over their work. A minimized web view doesn't draw, so clicks and
+  shots wait and time out (`waiting for element to be visible, enabled and stable`), though `eval` still works and the
+  page's script and screens still run. Leave it minimized: check the page through `eval`, clicking from script
+  (`element.click()`), and close it with `WM_CLOSE` (PowerShell: `(Get-Process TinapayanRMS.Maui).CloseMainWindow()`).
 - **`launch` reuses a copy it started**, and refuses one started without the debugging port (a `dotnet run`, or the user's):
   close that first.
 - **`close` asks, as the user's Close does.** With unsaved changes the window asks Save, Don't Save (No) or Cancel and
@@ -101,5 +105,6 @@ dotnet test --solution TinapayanRMS.slnx
 
 - **`launch` throws "Not built"**: run the build above.
 - **`launch` times out**: the app may have failed as it started; read `%LocalAppData%\TinapayanRMS\Maui\logs\`.
-- **A click times out**: the selector found nothing showing; `shot` to see the page, `eval` to look for the element.
+- **A click times out**: the selector found nothing showing; `shot` to see the page, `eval` to look for the element. If
+  the shot times out too, the window is minimized (see Gotchas).
 - **`close` says it's still open**: the window is asking about unsaved changes; `shot`, then click No.

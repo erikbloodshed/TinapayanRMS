@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.IO;
 using System.Reactive.Linq;
 using AwesomeAssertions;
@@ -146,6 +147,79 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var salt = viewModel.RawMaterialPrices.Should().ContainSingle(r => r.Name == "Salt").Subject;
         salt.Price.Should().BeNull("salt has never been priced");
         salt.ChangePercent.Should().BeNull();
+    });
+
+    [Test]
+    public Task A_load_fills_each_table_in_one_change() => UiThread.RunAsync(async () =>
+    {
+        // A grid draws all its rows again for each change to its list: filled a row at a time, the tables were drawn some
+        // 330 times a visit and held the window for seconds.
+        await AddProductAsync("Pandesal");
+        await AddProductAsync("Ensaymada");
+        await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.04m);
+        await AddIngredientAsync("Salt");
+
+        using var viewModel = CreateViewModel();
+        List<NotifyCollectionChangedAction> productCosts = [];
+        List<NotifyCollectionChangedAction> rawMaterialPrices = [];
+        List<NotifyCollectionChangedAction> costBuffers = [];
+        viewModel.ProductCosts.CollectionChanged += (_, e) => productCosts.Add(e.Action);
+        viewModel.RawMaterialPrices.CollectionChanged += (_, e) => rawMaterialPrices.Add(e.Action);
+        viewModel.CostBuffers.CollectionChanged += (_, e) => costBuffers.Add(e.Action);
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.ProductCosts.Should().HaveCount(2);
+        productCosts.Should().Equal(NotifyCollectionChangedAction.Reset);
+        viewModel.RawMaterialPrices.Should().HaveCount(2);
+        rawMaterialPrices.Should().Equal(NotifyCollectionChangedAction.Reset);
+        viewModel.CostBuffers.Should().ContainSingle(r => r.Name == "Flour", "its buffer has worn below the target");
+        costBuffers.Should().Equal(NotifyCollectionChangedAction.Reset);
+    });
+
+    [Test]
+    public Task A_load_that_finds_nothing_new_leaves_the_tables_alone() => UiThread.RunAsync(async () =>
+    {
+        // What most visits to Reports find: the grids would draw every row again for the same figures.
+        await AddProductAsync("Pandesal");
+        await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.04m);
+        using var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        var pandesal = viewModel.ProductCosts.Single();
+        viewModel.SelectedCostBuffers.Add(viewModel.CostBuffers.Single());
+        List<NotifyCollectionChangedAction> changes = [];
+        viewModel.ProductCosts.CollectionChanged += (_, e) => changes.Add(e.Action);
+        viewModel.RawMaterialPrices.CollectionChanged += (_, e) => changes.Add(e.Action);
+        viewModel.CostBuffers.CollectionChanged += (_, e) => changes.Add(e.Action);
+
+        await viewModel.LoadCommand.Execute();
+
+        changes.Should().BeEmpty();
+        viewModel.ProductCosts.Single().Should().BeSameAs(pandesal);
+        viewModel.SelectedCostBuffers.Should().ContainSingle("the grid keeps the row picked, as it keeps the row");
+    });
+
+    [Test]
+    public Task A_load_that_finds_a_change_replaces_its_table() => UiThread.RunAsync(async () =>
+    {
+        await AddProductAsync("Pandesal");
+        await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.04m);
+        using var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedCostBuffers.Add(viewModel.CostBuffers.Single());
+        List<NotifyCollectionChangedAction> productCosts = [];
+        List<NotifyCollectionChangedAction> costBuffers = [];
+        viewModel.ProductCosts.CollectionChanged += (_, e) => productCosts.Add(e.Action);
+        viewModel.CostBuffers.CollectionChanged += (_, e) => costBuffers.Add(e.Action);
+
+        await AddProductAsync("Ensaymada");
+        await AddIngredientAsync("Sugar", costPerGram: 0.08m, bufferedCostPerGram: 0.07m);
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.ProductCosts.Select(r => r.ProductName).Should().Equal("Ensaymada", "Pandesal");
+        productCosts.Should().Equal(NotifyCollectionChangedAction.Reset);
+        costBuffers.Should().Equal(NotifyCollectionChangedAction.Reset);
+        viewModel.SelectedCostBuffers.Should().BeEmpty("the grid unpicks its rows as it takes new ones");
     });
 
     [Test]

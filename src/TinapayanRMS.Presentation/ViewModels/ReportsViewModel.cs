@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -192,12 +191,12 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     public const string MarginErosionTitle = "Margin Erosion";
 
     /// <summary>The purchased materials that make up most of what the products in Production cost, the most first.</summary>
-    public ObservableCollection<CostDriverRow> CostDrivers { get; } = [];
+    public TableRows<CostDriverRow> CostDrivers { get; } = [];
 
     private IReadOnlyList<MarginErosionRow> _allMarginErosion = [];
 
     /// <summary>Each product's markup as it stood on <see cref="MarginErosionSince"/> against now, the furthest dropped first.</summary>
-    public ObservableCollection<MarginErosionRow> MarginErosion { get; } = [];
+    public TableRows<MarginErosionRow> MarginErosion { get; } = [];
 
     private DateTime _marginErosionSince = DateTime.Today.AddDays(-30);
     /// <summary>The day Margin Erosion compares with: each product's latest version saved by its end. 30 days ago to start with.</summary>
@@ -240,7 +239,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     private IReadOnlyList<CostBufferRow> _allCostBuffers = [];
 
     /// <summary>Every purchased material with a price and a buffered cost, or only those whose buffer is below target.</summary>
-    public ObservableCollection<CostBufferRow> CostBuffers { get; } = [];
+    public TableRows<CostBufferRow> CostBuffers { get; } = [];
 
     /// <summary>The Cost Buffers rows picked (its SelectedItems): what Re-apply Target Buffer puts back, when any are.</summary>
     public ObservableCollection<object> SelectedCostBuffers { get; } = [];
@@ -271,9 +270,9 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     private readonly IProductRepository _productRepository;
     private readonly SavedProductReader _savedProducts;
 
-    public ObservableCollection<ProductCostRow> ProductCosts { get; } = [];
+    public TableRows<ProductCostRow> ProductCosts { get; } = [];
 
-    public ObservableCollection<RawMaterialPriceSummaryRow> RawMaterialPrices { get; } = [];
+    public TableRows<RawMaterialPriceSummaryRow> RawMaterialPrices { get; } = [];
 
     /// <summary>A Product Cost Summary row's double-click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
@@ -341,14 +340,12 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             var (productCosts, _) = await productCostsRead;
             var (rawMaterialPrices, costBuffers) = await rawMaterialPricesRead;
 
-            ProductCosts.Clear();
-            ProductCosts.AddRange(productCosts);
-            RawMaterialPrices.Clear();
-            RawMaterialPrices.AddRange(rawMaterialPrices);
+            // Each table in one change (TableRows), so its grid draws it once.
+            ProductCosts.ReplaceWith(productCosts);
+            RawMaterialPrices.ReplaceWith(rawMaterialPrices);
             _allCostBuffers = costBuffers;
             ShowCostBuffers();
-            CostDrivers.Clear();
-            CostDrivers.AddRange(await costDriversRead);
+            CostDrivers.ReplaceWith(await costDriversRead);
             _marginErosionWanted.OnNext(RxVoid.Default);
         }));
     }
@@ -418,17 +415,17 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         ShowMarginErosion();
     }
 
-    private void ShowMarginErosion()
-    {
-        MarginErosion.Clear();
-        MarginErosion.AddRange(OnlyDropped ? _allMarginErosion.Where(r => r.HasDropped) : _allMarginErosion);
-    }
+    private void ShowMarginErosion() =>
+        MarginErosion.ReplaceWith(OnlyDropped ? _allMarginErosion.Where(r => r.HasDropped) : _allMarginErosion);
 
     private void ShowCostBuffers()
     {
-        SelectedCostBuffers.Clear();
-        CostBuffers.Clear();
-        CostBuffers.AddRange(OnlyBelowTarget ? _allCostBuffers.Where(r => r.IsBelowTarget) : _allCostBuffers);
+        // The rows picked go with the rows they were picked from: the grid unpicks them as it takes new rows, and keeps
+        // them when the same rows come again (TableRows), so the picks here follow it.
+        if (CostBuffers.ReplaceWith(OnlyBelowTarget ? _allCostBuffers.Where(r => r.IsBelowTarget) : _allCostBuffers))
+        {
+            SelectedCostBuffers.Clear();
+        }
     }
 
     private async Task ReapplyTargetBuffersAsync()

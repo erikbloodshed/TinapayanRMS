@@ -36,12 +36,14 @@ public class ScreenBaseTests
 
         public ObservableCollection<int> Rows { get; } = [];
 
+        public TableRows<int> Table { get; } = [];
+
         public BehaviorSubject<bool> CanSave { get; } = new(false);
 
         public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
     }
 
-    /// <summary>A screen that shows its ViewModel's name, rows and whether Save can run, and counts its drawings.</summary>
+    /// <summary>A screen that shows its ViewModel's name, rows, table and whether Save can run, and counts its drawings.</summary>
     private sealed class LinesScreen : ScreenBase<Lines>
     {
         public int Drawings { get; private set; }
@@ -55,6 +57,9 @@ public class ScreenBaseTests
             Drawings++;
             builder.OpenElement(0, "p");
             builder.AddContent(1, $"{ViewModel!.Name}|{ViewModel.Rows.Count}|{CanRun(ViewModel.SaveCommand)}");
+            builder.CloseElement();
+            builder.OpenElement(2, "span");
+            builder.AddContent(3, string.Join(",", ViewModel.Table));
             builder.CloseElement();
         }
     }
@@ -98,6 +103,19 @@ public class ScreenBaseTests
         await screen.InvokeAsync(() => viewModel.Rows.Add(1));
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|1|False"));
+    }
+
+    [Test]
+    public async Task A_table_replaced_in_one_go_redraws_the_screen_once()
+    {
+        await using var context = AppServices.NewContext();
+        var (screen, viewModel) = Render(context);
+        var before = screen.Instance.Drawings;
+
+        await screen.InvokeAsync(() => viewModel.Table.ReplaceWith([3, 1, 2]));
+
+        screen.WaitForAssertion(() => screen.Find("span").TextContent.Should().Be("3,1,2"));
+        (screen.Instance.Drawings - before).Should().Be(1);
     }
 
     [Test]

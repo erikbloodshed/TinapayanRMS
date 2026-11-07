@@ -1,0 +1,14 @@
+@* What it holds draws itself, so the page drawing again doesn't draw it again: an SfGrid over a TableRows, which redraws
+   itself as its rows change (it watches the list). The page draws again for a button's state, a toast or a grid's event,
+   and each time took every grid on it through its parameters and its own drawing: on Reports, with its five tables built,
+   a filter ticked on an 11-row table held the window for 140 ms (2026-11-07). Syncfusion's advice: split the page, so an
+   unrelated update doesn't reach the grid. Only for content whose parameters never change after it's first drawn (a
+   grid's DataSource the same list throughout): it keeps what the page gave it then, drawn again only on a hot reload. *@
+@ChildContent
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = null!;
+
+    // Blazor draws a component the first time whatever this says, and again on a hot reload.
+    protected override bool ShouldRender() => false;
+}
