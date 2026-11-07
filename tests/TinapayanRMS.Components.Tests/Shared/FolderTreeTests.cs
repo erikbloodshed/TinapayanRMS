@@ -201,6 +201,37 @@ public class FolderTreeTests
     }
 
     [Test]
+    public async Task A_tree_left_is_let_go_though_its_folders_live_on()
+    {
+        await using var context = AppServices.NewContext();
+
+        // The ViewModel's folders and rows, which outlive every list drawn from them.
+        var folder = new WatchedNode("Breads", isFolder: true);
+        folder.Children!.Add(new WatchedNode("Pandesal"));
+
+        var left = context.ShowAndLeave<FolderTree<WatchedNode>>(
+            parameters => parameters
+                .Add(t => t.Roots, [folder])
+                .Add(t => t.ChildrenOf, node => node.Children)
+                .Add(t => t.IsExpanded, _ => true)
+                .Add(t => t.SetExpanded, (_, _) => { })
+                .Add(t => t.Selected, _selected)
+                .Add(t => t.KeyOf, node => node.Name)
+                .Add(t => t.RowTemplate, node => $"<span class=\"title\">{node.Name}</span>"),
+            whileShown: tree => tree.FindAll(".tree-row").Should().HaveCount(2));
+
+        // A refresh once the list has gone: a row arrives, and the folder's title changes with the count.
+        await context.Renderer.Dispatcher.InvokeAsync(() =>
+        {
+            folder.Children!.Add(new WatchedNode("Asado Roll"));
+            folder.Name = "Breads (2)";
+        });
+
+        left.IsCollected().Should().BeTrue("the folders outlive every visit to the list, and must hold on to none of the trees drawn from them");
+        GC.KeepAlive(folder);
+    }
+
+    [Test]
     public async Task Enter_opens_or_closes_the_folder_picked()
     {
         await using var context = AppServices.NewContext();

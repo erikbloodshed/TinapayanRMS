@@ -204,6 +204,26 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     });
 
     [Test]
+    public Task All_products_shown_are_the_tables_only_while_the_screen_shows_it() => UiThread.RunAsync(async () =>
+    {
+        await AddBakeryAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
+        IEnumerable<string> Printed() => viewModel.PrintChoices(DateTime.Now).Single().Set.Products.Select(p => p.ProductName);
+
+        // The screen's table, sorted the other way round.
+        List<PriceSimulatorProductRow> sorted = [.. viewModel.Products.Reverse()];
+        var shown = viewModel.ShowProductsFrom(() => sorted);
+        Printed().Should().Equal(sorted.Select(r => r.ProductName));
+
+        // The screen is left: the ViewModel lets go of its table, and prints its own list.
+        shown.Dispose();
+        Printed().Should().Equal(viewModel.Products.Select(r => r.ProductName));
+        viewModel.ShownProducts().Should().BeSameAs(viewModel.Products);
+    });
+
+    [Test]
     public Task A_new_price_works_out_the_change_and_the_other_way_round() => UiThread.RunAsync(async () =>
     {
         var bakery = await AddBakeryAsync();

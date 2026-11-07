@@ -145,8 +145,9 @@
         base.OnInitialized();
         var viewModel = ViewModel!;
 
-        // What Print Report's All products shown prints, and the order it prints them in.
-        viewModel.ShownProducts = () => _shown is { } shown && shown.All(viewModel.Products.Contains) ? shown : viewModel.Products;
+        // What Print Report's All products shown prints, and the order it prints them in: the table's, lent to the
+        // ViewModel while the screen shows it and taken back as it goes, since the ViewModel outlives every visit.
+        AddSubscription(viewModel.ShowProductsFrom(() => _shown is { } shown && shown.All(viewModel.Products.Contains) ? shown : viewModel.Products));
 
         // Save Scenario's name, the open scenario's to start with.
         AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>

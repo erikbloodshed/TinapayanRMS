@@ -164,4 +164,28 @@ public class ScreenBaseTests
         screen.Find("p").TextContent.Should().Be("Cheese Roll|1|False");
         (screen.Instance.Drawings - before).Should().Be(1);
     }
+
+    [Test]
+    public async Task A_screen_left_is_let_go_though_its_viewmodel_lives_on()
+    {
+        await using var context = AppServices.NewContext();
+        context.Services.AddScoped<Lines>();
+        var viewModel = context.Services.GetRequiredService<Lines>();
+
+        // Checked as drawn, not waited for: bUnit's waits hold on to the component they wait on.
+        var left = context.ShowAndLeave<LinesScreen>(whileShown: screen =>
+            screen.Find("p").TextContent.Should().Be("|0|False"));
+
+        // The ViewModel goes on changing once its screen has gone, as a load the screen started does.
+        await context.Renderer.Dispatcher.InvokeAsync(() =>
+        {
+            viewModel.Name = "Cheese Roll";
+            viewModel.Rows.Add(1);
+            viewModel.Table.ReplaceWith([1]);
+            viewModel.CanSave.OnNext(true);
+        });
+
+        left.IsCollected().Should().BeTrue("the ViewModel outlives every visit to its screen, and must hold on to none of them");
+        GC.KeepAlive(viewModel);
+    }
 }

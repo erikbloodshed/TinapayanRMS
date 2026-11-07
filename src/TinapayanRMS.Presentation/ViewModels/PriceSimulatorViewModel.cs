@@ -108,11 +108,32 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// <summary>The Products table's picked rows (its SelectedItems), Ctrl or Shift held for several: what Print Report's Selected products prints.</summary>
     public ObservableCollection<object> SelectedProducts { get; } = [];
 
+    private Func<IReadOnlyList<PriceSimulatorProductRow>>? _tableShown;
+
     /// <summary>
-    /// The products as the table shows them, filtered and sorted, which the view supplies from its grid: what Print Report's
-    /// All products shown prints, in that order. Until it does, <see cref="Products"/> as they are.
+    /// The products as the table shows them, filtered and sorted: what Print Report's All products shown prints, in that
+    /// order. The screen lends its table while it shows it (<see cref="ShowProductsFrom"/>); until then, and once the screen
+    /// has gone, <see cref="Products"/> as they are.
     /// </summary>
-    public Func<IReadOnlyList<PriceSimulatorProductRow>> ShownProducts { get; set; }
+    public IReadOnlyList<PriceSimulatorProductRow> ShownProducts() => _tableShown?.Invoke() ?? Products;
+
+    /// <summary>
+    /// Has <see cref="ShownProducts"/> read the screen's table until what this returns is disposed, as the screen is left.
+    /// The ViewModel lives as long as the window's page, and the screen is drawn afresh on each visit: a table it kept
+    /// past its screen would hold that screen, its grid and the rows it last showed until the next visit.
+    /// </summary>
+    public IDisposable ShowProductsFrom(Func<IReadOnlyList<PriceSimulatorProductRow>> table)
+    {
+        _tableShown = table;
+        return System.Reactive.Disposables.Disposable.Create(() =>
+        {
+            // Only its own: a screen shown since lent its own table.
+            if (_tableShown == table)
+            {
+                _tableShown = null;
+            }
+        });
+    }
 
     private bool _onlyAffected;
     public bool OnlyAffected
@@ -217,7 +238,6 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         _brandPriceRepository = brandPriceRepository;
         _scenarioRepository = scenarioRepository;
         _savedProducts = savedProducts;
-        ShownProducts = () => Products;
 
         Changes.CollectionChanged += ChangesChanged;
 

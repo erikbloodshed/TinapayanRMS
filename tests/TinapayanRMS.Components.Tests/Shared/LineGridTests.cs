@@ -155,4 +155,30 @@ public class LineGridTests
 
         grid.Find("tr.empty-row").TextContent.Should().Be("No lines yet.");
     }
+
+    [Test]
+    public async Task A_table_left_is_let_go_though_its_lines_and_draft_live_on()
+    {
+        await using var context = AppServices.NewContext();
+
+        var left = context.ShowAndLeave<LineGrid<Line>>(
+            parameters => parameters
+                .Add(grid => grid.Items, _lines)
+                .Add(grid => grid.NewItem, NewDraft)
+                .Add(grid => grid.Header, "<th>Name</th>")
+                .Add(grid => grid.Row, line => $"<td class=\"name\">{line.Name}</td>"),
+            whileShown: grid => grid.FindAll("tbody tr").Should().HaveCount(3));
+
+        // What the screen works out goes on changing once the table has gone: its lines' costs, and its draft's.
+        await context.Renderer.Dispatcher.InvokeAsync(() =>
+        {
+            foreach (var line in _lines.Concat(_drafts))
+            {
+                line.Cost = 1m;
+            }
+        });
+
+        left.IsCollected().Should().BeTrue("the screen's lines and draft outlive every visit to it, and must hold on to none of the tables drawn from them");
+        GC.KeepAlive(_drafts);
+    }
 }

@@ -421,6 +421,13 @@ Never inject `TinapayanRMSDbContext` into a repository or a ViewModel.
 
 A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`, so that the page's scope disposes the cache when the page goes.
 
+**A screen is drawn afresh on each visit, and its ViewModel outlives it.** So whatever a component hooks into something that lasts longer than it does (a ViewModel's events, lists or commands, the ViewModel's rows, a scoped or singleton service) it lets go of in its `Dispose`. Otherwise the ViewModel holds every screen it was ever shown on, each one still answering its changes. `ScreenBase` keeps its own subscriptions, and the ones a page adds with `AddSubscription`, and disposes them all with the page. `FolderTree` and `LineGrid` unhook their rows in `Dispose`. The title bar, Find, the Vim keys and the undo keys dispose their `DotNetObjectReference`, and the JavaScript registrations they made remove their listeners. Two rules follow:
+
+- **A page lends its ViewModel nothing of its own except through `AddSubscription`.** The Price Simulator's ViewModel prints the products in the table's sort and filters, which only the page's grid knows. The page lends that view with `ShowProductsFrom`, whose disposable gives it back as the page goes. A lambda set on the ViewModel instead would keep the page, its grid and the rows it last showed for as long as the window is open.
+- **An `SfGrid`'s rows don't notify** (`INotifyPropertyChanged`). Syncfusion lets go of a grid's `DataSource` when the grid goes, but it hooks a row added to that list after the grid bound without keeping the handler, so it can't unhook it. Each such row the ViewModel keeps would hold the grid.
+
+Blazor itself holds a screen for one more drawing: a component keeps the frames of its last drawing until it draws again, so the layout keeps the screen shown before until the next move.
+
 **Threads.** The components run on one thread at a time, the web view's dispatcher, which is the window's UI thread. A ViewModel's property can change on another thread, when a `Task.Run` read finishes, so anything that touches a component from a ViewModel's event goes through `InvokeAsync`. `ScreenBase` does this for the redraws, through a [RedrawGate](../src/TinapayanRMS.Components/Shared/RedrawGate.cs). Nothing on the UI thread may wait on a task synchronously: it would hold up the window.
 
 ### How a change travels through the layers
@@ -871,7 +878,7 @@ A screen's page inherits [ScreenBase&lt;TViewModel&gt;](../src/TinapayanRMS.Comp
 - **redraws the page** when a property of the ViewModel changes, and also when any of its lists or any of its commands' `CanExecute` changes. A grid's rows or a button's enabled state change without a property of the ViewModel changing, so `ScreenBase` subscribes to every `INotifyCollectionChanged` and `ICommand` property it finds on the ViewModel, once;
 - **draws once for changes that come together.** A load sets hundreds of properties, rows and commands in a row, and a redraw asked for on the dispatcher is drawn and sent to the web view at once. So every request goes to the screen's `RedrawGate`: the first queues one redraw behind the work in hand, and the rest find it queued. The redraw follows the change by one turn of the dispatcher, with no timer. `FolderTree` has a gate of its own for its rows;
 - **tells the Vim keys which screen is on show** (`VimKeysState`);
-- gives the page `AddSubscription` (to keep an `Interaction` handler until the page goes), `Run` (to run a command from a click), `ScreenNotices`, `OnViewModelChanged(propertyName)` to override, and `RedrawNowAsync` for the few things that have to follow the drawing, such as moving the cursor into a field the redraw fills in.
+- gives the page `AddSubscription` (to keep an `Interaction` handler, or anything else the page lends its ViewModel, until the page goes), `Run` (to run a command from a click), `ScreenNotices`, `OnViewModelChanged(propertyName)` to override, and `RedrawNowAsync` for the few things that have to follow the drawing, such as moving the cursor into a field the redraw fills in.
 
 A component that redraws on a ViewModel's events asks its own `RedrawGate` (`Request`), and never calls `InvokeAsync(StateHasChanged)` from a handler that runs once per change.
 
@@ -1353,6 +1360,7 @@ public class LineGridTests
 - A test that draws a Syncfusion dialog calls `RenderingAsTheWebView()` on the context once its services are added: the dialog asks the renderer whether it's interactive, and bUnit's says it isn't.
 - bUnit's own `TestContext` is aliased away in the project file: `TestContext` is TUnit's.
 - Change a ViewModel or a row from a test inside `InvokeAsync`, as the app changes it on the UI thread.
+- **A component that hooks into what outlives it has a test that it's let go once it's left.** `context.ShowAndLeave<T>(parameters, whileShown)` ([Visits](../tests/TinapayanRMS.Components.Tests/Fixtures/Visits.cs)) shows the component in a page, leaves it as the router does, and returns a weak reference to it. `IsCollected()` is true once nothing holds it. See `A_screen_left_is_let_go_though_its_viewmodel_lives_on`, and its like for `FolderTree` and `LineGrid`. In `whileShown`, check what's drawn with `Find`, not `WaitForAssertion`: bUnit's waits leave a continuation on its renderer that holds the component.
 
 Other helpers:
 
