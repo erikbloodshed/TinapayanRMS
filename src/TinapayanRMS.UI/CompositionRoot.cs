@@ -13,7 +13,7 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.Pricing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.UI.Vim;
 using TinapayanRMS.UI.Views;
 

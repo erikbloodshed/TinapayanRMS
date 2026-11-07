@@ -1,0 +1,145 @@
+@page "/products"
+@page "/products/{Id:int}"
+@inherits ScreenBase<ProductsViewModel>
+@inject NavigationManager Navigation
+@inject Prompts Prompts
+@inject IJSRuntime JS
+
+<PageTitle>@(ViewModel!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
+
+<UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
+
+@* The Products screen (the WPF ProductsView): the list beside the picked product's header and its tabs along the bottom.
+   Every tab but Scaling, Clone and History is part of the one form Save writes. Clone and History only apply to a saved
+   product. Between
+   picking a product and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each product has its own
+   address, so the browser's Back and Forward step between the products opened. *@
+<CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
+    <div class="record-screen">
+        <ProductList ViewModel="ViewModel!" />
+
+        <div class="record-details">
+            <ProductHeader ViewModel="ViewModel!" />
+
+            <section class="card tabs-card @(ViewModel!.AreDetailsReady ? "" : "details-pending")">
+                <SfTab @bind-SelectedItem="ViewModel!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+                    <TabItems>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Recipe" /></ChildContent>
+                            <ContentTemplate><RecipeStructure ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Costing" /></ChildContent>
+                            <ContentTemplate><Costing ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Scaling" /></ChildContent>
+                            <ContentTemplate><Scaling ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                        <TabItem Visible="ViewModel!.ShowLinks">
+                            <ChildContent><TabHeader Text="Clone" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="tab-card narrow-card">
+                                    <h2 class="panel-header">Clone This Product</h2>
+                                    <FormRow Label="New Product Name" For="clone-name">
+                                        <TextField ID="clone-name" @bind-Value="ViewModel!.EditingCloneName" />
+                                    </FormRow>
+                                    <div class="button-row">
+                                        <CommandButton Command="ViewModel!.CloneCommand" Glyph="@Glyphs.Copy" Label="Clone" />
+                                        <CommandButton Command="ViewModel!.CreateVariantCommand" Glyph="@Glyphs.Link" Label="Create Variant" />
+                                    </div>
+                                    <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Research and Development.</p>
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem Visible="ViewModel!.ShowLinks">
+                            <ChildContent><TabHeader Text="History" /></ChildContent>
+                            <ContentTemplate><History ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                    </TabItems>
+                </SfTab>
+            </section>
+        </div>
+    </div>
+</CascadingValue>
+
+@code {
+    /// <summary>The product in the address, opened as picking it in the list would.</summary>
+    [Parameter] public int? Id { get; set; }
+
+    /// <summary>The address last acted on: its product is opened once, not each time the screen is given it again.</summary>
+    private int? _addressOpened;
+
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var viewModel = ViewModel!;
+
+        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
+        AddSubscription(viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
+
+        // A name asked for by the list's menu: a product's new name, a clone's, or a category's.
+        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
+
+        // Move to In-House: the made ingredient's name and the Made category it goes in.
+        AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
+
+        // New clears the form: the cursor goes to Product Name, so typing can start straight away.
+        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.NewProductInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.NewCompositeCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.NewCompositeProductInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+
+        // The product in the address is the load's to open, at its end: the list is fresh only then. New clicked
+        // meanwhile is the later word.
+        _addressOpened = Id;
+        if (Id is { } id && viewModel.SelectedProduct?.Id != id)
+        {
+            viewModel.OpenProductOnLoad(id);
+        }
+    }
+
+    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
+    // called for too, once the load is back: New clicked before then would have the product load over it.
+    protected override void OnParametersSet()
+    {
+        if (Id == _addressOpened)
+        {
+            return;
+        }
+
+        _addressOpened = Id;
+        if (Id is { } id && ViewModel!.SelectedProduct?.Id != id)
+        {
+            ViewModel.OpenProduct(id);
+        }
+    }
+
+    // The product picked goes into the address, so Back returns to the one before.
+    protected override void OnViewModelChanged(string? propertyName)
+    {
+        if (propertyName == nameof(ProductsViewModel.SelectedProduct) && ViewModel!.SelectedProduct is { Id: > 0 } product && product.Id != Id)
+        {
+            _ = InvokeAsync(() => MoveAddressTo($"products/{product.Id}"));
+        }
+    }
+
+    protected override bool IsOwnAddress(string path) => path.StartsWith("products", StringComparison.OrdinalIgnoreCase);
+
+    // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
+    protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);
+
+    private async Task FocusNameAsync()
+    {
+        await RedrawNowAsync();
+
+        // After a moment: New's drop-down takes the cursor back to its arrow as it closes.
+        await Task.Delay(120);
+        await JS.InvokeVoidAsync("tinapayan.focus", "product-name");
+    }
+}

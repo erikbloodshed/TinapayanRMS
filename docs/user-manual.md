@@ -156,6 +156,17 @@ The column heading changes to show which one you're looking at. Only the grams a
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there, highlighted, the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
 - Changes made on one tab show up on another tab the next time you switch to it.
 
+### The new window
+
+A new version of the app is being tried out beside this one. It has the same screens, works on the same data and backups, and looks and works the same way, down to the title bar, the menu, the tabs and the Vim keys. Everything in this manual applies to it, apart from these:
+
+- **Settings** opens as a tab of its own, at the end of the tab strip, with **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard** and **Database** as tabs inside it, instead of a separate Settings window.
+- **Back and Forward** step through every screen and record you've opened, Settings' tabs included.
+- **Print** shows the pages in the window, a sheet for each, and prints them through Windows' print dialog, where you pick the printer, the paper and the pages.
+- **Closing the window** asks about changes you haven't saved, as moving to another screen does.
+- It remembers the folders you leave open, the Vim keys and the backups' second folder on its own. The first time you open it, it starts with what the old version remembered.
+- Both versions can be open at once. A change saved in one shows in the other the next time you open that screen there.
+
 ### Lists as folder trees
 
 The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of folders, like File Explorer:

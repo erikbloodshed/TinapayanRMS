@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Controls;
 

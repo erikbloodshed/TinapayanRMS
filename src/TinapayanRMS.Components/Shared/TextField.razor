@@ -1,0 +1,131 @@
+@* A text box bound to a ViewModel's string, as the WPF forms' SfTextBoxExts were with UpdateSourceTrigger=PropertyChanged:
+   each keystroke reaches the ViewModel, so whatever follows the text follows it as it's typed. Within an undo screen
+   (a cascading IUndoRecorder) the whole edit, from taking the cursor to leaving, is one undo step (FieldUndoStep).
+   While the box has the cursor the server never writes its text back: keystrokes reach the server one by one, and a
+   redraw for an earlier one would otherwise overwrite those typed since, dropping them. A change from elsewhere (an
+   undo, a load) shows once it's left. When another record takes the form's place under the cursor
+   (IUndoRecorder.FormVersion), the box is given up: what's typed into it is no longer passed on, and a fresh box, without
+   the cursor, is drawn in its place with the record's own text. *@
+<span class="e-input-group field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
+    <input @key="_box" id="@ID" class="e-input" type="@Type" value="@_text" placeholder="@Placeholder" readonly="@ReadOnly" autocomplete="off"
+           @onfocus="OnFocus" @oninput="OnInput" @onchange="OnChange" @onblur="OnBlur" @onkeydown="OnKeyDown" />
+</span>
+
+@code {
+    private string _text = "";
+    private bool _focused;
+
+    // The input drawn: another takes its place when the box is given up, which is what takes the cursor out of it.
+    private int _box;
+
+    // The form the box took the cursor on, and whether it has become another record's since.
+    private int _form;
+    private bool _givenUp;
+
+    [Parameter] public string? ID { get; set; }
+
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter] public string? Placeholder { get; set; }
+
+    [Parameter] public string? Tooltip { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public string Type { get; set; } = "text";
+
+    [Parameter] public string? CssClass { get; set; }
+
+    /// <summary>Raised once the box loses the cursor, after its value has landed (the Name field's check that the name is free).</summary>
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    /// <summary>Raised on Enter, after the value has landed.</summary>
+    [Parameter] public EventCallback OnEnter { get; set; }
+
+    /// <summary>Raised on every key the box gets, after Enter's OnEnter: Find's Up and Down move its pick.</summary>
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKey { get; set; }
+
+    [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        IsGivenUp();
+        if (!_focused)
+        {
+            _text = Value ?? "";
+        }
+    }
+
+    private void OnFocus()
+    {
+        _focused = true;
+        _givenUp = false;
+        _form = Recorder?.FormVersion ?? 0;
+        Recorder?.BeginUndoStep();
+    }
+
+    /// <summary>
+    /// Whether another record took the form's place while the box had the cursor. The box in the browser still holds the
+    /// record before's text, and keys typed into it may be on their way: none of it is this record's, so nothing more is
+    /// taken from the box until the cursor comes back to it. Its undo step went with the record before's history.
+    /// </summary>
+    private bool IsGivenUp()
+    {
+        if (_focused && Recorder is { } recorder && recorder.FormVersion != _form)
+        {
+            _focused = false;
+            _givenUp = true;
+            _box++;
+            _text = Value ?? "";
+        }
+
+        return _givenUp;
+    }
+
+    // _text, which the box is drawn with, is left as it was: the box already shows what's typed.
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        if (!IsGivenUp())
+        {
+            await ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+        }
+    }
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        if (!IsGivenUp())
+        {
+            await ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+        }
+    }
+
+    private async Task OnBlur()
+    {
+        if (IsGivenUp())
+        {
+            return;
+        }
+
+        _focused = false;
+        Recorder?.EndUndoStep();
+        _text = Value ?? "";
+        await OnLeave.InvokeAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (IsGivenUp())
+        {
+            return;
+        }
+
+        if (e.Key == "Enter")
+        {
+            await OnEnter.InvokeAsync();
+        }
+
+        await OnKey.InvokeAsync(e);
+    }
+}

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The ViewModels' tests, on plain net11.0 as the ViewModels are: each test that drives a screen runs on UiThread, a
+       thread that runs one thing at a time, as either app's UI thread does. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Presentation\TinapayanRMS.Presentation.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
+  </ItemGroup>
+
+</Project>

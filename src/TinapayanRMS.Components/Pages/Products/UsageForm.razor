@@ -1,0 +1,213 @@
+@inject IJSRuntime JS
+
+@* The form a recipe section is added and edited in (the WPF UsageFormPanel). While adding a link or a copy, the picker
+   of what to link or copy. Then one row: a linked section's badge, which opens it on Sub-Assemblies, with the pencil
+   that links another in its place; an own or new section's Role and optional Name; and at the far right Unlink and
+   Copy for a linked one, or Move to Sub-Assemblies and Move to In-House for an own one. Then either the packaging lines
+   (when the form adds packaging), or the batch's lines with this product's add-ins to a linked recipe under them, beside
+   the piece size: what a piece and the batch cost, the weight per piece and yield typed in, and the batch's weight they
+   share out. Insert Line and Insert Add-In put a blank line in above the one picked. *@
+<div class="usage-form">
+    @if (ViewModel.UsageForm.IsFormPickingSource)
+    {
+        <div class="usage-title">@ViewModel.UsageForm.UsageFormTitle</div>
+    }
+    @if (ViewModel.UsageForm.IsFormNewMovingToSubAssemblies)
+    {
+        <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, named after this product and its role, and this product links it there. Pick a product-owned role to keep it this product's own.">Moves to Sub-Assemblies on Save</span>
+    }
+
+    @if (ViewModel.UsageForm.IsFormPickingSource)
+    {
+        <div class="usage-row">
+            <label class="form-label" for="usage-source">Existing Sub-Assembly or Packaging</label>
+            <PickField ID="usage-source" TItem="LinkableSubAssemblyOption" Items="ViewModel.UsageForm.LinkableSubAssemblies" TextField="DisplayName" @bind-Value="ViewModel.UsageForm.EditingUsageSource"
+                       Tooltip="One from the Sub-Assemblies screen; or packaging: a packaging set, or another product's. A link follows every change made to it where it's kept; a copy is saved there as a new one, named after this product." />
+        </div>
+    }
+
+    <div class="usage-row usage-identity">
+        <div class="usage-badges">
+            @if (ViewModel.UsageForm.EditingUsage?.IsReleasing == true)
+            {
+                <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, and this product links it there. Undo or Revert to keep it this product's own.">Moves to Sub-Assemblies on Save</span>
+            }
+            @if (ViewModel.UsageForm.EditingUsage is { IsMovingToInHouse: true } moving)
+            {
+                <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, links this product to it there, and adds a made ingredient made from it, with no weight loss. Undo or Revert to keep it this product's own.">@moving.MovingToInHouseText</span>
+            }
+            @if (ViewModel.UsageForm.IsShowingLinkBadge && ViewModel.UsageForm.EditingUsage is { } linked)
+            {
+                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(ViewModel.OpenLinkedSourceCommand, linked)"
+                        title="@linked.LinkedFromToolTip">
+                    @linked.LinkedFromText
+                </button>
+                <CommandButton Command="ViewModel.StartChangingLinkCommand" Glyph="@Glyphs.Edit" Flat="true"
+                               Tooltip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept." />
+            }
+            @if (ViewModel.UsageForm.IsChangingLink)
+            {
+                <PickField TItem="LinkableSubAssemblyOption" Items="ViewModel.UsageForm.ChangeLinkOptions" TextField="DisplayName" @bind-Value="ViewModel.UsageForm.ChangeLinkTarget"
+                           Placeholder="Link instead…" CssClass="change-link" Tooltip="A sub-assembly from the Sub-Assemblies screen to link in this one's place" />
+                <CommandButton Command="ViewModel.CancelChangingLinkCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Keep the link as it is" />
+            }
+        </div>
+
+        @if (ViewModel.UsageForm.IsFormEditingLines)
+        {
+            <div class="usage-role">
+                <label class="form-label" for="usage-role">Role</label>
+                <PickField ID="usage-role" TItem="SubAssemblyRole" Items="ViewModel.UsageForm.FormRoleOptions" TextField="Name" @bind-Value="ViewModel.UsageForm.EditingUsageRole" CssClass="role-picker"
+                           Tooltip="What it's called in the recipe. Roles are added in Settings → Roles." />
+                @if (!ViewModel.UsageForm.IsFormPackaging)
+                {
+                    <label class="form-label" for="usage-name">Name (optional)</label>
+                    <TextField ID="usage-name" @bind-Value="ViewModel.UsageForm.EditingUsageName" Placeholder="e.g. Ube" CssClass="usage-name"
+                               Tooltip="Tells it apart from the recipe's other sub-assemblies in the same role: its tab reads Filling: Ube beside Filling: Cheese. One in a role can go without. Save keeps it on the Sub-Assemblies screen named after the product and role, with this after them: Cheese Roll Filling: Ube." />
+                }
+            </div>
+        }
+
+        <div class="usage-actions">
+            @if (ViewModel.UsageForm.HasFormAddIns)
+            {
+                <button type="button" class="badge badge-link" @onclick="GoToAddInsAsync" title="This product adds its own extras to the linked recipe. Click to scroll down to them.">@ViewModel.UsageForm.FormAddInsBadgeText</button>
+            }
+            @if (ViewModel.UsageForm.IsFormShowingNoAddIns)
+            {
+                <span class="badge badge-muted" title="This product adds nothing to the linked recipe. Add a colouring, a flavouring or an inclusion in the Add-Ins table under its lines.">@ViewModel.UsageForm.FormAddInsBadgeText</span>
+            }
+            @if (!ViewModel.UsageForm.IsAddingUsage && ViewModel.UsageForm.EditingUsage is { } usage)
+            {
+                @if (ViewModel.UsageForm.IsEditingLinkedUsage)
+                {
+                    <ActionButton Glyph="@Glyphs.Unlink" Label="Unlink" OnClick="() => Commands.Run(ViewModel.UnlinkCommand, usage)" Disabled="!Commands.CanRun(ViewModel.UnlinkCommand, usage)"
+                                  Tooltip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it." />
+                    <ActionButton Glyph="@Glyphs.Copy" Label="Copy" OnClick="() => Commands.Run(ViewModel.MakeCopyCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MakeCopyCommand, usage)"
+                                  Tooltip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
+                }
+                @if (ViewModel.UsageForm.IsEditingOwnedUsage)
+                {
+                    <ActionButton Glyph="@Glyphs.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(ViewModel.MoveToSubAssembliesCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToSubAssembliesCommand, usage)"
+                                  Tooltip="Save puts it on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
+                }
+                @if (ViewModel.UsageForm.CanMoveEditingUsageToInHouse)
+                {
+                    <ActionButton Glyph="@Glyphs.Export" Label="Move to In-House" OnClick="() => Commands.Run(ViewModel.MoveToInHouseCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToInHouseCommand, usage)"
+                                  Tooltip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there at the same piece size." />
+                }
+            }
+        </div>
+    </div>
+
+    @if (ViewModel.UsageForm.IsFormPackaging)
+    {
+        <PackagingLinesGrid Items="ViewModel.UsageForm.FormPackagingLines" NewItem="@(ViewModel.UsageForm.IsFormEditingPackaging ? ViewModel.UsageForm.NewFormPackagingLine : null)" Materials="ViewModel.PackagingMaterials"
+                            @bind-SelectedItem="ViewModel.UsageForm.SelectedFormPackagingLine" CostHeader="Cost per Piece" ReadOnly="!ViewModel.UsageForm.IsFormEditingPackaging" Basis="ViewModel.CostBasis" />
+        <div class="lines-footer">
+            <p class="caption">
+                @(ViewModel.UsageForm.IsFormEditingPackaging
+                    ? "How much of each material one piece takes, in its unit. It's the product's packaging: Apply puts it on the Packaging tab."
+                    : "Linked: its lines are kept where it's from, and follow every change there, one set per piece.")
+            </p>
+            <div class="lines-footer-right">
+                <span class="caption">Cost per piece · @ViewModel.UsageForm.UsageFormCostPerPieceText</span>
+                @if (ViewModel.UsageForm.IsFormEditingPackaging)
+                {
+                    <CommandButton Command="ViewModel.RemoveFormPackagingLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="usage-columns">
+            <div class="usage-tables">
+                @if (ViewModel.UsageForm.IsFormShowingLines)
+                {
+                    <div id="usage-lines">
+                        <IngredientLinesGrid @ref="_lines" Items="ViewModel.UsageForm.FormLines" NewItem="@(ViewModel.UsageForm.IsFormLinesEditable ? ViewModel.UsageForm.NewFormLine : null)" Ingredients="ViewModel.Ingredients"
+                                             @bind-SelectedItem="ViewModel.UsageForm.SelectedFormLine" PercentHeader="@ViewModel.UsageForm.UsageFormPercentHeader"
+                                             ReadOnly="!ViewModel.UsageForm.IsFormLinesEditable" Basis="ViewModel.CostBasis" />
+                    </div>
+                    <div class="lines-footer">
+                        <p class="caption">@ViewModel.UsageForm.UsageFormBaseCaption</p>
+                        @if (ViewModel.UsageForm.IsFormLinesEditable)
+                        {
+                            <div class="button-row">
+                                <ActionButton Glyph="@Glyphs.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
+                                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                                <CommandButton Command="ViewModel.RemoveFormLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (ViewModel.UsageForm.IsFormShowingAddIns)
+                {
+                    <div id="usage-add-ins" class="add-ins">
+                        <div class="add-ins-heading">
+                            <span class="group-heading">Add-Ins</span>
+                            <button type="button" class="badge badge-link" @onclick="GoToTopAsync" title="Scroll back up to the linked recipe's lines.">Go to top</button>
+                        </div>
+                        <IngredientLinesGrid @ref="_addIns" Items="ViewModel.UsageForm.FormAddIns" NewItem="ViewModel.UsageForm.NewFormAddIn" Ingredients="ViewModel.Ingredients"
+                                             @bind-SelectedItem="ViewModel.UsageForm.SelectedFormAddIn" PercentHeader="@ViewModel.UsageForm.UsageFormPercentHeader"
+                                             ShowBase="false" Basis="ViewModel.CostBasis" />
+                        <div class="lines-footer">
+                            <p class="caption">@ViewModel.UsageForm.UsageFormAddInsCaption</p>
+                            <div class="button-row">
+                                <ActionButton Glyph="@Glyphs.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
+                                              Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
+                                <CommandButton Command="ViewModel.RemoveFormAddInCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Add-In" />
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="piece-size">
+                <div class="stat-tiles">
+                    <div class="stat-tile" title="What one piece of the product takes of this section: the batch's cost shared out by weight per piece.">
+                        <div class="caption">Cost/piece</div>
+                        <div class="stat-value">@ViewModel.UsageForm.UsageFormCostPerPieceText</div>
+                    </div>
+                    <div class="stat-tile" title="What the whole batch costs: its lines, and this product's add-ins to them.">
+                        <div class="caption">Batch cost</div>
+                        <div class="stat-value">@ViewModel.UsageForm.UsageFormBatchCostText</div>
+                    </div>
+                </div>
+
+                <div class="group-heading">Batch parameters</div>
+                <div class="param-row">
+                    <label for="usage-weight">Weight/piece (g)</label>
+                    <NumberField ID="usage-weight" TValue="decimal" @bind-Value="ViewModel.UsageForm.EditingUsageWeightPerPiece" Min="0" CssClass="param-field"
+                                 Tooltip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
+                </div>
+                <div class="param-row">
+                    <label for="usage-yield">Yield (pcs)</label>
+                    <NumberField ID="usage-yield" TValue="decimal" @bind-Value="ViewModel.UsageForm.EditingUsageYield" Min="0" CssClass="param-field"
+                                 Tooltip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
+                </div>
+
+                <div class="group-heading">Computed</div>
+                <div class="param-row" title="The batch: the sum of its lines, and of this product's add-ins to them. The yield and the weight per piece share it out.">
+                    <span>Total weight</span>
+                    <span>@ViewModel.UsageForm.UsageFormTotalWeightText</span>
+                </div>
+
+                <p class="caption piece-size-caption">@ViewModel.UsageForm.UsageFormPieceSizeCaption</p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    private IngredientLinesGrid? _lines;
+    private IngredientLinesGrid? _addIns;
+
+    private async Task GoToAddInsAsync() => await JS.InvokeVoidAsync("tinapayan.scrollIntoView", "usage-add-ins");
+
+    private async Task GoToTopAsync() => await JS.InvokeVoidAsync("tinapayan.scrollIntoView", "usage-lines");
+}

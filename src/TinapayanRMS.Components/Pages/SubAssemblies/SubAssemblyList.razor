@@ -1,0 +1,73 @@
+@* Sub-Assemblies' list (the WPF SubAssemblyListCard): a search box; the list's commands as icons; the standalone
+   sub-assemblies in a folder for each role; and what the last move did, with Undo. Dragging sub-assemblies onto another
+   role's folder gives them that role, saved at once; a right-click opens the row's menu, or the list's. *@
+<section class="card list-card tree-card">
+    <div class="list-heading">
+        <h2 class="section-header">Sub-Assemblies</h2>
+        @* Not one of the form's boxes: it keeps the cursor, and what's typed, when another record takes the form. *@
+        <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+            <TextField @bind-Value="ViewModel.SearchText" Placeholder="Search sub-assembly" CssClass="list-search" />
+        </CascadingValue>
+    </div>
+
+    <div class="list-toolbar">
+        <ActionButton Glyph="@Glyphs.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.NewSubAssemblyInCommand, null)" />
+        <CommandButton Command="ViewModel.NewRoleCommand" Glyph="@Glyphs.NewFolder" Tooltip="New Role…" Flat="true" />
+        <CommandButton Command="ViewModel.ExpandAllCommand" Glyph="@Glyphs.ExpandAll" Tooltip="Expand All" Flat="true" />
+        <CommandButton Command="ViewModel.CollapseAllCommand" Glyph="@Glyphs.CollapseAll" Tooltip="Collapse All" Flat="true" />
+    </div>
+
+    <FolderTree TNode="SubAssemblyTreeNode"
+                Roots="ViewModel.SubAssemblyTree.Roots"
+                ChildrenOf="n => n is SubAssemblyFolderNode folder ? folder.Children : null"
+                IsExpanded="n => n is SubAssemblyFolderNode { IsExpanded: true }"
+                SetExpanded="(n, open) => { if (n is SubAssemblyFolderNode folder) folder.IsExpanded = open; }"
+                Selected="ViewModel.SelectedTreeNodes"
+                KeyOf="KeyOf"
+                RowClass="@(n => n.IsFolder ? "top-level" : null)"
+                CanDrag="n => n is SubAssemblyLeafNode"
+                CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
+                OnDrop="DropAsync"
+                MenuFor="ViewModel.TreeMenuFor"
+                Shortcut="ViewModel.TreeShortcut">
+        <RowTemplate Context="node">
+            @if (node.IsFolder)
+            {
+                <span class="glyph tree-glyph" aria-hidden="true">@node.Glyph</span>
+            }
+            <span class="tree-title">@node.Title</span>
+            @if (node.IsFolder)
+            {
+                <span class="tree-count">(@node.SubAssemblyCount)</span>
+            }
+        </RowTemplate>
+    </FolderTree>
+
+    <MoveNoticeBar Notice="@ViewModel.MoveNotice" UndoCommand="ViewModel.UndoMoveCommand" DismissCommand="ViewModel.DismissMoveNoticeCommand" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public SubAssembliesViewModel ViewModel { get; set; } = null!;
+
+    private static string KeyOf(SubAssemblyTreeNode node) => node switch
+    {
+        SubAssemblyFolderNode folder => "role-" + folder.Key,
+        SubAssemblyLeafNode leaf => "sub-assembly-" + leaf.SubAssembly.Id,
+        _ => node.Title,
+    };
+
+    private static IReadOnlyList<SubAssemblyMove> MovesFor(IReadOnlyList<SubAssemblyTreeNode> dragged, SubAssemblyTreeNode? target) =>
+        dragged.All(n => n is SubAssemblyLeafNode)
+            ? SubAssemblyTree.MovesTo(target, dragged.Cast<SubAssemblyLeafNode>().Select(l => l.SubAssembly))
+            : [];
+
+    private async Task DropAsync(IReadOnlyList<SubAssemblyTreeNode> dragged, SubAssemblyTreeNode? target)
+    {
+        var moves = MovesFor(dragged, target);
+        if (moves.Count > 0)
+        {
+            await Commands.Run(ViewModel.MoveSubAssembliesCommand, moves);
+        }
+    }
+
+}

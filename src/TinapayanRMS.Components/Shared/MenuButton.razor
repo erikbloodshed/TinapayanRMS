@@ -1,0 +1,24 @@
+@* A button that drops a short list of commands (New's arrow, Add Sub-Assembly, New Category), as the WPF
+   DropDownButtonAdvs and SplitButtonAdvs did. The list closes once one of its commands is clicked. *@
+<SfDropDownButton @ref="_button" CssClass="@CssClass" title="@Tooltip">
+    <ChildContent>@Face</ChildContent>
+    <PopupContent>
+        <div class="drop-down-items" @onclick="Close">@ChildContent</div>
+    </PopupContent>
+</SfDropDownButton>
+
+@code {
+    private SfDropDownButton? _button;
+
+    /// <summary>What the button itself shows: a glyph, a label, or nothing beside its arrow.</summary>
+    [Parameter] public RenderFragment? Face { get; set; }
+
+    /// <summary>The commands in the list.</summary>
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = null!;
+
+    [Parameter] public string? CssClass { get; set; }
+
+    [Parameter] public string? Tooltip { get; set; }
+
+    private void Close() => _button?.Toggle();
+}

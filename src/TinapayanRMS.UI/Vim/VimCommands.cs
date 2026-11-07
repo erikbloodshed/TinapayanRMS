@@ -3,7 +3,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using ReactiveUI;
 using TinapayanRMS.UI.Controls;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Vim;

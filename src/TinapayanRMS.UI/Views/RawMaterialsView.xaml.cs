@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 

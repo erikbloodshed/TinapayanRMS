@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
-             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels"
+             xmlns:viewModels="clr-namespace:TinapayanRMS.Presentation.ViewModels;assembly=TinapayanRMS.Presentation"
              xmlns:local="clr-namespace:TinapayanRMS.UI.Views.Products">
     <!--
         What goes into one piece, in tabs (RecipeTabs): a sub-assembly's for each one in the recipe, in role

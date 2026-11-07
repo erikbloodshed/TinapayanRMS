@@ -1,0 +1,261 @@
+@typeparam TRow where TRow : class
+@using System.Collections.ObjectModel
+@implements IDisposable
+@inject IJSRuntime JS
+
+@* A table of lines typed straight into, as the WPF screens' editable SfDataGrids were (Purchase Cost Setup, Alternative
+   Units, a BOM, a recipe's sections): every cell a field bound to its row, grid lines both ways, and a row header
+   showing the line picked (the one Remove takes). Under the lines, the add row (GridAddNewRow): a draft made by the
+   ViewModel's factory, which joins the lines the moment anything is typed into it, and a new draft takes its place. A
+   draft left untouched is never added. Where the order matters, a line is dragged by its row header to its new place
+   (GridRowReordering). Insert Line, or the Insert key while the table has the cursor, puts a blank line in above the one
+   picked, or at the bottom with none (GridRowInserting), and its first cell takes the cursor. *@
+<table id="@_id" class="line-grid @CssClass @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
+    <thead>
+        <tr>
+            <th class="row-header"></th>
+            @Header
+        </tr>
+    </thead>
+    <tbody>
+        @* The lines and the draft in one keyed list: when the draft joins the lines it keeps its row, and so the cursor
+           stays in the cell being typed into. *@
+        @foreach (var row in RowsAndDraft())
+        {
+            var isDraft = ReferenceEquals(row, _draft);
+            <tr @key="row" class="@(isDraft ? "add-row" : "") @(ReferenceEquals(row, SelectedItem) ? "selected" : "") @(ReferenceEquals(row, _dropTarget) ? "drop-target" : "")"
+                @onfocusin="() => SelectAsync(row)" @onclick="() => SelectAsync(row)"
+                @ondragover="() => OnDragOver(row)" @ondragover:preventDefault="true" @ondrop="() => OnDropAsync(row)" @ondrop:preventDefault="true">
+                <td class="row-header" draggable="@(Reorderable && !isDraft ? "true" : "false")" @ondragstart="() => _dragging = row" @ondragend="OnDragEnd"
+                    title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
+                    @if (isDraft)
+                    {
+                        <span class="glyph" aria-hidden="true">&#xE710;</span>
+                    }
+                    else if (ReferenceEquals(row, SelectedItem))
+                    {
+                        <span class="glyph" aria-hidden="true">&#xE76C;</span>
+                    }
+                    else if (Reorderable)
+                    {
+                        <span class="glyph drag-handle" aria-hidden="true">&#xE76F;</span>
+                    }
+                </td>
+                @Row(row)
+            </tr>
+        }
+        @if (Items.Count == 0 && (_draft is null || ReadOnly) && EmptyText is not null)
+        {
+            <tr class="empty-row"><td colspan="99">@EmptyText</td></tr>
+        }
+    </tbody>
+    @if (Footer is not null)
+    {
+        <tfoot>
+            <tr>
+                <td class="row-header"></td>
+                @Footer
+            </tr>
+        </tfoot>
+    }
+</table>
+
+@code {
+    private readonly string _id = "line-grid-" + Guid.NewGuid().ToString("N")[..8];
+    private TRow? _draft;
+    private TRow? _dragging;
+    private TRow? _dropTarget;
+
+    /// <summary>The line just inserted, whose first cell takes the cursor once it's drawn.</summary>
+    private int? _focusRow;
+
+    [Parameter, EditorRequired] public ObservableCollection<TRow> Items { get; set; } = null!;
+
+    /// <summary>The ViewModel's factory for the add row's draft (NewBrandPriceRow, NewUnitRow, NewBomLine); none for no add row.</summary>
+    [Parameter] public Func<TRow>? NewItem { get; set; }
+
+    /// <summary>
+    /// Whether a row has nothing typed in it yet, where the screen itself changes the draft (a composite's Products table
+    /// prices its add row as costs arrive): a draft still blank after a change doesn't join the lines.
+    /// </summary>
+    [Parameter] public Func<TRow, bool>? IsBlank { get; set; }
+
+    [Parameter] public TRow? SelectedItem { get; set; }
+
+    [Parameter] public EventCallback<TRow?> SelectedItemChanged { get; set; }
+
+    [Parameter, EditorRequired] public RenderFragment Header { get; set; } = null!;
+
+    [Parameter, EditorRequired] public RenderFragment<TRow> Row { get; set; } = null!;
+
+    [Parameter] public RenderFragment? Footer { get; set; }
+
+    [Parameter] public bool Reorderable { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public string? EmptyText { get; set; }
+
+    [Parameter] public string? CssClass { get; set; }
+
+    /// <summary>
+    /// Whether the Insert key puts a line in above the one picked, as the ingredient tables' Insert Line does. Insert Line
+    /// itself (InsertLineAsync) works in any table with an add row.
+    /// </summary>
+    [Parameter] public bool InsertKey { get; set; }
+
+    /// <summary>The screen's undo history, which an inserted line goes into as one step.</summary>
+    [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (NewItem is null)
+        {
+            Unwatch();
+            _draft = null;
+        }
+        else if (_draft is null)
+        {
+            NewDraft();
+        }
+    }
+
+    private void NewDraft()
+    {
+        Unwatch();
+        _draft = NewItem?.Invoke();
+        if (_draft is INotifyPropertyChanged changing)
+        {
+            changing.PropertyChanged += OnDraftChanged;
+        }
+    }
+
+    // The draft was typed into: it becomes a line, and a fresh draft takes its place.
+    private void OnDraftChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(async () =>
+    {
+        if (_draft is not { } draft || !ReferenceEquals(sender, draft))
+        {
+            return;
+        }
+
+        // The screen changed it, not the typing: it's still blank, so it stays the draft.
+        if (IsBlank?.Invoke(draft) == true)
+        {
+            return;
+        }
+
+        // No longer the draft before it's added: adding it redraws the screen, and a row that was both a
+        // line and the draft would be drawn twice.
+        Unwatch();
+        _draft = default;
+        Items.Add(draft);
+        NewDraft();
+        await SelectAsync(draft);
+        StateHasChanged();
+    });
+
+    private void Unwatch()
+    {
+        if (_draft is INotifyPropertyChanged changing)
+        {
+            changing.PropertyChanged -= OnDraftChanged;
+        }
+    }
+
+    private IEnumerable<TRow> RowsAndDraft()
+    {
+        foreach (var item in Items)
+        {
+            yield return item;
+        }
+
+        if (_draft is not null && !ReadOnly)
+        {
+            yield return _draft;
+        }
+    }
+
+    // The draft isn't a line yet, so it's never the line picked: Remove takes lines only.
+    private async Task SelectAsync(TRow row)
+    {
+        if (!ReferenceEquals(row, _draft) && !ReferenceEquals(row, SelectedItem))
+        {
+            await SelectedItemChanged.InvokeAsync(row);
+        }
+    }
+
+    private void OnDragOver(TRow row) => _dropTarget = _dragging is not null && !ReferenceEquals(row, _dragging) ? row : null;
+
+    private void OnDragEnd()
+    {
+        _dragging = null;
+        _dropTarget = null;
+    }
+
+    private Task OnDropAsync(TRow target)
+    {
+        if (_dragging is { } dragging && Reorderable)
+        {
+            var from = Items.IndexOf(dragging);
+            var to = Items.IndexOf(target);
+            if (from >= 0 && to >= 0 && from != to)
+            {
+                Items.Move(from, to);
+            }
+        }
+
+        OnDragEnd();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Puts a blank line in above the one picked, or at the bottom when none is (or the add row is), picks it and gives its
+    /// first cell the cursor. A table with no add row, or read-only, takes none. A line left blank does no harm: Save leaves
+    /// it out.
+    /// </summary>
+    public async Task InsertLineAsync()
+    {
+        if (ReadOnly || NewItem is null)
+        {
+            return;
+        }
+
+        var line = NewItem();
+        var at = SelectedItem is { } picked && Items.IndexOf(picked) is >= 0 and var index ? index : Items.Count;
+        Recorder?.BeginUndoStep();
+        try
+        {
+            Items.Insert(at, line);
+        }
+        finally
+        {
+            Recorder?.EndUndoStep();
+        }
+
+        _focusRow = at;
+        await SelectedItemChanged.InvokeAsync(line);
+        StateHasChanged();
+    }
+
+    /// <summary>Whether Insert Line can put a line in: the table takes typing.</summary>
+    public bool CanInsertLine => !ReadOnly && NewItem is not null;
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (InsertKey && e.Key == "Insert" && !e.CtrlKey && !e.AltKey && !e.ShiftKey && !e.MetaKey)
+        {
+            await InsertLineAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusRow is { } row)
+        {
+            _focusRow = null;
+            await JS.InvokeVoidAsync("tinapayan.focusLineCell", _id, row);
+        }
+    }
+
+    public void Dispose() => Unwatch();
+}

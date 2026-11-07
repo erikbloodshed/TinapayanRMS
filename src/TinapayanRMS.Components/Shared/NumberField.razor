@@ -1,0 +1,223 @@
+@typeparam TValue
+@using System.Globalization
+@using System.Text.RegularExpressions
+
+@* A number box bound to a ViewModel's decimal or decimal?, as the WPF forms' DoubleTextBoxes and the grids' NumericColumns
+   were: shown in its Format, selected whole on taking the cursor (so it's typed over), right-aligned, and kept between
+   Min and Max. As TextField, it's never written to while it has the cursor. Each number typed reaches the ViewModel as it's typed (UpdateSourceTrigger=PropertyChanged),
+   so totals and percentages follow it; a box that LandsOnLeave passes its value only once it's left, and keeps Save
+   offered meanwhile (IUndoRecorder.IsEditPending). An empty box is null where the value can be, and 0 where it can't.
+   A number beyond Largest is read as no number at all. Within an undo screen the edit is one undo step. As TextField,
+   the box is given up when another record takes the form's place under the cursor. *@
+<span class="e-input-group field number-field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
+    <input @key="_box" id="@ID" class="e-input" type="text" inputmode="decimal" value="@_text" placeholder="@Placeholder" readonly="@ReadOnly" autocomplete="off" data-decimals="@DecimalsOf(Format)"
+           @onfocus="OnFocus" @oninput="OnInput" @onchange="OnChange" @onblur="OnBlur" />
+    @if (Suffix is not null)
+    {
+        <span class="field-suffix">@Suffix</span>
+    }
+</span>
+
+@code {
+    private static readonly bool IsNullable = Nullable.GetUnderlyingType(typeof(TValue)) is not null;
+
+    // A number still being typed that would read back differently once tidied ("1.", "2.50"): passed on when left.
+    private static readonly Regex Settled = new(@"^-?[\d,]+(\.\d*[1-9])?$", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// The largest number a box takes, either side of zero: just under a billion. Nothing a bakeshop weighs, counts or
+    /// pays is more, and a longer one typed (a held key, say) took the costs worked out from it past what a decimal
+    /// holds: the OverflowException left through the row's change and broke the page. It fits an int too.
+    /// </summary>
+    public const decimal Largest = 999_999_999.9999m;
+
+    /// <summary>
+    /// How many decimals <paramref name="format"/> shows: N2 two, N0 none, #,0.0### four. The Vim keys' Ctrl+R = rounds
+    /// the answer it types to it.
+    /// </summary>
+    public static int DecimalsOf(string format) =>
+        format.Length > 1 && char.ToUpperInvariant(format[0]) is 'N' or 'F' && int.TryParse(format.AsSpan(1), out var digits) ? digits
+        : format.IndexOf('.') is >= 0 and var point ? format[(point + 1)..].Count(c => c is '0' or '#')
+        : 0;
+
+    private string _text = "";
+    private bool _focused;
+
+    // What the browser's box holds since it was typed into. Typing isn't drawn, so it parts ways with _text.
+    private string? _typed;
+
+    // As TextField's: the input drawn, the form the box took the cursor on, and whether it's another record's since.
+    private int _box;
+    private int _form;
+    private bool _givenUp;
+
+    [Parameter] public string? ID { get; set; }
+
+    [Parameter] public TValue Value { get; set; } = default!;
+
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+
+    /// <summary>How the number shows while it hasn't the cursor: "N2", "N4", "#,0.####".</summary>
+    [Parameter] public string Format { get; set; } = "N2";
+
+    [Parameter] public decimal? Min { get; set; }
+
+    [Parameter] public decimal? Max { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public bool LandsOnLeave { get; set; }
+
+    [Parameter] public string? Tooltip { get; set; }
+
+    [Parameter] public string? Placeholder { get; set; }
+
+    [Parameter] public string? Suffix { get; set; }
+
+    [Parameter] public string? CssClass { get; set; }
+
+    [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
+
+    private decimal? Current => Value is null ? null : Convert.ToDecimal(Value, CultureInfo.InvariantCulture);
+
+    protected override void OnParametersSet()
+    {
+        IsGivenUp();
+        if (!_focused)
+        {
+            _text = Current?.ToString(Format, CultureInfo.CurrentCulture) ?? "";
+        }
+    }
+
+    /// <summary>
+    /// Whether another record took the form's place while the box had the cursor, as TextField.IsGivenUp: nothing more
+    /// is taken from the box until the cursor comes back to it.
+    /// </summary>
+    private bool IsGivenUp()
+    {
+        if (_focused && Recorder is { } recorder && recorder.FormVersion != _form)
+        {
+            _focused = false;
+            _givenUp = true;
+            _typed = null;
+            _box++;
+            _text = Current?.ToString(Format, CultureInfo.CurrentCulture) ?? "";
+            if (LandsOnLeave)
+            {
+                recorder.IsEditPending = false;
+            }
+        }
+
+        return _givenUp;
+    }
+
+    private void OnFocus()
+    {
+        if (ReadOnly)
+        {
+            return;
+        }
+
+        // The box keeps showing the number as it was drawn: a redraw now would overwrite the first keys typed. Its text is
+        // selected on the way in (app.js), so typing replaces it, and a typed thousands separator is read past.
+        _focused = true;
+        _givenUp = false;
+        _form = Recorder?.FormVersion ?? 0;
+        Recorder?.BeginUndoStep();
+        if (LandsOnLeave && Recorder is not null)
+        {
+            Recorder.IsEditPending = true;
+        }
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        if (IsGivenUp())
+        {
+            return;
+        }
+
+        _typed = e.Value?.ToString() ?? "";
+        var text = _typed.Trim();
+        if (LandsOnLeave)
+        {
+            return;
+        }
+
+        if (text.Length == 0 && IsNullable)
+        {
+            await SetAsync(null);
+        }
+        else if (Settled.IsMatch(text) && Parse(text) is { } typed && typed == Clamp(typed))
+        {
+            await SetAsync(typed);
+        }
+    }
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        if (IsGivenUp())
+        {
+            return;
+        }
+
+        _typed = e.Value?.ToString() ?? "";
+        var text = _typed.Trim();
+        if (text.Length == 0)
+        {
+            await SetAsync(IsNullable ? null : 0m);
+        }
+        else if (Parse(text) is { } typed)
+        {
+            await SetAsync(Clamp(typed));
+        }
+    }
+
+    private async Task OnBlur()
+    {
+        if (IsGivenUp() || !_focused)
+        {
+            return;
+        }
+
+        _focused = false;
+        if (LandsOnLeave && Recorder is not null)
+        {
+            Recorder.IsEditPending = false;
+        }
+
+        Recorder?.EndUndoStep();
+        var number = Current?.ToString(Format, CultureInfo.CurrentCulture) ?? "";
+        var typed = _typed;
+        _typed = null;
+        if (typed is not null && typed != number && number == _text)
+        {
+            // The box holds what was typed, and the number to show is the very text last drawn (letters, a number too
+            // long, or the same number typed again): drawn as it is, nothing would be sent, and the box would go on
+            // showing what it didn't take. Drawn as typed first (Blazor draws the box as the handler yields), the number
+            // then replaces it.
+            _text = typed;
+            await Task.Yield();
+        }
+
+        _text = number;
+    }
+
+    private decimal Clamp(decimal value) => Math.Min(Math.Max(value, Min ?? decimal.MinValue), Max ?? decimal.MaxValue);
+
+    private static decimal? Parse(string text) =>
+        decimal.TryParse(text.Replace(",", ""), NumberStyles.Number, CultureInfo.InvariantCulture, out var value) && Math.Abs(value) <= Largest
+            ? value
+            : null;
+
+    private async Task SetAsync(decimal? value)
+    {
+        if (value == Current)
+        {
+            return;
+        }
+
+        var converted = value is null ? default! : (TValue)Convert.ChangeType(value.Value, Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue), CultureInfo.InvariantCulture);
+        await ValueChanged.InvokeAsync(converted);
+    }
+}

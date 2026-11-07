@@ -1,0 +1,56 @@
+@implements IDisposable
+@inject Notices Notices
+@inject AppStatus Status
+
+@* Two toasts in the bottom-right corner: an error stays until it's closed or cleared, a success fades after 4 seconds
+   (held while the mouse is over it, then gone a second after it leaves). *@
+<SfToast @ref="_errorToast" CssClass="e-toast-danger" Timeout="0" ShowCloseButton="true" Width="380px">
+    <ToastPosition X="Right" Y="Bottom" />
+</SfToast>
+<SfToast @ref="_successToast" CssClass="e-toast-success" Timeout="4000" ExtendedTimeout="1000" ShowCloseButton="true" Width="380px">
+    <ToastPosition X="Right" Y="Bottom" />
+</SfToast>
+
+@code {
+    private SfToast? _errorToast;
+    private SfToast? _successToast;
+
+    protected override void OnInitialized() => Notices.Changed += OnNoticeChanged;
+
+    // A tab that just reloaded because of a restore says what was restored.
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && Status.RecentRestoreMessage() is { } restored)
+        {
+            OnNoticeChanged(NoticeKind.Success, restored);
+        }
+    }
+
+    private void OnNoticeChanged(NoticeKind kind, string? message) => InvokeAsync(async () =>
+    {
+        var toast = kind == NoticeKind.Error ? _errorToast : _successToast;
+        if (toast is null)
+        {
+            return;
+        }
+
+        // A new message replaces the one showing, and no message takes it away.
+        await toast.HideAsync("All");
+        if (!string.IsNullOrEmpty(message))
+        {
+            // The colour class goes on each toast: the component's own CssClass doesn't reach it.
+            var error = kind == NoticeKind.Error;
+            await toast.ShowAsync(new ToastModel
+            {
+                Content = message,
+                CssClass = error ? "e-toast-danger" : "e-toast-success",
+                Width = "380px",
+                ShowCloseButton = true,
+                Timeout = error ? 0 : 4000,
+                ExtendedTimeout = error ? 0 : 1000,
+            });
+        }
+    });
+
+    public void Dispose() => Notices.Changed -= OnNoticeChanged;
+}

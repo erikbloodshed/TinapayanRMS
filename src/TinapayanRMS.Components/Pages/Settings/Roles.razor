@@ -1,0 +1,46 @@
+@page "/settings/roles"
+@inherits ScreenBase<SubAssemblyRolesViewModel>
+
+<PageTitle>Roles · TinapayanRMS</PageTitle>
+
+<SettingsTabs />
+
+<div class="list-and-form">
+    <section class="card list-card">
+        <div class="card-header-row">
+            <h2 class="section-header">Roles</h2>
+            <div class="button-row">
+                <CommandButton Command="ViewModel!.MoveUpCommand" Glyph="@Glyphs.MoveUp" Label="Move Up" />
+                <CommandButton Command="ViewModel!.MoveDownCommand" Glyph="@Glyphs.MoveDown" Label="Move Down" />
+            </div>
+        </div>
+        <PickGrid TItem="SubAssemblyRole" DataSource="ViewModel!.Roles" @bind-SelectedItem="ViewModel!.SelectedRole">
+            <Columns>
+                <GridColumn Field="@nameof(SubAssemblyRole.Id)" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(SubAssemblyRole.Name)" HeaderText="Name" />
+                <GridColumn Field="@nameof(SubAssemblyRole.SortOrder)" HeaderText="Order" Width="90" TextAlign="TextAlign.Right" />
+                <GridColumn Field="@nameof(SubAssemblyRole.IsProductOwned)" HeaderText="Product-owned" Width="130" DisplayAsCheckBox="true" TextAlign="TextAlign.Center" />
+            </Columns>
+        </PickGrid>
+    </section>
+
+    <section class="card form-card">
+        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <FormRow Label="Name" For="role-name">
+            <SfTextBox ID="role-name" @bind-Value="ViewModel!.EditingName" />
+        </FormRow>
+        <FormRow Label="">
+            <SfCheckBox Label="Product-owned" @bind-Checked="ViewModel!.EditingIsProductOwned" Disabled="!ViewModel!.CanEditProductOwned"
+                        title="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role." />
+        </FormRow>
+        <div class="button-row">
+            <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+            <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" />
+            <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </section>
+</div>
+
+@code {
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+}

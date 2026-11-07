@@ -1,0 +1,132 @@
+@using Syncfusion.Blazor.Charts
+@using TinapayanRMS.ApplicationCore.Rules
+
+@* A saved product's History tab (the WPF HistoryCard): its versions, newest first, with what each cost and priced at when
+   it was saved and what the same recipe comes to at today's costs; a note typed into one is saved as its cell is left.
+   Beside them, what changed in the version picked, against the one before it, the product as saved now, or any other
+   version; then a chart of each version's base cost, suggested price and current price. Print Version shows the version
+   picked in the Print tab, at its costs then, and Restore puts it into the form, for Save to keep. *@
+<div class="history">
+    <div class="history-versions">
+        <h2 class="section-header">Version History</h2>
+        <p class="caption">A version is recorded each time a Save changes the recipe, packaging, costing or price. Then is what it cost when it was saved; Today is the same recipe at what its materials cost now. Type a note into a version to say what it was for.</p>
+
+        @* A note isn't one of the form's edits: it's saved on its own as its cell is left, and Undo doesn't take it back. *@
+        <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+            <div class="history-table">
+                <table class="line-grid">
+                    <thead>
+                        <tr>
+                            <th class="col-version">Version</th>
+                            <th class="col-saved">Saved</th>
+                            <th>Note</th>
+                            <th class="col-number">Base Cost Then</th>
+                            <th class="col-number">Suggested Price Then</th>
+                            <th class="col-number">Base Cost Today</th>
+                            <th class="col-number">Suggested Price Today</th>
+                            <th class="col-number">Current Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Versions.Rows)
+                        {
+                            <tr @key="row" class="@(ReferenceEquals(row, Versions.SelectedRow) ? "selected" : "")"
+                                @onclick="() => Versions.SelectedRow = row" @onfocusin="() => Versions.SelectedRow = row">
+                                <td class="cell-number">@row.Number</td>
+                                <td class="cell-text">@row.SavedText</td>
+                                <td>
+                                    <TextField Value="@row.Note" ValueChanged="v => _drafts[row] = v" OnLeave="() => CommitNote(row)" OnEnter="() => CommitNote(row)"
+                                               Placeholder="Add a note" CssClass="cell-field" Tooltip="What this version was for, such as Cheaper butter. Saved as you leave the cell." />
+                                </td>
+                                <td class="cell-number">@row.BaseCostThen.ToString("N2")</td>
+                                <td class="cell-number">@row.SuggestedPriceThen.ToString("N2")</td>
+                                <td class="cell-number">@row.BaseCostToday.ToString("N2")</td>
+                                <td class="cell-number">@row.SuggestedPriceToday.ToString("N2")</td>
+                                <td class="cell-number">@row.CurrentPrice?.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (Versions.IsEmpty)
+                {
+                    <p class="caption history-empty">No versions yet. The next Save that changes this product's recipe, packaging, costing or price records how it was before and how it is after.</p>
+                }
+            </div>
+        </CascadingValue>
+    </div>
+
+    <div class="history-side">
+        <div class="history-changes">
+            <h2 class="section-header">Changes</h2>
+            <div class="history-compare">
+                <label class="form-label" for="history-compare">Compare With</label>
+                <PickField ID="history-compare" TItem="VersionComparison" Items="Versions.CompareChoices" TextOf="c => c.Label"
+                           Value="Versions.CompareWith" ValueChanged="c => Versions.CompareWith = c" CssClass="history-compare-picker"
+                           Tooltip="What the version picked is compared with: the version before it, the product as saved now, or any other version. The changes always read from the older one to the newer one." />
+            </div>
+            <p class="caption">@Versions.ChangesCaption</p>
+            <ul class="history-change-list">
+                @foreach (var change in Versions.Changes)
+                {
+                    <li>@change</li>
+                }
+            </ul>
+        </div>
+
+        <div class="history-trend">
+            <h2 class="section-header">Cost Over Time</h2>
+            @if (Versions.IsTrendShown)
+            {
+                <SfChart Height="240px" Width="100%">
+                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                    <ChartPrimaryYAxis LabelFormat="N2" />
+                    <ChartTooltipSettings Enable="true" Format="${series.name} ${point.x}: ${point.y}" />
+                    <ChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
+                    <ChartSeriesCollection>
+                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.BaseCost)" Name="Base Cost" Type="ChartSeriesType.Line" Fill="#fe640b">
+                            <ChartMarker Visible="true" />
+                        </ChartSeries>
+                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.SuggestedPrice)" Name="Suggested Price" Type="ChartSeriesType.Line" Fill="#179299">
+                            <ChartMarker Visible="true" />
+                        </ChartSeries>
+                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.CurrentPrice)" Name="Current Price" Type="ChartSeriesType.Line" Fill="#8839ef">
+                            <ChartMarker Visible="true" />
+                            <ChartEmptyPointSettings Mode="EmptyPointMode.Gap" />
+                        </ChartSeries>
+                    </ChartSeriesCollection>
+                </SfChart>
+            }
+            @if (Versions.IsTrendHintShown)
+            {
+                <p class="caption">The chart shows how the cost and prices moved once there are two versions.</p>
+            }
+        </div>
+
+        <div class="button-row history-actions">
+            <CommandButton Command="ViewModel.PrintCommand" Glyph="@Glyphs.Print" Label="Print Version"
+                           Tooltip="Shows this version's recipe, packaging and costing, at its costs then, in the Print tab." />
+            <CommandButton Command="ViewModel.RestoreVersionCommand" Glyph="@Glyphs.Restore" Label="Restore"
+                           Tooltip="Puts this version's recipe, packaging, costing and price into the form. Save keeps it; Undo takes it back." />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    private ProductVersionHistory Versions => ViewModel.VersionHistory;
+
+    /// <summary>What's typed into a note's cell, saved as the cell is left.</summary>
+    private readonly Dictionary<ProductVersionRow, string> _drafts = [];
+
+    private void CommitNote(ProductVersionRow row)
+    {
+        if (!_drafts.Remove(row, out var typed))
+        {
+            return;
+        }
+
+        var note = typed.Trim();
+        row.Note = note.Length == 0 ? null : note.Length > ProductVersionRules.MaxNoteLength ? note[..ProductVersionRules.MaxNoteLength] : note;
+    }
+}

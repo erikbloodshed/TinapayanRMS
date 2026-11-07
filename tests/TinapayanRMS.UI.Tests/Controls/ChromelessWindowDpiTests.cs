@@ -14,6 +14,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// A ChromelessWindow with UseNativeChrome, as MainWindow is, sent the WM_DPICHANGED that Windows sends when the
 /// window moves to a monitor with another scale. WPF raises DpiChanged when it handles the message.
 /// </summary>
+[NotInParallel(ChromelessWindowCollection.Name)]
 public class ChromelessWindowDpiTests
 {
     private const int WmDpiChanged = 0x02E0;

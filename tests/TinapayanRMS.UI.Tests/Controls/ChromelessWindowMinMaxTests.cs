@@ -14,6 +14,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// (WM_GETMINMAXINFO) then, and the answer limits the size it comes back at. The windows are made per-monitor aware, as the
 /// app's manifest makes them, and never activated.
 /// </summary>
+[NotInParallel(ChromelessWindowCollection.Name)]
 public class ChromelessWindowMinMaxTests
 {
     private const int WmGetMinMaxInfo = 0x0024;

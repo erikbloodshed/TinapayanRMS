@@ -1,0 +1,85 @@
+@implements IDisposable
+@inject Prompts Prompts
+@inject IJSRuntime JS
+
+@* The name prompt: a heading, a line saying more, and one box that starts with the text it's given, selected so typing
+   replaces it, with a picker under it when there's a choice to make too (a made ingredient's Made category). OK (or
+   Enter) answers with what's typed, and picked; Cancel, Esc or the close button with nothing. A name left empty, or no
+   choice to pick from, keeps OK from answering. *@
+<SfDialog Visible="Prompts.Request is not null" IsModal="true" Width="420px" ShowCloseIcon="true" CloseOnEscape="true">
+    <DialogEvents OnClose="() => Prompts.Answer(null)" Opened="OnOpened" />
+    <DialogTemplates>
+        <Header>@Prompts.Request?.Title</Header>
+        <Content>
+            @if (Prompts.Request is { } request)
+            {
+                @if (request.Message is not null)
+                {
+                    <p class="prompt-message">@request.Message</p>
+                }
+                <FormRow Label="@request.Label" For="prompt-text">
+                    <TextField ID="prompt-text" @bind-Value="_text" OnEnter="Accept" />
+                </FormRow>
+                @if (Prompts.Choice is { } choice)
+                {
+                    <FormRow Label="@choice.ChoiceLabel" For="prompt-choice">
+                        <PickField ID="prompt-choice" TItem="string" Items="choice.Choices" TextOf="c => c"
+                                   Value="_choice >= 0 && _choice < choice.Choices.Count ? choice.Choices[_choice] : null"
+                                   ValueChanged="c => _choice = c is null ? -1 : IndexIn(choice.Choices, c)" />
+                    </FormRow>
+                }
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="OK" IsPrimary="true" OnClick="Accept" />
+        <DialogButton Content="Cancel" OnClick="() => Prompts.Answer(null)" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    private string? _text;
+    private int _choice;
+    private TextPromptRequest? _shown;
+
+    protected override void OnInitialized() => Prompts.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(() =>
+    {
+        if (!ReferenceEquals(Prompts.Request, _shown))
+        {
+            _shown = Prompts.Request;
+            _text = Prompts.Request?.InitialValue;
+            _choice = Prompts.Choice?.InitialChoice ?? 0;
+        }
+
+        StateHasChanged();
+    });
+
+    private async Task OnOpened() => await JS.InvokeVoidAsync("tinapayan.focus", "prompt-text");
+
+    private void Accept()
+    {
+        if (Prompts.Choice is { } choice && (string.IsNullOrWhiteSpace(_text) || _choice < 0 || _choice >= choice.Choices.Count))
+        {
+            return;
+        }
+
+        Prompts.Answer(_text ?? "", _choice);
+    }
+
+    private static int IndexIn(IReadOnlyList<string> choices, string choice)
+    {
+        for (var i = 0; i < choices.Count; i++)
+        {
+            if (choices[i] == choice)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    public void Dispose() => Prompts.Changed -= OnChanged;
+}

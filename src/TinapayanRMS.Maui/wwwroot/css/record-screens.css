@@ -1,0 +1,796 @@
+/* The record screens (Raw Materials, Sub-Assemblies, Products): a folder tree beside the picked record's header and its
+   tabs, the fields and line tables they're edited in, and the cards inside the tabs. */
+
+/* ---- Tile colours: the palette's washes, as the WPF headers' FigureTileStyle brushes. ---- */
+
+:root {
+    --tile-rosewater: #ebdcdc;
+    --tile-flamingo: #ebd9dc;
+    --tile-pink: #eed8ed;
+    --tile-mauve: #dacbf4;
+    --tile-peach: #f2d5c6;
+    --tile-yellow: #ecddca;
+    --tile-green: #cce1cd;
+    --tile-teal: #c4dee3;
+    --tile-sky: #c0e2f2;
+    --info-background: #e5dff4;    /* Latte Mauve, tint */
+    --info-foreground: #8136e3;    /* Latte Mauve, deep */
+    --warning-foreground: #915c13; /* Latte Yellow, deep */
+    --list-background: #ffffff;
+}
+
+/* ---- The list beside the picked record's header and tabs. ---- */
+
+.record-screen {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 4px;
+}
+
+.record-details {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tree-card {
+    width: 404px;
+    flex: none;
+}
+
+.list-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.list-heading .section-header {
+    margin: 0;
+}
+
+.list-search {
+    width: 190px;
+}
+
+.list-toolbar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.drop-down-items {
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    min-width: 220px;
+}
+
+.drop-down-items .e-btn {
+    justify-content: flex-start;
+    text-align: left;
+}
+
+/* ---- The folder tree. ---- */
+
+.folder-tree {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: var(--list-background);
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    padding: 4px 0;
+    outline: none;
+    user-select: none;
+}
+
+.folder-tree:focus-visible {
+    border-color: var(--color-sf-primary);
+}
+
+.tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding-right: 8px;
+    cursor: default;
+    white-space: nowrap;
+}
+
+.tree-row:hover {
+    background: var(--page-background);
+}
+
+.tree-row.selected {
+    background: var(--accent-soft);
+}
+
+.folder-tree:focus .tree-row.selected {
+    background: #b8dcf0;
+}
+
+.tree-row.drop-target {
+    outline: 2px solid var(--color-sf-primary);
+    outline-offset: -2px;
+}
+
+.tree-row.top-level .tree-title {
+    font-weight: 600;
+}
+
+.tree-expander {
+    width: 14px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    flex: none;
+}
+
+.tree-glyph {
+    font-size: 13px;
+    color: var(--muted-foreground);
+}
+
+.tree-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-count {
+    color: var(--muted-foreground);
+}
+
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+}
+
+.tree-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.tree-menu-glyph {
+    width: 16px;
+    font-size: 14px;
+}
+
+.tree-menu-text {
+    flex: 1;
+}
+
+.tree-menu-gesture {
+    color: var(--muted-foreground);
+    margin-left: 24px;
+}
+
+.move-notice {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 4px 4px 4px 10px;
+    border-radius: 6px;
+    background: var(--info-background);
+}
+
+.move-notice-text {
+    flex: 1;
+    color: var(--info-foreground);
+}
+
+/* ---- A record's header card: its title and commands, its figure tiles, then its fields row. ---- */
+
+.header-card {
+    padding: 12px;
+    flex: none;
+}
+
+.header-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+}
+
+/* The title keeps room for a name, as the WPF header's does: at a width where the buttons would leave it less (the
+   Products screen at the WPF window's 1400 wide), they go under it, still on the right. */
+.header-title-row > :first-child {
+    flex: 1 1 0;
+    min-width: 200px;
+}
+
+.header-title-row > .button-row {
+    margin-left: auto;
+}
+
+.header-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.section-divider {
+    height: 1px;
+    margin: 12px 0;
+    background: var(--card-border);
+}
+
+.figure-tiles {
+    display: flex;
+    gap: 8px;
+}
+
+.figure-tile {
+    flex: 1;
+    min-width: 0;
+    border-radius: 6px;
+    text-align: center;
+    padding: 8px 6px;
+}
+
+.figure-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.figure-value {
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tile-rosewater { background: var(--tile-rosewater); }
+.tile-flamingo { background: var(--tile-flamingo); }
+.tile-pink { background: var(--tile-pink); }
+.tile-mauve { background: var(--tile-mauve); }
+.tile-peach { background: var(--tile-peach); }
+.tile-yellow { background: var(--tile-yellow); }
+.tile-green { background: var(--tile-green); }
+.tile-teal { background: var(--tile-teal); }
+.tile-sky { background: var(--tile-sky); }
+
+.header-fields {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.header-fields .form-label {
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.header-fields .form-label:first-child {
+    margin-left: 0;
+}
+
+.header-fields > .field,
+.header-fields > .e-control-wrapper {
+    flex: 1;
+    min-width: 0;
+}
+
+.header-fields > .field-wide {
+    flex: 1.5;
+}
+
+.header-fields > .field-narrow {
+    flex: 0 0 90px;
+}
+
+/* ---- The details tabs, their strip along the bottom, in a card of their own. ---- */
+
+.tabs-card {
+    flex: 1;
+    min-height: 0;
+    padding: 4px;
+    display: flex;
+}
+
+.tabs-card .details-tabs {
+    flex: 1;
+    min-width: 0;
+}
+
+.details-tabs .e-content {
+    overflow: auto;
+}
+
+.details-pending {
+    pointer-events: none;
+}
+
+.details-pending .e-content {
+    opacity: 0.6;
+}
+
+.tab-card {
+    padding: 12px;
+}
+
+.tab-card-fill {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+.narrow-card {
+    max-width: 640px;
+}
+
+.tab-columns {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 4px;
+}
+
+/* ---- Fields: inputs that fill their place, numbers right-aligned. ---- */
+
+.field {
+    width: 100%;
+    min-width: 0;
+}
+
+/* The line that grows along the bottom of a box as it takes the cursor. The theme draws it on a wrapper with
+   e-input-focus, which only Syncfusion's own components give theirs (the pickers); the app's text and number boxes are
+   plain inputs in the same wrapper, so they ask for it by where the cursor is. Not on a box that can't be typed into. */
+.e-input-group.field:not(.read-only-field):focus-within::before,
+.e-input-group.field:not(.read-only-field):focus-within::after {
+    width: 50%;
+}
+
+.number-field input {
+    text-align: right;
+}
+
+.read-only-field input,
+.e-input-group.read-only-field {
+    background: var(--page-background);
+    color: var(--muted-foreground);
+}
+
+.field-suffix {
+    padding: 0 8px;
+    color: var(--muted-foreground);
+    align-self: center;
+}
+
+.field-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.field-label {
+    color: var(--muted-foreground);
+}
+
+.field-stack-button {
+    justify-content: flex-end;
+}
+
+.buffer-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 160px));
+    gap: 12px;
+    margin-top: 12px;
+    align-items: end;
+}
+
+.align-right {
+    justify-content: flex-end;
+}
+
+.info-text {
+    margin-top: 12px;
+    color: var(--info-foreground);
+}
+
+.warning-text {
+    color: var(--warning-foreground);
+}
+
+.empty-state {
+    color: var(--muted-foreground);
+    text-align: center;
+    padding: 24px;
+}
+
+.pick-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 12px;
+    width: 100%;
+}
+
+.pick-columns .number {
+    text-align: right;
+}
+
+/* ---- Line tables: cells typed straight into, grid lines both ways. ---- */
+
+.line-grid {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--list-background);
+    table-layout: fixed;
+}
+
+/* The row is given the height, not its cells: a cell's height leaves out the grid lines, which then add to the row. */
+.line-grid tr {
+    height: var(--control-height);
+}
+
+.line-grid th,
+.line-grid td {
+    border: 1px solid var(--card-border);
+    padding: 0;
+}
+
+.line-grid th {
+    padding: 0 8px;
+    font-weight: 600;
+    text-align: left;
+    background: var(--card-background);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.line-grid th.col-number {
+    text-align: right;
+}
+
+.line-grid th.col-number,
+.line-grid th.col-unit {
+    width: 124px;
+}
+
+/* A heading too long for a number column's width. */
+.line-grid th.col-wide {
+    width: 176px;
+}
+
+.line-grid .row-header {
+    width: 24px;
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 10px;
+    background: var(--card-background);
+}
+
+.line-grid td.row-header[draggable="true"] {
+    cursor: grab;
+}
+
+.line-grid .drag-handle {
+    visibility: hidden;
+}
+
+.line-grid tr:hover .drag-handle {
+    visibility: visible;
+}
+
+.line-grid tr.selected td {
+    background: var(--accent-soft);
+}
+
+.line-grid tr.drop-target td {
+    border-top: 2px solid var(--color-sf-primary);
+}
+
+.line-grid tr.add-row td {
+    background: #fafbfc;
+}
+
+.line-grid .cell-number,
+.line-grid .cell-text {
+    padding: 0 8px;
+}
+
+.line-grid .cell-number {
+    text-align: right;
+}
+
+.line-grid .cell-field.e-input-group,
+.line-grid .cell-field.e-control-wrapper {
+    border: none !important;
+    border-radius: 0;
+    background: transparent;
+    height: calc(var(--control-height) - 1px);
+}
+
+.line-grid .cell-field input {
+    padding: 0 8px;
+}
+
+.line-grid tfoot td {
+    padding: 0 8px;
+    font-weight: 600;
+    text-align: right;
+    background: var(--card-background);
+}
+
+.line-grid .empty-row td {
+    padding: 12px;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+
+/* ---- Unit Conversion Overview, Usage Example and Used By. ---- */
+
+.conversions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.conversion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--list-background);
+}
+
+.conversion-arrow {
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
+
+.conversion-base-row {
+    background: var(--accent-soft);
+}
+
+.example-result {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--tile-yellow);
+    text-align: center;
+}
+
+.example-title {
+    font-weight: 600;
+}
+
+.example-total {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 4px 0;
+}
+
+.example-breakdown {
+    margin-top: 12px;
+}
+
+.breakdown-heading {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.breakdown-line {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.breakdown-total span:last-child {
+    font-weight: 600;
+}
+
+.used-by-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 124px);
+    gap: 8px;
+}
+
+.used-by-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--list-background);
+    color: var(--heading-foreground);
+    font: inherit;
+    cursor: pointer;
+}
+
+.used-by-tile:hover {
+    border-color: var(--color-sf-primary);
+    background: var(--accent-soft);
+}
+
+.used-by-glyph {
+    font-size: 28px;
+    color: var(--accent-foreground);
+}
+
+.used-by-name {
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.prompt-message {
+    margin-top: 0;
+    color: var(--muted-foreground);
+}
+
+.list-heading .list-search {
+    width: 190px;
+    flex: none;
+}
+
+.list-heading .section-header {
+    white-space: nowrap;
+}
+
+/* An untouched add row shows nothing worked out: its figures are the draft's zeros. */
+.line-grid tr.add-row .cell-number,
+.line-grid tr.add-row .number-field input:not(:focus) {
+    color: transparent;
+}
+
+.used-by-tiles + .caption {
+    margin-top: 8px;
+}
+.buffer-row + .caption { margin-top: 6px; }
+
+/* ---- Recipe and packaging line tables. ---- */
+
+.line-grid th.col-check,
+.line-grid td.cell-check {
+    width: 34px;
+    text-align: center;
+}
+
+/* A recipe's number columns are as wide as their numbers (99,999.99 grams, 999.9999 a gram, a cost of 99,999.99) and
+   the percentage's as its longer heading, Absolute %, so the ingredient's name has the rest: in Products the table
+   shares its row with the piece's size, and at the old widths a narrow window left the name no room at all. */
+.line-grid th.col-grams {
+    width: 68px;
+}
+
+.line-grid th.col-percent {
+    width: 76px;
+}
+
+.line-grid th.col-cost-per-gram {
+    width: 60px;
+}
+
+.line-grid th.col-line-cost {
+    width: 64px;
+}
+
+.line-grid th.col-qty {
+    width: 110px;
+}
+
+.line-grid th.col-pack-unit {
+    width: 90px;
+}
+
+.pick-columns-4 {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.lines-footer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.lines-footer .caption {
+    margin: 0;
+}
+
+/* The tabs fill their card, and each tab's content scrolls inside it, so the strip stays put. This is all that sizes
+   them: an SfTab given a Height of its own can fail as it starts (DESIGN.md, "How it's built"). */
+.details-tabs.e-tab {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.details-tabs.e-tab > .e-content {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.details-tabs.e-tab > .e-content > .e-item.e-active {
+    height: 100%;
+}
+
+.details-tabs.e-tab > .e-tab-header {
+    flex: none;
+}
+
+/* Purchase Cost Setup: Cost From beside Remove, under the brand table; and the target buffer under the buffer, while
+   prices have moved it away. */
+.cost-from-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cost-from-row .cost-from-picker {
+    width: 280px;
+}
+
+.cost-from-row .remove-line {
+    margin-left: auto;
+}
+
+.target-buffer-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+/* A made ingredient's Made from, as a picker or a badge with its pencil. */
+.made-from {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.made-from .made-from-picker {
+    width: 320px;
+}
+
+.add-ins-header {
+    margin-top: 16px;
+}
+
+/* Sub-Assemblies' Scale, under the lines: the batch or its base, to a weight in grams. */
+.scale-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.scale-row .scale-basis {
+    width: 220px;
+}
+
+.scale-row .scale-to {
+    width: 110px;
+}
+
+/* What a material makes up of a product's material cost, under the product's name on a Used By tile. */
+.used-by-share {
+    font-size: 12px;
+    color: var(--muted-foreground);
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The screens' ViewModels, with no UI framework, so both apps draw the same screens over them: the WPF app
+       (TinapayanRMS.UI) and the .NET MAUI Blazor Hybrid app (TinapayanRMS.Maui, its screens in TinapayanRMS.Components).
+       Keep WPF, MAUI, Blazor and Syncfusion out of it. -->
+
+  <ItemGroup>
+    <PackageReference Include="DynamicData" />
+    <PackageReference Include="ReactiveUI" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="System.Reactive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
+    <!-- Failure, which puts what the database refused into words, and the backups' services. -->
+    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <!-- What a saved product costs, read the one way the screens and the two servers read it. -->
+    <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+  </ItemGroup>
+
+</Project>

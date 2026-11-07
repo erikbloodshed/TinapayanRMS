@@ -1,5 +1,5 @@
 using TinapayanRMS.Pricing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Printing;
 

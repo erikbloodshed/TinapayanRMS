@@ -9,7 +9,7 @@ using ReactiveUI;
 using Syncfusion.SfSkinManager;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.UI.Vim;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 

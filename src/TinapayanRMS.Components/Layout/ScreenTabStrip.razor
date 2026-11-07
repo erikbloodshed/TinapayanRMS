@@ -1,0 +1,52 @@
+@implements IDisposable
+@inject ScreenTabs Tabs
+@inject NavigationManager Navigation
+
+@* The screens' tabs, under the header as the WPF window's were: a tab for each screen that's open, the one showing
+   marked, each with its ✕. A tab is a link to its screen, which still has everything it held. A page with no tab
+   (a print preview) marks none. *@
+<nav class="screen-tabs" aria-label="Screens">
+    @foreach (var tab in Tabs.Open)
+    {
+        var showing = tab == _showing;
+        <div @key="tab.Screen" class="screen-tab @(showing ? "active" : null)">
+            <a class="screen-tab-link" href="@tab.Href" aria-current="@(showing ? "page" : null)">@tab.Label</a>
+            @if (Tabs.CanClose)
+            {
+                <button type="button" class="screen-tab-close" title="Close" aria-label="Close @tab.Label" @onclick="() => Close(tab)">
+                    <span class="glyph" aria-hidden="true">@Glyphs.Cancel</span>
+                </button>
+            }
+        </div>
+    }
+</nav>
+
+@code {
+    private ScreenTab? _showing;
+
+    protected override void OnInitialized()
+    {
+        ShowCurrent();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    // The screen in the address has its tab on the strip, however it was opened.
+    private void ShowCurrent() => _showing = Tabs.Show(Navigation.ToBaseRelativePath(Navigation.Uri));
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(() =>
+    {
+        ShowCurrent();
+        StateHasChanged();
+    });
+
+    // The tab showing makes way for its neighbour; any other just leaves the strip.
+    private void Close(ScreenTab tab)
+    {
+        if (Tabs.Close(tab) is { } neighbour && tab == _showing)
+        {
+            Navigation.NavigateTo(neighbour.Href);
+        }
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

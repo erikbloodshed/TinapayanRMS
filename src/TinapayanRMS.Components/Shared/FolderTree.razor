@@ -1,0 +1,430 @@
+@typeparam TNode where TNode : class
+@using System.Collections.Specialized
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* A list of records filed in folders: the Raw Materials, Sub-Assemblies and Products lists, as the WPF app's SfTreeViews
+   were (DESIGN.md, "How it's built"). The ViewModel owns everything: the folders and their rows (each tree's Roots and
+   Children), whether each folder is open (IsExpanded, kept through a refresh and between visits), and the rows picked
+   (SelectedTreeNodes, which this changes as rows are clicked: alone, or with Ctrl or Shift). Clicking a folder opens or
+   closes it. Rows that can be dragged are dragged onto a folder (or a row in one) to move them there, which the screen
+   saves at once. A right-click opens the menu for the row, or for the list in its empty space; F2 and Del do what the
+   row's menu shows beside them, Enter opens or closes a folder, and the arrows move through the rows. A row picked from
+   elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
+<div @ref="_element" class="folder-tree" tabindex="0" role="tree" aria-multiselectable="true"
+     @onkeydown="OnKeyDown" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
+     @ondragover="OnListDragOver" @ondragover:preventDefault="true" @ondrop="OnListDrop" @ondrop:preventDefault="true">
+    @{
+        _visible.Clear();
+        _redraws?.Drawn();
+    }
+    @foreach (var root in Roots)
+    {
+        @RenderNode(root, 0)
+    }
+</div>
+
+<TreeMenu @ref="_menu" />
+
+@code {
+    private ElementReference _element;
+    private TreeMenu? _menu;
+
+    // The rows as drawn, top to bottom, for the arrows and Shift-clicks.
+    private readonly List<TNode> _visible = [];
+
+    // What the tree last scrolled to, so a pick from elsewhere can be told from one made here.
+    private object? _shownSelection;
+    private bool _pickedHere;
+
+    // Dragging: the rows being dragged, and the row they're over.
+    private IReadOnlyList<TNode> _dragging = [];
+    private TNode? _dropTarget;
+
+    // The folders' and rows' changes this tree listens to, so it redraws when a folder opens, a title changes or a
+    // folder's rows change; added as rows appear, removed with the tree.
+    private readonly Dictionary<object, Action> _watched = new(ReferenceEqualityComparer.Instance);
+    private RedrawGate? _redraws;
+
+    /// <summary>The top-level folders.</summary>
+    [Parameter, EditorRequired] public IEnumerable<TNode> Roots { get; set; } = [];
+
+    /// <summary>A folder's rows, or null for a record, which holds none.</summary>
+    [Parameter, EditorRequired] public Func<TNode, IList<TNode>?> ChildrenOf { get; set; } = null!;
+
+    [Parameter, EditorRequired] public Func<TNode, bool> IsExpanded { get; set; } = null!;
+
+    [Parameter, EditorRequired] public Action<TNode, bool> SetExpanded { get; set; } = null!;
+
+    /// <summary>The ViewModel's SelectedTreeNodes.</summary>
+    [Parameter, EditorRequired] public IList<object> Selected { get; set; } = null!;
+
+    /// <summary>What a row shows: its glyph, title and count, as the WPF ItemTemplates did.</summary>
+    [Parameter, EditorRequired] public RenderFragment<TNode> RowTemplate { get; set; } = null!;
+
+    /// <summary>A stable key for each row, which its element's ID is made from.</summary>
+    [Parameter, EditorRequired] public Func<TNode, string> KeyOf { get; set; } = null!;
+
+    [Parameter] public Func<TNode, string?>? RowClass { get; set; }
+
+    [Parameter] public Func<TNode, bool>? CanDrag { get; set; }
+
+    /// <summary>Whether dropping the rows dragged on a row (or the list's empty space, null) would move any of them.</summary>
+    [Parameter] public Func<IReadOnlyList<TNode>, TNode?, bool>? CanDrop { get; set; }
+
+    [Parameter] public Func<IReadOnlyList<TNode>, TNode?, Task>? OnDrop { get; set; }
+
+    /// <summary>The menu for a row, or for the list's empty space (null).</summary>
+    [Parameter] public Func<TNode?, IReadOnlyList<TreeMenuItem>>? MenuFor { get; set; }
+
+    /// <summary>What a key (F2, Del) does to the row picked, as its menu shows: TreeShortcut.</summary>
+    [Parameter] public Func<string, TreeMenuItem?>? Shortcut { get; set; }
+
+    /// <summary>Changes the tree's rows can't be watched for on their own; the screen passes something that changes with them.</summary>
+    [Parameter] public object? Version { get; set; }
+
+    private string ElementId(TNode node) => "tree-" + KeyOf(node).Replace('/', '-').Replace(' ', '-');
+
+    private RenderFragment RenderNode(TNode node, int depth) => builder =>
+    {
+        _visible.Add(node);
+        Watch(node);
+        var children = ChildrenOf(node);
+        var isFolder = children is not null;
+        var isOpen = isFolder && IsExpanded(node);
+        var isSelected = Selected.Contains(node);
+        var draggable = CanDrag?.Invoke(node) == true;
+        var classes = "tree-row"
+            + (isSelected ? " selected" : "")
+            + (ReferenceEquals(node, _dropTarget) ? " drop-target" : "")
+            + (RowClass?.Invoke(node) is { } extra ? " " + extra : "");
+
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.SetKey(node);
+        builder.AddAttribute(seq++, "id", ElementId(node));
+        builder.AddAttribute(seq++, "class", classes);
+        builder.AddAttribute(seq++, "role", "treeitem");
+        builder.AddAttribute(seq++, "aria-selected", isSelected ? "true" : "false");
+        if (isFolder)
+        {
+            builder.AddAttribute(seq++, "aria-expanded", isOpen ? "true" : "false");
+        }
+
+        builder.AddAttribute(seq++, "style", $"padding-left:{8 + depth * 18}px");
+        builder.AddAttribute(seq++, "draggable", draggable ? "true" : "false");
+        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowClick(node, e)));
+        builder.AddAttribute(seq++, "oncontextmenu", EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)));
+        builder.AddEventStopPropagationAttribute(seq++, "oncontextmenu", true);
+
+        // The row's own, because the list's is never reached: stopping the event here stops it before the list's
+        // preventDefault, and the browser's menu opened over this one.
+        builder.AddEventPreventDefaultAttribute(seq++, "oncontextmenu", true);
+        if (draggable)
+        {
+            builder.AddAttribute(seq++, "ondragstart", EventCallback.Factory.Create<DragEventArgs>(this, () => OnDragStart(node)));
+            builder.AddAttribute(seq++, "ondragend", EventCallback.Factory.Create<DragEventArgs>(this, OnDragEnd));
+        }
+
+        builder.AddAttribute(seq++, "ondragover", EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDragOver(node)));
+        builder.AddEventStopPropagationAttribute(seq++, "ondragover", true);
+        builder.AddEventPreventDefaultAttribute(seq++, "ondragover", true);
+        builder.AddAttribute(seq++, "ondrop", EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDrop(node)));
+        builder.AddEventStopPropagationAttribute(seq++, "ondrop", true);
+        builder.AddEventPreventDefaultAttribute(seq++, "ondrop", true);
+
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", "tree-expander glyph");
+        builder.AddContent(seq++, isFolder && children!.Count > 0 ? (isOpen ? "" : "") : "");
+        builder.CloseElement();
+        builder.AddContent(seq++, RowTemplate(node));
+        builder.CloseElement();
+
+        if (isOpen)
+        {
+            foreach (var child in children!)
+            {
+                builder.AddContent(seq, RenderNode(child, depth + 1));
+            }
+        }
+    };
+
+    protected override void OnParametersSet()
+    {
+        var first = Selected.Count > 0 ? Selected[0] : null;
+        if (!ReferenceEquals(first, _shownSelection) && first is TNode node && !_pickedHere)
+        {
+            // Picked from elsewhere: open the folders above it, so it's drawn, and scroll to it once it is.
+            foreach (var folder in PathTo(node).SkipLast(1))
+            {
+                if (!IsExpanded(folder))
+                {
+                    SetExpanded(folder, true);
+                }
+            }
+        }
+
+        _pickedHere = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("tinapayan.preventKeys", _element, new[] { "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", " " });
+        }
+
+        var first = Selected.Count > 0 ? Selected[0] : null;
+        if (!ReferenceEquals(first, _shownSelection))
+        {
+            _shownSelection = first;
+            if (first is TNode node)
+            {
+                await JS.InvokeVoidAsync("tinapayan.scrollIntoView", ElementId(node));
+            }
+        }
+    }
+
+    /// <summary>The folders from the top down to <paramref name="target"/>, and it last; empty if it isn't in the tree.</summary>
+    private List<TNode> PathTo(TNode target)
+    {
+        var path = new List<TNode>();
+        foreach (var root in Roots)
+        {
+            if (Find(root, target, path))
+            {
+                return path;
+            }
+        }
+
+        return [];
+    }
+
+    private bool Find(TNode node, TNode target, List<TNode> path)
+    {
+        path.Add(node);
+        if (ReferenceEquals(node, target))
+        {
+            return true;
+        }
+
+        foreach (var child in ChildrenOf(node) ?? [])
+        {
+            if (Find(child, target, path))
+            {
+                return true;
+            }
+        }
+
+        path.RemoveAt(path.Count - 1);
+        return false;
+    }
+
+    private void OnRowClick(TNode node, MouseEventArgs e)
+    {
+        _pickedHere = true;
+
+        // Cmd-click on a Mac, where Ctrl-click opens the context menu.
+        if (e.CtrlKey || e.MetaKey)
+        {
+            if (!Selected.Remove(node))
+            {
+                Selected.Add(node);
+            }
+
+            return;
+        }
+
+        if (e.ShiftKey && Selected.Count > 0 && Selected[0] is TNode anchor)
+        {
+            var from = _visible.IndexOf(anchor);
+            var to = _visible.IndexOf(node);
+            if (from >= 0 && to >= 0)
+            {
+                var range = _visible.GetRange(Math.Min(from, to), Math.Abs(to - from) + 1);
+                Selected.Clear();
+                Selected.Add(anchor);
+                foreach (var row in range.Where(r => !ReferenceEquals(r, anchor)))
+                {
+                    Selected.Add(row);
+                }
+
+                return;
+            }
+        }
+
+        // A plain click picks the row alone; on a folder it also opens or closes it.
+        PickAlone(node);
+        if (ChildrenOf(node) is not null)
+        {
+            SetExpanded(node, !IsExpanded(node));
+        }
+    }
+
+    private void PickAlone(TNode node)
+    {
+        if (Selected.Count != 1 || !ReferenceEquals(Selected[0], node))
+        {
+            Selected.Clear();
+            Selected.Add(node);
+        }
+    }
+
+    private async Task OnRowContextMenu(TNode node, MouseEventArgs e)
+    {
+        if (MenuFor is null || _menu is null)
+        {
+            return;
+        }
+
+        // A row outside the rows picked is picked alone first, so the record the menu acts on is the one showing.
+        if (!Selected.Contains(node))
+        {
+            _pickedHere = true;
+            PickAlone(node);
+        }
+
+        await _menu.OpenAsync(MenuFor(node), e.ClientX, e.ClientY);
+    }
+
+    private async Task OnListContextMenu(MouseEventArgs e)
+    {
+        if (MenuFor is not null && _menu is not null)
+        {
+            await _menu.OpenAsync(MenuFor(null), e.ClientX, e.ClientY);
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.CtrlKey || e.AltKey || e.MetaKey)
+        {
+            return;
+        }
+
+        var current = Selected.Count > 0 ? Selected[0] as TNode : null;
+        switch (e.Key)
+        {
+            case "ArrowDown" or "ArrowUp" or "Home" or "End":
+                if (_visible.Count == 0)
+                {
+                    return;
+                }
+
+                var index = current is null ? -1 : _visible.IndexOf(current);
+                index = e.Key switch
+                {
+                    "ArrowDown" => Math.Min(index + 1, _visible.Count - 1),
+                    "ArrowUp" => Math.Max(index - 1, 0),
+                    "Home" => 0,
+                    _ => _visible.Count - 1,
+                };
+                _pickedHere = true;
+                PickAlone(_visible[index]);
+                _shownSelection = null;
+                break;
+            case "ArrowRight" when current is not null && ChildrenOf(current) is not null && !IsExpanded(current):
+                SetExpanded(current, true);
+                break;
+            case "ArrowLeft" when current is not null && ChildrenOf(current) is not null && IsExpanded(current):
+                SetExpanded(current, false);
+                break;
+            case "ArrowLeft" when current is not null && PathTo(current) is { Count: > 1 } path:
+                _pickedHere = true;
+                PickAlone(path[^2]);
+                _shownSelection = null;
+                break;
+            case "Enter" or " " when current is not null && ChildrenOf(current) is not null:
+                SetExpanded(current, !IsExpanded(current));
+                break;
+            case "F2" or "Delete":
+                if (Shortcut?.Invoke(e.Key == "F2" ? "F2" : "Del") is { Command: { } command } item && command.CanExecute(item.Parameter))
+                {
+                    command.Execute(item.Parameter);
+                }
+
+                break;
+            case "ContextMenu" when current is not null && MenuFor is not null && _menu is not null:
+                await _menu.OpenAsync(MenuFor(current), 200, 200);
+                break;
+        }
+    }
+
+    private void OnDragStart(TNode node)
+    {
+        // Dragging a row that's picked drags every row picked that can be dragged; any other drags alone.
+        if (!Selected.Contains(node))
+        {
+            _pickedHere = true;
+            PickAlone(node);
+        }
+
+        _dragging = [.. Selected.OfType<TNode>().Where(n => CanDrag?.Invoke(n) == true)];
+    }
+
+    private void OnDragEnd()
+    {
+        _dragging = [];
+        _dropTarget = null;
+    }
+
+    private void OnRowDragOver(TNode node)
+    {
+        var target = _dragging.Count > 0 && CanDrop?.Invoke(_dragging, node) == true ? node : null;
+        if (!ReferenceEquals(target, _dropTarget))
+        {
+            _dropTarget = target;
+        }
+    }
+
+    private void OnListDragOver() => _dropTarget = null;
+
+    private async Task OnRowDrop(TNode node) => await DropAsync(node);
+
+    private async Task OnListDrop() => await DropAsync(null);
+
+    private async Task DropAsync(TNode? target)
+    {
+        var dragging = _dragging;
+        _dragging = [];
+        _dropTarget = null;
+        if (dragging.Count > 0 && OnDrop is not null && CanDrop?.Invoke(dragging, target) == true)
+        {
+            await OnDrop(dragging, target);
+        }
+    }
+
+    private void Watch(TNode node)
+    {
+        if (!_watched.ContainsKey(node) && node is INotifyPropertyChanged changing)
+        {
+            changing.PropertyChanged += OnNodeChanged;
+            _watched[node] = () => changing.PropertyChanged -= OnNodeChanged;
+        }
+
+        if (ChildrenOf(node) is INotifyCollectionChanged rows && !_watched.ContainsKey(rows))
+        {
+            rows.CollectionChanged += OnRowsChanged;
+            _watched[rows] = () => rows.CollectionChanged -= OnRowsChanged;
+        }
+    }
+
+    // Many rows can change at once (a refresh); they're drawn once, after the last, unless the screen has drawn the tree
+    // by then.
+    private void OnNodeChanged(object? sender, PropertyChangedEventArgs e) => Redraws.Request();
+
+    private void OnRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Redraws.Request();
+
+    private RedrawGate Redraws => _redraws ??= new RedrawGate(InvokeAsync, StateHasChanged);
+
+    public ValueTask DisposeAsync()
+    {
+        foreach (var unwatch in _watched.Values)
+        {
+            unwatch();
+        }
+
+        _watched.Clear();
+        return ValueTask.CompletedTask;
+    }
+}

@@ -4,7 +4,7 @@
              xmlns:syncfusion="http://schemas.syncfusion.com/wpf"
              xmlns:vim="clr-namespace:TinapayanRMS.UI.Vim"
              xmlns:controls="clr-namespace:TinapayanRMS.UI.Controls"
-             xmlns:viewModels="clr-namespace:TinapayanRMS.UI.ViewModels">
+             xmlns:viewModels="clr-namespace:TinapayanRMS.Presentation.ViewModels;assembly=TinapayanRMS.Presentation">
 
     <Border Style="{StaticResource CardStyle}">
         <DockPanel>

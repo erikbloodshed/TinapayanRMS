@@ -1,0 +1,102 @@
+@using TinapayanRMS.Domain.Enums
+
+@* The picked material's header (the WPF SummaryHeaderCard): its name with New, Save, Undo, Redo and Delete; its figures
+   in coloured tiles (Base Unit, Current and Buffered Cost per its purchase unit, a made ingredient's Total Weight and
+   Total Cost as its BOM stands, and Last Updated); then its fields on one row, Name first. Packaging is always
+   purchased, so it has no Source and picks its Base Unit there instead; only a made ingredient has Weight Loss %. *@
+<section class="card header-card">
+    <div class="header-title-row">
+        <h1 class="header-title">@ViewModel.HeaderTitle</h1>
+        <div class="button-row">
+            <CommandButton Command="ViewModel.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+            <CommandButton Command="ViewModel.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" Tooltip="Saves the details, alternative units, price and bill of materials together." />
+            <CommandButton Command="ViewModel.UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" Tooltip="Takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
+            <CommandButton Command="ViewModel.RedoCommand" Glyph="@Glyphs.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+            <CommandButton Command="ViewModel.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="figure-tiles">
+        <div class="figure-tile tile-rosewater">
+            <div class="figure-label">Base Unit</div>
+            <div class="figure-value">@ViewModel.SavedBaseUnitText</div>
+        </div>
+        <div class="figure-tile tile-peach">
+            <div class="figure-label">Current Cost per @ViewModel.HeaderCostUnitText</div>
+            <div class="figure-value">@ViewModel.CurrentCostText</div>
+        </div>
+        <div class="figure-tile tile-yellow">
+            <div class="figure-label">Buffered Cost per @ViewModel.HeaderCostUnitText</div>
+            <div class="figure-value">@ViewModel.BufferedCostText</div>
+        </div>
+        @if (ViewModel.IsEditingMade)
+        {
+            <div class="figure-tile tile-teal" title="What the batch yields as the BOM stands: its grams less the weight loss.">
+                <div class="figure-label">Total Weight</div>
+                <div class="figure-value">@ViewModel.BomTotalWeight.ToString("#,0.##") g</div>
+            </div>
+            <div class="figure-tile tile-flamingo" title="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram.">
+                <div class="figure-label">Total Cost</div>
+                <div class="figure-value">@ViewModel.BomTotalCost.ToString("N2")</div>
+            </div>
+        }
+        <div class="figure-tile tile-mauve" title="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component.">
+            <div class="figure-label">Last Updated</div>
+            <div class="figure-value">@ViewModel.LastUpdatedText</div>
+        </div>
+    </div>
+
+    <div class="header-fields">
+        <label class="form-label" for="rm-name">Name</label>
+        <TextField ID="rm-name" @bind-Value="ViewModel.EditingName" OnLeave="ViewModel.CheckNameAvailability" CssClass="field-wide" />
+
+        <label class="form-label" for="rm-type">Type</label>
+        <PickField ID="rm-type" TItem="RawMaterialType" Items="ViewModel.Types" @bind-Value="ViewModel.EditingType" Disabled="!ViewModel.CanChangeTypeAndSource"
+                   Tooltip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
+
+        <label class="form-label" for="rm-category">Category</label>
+        <PickField ID="rm-category" TItem="RawMaterialCategory" Items="ViewModel.CategoryOptions" TextField="Name"
+                   Value="ViewModel.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true"
+                   OnArrive="ArriveAtCategory" OnTyped="t => ViewModel.CategorySearchText = t" OnLeave="ViewModel.CommitCategoryTextAsync"
+                   Tooltip="Pick a category, or type a new one's name to add it." />
+
+        @if (ViewModel.IsEditingIngredient)
+        {
+            <label class="form-label" for="rm-source">Source</label>
+            <PickField ID="rm-source" TItem="RawMaterialSource" Items="ViewModel.Sources" @bind-Value="ViewModel.EditingSource" Disabled="!ViewModel.CanChangeTypeAndSource" />
+        }
+        @if (ViewModel.IsEditingPackaging)
+        {
+            <label class="form-label" for="rm-base-unit">Base Unit</label>
+            <PickField ID="rm-base-unit" TItem="UnitOfMeasure" Items="ViewModel.UnitsOfMeasure" TextField="Name" @bind-Value="ViewModel.EditingBaseUnit" Disabled="!ViewModel.CanChangeBaseUnit"
+                       Tooltip="Fixed once the material has alternative units, prices or packaging lines." />
+        }
+        @if (ViewModel.IsEditingMade)
+        {
+            <label class="form-label" for="rm-weight-loss">Weight Loss %</label>
+            <NumberField ID="rm-weight-loss" TValue="decimal?" @bind-Value="ViewModel.EditingWeightLossPercent" Min="0" Max="99.99m" CssClass="field-narrow"
+                         Tooltip="How much of the batch's weight is lost while making it: the cost is spread over what's left. A new made ingredient starts at 3%." />
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+
+    // The picker's text, as the WPF ComboBoxAdv's Text binding kept it: the category's name, or what's typed since. Once
+    // the picker is left it's settled (CommitCategoryTextAsync): a listed category is picked, and a new name offers to
+    // add it.
+    private void ArriveAtCategory()
+    {
+        ViewModel.CategorySearchText = ViewModel.EditingCategory?.Name ?? "";
+        ViewModel.BeginCategoryEdit();
+    }
+
+    private void PickCategory(RawMaterialCategory? category)
+    {
+        ViewModel.EditingCategory = category;
+        ViewModel.CategorySearchText = category?.Name ?? "";
+    }
+}

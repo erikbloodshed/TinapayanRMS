@@ -10,7 +10,7 @@
     (DOTNET_WATCH_RESTART_ON_RUDE_EDIT), which takes longer. Stop it with Ctrl+C.
 
     Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
-    about 3 minutes for UI.Tests.
+    about 3 minutes for Presentation.Tests.
 
     Hot reload runs the tests again in the same test session, which TUnit 1.81.10 doesn't expect: without
     tests/HotReloadReruns.cs, every run after the first also reported a failure of TUnit's own ("ChannelClosedException:
@@ -21,7 +21,8 @@
     it meanwhile.
 
 .PARAMETER Project
-    The test project: UI, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or without .Tests).
+    The test project: Presentation, UI, Components, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or
+    without .Tests).
 
 .PARAMETER Class
     Only classes whose name matches, with * for any characters: "*ProductsViewModelRefreshTests".

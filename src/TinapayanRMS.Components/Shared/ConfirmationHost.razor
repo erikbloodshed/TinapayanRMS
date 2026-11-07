@@ -1,0 +1,34 @@
+@implements IDisposable
+@inject Confirmations Confirmations
+
+@* "Confirm" rather than "Confirm Delete": the same question comes before anything that can't be undone, and the message
+   says which. Closing it any other way (Esc, the close button) answers No. Asked about unsaved changes, it has Cancel
+   too, which keeps them and stays, as closing it does. The question's lines are kept as it has them. *@
+<SfDialog Visible="Confirmations.Question is not null" IsModal="true" Width="440px" ShowCloseIcon="true" CloseOnEscape="true">
+    <DialogEvents OnClose="Confirmations.Dismiss" />
+    <DialogTemplates>
+        <Header>@(Confirmations.HasCancel ? "Unsaved Changes" : "Confirm")</Header>
+        <Content>
+            <div class="confirm-message">
+                <span class="glyph confirm-glyph" aria-hidden="true">&#xE7BA;</span>
+                <span class="confirm-text">@Confirmations.Question</span>
+            </div>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Yes" IsPrimary="true" OnClick="() => Confirmations.Answer(true)" />
+        <DialogButton Content="No" OnClick="() => Confirmations.Answer(false)" />
+        @if (Confirmations.HasCancel)
+        {
+            <DialogButton Content="Cancel" OnClick="() => Confirmations.Answer(UnsavedChangesAnswer.Cancel)" />
+        }
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    protected override void OnInitialized() => Confirmations.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Confirmations.Changed -= OnChanged;
+}

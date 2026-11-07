@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- The MAUI app's screens and what they share: Blazor components over the ViewModels (TinapayanRMS.Presentation), with
+       Syncfusion's where one fits. A Razor class library on net11.0, so the MAUI app (TinapayanRMS.Maui) draws them in its
+       window and the tests render them with bUnit, without MAUI. The host page and the static files (wwwroot) are the MAUI
+       app's. What only the window can do (its file dialogs, its title bar's buttons) is an interface here, which the MAUI
+       app implements. Ported from the TinapayanRMS_Web repo's TinapayanRMS.UI on 2026-11-07, without its shop accounts. -->
+  <PropertyGroup>
+    <!-- BL0016 (ASP.NET Core 11) asks for every JS interop call to be inside a try with a catch. Each call here is to the
+         app's own script (app.js, vim.js), in the app's own window. The calls that can meet a page that has gone, as a
+         reload takes the last one away (the Dispose methods, ScreenBase's leave warning), catch what they meet. Here
+         rather than in .editorconfig, whose sections can't reach the C# the Razor compiler writes for a component. -->
+    <NoWarn>$(NoWarn);BL0016</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- What the Web SDK imported for every file, which the Razor SDK doesn't. -->
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+    <PackageReference Include="ReactiveUI.Blazor" />
+    <PackageReference Include="Syncfusion.Blazor.Buttons" />
+    <PackageReference Include="Syncfusion.Blazor.Charts" />
+    <PackageReference Include="Syncfusion.Blazor.DropDowns" />
+    <PackageReference Include="Syncfusion.Blazor.Grid" />
+    <PackageReference Include="Syncfusion.Blazor.Inputs" />
+    <PackageReference Include="Syncfusion.Blazor.Navigations" />
+    <PackageReference Include="Syncfusion.Blazor.Notifications" />
+    <PackageReference Include="Syncfusion.Blazor.Popups" />
+    <PackageReference Include="Syncfusion.Blazor.SplitButtons" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" />
+    <PackageReference Include="Syncfusion.XlsIO.Net.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Presentation\TinapayanRMS.Presentation.csproj" />
+  </ItemGroup>
+
+</Project>

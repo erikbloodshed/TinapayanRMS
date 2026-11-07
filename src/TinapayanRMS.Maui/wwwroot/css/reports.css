@@ -1,0 +1,90 @@
+/* Reports and the Price Simulator: tables that fill their cards, under a heading with its commands. */
+
+.report-card {
+    flex: 1;
+    min-height: 0;
+}
+
+.report-tabs.e-tab > .e-tab-header {
+    order: -1;
+}
+
+.report {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.report .e-grid {
+    flex: 1;
+    min-height: 0;
+}
+
+.report-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.report-heading .section-header {
+    margin: 0;
+}
+
+.report-heading .button-row {
+    align-items: center;
+}
+
+.report-filter {
+    width: 240px;
+}
+
+.stacked-cards {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.simulator-top {
+    flex: none;
+    display: flex;
+    gap: 4px;
+    min-height: 0;
+}
+
+.simulator-scenarios {
+    flex: 0 0 360px;
+}
+
+.simulator-changes {
+    flex: 1;
+    min-width: 0;
+}
+
+.simulator-products {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+}
+
+.scenario-table tbody tr {
+    cursor: pointer;
+}
+
+.scenario-table tbody tr.selected {
+    background: var(--accent-soft);
+}
+
+.scenario-table .col-date {
+    width: 170px;
+}
+
+.scroll-box {
+    max-height: 190px;
+    overflow: auto;
+}

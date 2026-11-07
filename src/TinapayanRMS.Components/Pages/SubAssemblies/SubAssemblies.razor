@@ -1,0 +1,209 @@
+@page "/sub-assemblies"
+@page "/sub-assemblies/{Id:int}"
+@inherits ScreenBase<SubAssembliesViewModel>
+@inject NavigationManager Navigation
+@inject Prompts Prompts
+@inject IJSRuntime JS
+
+<PageTitle>@(ViewModel!.SelectedRow?.Name ?? "Sub-Assemblies") · TinapayanRMS</PageTitle>
+
+<UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
+
+@* The standalone sub-assemblies (the WPF SubAssembliesView): the list by role, beside the picked one's header, with its
+   batch figures, and its Recipe and Used By tabs. One in the Packaging role is a packaging set: packaging materials per
+   set instead of ingredients in grams, and one figure, Set Cost. *@
+<CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
+    <div class="record-screen">
+        <SubAssemblyList ViewModel="ViewModel!" />
+
+        <div class="record-details">
+            <section class="card header-card">
+                <div class="header-title-row">
+                    <h1 class="header-title">@ViewModel!.HeaderTitle</h1>
+                    <div class="button-row">
+                        <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+                        <CommandButton Command="ViewModel!.CopyCommand" Glyph="@Glyphs.Copy" Label="Copy"
+                                       Tooltip="Starts a new sub-assembly with this one's role and lines, named '… Copy'. Rename it if you like, then Save; this one stays as it was saved." />
+                        <CommandButton Command="ViewModel!.NewProductCommand" Glyph="@Glyphs.Link" Label="New Product"
+                                       Tooltip="Starts a new product on the Products screen that links this sub-assembly, named after it. Type its piece size, then Save there. Not for a packaging set." />
+                        <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" Tooltip="Saves the name, role and lines together." />
+                        <CommandButton Command="ViewModel!.UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed. Ctrl+Z." />
+                        <CommandButton Command="ViewModel!.RedoCommand" Glyph="@Glyphs.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+                        <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+                    </div>
+                </div>
+
+                <div class="section-divider"></div>
+
+                <div class="figure-tiles">
+                    @if (ViewModel!.IsPackaging)
+                    {
+                        <div class="figure-tile tile-flamingo">
+                            <div class="figure-label">Set Cost</div>
+                            <div class="figure-value">@ViewModel!.SetCost.ToString("N4")</div>
+                        </div>
+                        <div class="figure-tile"></div>
+                        <div class="figure-tile"></div>
+                    }
+                    else
+                    {
+                        <div class="figure-tile tile-teal">
+                            <div class="figure-label">Batch Weight</div>
+                            <div class="figure-value">@ViewModel!.BatchWeight.ToString("#,0.##") g</div>
+                        </div>
+                        <div class="figure-tile tile-flamingo">
+                            <div class="figure-label">Batch Cost</div>
+                            <div class="figure-value">@ViewModel!.BatchCost.ToString("N2")</div>
+                        </div>
+                        <div class="figure-tile tile-yellow">
+                            <div class="figure-label">Cost per g</div>
+                            <div class="figure-value">@ViewModel!.CostPerGram.ToString("N4")</div>
+                        </div>
+                    }
+                </div>
+
+                <div class="header-fields">
+                    <label class="form-label" for="sa-name">Name</label>
+                    <TextField ID="sa-name" @bind-Value="ViewModel!.EditingName" CssClass="field-wide" />
+                    <label class="form-label" for="sa-role">Role</label>
+                    <PickField ID="sa-role" TItem="SubAssemblyRole" Items="ViewModel!.Roles" TextField="Name" @bind-Value="ViewModel!.EditingRole" />
+                </div>
+            </section>
+
+            <section class="card tabs-card">
+                <SfTab HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+                    <TabItems>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Recipe" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="tab-card">
+                                    <h2 class="section-header">Lines</h2>
+                                    @if (ViewModel!.IsPackaging)
+                                    {
+                                        <PackagingLinesGrid Items="ViewModel!.PackagingLines" NewItem="ViewModel!.NewPackagingLine" Materials="ViewModel!.PackagingMaterials"
+                                                            @bind-SelectedItem="ViewModel!.SelectedPackagingLine" CostHeader="Cost per Set" />
+                                    }
+                                    else
+                                    {
+                                        <IngredientLinesGrid @ref="_lines" Items="ViewModel!.Lines" NewItem="ViewModel!.NewLine" Ingredients="ViewModel!.Ingredients"
+                                                             @bind-SelectedItem="ViewModel!.SelectedLine" PercentHeader="@ViewModel!.PercentHeader" />
+                                    }
+                                    <div class="lines-footer">
+                                        <p class="caption">
+                                            @(ViewModel!.IsPackaging
+                                                ? "A product whose packaging links this set takes one whole set per sellable unit."
+                                                : ViewModel!.FormulaBaseCaption)
+                                        </p>
+                                        <div class="button-row">
+                                            @if (!ViewModel!.IsPackaging)
+                                            {
+                                                <ActionButton Glyph="@Glyphs.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
+                                                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                                            }
+                                            <CommandButton Command="ViewModel!.RemoveLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                                        </div>
+                                    </div>
+                                    @if (!ViewModel!.IsPackaging)
+                                    {
+                                        <div class="scale-row">
+                                            <label class="form-label" for="sa-scale-basis">Scale</label>
+                                            <PickField ID="sa-scale-basis" TItem="BatchScaleOption" Items="ViewModel!.ScaleOptions" TextOf="o => o.Label"
+                                                       Value="ViewModel!.ScaleOption" ValueChanged="o => { if (o is not null) ViewModel!.ScaleOption = o; }" CssClass="scale-basis" />
+                                            <span>to</span>
+                                            <NumberField TValue="decimal?" Value="ViewModel!.ScaleTo" ValueChanged="v => ViewModel!.ScaleTo = v" Format="#,0.##" Min="0"
+                                                         Placeholder="Grams" CssClass="scale-to" />
+                                            <span>g</span>
+                                            <CommandButton Command="ViewModel!.ScaleCommand" Glyph="@Glyphs.Calculate" Label="Scale"
+                                                           Tooltip="Multiplies every line so the batch, or its base, weighs this much. Each line keeps its percentage. Undo takes it back." />
+                                        </div>
+                                    }
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Used By" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="tab-card">
+                                    <h2 class="section-header">Used By</h2>
+                                    <UsedByTiles Products="ViewModel!.UsedBy" MadeIngredients="ViewModel!.MadeIngredients" Caption="@ViewModel!.UsedByText"
+                                                 Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" OpenMadeIngredient="id => Commands.Run(ViewModel!.OpenRawMaterialCommand, id)" />
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                    </TabItems>
+                </SfTab>
+            </section>
+        </div>
+    </div>
+</CascadingValue>
+
+@code {
+    /// <summary>The sub-assembly in the address, opened as picking it in the list would.</summary>
+    [Parameter] public int? Id { get; set; }
+
+    /// <summary>The address last acted on: its sub-assembly is opened once, not each time the screen is given it again.</summary>
+    private int? _addressOpened;
+
+    private IngredientLinesGrid? _lines;
+
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var viewModel = ViewModel!;
+
+        // A name asked for by the list's menu: a sub-assembly's new name, or a role's.
+        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
+
+        // Make In-House Ingredient: the made ingredient's name and the Made category it goes in.
+        AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
+
+        // New clears the form: the cursor goes to Name, so typing can start straight away.
+        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.NewSubAssemblyInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+
+        // The sub-assembly in the address is the load's to open, at its end: the list is fresh only then. New clicked
+        // meanwhile is the later word.
+        _addressOpened = Id;
+        if (Id is { } id && viewModel.SelectedRow?.Id != id)
+        {
+            viewModel.OpenSubAssemblyOnLoad(id);
+        }
+    }
+
+    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
+    // called for too, once the load is back: New clicked before then would have the sub-assembly load over it.
+    protected override void OnParametersSet()
+    {
+        if (Id == _addressOpened)
+        {
+            return;
+        }
+
+        _addressOpened = Id;
+        if (Id is { } id && ViewModel!.SelectedRow?.Id != id)
+        {
+            ViewModel.OpenSubAssembly(id);
+        }
+    }
+
+    // The sub-assembly picked goes into the address, so Back returns to the one before.
+    protected override void OnViewModelChanged(string? propertyName)
+    {
+        if (propertyName == nameof(SubAssembliesViewModel.SelectedRow) && ViewModel!.SelectedRow is { Id: > 0 } row && row.Id != Id)
+        {
+            _ = InvokeAsync(() => MoveAddressTo($"sub-assemblies/{row.Id}"));
+        }
+    }
+
+    protected override bool IsOwnAddress(string path) => path.StartsWith("sub-assemblies", StringComparison.OrdinalIgnoreCase);
+
+    private async Task FocusNameAsync()
+    {
+        await RedrawNowAsync();
+        await JS.InvokeVoidAsync("tinapayan.focus", "sa-name");
+    }
+}

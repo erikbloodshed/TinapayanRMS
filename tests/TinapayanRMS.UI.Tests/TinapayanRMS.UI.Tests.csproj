@@ -7,7 +7,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TinapayanRMS.UI\TinapayanRMS.UI.csproj" />
-    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
   </ItemGroup>
 
 </Project>

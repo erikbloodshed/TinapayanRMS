@@ -1,0 +1,83 @@
+@* A made ingredient's recipe (the WPF BillOfMaterialsCard): the sub-assembly it's made from, kept on the Sub-Assemblies
+   screen, picked once and then shown as a badge that opens it there, with the pencil that picks another; that recipe's
+   lines as they're saved, read-only here; then the ingredient's own add-ins on top, typed like recipe lines and dragged
+   into order. The header's Total Weight and Total Cost follow both, less the weight loss. *@
+<div class="tab-card">
+    <h2 class="section-header">Recipe</h2>
+
+    <div class="made-from">
+        <label class="form-label" for="made-from">Made from</label>
+        @if (ViewModel.IsPickingSubAssembly)
+        {
+            <PickField ID="made-from" TItem="SubAssembly" Items="ViewModel.SubAssemblyOptions" TextField="Name" AllowEmpty="true"
+                       Value="ViewModel.EditingSubAssembly" ValueChanged="s => ViewModel.EditingSubAssembly = s" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
+                       Tooltip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top." />
+        }
+        @if (ViewModel.IsShowingSubAssemblyBadge)
+        {
+            <button type="button" class="badge badge-link" @onclick="() => Commands.Run(ViewModel.OpenSubAssemblyCommand)"
+                    title="Open it on the Sub-Assemblies screen, where its lines are changed. Every made ingredient and product using it follows.">
+                @ViewModel.SubAssemblyBadgeText
+            </button>
+            <CommandButton Command="ViewModel.StartChangingSubAssemblyCommand" Glyph="@Glyphs.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
+        }
+        @if (ViewModel.IsChangingSubAssembly)
+        {
+            <CommandButton Command="ViewModel.CancelChangingSubAssemblyCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Keep the sub-assembly as it is" />
+        }
+    </div>
+
+    <LineGrid TRow="IngredientLineRow" Items="ViewModel.RecipeLines" ReadOnly="true" EmptyText="Pick the sub-assembly it's made from to see its lines.">
+        <Header>
+            <th>Ingredient</th>
+            <th class="col-number">Grams</th>
+            <th class="col-number">Cost/g</th>
+            <th class="col-number">Cost</th>
+        </Header>
+        <Row Context="row">
+            <td class="cell-text">@row.Ingredient?.Name</td>
+            <td class="cell-number">@row.Grams?.ToString("#,0.0")</td>
+            <td class="cell-number">@row.CostPerGram.ToString("N4")</td>
+            <td class="cell-number">@row.Cost.ToString("N2")</td>
+        </Row>
+    </LineGrid>
+
+    <h2 class="section-header add-ins-header">Add-Ins</h2>
+    <p class="caption">This ingredient's own extras on top of the recipe, such as a colouring or a flavouring. The recipe itself stays as it is.</p>
+    <LineGrid @ref="_addIns" TRow="IngredientLineRow" Items="ViewModel.AddInEdits" NewItem="ViewModel.NewAddIn" @bind-SelectedItem="ViewModel.SelectedAddInEdit" Reorderable="true" InsertKey="true">
+        <Header>
+            <th>Ingredient</th>
+            <th class="col-number">Grams</th>
+            <th class="col-number">Cost/g</th>
+            <th class="col-number">Cost</th>
+        </Header>
+        <Row Context="row">
+            <td>
+                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" PopupWidth="420px"
+                           Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id">
+                    <ItemTemplate Context="material">
+                        <span class="pick-columns">
+                            <span>@material.Name</span>
+                            <span class="muted">@material.Category?.Name</span>
+                            <span class="muted number">@material.BufferedCostPerBaseUnit.ToString("N4")</span>
+                        </span>
+                    </ItemTemplate>
+                </PickField>
+            </td>
+            <td><NumberField TValue="decimal?" Value="row.Grams" ValueChanged="v => row.Grams = v" Format="#,0.0###" Min="0" CssClass="cell-field" /></td>
+            <td class="cell-number">@row.CostPerGram.ToString("N4")</td>
+            <td class="cell-number">@row.Cost.ToString("N2")</td>
+        </Row>
+    </LineGrid>
+    <div class="button-row align-right form-extra">
+        <ActionButton Glyph="@Glyphs.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
+                      Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
+        <CommandButton Command="ViewModel.RemoveAddInCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Add-In" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+
+    private LineGrid<IngredientLineRow>? _addIns;
+}

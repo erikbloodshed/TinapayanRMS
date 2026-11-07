@@ -1,0 +1,14 @@
+@* A form's label and its field side by side, the labels lined up in one column, as the WPF forms' FormLabelStyle rows. *@
+<div class="form-row">
+    <label class="form-label" for="@For">@Label</label>
+    <div class="form-field">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>The field's ID, so clicking the label focuses it.</summary>
+    [Parameter] public string? For { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

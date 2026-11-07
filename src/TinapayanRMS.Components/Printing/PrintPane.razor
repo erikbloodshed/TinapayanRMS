@@ -1,0 +1,60 @@
+@inject IPagePrinter Printer
+
+@* A printout's preview, as the WPF print pane showed it: what to include, and Print, over the document on sheets of
+   paper, one for each part that starts a page. Print opens the computer's print dialog over the window's page, which
+   prints the document alone (print.css hides the rest), on pages the web view breaks and numbers. *@
+<div class="print-pane">
+    <div class="print-bar no-print">
+        @Options
+        @if (Set is not null)
+        {
+            <span class="form-label">Include</span>
+            @if (Set.IsScaling)
+            {
+                <SfCheckBox Label="Costs" @bind-Checked="_includeCosting"
+                            title="Each row's cost, and the total cost. Without them it shows only the amounts." />
+            }
+            else
+            {
+                <SfCheckBox Label="Recipe" @bind-Checked="_includeRecipe" Disabled="!_includeCosting"
+                            title="Each sub-assembly's ingredients and piece size, then the packaging." />
+                <SfCheckBox Label="Costing" @bind-Checked="_includeCosting" Disabled="!_includeRecipe"
+                            title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
+            }
+        }
+        <span class="print-bar-space"></span>
+        @if (Status is not null)
+        {
+            <span class="busy-text">@Status</span>
+        }
+        <ActionButton Glyph="@Glyphs.Print" Label="Print" Primary="true" Disabled="Set is null" OnClick="PrintAsync" />
+    </div>
+
+    <div class="print-stage">
+        @if (Set is not null)
+        {
+            <PrintDocument Set="Set" IncludeRecipe="_includeRecipe" IncludeCosting="_includeCosting" />
+        }
+        else if (Empty is not null)
+        {
+            <p class="empty-state no-print">@Empty</p>
+        }
+    </div>
+</div>
+
+@code {
+    private bool _includeRecipe = true;
+    private bool _includeCosting = true;
+
+    [Parameter] public ProductPrintSet? Set { get; set; }
+
+    /// <summary>What the bar starts with: the screen's own choice of what to print.</summary>
+    [Parameter] public RenderFragment? Options { get; set; }
+
+    /// <summary>What's happening while the printout is prepared, or a note about it.</summary>
+    [Parameter] public string? Status { get; set; }
+
+    [Parameter] public string? Empty { get; set; }
+
+    private Task PrintAsync() => Printer.PrintAsync();
+}

@@ -1,0 +1,27 @@
+@page "/print/preview"
+@using TinapayanRMS.Components.Printing
+@inject PrintPreviews Previews
+@inject NavigationManager Navigation
+
+<PageTitle>Print preview · TinapayanRMS</PageTitle>
+
+@* The preview a screen opens for its own report (the WPF PrintPreviewWindow): the Price Simulator's products, picked
+   or all shown. Back returns to the screen that asked. *@
+<section class="card print-card">
+    <PrintPane Set="_choice?.Set" Empty="Nothing to preview. Print a report from the Price Simulator.">
+        <Options>
+            <ActionButton Glyph="@Glyphs.Back" Label="Back" OnClick="() => Navigation.NavigateTo(Previews.ReturnTo)" />
+            @if (Previews.Choices.Count > 1)
+            {
+                <label class="form-label" for="preview-choice">Print</label>
+                <PickField ID="preview-choice" TItem="PrintChoice" Items="Previews.Choices" TextField="Label" @bind-Value="_choice" CssClass="print-scope" />
+            }
+        </Options>
+    </PrintPane>
+</section>
+
+@code {
+    private PrintChoice? _choice;
+
+    protected override void OnInitialized() => _choice = Previews.Choices.FirstOrDefault();
+}

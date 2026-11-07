@@ -1,0 +1,453 @@
+@using System.Globalization
+@using TinapayanRMS.ApplicationCore.Rules
+@using TinapayanRMS.Domain.Enums
+
+@* A printout as a document the browser prints (the WPF app's ProductPrintLayout, built from the same ProductPrintSet):
+   one product's recipe and costing, or its recipe scaled; a set of products, each starting a page of its own after a
+   title and contents; or a Price Simulator report, with today's figures beside the simulated ones.
+   Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
+   one the browser breaks the pages (print.css keeps a heading with its table and repeats table headings), and it numbers
+   them. *@
+<div class="print-document">
+    @if (Set.Title is { } title)
+    {
+        <section class="print-sheet">
+            <header class="print-title">
+                <h1>@title</h1>
+                <p class="print-muted">@Set.Products.Count @(Set.Products.Count == 1 ? "product" : "products") · @Parts · Printed @Printed(Set.PrintedAt)</p>
+                <p class="print-small">As saved: edits not yet saved on the Products screen aren't in these pages.</p>
+                @if (IsSimulation)
+                {
+                    <p class="print-small">At buffered costs, with the price changes tried on the Price Simulator screen, beside today's figures. Nothing in it is saved.</p>
+                }
+            </header>
+
+            @if (IsSimulation)
+            {
+                @PriceChanges("Price Changes", Set.PriceChanges ?? [], "No price changes tried: every figure is today's.")
+            }
+
+            <h2 class="print-section">Products</h2>
+            @if (Set.Products.Count == 0)
+            {
+                <p class="print-muted">No products in @title.</p>
+            }
+            else if (IsSimulation)
+            {
+                <table class="print-table">
+                    <thead><tr><th>Product</th><th class="n">Base Cost</th><th class="n">Simulated Base Cost</th><th class="n">Change %</th></tr></thead>
+                    <tbody>
+                        @foreach (var product in Set.Products)
+                        {
+                            var now = product.Simulation?.Now ?? product.Costs;
+                            <tr><td>@product.ProductName</td><td class="n">@Money(now.BaseCost)</td><td class="n">@Money(product.Costs.BaseCost)</td><td class="n">@ChangePercent(now.BaseCost, product.Costs.BaseCost)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <table class="print-table">
+                    <thead><tr><th>Product</th><th>Folder</th></tr></thead>
+                    <tbody>
+                        @foreach (var product in Set.Products)
+                        {
+                            <tr><td>@product.ProductName</td><td>@product.StageTitle › @product.CategoryName</td></tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        @foreach (var product in Set.Products)
+        {
+            <article class="print-sheet print-product">@ProductPart(product)</article>
+        }
+    }
+    else
+    {
+        @foreach (var product in Set.Products)
+        {
+            <article class="print-sheet print-product">@ProductPart(product)</article>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductPrintSet Set { get; set; } = null!;
+
+    /// <summary>Each sub-assembly's ingredients and piece size, then the packaging.</summary>
+    [Parameter] public bool IncludeRecipe { get; set; } = true;
+
+    /// <summary>The costing breakdown, and the costs beside the recipe's lines; for a scaled recipe, each row's cost and the total.</summary>
+    [Parameter] public bool IncludeCosting { get; set; } = true;
+
+    private bool IsSimulation => Set.PriceChanges is not null || Set.Products.Any(p => p.Simulation is not null);
+
+    /// <summary>What the printout is, naming only the parts included, as the WPF print job was named.</summary>
+    private string Parts => Set.IsScaling ? "Scaling"
+        : (IncludeRecipe, IncludeCosting) switch
+        {
+            (true, true) => "Recipe and Costing",
+            (true, false) => "Recipe",
+            _ => "Costing",
+        };
+
+    private static string Printed(DateTime at) => at.ToString("MMM d, yyyy, h:mm tt", CultureInfo.CurrentCulture);
+
+    private static string Grams(decimal grams) => grams.ToString("N1", CultureInfo.CurrentCulture);
+
+    private static string Percent(decimal? percent) => percent is { } value ? value.ToString("N1", CultureInfo.CurrentCulture) : "—";
+
+    private static string Share(decimal share) => share.ToString("N1", CultureInfo.CurrentCulture) + "%";
+
+    private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.CurrentCulture);
+
+    private static string MarkupText(decimal? markup) => markup is { } value ? value.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—";
+
+    private static string Change(decimal now, decimal simulated) =>
+        simulated == now ? "—" : (simulated - now).ToString("+#,0.00;-#,0.00", CultureInfo.CurrentCulture);
+
+    private static string ChangePercent(decimal now, decimal simulated) =>
+        simulated == now ? "—" : CostingRules.PercentOf(simulated - now, now).ToString("+#,0.00;-#,0.00;0.00", CultureInfo.CurrentCulture) + "%";
+
+    /// <summary>What the report says under a product's simulated Current Price: the price that keeps today's markup.</summary>
+    public const string KeepMarkupNote = "To keep markup";
+
+    private static string BasisSuffix(ProductPrintout printout) =>
+        printout.CostBasis == CostBasis.Unbuffered ? $" · {ProductPrintout.UnbufferedNote}" : string.Empty;
+
+    private static string PieceSizeText(PrintedSection section, bool withCost)
+    {
+        if (!section.HasPieceSize)
+        {
+            return withCost ? "No weight per piece or yield yet, so this section costs nothing per piece." : "No weight per piece or yield yet.";
+        }
+
+        List<string> parts = [];
+        parts.Add($"Weight per piece {section.WeightPerPiece:#,0.##} g");
+        parts.Add($"Yield {section.Yield:#,0.##} pcs");
+        if (withCost)
+        {
+            parts.Add($"Cost per piece {section.CostPerPiece:N2}");
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private RenderFragment ProductPart(ProductPrintout printout) => @<text>
+        <header class="print-title">
+            <h1>@printout.ProductName</h1>
+            <p class="print-muted">@printout.CategoryName · @printout.StageTitle · @printout.CostUnitCaption@BasisSuffix(printout)@(printout.Simulation is not null ? " · Simulated prices" : "")</p>
+            <p class="print-small">Last updated @printout.LastUpdatedText · Printed @Printed(Set.PrintedAt)@(printout.SaveNote is { } note ? " · " + note : "")</p>
+        </header>
+
+        @if (printout.Scaling is { } scaling)
+        {
+            @ScalingPart(scaling)
+        }
+        else
+        {
+            @if (IncludeCosting)
+            {
+                @Figures(printout)
+            }
+            @if (printout.Simulation is { } simulated)
+            {
+                @PriceChanges("Price Changes Applied", simulated.Changes, "No price change reaches this product: its figures are today's.")
+            }
+            @if (IncludeRecipe)
+            {
+                <h2 class="print-part">Recipe</h2>
+                @if (printout.Components is { } components)
+                {
+                    @ComponentsPart(printout, components)
+                }
+                @if (printout.Sections.Count == 0 && printout.Components is null)
+                {
+                    <p class="print-muted">No sub-assemblies yet.</p>
+                }
+                @foreach (var section in printout.Sections)
+                {
+                    @SectionPart(printout, section)
+                }
+                @if (printout.Packaging is { } packaging)
+                {
+                    @PackagingPart(printout, packaging)
+                }
+            }
+            @if (IncludeCosting)
+            {
+                @CostingPart(printout)
+            }
+        }
+    </text>;
+
+    private RenderFragment Figures(ProductPrintout printout) => @<div class="print-figures">
+        @if (printout.Simulation is { } simulated)
+        {
+            var costs = printout.Costs;
+            var now = simulated.Now;
+            <div><span>Base Cost</span><strong>@Money(costs.BaseCost)</strong><em>Now @Money(now.BaseCost)</em></div>
+            <div><span>Suggested Price</span><strong>@Money(costs.SellingPrice)</strong><em>Now @Money(now.SellingPrice)</em></div>
+            <div>
+                <span>Current Price</span><strong>@(costs.CurrentPrice is { } price ? Money(price) : "—")</strong>
+                @if (costs.BaseCost != now.BaseCost && PriceChangeRules.PriceToKeepMarkup(costs.CurrentPrice, now.BaseCost, costs.BaseCost) is { } keep)
+                {
+                    <em>@KeepMarkupNote @Money(keep)</em>
+                }
+            </div>
+            <div><span>Markup at Current Price</span><strong class="@(costs.IsCurrentPriceBelowCost ? "print-error" : "")">@MarkupText(costs.CurrentMarkupPercent)</strong><em>Now @MarkupText(now.CurrentMarkupPercent)</em></div>
+        }
+        else
+        {
+            <div><span>Material Cost</span><strong>@Money(printout.Costs.Material)</strong></div>
+            <div><span>Base Cost</span><strong>@Money(printout.Costs.BaseCost)</strong></div>
+            <div><span>Current Price</span><strong>@(printout.Costs.CurrentPrice is { } price ? Money(price) : "—")</strong></div>
+            <div><span>Markup at Current Price</span><strong class="@(printout.Costs.IsCurrentPriceBelowCost ? "print-error" : "")">@MarkupText(printout.Costs.CurrentMarkupPercent)</strong></div>
+        }
+    </div>;
+
+    private RenderFragment PriceChanges(string heading, IReadOnlyList<PrintedPriceChange> changes, string none) => @<text>
+        <h2 class="print-section">@heading</h2>
+        @if (changes.Count == 0)
+        {
+            <p class="print-muted">@none</p>
+        }
+        else
+        {
+            <table class="print-table">
+                <thead><tr><th>Raw Material</th><th>Per</th><th class="n">Current Price</th><th class="n">Change %</th><th class="n">New Price</th></tr></thead>
+                <tbody>
+                    @foreach (var change in changes)
+                    {
+                        <tr>
+                            <td>@change.Material</td>
+                            <td>@change.Per</td>
+                            <td class="n">@(change.CurrentPrice is { } current ? Money(current) : "—")</td>
+                            <td class="n">@(change.ChangePercent is { } percent ? percent.ToString("+#,0.00;-#,0.00;0.00", CultureInfo.CurrentCulture) + "%" : "—")</td>
+                            <td class="n">@Money(change.NewPrice)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </text>;
+
+    private RenderFragment ComponentsPart(ProductPrintout printout, IReadOnlyList<PrintedComponent> components) => @<text>
+        <h3 class="print-section">Products</h3>
+        @if (components.Count == 0)
+        {
+            <p class="print-muted">No products yet.</p>
+        }
+        else
+        {
+            var withPackaging = components.Any(c => c.PackagingCost is not null);
+            var withNow = printout.Simulation is not null;
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Product</th><th class="n">Qty</th>
+                        @if (IncludeCosting)
+                        {
+                            <th class="n">Recipe Cost</th>
+                            @if (withPackaging) { <th class="n">Packaging Cost</th> }
+                            <th class="n">Cost</th>
+                            @if (withNow) { <th class="n">Cost Now</th> }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var component in components)
+                    {
+                        <tr>
+                            <td>@component.Product</td><td class="n">@component.Quantity?.ToString("N0")</td>
+                            @if (IncludeCosting)
+                            {
+                                <td class="n">@Money(component.RecipeCost)</td>
+                                @if (withPackaging) { <td class="n">@(component.PackagingCost is { } p ? Money(p) : "")</td> }
+                                <td class="n">@Money(component.Cost)</td>
+                                @if (withNow) { <td class="n">@(component.NowCost is { } now ? Money(now) : "")</td> }
+                            }
+                        </tr>
+                    }
+                </tbody>
+                @if (IncludeCosting)
+                {
+                    <tfoot>
+                        <tr>
+                            <td>Total</td><td></td><td></td>
+                            @if (withPackaging) { <td></td> }
+                            <td class="n">@Money(components.Sum(c => c.Cost))</td>
+                            @if (withNow) { <td class="n">@(components.Any(c => c.NowCost is not null) ? Money(components.Sum(c => c.NowCost ?? c.Cost)) : "")</td> }
+                        </tr>
+                    </tfoot>
+                }
+            </table>
+        }
+    </text>;
+
+    private RenderFragment SectionPart(ProductPrintout printout, PrintedSection section) => @<section class="print-block">
+        @{ var withNow = printout.Simulation is not null && IncludeCosting; }
+        <h3 class="print-section">@section.Name @if (section.Source is { } source) { <span class="print-source">@source</span> }</h3>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Ingredient</th><th class="n">Grams</th><th class="n">@section.PercentHeader</th>
+                    @if (IncludeCosting) { <th class="n">Cost/g</th><th class="n">Cost</th> }
+                    @if (withNow) { <th class="n">Cost Now</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in section.Lines)
+                {
+                    @LineRow(line, withNow)
+                }
+                @if (section.AddIns.Count > 0)
+                {
+                    <tr class="print-subheading"><td colspan="@(3 + (IncludeCosting ? 2 : 0) + (withNow ? 1 : 0))">Add-ins</td></tr>
+                    @foreach (var line in section.AddIns)
+                    {
+                        @LineRow(line, withNow)
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td><td class="n">@Grams(section.TotalWeight)</td><td class="n">@Percent(section.TotalPercent)</td>
+                    @if (IncludeCosting) { <td></td><td class="n">@Money(section.BatchCost)</td> }
+                    @if (withNow) { <td class="n">@(section.NowBatchCost is { } now ? Money(now) : "")</td> }
+                </tr>
+            </tfoot>
+        </table>
+        <p class="print-small">@PieceSizeText(section, IncludeCosting)</p>
+    </section>;
+
+    private RenderFragment LineRow(PrintedLine line, bool withNow) => @<tr>
+        <td>@line.Ingredient</td><td class="n">@Grams(line.Grams)</td><td class="n">@Percent(line.Percent)</td>
+        @if (IncludeCosting) { <td class="n">@line.CostPerGram.ToString("N4")</td><td class="n">@Money(line.Cost)</td> }
+        @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
+    </tr>;
+
+    private RenderFragment PackagingPart(ProductPrintout printout, PrintedPackaging packaging) => @<section class="print-block">
+        @{ var withNow = printout.Simulation is not null && IncludeCosting; }
+        <h3 class="print-section">Packaging @if (packaging.LinkedTo is { } linkedTo) { <span class="print-source">@linkedTo</span> }</h3>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Material</th><th class="n">Qty</th><th>Unit</th>
+                    @if (IncludeCosting) { <th class="n">Unit Cost</th><th class="n">Cost</th> }
+                    @if (withNow) { <th class="n">Cost Now</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in packaging.Lines)
+                {
+                    <tr>
+                        <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
+                        @if (IncludeCosting) { <td class="n">@line.UnitCost.ToString("N4")</td><td class="n">@Money(line.Cost)</td> }
+                        @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
+                    </tr>
+                }
+            </tbody>
+            @if (IncludeCosting)
+            {
+                <tfoot>
+                    <tr>
+                        <td>Total</td><td></td><td></td><td></td><td class="n">@Money(packaging.Total)</td>
+                        @if (withNow) { <td class="n">@(packaging.Lines.Any(l => l.NowCost is not null) ? Money(packaging.Lines.Sum(l => l.NowCost ?? l.Cost)) : "")</td> }
+                    </tr>
+                </tfoot>
+            }
+        </table>
+    </section>;
+
+    private RenderFragment CostingPart(ProductPrintout printout) => @<section class="print-block print-keep">
+        @{
+            var costs = printout.Costs;
+            var now = printout.Simulation?.Now;
+            var unit = printout.CostUnitCaption;
+        }
+        <h2 class="print-part">Costing (@unit@BasisSuffix(printout))</h2>
+        <table class="print-table print-costing">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    @if (now is not null) { <th class="n">Now</th><th class="n">Simulated</th><th class="n">Change</th> } else { <th class="n">@unit</th> }
+                    <th class="n">% of Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                @CostRow(costs.PartsTitle, now?.SubAssemblies, costs.SubAssemblies, costs.SubAssembliesShare)
+                @foreach (var line in costs.SubAssemblyLines)
+                {
+                    var nowLine = now?.SubAssemblyLines.FirstOrDefault(l => l.Name == line.Name);
+                    <tr class="print-part-row">
+                        <td>@line.Name</td>
+                        @if (now is not null) { <td class="n">@(nowLine is not null ? Money(nowLine.Cost) : "")</td><td class="n">@Money(line.Cost)</td><td class="n">@(nowLine is not null ? Change(nowLine.Cost, line.Cost) : "")</td> } else { <td class="n">@Money(line.Cost)</td> }
+                        <td class="n">@Share(line.Share)</td>
+                    </tr>
+                }
+                @CostRow($"Wastage ({costs.WastagePercent:0.##}% of {costs.PartsBase})", now?.Wastage, costs.Wastage, costs.WastageShare)
+                @CostRow(costs.PackagingTitle, now?.Packaging, costs.Packaging, costs.PackagingShare)
+                @CostRow($"Labor ({costs.LaborPercent:0.##}% of {costs.PartsBase})", now?.Labor, costs.Labor, costs.LaborShare)
+                @CostRow($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", now?.Overhead, costs.Overhead, costs.OverheadShare)
+                @CostRow($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", now?.Administrative, costs.Administrative, costs.AdministrativeShare)
+                @CostRow("Subtotal (base cost)", now?.BaseCost, costs.BaseCost, costs.BaseCostShare, "print-band")
+                @CostRow($"Markup ({costs.MarginPercent:0.##}%)", now?.Markup, costs.Markup, costs.MarkupShare)
+                @CostRow($"VAT ({costs.VatPercent:0.##}%)", now?.Vat, costs.Vat, costs.VatShare)
+                @CostRow(printout.SuggestedSellingPriceLabel, now?.SellingPrice, costs.SellingPrice, costs.SellingPriceShare, "print-band print-total")
+            </tbody>
+        </table>
+    </section>;
+
+    private RenderFragment CostRow(string label, decimal? now, decimal amount, decimal share, string? css = null) => @<tr class="@css">
+        <td>@label</td>
+        @if (now is { } before) { <td class="n">@Money(before)</td><td class="n">@Money(amount)</td><td class="n">@Change(before, amount)</td> } else { <td class="n">@Money(amount)</td> }
+        <td class="n">@Share(share)</td>
+    </tr>;
+
+    private RenderFragment ScalingPart(PrintedScaling scaling) => @<section class="print-block">
+        <h2 class="print-part">Scaling</h2>
+        <div class="print-figures">
+            <div><span>Sellable Units</span><strong>@scaling.Units.ToString("N0")</strong></div>
+            @if (scaling.Pieces is { } pieces)
+            {
+                <div><span>Pieces</span><strong>@pieces.ToString("#,0.##")</strong></div>
+            }
+            @if (IncludeCosting)
+            {
+                <div><span>Total Cost</span><strong>@Money(scaling.TotalCost)</strong></div>
+            }
+        </div>
+        @if (scaling.Rows.Count == 0)
+        {
+            <p class="print-muted">Nothing to scale yet.</p>
+        }
+        else
+        {
+            <table class="print-table">
+                <thead><tr><th>Item</th><th class="n">Amount</th>@if (IncludeCosting) { <th class="n">Cost</th> }</tr></thead>
+                <tbody>
+                    @foreach (var row in scaling.Rows)
+                    {
+                        @ScalingRowPart(row, 0)
+                    }
+                </tbody>
+            </table>
+        }
+    </section>;
+
+    private RenderFragment ScalingRowPart(ScalingRow row, int depth) => @<text>
+        <tr class="@(row.IsGroup ? "print-group" : "")">
+            <td style="padding-left:@(6 + depth * 16)px">@row.Name @if (!string.IsNullOrEmpty(row.Detail)) { <span class="print-source">@row.Detail</span> }</td>
+            <td class="n">@row.AmountText</td>
+            @if (IncludeCosting) { <td class="n">@Money(row.Cost)</td> }
+        </tr>
+        @foreach (var child in row.Children)
+        {
+            @ScalingRowPart(child, depth + 1)
+        }
+    </text>;
+
+}

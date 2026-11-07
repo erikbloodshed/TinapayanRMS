@@ -3,7 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Controls;
 

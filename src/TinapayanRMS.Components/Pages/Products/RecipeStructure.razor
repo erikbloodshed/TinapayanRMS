@@ -1,0 +1,63 @@
+@* A product's Recipe Structure (the WPF RecipeStructureCard): a tab per section (a composite's Products first, then its
+   sub-assemblies, one while a sub-assembly is being added, and Packaging while there is any), with Add Sub-Assembly's
+   three ways in and Delete Sub-Assembly. Under the tabs, the form for the tab showing. The strip and the heading stay
+   put while the form under them scrolls. *@
+<div class="recipe-structure">
+    <div class="recipe-heading">
+        <h2 class="panel-header">Recipe Structure</h2>
+        <div class="button-row">
+            <MenuButton CssClass="e-outline" Tooltip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own">
+                <Face><span class="glyph" aria-hidden="true">@Glyphs.Add</span> <span class="command-label">Add Sub-Assembly</span></Face>
+                <ChildContent>
+                    <ActionButton Glyph="@Glyphs.Add" Label="New sub-assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.AddUsageCommand, UsageFormMode.New)"
+                                  Tooltip="Type its lines in here. In a product-owned role (Settings → Roles) Save keeps it as this product's own; in any other, on the Sub-Assemblies screen, named after this product and its role, and linked." />
+                    <ActionButton Glyph="@Glyphs.Link" Label="Link an existing one" Flat="true" OnClick="() => Commands.Run(ViewModel.AddUsageCommand, UsageFormMode.Link)"
+                                  Tooltip="One from the Sub-Assemblies screen, or packaging. Its lines stay where they're kept, and it follows every change made to them. Another product's own can only be copied." />
+                    <ActionButton Glyph="@Glyphs.Copy" Label="Copy an existing one" Flat="true" OnClick="() => Commands.Run(ViewModel.AddUsageCommand, UsageFormMode.Copy)"
+                                  Tooltip="Starts from an existing one's lines and role, another product's own included. Save keeps it as a new one named after this product: its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
+                </ChildContent>
+            </MenuButton>
+            <CommandButton Command="ViewModel.RemoveUsageCommand" Glyph="@Glyphs.Delete" Label="Delete Sub-Assembly"
+                           Tooltip="Take the sub-assembly showing out of the recipe, with Save. One of this product's own is deleted; a linked one stays on the Sub-Assemblies screen." />
+        </div>
+    </div>
+
+    @if (!ViewModel.HasRecipeTabs)
+    {
+        <p class="caption">Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied — and its Packaging role adds the packaging.</p>
+    }
+    else
+    {
+        <div class="recipe-tabs" role="tablist">
+            @foreach (var tab in ViewModel.RecipeTabs)
+            {
+                var recipeTab = tab;
+                <button type="button" role="tab" class="recipe-tab @(ReferenceEquals(recipeTab, ViewModel.SelectedRecipeTab) ? "active" : "")"
+                        aria-selected="@(ReferenceEquals(recipeTab, ViewModel.SelectedRecipeTab) ? "true" : "false")"
+                        @onclick="() => ViewModel.SelectedRecipeTab = recipeTab">
+                    <span class="glyph" aria-hidden="true">@recipeTab.Glyph</span>
+                    <span>@recipeTab.Header</span>
+                </button>
+            }
+        </div>
+
+        <div class="recipe-form">
+            @if (ViewModel.IsUsageFormShowing)
+            {
+                <UsageForm ViewModel="ViewModel" />
+            }
+            @if (ViewModel.IsPackagingShowing)
+            {
+                <PackagingSection ViewModel="ViewModel" />
+            }
+            @if (ViewModel.IsComponentsShowing)
+            {
+                <ComponentsSection ViewModel="ViewModel" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+}

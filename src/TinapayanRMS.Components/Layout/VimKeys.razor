@@ -1,0 +1,87 @@
+@using TinapayanRMS.Components.Vim
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject VimKeysState State
+
+@* The Vim keys' place in the header, and their way back to the server. The keys themselves are read in the browser
+   (wwwroot/vim.js), where the keyboard and the cursor are: it's handed the key table and the command list as the keys
+   are turned on, writes NORMAL or INSERT into the label here, and calls back for the labels f puts on what can be
+   clicked and to run what's typed after a colon. *@
+<span id="vim-mode" class="vim-mode" hidden title="Vim keys are on (Settings → Keyboard). NORMAL: letters move and act. INSERT: letters type; Esc stops."></span>
+
+@code {
+    private DotNetObjectReference<VimKeys>? _self;
+
+    protected override void OnInitialized() => State.Changed += OnChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await ApplyAsync();
+        }
+    }
+
+    private void OnChanged() => InvokeAsync(ApplyAsync);
+
+    private async Task ApplyAsync()
+    {
+        if (!State.IsOn)
+        {
+            await JS.InvokeVoidAsync("tinapayanVim.disable");
+            return;
+        }
+
+        var keys = VimKeymap.Bindings.Select(binding => new
+        {
+            keys = binding.Keys,
+            action = binding.Action.ToString(),
+            where = Enum.GetValues<VimContexts>()
+                .Where(context => context is VimContexts.Field or VimContexts.Table or VimContexts.Tree or VimContexts.Other && binding.Where.HasFlag(context))
+                .Select(context => context.ToString()),
+            anywhere = binding.Where == VimContexts.Anywhere,
+            typed = binding.IsTyped,
+            description = binding.Description,
+        });
+        var commands = VimCommandLine.Commands.Select(command => new { usage = command.Usage, description = command.Description });
+        await JS.InvokeVoidAsync("tinapayanVim.enable", _self, keys, commands);
+    }
+
+    /// <summary>The labels f puts on <paramref name="count"/> things that can be clicked.</summary>
+    [JSInvokable]
+    public IReadOnlyList<string> HintLabelsFor(int count) => HintLabels.For(count);
+
+    /// <summary>Runs what was typed after a colon, on the screen on show.</summary>
+    [JSInvokable]
+    public VimCommandResult RunCommandLine(string line) => State.Run(line);
+
+    /// <summary>
+    /// The sum typed after Ctrl+R = (VimExpression), as it's typed into the box: rounded to the decimals a number box takes,
+    /// when it's one. Its answer, or why it can't be worked out.
+    /// </summary>
+    [JSInvokable]
+    public object EvaluateSum(string text, int? decimals) =>
+        VimExpression.Evaluate(text, out var error) is { } value
+            ? new { answer = VimExpression.Format(value, decimals, System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator) }
+            : new { error };
+
+    public async ValueTask DisposeAsync()
+    {
+        State.Changed -= OnChanged;
+        try
+        {
+            await JS.InvokeVoidAsync("tinapayanVim.disable");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The tab closed: nothing left to turn off.
+        }
+        catch (InvalidOperationException)
+        {
+            // Disposed before the page ever rendered in a browser.
+        }
+
+        _self?.Dispose();
+    }
+}

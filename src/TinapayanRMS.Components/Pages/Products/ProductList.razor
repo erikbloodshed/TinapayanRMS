@@ -1,0 +1,90 @@
+@* Products' list (the WPF ProductListCard): a search box; the list's commands as icons; the products in a folder for
+   their stage (Production, Research and Development), then their category, each with an image saying what it is; the
+   deleted ones in a Deleted folder at the end; and what the last move did, with Undo. Dragging products onto a folder
+   moves them there, saved at once; a deleted product only comes back by Restore, from its menu. *@
+<section class="card list-card tree-card">
+    <div class="list-heading">
+        <h2 class="section-header">Products</h2>
+        @* Not one of the form's boxes: it keeps the cursor, and what's typed, when another record takes the form. *@
+        <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+            <TextField @bind-Value="ViewModel.SearchText" Placeholder="Search products" CssClass="list-search" />
+        </CascadingValue>
+    </div>
+
+    <div class="list-toolbar">
+        <ActionButton Glyph="@Glyphs.Add" Tooltip="New Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewProductInCommand, null)" />
+        <ActionButton Glyph="@Glyphs.Composite" Tooltip="New Composite Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCompositeProductInCommand, null)" />
+        <ActionButton Glyph="@Glyphs.NewFolder" Tooltip="New Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, null)" />
+        <CommandButton Command="ViewModel.PrintAllCommand" Glyph="@Glyphs.Print" Tooltip="Print All Products" Flat="true" />
+        <ActionButton Glyph="@Glyphs.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
+        <ActionButton Glyph="@Glyphs.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
+    </div>
+
+    <FolderTree TNode="ProductTreeNode"
+                Roots="ViewModel.ProductTree.Roots"
+                ChildrenOf="n => n is ProductFolderNode folder ? folder.Children : null"
+                IsExpanded="n => n is ProductFolderNode { IsExpanded: true }"
+                SetExpanded="(n, open) => { if (n is ProductFolderNode folder) folder.IsExpanded = open; }"
+                Selected="ViewModel.SelectedTreeNodes"
+                KeyOf="KeyOf"
+                RowClass="RowClass"
+                CanDrag="n => n is ProductLeafNode { IsDeleted: false }"
+                CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
+                OnDrop="DropAsync"
+                MenuFor="ViewModel.TreeMenuFor"
+                Shortcut="ViewModel.TreeShortcut">
+        <RowTemplate Context="node">
+            @if (node.IsFolder)
+            {
+                <span class="glyph tree-glyph" aria-hidden="true">@node.Glyph</span>
+            }
+            else if (ProductIcons.ImageFor(node.IconKind) is { } image)
+            {
+                <img class="tree-icon" src="@image" alt="" />
+            }
+            <span class="tree-title">@node.Title</span>
+            @if (node.IsBelowTargetMarkup)
+            {
+                <span class="glyph tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup">@Glyphs.Warning</span>
+            }
+            @if (node.IsFolder)
+            {
+                <span class="tree-count">(@node.ProductCount)</span>
+            }
+        </RowTemplate>
+    </FolderTree>
+
+    <MoveNoticeBar Notice="@ViewModel.MoveNotice" UndoCommand="ViewModel.UndoMoveCommand" DismissCommand="ViewModel.DismissMoveNoticeCommand" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    private static string KeyOf(ProductTreeNode node) => node switch
+    {
+        ProductFolderNode folder => "folder-" + folder.Key,
+        ProductLeafNode leaf => "product-" + leaf.Product.Id,
+        _ => node.Title,
+    };
+
+    private static string? RowClass(ProductTreeNode node) => node switch
+    {
+        { IsTopLevel: true } => "top-level",
+        ProductLeafNode { IsDeleted: true } => "deleted",
+        _ => null,
+    };
+
+    private static IReadOnlyList<ProductMove> MovesFor(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target) =>
+        dragged.All(n => n is ProductLeafNode)
+            ? ProductTree.MovesTo(target, dragged.Cast<ProductLeafNode>().Select(l => l.Product))
+            : [];
+
+    private async Task DropAsync(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target)
+    {
+        var moves = MovesFor(dragged, target);
+        if (moves.Count > 0)
+        {
+            await Commands.Run(ViewModel.MoveProductsCommand, moves);
+        }
+    }
+}

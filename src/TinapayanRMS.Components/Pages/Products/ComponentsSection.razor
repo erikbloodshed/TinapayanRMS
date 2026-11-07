@@ -1,0 +1,46 @@
+@* A composite product's Products tab (the WPF ComponentsSectionView): the products it holds and how many of each, each
+   bringing its recipe cost and, when ticked, its own packaging's too. *@
+<div class="section-view">
+    <div class="section-heading">
+        <p class="caption">@ViewModel.ComponentsCaption</p>
+        <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.ComponentsTable.ComponentsCost.ToString("N2")</span>
+    </div>
+
+    <LineGrid TRow="ProductComponentRow" Items="ViewModel.ComponentsTable.ComponentEdits" NewItem="ViewModel.ComponentsTable.NewComponentRow" IsBlank="r => r.IsBlank" @bind-SelectedItem="ViewModel.ComponentsTable.SelectedComponentEdit" Reorderable="true">
+        <Header>
+            <th>Product</th>
+            <th class="col-number col-qty">Qty</th>
+            <th class="col-number">Recipe Cost</th>
+            @if (ViewModel.EditingIncludesComponentPackaging)
+            {
+                <th class="col-number">Packaging Cost</th>
+            }
+            <th class="col-number">Cost</th>
+        </Header>
+        <Row Context="row">
+            <td>
+                <PickField TItem="Product" Items="ViewModel.ComponentsTable.ComponentProductOptions" TextField="Name" CssClass="cell-field" PopupWidth="420px"
+                           Value="row.Product" ValueChanged="p => row.ComponentProductId = p?.Id">
+                    <ItemTemplate Context="product"><span class="pick-columns"><span>@product.Name</span><span class="muted">@product.Category?.Name</span></span></ItemTemplate>
+                </PickField>
+            </td>
+            <td><NumberField TValue="int?" Value="row.Quantity" ValueChanged="v => row.Quantity = v" Format="N0" Min="0" CssClass="cell-field" /></td>
+            <td class="cell-number">@row.RecipeCost?.ToString("N2")</td>
+            @if (ViewModel.EditingIncludesComponentPackaging)
+            {
+                <td class="cell-number">@row.PackagingCost?.ToString("N2")</td>
+            }
+            <td class="cell-number">@row.Cost.ToString("N2")</td>
+        </Row>
+    </LineGrid>
+
+    <div class="lines-footer">
+        <SfCheckBox Label="Include each product's packaging" @bind-Checked="ViewModel.IsComponentPackagingTicked"
+                    title="Each product's own packaging, times how many of it go in, joins this product's Packaging on the Costing tab. Labor, overhead and administrative aren't charged on it." />
+        <CommandButton Command="ViewModel.RemoveComponentCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+}

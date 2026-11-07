@@ -8,7 +8,7 @@ using Syncfusion.UI.Xaml.Grid.Helpers;
 using Syncfusion.UI.Xaml.ScrollAxis;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Controls;
 
@@ -31,6 +31,8 @@ public class GridUndoStepsTests
     private sealed class SaveOffer(ObservableCollection<Line> lines, Button save) : IUndoRecorder
     {
         private bool _isEditPending;
+
+        public int FormVersion => 0;
 
         public bool IsEditPending
         {

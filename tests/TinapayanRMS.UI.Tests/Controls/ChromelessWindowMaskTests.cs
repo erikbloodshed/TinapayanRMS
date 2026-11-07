@@ -15,6 +15,7 @@ namespace TinapayanRMS.UI.Tests.Controls;
 /// A themed ChromelessWindow with UseNativeChrome, as MainWindow is: the Windows11 template masks its whole content, and
 /// ChromelessWindow applies the mask again whenever it updates the window region, as it does on every WM_SIZE.
 /// </summary>
+[NotInParallel(ChromelessWindowCollection.Name)]
 public class ChromelessWindowMaskTests
 {
     private const int WmSize = 0x0005;

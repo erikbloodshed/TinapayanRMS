@@ -1,0 +1,40 @@
+@* What a quantity of the material costs (the WPF UsageExampleCard): a quantity in any of its units, then Calculate, and
+   the buffered cost with its working underneath. *@
+<div class="tab-card narrow-card">
+    <h2 class="section-header">Usage Example</h2>
+
+    <div class="buffer-row">
+        <div class="field-stack">
+            <label class="field-label" for="rm-example-quantity">Use Quantity</label>
+            <NumberField ID="rm-example-quantity" TValue="decimal" @bind-Value="ViewModel.ExampleQuantity" Format="#,0.####" Min="0" />
+        </div>
+        <div class="field-stack">
+            <label class="field-label" for="rm-example-unit">Unit</label>
+            <PickField ID="rm-example-unit" TItem="RawMaterialUnitOption" Items="ViewModel.ExampleUnitOptions" TextField="Name" @bind-Value="ViewModel.ExampleUnit" />
+        </div>
+        <div class="field-stack field-stack-button">
+            <CommandButton Command="ViewModel.CalculateExampleCommand" Glyph="@Glyphs.Calculate" Label="Calculate" Primary="true" />
+        </div>
+    </div>
+
+    @if (ViewModel.ExampleResult is { } result)
+    {
+        <div class="example-result">
+            <div class="example-title">@result.Title</div>
+            <div class="example-total">@result.BufferedTotalCost.ToString("N2")</div>
+            <div class="caption">Buffered cost, with a @result.BufferPercent.ToString("0.##")% buffer</div>
+        </div>
+        <div class="example-breakdown">
+            <div class="breakdown-heading">Breakdown</div>
+            <div class="breakdown-line"><span class="caption">Quantity in base unit</span><span>@result.QuantityInBaseUnits.ToString("#,0.####") @result.BaseUnitAbbreviation</span></div>
+            <div class="breakdown-line"><span class="caption">Cost per base unit</span><span>@result.CostPerBaseUnit.ToString("N4")</span></div>
+            <div class="breakdown-line"><span class="caption">Calculated cost</span><span>@result.TotalCost.ToString("N2")</span></div>
+            <div class="breakdown-line"><span class="caption">Buffer</span><span>@result.BufferPercent.ToString("0.##")%</span></div>
+            <div class="breakdown-line breakdown-total"><span class="caption">Buffered cost</span><span>@result.BufferedTotalCost.ToString("N2")</span></div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+}

@@ -1,0 +1,34 @@
+@* The navigation menu, as the WPF navigation drawer listed the screens, with its glyphs (Segoe Fluent Icons), then
+   Settings. Print isn't listed: Products' Print opens it, as the WPF Print tab only showed when asked for. *@
+<nav class="nav-menu">
+    <div class="nav-section">NAVIGATE</div>
+    @foreach (var item in Items)
+    {
+        <NavLink class="nav-item" href="@item.Href" Match="NavLinkMatch.Prefix" @onclick="Navigated">
+            <span class="glyph" aria-hidden="true">@item.Glyph</span>
+            <span>@item.Label</span>
+        </NavLink>
+    }
+
+    <div class="nav-separator"></div>
+    <NavLink class="nav-item" href="settings" Match="NavLinkMatch.Prefix" @onclick="Navigated">
+        <span class="glyph" aria-hidden="true">&#xE713;</span>
+        <span>Settings</span>
+    </NavLink>
+</nav>
+
+@code {
+    /// <summary>Raised when a link is followed, so the floating menu can close.</summary>
+    [Parameter] public EventCallback Navigated { get; set; }
+
+    private sealed record NavItem(string Label, string Glyph, string Href);
+
+    private static readonly NavItem[] Items =
+    [
+        new("Raw Materials", "", "raw-materials"),
+        new("Sub-Assemblies", "", "sub-assemblies"),
+        new("Products", "", "products"),
+        new("Reports", "", "reports"),
+        new("Price Simulator", "", "price-simulator"),
+    ];
+}

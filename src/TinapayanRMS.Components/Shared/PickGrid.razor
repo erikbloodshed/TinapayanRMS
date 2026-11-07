@@ -1,0 +1,90 @@
+@typeparam TItem where TItem : class
+
+@* A list of records to pick one from, as the WPF screens' read-only SfDataGrids were: single row selection, kept in step
+   with a ViewModel's Selected… property both ways. A pick in the grid sets it; the ViewModel clearing it (New, Save,
+   Delete) clears the grid's highlight, and the ViewModel pointing it at a record (after a load, or a refresh) highlights
+   that row. Columns must include the item's key with IsPrimaryKey, so a refresh keeps the right row picked. *@
+<SfGrid @ref="_grid" TValue="TItem" DataSource="DataSource" GridLines="GridLine.Both" Height="@Height" Width="100%" RowHeight="24" EnableHover="true">
+    <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Single" EnableToggle="false" />
+    <GridEvents TValue="TItem" RowSelected="OnRowSelected" DataBound="OnDataBound" />
+    <GridColumns>
+        @Columns
+    </GridColumns>
+</SfGrid>
+
+@code {
+    private SfGrid<TItem>? _grid;
+
+    // What the grid last showed as picked, so a change coming from the ViewModel can be told from one the grid made.
+    private TItem? _shown;
+    private bool _syncPending;
+
+    [Parameter, EditorRequired] public IEnumerable<TItem> DataSource { get; set; } = [];
+
+    [Parameter] public TItem? SelectedItem { get; set; }
+
+    [Parameter] public EventCallback<TItem?> SelectedItemChanged { get; set; }
+
+    [Parameter, EditorRequired] public RenderFragment Columns { get; set; } = null!;
+
+    [Parameter] public string Height { get; set; } = "100%";
+
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(SelectedItem, _shown))
+        {
+            _syncPending = true;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_syncPending)
+        {
+            await SyncSelectionAsync();
+        }
+    }
+
+    private async Task OnDataBound(object args)
+    {
+        // The rows were drawn again (a refresh), which drops the highlight: put it back on the picked record.
+        if (SelectedItem is not null)
+        {
+            _syncPending = true;
+            await SyncSelectionAsync();
+        }
+    }
+
+    private async Task SyncSelectionAsync()
+    {
+        if (_grid is null)
+        {
+            return;
+        }
+
+        _syncPending = false;
+        _shown = SelectedItem;
+        if (SelectedItem is null)
+        {
+            await _grid.ClearSelectionAsync();
+            return;
+        }
+
+        var index = DataSource.Select((item, i) => (item, i)).FirstOrDefault(x => ReferenceEquals(x.item, SelectedItem)).i;
+        if (index >= 0 && DataSource.Skip(index).FirstOrDefault() is { } found && ReferenceEquals(found, SelectedItem))
+        {
+            await _grid.SelectRowAsync(index);
+        }
+    }
+
+    private async Task OnRowSelected(RowSelectEventArgs<TItem> args)
+    {
+        if (args.Data is null || ReferenceEquals(args.Data, _shown))
+        {
+            return;
+        }
+
+        _shown = args.Data;
+        await SelectedItemChanged.InvokeAsync(args.Data);
+    }
+}

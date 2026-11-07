@@ -7,7 +7,7 @@ using System.Windows.Markup;
 using System.Windows.Xps;
 using Serilog;
 using Syncfusion.Windows.Shared.Printing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Printing;
 

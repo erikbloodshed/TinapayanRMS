@@ -1,5 +1,5 @@
 using TinapayanRMS.Infrastructure.Services;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.UI;

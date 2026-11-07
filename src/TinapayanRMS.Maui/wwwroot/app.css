@@ -1,0 +1,834 @@
+/* TinapayanRMS, on Syncfusion's Fluent 2 theme recoloured with the WPF app's palette (Catppuccin Latte, Sky accent). */
+
+:root {
+    /* Latte Sky, with its dark ink for text on it: white on Sky is only 2.8:1. */
+    --color-sf-primary: #04a5e5;
+    --color-sf-primary-text-color: #013245;
+    --color-sf-primary-light: #d8e9f3;
+    --color-sf-primary-lighter: #e8f4fa;
+    --color-sf-primary-dark: #036b95;
+    --color-sf-primary-darker: #013245;
+    --color-sf-primary-bg-color-hover: #0395ce;
+    --color-sf-primary-bg-color-pressed: #0385b8;
+    --color-sf-primary-bg-color-selected: #0385b8;
+
+    --page-background: #e6e9ef;   /* Latte Mantle */
+    --card-background: #eff1f5;   /* Latte Base */
+    --card-border: #dce0e8;       /* Latte Crust */
+    --heading-foreground: #4c4f69; /* Latte Text */
+    --muted-foreground: #5c5f77;  /* Latte Subtext 1 */
+    --accent-foreground: #036b95; /* Latte Sky, deep */
+    --accent-soft: #d8e9f3;       /* Latte Sky, tint */
+    /* The WPF app's icons (its IconFontFamily), at the same code points (Shared/Glyphs.cs). */
+    --icon-font: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+
+    /* How tall a button, a box, a picker and a table's row and heading are ("Control heights" below). */
+    --control-height: 24px;
+}
+
+html, body {
+    margin: 0;
+    height: 100%;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    color: var(--heading-foreground);
+    background: var(--page-background);
+}
+
+.glyph {
+    font-family: var(--icon-font);
+    font-style: normal;
+    line-height: 1;
+}
+
+.muted {
+    color: var(--muted-foreground);
+}
+
+/* The shell: the title bar, then the screen, with the menu floating over the screen when summoned. */
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* The window's title bar, which the page draws (Layout/TitleBar.razor), as the WPF window's ChromelessWindow draws its
+   own (MainWindow.xaml): 32px in the card colour, the menu toggle and the heading on the left, and on the right glyph
+   buttons 40×32, with the theme's faint wash on hover, Close red. Windows drags the rest of the bar (IAppWindow). */
+.app-titlebar {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    background: var(--card-background);
+    flex: none;
+    user-select: none;
+}
+
+.app-heading {
+    margin-left: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.titlebar-fill {
+    flex: 1;
+    min-width: 8px;
+}
+
+.titlebar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 40px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--heading-foreground);
+    font-size: 14px;
+}
+
+.titlebar-button:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.titlebar-button:active:not(:disabled) {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.titlebar-button:disabled {
+    color: var(--muted-foreground);
+    opacity: 0.4;
+}
+
+.titlebar-button:focus-visible {
+    outline: 2px solid var(--color-sf-primary);
+    outline-offset: -2px;
+}
+
+/* Find, Back and Forward, at the WPF title bar's 12px. */
+.titlebar-small-glyph .glyph {
+    font-size: 12px;
+}
+
+.caption-buttons {
+    display: flex;
+    margin-left: 4px;
+}
+
+.caption-button .glyph {
+    font-size: 10px;
+}
+
+.caption-close:hover:not(:disabled) {
+    background: #c42b1c;
+    color: #fff;
+}
+
+.caption-close:active:not(:disabled) {
+    background: #c83c31;
+    color: #fff;
+}
+
+.app-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.app-screen {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* The screens' tabs, a darker strip under the header: the tab showing is the page's colour, so it joins the screen
+   below it, under a line of the accent. */
+
+.screen-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 4px 4px 0;
+    background: var(--card-border);
+    overflow-x: auto;
+    flex: none;
+}
+
+.screen-tab {
+    display: flex;
+    align-items: center;
+    border-top: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+
+.screen-tab:hover {
+    background: var(--card-background);
+}
+
+.screen-tab.active {
+    background: var(--page-background);
+    border-top-color: var(--color-sf-primary);
+    color: var(--heading-foreground);
+}
+
+.screen-tab-link {
+    padding: 5px 6px 7px 14px;
+    color: inherit;
+    text-decoration: none;
+}
+
+/* The only tab left has no ✕ to make room for. */
+.screen-tab-link:last-child {
+    padding-right: 14px;
+}
+
+.screen-tab-close {
+    display: flex;
+    margin-right: 6px;
+    padding: 4px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.55;
+}
+
+.screen-tab-close:hover,
+.screen-tab-close:focus-visible {
+    background: rgba(76, 79, 105, 0.14);
+    opacity: 1;
+}
+
+.app-page {
+    flex: 1;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 4px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.app-nav.e-sidebar {
+    background: var(--card-background);
+    border-right: 1px solid var(--card-border);
+    box-shadow: 4px 0 16px rgba(76, 79, 105, 0.18);
+}
+
+.nav-menu {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+}
+
+.nav-section {
+    padding: 8px 12px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--muted-foreground);
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: var(--heading-foreground);
+    text-decoration: none;
+}
+
+.nav-item .glyph {
+    font-size: 16px;
+    width: 20px;
+}
+
+.nav-item:hover {
+    background: var(--card-border);
+}
+
+.nav-item.active {
+    background: var(--accent-soft);
+    color: var(--accent-foreground);
+    font-weight: 600;
+}
+
+.nav-item-pending {
+    color: var(--muted-foreground);
+    opacity: 0.55;
+    cursor: default;
+}
+
+.nav-item-pending:hover {
+    background: none;
+}
+
+.nav-separator {
+    height: 1px;
+    margin: 8px 4px;
+    background: var(--card-border);
+}
+
+/* Cards, as the WPF CardStyle: rounded, bordered, on the page's darker background. */
+
+.card {
+    background: var(--card-background);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.section-header {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--heading-foreground);
+}
+
+.home-card {
+    max-width: 640px;
+}
+
+/* A list beside a 320px form, as the Settings tabs lay out. */
+
+.list-and-form {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
+    align-items: start;
+    height: 100%;
+}
+
+.list-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.list-card .e-grid {
+    flex: 1;
+    min-height: 0;
+}
+
+.form-row {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.form-label {
+    color: var(--muted-foreground);
+}
+
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
+.button-row .glyph {
+    margin-right: 4px;
+}
+
+/* The Settings tabs, a strip of links over the tab's content. */
+
+.settings-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    background: var(--card-background);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    flex: none;
+}
+
+.settings-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    color: var(--heading-foreground);
+    text-decoration: none;
+}
+
+.settings-tab:hover {
+    background: var(--card-border);
+}
+
+.settings-tab.active {
+    background: var(--accent-soft);
+    color: var(--accent-foreground);
+    font-weight: 600;
+}
+
+.settings-tab-pending {
+    color: var(--muted-foreground);
+    opacity: 0.55;
+    cursor: default;
+}
+
+.settings-tab-pending:hover {
+    background: none;
+}
+
+/* Find (Ctrl+K): its box over the matches, which scroll under it. */
+
+.find-dialog .find-query {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+.find-results {
+    max-height: 360px;
+    overflow: auto;
+}
+
+.find-results tbody tr {
+    cursor: pointer;
+}
+
+.find-results tbody tr.selected {
+    background: var(--accent-soft);
+}
+
+.find-results .col-kind {
+    width: 140px;
+}
+
+.find-results .col-group {
+    width: 170px;
+}
+
+/* A banner's message kept as its lines have it: the backups' warning says what's wrong, then what to do. */
+.app-banner-text span:last-child {
+    white-space: pre-line;
+}
+
+/* The confirmation dialog's message, beside a warning sign. */
+
+.confirm-message {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.confirm-glyph {
+    font-size: 24px;
+    color: #df8e1d; /* Latte Yellow */
+}
+
+/* "Save the changes to Pandesal?", then a blank line, then what each answer does. */
+.confirm-text {
+    white-space: pre-line;
+}
+
+/* Blazor's own error bar, for a failure no screen caught. */
+
+#blazor-error-ui {
+    background: #fdf3f4;
+    border-top: 1px solid #d20f39;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+.form-extra {
+    margin-top: 8px;
+}
+
+/* A warning for the whole app, under the header: the database missing updates. */
+
+.app-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #fdf6e3;
+    border-bottom: 1px solid #df8e1d;
+    color: #4c4f69;
+    flex: none;
+}
+
+.app-banner .glyph {
+    color: #df8e1d;
+    font-size: 16px;
+}
+
+/* Cards of their own width that wrap in a narrow window (Costing Defaults). */
+
+.card-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.fixed-card {
+    width: 440px;
+}
+
+.caption {
+    margin: -4px 0 12px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.card-header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.form-field {
+    min-width: 0;
+}
+
+.form-row .form-label {
+    white-space: nowrap;
+}
+
+.read-only-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.icon-only .glyph {
+    margin-right: 0;
+}
+
+.e-btn .glyph {
+    font-size: 14px;
+    vertical-align: -2px;
+}
+
+.e-btn .glyph + .command-label {
+    margin-left: 6px;
+}
+
+/* ---- Control heights: a button, a box, a picker and a table's row and heading are all --control-height tall, where the
+   theme's are 32px. Each is given the height itself, not padding that adds up to it: at a display scale other than 100%
+   a 1px border is drawn thinner (0.8px at 125%), and the sum came out short. A LineGrid's rows are sized in
+   record-screens.css, and an SfGrid's by its RowHeight. ---- */
+
+/* A button of any kind: the theme padded an icon's, a drop-down's and a small one each differently. A <button> centres
+   what it holds; a link drawn as a button (the header's Change Password) is told to. */
+.e-btn,
+.e-css.e-btn,
+.e-btn.e-icon-btn,
+.e-css.e-btn.e-icon-btn,
+.e-btn.e-small,
+.e-css.e-btn.e-small {
+    box-sizing: border-box;
+    height: var(--control-height);
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+a.e-btn {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* A dialog's ✕, which the theme makes a 32px square. */
+.e-dialog .e-dlg-header-content .e-btn.e-dlg-closeicon-btn {
+    width: var(--control-height);
+    height: var(--control-height);
+    padding: 0;
+}
+
+/* A box or a picker, its input filling it inside the border. A box on its own (the account pages') is the input. */
+input.e-input {
+    height: var(--control-height);
+}
+
+.e-input-group,
+.e-input-group.e-control-wrapper {
+    box-sizing: border-box;
+    height: var(--control-height);
+}
+
+.e-input-group input,
+.e-input-group.e-control-wrapper input,
+.e-input-group input.e-input,
+.e-input-group.e-control-wrapper input.e-input {
+    height: 100%;
+}
+
+/* A picker's arrow and a box's clear and calendar buttons, which held the box at the theme's height. */
+.e-input-group .e-input-group-icon,
+.e-input-group.e-control-wrapper .e-input-group-icon,
+.e-input-group .e-clear-icon,
+.e-input-group.e-control-wrapper .e-clear-icon,
+.e-input-group-icon.e-date-icon,
+.e-control-wrapper .e-input-group-icon.e-date-icon {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* A grid's heading row, as tall as its rows (RowHeight). */
+.e-grid .e-gridheader .e-headercell,
+.e-grid .e-gridheader .e-detailheadercell {
+    height: var(--control-height);
+}
+
+.busy-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted-foreground);
+}
+
+.busy-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--card-border);
+    border-top-color: var(--color-sf-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.number-box input {
+    text-align: right;
+}
+
+/* A grid that fills its card: its heading stays put and its rows scroll under it. Syncfusion sizes the rows' scroller
+   from the Height it's given, which a percentage of a flex item doesn't settle, so the grid is laid out as a column. */
+.list-card .e-grid,
+.report .e-grid {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    height: auto !important;
+}
+
+.list-card .e-grid > .e-gridheader,
+.report .e-grid > .e-gridheader {
+    flex: none;
+}
+
+.list-card .e-grid > .e-gridcontent,
+.report .e-grid > .e-gridcontent {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+
+.list-card .e-grid > .e-gridcontent > .e-content,
+.report .e-grid > .e-gridcontent > .e-content {
+    flex: 1;
+    height: auto !important;
+    overflow: auto !important;
+}
+
+/* The toasts, as the WPF ErrorToast and SuccessToast were coloured: a red edge for what went wrong, green for what was done. */
+.e-toast-container .e-toast {
+    background: #fff;
+    color: var(--heading-foreground);
+    border: 1px solid var(--card-border);
+    border-left-width: 4px;
+    box-shadow: 0 4px 16px rgba(76, 79, 105, 0.22);
+}
+
+.e-toast-container.e-toast-danger .e-toast,
+.e-toast-container .e-toast.e-toast-danger {
+    border-left-color: #d20f39;
+    background: #fdf3f4;
+}
+
+.e-toast-container.e-toast-success .e-toast,
+.e-toast-container .e-toast.e-toast-success {
+    border-left-color: #40a02b;
+    background: #f1faf1;
+}
+
+.e-toast-container .e-toast .e-toast-message,
+.e-toast-container .e-toast .e-toast-content {
+    color: var(--heading-foreground);
+}
+
+/* ---- The Vim keys (Settings → Keyboard; wwwroot/vim.js). ---- */
+
+/* NORMAL or INSERT, on the title bar before Find, as the WPF window shows it. */
+.vim-mode {
+    margin-right: 6px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--heading-foreground);
+    background: var(--accent-soft);
+    border: 1px solid var(--card-border);
+}
+
+.vim-mode.vim-insert {
+    color: #fff;
+    background: #40a02b;
+    border-color: #40a02b;
+}
+
+/* f: a label on everything that can be clicked. */
+.vim-hints {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    pointer-events: none;
+}
+
+.vim-hint {
+    position: absolute;
+    padding: 0 4px;
+    border: 1px solid #c38a22;
+    border-radius: 3px;
+    font: 700 11px/15px Consolas, "Cascadia Mono", monospace;
+    text-transform: uppercase;
+    color: #302505;
+    background: linear-gradient(#fff785, #ffc542);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vim-hint b {
+    color: #d4ac3a;
+}
+
+/* The command line along the bottom, and what a command had to say. */
+.vim-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20001;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 12px;
+    font: 14px/22px Consolas, "Cascadia Mono", monospace;
+    color: var(--heading-foreground);
+    background: var(--card-background);
+    border-top: 1px solid var(--card-border);
+    box-shadow: 0 -2px 10px rgba(76, 79, 105, 0.18);
+}
+
+.vim-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+}
+
+.vim-flash {
+    color: #8c0f2c;
+    background: #fdf3f4;
+}
+
+/* ?: the keys for wherever the cursor is. */
+.vim-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 20002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(76, 79, 105, 0.35);
+}
+
+.vim-sheet-card {
+    max-width: min(1100px, 94vw);
+    max-height: 90vh;
+    overflow: auto;
+    padding: 16px 22px;
+    border-radius: 8px;
+    background: var(--card-background);
+    box-shadow: 0 8px 30px rgba(76, 79, 105, 0.35);
+}
+
+.vim-sheet-card h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+.vim-sheet-card h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--muted-foreground);
+}
+
+.vim-sheet-columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.vim-sheet-card dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 12px;
+    margin: 0;
+    font-size: 12.5px;
+}
+
+.vim-sheet-card dt {
+    font: 700 12px/18px Consolas, "Cascadia Mono", monospace;
+    white-space: nowrap;
+}
+
+.vim-sheet-card dd {
+    margin: 0;
+}
+
+.vim-sheet-card p {
+    margin: 10px 0 0;
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
+
+/* The Vim keys' sum (Ctrl+R =): why it can't be worked out, beside it. */
+.vim-sum .vim-sum-error {
+    margin-left: 12px;
+    color: #d20f39; /* Latte Red */
+}

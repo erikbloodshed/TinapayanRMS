@@ -1,7 +1,7 @@
 using System.Collections;
 using Syncfusion.UI.Xaml.Grid;
 using TinapayanRMS.Pricing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Controls;
 

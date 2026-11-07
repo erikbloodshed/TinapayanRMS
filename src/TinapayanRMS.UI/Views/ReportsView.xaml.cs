@@ -3,7 +3,7 @@ using System.Windows.Threading;
 using Syncfusion.UI.Xaml.Grid;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.Exporting;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 

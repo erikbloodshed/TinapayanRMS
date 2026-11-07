@@ -1,0 +1,139 @@
+@page "/raw-materials"
+@page "/raw-materials/{Id:int}"
+@inherits ScreenBase<RawMaterialsViewModel>
+@inject NavigationManager Navigation
+@inject Prompts Prompts
+@inject IJSRuntime JS
+
+<PageTitle>@(ViewModel!.SelectedRawMaterial?.Name ?? "Raw Materials") · TinapayanRMS</PageTitle>
+
+<UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
+
+@* The list beside the picked material: its header, then its cards in tabs along the bottom, as the WPF screen laid them
+   out. Every tab is part of the one form Save writes. Price History only applies to a saved purchased material. Between
+   picking a material and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each material has its own
+   address, so the browser's Back and Forward step between the materials opened. *@
+<CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
+    <div class="record-screen">
+        <MaterialList ViewModel="ViewModel!" />
+
+        <div class="record-details">
+            <SummaryHeader ViewModel="ViewModel!" />
+
+            <section class="card tabs-card @(ViewModel!.AreDetailsReady ? "" : "details-pending")">
+                <SfTab @bind-SelectedItem="ViewModel!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+                    <TabItems>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Cost Setup" /></ChildContent>
+                            <ContentTemplate>
+                                @if (ViewModel!.ShowPurchaseSetup)
+                                {
+                                    <PurchaseCostSetup ViewModel="ViewModel!" />
+                                }
+                                @if (ViewModel!.IsEditingMade)
+                                {
+                                    <BillOfMaterials ViewModel="ViewModel!" />
+                                }
+                                @if (ViewModel!.IsEditingLinked)
+                                {
+                                    <LinkedCost ViewModel="ViewModel!" />
+                                }
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Alternative Units" /></ChildContent>
+                            <ContentTemplate><AlternativeUnits ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Usage Example" /></ChildContent>
+                            <ContentTemplate><UsageExample ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                        <TabItem>
+                            <ChildContent><TabHeader Text="Used By" /></ChildContent>
+                            <ContentTemplate>
+                                <div class="tab-card">
+                                    <h2 class="section-header">Used By</h2>
+                                    <UsedByTiles Products="ViewModel!.UsedBy" Caption="@ViewModel!.UsedByText" Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" />
+                                </div>
+                            </ContentTemplate>
+                        </TabItem>
+                        <TabItem Visible="ViewModel!.ShowPriceHistory">
+                            <ChildContent><TabHeader Text="Price History" /></ChildContent>
+                            <ContentTemplate><PriceHistory ViewModel="ViewModel!" /></ContentTemplate>
+                        </TabItem>
+                    </TabItems>
+                </SfTab>
+            </section>
+        </div>
+    </div>
+</CascadingValue>
+
+@code {
+    /// <summary>The material in the address, opened as picking it in the list would.</summary>
+    [Parameter] public int? Id { get; set; }
+
+    /// <summary>The address last acted on: its material is opened once, not each time the screen is given it again.</summary>
+    private int? _addressOpened;
+
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var viewModel = ViewModel!;
+
+        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
+        AddSubscription(viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
+
+        // A name asked for by the list's menu: a material's new name, or a category's.
+        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
+
+        // New clears the form, as New … Here does: the cursor goes to Name, so typing can start straight away.
+        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.NewMaterialInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+
+        // The material in the address is the load's to open, at its end: the list is fresh only then. New clicked
+        // meanwhile is the later word.
+        _addressOpened = Id;
+        if (Id is { } id && viewModel.SelectedRawMaterial?.Id != id)
+        {
+            viewModel.OpenRawMaterialOnLoad(id);
+        }
+    }
+
+    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
+    // called for too, once the load is back: New clicked before then would have the material load over it.
+    protected override void OnParametersSet()
+    {
+        if (Id == _addressOpened)
+        {
+            return;
+        }
+
+        _addressOpened = Id;
+        if (Id is { } id && ViewModel!.SelectedRawMaterial?.Id != id)
+        {
+            ViewModel.OpenRawMaterial(id);
+        }
+    }
+
+    // The material picked goes into the address, so Back returns to the one before.
+    protected override void OnViewModelChanged(string? propertyName)
+    {
+        if (propertyName == nameof(RawMaterialsViewModel.SelectedRawMaterial)
+            && ViewModel!.SelectedRawMaterial is { Id: > 0 } material && material.Id != Id)
+        {
+            _ = InvokeAsync(() => MoveAddressTo($"raw-materials/{material.Id}"));
+        }
+    }
+
+    protected override bool IsOwnAddress(string path) => path.StartsWith("raw-materials", StringComparison.OrdinalIgnoreCase);
+
+    private async Task FocusNameAsync()
+    {
+        await RedrawNowAsync();
+        await JS.InvokeVoidAsync("tinapayan.focus", "rm-name");
+    }
+}

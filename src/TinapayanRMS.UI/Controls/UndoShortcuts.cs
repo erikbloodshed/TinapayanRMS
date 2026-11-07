@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using Syncfusion.UI.Xaml.Grid;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Controls;
 

@@ -1,0 +1,23 @@
+@* A saved purchased material's prices over time (the WPF PriceHistoryCard), newest first, each worked out per base unit. *@
+<div class="tab-card tab-card-fill">
+    <h2 class="section-header">Price History</h2>
+    <PickGrid TItem="RawMaterialPriceRow" DataSource="ViewModel.PriceHistory" @bind-SelectedItem="ViewModel.SelectedPriceRow">
+        <Columns>
+            <GridColumn Field="Entry.Id" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field="@nameof(RawMaterialPriceRow.Date)" HeaderText="Date" Width="130">
+                <Template Context="cell">@(((RawMaterialPriceRow)cell).Date.ToString("MMM d, yyyy"))</Template>
+            </GridColumn>
+            <GridColumn Field="@nameof(RawMaterialPriceRow.Brand)" HeaderText="Brand" />
+            <GridColumn Field="@nameof(RawMaterialPriceRow.UnitName)" HeaderText="Unit" />
+            <GridColumn Field="@nameof(RawMaterialPriceRow.Price)" HeaderText="Price" Format="N2" TextAlign="TextAlign.Right" Width="120" />
+            <GridColumn Field="@nameof(RawMaterialPriceRow.CostPerBaseUnit)" HeaderText="Cost / Base Unit" Format="N4" TextAlign="TextAlign.Right" Width="150" />
+        </Columns>
+    </PickGrid>
+    <div class="button-row align-right form-extra">
+        <CommandButton Command="ViewModel.DeletePriceCommand" Glyph="@Glyphs.Delete" Label="Delete Price" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+}

@@ -1,0 +1,8 @@
+@page "/settings"
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+
+    // Settings opens on its first tab, as the WPF Settings dialog did.
+    protected override void OnInitialized() => Navigation.NavigateTo("settings/units-of-measure", replace: true);
+}

@@ -1,0 +1,108 @@
+@* The picked product's header (the WPF ProductHeaderCard and ProductDetailsCard): its name, with a tag while its costs
+   show unbuffered and one saying where a new product will be filed; New (a product, or from its arrow a composite),
+   Save, Undo, Redo, Revert, Print, the Buffered/Unbuffered switch and Delete; its figures in coloured tiles; then what's
+   typed in about it on one row. A composite has no Quantity Required: it's one unit of the products it holds. *@
+<section class="card header-card">
+    <div class="header-title-row">
+        <div class="header-title-group">
+            @if (ViewModel.IsUnbuffered)
+            {
+                <span class="badge badge-warning" title="Every cost on this screen is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
+            }
+            @if (ViewModel.BelowCostText is { } belowCost)
+            {
+                <span class="badge badge-warning" title="@belowCost">Priced below cost</span>
+            }
+            @if (ViewModel.NewProductTag is { } tag)
+            {
+                <span class="badge badge-warning" title="Where Save files this new product in the Products list: Research and Development after New, or the folder New Product Here was picked on.">@tag</span>
+            }
+            <h1 class="header-title">@ViewModel.HeaderTitle</h1>
+        </div>
+        <div class="button-row">
+            <div class="split-button">
+                <CommandButton Command="ViewModel.NewCommand" Glyph="@Glyphs.Add" Label="New" Tooltip="A new product. The arrow offers a composite product, made of other products, too." />
+                <MenuButton CssClass="split-arrow" Tooltip="New product, or new composite product">
+                    <CommandButton Command="ViewModel.NewCommand" Glyph="@Glyphs.Add" Label="New product" Flat="true"
+                                  Tooltip="A product made of sub-assemblies: its recipe, its packaging and its costing." />
+                    <CommandButton Command="ViewModel.NewCompositeCommand" Glyph="@Glyphs.Composite" Label="New composite product" Flat="true"
+                                  Tooltip="A product made of two or more other products, such as a Pasalubong Box, with its own packaging and any topping or filling over the whole. Each product brings its recipe cost." />
+                </MenuButton>
+            </div>
+            <CommandButton Command="ViewModel.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" Tooltip="Saves the details, recipe, packaging and costing together." />
+            <CommandButton Command="ViewModel.UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed, a sub-assembly put in. Ctrl+Z." />
+            <CommandButton Command="ViewModel.RedoCommand" Glyph="@Glyphs.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+            <CommandButton Command="ViewModel.RevertCommand" Glyph="@Glyphs.Cancel" Label="Revert"
+                           Tooltip="Puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited." />
+            <CommandButton Command="ViewModel.PrintCommand" Glyph="@Glyphs.Print" Label="Print"
+                           Tooltip="Opens the Print screen, which previews and prints this product's recipe and costing as this screen shows them. On the Scaling tab, it prints the recipe scaled instead." />
+            <CommandButton Command="ViewModel.ToggleCostBasisCommand" Glyph="@Glyphs.Calculate" Label="@ViewModel.CostBasisButtonLabel" Tooltip="@ViewModel.CostBasisButtonTooltip" />
+            <CommandButton Command="ViewModel.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <div class="figure-tiles">
+        <div class="figure-tile tile-peach" title="@ViewModel.MaterialCostTooltip">
+            <div class="figure-label">Material Cost</div>
+            <div class="figure-value">@ViewModel.Costing.Costs.Material.ToString("N2")</div>
+        </div>
+        <div class="figure-tile tile-pink" title="@($"{ViewModel.CostUnitCaption}: the material cost with labor, overhead and administrative on top, before markup and VAT")">
+            <div class="figure-label">Base Cost</div>
+            <div class="figure-value">@ViewModel.Costing.Costs.BaseCost.ToString("N2")</div>
+        </div>
+        <div class="figure-tile tile-sky" title="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now")">
+            <div class="figure-label">Current Price</div>
+            <div class="figure-value">@(ViewModel.EditingCurrentPrice?.ToString("N2") ?? "—")</div>
+        </div>
+        <div class="figure-tile tile-green" title="What the current price earns on the base cost, VAT taken out: the costing's Markup % at that price">
+            <div class="figure-label">Markup %</div>
+            <div class="figure-value @(ViewModel.Costing.Costs.IsCurrentPriceBelowCost ? "figure-error" : ViewModel.Costing.Costs.IsBelowTargetMarkup ? "figure-warning" : "")"
+                 title="@(ViewModel.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : ViewModel.Costing.Costs.IsBelowTargetMarkup ? "Less than the Markup Metric on the Costing tab." : null)">@(ViewModel.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
+        </div>
+        <div class="figure-tile tile-mauve" title="@ViewModel.LastUpdatedText">
+            <div class="figure-label">Last Updated</div>
+            <div class="figure-value">@ViewModel.LastUpdatedText</div>
+        </div>
+    </div>
+
+    <div class="header-fields">
+        <label class="form-label" for="product-name">Product Name</label>
+        <TextField ID="product-name" @bind-Value="ViewModel.EditingName" CssClass="field-wide" />
+
+        <label class="form-label" for="product-category">Category</label>
+        <PickField ID="product-category" TItem="ProductCategory" Items="ViewModel.Categories" TextField="Name"
+                   Value="ViewModel.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true"
+                   OnArrive="ArriveAtCategory" OnTyped="t => ViewModel.CategorySearchText = t" OnLeave="ViewModel.CommitCategoryTextAsync"
+                   Tooltip="What the Products list groups it under. Pick a category, or type a new one's name to add it." />
+
+        @if (ViewModel.IsEditingSingle)
+        {
+            <label class="form-label" for="product-quantity" title="How many finished pieces make one sellable unit. 1 for a product sold by the piece.">Quantity Required</label>
+            <NumberField ID="product-quantity" TValue="int" @bind-Value="ViewModel.EditingQuantityRequired" Format="N0" Min="1" CssClass="field-narrow"
+                         Tooltip="How many finished pieces make one sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The recipe stays per piece; the costing multiplies by this." />
+        }
+
+        <label class="form-label" for="product-price" title="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>
+        <NumberField ID="product-price" TValue="decimal?" @bind-Value="ViewModel.EditingCurrentPrice" Format="N2" Min="0" CssClass="field-medium"
+                     Tooltip="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now. The Markup % in the header shows what it earns.")" />
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    // The picker's text, as the WPF ComboBoxAdv's Text binding kept it; settled once the picker is left.
+    private void ArriveAtCategory()
+    {
+        ViewModel.CategorySearchText = ViewModel.EditingCategory?.Name ?? "";
+        ViewModel.BeginCategoryEdit();
+    }
+
+    private void PickCategory(ProductCategory? category)
+    {
+        ViewModel.EditingCategory = category;
+        ViewModel.CategorySearchText = category?.Name ?? "";
+    }
+}

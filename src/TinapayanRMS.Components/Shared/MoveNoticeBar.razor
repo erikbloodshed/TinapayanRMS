@@ -1,0 +1,62 @@
+@implements IDisposable
+
+@* What the last move in a list did ("Moved Flour to Ingredients › Dry Goods"), under the tree, with Undo beside it, as the
+   WPF lists' notice bars were: a drag or Move To saves at once, so this is where one made by mistake is taken back. It
+   hides itself 8 seconds on, unless the mouse is over it (it may be on its way to Undo). *@
+@if (Notice is not null)
+{
+    <div class="move-notice" @onmouseenter="() => _hovered = true" @onmouseleave="() => _hovered = false">
+        <span class="move-notice-text">@Notice</span>
+        <CommandButton Command="UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" />
+        <CommandButton Command="DismissCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Close" />
+    </div>
+}
+
+@code {
+    private static readonly TimeSpan ShownFor = TimeSpan.FromSeconds(8);
+    private string? _timed;
+    private bool _hovered;
+    private CancellationTokenSource? _timer;
+
+    [Parameter] public string? Notice { get; set; }
+
+    [Parameter, EditorRequired] public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; set; } = null!;
+
+    [Parameter, EditorRequired] public ReactiveCommand<RxVoid, RxVoid> DismissCommand { get; set; } = null!;
+
+    protected override void OnParametersSet()
+    {
+        if (Notice == _timed)
+        {
+            return;
+        }
+
+        _timed = Notice;
+        _timer?.Cancel();
+        if (Notice is not null)
+        {
+            var timer = _timer = new CancellationTokenSource();
+            _ = HideLaterAsync(timer.Token);
+        }
+    }
+
+    private async Task HideLaterAsync(CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(ShownFor, cancellation);
+            while (_hovered)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
+            }
+
+            await InvokeAsync(() => Commands.Run(DismissCommand));
+        }
+        catch (TaskCanceledException)
+        {
+            // A newer notice, or the list went.
+        }
+    }
+
+    public void Dispose() => _timer?.Cancel();
+}

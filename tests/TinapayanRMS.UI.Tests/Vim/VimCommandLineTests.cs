@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.UI.Vim;
 
 namespace TinapayanRMS.UI.Tests.Vim;

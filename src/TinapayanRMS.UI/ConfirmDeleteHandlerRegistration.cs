@@ -1,6 +1,6 @@
 using System.Reactive.Disposables;
 using System.Windows;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI;
 

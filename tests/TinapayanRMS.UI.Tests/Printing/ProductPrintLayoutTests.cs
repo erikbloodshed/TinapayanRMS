@@ -8,7 +8,7 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.Printing;
 using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Printing;
 

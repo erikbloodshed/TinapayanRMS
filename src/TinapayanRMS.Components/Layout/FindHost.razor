@@ -1,0 +1,151 @@
+@using System.Reactive.Linq
+@using TinapayanRMS.Components.Vim
+@implements IAsyncDisposable
+@inject QuickFindViewModel Find
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* Find (the WPF QuickFindWindow): Ctrl+K from anywhere, or the header's magnifier, opens a box over the names of every
+   raw material, standalone sub-assembly and product, read afresh each time it opens. Every word typed has to be in a
+   name, in any order, ignoring capitals and accents; the best matches come first. The keyboard stays in the box: Up and
+   Down (and Page Up and Page Down) move the pick, Enter opens it on its own screen, as a link from another screen opens
+   one, and Esc closes Find. A double-click on a match opens it too. The last search is still there, selected, the next
+   time Find opens. *@
+@* On the title bar's right, as the WPF window's Find is: a glyph button built like Back, Forward and the window's own. *@
+<button type="button" class="titlebar-button titlebar-small-glyph" title="Find a raw material, sub-assembly or product (Ctrl+K)"
+        aria-label="Find" @onclick="OpenAsync">
+    <span class="glyph" aria-hidden="true">@Glyphs.Search</span>
+</button>
+
+<SfDialog Visible="_open" IsModal="true" Width="680px" ShowCloseIcon="true" CloseOnEscape="true" CssClass="find-dialog">
+    <DialogEvents OnClose="Close" Opened="OnOpenedAsync" />
+    <DialogTemplates>
+        <Header>Find</Header>
+        <Content>
+            <TextField ID="find-query" Value="@Find.Query" ValueChanged="q => Find.Query = q" OnKey="OnKeyAsync"
+                       Placeholder="Part of the name of a raw material, sub-assembly or product" CssClass="find-query" />
+            <div class="find-results">
+                <table class="line-grid">
+                    <thead><tr><th>Name</th><th class="col-kind">Kind</th><th class="col-group">Category or Role</th></tr></thead>
+                    <tbody>
+                        @foreach (var result in Find.Results)
+                        {
+                            <tr @key="result" id="@RowId(result)" class="@(ReferenceEquals(result, Find.SelectedResult) ? "selected" : "")"
+                                @onclick="() => Find.SelectedResult = result" @ondblclick="() => OpenResult(result)">
+                                <td class="cell-text">@result.Name</td>
+                                <td class="cell-text muted">@result.Kind</td>
+                                <td class="cell-text muted">@result.Group</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (Find.ResultsNote is { } note)
+            {
+                <p class="caption">@note</p>
+            }
+            <p class="caption">Up and Down to pick, Enter to open it on its screen.</p>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Open" IsPrimary="true" Disabled="Find.SelectedResult is null" OnClick="() => OpenResult(Find.SelectedResult)" />
+        <DialogButton Content="Close" OnClick="Close" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    private bool _open;
+    private DotNetObjectReference<FindHost>? _self;
+    private IJSObjectReference? _key;
+
+    protected override void OnInitialized() => Find.PropertyChanged += OnFindChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _key = await JS.InvokeAsync<IJSObjectReference>("tinapayan.registerFindKey", _self);
+        }
+    }
+
+    /// <summary>Ctrl+K (Cmd+K on a Mac), from anywhere in the tab.</summary>
+    [JSInvokable]
+    public Task OpenFromKeyAsync() => InvokeAsync(OpenAsync);
+
+    // Find is drawn open before its names are read. The magnifier's click would draw it anyway, but Ctrl+K comes from the
+    // browser (OpenFromKeyAsync) rather than as an event, and then nothing else draws it until the names are in.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "BL0012", Justification = "Ctrl+K calls it outside an event.")]
+    private async Task OpenAsync()
+    {
+        _open = true;
+        StateHasChanged();
+        await Find.LoadCommand.Execute();
+    }
+
+    private void Close() => _open = false;
+
+    private async Task OnOpenedAsync() => await JS.InvokeVoidAsync("tinapayan.focus", "find-query");
+
+    private async Task OnKeyAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            OpenResult(Find.SelectedResult);
+            return;
+        }
+
+        var step = e.Key switch
+        {
+            "ArrowDown" => 1,
+            "ArrowUp" => -1,
+            "PageDown" => 10,
+            "PageUp" => -10,
+            _ => 0,
+        };
+        if (step == 0 || Find.Results.Count == 0)
+        {
+            return;
+        }
+
+        var at = Find.SelectedResult is { } picked ? Find.Results.IndexOf(picked) : -1;
+        var result = Find.Results[Math.Clamp(at + step, 0, Find.Results.Count - 1)];
+        Find.SelectedResult = result;
+        await JS.InvokeVoidAsync("tinapayan.scrollIntoView", RowId(result));
+    }
+
+    // The match opens on its own screen at its own address: the screen being left asks about its unsaved changes first.
+    private void OpenResult(QuickFindResult? result)
+    {
+        if (result is null)
+        {
+            return;
+        }
+
+        _open = false;
+        Navigation.NavigateTo($"{VimKeysState.UrlOf(result.Screen)}/{result.Id}");
+    }
+
+    private static string RowId(QuickFindResult result) => $"find-{result.Screen}-{result.Id}";
+
+    private void OnFindChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
+    {
+        Find.PropertyChanged -= OnFindChanged;
+        try
+        {
+            if (_key is not null)
+            {
+                await _key.InvokeVoidAsync("dispose");
+                await _key.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // The tab has gone.
+        }
+
+        _self?.Dispose();
+    }
+}

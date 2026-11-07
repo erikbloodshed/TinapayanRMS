@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using ReactiveUI;
 using TinapayanRMS.Infrastructure.Services;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests;
 

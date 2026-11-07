@@ -37,6 +37,8 @@
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
     <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
     <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+    <!-- The screens' ViewModels, which the MAUI app's screens draw too. -->
+    <ProjectReference Include="..\TinapayanRMS.Presentation\TinapayanRMS.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

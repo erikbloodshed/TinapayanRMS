@@ -1,0 +1,57 @@
+@* The units a material is bought or used in besides its base unit (the WPF AlternativeUnitsCard), each with how many base
+   units it holds: a standard unit's (a kilogram's 1,000 g) is fixed, any other is typed. Beside it, the Unit Conversion
+   Overview: what one of each comes to in the base unit. *@
+<div class="tab-columns">
+    <div class="tab-card">
+        <h2 class="section-header">Alternative Units</h2>
+        <LineGrid TRow="RawMaterialUnitRow" Items="ViewModel.UnitRows" NewItem="ViewModel.NewUnitRow" @bind-SelectedItem="ViewModel.SelectedUnitRow">
+            <Header>
+                <th>Alternative Unit</th>
+                <th class="col-unit">Abbreviation</th>
+                <th class="col-number">Multiplier</th>
+            </Header>
+            <Row Context="row">
+                <td>
+                    <PickField TItem="UnitOfMeasure" Items="ViewModel.UnitsOfMeasure" TextField="Name" CssClass="cell-field" PopupWidth="260px"
+                               Value="ViewModel.UnitsOfMeasure.FirstOrDefault(u => u.Id == row.UnitOfMeasureId)" ValueChanged="u => row.UnitOfMeasureId = u?.Id">
+                        <ItemTemplate Context="unit"><span class="pick-columns"><span>@unit.Name</span><span class="muted">@unit.Abbreviation</span></span></ItemTemplate>
+                    </PickField>
+                </td>
+                <td class="cell-text">@row.Abbreviation</td>
+                <td><NumberField TValue="decimal" Value="row.BaseUnitsPerUnit" ValueChanged="v => row.BaseUnitsPerUnit = v" Format="#,0.####" Min="0" ReadOnly="!row.CanTypeMultiplier" CssClass="cell-field" /></td>
+            </Row>
+        </LineGrid>
+        <div class="button-row align-right form-extra">
+            <CommandButton Command="ViewModel.DeleteUnitCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove" />
+        </div>
+    </div>
+
+    <div class="tab-card">
+        <h2 class="section-header">Unit Conversion Overview</h2>
+        @if (ViewModel.UnitRows.Count == 0)
+        {
+            <p class="empty-state">No alternative units yet. Add one to see how it converts to @(ViewModel.BaseUnitName).</p>
+        }
+        else
+        {
+            <div class="conversions">
+                @foreach (var row in ViewModel.UnitRows)
+                {
+                    <div class="conversion">
+                        <span class="conversion-unit">1 @row.UnitName</span>
+                        <span class="glyph conversion-arrow" aria-hidden="true">&#xE72A;</span>
+                        <span class="conversion-base">@row.BaseEquivalentText</span>
+                    </div>
+                }
+                <div class="conversion conversion-base-row">
+                    <span class="conversion-unit">@ViewModel.BaseUnitName</span>
+                    <span class="muted">(base unit)</span>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+}

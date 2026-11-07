@@ -6,7 +6,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests;
 

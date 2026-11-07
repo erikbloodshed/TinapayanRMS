@@ -21,7 +21,7 @@ using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.UI.Controls;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.UI.Vim;
 using TinapayanRMS.UI.Views;
 

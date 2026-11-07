@@ -1,0 +1,8 @@
+@* The window's root component: the screen in the address, in the window's layout (Layout.MainLayout). There's no sign-in
+   and nothing to wait for first, as the WPF app had none: a database that can't be reached shows on each screen's load,
+   as a message, as the WPF app's screens showed it. *@
+<Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+    </Found>
+</Router>

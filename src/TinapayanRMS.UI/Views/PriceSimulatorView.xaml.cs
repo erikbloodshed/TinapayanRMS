@@ -5,7 +5,7 @@ using Syncfusion.SfSkinManager;
 using Syncfusion.UI.Xaml.Grid;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.UI.Exporting;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.UI.Views;

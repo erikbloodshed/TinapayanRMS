@@ -1,0 +1,70 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- The .NET MAUI Blazor Hybrid app: a window that draws the screens (TinapayanRMS.Components) in its WebView2, beside
+       the WPF app (TinapayanRMS.UI) until it replaces it. Windows only. Ported from the TinapayanRMS_Web repo's on
+       2026-11-07, without its shop accounts or its Mac target. -->
+  <PropertyGroup>
+    <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <!-- The web view's stylesheets are Blazor's, not MAUI's. -->
+    <EnableDefaultCssItems>false</EnableDefaultCssItems>
+
+    <ApplicationTitle>TinapayanRMS</ApplicationTitle>
+    <ApplicationId>com.tinapayanfestivalbakeshoppe.tinapayanrms</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <!-- The WPF app's icon, for the .exe, the taskbar and Alt+Tab: the window takes it from the .exe. -->
+    <ApplicationIcon>Resources\AppIcon\tinapayan-rms-icon.ico</ApplicationIcon>
+
+    <!-- Unpackaged, as an .exe in a folder, with the Windows App SDK in that folder too, so the PC needs nothing installed
+         for it. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- The code LibraryImport writes for the calls into user32 and dwmapi (SingleInstance, AppWindowChrome). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The database to use, the WPF app's own file, built into the app (MauiProgram reads it). -->
+    <EmbeddedResource Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json" LogicalName="appsettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" />
+    <PackageReference Include="Microsoft.Maui.Controls" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Syncfusion.Licensing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
+  </ItemGroup>
+
+  <!-- The Syncfusion licence key, taken from the SYNCFUSION_LICENSE_KEY environment variable when the app is built, so
+       the installed app doesn't need the variable, as the WPF app's is. MauiProgram reads it back by its key. -->
+  <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
+    <AssemblyMetadata Include="SyncfusionLicenseKey" Value="$(SYNCFUSION_LICENSE_KEY)" />
+  </ItemGroup>
+
+  <!-- A publish without the key would make an app that shows Syncfusion's licence notice. -->
+  <Target Name="RequireSyncfusionLicenseKey" BeforeTargets="PrepareForPublish" Condition="'$(SYNCFUSION_LICENSE_KEY)' == ''">
+    <Error Text="Set the SYNCFUSION_LICENSE_KEY environment variable before publishing. The key is compiled into the app." />
+  </Target>
+
+  <!-- The Syncfusion themes package's static files are every theme Syncfusion makes, some 240 MB; the app links one,
+       fluent2.css (index.html). The rest are left out, so they're neither copied beside the app nor read by Windows'
+       resource indexer (MakePri), which takes their names (bootstrap5.3-dark.css) for resource qualifiers and warns. -->
+  <Target Name="KeepOnlyTheAppsSyncfusionTheme" AfterTargets="UpdateExistingPackageStaticWebAssets">
+    <ItemGroup>
+      <_UnusedSyncfusionTheme Include="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Syncfusion.Blazor.Themes' and '%(RelativePath)' != 'fluent2.css'" />
+      <StaticWebAsset Remove="@(_UnusedSyncfusionTheme)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

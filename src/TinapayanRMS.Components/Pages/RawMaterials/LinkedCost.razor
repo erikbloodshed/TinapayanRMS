@@ -1,0 +1,32 @@
+@* A linked ingredient's cost (the WPF LinkedCostCard): a share of another ingredient's, as egg white and yolk are of the
+   egg. Its buffer is the linked-to ingredient's, shown and not typed. *@
+<div class="tab-card narrow-card">
+    <h2 class="section-header">Linked Cost</h2>
+
+    <div class="field-stack">
+        <label class="field-label" for="rm-linked-to">Linked To</label>
+        <PickField ID="rm-linked-to" TItem="RawMaterial" Items="ViewModel.LinkTargets" TextField="Name" @bind-Value="ViewModel.EditingLinkedTo" />
+    </div>
+
+    <div class="buffer-row">
+        <div class="field-stack">
+            <label class="field-label" for="rm-weight-share">Weight Share %</label>
+            <NumberField ID="rm-weight-share" TValue="decimal?" @bind-Value="ViewModel.EditingWeightSharePercent" Min="0" Max="100" />
+        </div>
+        <div class="field-stack">
+            <label class="field-label" for="rm-cost-share">Cost Share %</label>
+            <NumberField ID="rm-cost-share" TValue="decimal?" @bind-Value="ViewModel.EditingCostSharePercent" Min="0" Max="100" />
+        </div>
+        <div class="field-stack">
+            <label class="field-label" for="rm-linked-buffer">Cost Buffer %</label>
+            <NumberField ID="rm-linked-buffer" TValue="decimal?" Value="ViewModel.EditingLinkedTo?.CostBufferPercent" ReadOnly="true" />
+        </div>
+    </div>
+
+    <p class="info-text">@ViewModel.LinkedCostPreviewText</p>
+    <p class="caption">@ViewModel.LinkedPartsText</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+}

@@ -1,0 +1,38 @@
+@page "/settings/units-of-measure"
+@inherits ScreenBase<UnitsOfMeasureViewModel>
+
+<PageTitle>Units of Measure · TinapayanRMS</PageTitle>
+
+<SettingsTabs />
+
+<div class="list-and-form">
+    <section class="card list-card">
+        <h2 class="section-header">Units of Measure</h2>
+        <PickGrid TItem="UnitOfMeasure" DataSource="ViewModel!.Units" @bind-SelectedItem="ViewModel!.SelectedUnit">
+            <Columns>
+                <GridColumn Field="@nameof(UnitOfMeasure.Id)" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(UnitOfMeasure.Name)" HeaderText="Name" />
+                <GridColumn Field="@nameof(UnitOfMeasure.Abbreviation)" HeaderText="Abbreviation" />
+            </Columns>
+        </PickGrid>
+    </section>
+
+    <section class="card form-card">
+        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <FormRow Label="Name" For="unit-name">
+            <SfTextBox ID="unit-name" @bind-Value="ViewModel!.EditingName" />
+        </FormRow>
+        <FormRow Label="Abbreviation" For="unit-abbreviation">
+            <SfTextBox ID="unit-abbreviation" @bind-Value="ViewModel!.EditingAbbreviation" />
+        </FormRow>
+        <div class="button-row">
+            <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+            <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" />
+            <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </section>
+</div>
+
+@code {
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+}

@@ -1,5 +1,5 @@
 using System.Windows.Controls;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 

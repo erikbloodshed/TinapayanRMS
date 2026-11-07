@@ -7,7 +7,7 @@ using Syncfusion.UI.Xaml.Grid;
 using Syncfusion.Windows.Controls.Input;
 using Syncfusion.Windows.Tools.Controls;
 using TinapayanRMS.UI.Controls;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.UI.Vim;
 
 namespace TinapayanRMS.UI.Views;

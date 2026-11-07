@@ -1,0 +1,40 @@
+@page "/settings/product-categories"
+@inherits ScreenBase<ProductCategoriesViewModel>
+
+<PageTitle>Product Categories · TinapayanRMS</PageTitle>
+
+<SettingsTabs />
+
+<div class="list-and-form">
+    <section class="card list-card">
+        <h2 class="section-header">Product Categories</h2>
+        <PickGrid TItem="ProductCategory" DataSource="ViewModel!.Categories" @bind-SelectedItem="ViewModel!.SelectedCategory">
+            <Columns>
+                <GridColumn Field="@nameof(ProductCategory.Id)" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(ProductCategory.Name)" HeaderText="Name" />
+                <GridColumn Field="@nameof(ProductCategory.WastagePercent)" HeaderText="Wastage %" Format="N2" TextAlign="TextAlign.Right" Width="110" />
+            </Columns>
+        </PickGrid>
+    </section>
+
+    <section class="card form-card">
+        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <FormRow Label="Name" For="product-category-name">
+            <SfTextBox ID="product-category-name" @bind-Value="ViewModel!.EditingName" />
+        </FormRow>
+        <FormRow Label="Wastage %" For="product-category-wastage">
+            <NumberField ID="product-category-wastage" TValue="decimal?" @bind-Value="ViewModel!.EditingWastagePercent" Format="N2" Min="0" Max="100" Placeholder="Shop-wide"
+                         Tooltip="What's lost making this category's products, as a cost on top of their sub-assemblies, in place of the shop-wide Wastage % (Costing Defaults). Blank uses the shop-wide one." />
+        </FormRow>
+        <p class="caption form-extra">Blank uses the shop-wide Wastage % from Costing Defaults. A composite product uses its own category's, not its products'.</p>
+        <div class="button-row">
+            <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+            <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" />
+            <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </section>
+</div>
+
+@code {
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+}

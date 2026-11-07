@@ -1,0 +1,116 @@
+@implements IAsyncDisposable
+@inject IAppWindow Window
+@inject MainWindowViewModel Shell
+@inject IJSRuntime JS
+
+@* The window's title bar, drawn by the page as the WPF app's ChromelessWindow draws its own (MainWindow.xaml): the window
+   has none of Windows' (IAppWindow). On the left, the menu toggle and the heading; on the right, the Vim keys' mode,
+   Find, Back and Forward, then Minimize, Maximize (Restore while maximized) and Close. The rest of the bar is the
+   window's caption, which Windows itself drags, double-clicks and right-clicks (wwwroot/app.js, watchTitleBar). The menu
+   opens under it, as the WPF drawer did, so its toggle stays where it is to put the menu away again. *@
+<header class="app-titlebar" @ref="_bar">
+    <button type="button" class="titlebar-button" title="Show the navigation menu" aria-label="Navigation menu" @onclick="OnMenu">
+        <span class="glyph" aria-hidden="true">@Glyphs.Menu</span>
+    </button>
+    <span class="app-heading">@Shell.Heading</span>
+
+    <span class="titlebar-fill"></span>
+
+    <VimKeys />
+    <FindHost />
+    @* Back and Forward between the screens' addresses (a record's included), as Alt+Left and Alt+Right, and the Vim keys'
+       H and L, go. The screen being left asks about its unsaved changes first. *@
+    <button type="button" class="titlebar-button titlebar-small-glyph" title="Back (Alt+Left)" aria-label="Back"
+            disabled="@(!_canGoBack)" @onclick="GoBackAsync">
+        <span class="glyph" aria-hidden="true">@Glyphs.Back</span>
+    </button>
+    <button type="button" class="titlebar-button titlebar-small-glyph" title="Forward (Alt+Right)" aria-label="Forward"
+            disabled="@(!_canGoForward)" @onclick="GoForwardAsync">
+        <span class="glyph" aria-hidden="true">@Glyphs.Forward</span>
+    </button>
+
+    <div class="caption-buttons">
+        <button type="button" class="titlebar-button caption-button" title="Minimize" aria-label="Minimize" @onclick="Window.Minimize">
+            <span class="glyph" aria-hidden="true">@Glyphs.Minimize</span>
+        </button>
+        <button type="button" class="titlebar-button caption-button" title="@(_maximized ? "Restore Down" : "Maximize")"
+                aria-label="@(_maximized ? "Restore Down" : "Maximize")" @onclick="Window.ToggleMaximize">
+            <span class="glyph" aria-hidden="true">@(_maximized ? Glyphs.RestoreWindow : Glyphs.Maximize)</span>
+        </button>
+        <button type="button" class="titlebar-button caption-button caption-close" title="Close" aria-label="Close" @onclick="Window.Close">
+            <span class="glyph" aria-hidden="true">@Glyphs.Close</span>
+        </button>
+    </div>
+</header>
+
+@code {
+    private ElementReference _bar;
+    private DotNetObjectReference<TitleBar>? _self;
+    private IJSObjectReference? _watch;
+    private bool _maximized;
+    private bool _canGoBack;
+    private bool _canGoForward;
+
+    /// <summary>The menu toggle's click: MainLayout opens or closes the menu.</summary>
+    [Parameter] public EventCallback OnMenu { get; set; }
+
+    protected override void OnInitialized()
+    {
+        _maximized = Window.IsMaximized;
+        Window.StateChanged += OnWindowStateChanged;
+        Shell.PropertyChanged += OnShellChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _watch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTitleBar", _bar, _self);
+        }
+    }
+
+    /// <summary>Where the bar and its buttons are, in device pixels, each time either moves or changes size.</summary>
+    [JSInvokable]
+    public void SetTitleBar(DeviceRect titleBar, DeviceRect[] buttons) => Window.SetTitleBar(titleBar, buttons);
+
+    /// <summary>Whether the web view's history has an address before and after the one showing, each time it moves.</summary>
+    [JSInvokable]
+    public Task HistoryChanged(bool canGoBack, bool canGoForward) => InvokeAsync(() =>
+    {
+        (_canGoBack, _canGoForward) = (canGoBack, canGoForward);
+        StateHasChanged();
+    });
+
+    private async Task GoBackAsync() => await JS.InvokeVoidAsync("history.back");
+
+    private async Task GoForwardAsync() => await JS.InvokeVoidAsync("history.forward");
+
+    private void OnWindowStateChanged() => InvokeAsync(() =>
+    {
+        _maximized = Window.IsMaximized;
+        StateHasChanged();
+    });
+
+    private void OnShellChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    public async ValueTask DisposeAsync()
+    {
+        Window.StateChanged -= OnWindowStateChanged;
+        Shell.PropertyChanged -= OnShellChanged;
+        try
+        {
+            if (_watch is not null)
+            {
+                await _watch.InvokeVoidAsync("dispose");
+                await _watch.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // The page has gone.
+        }
+
+        _self?.Dispose();
+    }
+}

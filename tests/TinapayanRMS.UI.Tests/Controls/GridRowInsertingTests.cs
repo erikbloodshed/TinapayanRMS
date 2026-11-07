@@ -7,7 +7,7 @@ using Syncfusion.UI.Xaml.Grid.Helpers;
 using Syncfusion.UI.Xaml.ScrollAxis;
 using TinapayanRMS.UI.Controls;
 using TinapayanRMS.UI.Tests.Fixtures;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Tests.Controls;
 
@@ -29,6 +29,8 @@ public class GridRowInsertingTests
     private sealed class StepCounter(ObservableCollection<Line> lines) : IUndoRecorder
     {
         public int Begun { get; private set; }
+
+        public int FormVersion => 0;
 
         public List<int> LineCountsAtEnd { get; } = [];
 

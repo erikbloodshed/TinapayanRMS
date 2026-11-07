@@ -1,0 +1,21 @@
+@* The Settings tabs, in the WPF Settings dialog's order. Each tab is a page of its own, so it has its own address and
+   Back goes to the tab before. *@
+<nav class="settings-tabs" aria-label="Settings">
+    @foreach (var (label, href) in Tabs)
+    {
+        <NavLink class="settings-tab" href="@href">@label</NavLink>
+    }
+</nav>
+
+@code {
+    private static readonly (string Label, string Href)[] Tabs =
+    [
+        ("Units of Measure", "settings/units-of-measure"),
+        ("Material Categories", "settings/material-categories"),
+        ("Product Categories", "settings/product-categories"),
+        ("Roles", "settings/roles"),
+        ("Costing Defaults", "settings/costing-defaults"),
+        ("Keyboard", "settings/keyboard"),
+        ("Database", "settings/database"),
+    ];
+}

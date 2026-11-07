@@ -4,7 +4,7 @@ using System.Windows.Media;
 using Syncfusion.SfSkinManager;
 using Syncfusion.UI.Xaml.TreeView;
 using Syncfusion.UI.Xaml.TreeView.Engine;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 using TreeViewItem = Syncfusion.UI.Xaml.TreeView.TreeViewItem;
 
 namespace TinapayanRMS.UI.Controls;

@@ -1,0 +1,52 @@
+@* A product's packaging (the WPF PackagingSectionView): where it's linked from, as a tag, or a link that opens the
+   packaging set on Sub-Assemblies; what it costs per sellable unit; its lines, typed into unless they're linked; and
+   Move to Sub-Assemblies for its own, or Make a Copy for a linked one. *@
+<div class="section-view">
+    <div class="section-heading">
+        <div class="usage-badges">
+            @if (ViewModel.Packaging.IsPackagingLinkedToProduct)
+            {
+                <span class="badge badge-warning">@ViewModel.Packaging.PackagingLinkedToText</span>
+            }
+            @if (ViewModel.Packaging.IsPackagingLinkedToSet && ViewModel.Packaging.PackagingLinkedSetId is { } setId)
+            {
+                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(ViewModel.OpenSubAssemblyCommand, setId)" title="Open the packaging set on the Sub-Assemblies screen">
+                    @ViewModel.Packaging.PackagingLinkedToText
+                </button>
+            }
+            @if (ViewModel.Packaging.IsPackagingMoving)
+            {
+                <span class="badge badge-warning" title="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own.">Moves to Sub-Assemblies on Save</span>
+            }
+        </div>
+        <div class="lines-footer-right">
+            <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.Costing.Costs.OwnPackaging.ToString("N2")</span>
+            @if (ViewModel.Packaging.CanMovePackaging)
+            {
+                <CommandButton Command="ViewModel.MovePackagingToSubAssembliesCommand" Glyph="@Glyphs.Link" Label="Move to Sub-Assemblies"
+                               Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
+            }
+        </div>
+    </div>
+
+    <PackagingLinesGrid Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
+                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis" />
+
+    <div class="lines-footer">
+        @if (ViewModel.Packaging.IsPackagingLinked)
+        {
+            <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
+            <CommandButton Command="ViewModel.CopyPackagingCommand" Glyph="@Glyphs.Copy" Label="Make a Copy"
+                           Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
+        }
+        else
+        {
+            <span></span>
+            <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+}

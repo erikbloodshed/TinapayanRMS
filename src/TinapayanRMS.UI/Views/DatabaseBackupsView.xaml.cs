@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 

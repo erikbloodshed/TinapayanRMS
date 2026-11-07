@@ -1,0 +1,81 @@
+@using TinapayanRMS.Domain.Enums
+@* Raw Materials' list (the WPF MaterialListCard): a search box; the list's commands as icons; the materials in a folder
+   for their type, then their category; and, under the tree, what the last move did, with Undo. Dragging materials onto
+   another category of their type moves them there, saved at once; a right-click opens the row's menu, or the list's. *@
+<section class="card list-card tree-card">
+    <div class="list-heading">
+        <h2 class="section-header">Raw Materials</h2>
+        @* Not one of the form's boxes: it keeps the cursor, and what's typed, when another record takes the form. *@
+        <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+            <TextField @bind-Value="ViewModel.SearchText" Placeholder="Search raw material" CssClass="list-search" />
+        </CascadingValue>
+    </div>
+
+    <div class="list-toolbar">
+        <ActionButton Glyph="@Glyphs.Add" Tooltip="New Raw Material" Flat="true" OnClick="() => Commands.Run(ViewModel.NewMaterialInCommand, null)" />
+        <MenuButton CssClass="e-flat icon-only" Tooltip="New Category: an ingredient, Made or packaging category">
+            <Face><span class="glyph" aria-hidden="true">@Glyphs.NewFolder</span></Face>
+            <ChildContent>
+                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Ingredient Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Ingredient)" />
+                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Made Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Made)" />
+                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Packaging Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Packaging)" />
+            </ChildContent>
+        </MenuButton>
+        <ActionButton Glyph="@Glyphs.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
+        <ActionButton Glyph="@Glyphs.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
+    </div>
+
+    <FolderTree TNode="RawMaterialTreeNode"
+                Roots="ViewModel.RawMaterialTree.Roots"
+                ChildrenOf="n => n is RawMaterialFolderNode folder ? folder.Children : null"
+                IsExpanded="n => n is RawMaterialFolderNode { IsExpanded: true }"
+                SetExpanded="(n, open) => { if (n is RawMaterialFolderNode folder) folder.IsExpanded = open; }"
+                Selected="ViewModel.SelectedTreeNodes"
+                KeyOf="KeyOf"
+                RowClass="@(n => n.IsTypeFolder ? "top-level" : null)"
+                CanDrag="n => n is RawMaterialLeafNode"
+                CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
+                OnDrop="DropAsync"
+                MenuFor="ViewModel.TreeMenuFor"
+                Shortcut="ViewModel.TreeShortcut">
+        <RowTemplate Context="node">
+            @if (node.IsFolder)
+            {
+                <span class="glyph tree-glyph" aria-hidden="true">@node.Glyph</span>
+            }
+            <span class="tree-title">@node.Title</span>
+            @if (node.IsFolder)
+            {
+                <span class="tree-count">(@node.MaterialCount)</span>
+            }
+        </RowTemplate>
+    </FolderTree>
+
+    <MoveNoticeBar Notice="@ViewModel.MoveNotice" UndoCommand="ViewModel.UndoMoveCommand" DismissCommand="ViewModel.DismissMoveNoticeCommand" />
+</section>
+
+@code {
+    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+
+    private static string KeyOf(RawMaterialTreeNode node) => node switch
+    {
+        RawMaterialFolderNode folder => "folder-" + folder.Key,
+        RawMaterialLeafNode leaf => "material-" + leaf.RawMaterial.Id,
+        _ => node.Title,
+    };
+
+    private static IReadOnlyList<RawMaterialMove> MovesFor(IReadOnlyList<RawMaterialTreeNode> dragged, RawMaterialTreeNode? target) =>
+        dragged.All(n => n is RawMaterialLeafNode)
+            ? RawMaterialTree.MovesTo(target, dragged.Cast<RawMaterialLeafNode>().Select(l => l.RawMaterial))
+            : [];
+
+    private async Task DropAsync(IReadOnlyList<RawMaterialTreeNode> dragged, RawMaterialTreeNode? target)
+    {
+        var moves = MovesFor(dragged, target);
+        if (moves.Count > 0)
+        {
+            await Commands.Run(ViewModel.MoveMaterialsCommand, moves);
+        }
+    }
+
+}

@@ -5,7 +5,7 @@ using System.Windows.Threading;
 using ReactiveUI;
 using Syncfusion.Windows.Shared.Printing;
 using TinapayanRMS.UI.Printing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Views;
 

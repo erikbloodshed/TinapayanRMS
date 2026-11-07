@@ -6,7 +6,7 @@ using System.Windows.Media;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using TinapayanRMS.UI.ViewModels;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.UI.Printing;
 

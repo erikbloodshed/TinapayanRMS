@@ -1,0 +1,44 @@
+@using System.Reactive.Linq
+@using System.Windows.Input
+
+@* A button bound to a ViewModel's command, as the WPF ButtonAdvs were through Command="{Binding …}": enabled while the
+   command can run, and running it on a click. The screen redraws it when the command's CanExecute changes (ScreenBase). *@
+<SfButton CssClass="@Css" Disabled="@(!((ICommand)Command).CanExecute(null) || Disabled)" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
+    @if (Glyph is not null)
+    {
+        <span class="glyph" aria-hidden="true">@Glyph</span>
+    }
+    @if (Label is not null)
+    {
+        <span class="command-label">@Label</span>
+    }
+</SfButton>
+
+@code {
+    [Parameter, EditorRequired] public ReactiveCommand<RxVoid, RxVoid> Command { get; set; } = null!;
+
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>A Segoe Fluent Icons glyph before the label, as the WPF IconTemplates had.</summary>
+    [Parameter] public string? Glyph { get; set; }
+
+    [Parameter] public bool Primary { get; set; }
+
+    [Parameter] public bool Flat { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public string? Tooltip { get; set; }
+
+    [Parameter] public string? CssClass { get; set; }
+
+    private string Css => string.Join(' ', new[] { Flat ? "e-flat" : null, Label is null ? "icon-only" : null, CssClass }.Where(c => c is not null));
+
+    private async Task RunAsync()
+    {
+        if (((ICommand)Command).CanExecute(null))
+        {
+            await Command.Execute();
+        }
+    }
+}

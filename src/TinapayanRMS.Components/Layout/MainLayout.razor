@@ -1,0 +1,74 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppStatus Status
+@inject NavigationManager Navigation
+@* Started here, once per page, so one screen can open another (a Used By tile, a Print). *@
+@inject ScreenLinks Links
+
+<div class="app-shell">
+    @* The window's title bar, which the page draws: the window has none of Windows' own, as the WPF window has none. *@
+    <TitleBar OnMenu="ToggleNavigation" />
+
+    @if (Status.DatabaseWarning is { } warning)
+    {
+        <div class="app-banner" role="alert">
+            <span class="glyph" aria-hidden="true">@Glyphs.Warning</span>
+            <span>@warning</span>
+        </div>
+    }
+    @if (Status.BackupWarning is { } backupWarning)
+    {
+        <div class="app-banner app-banner-text" role="alert">
+            <span class="glyph" aria-hidden="true">@Glyphs.Warning</span>
+            <span>@backupWarning</span>
+        </div>
+    }
+
+    <div class="app-body">
+        @* The menu floats over the screen, as the WPF app's does: summoned by the title bar's button, gone on a click away. *@
+        <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
+            <ChildContent>
+                <NavMenu Navigated="CloseNavigation" />
+            </ChildContent>
+        </SfSidebar>
+
+        @* The tabs are under the menu when it's out, as the WPF app's were. *@
+        <div class="app-screen">
+            <ScreenTabStrip />
+
+            <main class="app-page">
+                @Body
+            </main>
+        </div>
+    </div>
+</div>
+
+<NoticeHost />
+<ConfirmationHost />
+<PromptHost />
+
+@code {
+    private bool _navigationOpen;
+
+    protected override void OnInitialized()
+    {
+        Status.Restored += OnRestored;
+        Status.Changed += OnStatusChanged;
+    }
+
+    private void OnStatusChanged() => InvokeAsync(StateHasChanged);
+
+    // A restore replaced what every screen holds: load the window's page again, which builds every screen afresh, as the
+    // WPF app restarted.
+    private void OnRestored() => InvokeAsync(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true));
+
+    private void ToggleNavigation() => _navigationOpen = !_navigationOpen;
+
+    private void CloseNavigation() => _navigationOpen = false;
+
+    public void Dispose()
+    {
+        Status.Restored -= OnRestored;
+        Status.Changed -= OnStatusChanged;
+    }
+}

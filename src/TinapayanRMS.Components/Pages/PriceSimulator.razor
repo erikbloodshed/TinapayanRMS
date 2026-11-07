@@ -1,0 +1,220 @@
+@page "/price-simulator"
+@using TinapayanRMS.Pricing
+@using TinapayanRMS.Components.Printing
+@inherits ScreenBase<PriceSimulatorViewModel>
+@inject PrintPreviews Previews
+@inject IFileDialogs Dialogs
+@inject NavigationManager Navigation
+@inject Prompts Prompts
+
+<PageTitle>Price Simulator · TinapayanRMS</PageTitle>
+
+@* The Price Simulator (the WPF PriceSimulatorView): price changes tried without changing a real price, beside the saved
+   scenarios, above every product now and with them. A material is picked and its change typed in percent, or as its new
+   price; the other is worked out. A scenario is the table's changes saved under a name, kept in the database. The
+   products table sorts by its headings and filters from the funnel in Product's and Category's; rows picked (Ctrl or
+   Shift for several) are what Print Report offers first, and a double-click opens a product. Unbuffered switches every
+   figure to the materials' true costs, and Print Report and Export to Excel follow. *@
+<div class="stacked-cards">
+    <div class="simulator-top">
+        <section class="card simulator-scenarios">
+            <div class="report-heading">
+                <h2 class="section-header">Scenarios</h2>
+                <div class="button-row">
+                    <CommandButton Command="ViewModel!.SaveScenarioCommand" Glyph="@Glyphs.Save" Label="Save Scenario"
+                                   Tooltip="Saves the price changes in the table under a name. Keep the open scenario's name to update it." />
+                    <CommandButton Command="ViewModel!.DeleteScenarioCommand" Glyph="@Glyphs.Delete" Label="Delete Scenario"
+                                   Tooltip="Deletes the open scenario, after asking. Its changes stay in the table." />
+                </div>
+            </div>
+            <p class="caption">The price changes saved under a name, newest first. Click one to open it: its changes replace the table's.</p>
+            <div class="scroll-box">
+                <table class="line-table scenario-table">
+                    <thead><tr><th class="col-date">Saved</th><th>Name</th></tr></thead>
+                    <tbody>
+                        @foreach (var scenario in ViewModel!.Scenarios)
+                        {
+                            <tr @key="scenario.Id" class="@(ReferenceEquals(scenario, ViewModel.SelectedScenario) ? "selected" : "")"
+                                @onclick="() => ViewModel.SelectedScenario = scenario">
+                                <td class="cell-text">@scenario.SavedAt.ToString("MMM d, yyyy  h:mm tt")</td>
+                                <td class="cell-text">@scenario.Name</td>
+                            </tr>
+                        }
+                        @if (ViewModel.Scenarios.Count == 0)
+                        {
+                            <tr><td colspan="2" class="cell-text muted">No scenarios saved yet.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card simulator-changes">
+            <div class="report-heading">
+                <h2 class="section-header">Price Changes</h2>
+                <div class="button-row">
+                    <CommandButton Command="ViewModel!.RemoveChangeCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                    <CommandButton Command="ViewModel!.ClearCommand" Glyph="@Glyphs.Cancel" Label="Clear All"
+                                   Tooltip="Takes every price change away, so the figures are today's again, and closes the open scenario." />
+                </div>
+            </div>
+            <p class="caption">Pick a raw material and type how much its price changes, in percent, or its new price; the other is worked out. Prices are per the unit it's bought in, from the brand it's costed at. No real price changes here: the changes last until you close the tab, unless you save them as a scenario.</p>
+            <div class="scroll-box">
+                <LineGrid TRow="SimulatedPriceChange" Items="ViewModel!.Changes" NewItem="ViewModel!.NewChange" @bind-SelectedItem="ViewModel!.SelectedChange">
+                    <Header>
+                        <th>Raw Material</th>
+                        <th class="col-unit">Per</th>
+                        <th class="col-number">Current Price</th>
+                        <th class="col-number">New Price</th>
+                        <th class="col-number">Change %</th>
+                    </Header>
+                    <Row Context="row">
+                        <td>
+                            <PickField TItem="RawMaterial" Items="ViewModel!.Materials" TextField="Name" CssClass="cell-field" PopupWidth="420px"
+                                       Value="row.Material" ValueChanged="m => row.MaterialId = m?.Id">
+                                <ItemTemplate Context="material"><span class="pick-columns"><span>@material.Name</span><span class="muted">@material.Category?.Name</span></span></ItemTemplate>
+                            </PickField>
+                        </td>
+                        <td class="cell-text">@row.UnitName</td>
+                        <td class="cell-number">@row.CurrentPrice?.ToString("N2")</td>
+                        <td><NumberField TValue="decimal?" Value="row.NewPrice" ValueChanged="v => row.NewPrice = v" Format="N2" Min="0" CssClass="cell-field" /></td>
+                        <td><NumberField TValue="decimal?" Value="row.ChangePercent" ValueChanged="v => row.ChangePercent = v" Format="N2" CssClass="cell-field" /></td>
+                    </Row>
+                </LineGrid>
+            </div>
+        </section>
+    </div>
+
+    <section class="card list-card simulator-products">
+        <div class="report-heading">
+            <h2 class="section-header">
+                Products
+                @if (ViewModel!.IsUnbuffered)
+                {
+                    <span class="badge badge-warning" title="Every figure is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
+                }
+            </h2>
+            <div class="button-row">
+                <SfCheckBox Label="Only affected products" @bind-Checked="ViewModel!.OnlyAffected" />
+                <CommandButton Command="ViewModel!.ToggleCostBasisCommand" Glyph="@Glyphs.Calculate" Label="@ViewModel!.CostBasisButtonLabel" Tooltip="@ViewModel!.CostBasisButtonTooltip" />
+                <CommandButton Command="ViewModel!.PrintCommand" Glyph="@Glyphs.Print" Label="Print Report"
+                               Tooltip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows." />
+                <CommandButton Command="ViewModel!.ExportCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                               Tooltip="Saves the products as shown, and the price changes, to an Excel workbook." />
+            </div>
+        </div>
+        <p class="caption">Every product for one sellable unit, now and with the price changes, at buffered costs; Unbuffered shows them at the materials' true costs instead, and Print Report and Export to Excel follow. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns; Price to Keep Markup is the price that earns today's markup with the changes. Double-click a product to open it.</p>
+        <SfGrid @ref="_products" TValue="PriceSimulatorProductRow" DataSource="ViewModel!.Products" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true">
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+            <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
+            <GridTextWrapSettings WrapMode="WrapMode.Header" />
+            <GridEvents TValue="PriceSimulatorProductRow" RowSelected="SyncSelectionAsync" RowDeselected="SyncSelectionAsync"
+                        OnRecordDoubleClick="OpenProductAsync" DataBound="RememberShownAsync" />
+            <GridColumns>
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductId)" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductName)" HeaderText="Product" Width="220" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.Category)" HeaderText="Category" MinWidth="120" Width="130" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialCost)" HeaderText="Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedRawMaterialCost)" HeaderText="Simulated Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.BaseCost)" HeaderText="Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedBaseCost)" HeaderText="Simulated Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.ChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.SuggestedPrice)" HeaderText="Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedSuggestedPrice)" HeaderText="Simulated Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.CurrentPrice)" HeaderText="Current Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedMarkupPercent)" HeaderText="Simulated Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                <GridColumn Field="@nameof(PriceSimulatorProductRow.PriceToKeepMarkup)" HeaderText="Price to Keep Markup" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+            </GridColumns>
+        </SfGrid>
+    </section>
+</div>
+
+@code {
+    private SfGrid<PriceSimulatorProductRow>? _products;
+
+    /// <summary>The products as the table last showed them, in its sort and with its filters; null until it has.</summary>
+    private IReadOnlyList<PriceSimulatorProductRow>? _shown;
+
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var viewModel = ViewModel!;
+
+        // What Print Report's All products shown prints, and the order it prints them in.
+        viewModel.ShownProducts = () => _shown is { } shown && shown.All(viewModel.Products.Contains) ? shown : viewModel.Products;
+
+        // Save Scenario's name, the open scenario's to start with.
+        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
+
+        // Print Report: the preview page, with the choices the ViewModel made (the products picked, and all shown).
+        AddSubscription(viewModel.ShowPrint.RegisterHandler(interaction =>
+        {
+            Previews.Show(interaction.Input, "price-simulator");
+            Navigation.NavigateTo("print/preview");
+            interaction.SetOutput(RxVoid.Default);
+        }));
+
+        // Export to Excel: the products as shown and the price changes, a sheet each, as the WPF workbook has them.
+        AddSubscription(viewModel.ExportToExcel.RegisterHandler(async interaction =>
+        {
+            var fileName = $"{interaction.Input} {DateTime.Today:yyyy-MM-dd}.xlsx";
+            var workbook = ExcelWorkbook.Build(
+                ExcelSheet.Of(viewModel.IsUnbuffered ? "Products (Unbuffered)" : "Products", viewModel.ShownProducts(),
+                    new ExcelColumn<PriceSimulatorProductRow>("Product", r => r.ProductName),
+                    new("Category", r => r.Category),
+                    new("Raw Material Cost", r => r.RawMaterialCost, ExcelWorkbook.Money),
+                    new("Simulated Raw Material Cost", r => r.SimulatedRawMaterialCost, ExcelWorkbook.Money),
+                    new("Change %", r => r.RawMaterialChangePercent, ExcelWorkbook.Money),
+                    new("Base Cost", r => r.BaseCost, ExcelWorkbook.Money),
+                    new("Simulated Base Cost", r => r.SimulatedBaseCost, ExcelWorkbook.Money),
+                    new("Change %", r => r.ChangePercent, ExcelWorkbook.Money),
+                    new("Suggested Price", r => r.SuggestedPrice, ExcelWorkbook.Money),
+                    new("Simulated Suggested Price", r => r.SimulatedSuggestedPrice, ExcelWorkbook.Money),
+                    new("Current Price", r => r.CurrentPrice, ExcelWorkbook.Money),
+                    new("Markup %", r => r.MarkupPercent, ExcelWorkbook.Money),
+                    new("Simulated Markup %", r => r.SimulatedMarkupPercent, ExcelWorkbook.Money),
+                    new("Price to Keep Markup", r => r.PriceToKeepMarkup, ExcelWorkbook.Money)),
+                ExcelSheet.Of("Price Changes", viewModel.Changes.Where(c => c.Material is not null),
+                    new ExcelColumn<SimulatedPriceChange>("Raw Material", c => c.Material?.Name),
+                    new("Per", c => c.UnitName),
+                    new("Current Price", c => c.CurrentPrice, ExcelWorkbook.Money),
+                    new("New Price", c => c.NewPrice, ExcelWorkbook.Money),
+                    new("Change %", c => c.ChangePercent, ExcelWorkbook.Money)));
+            interaction.SetOutput(await Dialogs.SaveAsync(fileName, ExcelWorkbook.Kind, workbook));
+        }));
+    }
+
+    private Task OpenProductAsync(RecordDoubleClickEventArgs<PriceSimulatorProductRow> args) =>
+        args.RowData is { } row ? Commands.Run(ViewModel!.OpenProductCommand, row.ProductId) : Task.CompletedTask;
+
+    // The table without paging shows every row its filters leave, in its sort: what "the products shown" are.
+    private async Task RememberShownAsync(object args)
+    {
+        if (_products is not null)
+        {
+            _shown = [.. await _products.GetCurrentViewRecordsAsync()];
+        }
+    }
+
+    // The rows picked in the table, which Print Report offers first.
+    private async Task SyncSelectionAsync(object args)
+    {
+        if (_products is null)
+        {
+            return;
+        }
+
+        var picked = await _products.GetSelectedRecordsAsync();
+        ViewModel!.SelectedProducts.Clear();
+        foreach (var row in picked)
+        {
+            ViewModel.SelectedProducts.Add(row);
+        }
+    }
+}

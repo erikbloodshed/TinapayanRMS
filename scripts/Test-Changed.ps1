@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     Takes the files changed since -Since (HEAD by default: what isn't committed yet, new files included), and runs every
-    test project that references, directly or through others, a project one of them is in. A change to the UI runs
+    test project that references, directly or through others, a project one of them is in. A change to the WPF UI runs
     UI.Tests alone; one to Domain or ApplicationCore runs them all. A file another project links in (the UI's
     appsettings.json) counts for that project too.
 

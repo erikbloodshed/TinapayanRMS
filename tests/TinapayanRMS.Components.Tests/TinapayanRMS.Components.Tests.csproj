@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The MAUI app's screens (TinapayanRMS.Components): the DI wiring, the Vim keys' C#, and the shared components
+       rendered with bUnit, with no database, no web view and no MAUI. -->
+
+  <ItemGroup>
+    <PackageReference Include="bunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Bunit" />
+    <!-- bUnit still has a TestContext of its own (obsolete since 2.0): TUnit's is the one meant here. -->
+    <Using Include="TUnit.Core.TestContext" Alias="TestContext" />
+  </ItemGroup>
+
+</Project>

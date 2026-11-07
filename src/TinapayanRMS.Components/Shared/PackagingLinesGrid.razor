@@ -1,0 +1,76 @@
+@using System.Collections.ObjectModel
+@using TinapayanRMS.Domain.Enums
+
+@* Packaging lines, as the WPF packaging grids (a packaging set on Sub-Assemblies, a product's Packaging section): the
+   material (picked from a list showing its category, base unit and cost per unit), how many, in any of the material's
+   own units (its base unit or an alternative one), that unit's cost, and the line's cost. Dragged into order. *@
+<LineGrid TRow="PackagingLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
+          Reorderable="!ReadOnly" ReadOnly="ReadOnly" EmptyText="@EmptyText" Footer="Footer">
+    <Header>
+        <th>Material</th>
+        <th class="col-number col-qty">Qty</th>
+        <th class="col-unit col-pack-unit">Unit</th>
+        <th class="col-number">Unit Cost</th>
+        <th class="col-number">@CostHeader</th>
+    </Header>
+    <Row Context="row">
+        <td>
+            @if (ReadOnly)
+            {
+                <span class="cell-text">@row.PackagingMaterial?.Name</span>
+            }
+            else
+            {
+                <PickField TItem="RawMaterial" Items="Materials" TextField="Name" CssClass="cell-field" PopupWidth="460px"
+                           Value="row.PackagingMaterial" ValueChanged="m => row.PackagingMaterialId = m?.Id">
+                    <ItemTemplate Context="material">
+                        <span class="pick-columns pick-columns-4">
+                            <span>@material.Name</span>
+                            <span class="muted">@material.Category?.Name</span>
+                            <span class="muted">@material.BaseUnit?.Abbreviation</span>
+                            <span class="muted number">@((Basis == CostBasis.Unbuffered ? material.CostPerBaseUnit : material.BufferedCostPerBaseUnit).ToString("N4"))</span>
+                        </span>
+                    </ItemTemplate>
+                </PickField>
+            }
+        </td>
+        <td><NumberField TValue="decimal?" Value="row.QtyPerUnit" ValueChanged="v => row.QtyPerUnit = v" Format="#,0.0###" Min="0" ReadOnly="ReadOnly" CssClass="cell-field" /></td>
+        <td>
+            @if (ReadOnly || row.UnitOptions.Count == 0)
+            {
+                <span class="cell-text">@row.UnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)?.Abbreviation</span>
+            }
+            else
+            {
+                <PickField TItem="PackagingUnitChoice" Items="row.UnitOptions" TextField="Abbreviation" CssClass="cell-field"
+                           Value="row.UnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)" ValueChanged="o => { if (o is not null) row.UnitKey = o.Key; }" />
+            }
+        </td>
+        <td class="cell-number">@row.UnitCost.ToString("N4")</td>
+        <td class="cell-number">@row.CostPerUnit.ToString("N2")</td>
+    </Row>
+</LineGrid>
+
+@code {
+    [Parameter, EditorRequired] public ObservableCollection<PackagingLineRow> Items { get; set; } = null!;
+
+    [Parameter] public Func<PackagingLineRow>? NewItem { get; set; }
+
+    [Parameter, EditorRequired] public IEnumerable<RawMaterial> Materials { get; set; } = [];
+
+    [Parameter] public PackagingLineRow? SelectedItem { get; set; }
+
+    [Parameter] public EventCallback<PackagingLineRow?> SelectedItemChanged { get; set; }
+
+    /// <summary>The cost column's header: "Cost per Set" for a packaging set, "Cost per Unit" on a product.</summary>
+    [Parameter] public string CostHeader { get; set; } = "Cost per Unit";
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    /// <summary>Which of a material's costs its picker lists: buffered, or the true cost while Products shows unbuffered costs.</summary>
+    [Parameter] public CostBasis Basis { get; set; }
+
+    [Parameter] public string? EmptyText { get; set; }
+
+    [Parameter] public RenderFragment? Footer { get; set; }
+}
