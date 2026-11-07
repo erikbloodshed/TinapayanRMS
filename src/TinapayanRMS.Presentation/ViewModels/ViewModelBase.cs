@@ -8,9 +8,9 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// Shared behavior for every screen's ViewModel: a friendly ErrorMessage surfaced in the UI (as an
-/// error toast, Controls/ErrorToast) instead of letting a failed action or load fail
-/// silently or crash the app, a SuccessMessage for what an action did (Controls/SuccessToast), and a
-/// Delete-confirmation Interaction the View wires up to a native MessageBox. Introduced in Phase 13 once every screen needed the same things — not before, since
+/// error toast, through ScreenBase's Notices) instead of letting a failed action or load fail
+/// silently or crash the app, a SuccessMessage for what an action did (a toast too), and a
+/// Delete-confirmation Interaction the screen answers with a dialog (ConfirmationHost). Introduced in Phase 13 once every screen needed the same things — not before, since
 /// one screen needing them wouldn't have justified a shared base class over ReactiveObject directly.
 /// </summary>
 public abstract class ViewModelBase : ReactiveObject
@@ -156,8 +156,8 @@ public abstract class ViewModelBase : ReactiveObject
 
     /// <summary>
     /// Input: what's being exported, which names the file ("Product Cost Summary"). Output: where the workbook was saved, or
-    /// null when the user cancelled. The View registers the handler (Exporting/ExcelExportHandlerRegistration), since the
-    /// grids it writes, in their sort, filter and columns, are the View's.
+    /// null when the user cancelled. The screen registers the handler (Reports and the Price Simulator, through ExcelWorkbook
+    /// and IFileDialogs), since the grids it writes, in their sort, filter and columns, are the screen's.
     /// </summary>
     public Interaction<string, string?> ExportToExcel { get; } = new();
 

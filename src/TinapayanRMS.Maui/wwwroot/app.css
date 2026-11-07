@@ -53,7 +53,7 @@ html, body {
     height: 100vh;
 }
 
-/* The window's title bar, which the page draws (Layout/TitleBar.razor), as the WPF window's ChromelessWindow draws its
+/* The window's title bar, which the page draws (Layout/TitleBar.razor), as the WPF window's ChromelessWindow drew its
    own (MainWindow.xaml): 32px in the card colour, the menu toggle and the heading on the left, and on the right glyph
    buttons 40×32, with the theme's faint wash on hover, Close red. Windows drags the rest of the bar (IAppWindow). */
 .app-titlebar {
@@ -691,7 +691,7 @@ input.e-input {
 
 /* ---- The Vim keys (Settings → Keyboard; wwwroot/vim.js). ---- */
 
-/* NORMAL or INSERT, on the title bar before Find, as the WPF window shows it. */
+/* NORMAL or INSERT, on the title bar before Find, as the WPF window showed it. */
 .vim-mode {
     margin-right: 6px;
     padding: 2px 10px;

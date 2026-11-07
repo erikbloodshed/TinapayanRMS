@@ -37,6 +37,10 @@ public static class MauiProgram
 
     public static MauiApp CreateMauiApp()
     {
+        // Syncfusion's grid and charts report their use to Syncfusion, over HTTPS (Syncfusion.Telemetry), as the WPF
+        // controls did. Off before any Syncfusion type is touched, as the WPF app had it (2026-11-06).
+        Syncfusion.Telemetry.Telemetry.Disable();
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
@@ -102,7 +106,7 @@ public static class MauiProgram
 
     /// <summary>
     /// The key the build compiled in from the SYNCFUSION_LICENSE_KEY environment variable (the project's AssemblyMetadata),
-    /// so an installed app needs no variable, as the WPF app does; else the variable itself. Without either the app still
+    /// so an installed app needs no variable, as the WPF app did; else the variable itself. Without either the app still
     /// opens, and Syncfusion says in the window that it has no licence.
     /// </summary>
     private static void RegisterSyncfusionLicence()

@@ -516,7 +516,6 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             new RawMaterialRepository(factory),
             new ProductRepository(factory),
             SavedProducts(factory),
-            new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
     }
 

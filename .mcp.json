@@ -4,9 +4,9 @@
       "command": "powershell",
       "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "scripts/Start-McpServer.ps1"]
     },
-    "syncfusion-wpf": {
+    "syncfusion-blazor": {
       "command": "dotnet",
-      "args": ["dnx", "Syncfusion.WPF.MCP", "--yes"],
+      "args": ["dnx", "Syncfusion.Blazor.MCP", "--yes"],
       "env": {
         "Syncfusion_API_Key": "${SYNCFUSION_API_KEY}"
       }

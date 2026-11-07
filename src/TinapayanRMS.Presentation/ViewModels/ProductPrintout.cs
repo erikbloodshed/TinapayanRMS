@@ -7,7 +7,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// What Print puts on paper for a product (Printing/ProductPrintLayout): its recipe and its costing as the Products screen
-/// shows them, unsaved edits included, taken the moment Print was pressed. Nothing in it is WPF, so its figures can be
+/// shows them, unsaved edits included, taken the moment Print was pressed. Nothing in it is the screen's, so its figures can be
 /// checked without laying out a page.
 /// </summary>
 /// <param name="ProductName">The header's title: the product's name, or "New product" for one not named yet.</param>

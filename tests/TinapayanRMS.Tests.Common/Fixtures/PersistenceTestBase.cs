@@ -16,7 +16,7 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 ///
 /// Each concrete test class names its collection itself, since the key differs from class to class:
 /// [NotInParallel(DatabaseCollection.Name)] and [ClassDataSource&lt;DatabaseFixture&gt;(Shared = SharedType.Keyed,
-/// Key = DatabaseCollection.Name)], or in UI.Tests and Infrastructure.Tests DatabaseCollection.A to D, each with a
+/// Key = DatabaseCollection.Name)], or in Presentation.Tests and Infrastructure.Tests DatabaseCollection.A to D, each with a
 /// database of its own. Without NotInParallel the class's tests would run side by side against one database, each
 /// resetting it under the others; without the keyed ClassDataSource, TUnit has no fixture to construct it with.
 /// </summary>

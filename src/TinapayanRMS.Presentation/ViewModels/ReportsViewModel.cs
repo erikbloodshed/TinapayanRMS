@@ -178,13 +178,13 @@ public sealed class CostBufferRow(RawMaterial material)
 /// </summary>
 public sealed class ReportsViewModel : ViewModelBase, IDisposable
 {
-    /// <summary>The Product Cost Summary's name, which its export file takes and the View picks its grid by.</summary>
+    /// <summary>The Product Cost Summary's name, which its export file takes and the screen picks its grid by.</summary>
     public const string ProductCostSummaryTitle = "Product Cost Summary";
 
-    /// <summary>The Raw Materials Price Summary's name, which its export file takes and the View picks its grid by.</summary>
+    /// <summary>The Raw Materials Price Summary's name, which its export file takes and the screen picks its grid by.</summary>
     public const string RawMaterialPriceSummaryTitle = "Raw Materials Price Summary";
 
-    /// <summary>The Cost Buffers tab's name, which its export file takes and the View picks its grid by.</summary>
+    /// <summary>The Cost Buffers tab's name, which its export file takes and the screen picks its grid by.</summary>
     public const string CostBuffersTitle = "Cost Buffers";
 
     public const string CostDriversTitle = "Cost Drivers";
@@ -234,10 +234,6 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     public ReactiveCommand<RxVoid, RxVoid> ExportMarginErosionCommand { get; }
 
-    public GridLayoutStore CostDriversLayout { get; }
-
-    public GridLayoutStore MarginErosionLayout { get; }
-
     private readonly IProductVersionRepository? _versionRepository;
     private readonly IIngredientBomLineRepository? _bomLineRepository;
 
@@ -269,9 +265,6 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     /// <summary>The Cost Buffers table to an Excel workbook, as its grid shows it.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ExportCostBuffersCommand { get; }
-
-    /// <summary>The Cost Buffers table's sort and filters, kept between runs.</summary>
-    public GridLayoutStore CostBuffersLayout { get; }
 
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
@@ -310,18 +303,11 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>The Raw Materials Price Summary to an Excel workbook, as its grid shows it.</summary>
     public ReactiveCommand<RxVoid, RxVoid> ExportRawMaterialPricesCommand { get; }
 
-    /// <summary>The Product Cost Summary's filters, sort and columns, kept between runs (Controls/GridLayoutKeeping).</summary>
-    public GridLayoutStore ProductCostsLayout { get; }
-
-    /// <summary>The Raw Materials Price Summary's sort and filters, kept between runs.</summary>
-    public GridLayoutStore RawMaterialPricesLayout { get; }
-
     public ReportsViewModel(
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
         IRawMaterialRepository rawMaterialRepository,
         IProductRepository productRepository,
         SavedProductReader savedProducts,
-        IViewStateStore viewState,
         ILogger logger,
         IProductVersionRepository? versionRepository = null,
         IIngredientBomLineRepository? bomLineRepository = null)
@@ -329,8 +315,6 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     {
         _versionRepository = versionRepository;
         _bomLineRepository = bomLineRepository;
-        CostDriversLayout = new GridLayoutStore(viewState, "reports-cost-drivers");
-        MarginErosionLayout = new GridLayoutStore(viewState, "reports-margin-erosion");
         ExportCostDriversCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostDriversTitle));
         ExportMarginErosionCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(MarginErosionTitle));
 
@@ -340,9 +324,6 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         _rawMaterialRepository = rawMaterialRepository;
         _productRepository = productRepository;
         _savedProducts = savedProducts;
-        ProductCostsLayout = new GridLayoutStore(viewState, "reports-product-costs");
-        RawMaterialPricesLayout = new GridLayoutStore(viewState, "reports-raw-material-prices");
-        CostBuffersLayout = new GridLayoutStore(viewState, "reports-cost-buffers");
         ExportCostBuffersCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostBuffersTitle));
         ReapplyTargetBuffersCommand = ReactiveCommand.CreateFromTask(ReapplyTargetBuffersAsync);
 

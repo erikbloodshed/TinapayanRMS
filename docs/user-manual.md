@@ -149,23 +149,18 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Minimized and opened again from the taskbar, it comes back at the size it had, maximized or not.
+- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens at a time: opening it again brings the window that's open to the front.
+- **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
-- **Tabs**: each screen opens in a tab along the top. The app starts with **Raw Materials**, **Sub-Assemblies** and **Products** open; open the others from the menu. A tab you close can be opened again from the menu. Each tab keeps its place, such as the record you were looking at, until you close the app. A tab with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
-- **Back and Forward** (the arrows at the top right, next to the minimize button, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, like a web browser.
-- **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there, highlighted, the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
-- Changes made on one tab show up on another tab the next time you switch to it.
-
-### The new window
-
-A new version of the app is being tried out beside this one. It has the same screens, works on the same data and backups, and looks and works the same way, down to the title bar, the menu, the tabs and the Vim keys. Everything in this manual applies to it, apart from these:
-
-- **Settings** opens as a tab of its own, at the end of the tab strip, with **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard** and **Database** as tabs inside it, instead of a separate Settings window.
-- **Back and Forward** step through every screen and record you've opened, Settings' tabs included.
-- **Print** shows the pages in the window, a sheet for each, and prints them through Windows' print dialog, where you pick the printer, the paper and the pages.
-- **Closing the window** asks about changes you haven't saved, as moving to another screen does.
-- It remembers the folders you leave open, the Vim keys and the backups' second folder on its own. The first time you open it, it starts with what the old version remembered.
-- Both versions can be open at once. A change saved in one shows in the other the next time you open that screen there.
+- **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
+  - **Raw Materials**, **Sub-Assemblies** and **Products** have a tab from the start. **Reports**, **Price Simulator**, **Print** and **Settings** get one the first time you open them.
+  - The **✕** on a tab closes it. Nothing is lost: the screen keeps the record it had open, and its tab comes back when you open the screen again from the menu. The last tab left has no ✕.
+  - The **Settings** tab is the last one. Clicking it opens Settings on its first tab, **Units of Measure**.
+  - Each screen keeps its place, such as the record you were looking at, until you close the app. A screen with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
+- **Back and Forward** (the arrows at the top right, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, Settings' tabs included, like a web browser. If the cursor was in a box when another record opens, the cursor leaves the box, so that you don't type over the record that just opened. Click the box again to type in it.
+- **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
+- Changes made on one screen show up on another the next time you open it.
+- **Closing the window** closes the app. What you've saved is kept. If a product, sub-assembly or raw material has changes you **haven't** saved, the app asks whether to save them first, as it does when you go to another screen (see [Editing and saving](#editing-and-saving)).
 
 ### Lists as folder trees
 
@@ -181,24 +176,24 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **One Save saves the whole record**, including everything on its tabs. Until you press **Save**, nothing you type is stored.
 - **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Y**) step back and forth through the changes you've made since opening the record.
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
-- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to matching names and highlights the best match: the name you typed in full, or else the first name that starts with what you typed, or else the first that contains it. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine. **Down** and **Up** move the highlight to the other names. Clicking or tabbing into a picker selects its text, so what you type replaces it. Click again to put the cursor where you click. A picker that can't be left empty, such as a raw material's **Type** or **Source**, shows its value again if you delete its text and move on.
+- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to the names that contain what you typed, and fills in the first name that starts with it. **Enter** or **Tab** picks that name, so "marg" and Enter picks Margarine. **Down** and **Up** move to the other names. If what you typed matches nothing, the picker keeps what it had. Clicking or tabbing into a picker selects its text, so what you type replaces it.
 - **New** starts a blank record. **Delete** asks before deleting anything.
-- **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another tab (or close the one showing), pick another item in the list, press **New**, click a **Used By** tile or another link, press **Back** or **Forward**, use **Clone** or **Create Variant**, or close the app.
+- **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another screen (from the tabs, the menu or Find, or by closing the tab showing), pick another item in the list, press **New**, click a **Used By** tile or another link, go **Back** or **Forward**, use **Clone** or **Create Variant**, or close the window. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
-  - **No** throws them away, then goes on. If you were leaving the tab, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
+  - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
-  - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
+  - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Leaving Print for any other screen asks about the product's changes, as leaving Products would. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
-- If something goes wrong that the app didn't expect, a message says what happened and that the app is still running, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost.
+- If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
 
 ### Working in tables
 
 - Most tables are typed straight into. Click a cell and type. The empty row at the bottom adds a new line.
 - On that bottom row, **Tab** from its last cell adds the line, as **Enter** does, and opens the first cell of the next empty row, so you can type one line after another without reaching for the mouse.
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
-- To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was, whether you press Esc, Tab, Enter or click away. To empty the cell, delete all its text.
-- **Drag a row**, by its left edge or any cell you aren't typing in, to change the order of recipe lines, add-ins and packaging lines. The order is saved.
-- **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell opens, ready to type. With no line selected, or the empty row at the bottom selected, the new line goes in at the bottom. You can also press **Insert** while the table has the cursor and you aren't typing in a cell. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, and a product section's lines and add-ins (the add-ins button is **Insert Add-In**). A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
+- To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was.
+- **Drag a row** by its left edge to change the order of recipe lines, add-ins and packaging lines. The order is saved.
+- **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell takes the cursor, ready to type. With no line selected, the new line goes in at the bottom. You can also press **Insert** while the cursor is in the table. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, a product section's lines and add-ins (the add-ins button is **Insert Add-In**), and a made ingredient's add-ins. A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
 - Figures shown in grey are worked out by the app, so they can't be typed into.
 
@@ -211,15 +206,14 @@ With them on, the keys work in two modes. The mode shows at the top right of the
 - **NORMAL**: letters move around the app and run commands. They don't type.
 - **INSERT**: what you type goes into the field or table cell, as usual.
 
-Clicking a field or cell, tabbing into it, or picking it by its label (**f**, below) puts you in INSERT, ready to type. **Esc** stops typing and goes back to NORMAL.
+Clicking a field or cell, tabbing into it, or picking it by its label (**f**, below) puts you in INSERT, ready to type. **Esc** stops typing and goes back to NORMAL, keeping what you typed.
 
-**Ctrl+[** does everything Esc does, as in Vim, so you don't have to reach for the Esc key. It works wherever Esc does: in a field or cell, on the labels, the command bar and the list of keys, and to close Settings or a small window.
+**Ctrl+[** does everything Esc does, as in Vim, so you don't have to reach for the Esc key. It works wherever Esc does: in a field or cell, on the labels, the command bar and the list of keys, and to close a small window.
 
-While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, like the Down and Up arrows. That covers the list under a field you're typing a name into and the one in a table cell. With no list open, they do nothing.
+While a picker's list is open, **Ctrl+J** and **Ctrl+K** move down and up it, like the Down and Up arrows. **Ctrl+P** moves up too, as in Vim. (Vim's Ctrl+N belongs to the window's web view, which opens a new window with it.) That covers the list under a field you're typing a name into and the one in a table cell. With no list open, they do nothing.
 
-- In a table cell, Esc keeps what you typed. Without Vim keys, Esc in a cell throws the typing away.
-- In a table, INSERT lasts from cell to cell. After **Tab**, **Enter** or an arrow takes you to the next cell, just type: there's no need to press **i** again. Tabbing into a table from a field you were typing in keeps INSERT too. Press **Esc** when you're done, and the letters move around the table again.
-- In Settings, or a small window that asks for a name, the first Esc stops typing, and a second Esc closes the window.
+- **Tab** takes you to the next field or cell still in INSERT, so just keep typing. Press **Esc** when you're done, and the letters move around again.
+- In a small window that asks for a name or a Yes or No, the first Esc stops typing, and a second Esc closes the window. While such a window is open, **j** and **k** move between its buttons.
 
 **Moving around**
 
@@ -228,8 +222,8 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 - **gg** and **G**: the first and last row.
 - **0** and **$**: the first and last column of a table, or the start and end of a field.
 - **J** and **K**: leave the list or table, for the control after it or before it.
-- **gt** and **gT**: the next and previous tab.
-- **H** and **L**: Back and Forward, like Alt+Left and Alt+Right.
+- **gt** and **gT**: the next and previous tab along the top, round from the last to the first. They pass over the **Settings** tab, because in Settings they move through its own tabs instead.
+- **H** and **L**: Back and Forward, like **Alt+Left** and **Alt+Right**.
 - **/**: the search box of the list on screen.
 - **f**: puts a small yellow label on everything you can click. Type a label to click its item. Esc takes the labels away.
 
@@ -239,9 +233,9 @@ While a picker's list is open, **Ctrl+N** and **Ctrl+P** move down and up it, li
 - **cc**: type over a field or cell. Its text is selected, so what you type replaces it.
 - **o**: start a new line in a table, in the empty row at the bottom.
 - **O**: start a new line above the one under the cursor, as **Insert Line** does. It works in the ingredient tables that have that button.
-- **dd**: delete the table line under the cursor. In the Raw Materials and Products lists, it deletes the row, as the row's menu does, and asks first.
+- **dd**: delete the table line under the cursor. In the Raw Materials, Sub-Assemblies and Products lists, it deletes the row, as the row's menu does, and asks first.
 - **r**: rename the list row, as the row's menu does.
-- **u**: undo. **Ctrl+R**: redo.
+- **u**: undo. **Ctrl+R**: redo. While the Vim keys are on, Ctrl+R doesn't reload the page as it otherwise does; use **F5** for that.
 
 **Working out a sum while you type**
 
@@ -258,7 +252,7 @@ While you're typing in a table cell or a field (INSERT), press **Ctrl+R**, then 
 
 **Commands**
 
-Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it. Enter closes it too and runs the command. If the command can't run, for example **:w** when there's nothing to save, the bar says why. That message goes away at your next key or click, or after a few seconds.
+Type **:**, then a command, then **Enter**. A bar opens at the bottom of the window for it, and Esc closes it. Enter closes it too and runs the command. If the command can't run, for example **:w** when there's nothing to save, a bar at the bottom says why. That message goes away at your next key or click, or after a few seconds.
 
 - **:w** saves.
 - **:new** starts a new one.
@@ -295,7 +289,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It has seven tabs. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Press **Close**, the **✕** at its top right, or **Esc** to close Settings. The button beside the ✕ makes the window fill the screen, and pressing it again returns the window to its normal size. You can also drag the title bar to move the window.
+Open **Settings** from the bottom of the navigation menu. It opens as a screen of its own, with a tab at the end of the tab strip, and has seven tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
 
 ### Units of Measure
 
@@ -366,19 +360,19 @@ The setting is kept for you on this computer, not in the bakeshop's data. Turnin
 
 Backups of all of the app's data: every raw material, price, sub-assembly, product and setting.
 
-- **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. **Open Folder** shows it in File Explorer. Everyone who uses the app on this computer shares the folder.
+- **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. Open it in File Explorer to see the files. Everyone who uses the app on this computer shares the folder.
 - The list shows every backup, newest first: when it was **Taken**, its **Kind** and its **Size (MB)**.
   - **Manual**: taken with **Back Up Now**.
-  - **Automatic**: the app takes one by itself each day: when it's opened, and if it stays open past midnight, within the hour after. The newest 14 are kept, and older automatic ones are deleted.
+  - **Automatic**: the app takes one by itself each day, while it's open: when it starts, and if it's left open overnight, within the hour after midnight. The newest 14 are kept, and older automatic ones are deleted.
   - **Before restore**: the safety backup a restore takes of the data it replaces.
   - **Copied in**: a backup brought in with **Restore from File…**.
   - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
 - **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The note stays until a copy goes through or you change the folder. The folder is kept for you on this computer.
-- If an automatic backup can't be taken, a note in amber under **Folder** says why, and the app tries again within the hour. The note stays until one is taken, even if you close the app and open it again. If they keep failing, and the newest backup is three days old or more, a message says so once each time the app is opened. Ask whoever set up the app to look into it.
+- If an automatic backup can't be taken, a note in amber under **Folder** says why, and the app tries again within the hour. The note stays until one is taken, even if you close the app and open it again. If they keep failing, and the newest backup is three days old or more, a warning across the top of every screen says so until a backup is taken. Ask whoever set up the app to look into it.
 - A file in the folder ending in *.partial* is a backup still being written, or one that was cut short, by a power cut for example. It isn't listed, it can't be restored, and the app deletes one that's left behind after a day.
 - **Back Up Now** takes a backup straight away.
-- **Copy to…** copies the backup picked in the list somewhere else, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
-- **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and the app closes and opens again. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
+- **Copy To…** saves a copy of the backup picked in the list where you choose, such as a USB stick. Do this now and then: backups kept only on this computer are lost with it if it breaks.
+- **Restore** puts the backup picked in the list back, in place of all of the app's data. It asks first, saying when the backup was taken. Then it takes a safety backup of the data as it is, puts the backup back, and every screen starts afresh with the restored data. Anything saved since the backup was taken is lost, and so is anything not yet saved on another screen.
   - A backup from an earlier version of TinapayanRMS is brought up to date as it's restored.
   - A backup from a later version is refused, and nothing changes. Update the app first.
   - A backup is checked and brought up to date before it takes the data's place. If it's refused, or anything goes wrong part-way, the data stays as it was.
@@ -647,7 +641,7 @@ Below the header are the fields you fill in:
 **Unbuffered** switches every cost on the Products screen to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the ingredient and packaging pickers. While it's on, the button reads **Buffered** and an **Unbuffered costs** badge shows beside the product's name. Press **Buffered** to go back to buffered costs.
 
 - It only changes what you see. Nothing is saved, **Save** and **Undo** aren't affected, and **Reports** still use buffered costs.
-- It stays on when you open another product, until you switch it off or close the app. The app always starts on buffered costs.
+- It stays on when you open another product, until you switch it off, close the window or reload the page. The app always starts on buffered costs.
 - **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
 
 A **Priced below cost** badge in the header means prices have risen past the buffered cost of a purchased material in the recipe or packaging. Every cost here is at buffered costs, so the product is priced under what that material costs. Point at the badge to see which materials. Re-apply their target buffers on Raw Materials, or in Reports' **Cost Buffers**, to carry their new prices in. A composite product's own products aren't checked here; each shows its badge when you open it.
@@ -852,22 +846,22 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows a preview of the product's recipe and costing as the screen shows them, including changes you haven't saved yet. On the Scaling tab, it prints the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it prints the version picked there, at its costs then (see [History tab](#history-tab)).
+Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the Scaling tab, it shows the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
+- **Print** (the picker at the top left) chooses **This product**, the folder last asked for, or **All products**.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
-- **Print**: the drop-down chooses **This product**, the folder last asked for, or **All products**.
-- The preview's own controls set the printer, paper, orientation and margins. The paper starts as the Windows default printer's, as set in that printer's **Printing preferences**, or A4 if Windows has no default printer.
+- **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
 To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**.
 
-A set prints each product **as saved**, with a contents page and each product starting on a new page. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
+A set prints each product **as saved**, with a contents list first and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen and prints on two pages or more. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
-The footer on each page shows the product, when it was printed, whether it includes unsaved changes, and the page number.
+Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
 
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
-Close the Print tab with its ✕.
+Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, or by closing the **Print** tab with its **✕**.
 
 A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
@@ -877,7 +871,7 @@ If the Products screen is showing the [Scaling tab](#scaling-tab) when you press
 
 **Include** then has a single tick box, **Costs**. Clear it to print only the amounts, for example for the kitchen.
 
-The Print tab always follows the Products screen. If you go back to Products, change to another tab and show the Print tab again, it shows the recipe and costing again.
+The Print tab always follows the Products screen. If you go back to Products, change to another of its tabs and press **Print** again, it shows the recipe and costing again.
 
 ---
 
@@ -904,9 +898,9 @@ One row for every product, as it's saved:
 
 Sort by **Markup %** to see which products earn the least, or by **Short By** to see which fall furthest short of what you're aiming for.
 
-To show only some products, click the funnel in the **Product**, **Stage** or **Category** heading. Untick what you don't want to see, or untick **(Select All)** and tick only what you do, then click **OK**. The search box at the top finds a name in a long list. A funnel with a dot shows that its column is filtered, and filters in more than one column work together: **Stage** set to Production and **Category** set to Breads shows only the breads in production. **Clear Filter** at the top of the list shows everything in that column again. The filters stay as you set them, even after you close the app: Reports opens with them the next time.
+To show only some products, click the funnel in the **Product**, **Stage** or **Category** heading. Untick what you don't want to see, or untick **(Select All)** and tick only what you do, then click **OK**. The search box at the top finds a name in a long list. A funnel with a dot shows that its column is filtered, and filters in more than one column work together: **Stage** set to Production and **Category** set to Breads shows only the breads in production. **Clear Filter** at the top of the list shows everything in that column again. The filters stay as you set them, for you on this computer: Reports opens with them the next time you open the app.
 
-To choose which columns show, click **Columns** at the top right and untick the ones you don't need, such as **Labor Cost**, **Overhead Cost** and **Admin Cost**. Tick one again to bring it back. The list stays open while you tick, and closes when you click anywhere else. **Product** is always shown, so it isn't in the list. A hidden column's filter still applies: you can filter **Stage** to Production and then hide the Stage column. Like the filters, your choice of columns, and the column you sorted by, are kept for the next time you open the app. They're kept for you on this computer.
+To choose which columns show, click **Columns** at the top right and untick the ones you don't need, such as **Labor Cost**, **Overhead Cost** and **Admin Cost**. Tick one again to bring it back. Press **OK** to apply your choice. **Product** is always shown, so it isn't in the list. A hidden column's filter still applies: you can filter **Stage** to Production and then hide the Stage column. Like the filters, your choice of columns, and the column you sorted by, are kept for you on this computer: Reports opens with them the next time you open the app.
 
 The headings wrap onto two lines to leave room for all the columns. On a smaller screen, such as a 1366-pixel laptop, the table scrolls sideways, and the **Product** column stays in place.
 
@@ -973,7 +967,7 @@ Each tab has **Export to Excel** at its top right. It saves the table to an Exce
 - with only the rows your filters leave;
 - with only the columns showing (Product Cost Summary's **Columns** list decides which).
 
-Choose where to save it and press **Save**. The name offered is the report's and today's date, such as *Product Cost Summary 2026-10-03.xlsx*. A notice then says where the file went.
+A **Save** window asks where to put the file, suggesting a name after the report and today's date, such as *Product Cost Summary 2026-10-03.xlsx*. A green notice says where it went. **Cancel** saves nothing.
 
 The figures are real numbers in Excel, kept to every decimal the app works with, and shown to 2 decimal places as on the screen. So you can add them up or chart them in Excel.
 
@@ -983,7 +977,7 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ## 10. Price Simulator
 
-The **Price Simulator** shows what raw material price changes would do to every product, before they happen. It never changes a real price, and nothing else in the app changes. The changes you try last until you close the app, unless you save them as a scenario.
+The **Price Simulator** shows what raw material price changes would do to every product, before they happen. It never changes a real price, and nothing else in the app changes. The changes you try last until you close the window or reload the page, unless you save them as a scenario.
 
 ### Price Changes
 
@@ -1031,13 +1025,13 @@ The figures start at the materials' buffered costs, as everywhere else in the ap
 
 - A price change moves a material's true cost and its buffered cost by the same percent, so a 10% rise in flour is a 10% rise either way.
 - **Print Report** and **Export to Excel** follow the switch. Each page of an unbuffered report says **Unbuffered costs**. The workbook is named **Price Simulator (Unbuffered)**, with a **Products (Unbuffered)** sheet.
-- Nothing is saved. A scenario doesn't remember the switch, switching doesn't count as a change to the open scenario, and the screen starts on buffered costs each time you open the app.
+- Nothing is saved. A scenario doesn't remember the switch, switching doesn't count as a change to the open scenario, and the screen starts on buffered costs each time you open the window or reload the page.
 
 ### Printing a Price Simulator report
 
-**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. Print it, or save it as a PDF with **Microsoft Print to PDF**.
+**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. **Print** there opens Windows' print window: print it, or choose **Microsoft Print to PDF** as the printer to make a PDF. **Back** returns to the Price Simulator.
 
-To print only some products, click one in the **Products** table, or several with **Ctrl** or **Shift** held, before pressing **Print Report**. The products you picked stay picked while you change prices. At the bottom of the preview, **Print** chooses:
+To print only some products, click one in the **Products** table, or several with **Ctrl** or **Shift** held, before pressing **Print Report**. The products you picked stay picked while you change prices. At the top of the preview, the **Print** picker chooses:
 
 - **Selected products**: only the ones you picked. The preview opens on this choice when you've picked any.
 - **All products shown**: every product the table shows, with **Only affected products** and the column filters applied, in the table's order.
@@ -1075,7 +1069,7 @@ A packaging material's price changes
     → every composite product that includes those products' packaging
 ```
 
-This happens as soon as you save. A product already open on another tab shows the new figures when you switch back to it.
+This happens as soon as you save. A product you had open on the Products screen shows the new figures when you go back to it.
 
 ### Raw materials
 
@@ -1226,14 +1220,14 @@ To have it done every day, set the USB stick as **Also Copy To** on the **Databa
 1. Put in the USB stick.
 2. Open **Settings**, then the **Database** tab.
 3. Press **Back Up Now**. The new backup is picked in the list.
-4. Press **Copy to…**, choose the USB stick, and press **Save**.
+4. Press **Copy To…**, pick the USB stick, and press **Save**.
 
 ### Restore a backup
 
 1. Open **Settings**, then the **Database** tab.
 2. Pick the backup in the list. For a backup on a USB stick, press **Restore from File…** and pick the file instead.
 3. Press **Restore**, read the message, and press **Yes**.
-4. Wait while it restores. The app closes and opens again with the backup's data.
+4. Wait while it restores. The window then starts its screens afresh, with the backup's data.
 
 If the data restored wasn't the one you wanted, the **Before restore** backup holds what was there just before. Restore that one to undo it.
 
@@ -1322,7 +1316,7 @@ The app keeps its data in PostgreSQL on this computer, and it isn't answering. C
 **"The database didn't answer in time."** or **"The database was busy with another change."**
 Nothing was saved. Try again.
 
-**A message says the database is out of date for this version of TinapayanRMS.**
+**A yellow bar under the title bar says the database is out of date for this version of TinapayanRMS.**
 The app was updated, but the update to its database wasn't applied. Close the app and ask whoever installs it to apply the database update. Until they do, some screens show an error.
 
 **"Couldn't write the file. If it's open in another program, such as Excel, close it there and try again."**
@@ -1340,8 +1334,8 @@ Windows couldn't finish with the file, for the reason it gives, such as a full d
 **"PostgreSQL's pg_dump reported a problem: …"** or **"PostgreSQL's pg_restore reported a problem: …"**
 PostgreSQL's own tool stopped a backup or restore, for the reason it gives. No backup was made and the data wasn't changed. Ask whoever set up the computer to look into it. *No password supplied* means this Windows user has no password file for the database.
 
-**A message says TinapayanRMS couldn't start.**
-Something the app needs before it can open is missing or wrong, such as its settings file. The message says what, and where the log is, and the app closes after it. Ask whoever installs the app to look into it, and give them the log.
+**The app doesn't open.**
+Something the app needs before it can open is missing or wrong, such as its settings file. The log says what. Ask whoever installs the app to look into it, and give them the log.
 
 **"Backups need PostgreSQL's pg_dump and pg_restore, and they weren't found on this computer."**
 Backups are taken by PostgreSQL's own tools, which come with PostgreSQL. Ask whoever set up the computer to install PostgreSQL's command-line tools, or to tell the app where they are.
@@ -1364,20 +1358,17 @@ Ask whoever looks after the computer to give **Users** **Modify** on that folder
 **"A number is too large to save."**
 A figure has more digits than the app keeps, for example a price typed with too many zeros. Check what you typed.
 
-**A message says something went wrong, and that the app is still running.**
-Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. If anything on the screen looks wrong afterwards, save what you can, then close the app and open it again. If such messages keep coming, the app closes by itself.
+**A number box doesn't take what I typed.**
+A number box takes numbers under a billion (999,999,999.9999 at most). If you type more digits than that, for example by holding a key down, the box keeps the last number it could take and shows it when you leave the box. Check the figure and type it again.
+
+**A bar at the bottom of the window says something went wrong, and that the page needs reloading.**
+Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. Press **Reload**. What you had saved is safe; what you hadn't saved is lost.
 
 **Opening the app brings up the window that's already open, not a new one.**
-Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another Windows user on the same PC, or another PC using the same database, so take care not to work on the same thing at the same time.
+Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another Windows user on the same PC, another PC using the same database, or another version of the app on this PC, so take care not to work on the same thing in two of them at the same time.
 
-**"TinapayanRMS is already open, but it isn't answering."**
-The copy that's open has stopped responding, or is busy with something long. Give it a moment. If its window doesn't come back, end it in Task Manager, then open the app again. Anything it hadn't saved is lost.
-
-**"TinapayanRMS is already open, in a way this copy can't reach."**
-It was started as an administrator, or under another Windows user. Use that window, or close it, then open the app again.
-
-**"TinapayanRMS is already open from another folder."**
-There's more than one copy of the app on this PC, and it's the other one that's open. Press **OK** and that one comes to the front. To use the one you just started, close that one first.
+**Opening the app does nothing.**
+The copy that's open has stopped responding, or is busy with something long. Give it a moment. If its window doesn't come back, end **TinapayanRMS.Maui** in Task Manager, then open the app again. Anything it hadn't saved is lost.
 
 **"That name is already in use."** or **"That abbreviation is already in use."**
 Names must be unique within each list: raw materials, sub-assemblies, products, categories, roles and units. A unit's abbreviation must be unique too. Upper and lower case count as the same. Spaces at the start or end of a name don't count either: they're taken off when it's saved.
@@ -1395,10 +1386,10 @@ Purchased materials are costed at their **buffered cost**, which stays fixed unt
 Packaging quantities are per sellable unit and aren't rescaled. Update the Packaging tab by hand, or link a packaging set made for that pack size.
 
 **A message asks "Save the changes to …?" when I click somewhere else.**
-The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving).
+The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving). Closing the window asks the same. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
 
-**The app shows an error about the licence when it starts.**
+**The window shows a notice about a Syncfusion licence.**
 The app needs a licence key for its screen components, set on the computer by whoever installed it. Ask them to check it.
 
 **Where are the log files?**
-In the **logs** folder next to the app. There's one file per day, kept for 31 days. They're useful to send along when reporting a problem.
+In the **logs** folder of the app's data folder, *%LocalAppData%\TinapayanRMS\Maui\logs*. There's one file per day, kept for 31 days. They're useful to send along when reporting a problem.

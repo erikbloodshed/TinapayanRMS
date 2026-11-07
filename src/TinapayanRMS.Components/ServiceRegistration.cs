@@ -17,7 +17,7 @@ using TinapayanRMS.Components.Vim;
 namespace TinapayanRMS.Components;
 
 /// <summary>
-/// The MAUI app's services, as the WPF app's CompositionRoot registers them, except that the ViewModels are scoped. In
+/// The MAUI app's services, as the WPF app's CompositionRoot registered them, except that the ViewModels are scoped. In
 /// Blazor Hybrid a scope is a page the window's web view loads, so a reload (after a restore) builds every screen afresh,
 /// as the WPF app restarted. The repositories and services hold nothing but the context factory, so they stay singletons.
 /// What only the window can do (its file dialogs, its title bar's buttons) the MAUI app adds: IFileDialogs and IAppWindow.
@@ -83,7 +83,7 @@ public static class ServiceRegistration
         services.AddSingleton<AppStatus>();
 
         // The day's automatic backup and its copy to a second folder, checked every hour (StartupTasks). The second folder
-        // and the last problems are kept in the view state, as the WPF app keeps them.
+        // and the last problems are kept in the view state, as the WPF app kept them.
         services.AddSingleton<AutomaticBackups>();
         services.AddScoped(provider => new DatabaseBackupsViewModel(
             provider.GetRequiredService<IDatabaseBackups>(),

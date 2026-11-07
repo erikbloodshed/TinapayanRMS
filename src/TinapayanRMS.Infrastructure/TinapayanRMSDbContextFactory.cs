@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore.Design;
 namespace TinapayanRMS.Infrastructure;
 
 /// <summary>
-/// Lets `dotnet ef` create a DbContext at design time without running the WPF host.
+/// Lets `dotnet ef` create a DbContext at design time without running the app.
 /// The connection string here is only for migration authoring; the app itself
-/// gets its connection string from TinapayanRMS.UI's appsettings.json.
+/// gets its connection string from TinapayanRMS.Maui's appsettings.json.
 /// </summary>
 public sealed class TinapayanRMSDbContextFactory : IDesignTimeDbContextFactory<TinapayanRMSDbContext>
 {

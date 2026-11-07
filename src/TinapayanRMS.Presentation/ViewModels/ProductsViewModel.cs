@@ -4078,8 +4078,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// A tab was picked in the strip, or SelectedRecipeTab set. A pick the screen makes itself (SelectRecipeTab,
-    /// or the tabs rearranged) belongs to whatever step it's part of. The user's own runs between steps: WPF selects
-    /// a tab as it takes the cursor, before the field it takes it from hears so (TabItem.OnPreviewGotKeyboardFocus),
+    /// or the tabs rearranged) belongs to whatever step it's part of. The user's own runs between steps: the WPF app
+    /// this screen began in selected a tab as it took the cursor, before the field it took it from heard so (TabItem.OnPreviewGotKeyboardFocus),
     /// so that field's step is still open while the form changes over to the other tab's section, and closed after,
     /// it would record the change of section as an edit. So the step closes on the tab being left, keeping what
     /// was typed there, and another opens on the tab arrived at, for the field to close.
@@ -4570,7 +4570,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private const string CostingGlyph = "";
 
     /// <summary>
-    /// The menu a right-click opens on the list (ProductListCard): on <paramref name="node"/>'s row, which the View picks
+    /// The menu a right-click opens on the list (ProductList): on <paramref name="node"/>'s row, which the list picks
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
     /// product's menu covers every product picked with it.
     /// </summary>

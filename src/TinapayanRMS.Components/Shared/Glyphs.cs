@@ -39,7 +39,7 @@ public static class Glyphs
     public const string Download = "";
     public const string Upload = "";
 
-    // The title bar's, as the WPF main window's title bar draws them (MainWindow.xaml; ChromelessWindow's own buttons).
+    // The title bar's, as the WPF main window's title bar drew them (ChromelessWindow's own buttons).
     public const string Menu = "";
     public const string Minimize = "";
     public const string Maximize = "";

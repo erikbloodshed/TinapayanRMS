@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <!-- DatabaseFixtureBase reads the connection string from it. Copied on into each test project's output. -->
-    <Content Include="..\..\src\TinapayanRMS.UI\appsettings.json" Link="appsettings.json">
+    <Content Include="..\..\src\TinapayanRMS.Maui\appsettings.json" Link="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

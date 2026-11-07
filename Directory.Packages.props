@@ -28,10 +28,9 @@
     <!-- The official MCP C# SDK, for TinapayanRMS.Mcp. -->
     <PackageVersion Include="ModelContextProtocol" Version="2.3.1" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.3" />
-    <!-- ReactiveUI and its two hosts, the WPF app's and the Blazor screens': move them together. -->
+    <!-- ReactiveUI and its Blazor host: move them together. -->
     <PackageVersion Include="ReactiveUI" Version="26.0.1" />
     <PackageVersion Include="ReactiveUI.Blazor" Version="26.0.1" />
-    <PackageVersion Include="ReactiveUI.WPF" Version="26.0.1" />
     <PackageVersion Include="Serilog" Version="4.3.0" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
@@ -44,7 +43,6 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebView" Version="$(MicrosoftExtensionsVersion)" />
   </ItemGroup>
   <ItemGroup Label="Syncfusion">
-    <!-- The MAUI app's screens (Syncfusion Blazor). -->
     <PackageVersion Include="Syncfusion.Blazor.Buttons" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Blazor.Charts" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Blazor.DropDowns" Version="$(SyncfusionVersion)" />
@@ -56,18 +54,7 @@
     <PackageVersion Include="Syncfusion.Blazor.SplitButtons" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Blazor.Themes" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="$(SyncfusionVersion)" />
-    <!-- The WPF app's controls. -->
-    <PackageVersion Include="Syncfusion.DataGridExcelExport.WPF" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfChart.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfGrid.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfInput.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfNavigationDrawer.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfSkinManager.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfTextInputLayout.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.SfTreeView.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.Themes.Windows11Light.WPF" Version="$(SyncfusionVersion)" />
-    <PackageVersion Include="Syncfusion.Tools.WPF" Version="$(SyncfusionVersion)" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />

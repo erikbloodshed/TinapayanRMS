@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- The app's own, so it reads the database the app saves to. -->
-    <Content Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TinapayanRMS.Maui\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

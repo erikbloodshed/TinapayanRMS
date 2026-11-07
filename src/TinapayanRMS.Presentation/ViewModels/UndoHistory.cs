@@ -3,8 +3,8 @@ using ReactiveUI;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// What a screen offers the Controls/ behaviours that record undo steps, so a behaviour never needs to know
-/// which screen it's on: it brackets the gesture it can see and the screen decides whether anything changed.
+/// What a screen offers the components that record undo steps (TextField, NumberField, PickField, LineGrid), so a
+/// component never needs to know which screen it's on: it brackets the gesture it can see and the screen decides whether anything changed.
 /// Opening a step settles any step still open, so a gesture that's abandoned rather than finished — Esc on
 /// the add row, a cell edit a rule refused — costs nothing and needs no cancel path of its own.
 /// </summary>

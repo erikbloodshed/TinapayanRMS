@@ -224,7 +224,7 @@
     {
         _pickedHere = true;
 
-        // Cmd-click on a Mac, where Ctrl-click opens the context menu.
+        // Ctrl-click adds a row to the rows picked, or takes it out (Cmd-click too, as the web app took it on a Mac).
         if (e.CtrlKey || e.MetaKey)
         {
             if (!Selected.Remove(node))

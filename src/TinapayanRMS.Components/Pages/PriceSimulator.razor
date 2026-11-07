@@ -160,7 +160,7 @@
             interaction.SetOutput(RxVoid.Default);
         }));
 
-        // Export to Excel: the products as shown and the price changes, a sheet each, as the WPF workbook has them.
+        // Export to Excel: the products as shown and the price changes, a sheet each, as the WPF workbook had them.
         AddSubscription(viewModel.ExportToExcel.RegisterHandler(async interaction =>
         {
             var fileName = $"{interaction.Input} {DateTime.Today:yyyy-MM-dd}.xlsx";

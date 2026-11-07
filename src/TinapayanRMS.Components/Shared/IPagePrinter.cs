@@ -11,8 +11,7 @@ public interface IPagePrinter
 }
 
 /// <summary>
-/// The web view's own print dialog (window.print), which Windows' WebView2 has. A Mac's web view has none, so the MAUI
-/// app puts its own printer in this one's place there.
+/// The web view's own print dialog (window.print), which Windows' WebView2 has.
 /// </summary>
 public sealed class WebViewPagePrinter(IJSRuntime js) : IPagePrinter
 {

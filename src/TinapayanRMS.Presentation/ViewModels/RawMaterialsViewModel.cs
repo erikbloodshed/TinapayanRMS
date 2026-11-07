@@ -2961,7 +2961,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private const string DeleteGlyph = "";
 
     /// <summary>
-    /// The menu a right-click opens on the list (MaterialListCard): on <paramref name="node"/>'s row, which the View picks
+    /// The menu a right-click opens on the list (MaterialList): on <paramref name="node"/>'s row, which the list picks
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
     /// material's menu covers every material picked with it.
     /// </summary>

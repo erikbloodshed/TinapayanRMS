@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The screens' ViewModels, with no UI framework, so both apps draw the same screens over them: the WPF app
-       (TinapayanRMS.UI) and the .NET MAUI Blazor Hybrid app (TinapayanRMS.Maui, its screens in TinapayanRMS.Components).
-       Keep WPF, MAUI, Blazor and Syncfusion out of it. -->
+  <!-- The screens' ViewModels, with no UI framework: the app's Blazor screens (TinapayanRMS.Components) draw them.
+       They were the WPF app's, moved out of it on 2026-11-07. Keep MAUI, Blazor and Syncfusion out of it, so they're
+       tested without a window (Presentation.Tests). -->
 
   <ItemGroup>
     <PackageReference Include="DynamicData" />

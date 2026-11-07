@@ -9,7 +9,7 @@ namespace TinapayanRMS.Maui.WinUI;
 /// One copy of the app for the Windows user: starting it again (the Desktop icon twice) brings the window already open
 /// to the front, rather than a second copy that would run its own hourly backups and write the same view-state files.
 /// Each copy on the disk is its own app, so one run from source doesn't stop the installed copy, nor the other way round.
-/// The WPF app keeps to one copy of its own the same way (SingleInstanceGuard): the two apps can be open at once.
+/// The WPF app (on main, or installed) keeps to one copy of its own the same way: the two apps can be open at once.
 /// </summary>
 public static partial class SingleInstance
 {

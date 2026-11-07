@@ -9,8 +9,8 @@ using TinapayanRMS.Infrastructure.Services;
 namespace TinapayanRMS.Infrastructure;
 
 /// <summary>
-/// The app's database and every repository, registered the one way all their hosts register them: the WPF app
-/// (CompositionRoot), the MAUI app (TinapayanRMS.Components' ServiceRegistration) and the two servers, the Recipe API and
+/// The app's database and every repository, registered the one way all their hosts register them: the app
+/// (TinapayanRMS.Components' ServiceRegistration) and the two servers, the Recipe API and
 /// the MCP server, so they reach the same database the same way. It's here, not in either app's project, because the
 /// servers can't reference those.
 /// </summary>
@@ -32,8 +32,8 @@ public static class DatabaseHost
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration value.");
 
-        // A factory, not AddDbContext: ViewModels outlive any one operation (singletons in the WPF app, one for each
-        // page the MAUI app's web view loads), so there's no natural request scope to hand a single DbContext to.
+        // A factory, not AddDbContext: ViewModels outlive any one operation (one set for each
+        // page the app's web view loads), so there's no natural request scope to hand a single DbContext to.
         // Each repository call creates and disposes its own short-lived context instead,
         // which also makes concurrent calls from different screens safe. The factory is also the
         // unit of work: inside one, every repository's context shares its one transaction.

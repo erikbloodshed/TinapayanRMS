@@ -6,8 +6,8 @@ using GridAction = Syncfusion.Blazor.Grids.Action;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// A table's sort, filters and columns kept as it was left, for the account (the WPF app's GridLayoutKeeping, there for
-/// the Windows user): the grid's own state as Syncfusion writes it (GetPersistDataAsync), one line under the table's key
+/// A table's sort, filters and columns kept as it was left, for the Windows user, as the WPF app kept them
+/// (GridLayoutKeeping): the grid's own state as Syncfusion writes it (GetPersistDataAsync), one line under the table's key
 /// in the view state, put back as the grid is created. Reports' tables keep theirs this way.
 /// </summary>
 public static class GridLayouts

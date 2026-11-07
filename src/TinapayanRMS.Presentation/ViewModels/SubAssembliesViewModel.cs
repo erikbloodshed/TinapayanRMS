@@ -1257,7 +1257,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     private const string DeleteGlyph = "";
 
     /// <summary>
-    /// The menu a right-click opens on the list (SubAssemblyListCard): on <paramref name="node"/>'s row, which the View
+    /// The menu a right-click opens on the list (SubAssemblyList): on <paramref name="node"/>'s row, which the list
     /// picks first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null.
     /// A sub-assembly's menu covers every sub-assembly picked with it.
     /// </summary>

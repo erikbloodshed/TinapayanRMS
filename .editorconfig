@@ -10,10 +10,6 @@ dotnet_diagnostic.CA1716.severity = none
 [src/TinapayanRMS.Infrastructure/Migrations/**.cs]
 generated_code = true
 
-# WPF never disposes an Application: what App owns, it lets go in OnExit.
-[src/TinapayanRMS.UI/App.xaml.cs]
-dotnet_diagnostic.CA1001.severity = none
-
 [tests/**.cs]
 # Test methods are named Method_Scenario_Result.
 dotnet_diagnostic.CA1707.severity = none

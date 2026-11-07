@@ -1,15 +1,17 @@
 # The Sub-Assemblies screen
 
-Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen and the roles it files sub-assemblies under, as they are now. When each part came in, who asked for it and what it replaced are in the [build plan](build-plan.md)'s dated log. "The Syncfusion notes" means [syncfusion.md](syncfusion.md); a section named without a file (Domain Model, Application Architecture, Reactive Costing Cascade) is PLAN.md's.
+Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen and the roles it files sub-assemblies under, as they are now. When each part came in, who asked for it and what it replaced are in the [build plan](build-plan.md)'s dated log. "The app's notes" means [maui-app.md](maui-app.md); a section named without a file (Domain Model, Application Architecture, Reactive Costing Cascade) is PLAN.md's.
+
+**Since 2026-11-07 the screen is the Blazor page's** (`Components/Pages/SubAssemblies`), over the same ViewModel, so what it does, and why, is as these notes say. They were written for the WPF view, the screen's first, so where one names a WPF control or attached behaviour (`SfTreeView`, `SfDataGrid`, `ComboBoxAdv`, a `controls:` behaviour), the Blazor page does that part with the app's own components instead: `FolderTree` for the list, `LineGrid` for a table typed into, `PickField` for a picker, `NumberField` and `TextField` for the boxes ([maui-app.md](maui-app.md), "How it's built").
 
 ## What it keeps
 
-- **The standalone sub-assemblies, recipes and packaging sets, which no product owns** (`SubAssembliesView`/`SubAssembliesViewModel`, a tab and drawer item between Raw Materials and Products). Products link them, and follow every change saved here, or copy them, from their recipe (Domain Model). A sub-assembly in a product-owned role is that product's own, edited in its recipe and never listed here; one a product saved in any other role is listed here, named after the product and the role (`SubAssemblyRules.StandaloneNameFor`).
+- **The standalone sub-assemblies, recipes and packaging sets, which no product owns** (`SubAssemblies`/`SubAssembliesViewModel`, a tab and drawer item between Raw Materials and Products). Products link them, and follow every change saved here, or copy them, from their recipe (Domain Model). A sub-assembly in a product-owned role is that product's own, edited in its recipe and never listed here; one a product saved in any other role is listed here, named after the product and the role (`SubAssemblyRules.StandaloneNameFor`).
 - **The roles are the list's folders**, ordered and marked product-owned in Settings → Roles (below). The list can add, rename and delete a role too.
 
 ## The layout
 
-- **The list beside the form, which is in two cards, as on Products and Raw Materials.** The list (`Views/SubAssemblies/SubAssemblyListCard`) is as wide as its tree, 370px, and the form takes the rest.
+- **The list beside the form, which is in two cards, as on Products and Raw Materials.** The list (`Pages/SubAssemblies/SubAssemblyList.razor`) is as wide as its tree, 370px, and the form takes the rest.
   - **The header card**, held to `HeaderCardHeight`: the title (`HeaderTitle`: the saved name, "New sub-assembly", or "Copy of …"), then New, Copy, New Product, Save, Undo, Redo and Delete; Batch Weight, Batch Cost and Cost per g (Set Cost for a packaging set), worked out from the lines as they're typed; then Name and Role.
   - **The details card** under it scrolls while the header stays put, with two tabs along its bottom: **Recipe**, the lines, and **Used By**.
 - **The lines are typed straight into the table** (`IngredientLineRow`, through the grids' shared drop-down, edit-commit and add-row behaviours in Application Architecture): Ingredient, Grams, the percentage, Cost/g, Cost and Base. Ticking Base makes the percentages baker's, over the ticked lines' total; with nothing ticked they're absolute, each line's share of the batch (`PercentHeader`, `FormulaBaseCaption`). A line typed as a baker's percentage keeps it as the base changes (Domain Model). Lines can be dragged into order and put in above the current one. Remove Line acts on the table showing.
@@ -39,7 +41,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
   - Tests: two `SubAssembliesViewModelRefreshTests` cases and `ProductsViewModelRefreshTests.StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link`.
 - **Undo and Redo** step through the form's history (`History`, an `UndoHistory<SubAssemblyFormSnapshot>`, the same shape as Products').
   - A step is one finished change: a cell committed, a line added or removed, a field typed and left. The history is cleared when the form stops being the one it recorded: another sub-assembly picked, New, Copy, or a Save.
-  - Ctrl+Z and Ctrl+Y reach it from anywhere on the screen (`UndoShortcuts`, in the Syncfusion notes). Unlike Products', an undo doesn't rebase the form onto a settled snapshot.
+  - Ctrl+Z and Ctrl+Y reach it from anywhere on the screen (`UndoKeys`). Unlike Products', an undo doesn't rebase the form onto a settled snapshot.
 - **Scale**, a row under the Recipe tab's lines (not for a packaging set), resizes the recipe to a weight.
   - Its picker says what's to weigh the grams typed (`ScaleOptions`: the whole batch, or the base, the ticked lines' total). `ScaleCommand` multiplies every line typed in grams by to ÷ from (`SubAssemblyRules.ScaledGrams`, rounded to the 4 stored decimals), as one undo step. A line typed as a baker's percentage keeps it and follows the scaled base (`RecomputeFormulaBase`).
   - Scaling the base with nothing ticked says so and changes nothing. The grams typed aren't part of the sub-assembly, so they're no edit, and they stay from one sub-assembly to the next.
@@ -56,11 +58,11 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 ## The list
 
-- **A tree one level deep: a folder for every role, in the Roles tab's order** (`SubAssemblyTree`, under an `SfTreeView`), each holding its sub-assemblies by name and showing how many. The Packaging role's folder holds the packaging sets. A search shows only the folders holding a match, opened.
-- **It's built as the Raw Materials and Products trees are** (the Syncfusion notes' `SfTreeView`), and shares their parts:
+- **A tree one level deep: a folder for every role, in the Roles tab's order** (`SubAssemblyTree`, drawn by `FolderTree`), each holding its sub-assemblies by name and showing how many. The Packaging role's folder holds the packaging sets. A search shows only the folders holding a match, opened.
+- **It's built as the Raw Materials and Products trees are** (`FolderTree`), and shares their parts:
   - `TreeSelection`, for `SelectedTreeNodes`/`SelectedTreeNode` against `SelectedRow` (`SyncTreeSelection`, `TreeSelectionChanged`).
-  - `TreeLeaves` and `TreeRows`, `TreeMenuItem` and `Controls/TreeContextMenu`, and the move notice with Undo (`Controls/MoveNoticeBar`).
-  - Drag and drop, the menus, F2, Del and Enter in `Controls/ListTree`, through `IListTreeScreen`, which the screen implements explicitly.
+  - `TreeLeaves` and `TreeRows`, `TreeMenuItem` and `TreeMenu`, and the move notice with Undo (`MoveNoticeBar`).
+  - Drag and drop, the menus, F2, Del and Enter in `FolderTree`, through `IListTreeScreen`, which the screen implements explicitly.
   - A toolbar under the search box holds the empty space's commands.
 - **The roles come in before the rows on a load**, so `Refresh` announces each folder shown and each that gets its first rows (`AnnounceExpanded`), top-level ones included. Unlike Raw Materials' type folders, none of its folders exists when the tree binds.
 - **Every folder starts open, and the ones left closed are remembered** (`SubAssemblies.ClosedFolders`, by role id, through `FolderMemory`), so a role added since opens too. `SubAssemblyTree.ClosedFolderKeys` gives back the keys it was given until the first `Refresh` makes the folders, so disposing a screen never shown doesn't write the list away.
@@ -94,6 +96,3 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
   - `AddAsync` numbers a new role one past the last, whatever it's given, and `UpdateAsync` leaves the order alone.
   - `MoveAsync` and `DeleteAsync` number every role 1…n again (ties by name, the order the tab lists them in), so the order never has a gap.
   - A move leaves the form's unsaved edits alone and keeps the role picked.
-- **Product-owned** (`EditingIsProductOwned`) is WPF's own `CheckBox`: Syncfusion has none outside its grids and ribbon, and its samples use WPF's, which the theme styles.
-  - It's disabled for the Packaging role (`CanEditProductOwned`), and a read-only `GridCheckBoxColumn` shows it in the list.
-  - Changing it on a saved role asks first (`OwnershipChangeMessage`), saying how many sub-assemblies move. What the change does is in the Domain Model ("Turning a role product-owned"). A rename alone asks nothing.

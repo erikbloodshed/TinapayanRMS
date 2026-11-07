@@ -8,9 +8,9 @@
 
 @* Reports (the WPF ReportsView): five tables in tabs. Each sorts by a click on a heading and filters from the funnel in
    it; a double-click on a row opens its product or material; and Export to Excel saves the table as it's shown, in its
-   order, with its filters and only the columns showing (the grid's own export, to the browser's downloads). Product Cost
+   order, with its filters and only the columns showing (the grid's own export, saved where Windows' Save dialog says). Product Cost
    Summary's Columns button chooses which columns show. Each table's filters, sort and columns are as they were left,
-   kept for the account (GridLayouts). Cost Buffers' Re-apply Target Buffer changes the buffered costs of the materials
+   kept for the Windows user (GridLayouts). Cost Buffers' Re-apply Target Buffer changes the buffered costs of the materials
    picked, or of every one shown below target, after asking. *@
 <section class="card tabs-card report-card">
     <SfTab LoadOn="ContentLoad.Init" CssClass="details-tabs report-tabs">
@@ -261,7 +261,7 @@
     private static async Task<MemoryStream?> WorkbookOfAsync<TRow>(SfGrid<TRow>? grid, ExcelExportProperties properties) =>
         grid is null ? null : await grid.ExportToExcelAsync(asMemoryStream: true, properties);
 
-    // A table as it was left, for the account: its sort, filters and columns.
+    // A table as it was left, for the Windows user: its sort, filters and columns.
     private Task RestoreAsync<TRow>(SfGrid<TRow>? grid, string key) => GridLayouts.RestoreAsync(grid, ViewState, key);
 
     private Task SaveAsync<TRow>(SfGrid<TRow>? grid, string key, Syncfusion.Blazor.Grids.Action action) =>

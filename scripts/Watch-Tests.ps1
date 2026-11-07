@@ -21,7 +21,7 @@
     it meanwhile.
 
 .PARAMETER Project
-    The test project: Presentation, UI, Components, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or
+    The test project: Presentation, Components, Infrastructure, Pricing, Mcp, RecipeApi or ApplicationCore (with or
     without .Tests).
 
 .PARAMETER Class

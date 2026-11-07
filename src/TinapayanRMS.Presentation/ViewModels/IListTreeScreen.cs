@@ -6,9 +6,9 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A screen whose list is a tree of folders: Products, Raw Materials and Sub-Assemblies. What its list card works the tree
-/// with (Controls/ListTree): the rows picked, their menus and shortcuts, dragging rows onto a folder, and the notice of the
-/// last move. The rows are the screen's own tree's nodes.
+/// A screen whose list is a tree of folders: Products, Raw Materials and Sub-Assemblies. What its list works the tree with
+/// (FolderTree and MoveNoticeBar, in TinapayanRMS.Components): the rows picked, their menus and shortcuts, dragging rows
+/// onto a folder, and the notice of the last move. The rows are the screen's own tree's nodes.
 /// </summary>
 public interface IListTreeScreen : INotifyPropertyChanged
 {

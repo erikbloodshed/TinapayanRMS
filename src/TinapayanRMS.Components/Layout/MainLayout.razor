@@ -6,7 +6,7 @@
 @inject ScreenLinks Links
 
 <div class="app-shell">
-    @* The window's title bar, which the page draws: the window has none of Windows' own, as the WPF window has none. *@
+    @* The window's title bar, which the page draws: the window has none of Windows' own, as the WPF window had none. *@
     <TitleBar OnMenu="ToggleNavigation" />
 
     @if (Status.DatabaseWarning is { } warning)
@@ -25,7 +25,7 @@
     }
 
     <div class="app-body">
-        @* The menu floats over the screen, as the WPF app's does: summoned by the title bar's button, gone on a click away. *@
+        @* The menu floats over the screen, as the WPF app's did: summoned by the title bar's button, gone on a click away. *@
         <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
             <ChildContent>
                 <NavMenu Navigated="CloseNavigation" />

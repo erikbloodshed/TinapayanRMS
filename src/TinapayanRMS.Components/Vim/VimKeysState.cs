@@ -10,8 +10,8 @@ namespace TinapayanRMS.Components.Vim;
 public sealed record VimCommandResult(string? Message = null, string? Url = null, bool Help = false);
 
 /// <summary>
-/// The Vim keys for one browser tab: whether they're on (the account's choice, kept with its view state and changed in
-/// Settings → Keyboard), and the screen on show, which the command line's <c>:w</c>, <c>:new</c>, <c>:delete</c>,
+/// The Vim keys for one page the window loads: whether they're on (the Windows user's choice, kept with the view state
+/// and changed in Settings → Keyboard), and the screen on show, which the command line's <c>:w</c>, <c>:new</c>, <c>:delete</c>,
 /// <c>:e name</c> and <c>:revert</c> run on. The WPF app found that screen by walking up from the keyboard to a
 /// DataContext; here each screen says it's showing (ScreenBase) and that it's gone.
 /// </summary>

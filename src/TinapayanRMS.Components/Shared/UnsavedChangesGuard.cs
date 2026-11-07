@@ -3,8 +3,8 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// The form on show, for the window to ask about before it closes, as the WPF window did and as a browser tab's "Leave
-/// site?" did in the web app: closing a window isn't a move to another address, so ScreenBase's own question never
+/// The form on show, for the window to ask about before it closes, as the WPF window did: closing a window isn't a
+/// move to another address, so ScreenBase's own question never
 /// sees it. ScreenBase keeps the form here while its screen is up. One per page the window loads.
 /// </summary>
 public sealed class UnsavedChangesGuard

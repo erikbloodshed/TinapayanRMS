@@ -1,6 +1,6 @@
 # TinapayanRMS Developer Manual
 
-TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app built with WPF, Syncfusion and ReactiveUI on .NET 11, and it keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
+TinapayanRMS is the recipe and costing app of Tinapayan Festival Bakeshoppe. It's a Windows desktop app on .NET 11: a .NET MAUI Blazor Hybrid window, whose screens are Blazor components drawn in a web view, with Syncfusion Blazor components and ReactiveUI ViewModels. It keeps its data in PostgreSQL through EF Core and Dapper. The shop records what its raw materials cost. The app works out what every recipe, product and selling price comes to, and when a price changes it carries the change up to every product that uses it.
 
 This manual is for developers who build, maintain or extend the app. It explains how the code is organised, which patterns it follows and why, and what you need to know and install before you change it. It assumes you know C#, but not this codebase.
 
@@ -10,7 +10,7 @@ This manual is for developers who build, maintain or extend the app. It explains
 |---|---|---|
 | [docs/user-manual.md](user-manual.md) | The shop's staff | Every screen, and how costs are worked out, as a user sees them |
 | docs/developer-manual.md (this file) | Developers | How the code is built, and how to change it safely |
-| [PLAN.md](../PLAN.md) and [docs/plan/](plan/) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade and conventions in PLAN.md; each main screen's design notes, the Syncfusion notes and the build plan in `docs/plan/` |
+| [PLAN.md](../PLAN.md) and [docs/plan/](plan/) | Developers and AI agents | Every design decision with its reason and date: tech stack, domain model, architecture, costing cascade and conventions in PLAN.md; the app's design notes, each main screen's and the build plan in `docs/plan/` |
 | [CLAUDE.md](../CLAUDE.md) | AI coding agents | The commands and rules an agent needs before it changes the code |
 
 PLAN.md is long: an overview ("At a glance"), then about 650 lines of long bullets, describing the app as it is now. List its sections with `grep -n "^#" PLAN.md` and read the ones your change touches. Its largest parts are in `docs/plan/` and are still part of it; the build plan's dated log there holds the history.
@@ -45,21 +45,23 @@ PLAN.md is long: an overview ("At a glance"), then about 650 lines of long bulle
 
 It's a single-user desktop app. There's no server, no login and no network service of its own.
 
-**It comes as two apps for now** (since 2026-11-07): the WPF app (`src/TinapayanRMS.UI`), and the same screens as Blazor components in a .NET MAUI Blazor Hybrid window (`src/TinapayanRMS.Components` and `src/TinapayanRMS.Maui`), which will replace it. Both draw the same ViewModels (`src/TinapayanRMS.Presentation`) over the same database. See [The MAUI app](#the-maui-app) and [docs/plan/maui-app.md](plan/maui-app.md). The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
+**It was a WPF app until 2026-11-07.** Its screens were ported that day from the shop's web copy of it (`../TinapayanRMS_Web`, without that copy's shop accounts or its Mac target), ran beside the WPF app for a day, and replaced it on the `maui-blazor-hybrid` branch; `main` still has the WPF app. The ViewModels (`src/TinapayanRMS.Presentation`) are the WPF app's, kept. [docs/plan/maui-app.md](plan/maui-app.md) has the story. The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
 
 ### Screens
 
-| Screen | View | ViewModel |
-|---|---|---|
-| Raw Materials | `RawMaterialsView`, with its cards in `Views/RawMaterials/` | `RawMaterialsViewModel` |
-| Sub-Assemblies | `SubAssembliesView`, with its list in `Views/SubAssemblies/` | `SubAssembliesViewModel` |
-| Products | `ProductsView`, with its cards in `Views/Products/` | `ProductsViewModel` |
-| Reports | `ReportsView` | `ReportsViewModel` |
-| Price Simulator | `PriceSimulatorView` | `PriceSimulatorViewModel` |
-| Print (opened from Products) | `ProductPrintView` | `PrintTabViewModel` |
-| Settings dialog: Units of Measure, Categories, Product Categories, Roles, Costing Defaults, Keyboard | `SettingsWindow`, and one view per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel` |
+Each screen is a page with an address, a ViewModel behind it, and, for the large ones, a folder of parts.
 
-In the MAUI app each screen is a page in `src/TinapayanRMS.Components/Pages/` over the same ViewModel, and Settings is a tab of pages (Database included) rather than a dialog.
+| Screen | Address | Page (in `Components/Pages/`) | ViewModel |
+|---|---|---|---|
+| Raw Materials | `/raw-materials`, `/raw-materials/{id}` | `RawMaterials/RawMaterials.razor`, with its parts beside it | `RawMaterialsViewModel` |
+| Sub-Assemblies | `/sub-assemblies`, `/sub-assemblies/{id}` | `SubAssemblies/SubAssemblies.razor` | `SubAssembliesViewModel` |
+| Products | `/products`, `/products/{id}` | `Products/Products.razor`, with its parts beside it | `ProductsViewModel` |
+| Reports | `/reports` | `Reports.razor` | `ReportsViewModel` |
+| Price Simulator | `/price-simulator` | `PriceSimulator.razor` | `PriceSimulatorViewModel` |
+| Print (opened from Products) | `/print` | `Print.razor` | `PrintTabViewModel` |
+| Print preview (the Price Simulator's report) | `/print/preview` | `PrintPreview.razor` | — (`PrintPreviews`) |
+| Find (Ctrl+K), a dialog over every screen | — | `Layout/FindHost.razor` | `QuickFindViewModel` |
+| Settings: Units of Measure, Material Categories, Product Categories, Roles, Costing Defaults, Keyboard, Database | `/settings/<tab>` | `Settings/`, a page per tab | `UnitsOfMeasureViewModel`, `CategoriesViewModel`, `ProductCategoriesViewModel`, `SubAssemblyRolesViewModel`, `CostingDefaultsViewModel`, `KeyboardSettingsViewModel`, `DatabaseBackupsViewModel` |
 
 The [user manual](user-manual.md) describes every screen. Read its [Key ideas](user-manual.md#1-key-ideas) chapter before you read the code, because the code uses the same words.
 
@@ -99,15 +101,17 @@ You'll be productive sooner if you're comfortable with the following.
 | Area | What to know | Where it's used |
 |---|---|---|
 | C# 15 and .NET 11 | Primary constructors, records and `record struct`, `required` members, collection expressions, pattern matching, nullable reference types, `async`/`await` | Everywhere |
-| WPF and XAML | Data binding and `DataContext` inheritance, dependency and attached properties, resources, styles and templates, routed events, the `Dispatcher` and STA threads | `src/TinapayanRMS.UI` |
-| MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `ViewModels/` |
+| Blazor | Components and parameters, `RenderFragment`s, `@key`, cascading values, the component lifecycle, `InvokeAsync` and `StateHasChanged`, scoped services, JavaScript interop | `src/TinapayanRMS.Components` |
+| .NET MAUI Blazor Hybrid | `MauiApp`'s builder, `BlazorWebView` and its root components, the window's lifecycle events, WinUI's window (`AppWindow`, its presenter and non-client regions) and file pickers under `Platforms/Windows/` | `src/TinapayanRMS.Maui` |
+| HTML, CSS and a little JavaScript | Flexbox and grid layout, CSS variables, print styles (`@page`), DOM events and focus | `Maui/wwwroot`, the shared components |
+| MVVM with ReactiveUI 26 and Rx | `ReactiveObject`, `RaiseAndSetIfChanged`, `WhenAnyValue`, `ToProperty` (`ObservableAsPropertyHelper`), `ReactiveCommand`, `Interaction`, `Subject`, Rx operators | `Presentation/ViewModels/` |
 | DynamicData | `SourceCache<T, TKey>`, `Connect().SortAndBind(...)` | List ViewModels |
 | EF Core 11 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
 | Dapper and PostgreSQL SQL | Multi-mapped joins (`splitOn`), recursive CTEs (`WITH RECURSIVE`, stopped at a loop by `CYCLE`), arrays with `unnest` | Reads, in `Infrastructure` |
 | PostgreSQL | Roles and the password file, snake_case names, `psql`, `pg_dump` and `pg_restore`, ICU collations | Setup, tests, backups, debugging |
-| Syncfusion Essential Studio for WPF | `SfDataGrid`, `SfTreeView`, `SfTreeGrid`, `ComboBoxAdv`, `TabControlExt`, `ButtonAdv`, `DoubleTextBox` and its kin, `SfNavigationDrawer`, `ChromelessWindow`, `SfSkinManager`, `PrintPreview` | Every view |
+| Syncfusion Blazor | `SfGrid`, `SfComboBox`, `SfTab`, `SfDialog`, `SfToast`, `SfSidebar`, `SfButton`, `SfDropDownButton`, `SfChart`; the Fluent 2 theme; XlsIO for workbooks | Every page |
 | FluentValidation | `AbstractValidator<T>` | `ApplicationCore/Validators` |
-| .NET Generic Host and DI | `HostBuilder`, service lifetimes | `CompositionRoot.cs` |
+| DI | Service lifetimes, scopes (one per page the web view loads) | `Components/ServiceRegistration.cs` |
 | Serilog | The static `Log.Logger`, `ForContext` | Logging |
 | TUnit on Microsoft.Testing.Platform | `[Test]`, `[Arguments]` and `[MethodDataSource]`, `[Before(Test)]` hooks, keyed `[ClassDataSource]` fixtures, `[NotInParallel]` | `tests/` |
 | AwesomeAssertions | `Should()` assertions. It's a fork of FluentAssertions 7, with the same API. | `tests/` |
@@ -119,14 +123,15 @@ You'll be productive sooner if you're comfortable with the following.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Windows | 10 or 11 | Both apps only run on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. The MAUI app draws in WebView2, which Windows 11 has. |
-| .NET MAUI workload | `maui-windows` 11.0.0-rc.2 (`MauiPackagesVersion` in [Directory.Packages.props](../Directory.Packages.props)) | For the MAUI app. From an administrator terminal: `dotnet workload install maui-windows --skip-manifest-update`; `dotnet workload list` shows it. A build that asks for `maui-tizen` (NETSDK1147) is missing it. |
+| Windows | 10 or 11 | The app only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
+| The web view | WebView2 (the Evergreen runtime, which Windows 10 and 11 have) | The app's window draws its screens in it. |
+| .NET MAUI workload | `maui-windows` 11.0.0-rc.2 (`MauiPackagesVersion` in [Directory.Packages.props](../Directory.Packages.props)) | From an administrator terminal, since the SDK is in Program Files: `dotnet workload install maui-windows --skip-manifest-update`; `dotnet workload list` shows it. A build that asks for `maui-tizen` (NETSDK1147) is missing it. |
 | .NET SDK | 11.0.100-rc.3.26522.148 (a preview), or a later 11.0 feature band | Pinned in [global.json](../global.json) with `allowPrerelease` and `rollForward: latestFeature`. |
 | PostgreSQL | 18 (EDB's Windows installer, service `postgresql-x64-18`, `localhost:5432`) | Reached as the `tinapayanrms` role, which must be able to create databases (`CREATEDB`), because the tests create their own. Its password goes in the password file, `%APPDATA%\postgresql\pgpass.conf`, so no connection string carries one. The installer's `bin` folder holds `psql`, and the `pg_dump` and `pg_restore` the backups run. |
 | `dotnet-ef` | 11.0.x, matching EF Core (`EFCoreVersion` in [Directory.Packages.props](../Directory.Packages.props), now 11.0.0-rc.3.26522.148) | `dotnet tool update --global dotnet-ef --version 11.0.0-rc.3.26522.148` (it installs the tool if it isn't there) |
-| Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable, but an app built without it won't start, and `dotnet publish` fails without it. The UI tests that build Syncfusion controls read the variable themselves and are skipped without it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
+| Syncfusion licence key | Essential Studio 35.x | Set as the `SYNCFUSION_LICENSE_KEY` user environment variable. The build compiles it into the app, so the app runs on a computer without the variable. An app built without it still opens, and Syncfusion shows a licence notice in the window; `dotnet publish` fails without it. The tests don't need it. After changing the key, rebuild. A key covers one major version, so moving `SyncfusionVersion` to a new major version needs a new key. A program started before the variable changed, such as the IDE and its terminals, keeps the old value until it's restarted. |
 | An IDE | Any with .NET 11 support | Visual Studio, VS Code with the C# Dev Kit, or Rider. Git ignores `.vs/`, `.vscode/` and `.idea/`. |
-| Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Syncfusion's Essential Studio installer puts the demo source of every control in `C:\Users\Public\Documents\Syncfusion\WPF\<version>\SampleBrowser\`. |
+| Optional tools | | `ilspycmd` (decompiles Syncfusion's assemblies), and `dotnet-stack`, `dotnet-dump` and `dotnet-trace` (diagnose the running app). Node.js, for the `run-tinapayanrms` skill's driver, which drives the window with `playwright-core` ([Checking a screen in the app's window](#checking-a-screen-in-the-apps-window)). |
 
 Docker isn't used anywhere in this project.
 
@@ -158,14 +163,14 @@ Run every command from the repository root.
    ```powershell
    dotnet ef database update --project src/TinapayanRMS.Infrastructure
    ```
-7. **Run the app:** `dotnet run --project src/TinapayanRMS.UI`, or the MAUI app, `dotnet run --project src/TinapayanRMS.Maui`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
+7. **Run the app:** `dotnet run --project src/TinapayanRMS.Maui`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
 8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure`, `tinapayanrms_test_presentation`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. The tests never touch `tinapayanrms`.
 
 ### Connection strings
 
 | Used by | Where it's set |
 |---|---|
-| Both apps | `ConnectionStrings:Default` in [src/TinapayanRMS.UI/appsettings.json](../src/TinapayanRMS.UI/appsettings.json): the WPF app reads it beside itself, and the MAUI app has the same file built in, with environment variables (`ConnectionStrings__Default`) over it |
+| The app | `ConnectionStrings:Default` in [src/TinapayanRMS.Maui/appsettings.json](../src/TinapayanRMS.Maui/appsettings.json), which the build puts inside the app (an embedded resource), with environment variables (`ConnectionStrings__Default`) over it. The MCP server and the Recipe API link the same file into their output. |
 | `dotnet ef` | Hard-coded in the design-time factory, [TinapayanRMSDbContextFactory](../src/TinapayanRMS.Infrastructure/TinapayanRMSDbContextFactory.cs) |
 | The tests | The app's `appsettings.json`, which `TinapayanRMS.Tests.Common` copies into each test project's output. Each project swaps in its own database name. |
 
@@ -175,9 +180,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 
 ### Where the app writes
 
-- **The MAUI app** writes its log and view state under `%LocalAppData%\TinapayanRMS\Maui\` (`logs\tinapayanrms-<date>.log`, and `view-state.json`, its own, started as a copy of the WPF app's on its first run: `ViewStateSeed`). Its backups are the WPF app's. The rest of this list is the WPF app's.
-- **Logs**: `logs/tinapayanrms-<date>.log` beside the executable. In a debug build that's `src/TinapayanRMS.UI/bin/Debug/net11.0-windows10.0.19041.0/win-x64/logs/`. There's one file a day, and the last 31 are kept.
-- **View state**: `%LocalAppData%\TinapayanRMS\view-state.json` remembers which tree folders were left closed (`FolderMemory`, so a folder new since opens), whether the Vim keys are on (`"vim-keys": ["on"]`), and the Reports tables' filters, sort and hidden columns (`reports-*`, through `GridLayoutStore` and `Controls/GridLayoutKeeping`, which any other grid can use the same way). It's safe to delete.
+- **Logs**: `%LocalAppData%\TinapayanRMS\Maui\logs\tinapayanrms-<date>.log`. There's one file a day, and the last 31 are kept.
+- **View state**: `%LocalAppData%\TinapayanRMS\Maui\view-state.json` remembers which tree folders were left closed (`FolderMemory`, so a folder new since opens), whether the Vim keys are on (`"vim-keys": ["on"]`), the Reports grids' filters, sort and hidden columns (`reports-*`, through `GridLayouts`), and the automatic backups' copy folder and last problems. It's safe to delete. On its first run the app starts it as a copy of the WPF app's, `%LocalAppData%\TinapayanRMS\view-state.json` (`ViewStateSeed`), which `main` and an installed WPF copy still write: each app reads its file once and writes it whole, so two sharing one would write over each other's changes.
 - **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
@@ -185,8 +189,8 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Task | Command |
 |---|---|
 | Build | `dotnet build TinapayanRMS.slnx` |
-| Run | `dotnet run --project src/TinapayanRMS.UI` |
-| Run the MAUI app | `dotnet run --project src/TinapayanRMS.Maui` |
+| Run | `dotnet run --project src/TinapayanRMS.Maui` |
+| Run it and drive it from a script (see [Checking a screen in the app's window](#checking-a-screen-in-the-apps-window)) | `powershell -ExecutionPolicy Bypass -File .claude/skills/run-tinapayanrms/driver.ps1 launch` |
 | All tests | `dotnet test --solution TinapayanRMS.slnx` |
 | One test project | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests` |
 | One test class | `dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --treenode-filter "/*/*/UnitConversionRulesTests/*"` |
@@ -198,7 +202,6 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
 | Apply migrations | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
 | Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
-| Publish the app (ReadyToRun, to `src/TinapayanRMS.UI/bin/Release/net11.0-windows10.0.19041.0/win-x64/publish/`) | `dotnet publish src/TinapayanRMS.UI` |
 | Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 | Run the MCP server by hand, as an AI assistant does from `.mcp.json` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)) | `powershell -ExecutionPolicy Bypass -File scripts/Start-McpServer.ps1` |
 | Run the Recipe API (see [The Recipe API](#the-recipe-api)), then try it | `dotnet run --project src/TinapayanRMS.RecipeApi`, then `curl http://localhost:5290/api/v1/mixes` |
@@ -207,7 +210,9 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 
 The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test.runner`). VSTest-style flags such as `--filter` and `--collect` don't work: use TUnit's `--treenode-filter` and `--coverage` instead. The filter is a path, `/assembly/namespace/class/test`, where `*` matches any characters within a part and `(A)|(B)` either name: `/*/*/*Products*/*` is every test of every class with Products in its name. A test project is a platform executable of its own (TUnit.Engine makes it one), so one run directly (`dotnet run`, or its `.exe`) takes the same options.
 
-Close any copy of the app you have running before you build. A running app locks its own output files: the MAUI app's process is `TinapayanRMS.Maui`.
+Close any copy of the app you have running before you build. A running app locks its own output files: its process is `TinapayanRMS.Maui`.
+
+There's no install script for the app yet: it's run from source, and the shop's computer still has the WPF app, installed from `main`. An unpackaged publish with the Windows App SDK beside it, as the web repo's `Install-TinapayanRMS.ps1` makes, is an open item in [docs/plan/maui-app.md](plan/maui-app.md).
 
 ### When a change is done
 
@@ -232,27 +237,25 @@ A change is done when:
 | `src/TinapayanRMS.ApplicationCore` | `net11.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net11.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper, the Generic Host | `TinapayanRMSDbContext` and its design-time factory, `DatabaseHost` and `ReadOnlyConnection` at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.Pricing` | `net11.0` | ApplicationCore | What a saved product costs, the one way the screens and both servers work it out: `SavedProductReader` and what it builds, at its root. `Versions/` holds the product versions' snapshot and the saves that record them (`VersionedSaves`, `ProductVersionRecorder`) |
-| `src/TinapayanRMS.Presentation` | `net11.0` | All four; ReactiveUI, DynamicData, System.Reactive, Serilog | The screens' ViewModels, which both apps draw: `ViewModels/` |
-| `src/TinapayanRMS.UI` | `net11.0-windows10.0.19041.0` | All five; ReactiveUI.WPF, DynamicData, System.Reactive, the Generic Host, Serilog, Syncfusion (WPF) | The WPF app. App startup at the root; `Views/`, `Controls/`, `Converters/`, `Printing/`, `Exporting/`, `Vim/`, `Themes/`, `Assets/Icons/` |
-| `src/TinapayanRMS.Components` | `net11.0` (Razor) | Infrastructure, Presentation; Blazor, ReactiveUI.Blazor, Syncfusion Blazor, XlsIO | The MAUI app's screens: `ServiceRegistration`, `StartupTasks`, `ViewStateSeed` and `ReactiveUIBootstrapper` at the root; `Pages/`, `Layout/`, `Shared/`, `Printing/`, `Vim/` |
-| `src/TinapayanRMS.Maui` | `net11.0-windows10.0.19041.0` (MAUI) | Components; MAUI, BlazorWebView, Serilog | The MAUI app: `MauiProgram`, `App`, `MainPage` at the root; `Platforms/Windows/`, `Services/`, `Resources/AppIcon/`, `wwwroot/` |
+| `src/TinapayanRMS.Presentation` | `net11.0` | All four; ReactiveUI, DynamicData, System.Reactive, Serilog | The screens' ViewModels (the WPF app's, kept), with no UI framework in them: `ViewModels/` |
+| `src/TinapayanRMS.Components` | `net11.0` (Razor) | Infrastructure, Presentation; Blazor, ReactiveUI.Blazor, Syncfusion Blazor, XlsIO | The screens: `ServiceRegistration`, `StartupTasks`, `ViewStateSeed` and `ReactiveUIBootstrapper` at the root; `Pages/`, `Layout/`, `Shared/`, `Printing/`, `Vim/` |
+| `src/TinapayanRMS.Maui` | `net11.0-windows10.0.19041.0` (MAUI) | Components; MAUI, BlazorWebView, Serilog | The app: `MauiProgram`, `App`, `MainPage` and `appsettings.json` at the root; `Platforms/Windows/` (the window), `Services/`, `Resources/AppIcon/`, `wwwroot/` (the page, its styles and scripts) |
 | `src/TinapayanRMS.Mcp` | `net11.0` | Infrastructure, Pricing; ModelContextProtocol | An MCP server for AI coding assistants (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)): `Program` at the root; `Tools/`, `Results/`, `Serialization/` |
 | `src/TinapayanRMS.RecipeApi` | `net11.0` | Infrastructure, Pricing; ASP.NET Core (a framework reference), Serilog | A read-only HTTP API for the shop's other apps (see [The Recipe API](#the-recipe-api)): `Program`, `RecipeApiHost` and `recipeapi.json` at the root; `Contracts/`, `Endpoints/` |
 | `tests/TinapayanRMS.ApplicationCore.Tests` | `net11.0` | Domain, ApplicationCore | Rule and validator tests, with no database |
 | `tests/TinapayanRMS.Infrastructure.Tests` | `net11.0` | Infrastructure, Tests.Common | Persistence tests against the project's own database |
 | `tests/TinapayanRMS.Presentation.Tests` | `net11.0` | Presentation, Tests.Common | The ViewModels on real repositories, against the project's own databases |
-| `tests/TinapayanRMS.UI.Tests` | `net11.0-windows10.0.19041.0` | UI | The WPF app's controls, printing, export, converters and Vim keys, with no database |
-| `tests/TinapayanRMS.Components.Tests` | `net11.0` | Components; bUnit | The MAUI app's DI wiring, components (rendered with bUnit) and Vim keys' C#, with no database and no MAUI |
-| `tests/TinapayanRMS.Pricing.Tests` | `net11.0` | Pricing, Tests.Common | The pricing and the versioned saves (`Versions/`), some of it against the project's own database. What a composite prints stays in `UI.Tests`, since the printouts are the UI's |
+| `tests/TinapayanRMS.Components.Tests` | `net11.0` | Components; bUnit | The app's DI wiring, the shared components and the title bar (rendered with bUnit), and the Vim keys' C#, with no database and no MAUI |
+| `tests/TinapayanRMS.Pricing.Tests` | `net11.0` | Pricing, Tests.Common | The pricing and the versioned saves (`Versions/`), some of it against the project's own database. What a composite prints is tested with the printouts, in `Presentation.Tests` (`ProductPrintoutTests`) |
 | `tests/TinapayanRMS.Mcp.Tests` | `net11.0` | Mcp, Tests.Common | The MCP server's tools against the project's own database |
 | `tests/TinapayanRMS.RecipeApi.Tests` | `net11.0` | RecipeApi, Tests.Common; ASP.NET Core's TestHost | The Recipe API, served in memory, against the project's own database |
 | `tests/TinapayanRMS.Tests.Common` | `net11.0` | Infrastructure, Pricing; Respawn | The shared database fixtures, and `VersionRecorders`, which builds the versioned saves over real repositories. It's a plain library, not a test project. |
 
-The WPF projects and the MAUI app target Windows SDK 10.0.19041 because ReactiveUI.WPF and MAUI's Windows target need it. The bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low. The MCP and Recipe API projects are on plain `net11.0`, which can't reference a Windows project, so neither server can come to depend on the UI by accident.
+Only the Maui project targets Windows (`$(WindowsTargetFramework)`, Windows SDK 10.0.19041, which MAUI's Windows target needs; the bare `net11.0-windows` moniker resolves to `windows7.0`, which is too low). Everything else is on plain `net11.0`, the screens included, so the components and ViewModels are tested without a window, and neither server can come to depend on the app by accident.
 
 ### Folders are namespaces
 
-Every folder in a project is a sub-namespace: `src/TinapayanRMS.Presentation/ViewModels/` holds `TinapayanRMS.Presentation.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (`App`, `CompositionRoot`, `ReactiveUIBootstrapper`, `ConfirmDeleteHandlerRegistration`, `BindingErrorLog`, Infrastructure's `DatabaseHost` and `ReadOnlyConnection`, the MCP server's `Program`, and the Recipe API's `Program` and `RecipeApiHost`), the DbContext pair, and `TinapayanRMS.Pricing`, which is one kind of thing throughout, sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
+Every folder in a project is a sub-namespace: `src/TinapayanRMS.Presentation/ViewModels/` holds `TinapayanRMS.Presentation.ViewModels`. A new file goes in the folder for its kind, never at a project root. Only app-startup plumbing (the Maui project's `MauiProgram`, `App` and `MainPage`, the Components project's `ServiceRegistration`, `StartupTasks`, `ViewStateSeed` and `ReactiveUIBootstrapper`, Infrastructure's `DatabaseHost` and `ReadOnlyConnection`, the MCP server's `Program`, and the Recipe API's `Program` and `RecipeApiHost`), the DbContext pair, and `TinapayanRMS.Pricing`, which is one kind of thing throughout, sit at a root. Code in a sub-namespace sees its parent namespaces without a `using`; sibling folders need one.
 
 | A new… | Goes in | Its tests go in |
 |---|---|---|
@@ -263,13 +266,15 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.Presentation/Vie
 | EF configuration | `Infrastructure/Configurations/` | `Infrastructure.Tests/Persistence/` |
 | Cross-entity service | `Infrastructure/Services/` | `Infrastructure.Tests/` |
 | Anything a server prices with as well as the screens | `Pricing/` | `Pricing.Tests/` |
-| Screen | ViewModel in `Presentation/ViewModels/`; the WPF View in `UI/Views/`, the MAUI app's page in `Components/Pages/` | `Presentation.Tests/ViewModels/`; a shared component's in `Components.Tests/Shared/` |
-| Card of a large screen | `UI/Views/<Screen>/` | — |
-| Reusable control or behaviour | `UI/Controls/` | `UI.Tests/Controls/` |
-| Value converter | `UI/Converters/` | `UI.Tests/Converters/` |
-| Something written to a file, such as an Excel export | `UI/Exporting/` | `UI.Tests/Exporting/` |
-| Part of the Vim keys | `UI/Vim/` | `UI.Tests/Vim/` |
-| Icon image file (`.png` or `.ico`) | `UI/Assets/Icons/` | — |
+| Screen | ViewModel in `Presentation/ViewModels/`; its page in `Components/Pages/` | `Presentation.Tests/ViewModels/` |
+| Part of a large screen | `Components/Pages/<Screen>/` | — |
+| Shared component, or a service the pages share | `Components/Shared/` | `Components.Tests/Shared/` |
+| Part of the window's frame (the title bar, the menu, the tabs, Find) | `Components/Layout/` | `Components.Tests/Layout/` |
+| What only the window can do | An interface in `Components/Shared/` (`IAppWindow`, `IFileDialogs`, `IPagePrinter`), its Windows code in `Maui/Platforms/Windows/` | a fake in `Components.Tests/Fixtures/` |
+| Part of a printout | `Components/Printing/` | — |
+| Part of the Vim keys | `Components/Vim/`, and `Maui/wwwroot/vim.js` | `Components.Tests/Vim/` |
+| A style | The screen family's stylesheet in `Maui/wwwroot/css/`, or `Maui/wwwroot/app.css` | — |
+| Icon image file | `Maui/wwwroot/icons/` | — |
 
 A file can hold a few small, closely related types, such as a tree's rows in `ProductTree.cs`. The screen ViewModels hold only their screen: the row and edit types a screen uses have files of their own beside it, such as `ProductUsageEdit.cs` and `PackagingLineRow.cs` for Products.
 
@@ -280,11 +285,11 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 - [Directory.Packages.props](../Directory.Packages.props) turns on Central Package Management. Versions live only there, so a `PackageReference` never has a `Version`. The EF Core, Microsoft.Extensions and Syncfusion versions are the `EFCoreVersion`, `MicrosoftExtensionsVersion` and `SyncfusionVersion` properties. Every Syncfusion package must be on the same version, so upgrade them together. Transitive pinning is on, so the "Transitive pins" group can lift a transitive dependency to a fixed version: currently `Microsoft.EntityFrameworkCore.Relational`, held at `EFCoreVersion` so every project gets one EF Core. `EFCore.NamingConventions` has no .NET 11 release yet, and its 10.0.1 asks for EF Core 10. It works on EF Core 11 (the snake_case names, the model-changes check and the compiled model all hold), so move it to its 11.x when there is one. `dotnet list TinapayanRMS.slnx package --include-transitive --vulnerable` lists what still needs one.
 - [.editorconfig](../.editorconfig) marks `Migrations/` as generated code, turns off CA1707 (underscores in names) in `tests/`, and turns off CA1716 everywhere. The files in `CompiledModels/` carry their own `<auto-generated />` header, so the analyzers skip them too.
 - Warnings aren't treated as errors, but the build is kept free of them.
-- The UI project sets `PublishReadyToRun`, with its `win-x64` runtime identifier, so `dotnet publish` precompiles every assembly the app ships, and less code waits on the JIT at startup. `dotnet build` and `dotnet run` ignore it.
+- The Maui project compiles the Syncfusion licence key in (an `AssemblyMetadata` item from `SYNCFUSION_LICENSE_KEY`), fails a publish without it (`RequireSyncfusionLicenseKey`), and leaves Syncfusion's other themes out of its output (`KeepOnlyTheAppsSyncfusionTheme`).
 
 ### Other files at the root
 
-`.claude/`, `apm.yml`, `apm.lock.yaml` and `skills-lock.json` hold AI-assistant tooling: Syncfusion's WPF agent skills, and a UI-builder agent. You don't need them to build or run the app. However, the `syncfusion-wpf-*` skills in `.claude/skills/` are readable Markdown guides to each Syncfusion control. `.mcp.json` tells an AI assistant how to start two MCP servers: this repo's `src/TinapayanRMS.Mcp`, through `scripts/Start-McpServer.ps1` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)), and Syncfusion's documentation server, `syncfusion-wpf` (see [Working with Syncfusion](#working-with-syncfusion)).
+`.claude/` holds AI-assistant tooling, which you don't need to build or run the app: the `run-tinapayanrms` skill, whose driver starts and drives the app's window ([Checking a screen in the app's window](#checking-a-screen-in-the-apps-window)). `.mcp.json` tells an AI assistant how to start two MCP servers: this repo's `src/TinapayanRMS.Mcp`, through `scripts/Start-McpServer.ps1` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)), and Syncfusion's Blazor documentation server, `syncfusion-blazor` (see [Working with Syncfusion](#working-with-syncfusion)).
 
 ### A reading order for the code
 
@@ -292,12 +297,12 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 2. [CostingRules](../src/TinapayanRMS.ApplicationCore/Rules/CostingRules.cs), [ProductRules](../src/TinapayanRMS.ApplicationCore/Rules/ProductRules.cs) and [IngredientCostGraph](../src/TinapayanRMS.ApplicationCore/Rules/IngredientCostGraph.cs).
 3. [IngredientCostPropagator](../src/TinapayanRMS.Infrastructure/Services/IngredientCostPropagator.cs).
 4. [ProductCategoryRepository](../src/TinapayanRMS.Infrastructure/Repositories/ProductCategoryRepository.cs), the simplest repository; then `SaveAsync` in [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs).
-5. [App.xaml.cs](../src/TinapayanRMS.UI/App.xaml.cs), [CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs) and [MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs).
-6. [ViewModelBase](../src/TinapayanRMS.Presentation/ViewModels/ViewModelBase.cs), then the smallest complete screen: [CategoriesViewModel](../src/TinapayanRMS.Presentation/ViewModels/CategoriesViewModel.cs) with [CategoriesView.xaml](../src/TinapayanRMS.UI/Views/CategoriesView.xaml).
+5. [MauiProgram.cs](../src/TinapayanRMS.Maui/MauiProgram.cs), [ServiceRegistration.cs](../src/TinapayanRMS.Components/ServiceRegistration.cs) and [MainLayout.razor](../src/TinapayanRMS.Components/Layout/MainLayout.razor).
+6. [ViewModelBase](../src/TinapayanRMS.Presentation/ViewModels/ViewModelBase.cs) and [ScreenBase](../src/TinapayanRMS.Components/Shared/ScreenBase.cs), then the smallest complete screen: [CategoriesViewModel](../src/TinapayanRMS.Presentation/ViewModels/CategoriesViewModel.cs) with [MaterialCategories.razor](../src/TinapayanRMS.Components/Pages/Settings/MaterialCategories.razor).
 7. [CollectionMerge](../src/TinapayanRMS.Presentation/ViewModels/CollectionMerge.cs) and [UndoHistory](../src/TinapayanRMS.Presentation/ViewModels/UndoHistory.cs).
 8. [ReactiveCostCascadeTests](../tests/TinapayanRMS.Infrastructure.Tests/Persistence/ReactiveCostCascadeTests.cs), which runs the whole cascade end to end.
 
-Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines and `RawMaterialsViewModel.cs` about 3,100, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom. Parts of the Products screen have ViewModels of their own, which it holds and its views bind through: the Costing tab is [ProductCosting](../src/TinapayanRMS.Presentation/ViewModels/ProductCosting.cs) (`Costing`), the Recipe Structure's Packaging tab [ProductPackaging](../src/TinapayanRMS.Presentation/ViewModels/ProductPackaging.cs) (`Packaging`), a composite's Products table [ProductComponents](../src/TinapayanRMS.Presentation/ViewModels/ProductComponents.cs) (`ComponentsTable`), the add/edit sub-assembly form [ProductUsageForm](../src/TinapayanRMS.Presentation/ViewModels/ProductUsageForm.cs) (`UsageForm`), which works out its own piece size and figures, the Scaling tab [ProductScaling](../src/TinapayanRMS.Presentation/ViewModels/ProductScaling.cs) (`Scaling`), and the History tab `ProductVersionHistory` (`VersionHistory`), which reads its versions and saves their notes; restoring one stays on the screen, which puts it into the form. The screen keeps the undo history and the commands, which change them as undo steps.
+Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines and `RawMaterialsViewModel.cs` about 3,100, so navigate them by command and member with your IDE's outline, rather than reading them top to bottom. Parts of the Products screen have ViewModels of their own, which it holds and its page's parts bind through: the Costing tab is [ProductCosting](../src/TinapayanRMS.Presentation/ViewModels/ProductCosting.cs) (`Costing`), the Recipe Structure's Packaging tab [ProductPackaging](../src/TinapayanRMS.Presentation/ViewModels/ProductPackaging.cs) (`Packaging`), a composite's Products table [ProductComponents](../src/TinapayanRMS.Presentation/ViewModels/ProductComponents.cs) (`ComponentsTable`), the add/edit sub-assembly form [ProductUsageForm](../src/TinapayanRMS.Presentation/ViewModels/ProductUsageForm.cs) (`UsageForm`), which works out its own piece size and figures, the Scaling tab [ProductScaling](../src/TinapayanRMS.Presentation/ViewModels/ProductScaling.cs) (`Scaling`), and the History tab `ProductVersionHistory` (`VersionHistory`), which reads its versions and saves their notes; restoring one stays on the screen, which puts it into the form. The screen keeps the undo history and the commands, which change them as undo steps.
 
 ---
 
@@ -306,10 +311,19 @@ Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines a
 ### Layers
 
 ```
-┌──────────────────────────── TinapayanRMS.UI ──────────────────────────────┐
-│  Views (XAML + code-behind)  ◄── bind to ──  ViewModels (ReactiveUI)      │
-│  Controls, Converters, Printing, Themes                                   │
-│  App and CompositionRoot (which register Infrastructure's types)          │
+┌──────────────────────────── TinapayanRMS.Maui ────────────────────────────┐
+│  The window (chromeless), and the web view its screens are drawn in       │
+│  MauiProgram; wwwroot; Platforms/Windows: the frame, file dialogs, closing │
+└───────────────┬───────────────────────────────────────────────────────────┘
+                │ hosts
+┌───────────────▼──────────── TinapayanRMS.Components ──────────────────────┐
+│  Pages and shared components (Blazor)  ── render ──►  the ViewModels      │
+│  ServiceRegistration (the code that names Infrastructure)                 │
+│  The title bar, printing, the Vim keys                                    │
+└───────────────┬───────────────────────────────────────────────────────────┘
+                │ renders, and runs the commands of
+┌───────────────▼──────────── TinapayanRMS.Presentation ────────────────────┐
+│  ViewModels (ReactiveUI): each screen's state, commands, undo and loads   │
 └───────────────┬───────────────────────────────────────────────────────────┘
                 │ prices saved products with
 ┌───────────────▼──────────── TinapayanRMS.Pricing ─────────────────────────┐
@@ -325,7 +339,7 @@ Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines a
 ┌───────────────┴──────────── TinapayanRMS.Infrastructure ──────────────────┐
 │  TinapayanRMSDbContext, Configurations, Migrations     EF Core: writes    │
 │  Queries                                               Dapper: reads      │
-│  Repositories; Services (cost propagator, ProductCloner, view state)      │
+│  Repositories; Services (cost propagator, ProductCloner, backups)         │
 └───────────────────────────────────────────────────────────────────────────┘
                 every layer uses
 ┌──────────────────────────── TinapayanRMS.Domain ──────────────────────────┐
@@ -336,38 +350,48 @@ Then move on to the large screens. `ProductsViewModel.cs` is about 4,890 lines a
 The layering is fixed:
 
 - **Domain** holds the persisted entities as plain classes with documented properties. It has no dependencies and no behaviour beyond default values.
-- **ApplicationCore** holds the rules, the repository contracts and the validators. It knows nothing of EF Core, SQL or WPF, so everything in it can be unit tested without a database.
+- **ApplicationCore** holds the rules, the repository contracts and the validators. It knows nothing of EF Core, SQL or the UI, so everything in it can be unit tested without a database.
 - **Infrastructure** does all the I/O: EF Core for writes, the schema and migrations; Dapper for reads; and the services that work across entities.
-- **Pricing** is what a saved product costs, read and worked out one way: `SavedProductReader`, the immutable `SavedProduct` it builds (its `PricedSection`s and `PricedPackagingLine`s), and `ProductCostSummary`, which is worked out from a `ProductCostInputs` record: the screen fills one from the form and the reader from what's saved. A section's batch and piece figures come from `SectionFigures.Of` and a packaging line's cost from `PricedPackagingLine.Price`, for the screens' editable rows and saved products alike, and a row gives its immutable form with `ToPriced()`, which printouts and scaling read. A price tried on the Price Simulator is worked out and checked by `TriedPriceChange.Of`, for its Price Changes table and the MCP server's `simulate_price_changes`. A saved product's sections are named as the screen names them, two in one role apart by their labels ("Dough" beside "Dough: Paste"). It knows ApplicationCore's interfaces and rules, and nothing of EF Core, WPF, Syncfusion or ReactiveUI, so the Recipe API and the MCP server price exactly as the screens do with no UI in them. Everything in it is immutable: the editable rows the screens type into (`ProductUsageEdit`, `PackagingLineRow`, `SimulatedPriceChange`, on `ObservableRow`) are the UI's, in `ViewModels/`, so the servers can't reach them.
-- **UI** depends on ApplicationCore's interfaces and on Pricing. `CompositionRoot` names Infrastructure's types to register them, and the screens say what failed in `Failure`'s words.
+- **Pricing** is what a saved product costs, read and worked out one way: `SavedProductReader`, the immutable `SavedProduct` it builds (its `PricedSection`s and `PricedPackagingLine`s), and `ProductCostSummary`, which is worked out from a `ProductCostInputs` record: the screen fills one from the form and the reader from what's saved. A section's batch and piece figures come from `SectionFigures.Of` and a packaging line's cost from `PricedPackagingLine.Price`, for the screens' editable rows and saved products alike, and a row gives its immutable form with `ToPriced()`, which printouts and scaling read. A price tried on the Price Simulator is worked out and checked by `TriedPriceChange.Of`, for its Price Changes table and the MCP server's `simulate_price_changes`. A saved product's sections are named as the screen names them, two in one role apart by their labels ("Dough" beside "Dough: Paste"). It knows ApplicationCore's interfaces and rules, and nothing of EF Core, Blazor, MAUI, Syncfusion or ReactiveUI, so the Recipe API and the MCP server price exactly as the screens do with no UI in them. Everything in it is immutable: the editable rows the screens type into (`ProductUsageEdit`, `PackagingLineRow`, `SimulatedPriceChange`, on `ObservableRow`) are Presentation's, in `ViewModels/`, so the servers can't reach them.
+- **Presentation** holds the ViewModels, the WPF app's, kept. It depends on ApplicationCore's interfaces and on Pricing, and knows nothing of Blazor, MAUI, HTML or Syncfusion, so a ViewModel is tested by driving its commands. The screens say what failed in `Failure`'s words.
+- **Components** renders the ViewModels: the pages, the shared components, the title bar, the printouts and the Vim keys. `ServiceRegistration` is the only code that names an Infrastructure type, to register it. What only the window can do is an interface here (`IAppWindow`, `IFileDialogs`, `IPagePrinter`), which the Maui project implements and the tests fake.
+- **Maui** is the app: the window, the web view that hosts the components, the page they're drawn in with its styles and scripts (`wwwroot`), and the Windows code under `Platforms/Windows/` (the chromeless frame, the file dialogs, asking before the window closes, one copy at a time).
 
-Business and costing rules go in ApplicationCore, and EF Core and other I/O stay in Infrastructure. A ViewModel never sees a `DbContext`.
+Business and costing rules go in ApplicationCore, and EF Core and other I/O stay in Infrastructure. A ViewModel never sees a `DbContext`, and a page never calls a repository: it binds to its ViewModel.
 
 ### Startup
 
-1. **`App`'s static constructor** ([App.xaml.cs](../src/TinapayanRMS.UI/App.xaml.cs)) runs before anything touches a Syncfusion type. It first turns off Syncfusion's telemetry (`Syncfusion.Telemetry.Telemetry.Disable()`), which otherwise reports which controls the app uses to Syncfusion over HTTPS, from the first theme registration on. It then builds the Serilog logger and, in Debug builds, adds the binding-error log. It registers the Syncfusion licence: the key the build compiled in (the UI project's `SyncfusionLicenseKey` `AssemblyMetadata` item, taken from `SYNCFUSION_LICENSE_KEY`), or else the variable itself. It throws (after logging) with neither. It also sets app-wide control defaults: 24 px text boxes and buttons, right-aligned number boxes, editable pickers that filter as you type, and the grid, picker and undo behaviours from `Controls/`.
-2. **`App.OnStartup`** hooks unhandled-exception logging and claims the app (see [One copy at a time](#one-copy-at-a-time)): a copy that finds another open closes here, having started nothing. It then registers the Windows11Light theme settings, with the accent recoloured to the app's Sky and every text size 2 px larger than the theme's default. It then builds and starts the host from `CompositionRoot.CreateHostBuilder`, resolves `MainWindow`, themes it with `SfSkinManager.SetTheme` and shows it. A failure in any of that goes to [AppStartup](../src/TinapayanRMS.UI/AppStartup.cs), which logs it, says why and closes the app with exit code 1: with no window yet, there's nothing to carry on in.
-3. **`CompositionRoot.CreateHostBuilder`** ([CompositionRoot.cs](../src/TinapayanRMS.UI/CompositionRoot.cs)) initialises ReactiveUI and starts from [DatabaseHost](../src/TinapayanRMS.Infrastructure/DatabaseHost.cs), which reads `appsettings.json` and registers the DbContext factory and the repositories, as it does for the two servers. It then registers the rest: `SavedProductReader`, `ProductVersionRecorder`, the view-state store, the logger, the validators, the ViewModels and `MainWindow`.
-4. **`MainWindow`'s constructor** ([MainWindow.xaml.cs](../src/TinapayanRMS.UI/Views/MainWindow.xaml.cs)) creates the first tab's view around its ViewModel. Every other tab's view is made the first time the tab is shown (`CreateScreen`). It maps each tab to its screen's `LoadCommand` and to its Back and Forward handling, and wires up the requests that one screen makes of another. When the window has loaded, it loads the tab on show.
-5. Once the window shows, **`App`** starts two things off the UI thread: a check for migrations the database doesn't have yet, and the day's automatic backup (`AutomaticBackups.RunAsync`, over `IDatabaseBackups.BackUpDailyIfDueAsync`), taken the first time the app starts each day and checked again every hour by a `DispatcherTimer`, so a copy left open over midnight takes the next day's. Each one is also copied to the second folder chosen on Settings → Database, when there is one (kept in the view-state file under `backup-copy-folder`). A backup or copy that fails is logged and shown on the Database tab, and stays shown after a restart (under `backup-problem` and `backup-copy-problem` in the view-state file) until one goes through. If the automatic backup failed and the newest backup of this database is three days old or more, `App` also shows a message, once a run (`AutomaticBackups.OverdueWarningAsync`, `BackupRules.IsOverdue`).
-6. **`App.OnExit`** disposes the host, which disposes the singleton ViewModels, flushes the log, and lets go of the app. After a restore, `App.RestartAfterExit` has set it to start the app again (`Process.StartAndForget`), once all of that is done, or the new copy would find this one still open.
+Windows starts the WinUI application ([Platforms/Windows/App.xaml.cs](../src/TinapayanRMS.Maui/Platforms/Windows/App.xaml.cs)), which first makes sure it's the only copy from its folder (see [One copy at a time](#one-copy-at-a-time)), then asks [MauiProgram](../src/TinapayanRMS.Maui/MauiProgram.cs) to build the app. `MauiProgram.CreateMauiApp`, in order:
 
-ReactiveUI 26 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.UI/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithCoreServices().WithWpf().BuildApp()`, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
+1. **Turns off Syncfusion's telemetry** (`Syncfusion.Telemetry.Telemetry.Disable()`), before anything touches a Syncfusion type. Syncfusion's grid and charts otherwise report which of them the app uses to Syncfusion over HTTPS.
+2. **Builds the Serilog logger**, so even a failure to start is logged ([Logging and errors](#logging-and-errors)).
+3. **Registers the Syncfusion licence**: the key the build compiled in (the Maui project's `SyncfusionLicenseKey` `AssemblyMetadata` item, taken from `SYNCFUSION_LICENSE_KEY`), or else the variable itself. Without either it logs an error and goes on, and Syncfusion shows a licence notice in the window.
+4. **Initialises ReactiveUI.** ReactiveUI 26 must be initialised exactly once per process, before any `ReactiveObject` exists. [ReactiveUIBootstrapper](../src/TinapayanRMS.Components/ReactiveUIBootstrapper.cs) does it with `RxAppBuilder.CreateReactiveUIBuilder().WithBlazor().BuildApp()`. Presentation.Tests has its own, with the core services, and tests that build ViewModels call `ReactiveUIBootstrapper.EnsureInitialized()` themselves.
+5. **Starts the view state** from the WPF app's on the first run (`ViewStateSeed`, [Where the app writes](#where-the-app-writes)).
+6. **Reads the configuration**: `appsettings.json`, built into the app as a resource, then environment variables over it.
+7. **Registers the services**: MAUI's `BlazorWebView` (with its developer tools in a Debug build), Syncfusion Blazor, the app's own ([ServiceRegistration](../src/TinapayanRMS.Components/ServiceRegistration.cs)`.AddTinapayanRMS`: [DatabaseHost](../src/TinapayanRMS.Infrastructure/DatabaseHost.cs)'s DbContext factory and repositories, as the two servers have them, then the services, the view-state store, the validators, the ViewModels and what the screens share), and the window's own: the file dialogs (`IFileDialogs`) and the frame (`AppWindowChrome`, as `IAppWindow`). It hooks the window's creation and its messages (`WindowsWindow.Configure` and `OnMessage`: chromeless, centred on the screen the mouse is on, and asking about unsaved changes before it closes).
+8. **Starts the background work** ([BackgroundWork](../src/TinapayanRMS.Maui/Services/BackgroundWork.cs)): the hosted services a web host would have started, which a MAUI app doesn't. [StartupTasks](../src/TinapayanRMS.Components/StartupTasks.cs) checks for migrations the database doesn't have yet, and puts a warning under the title bar if there are any. It then takes the day's automatic backup if it's due (`AutomaticBackups.RunAsync`, over `IDatabaseBackups.BackUpDailyIfDueAsync`), and checks again every hour, so a copy left open over midnight takes the next day's ([Backups](#backups)). Neither holds the app up, and a failure of either is logged.
+
+A failure in any of that is logged as fatal, and the app ends: with no window yet, there's nothing to carry on in.
+
+The window is [App](../src/TinapayanRMS.Maui/App.cs)'s, over [MainPage](../src/TinapayanRMS.Maui/MainPage.cs): a `BlazorWebView` filling it, whose page is [wwwroot/index.html](../src/TinapayanRMS.Maui/wwwroot/index.html), with `Routes` in its `#app`. The web view serves the page and the static files from `https://0.0.0.1/`, with nothing listening on the network. As the window closes, `App` stops the background work (a backup in hand gets ten seconds), flushes the log and ends the process ([The shell](#the-shell) says why it doesn't wait).
 
 ### One copy at a time
 
-Nothing in the database notices a row changing after a screen read it (there are no concurrency tokens), so two copies side by side would save over each other with neither saying so. [SingleInstanceGuard](../src/TinapayanRMS.UI/SingleInstanceGuard.cs) keeps the app to one copy for each Windows sign-in, with a named mutex, `Local\TinapayanRMS`. Windows frees it when a copy crashes or is ended, so there's nothing to clear up.
+Nothing in the database notices a row changing after a screen read it (there are no concurrency tokens), so two copies side by side would save over each other with neither saying so, and each would run its own hourly backups and write the same view-state file. [SingleInstance](../src/TinapayanRMS.Maui/Platforms/Windows/SingleInstance.cs) keeps the app to one copy from each folder for each Windows sign-in, with a named mutex (`Local\TinapayanRMS.Maui-<the folder's hash>`). Windows frees it when a copy crashes or is ended, so there's nothing to clear up.
 
-- **A second copy** asks the open one to come to the front, over two named events, and closes. It asks again every 250 ms for up to 30 seconds (`Patience`), because the open copy may only be starting: it listens once its window shows. It answers from its UI thread, so an answer means it isn't frozen. No answer in time says so in a message. If the open copy closes meanwhile, the one asking gets the app and carries on.
-- **`dotnet run` or a new build with the published app open doesn't start the new build.** A copy from another folder says where the open one runs from, then brings it forward, so the old build isn't taken for the new one. A copy from the same folder comes forward without a word. This only works against a build that has the guard, so publish again to protect a copy started from a shortcut.
-- **It doesn't reach further than the sign-in.** Another Windows user on this PC, or another PC on the same database, can still save over this one: only a check made when saving could catch those. A copy running as an administrator can't be opened by one that isn't, so that says so too (`OutOfReach`).
-- **A mutex belongs to the thread that took it,** so `TryClaim` and `Dispose` both run on the UI thread, and a test gives each copy a thread of its own (`SingleInstanceGuardTests`). The window itself comes forward through Win32 (`SingleInstanceGuard.BringToFront`), since WPF's `Activate` and `SystemCommands.RestoreWindow` fall short with a dialog or message box open.
+- **A second copy** brings the open one's window forward (restoring it if it's minimized) and exits, before building anything.
+- **A copy from another folder is another app**: one run from source doesn't stop an installed copy, nor the other way round, so the two can be open at once, and so can the WPF app (from `main`, or installed), which keeps to one copy of its own.
+- **It doesn't reach further than the sign-in.** Another Windows user on this PC, or another PC on the same database, can still save over this one: only a check made when saving could catch those.
 
-### Dependency injection and lifetimes
+### Rendering, scopes and lifetimes
 
-Everything in the container is a **singleton**: the repositories, the services (`ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`, `VersionedSaves`), the validators, every ViewModel and `MainWindow`. A screen lives for the whole session, and so does its ViewModel.
+The app is a **Blazor Hybrid** app: the components run in the app's own process, and the web view only draws them, sending events in and taking changes to the page out, with no server and no HTTP between them. They run on the web view's dispatcher, which is the window's UI thread.
 
-The DbContext comes from a **factory**, never `AddDbContext`. A singleton can't hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call. The factory is [SharedTransactionDbContextFactory](../src/TinapayanRMS.Infrastructure/Services/SharedTransactionDbContextFactory.cs), registered as both `IDbContextFactory<TinapayanRMSDbContext>` and `IUnitOfWork` (see "Unit of work" below):
+- **ViewModels are scoped**, and in Blazor Hybrid a scope is a page the web view loads. So the screens keep their selection and unsaved edits from one screen to another and back, until the page is loaded again: after a restore, which loads it afresh (`NavigateTo(…, forceLoad: true)`) so every screen is built anew.
+- **Repositories, services and validators are singletons**: `ProductCloner`, `CostRecalculator`, `SavedProductReader`, `ProductVersionRecorder`, `VersionedSaves`, the backups, the view-state store and the logger. They hold nothing but the context factory, or state that is the computer's rather than a page's (`AppStatus`, `AutomaticBackups`).
+
+The DbContext comes from a **factory**, never `AddDbContext`. A ViewModel outlives any one operation and a repository is a singleton, so neither can hold a `DbContext`: two screens loading at once would share it, and EF Core throws when a second operation starts on a context that's still busy. That happened the first time the WPF app ran. So every repository takes `IDbContextFactory<TinapayanRMSDbContext>` and creates a short-lived context for each call. The factory is [SharedTransactionDbContextFactory](../src/TinapayanRMS.Infrastructure/Services/SharedTransactionDbContextFactory.cs), registered as both `IDbContextFactory<TinapayanRMSDbContext>` and `IUnitOfWork` (see "Unit of work" below):
 
 ```csharp
 public class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IProductCategoryRepository
@@ -393,26 +417,33 @@ Never inject `TinapayanRMSDbContext` into a repository or a ViewModel.
 - **Reads inside a unit of work run one at a time.** They share one connection, and Npgsql refuses a second command while one is running. So `SavedProductReader` and `ProductVersionRecorder` read in sequence, never with `Task.WhenAll`.
 - **Only [VersionedSaves](../src/TinapayanRMS.Pricing/Versions/VersionedSaves.cs) uses it today**, for the saves that record product versions (see "Product versions"). Outside a unit of work, each context has a connection of its own, as before.
 
-Views aren't in the container. `MainWindow` and `SettingsWindow` create them with `new SomeView(viewModel)`. [CompositionRootTests](../tests/TinapayanRMS.UI.Tests/CompositionRootTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app. It builds the host with the view state in memory (`InMemoryViewStateStore`) in place of the developer's own `view-state.json`, and checks that screens made and disposed without being shown write none of it.
+[ServiceRegistrationTests](../tests/TinapayanRMS.Components.Tests/ServiceRegistrationTests.cs) resolves every screen's ViewModel, so a missing registration fails a test rather than the app. It builds the services with the view state in memory (`InMemoryViewStateStore`) in place of the developer's own `view-state.json`.
 
-A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`, so that the host disposes the cache at exit.
+A ViewModel that owns a DynamicData `SourceCache` is `sealed` and `IDisposable`, so that the page's scope disposes the cache when the page goes.
+
+**Threads.** The components run on one thread at a time, the web view's dispatcher, which is the window's UI thread. A ViewModel's property can change on another thread, when a `Task.Run` read finishes, so anything that touches a component from a ViewModel's event goes through `InvokeAsync`. `ScreenBase` does this for the redraws, through a [RedrawGate](../src/TinapayanRMS.Components/Shared/RedrawGate.cs). Nothing on the UI thread may wait on a task synchronously: it would hold up the window.
 
 ### How a change travels through the layers
 
 Take a user who types a new price for cake flour on Raw Materials and presses **Save**:
 
-1. **The ViewModel.** `RawMaterialsViewModel.SaveCommand` runs inside `RunSafelyAsync`. It runs the FluentValidation validators for what it's about to save, and stops with an `ErrorMessage` if one fails.
-2. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, addIns)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces a made ingredient's add-ins if they were sent, then checks the made ingredient as a whole (`EnsureMadeIngredientFitsAsync`: a sub-assembly it can be made from, add-ins its recipe lacks, no loop).
-3. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. Nothing above the ingredients stores a cost: every sub-assembly and product using them is costed from its lines when it's next read. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
-4. **The DbContext** stamps `CostUpdatedAt` on every material whose stored cost changed.
-5. **Back in the ViewModel**, `LoadCommand` merges the fresh data into the screen, and a success toast says "Cake Flour was saved."
-6. **The Products screen** stores no costs. The next time its tab shows, its `LoadCommand` reads the new sub-assembly costs, and `ProductRules` and `CostingRules` work out the new selling price on read.
+1. **The page.** Each keystroke in the price's `NumberField` sets the row's property on the ViewModel, which redraws what follows it. The Save button is a `CommandButton` bound to `RawMaterialsViewModel.SaveCommand`.
+2. **The ViewModel.** `SaveCommand` runs inside `RunSafelyAsync`. It runs the FluentValidation validators for what it's about to save, and stops with an `ErrorMessage` if one fails.
+3. **The repository, in one transaction.** `IRawMaterialRepository.SaveAsync(material, units, brandPrices, addIns)` opens one context and one transaction. It saves the material through `RawMaterialRules`' checks, replaces the units and brand prices, and reprices the material at its dearest brand, logging one price history entry if the cost moved. It replaces a made ingredient's add-ins if they were sent, then checks the made ingredient as a whole (`EnsureMadeIngredientFitsAsync`: a sub-assembly it can be made from, add-ins its recipe lacks, no loop).
+4. **The cascade, in the same transaction.** `IngredientCostPropagator` recomputes every made or linked ingredient that depends on the flour, in dependency order. Nothing above the ingredients stores a cost: every sub-assembly and product using them is costed from its lines when it's next read. Then the transaction commits. A rule that throws anywhere, or a cascade that fails part-way, rolls all of it back.
+5. **The DbContext** stamps `CostUpdatedAt` on every material whose stored cost changed.
+6. **Back in the ViewModel**, `LoadCommand` merges the fresh data into the screen, and `SuccessMessage` becomes "Cake Flour was saved.", which `ScreenBase` shows as a green toast.
+7. **The Products screen** stores no costs. The next time its page opens, its `LoadCommand` reads the new sub-assembly costs, and `ProductRules` and `CostingRules` work out the new selling price on read.
 
 ### Key decisions
 
 | Decision | Why | Read more in PLAN.md |
 |---|---|---|
-| A DbContext factory, and one short-lived context per operation | ViewModels are singletons, and screens load at the same time | [Application Architecture](../PLAN.md#application-architecture) |
+| The ViewModels kept from the WPF app, in a project with no UI framework | The costing, undo, merge-on-refresh and tree behaviour were already built and tested; only what draws them changed | [docs/plan/maui-app.md](plan/maui-app.md) |
+| .NET MAUI Blazor Hybrid, ported from the web copy of the app | The screens are Blazor components in an app window of their own, run in the app's process, with no server, HTTP or API between them and the rules; the web copy had built and checked them already | [docs/plan/maui-app.md](plan/maui-app.md) |
+| A chromeless window, its title bar drawn by the page | It looks as the WPF window did, and Windows still drags, snaps and maximizes it from the gaps between the buttons | [docs/plan/maui-app.md](plan/maui-app.md), "The window" |
+| ViewModels scoped to the page the window loads | A screen keeps its edits while the app runs, and a reload (after a restore) builds every screen afresh | [Application Architecture](../PLAN.md#application-architecture) |
+| A DbContext factory, and one short-lived context per operation | ViewModels are long-lived, and screens load at the same time | [Application Architecture](../PLAN.md#application-architecture) |
 | Reads through Dapper, writes through EF Core | Plain SQL reads are fast and explicit. Every write still goes through EF Core, so the cost propagator runs and a duplicate name surfaces as `DbUpdateException`. | [Conventions](../PLAN.md#conventions) |
 | Material and sub-assembly costs stored and propagated; product costs computed on read | BOMs nest to any depth, so their costs are worth keeping current. A product's figures are quick to work out from those stored costs, and working them out on every read is simpler than keeping them in step. | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
 | A pure ordering function plus a database orchestrator, instead of DynamicData joins | Simpler, testable without a database, and the database stays the single source of truth | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
@@ -420,9 +451,10 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | `decimal` at full precision, rounded only for display and the final price | Rounding each figure before adding them up drifts | Conventions, "Decimal precision" |
 | One Save per screen, in one transaction, with the cost cascade it causes | A rejected part, or a cascade that fails, leaves nothing half-saved and no stored cost stale | Application Architecture, "One Save writes the whole material"; [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) |
 | A failure is shown on its screen, and the app carries on | A crash loses unsaved work, and one failed read mustn't stop a screen working | Application Architecture, "A failure is shown on its screen" |
-| Screens merge fresh data instead of reloading it | A tab keeps its selection, scroll position and unsaved edits | Application Architecture, "A tab keeps its view state" |
+| Screens merge fresh data instead of reloading it | A screen keeps its selection and unsaved edits through a reload | Application Architecture, "Every `LoadCommand` is a fetch-then-merge" |
+| The app's own fields, line tables and trees, rather than Syncfusion's inputs, grid editing and tree view | Typing must reach the ViewModel key by key without a redraw overwriting it, and the ViewModel already owns a tree's state | [docs/plan/maui-app.md](plan/maui-app.md), "How it's built" |
 | Tests on a real database, with nothing mocked | They catch what mocks miss: SQL, constraints and EF Core's behaviour | [Development Environment](../PLAN.md#development-environment) |
-| Syncfusion controls over native ones | The whole UI picks up the theme consistently | [Syncfusion notes](plan/syncfusion.md) |
+| Syncfusion Blazor components over plain HTML controls | The whole UI picks up the theme consistently | [Syncfusion UI Framework](../PLAN.md#syncfusion-ui-framework) |
 | AwesomeAssertions, not FluentAssertions | FluentAssertions 8 needs a paid licence for commercial use | [Tech Stack](../PLAN.md#tech-stack) |
 
 ### The Recipe API
@@ -443,7 +475,7 @@ Take a user who types a new price for cake flour on Raw Materials and presses **
 | `GET /mixes/{id}` | One mix and its lines, grams per batch, in the recipe's order, each with `isFormulaBase` | `ISubAssemblyLineRepository.GetForSubAssembliesAsync` |
 
 - **It can't write.** Its host is `DatabaseHost`'s with the web server on top (`RecipeApiHost.AddRecipeApi`), on the read-only connection the MCP server uses ([ReadOnlyConnection](../src/TinapayanRMS.Infrastructure/ReadOnlyConnection.cs)): every transaction starts read-only. The installed copy also connects as `tinapayanrms_reader` (`Database:ReadOnlyUser` in its `recipeapi.json`, which `ReadOnlyConnection.Apply` makes the connection's user), a role that can't write at all, so code that turned the read-only transactions off would still be refused. `scripts/New-DatabaseReader.ps1` makes the role, as postgres: a member of PostgreSQL's `pg_read_all_data`, rather than grants on the tables, since a restore rebuilds the database without them (`pg_restore --no-privileges` into a new database, renamed into place) and a migration adds tables. It can read the server's other databases too, and write none. Its password, 24 random bytes in hex, goes into the Windows user's `pgpass.conf` through `psql`'s standard input and is never shown. Running it again gives the role a new password in place of the old. Under `dotnet run`, in the tests and in the MCP server, no reader is set, so they connect as `tinapayanrms`, read-only.
-- **It has no UI in it** (2026-11-04). It's on plain `net11.0`, on `Infrastructure` and `Pricing`, so its figures are the screens' without WPF, Syncfusion or ReactiveUI coming with them: it publishes at about 10 MB, where it was 77 MB. `appsettings.json` is still the UI project's, linked into its output.
+- **It has no UI in it** (2026-11-04). It's on plain `net11.0`, on `Infrastructure` and `Pricing`, so its figures are the screens' without Blazor, MAUI, Syncfusion or ReactiveUI coming with them: it publishes at about 10 MB, where it was 77 MB. `appsettings.json` is the app's (`src/TinapayanRMS.Maui`), linked into its output.
 - **Planning lives in TinapayanBMS** (2026-10-31). TinapayanBMS copies `/ingredients`, `/boms`, `/materials`, `/mixes/details` and `/products/recipes` into its own database and plans from them with its port of what was `ProductionPlanRules` and `ProductionPlanBuilder`; this app's Production Plan screen, its saved plans, Reports' Production Results and `POST /plan` were then taken out (see [The Production Plan](#the-production-plan)). Removing `/plan` and `/plans` from `/api/v1` broke no caller: TinapayanBMS, the only one, had stopped using them.
 - **The contract is `Contracts/RecipeContracts.cs`.** The apps that call it keep their own copies of those records, so add to a record rather than renaming or removing a field, or start `/api/v2`.
 - **Where it listens** is in `recipeapi.json` beside it: Kestrel's `http://*:5290`, every address, so the LAN can reach it. The database is the app's own `appsettings.json`'s.
@@ -538,7 +570,7 @@ Every save that changes a product's recipe or price records a `ProductVersion`, 
 - **Figures are worked out on read, by the screen's own code.** `ProductVersionSnapshot.ToDetail` rebuilds a `ProductDetail` from the content and `SavedProductReader.Build` prices it: with its own materials for Then, and with the screen's current materials (`materialsById`, the Price Simulator's way in) and each held product's cost now (`ReadComponentCostsAsync`) for Today.
 - **The History tab reads lazily.** [ProductVersionHistory](../src/TinapayanRMS.Presentation/ViewModels/ProductVersionHistory.cs) holds the rows, the picked one and its changes. `ProductsViewModel.RequestVersions` pushes the product to a `LoadLatest` only while `HistoryTab` shows, once per product, and again after a Save.
   - **Compare With** is a list of `VersionComparison` records: `Previous`, `Current`, then one per version (`With(row)`). They're equal by value, so the choice picked is found again in the list `Show` builds for a new read, and goes back to `Previous` for another product. The picker binds `SelectedItem`, and `CompareWith` ignores the null it sends while its list is replaced. Two versions are always compared from the older to the newer.
-  - **Cost Over Time** is an `SfChart` of `Trend`: one `VersionTrendPoint` per version, oldest first, with each one's Then figures as doubles. A missing current price is `NaN`, which the chart draws as a gap. It's rebuilt by `Show`, `Reprice` and `Clear`. Its three series brushes are in `HistoryCard.xaml`'s resources: the dataviz palette's first three hues, checked with its validator against the card's colour.
+  - **Cost Over Time** is an `SfChart` of `Trend`: one `VersionTrendPoint` per version, oldest first, with each one's Then figures as doubles. A missing current price is `NaN`, which the chart draws as a gap. It's rebuilt by `Show`, `Reprice` and `Clear`. Its three series colours are set on the chart in [History.razor](../src/TinapayanRMS.Components/Pages/Products/History.razor): the dataviz palette's first three hues, checked with its validator against the card's colour.
 - **Print shows the version picked while the History tab shows**, as it shows the scaled recipe on the Scaling tab: `PreparePrintout` returns `VersionPrintout`, the version's `ProductDetail` built and priced at its costs then, through `SavedProduct.ToPrintout`, titled with the version and footed with `ProductPrintout.VersionNote`. The form isn't applied, since the pages aren't the form's. The tab's Print Version button is the same `PrintCommand`.
 - **Restore is an undo step.** `RestoreVersionAsync` builds the version into the form's state and applies it through `RestoreSnapshot` inside `AsUndoStep`, so Save writes it and Undo takes it back, with no restore path of its own. A linked section is linked again with its current lines (Save never writes a version's lines into a shared sub-assembly). Anything it needs that's gone is named, and nothing changes.
 
@@ -776,43 +808,82 @@ The app runs on a compiled EF Core model, the generated code in `Infrastructure/
 
 ### The shell
 
-[MainWindow](../src/TinapayanRMS.UI/Views/MainWindow.xaml) is an `AppWindow`, which is a Syncfusion `ChromelessWindow`: the title bar is drawn in the theme, with Back and Forward on its right, just before Minimize. The hamburger button opens an `SfNavigationDrawer` menu with Raw Materials, Sub-Assemblies, Products, Reports, Production Plan and Price Simulator, and a Settings button at the bottom. The screens are the tabs of `MainTabControl`, a `TabControlExt` with two important settings:
+The app is a .NET MAUI window ([MauiProgram](../src/TinapayanRMS.Maui/MauiProgram.cs), [App](../src/TinapayanRMS.Maui/App.cs)) whose one page, [MainPage](../src/TinapayanRMS.Maui/MainPage.cs), is a `BlazorWebView` filling it: `wwwroot/index.html` with the app's `Routes` in it. [MainLayout](../src/TinapayanRMS.Components/Layout/MainLayout.razor) wraps every screen:
 
-- **`CloseMode="Hide"`**: closing a tab hides it rather than deleting it, so the menu can always show it again.
-- **`IsDisableUnloadTabItemExtContent="True"`**: every tab's content stays loaded. Scroll positions, sort orders, sub-tabs and typed text survive a switch without any code.
+- **The title bar** ([TitleBar](../src/TinapayanRMS.Components/Layout/TitleBar.razor)), which the page draws, since the window is chromeless as the WPF window was: the menu button and the app's heading (`MainWindowViewModel.Heading`) on the left; the Vim keys' mode while they're on, Find, Back, Forward, then Minimize, Maximize (Restore Down while maximized) and Close on the right. The window does what the buttons ask through [IAppWindow](../src/TinapayanRMS.Components/Shared/IAppWindow.cs), which [AppWindowChrome](../src/TinapayanRMS.Maui/Platforms/Windows/AppWindowChrome.cs) implements. `app.js` (`watchTitleBar`) reports where the bar and its buttons are, and the window makes the gaps between the buttons its caption, so Windows itself drags it, snaps it, maximizes it on a double-click and opens its system menu on a right-click. Anything clickable added to the bar must be a `button`, `a` or `input`, or it's taken as caption. [WindowsWindow](../src/TinapayanRMS.Maui/Platforms/Windows/WindowsWindow.cs) takes Windows' own title bar away and hides MAUI's (docs/plan/maui-app.md, "The window").
+- **The menu** ([NavMenu](../src/TinapayanRMS.Components/Layout/NavMenu.razor)) floats over the screen in an `SfSidebar` and closes on a click away: Raw Materials, Sub-Assemblies, Products, Reports, Price Simulator, then Settings.
+- **The screens' tabs** ([ScreenTabStrip](../src/TinapayanRMS.Components/Layout/ScreenTabStrip.razor)) under the title bar, as the WPF window had them. Each tab is a link to its screen, and the one in the address is marked. [ScreenTabs](../src/TinapayanRMS.Components/Shared/ScreenTabs.cs), one per page the window loads, holds which are open: Raw Materials, Sub-Assemblies and Products from the start, and Reports, Price Simulator, Print and Settings once their screen is shown. A tab's ✕ takes it off the strip, and closing the one showing goes to its neighbour. The screen's ViewModel isn't touched, so nothing is lost. Settings has one tab for all its pages (`/settings/roles`), which links to `/settings` and so opens on its first. A page that isn't a screen (`/print/preview`) has no tab and marks none.
+- **A warning banner** under the title bar while the database lacks migrations (`AppStatus.DatabaseWarning`), or while automatic backups keep failing (`AppStatus.BackupWarning`).
+- **The hosts** for what any screen can show: `NoticeHost` (toasts), `ConfirmationHost` (a Yes/No dialog) and `PromptHost` (a dialog asking for a name).
 
-**A tab's screen is made the first time the tab is shown.** `MainWindow` keeps a factory for each tab (`_screenFactories`), and `CreateScreen` runs it from `MainTabControl.SelectionChanged`. `TabControlExt` takes in the shown tab's content only after it has raised that event, so the content is in place in time. The first tab's screen is made in the constructor, since the control can read it before any `SelectionChanged`. Making all seven at startup used to take most of the time between the window appearing and the app being ready. A ViewModel exists from the start, so a link from another screen can open a record on a screen that isn't made yet: the screen shows the record once it's made and loaded.
+Settings isn't a dialog but a screen with a tab on the strip: [SettingsTabs](../src/TinapayanRMS.Components/Pages/Settings/SettingsTabs.razor) is a row of links, and each tab is a page of its own under `/settings/`.
 
-The app starts with only Raw Materials, Sub-Assemblies and Products open: Reports and Price Simulator start hidden (`Visibility="Collapsed"`), like a closed tab, until the menu shows them. The Print tab stays hidden until Products asks for it. The Settings dialog, `SettingsWindow`, is built afresh each time it opens, over the same singleton ViewModels. When it closes, it disposes its delete confirmations and releases its controls (grids, text boxes and picker filters), which would otherwise keep every closed dialog in memory. Then the main window reloads the screen on show, so its pickers include anything added in Settings.
+Back and Forward are the web view's history: a screen is an address, and the title bar's arrows, Alt+Left and Alt+Right, and the Vim keys' `H` and `L` step through it. The arrows are enabled from the web view's Navigation API (`navigation.canGoBack`).
 
-### The MAUI app
+Closing the window ends the process there and then ([App](../src/TinapayanRMS.Maui/App.cs)), once the background work has stopped and the log is flushed: left to itself, it stayed 17 to 22 seconds after the window had gone, and a start in that time found it running and exited.
 
-The same screens, as Blazor components (`src/TinapayanRMS.Components`) drawn in a .NET MAUI window's WebView2 (`src/TinapayanRMS.Maui`), over the same ViewModels. It was ported from the `../TinapayanRMS_Web` repo on 2026-11-07, without that repo's shop accounts or its Mac target; [docs/plan/maui-app.md](plan/maui-app.md) has where it came from, every decision in how it's built, and how to check it in its window. In short:
+### Pages and their parts
 
-- **Startup.** [MauiProgram](../src/TinapayanRMS.Maui/MauiProgram.cs) sets up the log, registers the Syncfusion key (compiled in, as the WPF app's), starts ReactiveUI (`WithBlazor()`), seeds the view state from the WPF app's (`ViewStateSeed`), reads the built-in `appsettings.json`, registers the services (`ServiceRegistration.AddTinapayanRMS`, then the window's own `IFileDialogs` and `IAppWindow`), and starts the hosted services (`BackgroundWork`: `StartupTasks`, the pending-migrations banner and the hourly automatic backups), which stop with the window.
-- **Lifetimes.** The ViewModels are scoped: one set per page the web view loads, so a reload after a restore builds them afresh. The repositories and services are singletons, as in the WPF app, and so is the view state store (one file, one lock).
-- **A screen is a page over its ViewModel.** It inherits [ScreenBase](../src/TinapayanRMS.Components/Shared/ScreenBase.cs), which runs the load each time the page opens, shows messages as toasts, answers confirmations with a dialog, asks before a move away from unsaved changes, and redraws through a [RedrawGate](../src/TinapayanRMS.Components/Shared/RedrawGate.cs). Record screens have an address per record (`/products/42`), so Back and Forward work.
-- **The window is chromeless**, as the WPF window is: [TitleBar](../src/TinapayanRMS.Components/Layout/TitleBar.razor) is the title bar, and [AppWindowChrome](../src/TinapayanRMS.Maui/Platforms/Windows/AppWindowChrome.cs) gives Windows the gaps between its buttons as the caption, from the places `app.js` reports; [WindowsWindow](../src/TinapayanRMS.Maui/Platforms/Windows/WindowsWindow.cs) takes Windows' title bar away, opens the window at 1400×800 in the middle of the mouse's monitor, and asks about unsaved changes as it closes. MAUI's own title bar row is hidden by calling its internal `NavigationRootManager.SetTitleBarVisibility` after each change to the window's style.
-- **What the screens type into** is the app's own components, not Syncfusion's inputs: `TextField`, `NumberField`, `PickField`, `LineGrid` and `FolderTree`, which never write into a box that has the cursor.
-- **Tests**: `Components.Tests` renders the components with bUnit (in `AppServices.NewContext()`, the app's registrations with an in-memory view state and a `FakeAppWindow`; `RenderingAsTheWebView()` for a test that draws a Syncfusion dialog). Focus, typing, printing, the dialogs, the Vim keys and the title bar only show in the window itself.
+A screen's page inherits [ScreenBase&lt;TViewModel&gt;](../src/TinapayanRMS.Components/Shared/ScreenBase.cs), which injects the ViewModel as `ViewModel`:
 
-### Views and cards
+```razor
+@page "/settings/units-of-measure"
+@inherits ScreenBase<UnitsOfMeasureViewModel>
 
-A view is a `UserControl` whose constructor takes its ViewModel:
+<PageTitle>Units of Measure · TinapayanRMS</PageTitle>
 
-```csharp
-public RawMaterialsView(RawMaterialsViewModel viewModel)
-{
-    InitializeComponent();
-    DataContext = viewModel;
-    viewModel.RegisterNativeMessageBoxHandler();   // ConfirmDelete as a Yes/No MessageBox, ConfirmUnsavedChanges as Yes/No/Cancel
-    // … handlers for the screen's other Interactions (prompts) …
+<SettingsTabs />
+
+<div class="list-and-form">
+    <section class="card list-card">
+        <h2 class="section-header">Units of Measure</h2>
+        <PickGrid TItem="UnitOfMeasure" DataSource="ViewModel!.Units" @bind-SelectedItem="ViewModel!.SelectedUnit">
+            <Columns>
+                <GridColumn Field="@nameof(UnitOfMeasure.Id)" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(UnitOfMeasure.Name)" HeaderText="Name" />
+            </Columns>
+        </PickGrid>
+    </section>
+
+    <section class="card form-card">
+        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <FormRow Label="Name" For="unit-name">
+            <SfTextBox ID="unit-name" @bind-Value="ViewModel!.EditingName" />
+        </FormRow>
+        <div class="button-row">
+            <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
+            <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" />
+            <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+        </div>
+    </section>
+</div>
+
+@code {
+    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
 }
 ```
 
-A large screen is split into card `UserControl`s in a folder named after it (`Views/RawMaterials/`, `Views/SubAssemblies/`, `Views/Products/`). A card never sets its own `DataContext`: it inherits the screen's ViewModel. The screen's XAML decides when each card shows. Keep each XAML file shallow, and keep a card's code-behind to view-only work, such as focus and scrolling. The three list cards (`ProductListCard`, `MaterialListCard`, `SubAssemblyListCard`) share theirs: the tree's drag and drop, menus, F2/Del/Enter and bringing a picked row into view are `Controls/ListTree` (`controls:ListTree.IsEnabled="True"` on the `SfTreeView`), over the screen's `IListTreeScreen`, and the notice of the last move is `Controls/MoveNoticeBar`. A fourth screen with a folder tree takes the same two.
+`ScreenBase` is what makes that enough. It:
 
-Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it reports success. Both bind to the screen's `ErrorMessage` and `SuccessMessage`, which every `ViewModelBase` has.
+- **runs `LoadCommand` each time the page opens** (`OnInitializedAsync`);
+- **shows `ErrorMessage` and `SuccessMessage` as toasts**, through `Notices`;
+- **answers `ConfirmDelete` with a dialog**, through `Confirmations`;
+- **redraws the page** when a property of the ViewModel changes, and also when any of its lists or any of its commands' `CanExecute` changes. A grid's rows or a button's enabled state change without a property of the ViewModel changing, so `ScreenBase` subscribes to every `INotifyCollectionChanged` and `ICommand` property it finds on the ViewModel, once;
+- **draws once for changes that come together.** A load sets hundreds of properties, rows and commands in a row, and a redraw asked for on the dispatcher is drawn and sent to the web view at once. So every request goes to the screen's `RedrawGate`: the first queues one redraw behind the work in hand, and the rest find it queued. The redraw follows the change by one turn of the dispatcher, with no timer. `FolderTree` has a gate of its own for its rows;
+- **tells the Vim keys which screen is on show** (`VimKeysState`);
+- gives the page `AddSubscription` (to keep an `Interaction` handler until the page goes), `Run` (to run a command from a click), `ScreenNotices`, `OnViewModelChanged(propertyName)` to override, and `RedrawNowAsync` for the few things that have to follow the drawing, such as moving the cursor into a field the redraw fills in.
+
+A component that redraws on a ViewModel's events asks its own `RedrawGate` (`Request`), and never calls `InvokeAsync(StateHasChanged)` from a handler that runs once per change.
+
+A large screen is split into components in a folder named after it (`Pages/RawMaterials/`, `Pages/Products/`). A part takes the screen's ViewModel as a `ViewModel` parameter and has no state the ViewModel should own. The screen's page decides when each part shows. Keep a part's `@code` to view-only work, such as focus.
+
+**A record screen has an address per record.** Its page takes an optional `Id` (`@page "/products/{Id:int}"`), opens that record, and puts the record the user picks into the address in `OnViewModelChanged`. That gives the web view's Back and Forward something to step through, and lets one screen open a record on another by navigating.
+
+**The page acts on an address once, when it arrives** (`_addressOpened`), and not each time it's handed the same one:
+
+- **As the screen opens**, `OnInitialized` gives the record to the load that follows (`OpenProductOnLoad`, `OpenRawMaterialOnLoad`, `OpenSubAssemblyOnLoad`), which opens it at its end, when the list is fresh.
+- **When the address changes** (Back, Forward, another screen's link), `OnParametersSet` opens the record there and then (`OpenProduct` and its like).
+- **New drops a record still waiting for the load.** Blazor also calls `OnParametersSet` once `OnInitializedAsync` is back, which is after the load. The pages used to open the record there, so a New clicked while the list was still loading had the record load over the new form. The Name box had the cursor, so it stayed blank, and the name typed into it was saved as the old record's.
 
 ### ViewModels
 
@@ -831,7 +902,7 @@ Each screen puts an `ErrorToast` over its content, and a `SuccessToast` where it
 
 A command that deletes, or does anything else that can't be undone, goes through `RunWithConfirmationAsync`. A command that saves runs inside `RunSafelyAsync`, and runs its validator first. A command that only changes the form in memory isn't wrapped.
 
-The smallest complete screen is the Settings dialog's Categories tab. Abridged from [CategoriesViewModel](../src/TinapayanRMS.Presentation/ViewModels/CategoriesViewModel.cs):
+The smallest complete screen is Settings' Material Categories tab ([MaterialCategories.razor](../src/TinapayanRMS.Components/Pages/Settings/MaterialCategories.razor)). Abridged from [CategoriesViewModel](../src/TinapayanRMS.Presentation/ViewModels/CategoriesViewModel.cs):
 
 ```csharp
 public sealed class CategoriesViewModel : ViewModelBase, IDisposable
@@ -908,20 +979,19 @@ The rules for ViewModels:
 - **Commands without a parameter** are `ReactiveCommand<RxVoid, RxVoid>`. Import the type with `using RxVoid = ReactiveUI.Primitives.RxVoid;`. Never write `using ReactiveUI.Primitives;`: its own `Select`, `Where` and `Subscribe` clash with `System.Reactive.Linq`'s (error CS0121). `System.Reactive` is referenced directly for the Rx operators.
 - **Switching to the latest inner observable** is written `Observable.Switch(source)`, never `source.Switch()`. ReactiveUI imports `ReactiveUI.Binding` into every file, and that namespace has a `Switch` of its own that clashes with Rx's (error CS0121). `ViewModelBase.LoadLatest` uses it to load a selection's details, so a newer pick cancels an older load that is still running.
 - **Lists** are a DynamicData `SourceCache<T, int>` bound with `Connect().SortAndBind(out collection, comparer).Subscribe()`, or an `ObservableCollection<T>` of editable rows.
-- **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
-- **Dialogs and prompts** are `Interaction`s that the view handles: `ConfirmDelete` (a Yes/No `MessageBox`, through `RegisterNativeMessageBoxHandler`), `ConfirmUnsavedChanges` (Yes / No / Cancel for Save / Don't Save / Cancel, through the same), `ExportToExcel` (a Save dialog and the export, through `RegisterExcelExport`), `PromptForName` and `PromptForNewCategory` (`TextPromptWindow.Prompt`), Find (`QuickFindWindow.Pick`, opened by `MainWindow` itself), and the Products and Sub-Assemblies screens' `PromptForMadeIngredient` (`TextPromptWindow.PromptWithChoice`, a name box with a picker under it, taking a `ChoicePromptRequest` that `MadeIngredientPrompt` builds for both).
- Tests register handlers of their own.
-
-- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies and Reports), `RawMaterialOpenRequests` (from Reports), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` and `PrintRequests` (from Products). `MainWindow` subscribes to them, calls the target screen's `Open*` (or `StartNewProductFrom`) method and shows its tab, so the ViewModels never know about each other.
+- **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step, back on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
+- **Dialogs, prompts and files** are `Interaction`s that the page handles: `ConfirmDelete` and `ConfirmUnsavedChanges` (`ScreenBase` answers them, through `Confirmations`), `PromptForName` and `PromptForNewCategory` (the page answers through `Prompts`), `PromptForMadeIngredient` (Move to In-House and Make In-House Ingredient: a name and a Made category, `Prompts.AskChoiceAsync`), `ExportToExcel` (the page asks where with the Save dialog, then builds or exports the workbook there), `ChooseCopyDestination`, `ChooseBackupFile` and `ChooseCopyFolder` (the Database page answers with the Save, Open and folder dialogs, `IFileDialogs`), and `ShowPrint` (the Price Simulator hands its printouts to `PrintPreviews` and navigates to the preview). Tests register handlers of their own.
+- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies, Reports and the Price Simulator), `RawMaterialOpenRequests` (from Reports, and Sub-Assemblies' Used By for a made ingredient), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` (from Products, and a made ingredient's Made from badge on Raw Materials) and `PrintRequests` (from Products). [ScreenLinks](../src/TinapayanRMS.Components/Shared/ScreenLinks.cs), one per page the window loads and started by the layout, subscribes to them and navigates to the target's address, so the ViewModels never know about each other.
 
 ### Loading and refreshing
 
-- **There's one load trigger: showing a tab.** `MainWindow.LoadSelectedTab` runs the shown tab's `LoadCommand` at startup and on every `MainTabControl.SelectionChanged`. It ignores `SelectionChanged` events that bubble up from grids and pickers, and runs the loads through `ScreenLoads`: never two of a tab's side by side, and one asked for while the last runs follows it if the tab still shows, since the running one may have read before another screen saved. Views never load data on `Loaded`. The Settings dialog loads its lists when it opens.
-- **Every `LoadCommand` is a fetch-then-merge, never a clear-and-reload.** It awaits all its reads first, then records the ids of the selected row and of every picker's choice, then merges inside `ApplyRefresh` and picks everything again by id. A `ComboBoxAdv` can clear its own `SelectedItem` when its item is replaced mid-merge, which is why the ids are read before the merge.
-- **[CollectionMerge](../src/TinapayanRMS.Presentation/ViewModels/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a grid's selection and scroll position and a picker's `SelectedItem` are tied to. An `ObservableCollection` merge takes a key of any type, and rows that share a key are matched in order. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
+- **There's one load trigger: opening the page.** `ScreenBase` runs the page's `LoadCommand` as it initialises, so going to a screen reloads it, and coming back to it reloads it again with whatever another screen changed. A page never loads data anywhere else.
+- **Every `LoadCommand` is a fetch-then-merge, never a clear-and-reload.** It awaits all its reads first, then records the ids of the selected row and of every picker's choice, then merges inside `ApplyRefresh` and picks everything again by id.
+- **[CollectionMerge](../src/TinapayanRMS.Presentation/ViewModels/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a list's selection, a row's `@key` and a picker's choice are tied to. An `ObservableCollection` merge takes a key of any type, and rows that share a key are matched in order. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
 - **Pointing a selection at its refreshed copy must not reload the form or throw away unsaved edits.** On Products, Raw Materials and Sub-Assemblies the merge re-points it quietly (`RepointSelection`), and only a pick, the selection's setter, loads the form (`_picks`). Elsewhere, subscriptions driven by a selection skip while `IsRefreshing` is set.
 - Save and Delete call the same `LoadCommand` afterwards, so the record you saved stays selected.
-- **A load that fails says so, and the screen keeps working.** `LoadSafelyAsync` and `LoadLatest` show the failure in the screen's error notice, and the next tab show or pick tries again. A selection's load that fails clears what it would have replaced rather than leave another record's details under the new pick.
+- **A load that fails says so, and the screen keeps working.** `LoadSafelyAsync` and `LoadLatest` show the failure in a red toast, and the next visit or pick tries again. A selection's load that fails clears what it would have replaced rather than leave another record's details under the new pick.
+- **Between a pick and its details arriving**, a record screen's tabs ignore the mouse (`AreDetailsReady`, the `details-pending` class), so nothing is typed into the record that's on its way out.
 
 ### Editing, undo and Save
 
@@ -931,175 +1001,174 @@ Undo and redo follow the Memento pattern:
 
 - **[UndoHistory&lt;TSnapshot&gt;](../src/TinapayanRMS.Presentation/ViewModels/UndoHistory.cs)** keeps a screen's undo and redo stacks. It knows nothing about what a snapshot holds. The screen gives it a way to take a snapshot, a way to compare two, and a way to tell whether recording is allowed (not while loading or restoring).
 - **Snapshots are immutable records**: `RawMaterialFormSnapshot`, `SubAssemblyFormSnapshot` and `ProductFormSnapshot`. They hold the related records by id, not by object, because a refresh swaps in fresh objects and comparing those by reference would look like an edit.
-- **Behaviours mark where a step starts and ends**: `controls:FieldUndoStep.Recorder="{Binding}"` makes one step of a visit to a field, and `controls:GridUndoSteps.Recorder="{Binding}"` makes one step of each change in a grid.
-- **`UndoShortcuts`** sends Ctrl+Z and Ctrl+Y to the screen under the cursor, through its `IUndoScreen`. It's a class handler on `PreviewKeyDown`, because Syncfusion's number boxes take both keys for their own undo.
-- **`History.IsDirty`** compares the form with the snapshot it was last saved or loaded with. It decides whether Save is offered, whether Back and Forward may change the record a screen has open, and whether a printout says "Includes unsaved changes".
-- **A dirty form is never left without asking.** Products, Raw Materials and Sub-Assemblies are `IUnsavedChangesScreen`s: `ResolveUnsavedChangesAsync(revert)` asks Save / Don't Save / Cancel through `ConfirmUnsavedChanges` (`ViewModelBase.AskAboutUnsavedChangesAsync`) and says whether the form may be left. A screen asks before its own form shows another record (a list pick, through `PickAfterAskingAsync`; New; the `Open*Async` methods the links call). [ScreenNavigator](../src/TinapayanRMS.Presentation/ViewModels/ScreenNavigator.cs) asks before the screen is left, with `MainWindow` telling it which screen shows and showing the one asked for: a tab change is undone and redone once answered (`TurnBackToUnsaved`, then `AfterAskingAsync`), links go through `OpenOnAsync`, Back and Forward (`GoBack`, `GoForward`) peek at `NavigationHistory.BackTarget`/`ForwardTarget` first, and `OnClosing` asks before the app closes (`CloseAfterAskingAsync`). With `revert`, Don't Save also puts the form back as saved. Products and Print count as one screen. What fails while asking, such as reading the record back, shows on the form, which isn't left. A new path that replaces a form's record, or leaves a screen, goes through one of these.
+- **The fields mark where a step starts and ends.** A record screen's page wraps its content in `<CascadingValue Value="(IUndoRecorder)ViewModel!">`. `TextField`, `NumberField` and `PickField` take that recorder as a cascading parameter and call `BeginUndoStep` as they take the cursor and `EndUndoStep` as they lose it, so one visit to a field or a cell is one step. A change made in one go (a tick box, a row dragged) wraps itself in the same pair.
+- **The recorder also says which record the form is for**: `IUndoRecorder.FormVersion`, a count each record ViewModel raises as another record, or a new one, takes the form's place (`LoadIntoForm` for a different id, and New). `TextField` and `NumberField` remember it as they take the cursor. If it has changed, the box is given up (`IsGivenUp`): nothing more is taken from it, and a fresh input, without the cursor, is drawn in its place with the record's own value. The lists' search boxes sit inside a `CascadingValue` of a null recorder, so they keep the cursor when a record opens.
+- **[UndoKeys](../src/TinapayanRMS.Components/Shared/UndoKeys.razor)**, placed on a record screen, sends Ctrl+Z, Ctrl+Y and Ctrl+Shift+Z to its `IUndoScreen`. The web view's own undo in a text box is never used. The key first takes the cursor out of the field it's in, so that what's half-typed lands and so the field shows what the step put in it, then puts the cursor back once the screen has been drawn again: in the same control, or in the same cell where the step drew a table's lines afresh. The page passes it `RedrawNowAsync` as `Redraw`, so the step is drawn before the page's script is told the key is done.
+- **`History.IsDirty`** compares the form with the snapshot it was last saved or loaded with. It decides whether Save is offered, whether the form may be left without asking, and whether a printout says "Includes unsaved changes".
+- **A dirty form is never left without asking.** Products, Raw Materials and Sub-Assemblies are `IUnsavedChangesScreen`s: `ResolveUnsavedChangesAsync(revert)` asks Save / Don't Save / Cancel through `ConfirmUnsavedChanges` (`ViewModelBase.AskAboutUnsavedChangesAsync`) and says whether the form may be left. A screen asks before its own form shows another record (a list pick, through `PickAfterAskingAsync`; New; the `Open*Async` methods the links call), and the page asks before the screen is left ([Unsaved changes](#unsaved-changes)). With `revert`, Don't Save also puts the form back as saved. What fails while asking, such as reading the record back, shows on the form, which isn't left. A new path that replaces a form's record, or leaves a screen, goes through one of these.
 - **An edit the form hasn't seen yet keeps Save offered** (`IUndoRecorder.IsEditPending`): a grid cell being typed into, and an add row with something typed into it until the row is added or dropped. The click on Save is what ends the edit, so a Save that went disabled as the edit ended would lose that click.
 
-### Navigation history
+### The shared components
 
-[NavigationHistory](../src/TinapayanRMS.Presentation/ViewModels/NavigationHistory.cs) holds the Back and Forward stacks of `ScreenVisit(AppScreen, RecordId)`. Back keeps up to 50 stops. A step is any change of screen: the menu, the tab strip, a closed tab, or a link from one screen to another. Picking another record in a list isn't a step. `MainWindow` records each step with the record the screen had open as it was left. Going back reopens that record through the screen's `Open*` method, unless the screen's form holds unsaved changes. Alt+Left and Alt+Right work too: they're handled on the window's `PreviewKeyDown`, which checks `SystemKey` because WPF reports a key pressed with Alt as `Key.System`.
+The pages are built from the components in [Shared/](../src/TinapayanRMS.Components/Shared/). Use them rather than a raw Syncfusion input or an `<input>` of your own: each exists because of something that went wrong without it.
 
-**Find** (Ctrl+K, on the same `PreviewKeyDown`, or the title bar's magnifier) is [QuickFindWindow](../src/TinapayanRMS.UI/Views/QuickFindWindow.xaml), a chromeless modal dialog built like `TextPromptWindow`, over the singleton [QuickFindViewModel](../src/TinapayanRMS.Presentation/ViewModels/QuickFindViewModel.cs). Each time it opens, `LoadCommand` reads every raw material, standalone sub-assembly (`GetStandaloneAsync`) and undeleted product into `QuickFindResult(AppScreen, Id, Name, Kind, Group)` rows, and `Query` filters them through `QuickFindViewModel.Match`: every word somewhere in the name, ignoring case and accents (`CompareOptions.IgnoreNonSpace`); exact, then prefix, then a word starting with the first word, then the rest; at most `MostShown` (50). The keyboard stays in the box: its `PreviewKeyDown` moves `SelectedResult` with Up, Down, PageUp and PageDown. `MainWindow.OpenFind` opens the pick through `OpenOnAsync` and the screen's `Open*Async` (`_recordOpeners`), so the unsaved-changes questions are the links' own.
+| Component | Use it for | What it takes care of |
+|---|---|---|
+| `TextField` | Text bound to a ViewModel | Each keystroke reaches the ViewModel. Nothing writes into the box while it has the cursor. One undo step per visit. `OnLeave`, `OnEnter`. |
+| `NumberField<TValue>` | A `decimal`, `decimal?`, `int` or `int?` | Shown in its `Format`, right-aligned, selected whole on taking the cursor. Passes a number on as it's typed once it reads back the same (`2.5`, but not `2.` or `2.50`), and otherwise on leaving. `Min` and `Max`. A number beyond `NumberField.Largest` (just under a billion, either side of zero) is read as no number at all, as letters are: the costs worked out from a longer one overflow `decimal`. A box left holding text it didn't take is drawn as typed and then as its number, so the web view is sent the number. `LandsOnLeave` holds the value until the box is left. `ReadOnly` greys it. |
+| `PercentBox` | A percentage | A `NumberField` with its % sign. |
+| `PickField<TItem>` | A picker (a Category, a Role, a line's ingredient) | An `SfComboBox` that filters as you type and fills in the best match, bound **by index**. Typed text that matches nothing puts the pick back, unless the picker is `AllowEmpty`. `ItemTemplate` for a list with columns. `OnTyped`, `OnArrive` and `OnLeave` for a picker that offers to add what was typed. |
+| `LineGrid<TRow>` | A table typed straight into (brand prices, a BOM, a recipe's lines) | A plain table of fields: one keyed row per line, a row header showing the line picked, drag to reorder (`Reorderable`), and the add row. |
+| `IngredientLinesGrid`, `PackagingLinesGrid` | A recipe's ingredient lines; packaging lines | The `LineGrid`s that Sub-Assemblies and Products share. |
+| `PickGrid<TItem>` | A list to pick one record from (Settings' lists) | An `SfGrid` with single row selection, kept in step with the ViewModel's `Selected…` property both ways. Its columns must include the key, with `IsPrimaryKey`. |
+| `FolderTree<TNode>` | The Raw Materials, Sub-Assemblies and Products lists | Draws the ViewModel's folders and rows, and changes its open folders and picked rows on a click (with Ctrl or Shift), the arrow keys, Home, End and Enter. Drag onto a folder. A right-click menu (`TreeMenu`), and F2 and Del for what the menu shows beside them. |
+| `MoveNoticeBar` | Under a tree | What the last drag moved, with Undo. |
+| `CommandButton` | A button bound to a `ReactiveCommand<RxVoid, RxVoid>` | Enabled while the command can run. |
+| `ActionButton` | A button for a command with a parameter, or a page's own action | Pair it with `Commands.Run(command, parameter)`. |
+| `MenuButton` | A button that drops a short list of commands | Closes its list once one is clicked. |
+| `FormRow` | A label on the left of its field, in a stacked form | Lines the labels up. |
+| `UsedByTiles` | The products or sub-assemblies using a record | Each tile opens the record on its screen. |
+| `UndoKeys` | A record screen | Ctrl+Z and Ctrl+Y (see above). |
+| `Glyphs`, `ProductIcons` | Icons | The icons' code points by name (Segoe Fluent Icons', the WPF app's); a product category's picture. |
+
+How a page runs a command:
+
+- a `CommandButton`, for a command without a parameter;
+- `Commands.Run(command, parameter)` from an `ActionButton` or any event, which runs the command only if it can run now;
+- never `command.Execute().Subscribe()` from markup: the click wouldn't wait for it.
+
+`ReactiveCommand.CanExecute` is an observable. To ask whether a command can run now, cast it: `((ICommand)command).CanExecute(null)`, or use `Commands.CanRun`.
+
+### Typing: three rules
+
+Each event in the web view goes to the components and comes back as a redraw (the web app this was ported from sent them over the network, Blazor Server). These rules keep that round trip from eating what's typed. Each was learned from a bug.
+
+1. **Never write into a box that has the cursor.** A redraw answering an earlier keystroke would overwrite the keystrokes typed since: "zz web test material" arrived as "zt material". `TextField` and `NumberField` keep their own text while focused and take the ViewModel's value again once left. What has to happen before the first key, such as selecting a number's text as it takes the cursor, is done in the page's script ([app.js](../src/TinapayanRMS.Maui/wwwroot/app.js)), because the components can't be asked in time.
+   - **The one exception is another record loading under the cursor** (New, then Back; or a box typed into while the screen is still opening its record). The box then holds the record before's text, and a name typed into it was saved as the loaded record's. So the box is given up and drawn afresh, as `FormVersion` above describes.
+2. **Key a table's rows, and never draw one object as two rows.** `LineGrid` draws the lines and the add row's draft in one `@key`ed loop, so the draft keeps its row, and the cursor, as it becomes a line. It clears its draft before adding it to the lines, because the add redraws the screen, and a row that is both a line and the draft breaks the page ("more than one sibling has the same key").
+3. **Bind a picker by index, not by value.** `SfComboBox` reads the first value of an enum as empty, so a picker bound to `RawMaterialType` showed blank for Ingredient. `PickField` binds an `int?` index into its list.
+
+### The add row
+
+A `LineGrid`'s add row is a draft made by the ViewModel's factory (`NewBrandPriceRow`, `NewBomLine`, and so on). The moment one of its properties changes, it joins the lines and a new draft takes its place. A draft nobody types into is never a line.
+
+Where the screen itself changes the draft, pass `IsBlank`. A composite's Products table prices its add row when a product's costs arrive, and without `IsBlank` that put a blank line after every pick.
 
 ### Vim keys
 
-[Vim/](../src/TinapayanRMS.UI/Vim/) holds an optional layer of Vim-style keys over the whole app, in the manner of Vimium. The user turns it on in Settings → Keyboard. `KeyboardSettingsViewModel` keeps the choice in the view state (`vim-keys`), and `App.OnStartup` applies it. While it's off, each handler returns after a single `bool` check.
+An optional layer of Vim-style keys over the whole app, in the manner of Vimium. The user turns it on in Settings → Keyboard. `KeyboardSettingsViewModel` keeps the choice in the Windows user's view state (`vim-keys`).
 
-- **Where keys are caught.** `VimKeys.Register()`, called from `App`'s static constructor, adds class handlers on `Window` for `PreviewKeyDown`, `PreviewTextInput` and `GotKeyboardFocus` (with `handledEventsToo`).
-  - Letters come from `PreviewTextInput`. `SfDataGrid` starts a cell edit for a letter in `OnTextInput`, which this handler runs before, and `e.Text` is already the keyboard layout's character.
-  - Keys that type nothing (Esc, Ctrl+R) come from `PreviewKeyDown`.
-- **Modes.**
-  - Insert is the app as it always was. It applies when focus is in a `TextBoxBase` (a field, or a picker's text) or in a grid cell being edited.
-  - A column filter's pop-up isn't part of its grid. `VisualTreeWalk` steps out of a pop-up to its `PlacementTarget`, and the filter's pop-up is placed on the heading's funnel, so walking up from its search box would land in the grid and read as Normal, swallowing every letter. `PlaceOf` stops at the filter control's own pop-up (`Popup { TemplatedParent: GridFilterControl }`), so the search box is a field.
-  - The keyboard can land on text content as well as on controls: a `Hyperlink` takes it when it's clicked. A `ContentElement` isn't a `Visual`, and `VisualTreeHelper.GetParent` throws on one, so `VisualTreeWalk` steps out of it by its logical parent (or `ContentOperations.GetParent`) to the text block or document holding it.
-  - In a grid, Insert lasts until Esc (`_gridIsInsert`, set whenever a cell is seen being edited). Tab, Enter or an arrow ends the cell's edit, but the next letter or digit still goes through, so the grid starts that cell's edit itself. A grid reached from somewhere else takes the mode the keys were in (`Arrive`), so Tab from a field in Insert goes on typing. Esc on a cell that isn't being edited takes the grid back to Normal.
-  - Normal applies everywhere else. It also applies to a field reached with `j`/`k` or left with Esc. In Normal, every printable character is handled, so none types or starts an edit.
-  - Esc in a cell commits it through `GridEditCommit.Commit(grid, keepCurrentCell: true)` instead of cancelling it. Esc is handled only when it has something to do, so otherwise a dialog's Cancel still gets it.
-  - Ctrl chords stand for other keys, as in Vim: Ctrl+[ is Esc, and Ctrl+N and Ctrl+P are Down and Up while a dropdown or suggestion list is open (`KeyForChord`). `PressInstead` sends the key through `InputManager.ProcessInput`, so it reaches what a typed key reaches. That includes a `ButtonAdv.IsCancel` button, which takes Esc as an access key and only through the input manager. Ctrl is still held, so it's lifted from the thread's key state (`GetKeyboardState`/`SetKeyboardState`) while the key goes through. WPF reads modifiers live from that state, and Ctrl+Down would jump a list to its last row.
-- **Speed.** Where the keyboard is (a `Place`: field, grid, tree, table, other or overlay) is worked out once per focus change and cached. A key is then a `FrozenDictionary` lookup (`VimKeySequence`, built from `VimKeymap`) plus the action.
-- **Keys stand for the keys they replace.**
-  - In grids, trees and lists, `j` is raised as Down and `dd` as Delete. In a tree, `o` is raised as Enter and `r` as F2.
-  - Each is raised on the element that has the keyboard, as WPF's `KeyboardDevice` raises a real key: `PreviewKeyDown`, then `KeyDown` unless the first was handled. So the controls' own handling and the app's behaviours (`GridAddNewRow`, `GridUndoSteps`, the trees' `ListTree`) apply unchanged.
-  - A raised key reads Ctrl and Shift from the physical keyboard (`KeyboardDevice.Modifiers`), so only keys typed without a modifier are raised. `gg`, `G`, `0` and `$` use the grid's `MoveCurrentCell`, with `GetFirstDataRowIndex`, `GetLastDataRowIndex` (which skips the add row) and the column helpers. The trees pick their row through `SelectedItems`.
-  - In a form, `j`/`k` call `MoveFocus` (Next or Previous), because an arrow key would step a number box's value.
-- **Each list card has a toolbar under its search box**: icon-only `ButtonAdv`s (`SizeMode="Small"`, the name in `Label` and `ToolTip`, `Focusable="False"` so Tab still goes from the search box to the tree) bound to the commands of the tree's empty-space menu (`EmptySpaceMenu` in each ViewModel), with no parameter. Raw Materials' two New Category items share one `DropDownButtonAdv`. A list command added to that menu belongs in the toolbar too. The properties are set on each button, not through a `Style`, so the theme's template stays intact. A Small `ButtonAdv` comes with `Padding` 2,0,4,0 and draws the 14 px glyph in the top-left corner of a 16 × 16 icon box, so each toolbar button sets `IconWidth` and `IconHeight` to 14 and `Padding` to 3,1,3,0 to centre it. The `DropDownButtonAdv` ignores `Padding`, so it gets a 16-tall icon box with the glyph at its bottom instead. Their icons include `NewFolderIconTemplate`, `ExpandAllIconTemplate` and `CollapseAllIconTemplate` in `App.xaml`.
-- **`SfTreeView` in Extended mode** (the Products, Raw Materials and Sub-Assemblies lists) has three behaviours to work around:
-  - its Home only moves the focus border, without picking the row;
-  - its arrow keys do nothing while the current row is hidden, for example by a search;
-  - a `SelectedItem` set from outside is inserted in front of the rows already picked, rather than replacing them.
-
-  So `gg`, `G`, and `j`/`k` from a hidden row pick their row by replacing `SelectedItems`: clear it, then add the row, as the screens' `SelectedTreeNode` setters do.
-- **Windows** take part through `IVimHost`, which `MainWindow` and `SettingsWindow` implement. It provides `gt`/`gT` (`VimTabs.Step`), Back and Forward, the screens the command line names, and Settings.
-- **The command line** (`:`) is parsed by `VimCommandLine` and run by `VimCommands`. A command runs on the screen found by walking `DataContext` up from the keyboard, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. It goes through `ICommand.Execute`, as a button does, so its errors end up where they always do. Enter always closes the line first. A parse error, or the reason `VimCommands.Run` returns, then shows in the same bar as a message with no box (`VimOverlay.ShowMessage`), which the next key, click or a 5-second timer puts away.
-- **The expression register** (Ctrl+R then `=` in Insert, as Vim's) types the answer to a sum into the box the keyboard is in.
-  - Ctrl+R in Insert sets `_awaitingRegister`, shown as `"` in the indicator, as Vim shows it. The next character names the register: `=` opens the expression line (`VimOverlay.ShowExpressionLine`), and any other character is dropped. A key that types nothing (an arrow, Enter, Tab) cancels the wait and does what it does. Ctrl+R in Normal is still redo.
-  - The keyboard never leaves the cell. Moving focus to a box in the bar would end the cell's edit (`GridEditCommit.CommitWhenFocusLeaves`) and lose the caret. So the overlay captures keys as the hints do (`Capturing`, `TakeKey`, `TakeText`), and the bar draws the sum as text. Space comes through `TakeKey`, because `DoubleTextBox` handles Space on key-down, so no text input follows it. Every other key is taken and ignored, so an arrow or Tab can't move the cell from under the sum.
-  - `VimExpression.Evaluate` is a recursive-descent parser over `decimal` (`+ - * / %`, brackets, unary signs, comma-grouped thousands). Division is decimal, unlike Vim's whole-number division. A sum it can't work out keeps the line open with the reason after it.
-  - `VimKeys.TypeAnswer` types the answer a character at a time through `TextCompositionManager.StartComposition`, with `_raising` set. So a number box applies its own mask, limits and decimals, and `GridUndoSteps` sees an ordinary edit. The answer is first rounded (half away from zero) to the decimals the box takes (`DecimalsTaken`: `MaximumNumberDecimalDigits`, which `NumericEditRenderer` sets for a `TypedDecimalDigits` column, else `NumberDecimalDigits`), since the mask would otherwise cut it short. A grid in Insert between cells has no editor yet, so its current cell's edit is begun first (which `GridCellEditing` can still refuse), and the answer is typed once the editor has the keyboard.
-- **Overlays.** `VimOverlay` is one adorner per window, on the content's adorner layer. It holds:
-  - the hint labels (`HintTargets`, `HintLabels`), all drawn in a single `OnRender`;
-  - the command bar;
-  - the cheat sheet, built from `VimKeymap` so it lists what the keys actually do.
-
-  A hint clicks a `ButtonBase` or `SplitButtonAdv` through its protected `OnClick`, by reflection, because `ButtonAdv`'s automation peer has no Invoke pattern. A hint on a picker puts the keyboard in its `PART_Editable` box (`VimKeys.FocusPicker`), not on the picker: a Shift+Tab out of the box leaves a `ComboBoxAdv` unfocusable for good, and its `Focus()` then does nothing.
-- **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description). Then handle its `VimAction` in `VimKeys.Perform`, or in the `In*` method for its place. The cheat sheet picks it up.
-- **Slow keys.** Debug builds log any key the layer takes more than 4 ms to handle (`The Vim key … took … ms`). Most of that time is the screen's own response, such as a picked row loading its form.
-- **Tests** are in `UI.Tests/Vim/`.
-  - The parser, keymap, command line, expression evaluator (`VimExpressionTests`) and labels are tested without WPF.
-  - `VimKeysGridTests` raises text input and key presses on a real off-screen grid.
-  - `VimKeysPickerTests` checks a hint reaches a real off-screen picker, including one a Shift+Tab has left unfocusable.
-  - These tests switch the static `VimKeys.State` on and off, so they run in `OffscreenGridCollection`.
-
-### Controls and behaviours
-
-The app extends Syncfusion's controls with **attached behaviours** in `Controls/` rather than subclassing them. You turn a behaviour on in XAML, and it hooks the control's events. Behaviours that apply everywhere are registered once, in `App`'s static constructor.
-
-| Behaviour | Set on | What it does |
-|---|---|---|
-| `GridFillerRows.IsEnabled` | A grid with height to fill | Draws the lines of empty rows in the space under the last row (`GridFillerLayer`, in the grid's template). It adds no rows to the grid, so selection, editing and export never see them |
-| `GridRowReordering.IsEnabled` | An editable grid of lines | Lets rows be dragged into order. The collection's order is what's saved as `SortOrder`. |
-| `GridRowInserting.IsEnabled` | An editable grid of lines with an `ItemFactory` | Puts a blank line from the `ItemFactory` in above the current one, as one undo step, and opens its first column. It's run by the `GridRowInserting.InsertLine` routed command: a button with `CommandTarget` set to the grid, the Insert key, or Vim's `O`. It's on the ingredient line tables of Sub-Assemblies and of a product's section form, including its add-ins. |
-| `GridAddNewRow.ItemFactory` | An editable grid | Makes the add row edit a row the screen creates |
-| `GridAddNewRow.DropWhenUntouched` | An editable grid with row selection | Swaps in `UntouchedAddRowSelectionController`. It drops an add row nothing was typed into instead of adding an empty line. Tab from the last cell Tab can reach on a typed-into add row adds the line, as Enter does, and opens the next add row's first cell; the grid only ended the cell's edit there. |
-| `GridEditCommit` | An editable grid | Commits an open cell edit when focus leaves the grid, so Save sees it |
-| `GridCellEditing.IsEnabled` | A grid | Makes a column editable on some rows and not others |
-| `GridUndoSteps.Recorder`, `FieldUndoStep.Recorder` | A grid; a field | Undo steps (see above) |
-| `GridHeaderAlignment.IsBottom` | A grid whose headings wrap (`GridHeaderHeight.Lines`) | Puts the headings, and their sort arrows and filter funnels, at the bottom of the header row, so one-line headings line up with the last line of two-line ones. It sets each header cell as it loads rather than through a `HeaderStyle`, which would drop the theme's style unless it was `BasedOn` it. On the Price Simulator's Products table. |
-| `CheckboxFilterFill.IsEnabled` | A grid that filters | Widens a filter pop-up's list of values to the pop-up. The theme fixes it at 188px, which cut long names off. |
-| `AutoCompleteDropDown.IsEnabled` | A grid with a drop-down column that's typed into | Fixes Syncfusion's drop-down cell. Pair it with `AllowNullInput="True"` on the column. The pick reaches the row only when the edit is committed: the renderer makes each drop-down column's `UpdateTrigger` Explicit before every edit, so no column needs to set it. A commit with text that names nothing in the list keeps the row's value (`AutoCompleteDropDownRenderer.UpdateSource`). |
-| `OptionalColumns.IsOptional`, `CostBasisColumns` | Grid columns | Show or hide columns from the screen's state. A grid's columns aren't in the visual tree, so they can't bind to it themselves. |
-| `NumericColumn`, `NumericEditing.IsEnabled` | Number columns; their grid | Thousands separators and right alignment. An edit is parsed as a decimal (`ParsingMode` `Decimal`), so 6.67 typed is 6.67 (see [Precision and rounding](#precision-and-rounding)). `TypedDecimalDigits` accepts more decimals than the column shows. |
-| `MouseWheelForwarding`, `FocusScrolling` | Stacked grids; tall pages | Keep the page scrolling under the mouse, and stop a click from scrolling the page |
-| `CategoryTextCommit.Screen` | A Category picker | Offers to add a typed name that isn't a category yet |
-| `ReadOnlyText.IsGreyed` | A `DoubleTextBox` | Greys out a number that can't be typed |
-| `GridKeyboardFocus`, `GridHeaderHeight`, `PickerMatchHighlight`, `PickerSelectOnEntry`, `PickerRestoresPick`, `UndoShortcuts` | Every grid, picker or window (registered in `App`) | Focus sits on a cell, never the whole grid; header rows fit their text (two lines for a grid whose headings wrap, `GridHeaderHeight.Lines`); a picker highlights its best match for Enter or Tab; a picker selects its text when clicked or tabbed into, and a letter typed over a picked name stays; a picker emptied while bound to a value that can't be null (an enum) shows that value again once the keyboard leaves; Ctrl+Z and Ctrl+Y |
-| `AppWindow`, `ChromelessWindowDpi`, `ChromelessWindowMask`, `ChromelessWindowMinMax`, `RestoreRendering`, `StartupCentering` | Windows | The chromeless title bar, and fixes for its DPI changes, content mask, restore-from-taskbar flicker and size, and where a `CenterScreen` window (the main window) opens |
-| `ErrorToast`, `SuccessToast` | Each screen | Show `ErrorMessage` and `SuccessMessage` |
+- **The keys are read in the web view**, by [vim.js](../src/TinapayanRMS.Maui/wwwroot/vim.js), in the capture phase of `keydown`, before any control sees them. The keyboard and the cursor are the web view's, and a round trip to the components per key would be felt.
+- **The server side is in [Vim/](../src/TinapayanRMS.Components/Vim/)**, and the [VimKeys](../src/TinapayanRMS.Components/Layout/VimKeys.razor) component in the layout joins the two. As the keys are turned on it hands `vim.js` the key table (`VimKeymap`), the command list (`VimCommandLine.Commands`) and the screens; `vim.js` writes NORMAL or INSERT into the title bar, and calls back for hint labels (`HintLabels`) and to run a command line (`VimKeysState.Run`).
+- **Modes.** In NORMAL, a typed character is swallowed and looked up, so none types. INSERT is the app as it always was, and only Esc and Ctrl+[ are the keys'. A field that takes the cursor by a click or Tab goes to INSERT; one reached with `j` or `k` stays in NORMAL (`focusQuietly`). Esc in INSERT stops typing and keeps what was typed, by raising the field's `change`.
+- **Where the cursor is** decides what a key does (`contextOf`): a field, a table (a `LineGrid` or an `SfGrid`), a tree (`FolderTree`), or anything else.
+- **Keys stand for what a hand would do.** In a tree, `j` is raised as the Down arrow, `dd` as Del and `r` as F2, on the tree itself, so `FolderTree`'s own key handling applies. In a `LineGrid`, the keys move the cursor from field to field by row and column. In an `SfGrid`, `j` and `k` click the next row. In a form, `j` and `k` move to the next and previous control in tab order. Nothing has Vim code of its own.
+  - A key the layer raises itself is a synthetic event. Its own listener ignores those (`event.isTrusted`), so they reach the control.
+  - `dd` in a `LineGrid` clicks the nearest button with the `remove-line` class after the table. Give a table's Remove button that class.
+- **`f` labels what can be clicked** (`hintTargets`): buttons, links, fields, tabs, tree rows, grid rows, an open list's items. Typing a label clicks its target, or starts typing in it if it's a field.
+- **The command line** (`:`) is a bar `vim.js` draws. The line goes to `VimKeysState.Run`, which parses it with `VimCommandLine` and runs it on the screen on show, through `IRecordScreen` (New, Save, Delete, `OpenByName`) and `IRevertScreen`. A command goes through the screen's own `ReactiveCommand`, as a button does, so it asks, checks and reports as a click would. A screen's address comes back for the page to open.
+- **While a dialog is open the keys are for it**, wherever the cursor was left: `j` and `k` go round its buttons, and Esc closes it.
+- **What a web view changes from the WPF app's keys.** `gt` and `gT` click the next and previous tab on the strip, so a closed tab is passed over. In Settings they click its own tabs, so the strip's Settings tab is passed over too: keys that went in couldn't come back out. `H` and `L` are the web view's Back and Forward. Ctrl+N is the web view's and can't be taken, so Ctrl+J and Ctrl+K move through an open list (Ctrl+P still works for up). Ctrl+R is taken from the web view, for redo, while the keys are on.
+- **To add a key**, add a `VimKeyBinding` to `VimKeymap` (keys, action, contexts, description), and a `VimAction` if it's a new one. Then handle the action in `vim.js`'s `run`, or in the function for its place (`lineGridKey`, `pickGridKey`). The cheat sheet picks it up from the table.
+- **To add a command**, add a `VimCommandDefinition` to `VimCommandLine.Commands` and handle its kind in `VimKeysState.Run`.
+- **Tests** are in `Components.Tests/Vim/`: the key table, the command line, the labels and `VimKeysState`. `vim.js` itself has no automated test: check a change to it in the app's window.
 
 ### Theme and visual conventions
 
-- **The theme** is Syncfusion's `Syncfusion.Themes.Windows11Light.WPF` package. A window is themed with `SfSkinManager.SetTheme(window, new Theme("Windows11Light"))` before it's shown: `App.OnStartup` does it for `MainWindow`, and `MainWindow.OpenSettings` for the Settings dialog. `ApplyThemeAsDefaultStyle` is deliberately left unset, because it would restyle every window. `SizeMode` is `Default`.
-- **Colours** come from [Themes/Palette.xaml](../src/TinapayanRMS.UI/Themes/Palette.xaml), the Catppuccin Latte palette with derived Tint, Deep and Wash steps that make each hue readable as text or as a background. [App.xaml](../src/TinapayanRMS.UI/App.xaml) names them as design tokens (`PageBackgroundBrush`, `CardBackgroundBrush`, `AccentBrush`, `ErrorForegroundBrush`, …) and defines the shared styles (`CardStyle`, `SectionHeaderStyle`, `FormLabelStyle`, `FieldLabelStyle`, `FigureTileStyle`, …). Views use the tokens, never a hex colour or the raw palette.
-- **Icons** are Segoe Fluent Icons glyphs, through the `*IconTemplate` data templates and `IconGlyphStyle`. Don't add an icon package: one was tried, and its icons weren't crisp. WPF draws emoji as outlines only, so a full-colour picture is an icon file (below).
-- **Icon files**: an icon that has to be an image rather than a glyph (a downloaded `.png` or `.ico`) goes in [Assets/Icons/](../src/TinapayanRMS.UI/Assets/Icons/). The UI project compiles every `.png` and `.ico` there into the app as a WPF `Resource`, so a view refers to it as `/Assets/Icons/<name>.png`, and nothing needs adding to the `.csproj`. The folder holds no code, so it isn't a namespace. Windows scales the app by the display's setting (125% on the development PC), so an image is nearly always resized, and enlarging one blurs it. Download it larger than it's shown (64 px for 16), and set its `Width`, `Height` and `RenderOptions.BitmapScalingMode="HighQuality"`, as the Products list (64 px shown at 16) and the Used By tiles (128 px shown at 32) do for the product images (`Bread_`, `Loaf_`, `Cake_`, `Pastry_`, `Roll_Cake_` and `Composite_64px.png` and `_128px.png`). Set `UseLayoutRounding="True"` on the `Image` too: the app doesn't round layout to whole pixels, and an image placed between them blurs.
-- **The app's icon** is `tinapayan-rms-icon.png` (1024 px) in the same folder, and `tinapayan-rms-icon.ico` made from it. The `.ico` is the `.exe`'s icon (`ApplicationIcon` in the UI project), which Explorer and shortcuts show. WPF doesn't hand it on to the windows, so `AppWindow`'s constructor sets each window's `Icon` from the same `.ico` (`AppWindow.IconUri`), for the taskbar and Alt+Tab. The title bars don't draw it (`ShowIcon="False"`). To change the icon, replace the `.png` and make the `.ico` again with 16, 20, 24, 32, 40, 48, 64, 128 and 256 px sizes. Those cover 100% to 200% display scaling: at 125%, Windows takes the 20 and 40 px ones for the window.
-- **Sizes**: every text box and button is 24 px tall, number boxes are right-aligned, and the body text is 14 px. `App` sets all of these.
-- **Forms**: an input's label goes on its left in a stacked form (`FormLabelStyle`, lined up with `SharedSizeGroup`). A row of fields side by side keeps each label above its field (`FieldLabelStyle`). A value that can never be typed is a `TextBlock`, not a read-only text box.
+- **The theme** is Syncfusion's Fluent 2 (`_content/Syncfusion.Blazor.Themes/fluent2.css`, linked in `wwwroot/index.html`; the Maui project leaves the package's other themes out of the build), then [app.css](../src/TinapayanRMS.Maui/wwwroot/app.css), which recolours it and draws the app's own cards, tiles and forms.
+- **Colours** are CSS variables at the top of `app.css`: the Catppuccin Latte palette, the Sky accent, and design tokens named for what they're for (`--page-background`, `--card-background`, `--card-border`, `--heading-foreground`, `--muted-foreground`, `--accent-soft`). Syncfusion's own variables (`--color-sf-primary` and the rest) are set from them. Styles use the tokens, never a hex colour of their own.
+- **One stylesheet per screen family**, in `wwwroot/css/`: `record-screens.css` (the three record screens and the shared components), `products.css`, `reports.css` (Reports and the Price Simulator) and `print.css`. They're linked in `wwwroot/index.html`.
+- **Icons** are characters in a `<span class="glyph">`, named in [Glyphs](../src/TinapayanRMS.Components/Shared/Glyphs.cs) and drawn in Segoe Fluent Icons (Segoe MDL2 Assets on Windows 10; `--icon-font` in `app.css`), at the WPF app's code points, so the icons are the WPF app's. The icons Syncfusion's components draw themselves (a grid's sort arrows, a picker's arrow) come from the Fluent 2 theme.
+- **Icon files**: a picture that has to be an image (the product categories' breads and cakes) goes in `wwwroot/icons/`, at 64 and 128 px, and is shown smaller.
+- **Forms**: an input's label goes on its left in a stacked form (`FormRow`). A row of fields side by side keeps each label beside its field (`header-fields`). A value that can never be typed is text, not a read-only box.
 - **Amounts** have no currency symbol, and use the decimals in [Precision and rounding](#precision-and-rounding).
 - **Keep it plain.** Use the plainest standard control and the fewest columns. Fold a derived or helper value into a figure that's already shown rather than giving it a column of its own. A real cost component, though, gets its own column, and the line's total includes it.
-- **Grids**: every `SfDataGrid` sets `GridLinesVisibility="Both"` and `CurrentCellBorderBrush="{StaticResource AccentBrush}"`. A grid with height to spare uses `controls:GridFillerRows.IsEnabled="True"`. A grid whose lines are typed into shows a row header. Quantity columns use `NumericColumn` with `NumberDecimalDigits="1" TypedDecimalDigits="4"`, which needs `controls:NumericEditing.IsEnabled="True"` on the grid.
+- **Tables** have grid lines both ways. Quantity cells are `NumberField`s with `Format="#,0.0###"`: at least one decimal, and up to the four the database keeps.
+- **Controls are 24px tall**: a button, a text or number box, a picker, and a table's rows and heading. `--control-height` at the top of `app.css` sets them, through its "Control heights" section (the Syncfusion buttons and boxes, the app's own fields, a grid's heading) and `record-screens.css` (a `LineGrid`'s rows). An `SfGrid` takes `RowHeight="24"`, which can't read the variable: give a new grid it too. To size a control, give it the height with `box-sizing: border-box` rather than padding that adds up to it, since a 1px border is drawn thinner at a display scale over 100%. [docs/plan/maui-app.md](plan/maui-app.md) ("How it's built") says what was left out and why.
 
 ### Working with Syncfusion
 
-- **Prefer a Syncfusion control** to its native WPF equivalent (`ButtonAdv` over `Button`, `TabControlExt` over `TabControl`, `ComboBoxAdv`, `SfDataGrid`, `SfTextBoxExt`, `DoubleTextBox`), so the whole UI picks up the theme. Use a native control only when Syncfusion has none that fits.
-- **To add a control**, add its package's `PackageReference` (with no version) to the UI project, and a `PackageVersion` at `$(SyncfusionVersion)` in `Directory.Packages.props` if it's a new package. The theme package already styles every control.
-- **To learn how a control is meant to be used**, start with its `syncfusion-wpf-*` skill in `.claude/skills/`. Then ask Syncfusion's MCP server, `syncfusion-wpf`, which searches Syncfusion's current documentation (its one tool is `search_docs`). `.mcp.json` runs it with `dotnet dnx Syncfusion.WPF.MCP --yes`, which needs no install, and passes it the API key from the `SYNCFUSION_API_KEY` user environment variable. That key isn't the licence key: generate it in your syncfusion.com account. Without it, only that server fails to start. Then read the Sample Browser source in `C:\Users\Public\Documents\Syncfusion\WPF\34.2.2\SampleBrowser\` (a v34 install, older than the packages), and grep file contents there, because the demo file names often don't name the control. Only then decompile the assembly with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.*\<version>\lib\`.
+- **Prefer a Syncfusion Blazor component** to a plain HTML control where one fits (`SfButton`, `SfGrid`, `SfTab`, `SfDialog`, `SfToast`, `SfDropDownButton`), so the whole UI picks up the theme. The exceptions are the shared components above.
+- **To add a component from a new package**, add its `PackageReference` (with no version) to the Components project, a `PackageVersion` at `$(SyncfusionVersion)` in `Directory.Packages.props`, and its namespace to `_Imports.razor`.
+- **To learn how a component is meant to be used**, ask the `syncfusion-blazor` MCP server (Syncfusion's Blazor documentation, started from `.mcp.json`), then read its type with `ilspycmd`: the packages are in `%UserProfile%\.nuget\packages\syncfusion.blazor.*\<version>\lib\net10.0\` (the grid's assembly is `Syncfusion.Blazor.Grids.dll`). Syncfusion ships no `net11.0` build yet, and .NET 11 runs the `net10.0` one.
 - **Known traps:**
-  - Bind an editable `DoubleTextBox`'s `Value` with `UpdateSourceTrigger=PropertyChanged`. Otherwise the ViewModel only sees the value when the box loses focus, and the buttons and figures that depend on it lag behind.
-  - A two-way `DoubleTextBox` or `PercentTextBox` bound to a `decimal` takes `Converter={StaticResource DecimalValueConverter}` on its binding. Without it, WPF's own conversion keeps the box's `double` at its exact binary value, so 28.35 typed reaches the ViewModel as 28.349999999999997868371792719 (see [Precision and rounding](#precision-and-rounding)).
-  - A `DoubleTextBox` bound to a `decimal?` needs `TargetNullValue={x:Null}` on its binding.
-  - A `ButtonAdv` takes its icon from `IconTemplate`, not `SmallIcon` or `LargeIcon`. Always set its `Label`, which otherwise reads "Button".
-  - An `SfTreeGrid` must be themed on its own (its own `SfSkinManager.Theme` and `SizeMode`), never through its window. Otherwise it un-themes every `SfDataGrid` in the window. `TreeGridThemeScopeTests` checks this.
-  - A grid's columns aren't in the visual tree, so a column property can't bind to the screen. Use a behaviour such as `OptionalColumns` instead.
-  - Syncfusion's number boxes take Ctrl+Z and Ctrl+Y for themselves. That's why `UndoShortcuts` exists.
-  - A window built over long-lived ViewModels must release its grids, text boxes and picker filters when it closes, as `SettingsWindow.ReleaseControls` does, or it stays in memory.
+  - `_Imports.razor` aliases the names Syncfusion's namespaces share with each other and with ASP.NET Core (`SelectionMode`, `SelectionType`, `FilterType`, `ChangeEventArgs`, `DragEventArgs`, `Action`). A new clash shows as CS0104: add an alias there.
+  - `SfComboBox` reads an enum's first value as empty. Use `PickField`.
+  - `SfDropDownButton` with custom popup content doesn't close when something in it is clicked. Use `MenuButton`.
+  - `SfToast`'s `CssClass` doesn't reach the toast. Set it on each `ToastModel`, as `NoticeHost` does.
+  - An `SfGrid` in a flex card needs the CSS in `app.css` (`.list-card .e-grid`) to fill the card and scroll inside it.
+  - An `SfTab` gets no `Height`. With one, its script reads the tab strip's height as it starts, and now and then the strip isn't in the page yet: the script throws, and Blazor's "Something went wrong" bar ends the screen. The `details-tabs` class sizes the tabs instead (`record-screens.css`). [docs/plan/maui-app.md](plan/maui-app.md) ("How it's built") has the whole story.
+  - A grid's menu items are `MenuItem`s set in code, which trips analyzer BL0005: the tree's menu suppresses it locally.
+  - Syncfusion's dialog asks the renderer whether it's interactive: a bUnit test that draws one calls `RenderingAsTheWebView()` (Components.Tests' `AppServices`).
 
 ### Printing
 
-The Products screen prints a product, its scaled recipe, or a whole folder of products. The parts, in [Printing/](../src/TinapayanRMS.UI/Printing/):
+The Products screen prints a product, its scaled recipe, a version from its History tab, or a whole folder of products. The Price Simulator prints a report of its own. The parts:
 
-1. `ProductsViewModel.PrintRequests` asks for the Print tab. `MainWindow` hands the choice to `PrintTabViewModel.Pick` and shows the tab.
-2. A **`ProductPrintout`** (immutable records, in `ViewModels/ProductPrintout.cs`) holds what's printed. It's taken from the screen as shown, unsaved edits included, or from `SavedProductReader` for a set of saved products.
-3. **`ProductPrintLayout`** builds the page content in code, as blocks.
-4. **`PrintPagination`** is pure: it splits the blocks into pages, keeps headings with what follows them, and continues a long table under "(continued)".
-5. **`ProductPrintManager`**, a subclass of Syncfusion's `PrintManager`, lays the printout out again whenever the paper, margins or orientation change. It starts on the paper it's given: the Print tab and `PrintPreviewWindow` give it `ProductPrintManager.DefaultPrinterPaper()`, the Windows default printer's, and the tests a fixed `ProductPrintManager.A4`. It overrides `PrintDocument` to print on the printer's own ticket and to report errors, which the base class swallows.
-6. Syncfusion's **`PrintPreview`** pane shows the pages. `PrintPaneFit` and `PrintPaneTemplates.xaml` fit the pane to the app's 14 px text. The window must be themed before the pane goes into it.
+1. `ProductsViewModel.PrintRequests` asks for the Print screen. `ScreenLinks` hands the choice to `PrintTabViewModel.Pick` and navigates to `/print`.
+2. A **`ProductPrintout`** (immutable records, in `Presentation/ViewModels/ProductPrintout.cs`) holds what's printed. It's taken from the screen as shown, unsaved edits included, or from `SavedProductReader` for a set of saved products. A **`ProductPrintSet`** is one printout or several, or a Price Simulator report.
+3. **[PrintDocument](../src/TinapayanRMS.Components/Printing/PrintDocument.razor)** renders a `ProductPrintSet` as HTML: headings, tables and totals. Each part that starts a page (a set's title and contents, then each of its products) is a `print-sheet` element.
+4. **[print.css](../src/TinapayanRMS.Maui/wwwroot/css/print.css)** lays that document out for paper. Under `@media print` it hides the app around the document, sets the page's margins and a "Page n of m" footer (`@page`), starts each `print-sheet` after the first on a new page, keeps a heading with the table under it, and repeats a table's headings on each page. The web view breaks the pages. On screen it draws each `print-sheet` as a sheet of paper, as long as its part is.
+5. **[PrintPane](../src/TinapayanRMS.Components/Printing/PrintPane.razor)** shows the document on screen as a preview, with the **Include** tick boxes (Recipe and Costing, or a scaled recipe's Costs) and **Print**, which opens the computer's print dialog through `IPagePrinter`: WebView2's own (`window.print()`, [WebViewPagePrinter](../src/TinapayanRMS.Components/Shared/IPagePrinter.cs)). Paper size, orientation and the printer are chosen there.
+
+The Price Simulator opens the preview page (`/print/preview`) instead of the Print screen: its `ShowPrint` interaction hands the choices to `PrintPreviews`, which the page reads.
+
+- [PriceSimulatorReport](../src/TinapayanRMS.Presentation/ViewModels/PriceSimulatorReport.cs) pairs a product's `SavedProduct` priced now with the same product priced at the simulated prices. Both are built from one `ProductDetail`, so their sections, lines, packaging and products pair up by index. It sets `NowCost` on each line, and `NowBatchCost` on each section, whose cost a change moves, and puts `PrintedSimulation` (today's `ProductCostSummary` and the changes reaching the product) on the printout.
+- `PriceSimulatorViewModel` keeps the last recalculation's simulated `SavedProduct`s and the changes it tried, so the report always matches the table. `PrintChoices` builds a `PrintChoice` for the rows picked and one for every row shown.
+- A `ProductPrintSet` with `PriceChanges` set is a Price Simulator report. With the costing included, its first page has the price changes and a contents with each product's base cost now and simulated. Each product gets a Price Changes Applied table, a Cost Now column on every recipe, packaging and products table, a costing with Now, Simulated and Change columns, and, under a Current Price a change reaches, the price to keep today's markup.
+- **What's printed follows the WPF app's layout**: a section's lines have no Base column, the costing has its Wastage row, and its last row is named for the unit the figures are for (`ProductPrintout.SuggestedSellingPriceLabel`, Suggested Selling Price per Piece).
 
 ### Exporting to Excel
 
-Reports' tables go to an Excel workbook with **Export to Excel**. The parts, in [Exporting/](../src/TinapayanRMS.UI/Exporting/):
+A ViewModel's export command calls `ExportToExcelAsync(title)`, which raises the `ExportToExcel` interaction with the export's title and, once the page answers with a path, sets `SuccessMessage` to where the file went. It runs inside `RunSafelyAsync`. The page asks where with the computer's Save dialog ([IFileDialogs](../src/TinapayanRMS.Components/Shared/IFileDialogs.cs)`.ChooseSaveFileAsync`), suggesting "<title> yyyy-MM-dd.xlsx", and answers null, saving nothing, if it's cancelled. The workbook comes one of two ways:
 
-1. The ViewModel's command calls `ExportToExcelAsync(title)`, which raises `ViewModelBase.ExportToExcel` with the export's title and, once the view answers with a path, sets `SuccessMessage` to where the file went. It runs inside `RunSafelyAsync`, so a file open in Excel shows as an error notice.
-2. The view answers through `RegisterExcelExport(this, title => sheets)` (`ExcelExportHandlerRegistration`): it asks for a path with a Save dialog, then writes the `ExcelSheet`s it picks for that title. The grids are the view's, because the sort, the filters and the hidden columns the user chose live on them, not in the ViewModel.
-3. **`ExcelExport.Save`** writes each grid on a sheet of its own through Syncfusion's grid converter (`Syncfusion.DataGridExcelExport.WPF`, which brings XlsIO, licensed by the same key). It exports the grid's `View`, so the current sort and filters come with it. It also does three things the converter leaves undone:
-   - it leaves out hidden columns by name (`ExcludeColumns`), since the converter writes them too;
-   - it writes each figure itself (`CellsExportingEventHandler`, `Handled`), with its own column's decimals and a thousands separator (`#,##0.00`), since the converter's own format has none;
-   - it fits the columns to their contents, since the converter copies the grid's on-screen widths.
-   A grouped grid's groups go as their caption rows. Each cell is formatted by the grid's own column, as no table has a row's details: a details cell's column would be its `GridViewDefinition`'s grid's, where `ExcelExport` looked it up for the Production Plan's Mixing Sheet until 2026-11-04. `GridFillerRows`' padding is only drawn, never rows of the grid, so it can't reach the file. Figures are written as numbers at full precision; the format only shows them rounded. The workbook is built in memory before the file is touched, so a file that can't be written is left as it was.
+- **A grid exports itself.** Reports' tables are `SfGrid`s with `AllowExcelExport`, and the page asks the grid for the workbook as a stream (`ExportToExcelAsync(asMemoryStream: true, …)`), which it writes where the dialog said. The sort, the filters and the columns the user chose are the grid's, so they come with it. Each Reports grid keeps them for the Windows user, as the grid's own state (`GetPersistDataAsync`), restored as it's created ([GridLayouts](../src/TinapayanRMS.Components/Shared/GridLayouts.cs)).
+- **The page builds a workbook.** The Price Simulator describes its sheets with [ExcelWorkbook](../src/TinapayanRMS.Components/Shared/ExcelWorkbook.cs) (`ExcelSheet.Of(name, rows, columns…)`, each `ExcelColumn` a heading, a value and a number format), builds it with `ExcelWorkbook.Build` (Syncfusion XlsIO, licensed by the same key), and saves the bytes with `IFileDialogs.SaveAsync`. Figures are written as numbers at full precision; the format only shows them rounded.
 
-`ExcelExportTests` checks all of this against a real grid read back with XlsIO.
-
-The Price Simulator screen's **Print Report** goes through the same dialog, with each product's recipe and costing at the simulated prices beside today's:
-
-- [PriceSimulatorReport](../src/TinapayanRMS.Presentation/ViewModels/PriceSimulatorReport.cs) pairs a product's `SavedProduct` priced now with the same product priced at simulated prices. Both are built from one `ProductDetail`, so their sections, lines, packaging and products pair up by index. It sets `NowCost` on each line, and `NowBatchCost` on each section, whose cost a change moves, and puts `PrintedSimulation` (today's `ProductCostSummary` and the changes reaching the product) on the printout. A change reaches a product when `IngredientCostRules.ReachedBy` (the material and every made or linked ingredient depending on it) meets `PriceSimulatorReport.MaterialIdsOf` (its sections', add-ins' and packaging's materials, and those of the products a composite holds).
-- `PriceSimulatorViewModel` keeps the last recalculation's `SavedProduct`s, now and simulated, at the basis it ran at, and the changes it tried, so the report always matches the table. `PrintChoices` builds a `PrintChoice` for the rows picked in the grid (`SelectedProducts`, bound to the grid's `SelectedItems`, picked again by id after each recalculation) and one for every row shown. `ShownProducts` is the grid's `View.Records`, which the view supplies, so the report follows the column filters and sort.
-- A `ProductPrintSet` with `PriceChanges` set is a Price Simulator report. With the costing included, `ProductPrintLayout` gives its first page the price changes and a contents with each product's base cost now and simulated. Each product gets a Price Changes Applied table, a Cost Now column on every recipe, packaging and products table (moved lines in the accent), and a costing with Now, Simulated and Change columns. Without the costing it prints the recipes as a plain set does.
-- `PrintPreviewWindow(IReadOnlyList<PrintChoice>, Theme)` shows a Print dropdown when there's more than one choice, and Recipe and Costing tick boxes.
+The dialogs are Windows' own ([Platforms/Windows/FileDialogs.cs](../src/TinapayanRMS.Maui/Platforms/Windows/FileDialogs.cs)): WinRT's pickers, given the window's handle, as an unpackaged app must.
 
 ### The Price Simulator
 
-`PriceSimulatorViewModel` prices every product now and with the table's changes (see [Formulas and where they live](#formulas-and-where-they-live) and [Printing](#printing)). Each `PriceSimulatorProductRow` also carries the product's current price and `PriceToKeepMarkup`.
+`PriceSimulatorViewModel` prices every product now and with the table's changes (`TriedPriceChange`, `IngredientCostRules.Reprice`, `SavedProductReader.PricedAt`), each a `PriceSimulatorProductRow` with its current price and `PriceToKeepMarkup`. The page, [PriceSimulator.razor](../src/TinapayanRMS.Components/Pages/PriceSimulator.razor), gives the ViewModel the products as its grid shows them (`ShownProducts`, from `GetCurrentViewRecordsAsync` after each `DataBound`), for Print Report's All products shown and for Export to Excel.
 
 The table can be saved as a **scenario** ([PriceScenario](../src/TinapayanRMS.Domain/Entities/PriceScenario.cs)), kept in the database:
 
 - `SimulatedPriceChange.ToScenarioLine` gives a row's material and whichever of Change % and New Price was typed, and `Open(line)` types it back. So a percentage goes on the price as it is when the scenario is opened.
-- `HasUnsavedChanges` compares the table with what was last opened or saved, by value. Picking a scenario over unsaved changes asks first (`ConfirmDelete`). Keeping them picks the open scenario again in the list: `OpenScenarioAsync` starts with `Task.Yield`, so the list has finished its own pick before it's undone.
-- The scenarios are an `SfDataGrid` of two columns (Saved, Name; newest first, as `GetAllAsync` reads them) whose `SelectedItem` is `SelectedScenario`. Its setter only asks for a scenario to be opened, and ignores a null, which the grid can send when its rows are replaced. The ViewModel sets the field itself (`ShowSelectedScenario`), and always raises the change, so a pick the user took back is undone in the list too.
-- Save asks for a name through `PromptForName` (a `TextPromptWindow`), and asks again before replacing another scenario of that name.
+- `HasUnsavedChanges` compares the table with what was last opened or saved, by value. Picking a scenario over unsaved changes asks first.
+- The scenarios list sets `SelectedScenario`, whose setter only asks for the scenario to be opened. Save asks for a name through `PromptForName`, and asks again before replacing another scenario of that name.
 
 ### The Production Plan
 
-Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanBMS`), which plans from a copy of this app's recipes, prices and costs taken through the Recipe API. Its `ProductionPlanRules`, `SavedPlanRules`, `ProductionPlanBuilder` and `ProductionPlanViewModel`, the saved plans (`saved_plans` and `saved_plan_lines`, dropped by the migration `RetireProductionPlan`, empty at the time), Reports' Production Results (`ProductionResultsAnalysis`), the plan's printout (`PrintedPlan`) and `POST /plan` all went, with their tests, which TinapayanBMS keeps as its own. `RecipeScalingRules` stays: the Scaling tab uses it. What only the plan had used went on 2026-11-04, from a code review: `RecipeScalingRules.HalfBatches`, `BatchesToMake` and `UnitsToBuy`, `GridAutoRowHeight`, and `PrintPreviewWindow`'s one-printout constructor. So did two parts of controls still in use: `GridAddNewRow.ItemDropped`, and Excel export's handling of a row's details (`ExcelExport`'s `GridViewDefinition` cells). PLAN.md's Production Plan entries and the build plan's log keep the history.
+It moved to TinapayanBMS on 2026-10-31, and its screen, ViewModel, builder and rules were taken out. TinapayanBMS plans from what the [Recipe API](#the-recipe-api) gives it.
+
+### Backups
+
+Settings → Database is `DatabaseBackupsViewModel` over `IDatabaseBackups`, with the computer's own dialogs for its files:
+
+- **Copy To…** asks where with the Save dialog (`ChooseCopyDestination`) and copies the picked backup there.
+- **Restore from File…** asks for a `.backup` file with the Open dialog (`ChooseBackupFile`). The ViewModel copies it into the backups folder and restores it from there.
+- **After a restore, the window's page loads again.** The ViewModel's restart callback raises `AppStatus.Restored`, a singleton's event, and `MainLayout` answers with a forced navigation, which builds every ViewModel afresh in a new scope, as the WPF app restarted.
+- **Automatic backups are checked every hour** while the app runs, not only as it starts, since it can be left open for days: `StartupTasks` runs [AutomaticBackups](../src/TinapayanRMS.Presentation/ViewModels/AutomaticBackups.cs)' `RunAsync` at once and then on a `PeriodicTimer`. It takes the day's backup if it's due and copies it to **Also Copy To**, keeping the newest 14 there. That folder, and what last went wrong with a backup or its copy, are kept in the view state (`backup-copy-folder`, `backup-problem`, `backup-copy-problem`), as the WPF app kept them. The Database tab's **Choose…** picks the folder with the folder dialog (`ChooseCopyFolder`). When backups keep failing and the newest is three days old, `AppStatus.WarnOfBackups` puts a banner over the screens until one is taken.
+- **pg_dump writes to a `.partial` file**, which takes the backup's name only once it's done, and a tool still running after half an hour is stopped (`PostgresTools`).
+
+### Unsaved changes
+
+A form with unsaved changes (`IUnsavedChangesScreen`: Products, Raw Materials, Sub-Assemblies) is never left with them, as the WPF app's `ScreenNavigator` saw to. The ViewModels ask about their own form before another record takes its place (a list pick, New, Clone), through `ConfirmUnsavedChanges`, which `ScreenBase` answers with the Yes, No and Cancel dialog (`Confirmations.AskAboutUnsavedChangesAsync`). Moves between addresses are `ScreenBase`'s: it registers a location-changing handler (`NavigationManager.RegisterLocationChangingHandler`, what `NavigationLock` uses) that calls `ResolveUnsavedChangesAsync` and prevents the move on Cancel. Another of the screen's own records leaves the form to it (`revert: false`); any other screen puts it back as saved on No (`revert: true`). The screen's own move of its address to the record it now shows goes through `MoveAddressTo` and isn't asked about. Print keeps Products' form (`KeepsForm`), and guards it in Products' place (`UnsavedChangesForm`).
+
+Closing the window isn't a move between addresses, so `ScreenBase` also keeps its form in the page's [UnsavedChangesGuard](../src/TinapayanRMS.Components/Shared/UnsavedChangesGuard.cs). The window's `Closing` handler ([WindowsWindow](../src/TinapayanRMS.Maui/Platforms/Windows/WindowsWindow.cs)) holds the window open, asks the same question through the guard on the web view's dispatcher (`BlazorWebView.TryDispatchAsync`, `revert: false`, as for the app closing), and closes it once the form may be left. Reloading the page (F5) has the web view's own leave warning, which `ScreenBase` turns on while the form holds changes (`tinapayan.setLeaveWarning`, a `beforeunload` handler).
+
+### Find
+
+Ctrl+K, or the title bar's magnifier, opens [FindHost](../src/TinapayanRMS.Components/Layout/FindHost.razor), a dialog over `QuickFindViewModel`, which reads every name each time it opens and matches what's typed (`QuickFindViewModel.Match`). The key is caught in the page's script (`tinapayan.registerFindKey`). Opening a match navigates to its address, so the screen being left asks about its unsaved changes as any link does.
 
 ### Logging and errors
 
-- Serilog's static `Log.Logger` is built in `App`'s static constructor, so even a licence failure is logged. It writes one rolling file a day under `logs/`, keeping 31. It's registered in DI as a `Serilog.ILogger`.
-- `RunSafelyAsync`, `LoadSafelyAsync` and `LoadLatest` log a refusal as a warning, and any other failure as an error with its stack.
-- `App` handles an exception that nothing else caught on the UI thread (`DispatcherUnhandledException`): it logs it, shows a message saying the app is still running, and carries on. If more than three arrive within ten seconds, [UnhandledErrorGuard](../src/TinapayanRMS.UI/UnhandledErrorGuard.cs) lets the app close, since they'd come faster than anyone could act on them. A failure ReactiveUI was left holding arrives wrapped in its `UnhandledErrorException`, and `App` shows the cause inside. It logs exceptions from other threads (`AppDomain.UnhandledException`) and unobserved task exceptions. A task nothing awaits has to deal with its own failure, since an unobserved one only reaches a warning in the log, when the task is collected, and the click that started it just does nothing. A screen's goes through `RunSafelyAsync` (`_ = RunSafelyAsync(...)`). `ScreenNavigator`'s moves never fault: they hand it to `showFailure`, and `MainWindow` puts it back on the dispatcher for `App`'s handler. `Dispatcher.InvokeAsync` keeps what its delegate throws in the task it returns, so it counts too; `BeginInvoke` doesn't. None of that is for a start that fails: until the main window shows, [AppStartup](../src/TinapayanRMS.UI/AppStartup.cs) catches it, logs it as fatal, shows its first line and where the log is, and closes the app.
-- Once the main window shows, `App` checks off the UI thread for migrations the database doesn't have yet, and says so in a message.
-- In Debug builds, [BindingErrorLog](../src/TinapayanRMS.UI/BindingErrorLog.cs) writes WPF's binding errors to the log as `WPF binding …` warnings, even without a debugger attached. Some are expected at every startup and harmless: one `Cannot find governing FrameworkElement` for each `GridMultiColumnDropDownList.ItemsSource` or `GridCheckBoxColumn.AllowEditing` binding while its grid is built, and a `FindAncestor` warning from Syncfusion's `TabItemExt` template.
+- Serilog's static `Log.Logger` is built at the top of `MauiProgram`. It writes one rolling file a day to `%LocalAppData%\TinapayanRMS\Maui\logs\`, keeping 31. It's registered in DI as a `Serilog.ILogger`, and it's the app's only logging provider: Blazor's and EF Core's own logs go to it from Warning up.
+- `RunSafelyAsync`, `LoadSafelyAsync` and `LoadLatest` log a refusal as a warning, and any other failure as an error with its stack. This is where nearly every failure ends: on its screen, as a red toast, with the app carrying on.
+- **An exception that escapes a component breaks the page.** Blazor shows the bar at the bottom of the window ("Something went wrong, and the page needs reloading", in `index.html`), and the exception is logged. Reloading builds the page afresh, and unsaved edits are lost, which is why a ViewModel catches what its actions throw and a page never lets a failure of its own go uncaught: it shows it with `ScreenNotices.ShowError`.
+- **A failure to start** is logged as fatal (`MauiProgram`), and the app ends. A database that can't be reached isn't one: the window opens, and each screen's load says so in its error notice.
+- An address that doesn't exist goes to `/not-found`.
+- In a Debug build, F12 opens the web view's developer tools (`AddBlazorWebViewDeveloperTools`), whose console shows a component's exception.
 
 ---
 
@@ -1107,8 +1176,8 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 
 ### How the tests work
 
-- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. Grid behaviours are tested in real `SfDataGrid`s in windows placed off-screen, and the MAUI app's components rendered with bUnit.
-- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_presentation`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test. `UI.Tests` and `Infrastructure.Tests` have four database collections each, `DatabaseCollection.A` to `D`, and each collection has a database of its own (the project's, then `_2` to `_4`), so their database tests run four at a time (2026-11-05). With one collection, those tests ran one after another and took about 7 of the suite's 7½ minutes. It now takes 4 to 6 on this PC, depending on what else is running: with everything at once its processor is the limit (85% on average, paging hard with 8 GB).
+- **Nothing is mocked.** Rules are tested as pure functions. Repositories, services and ViewModels are tested on a real PostgreSQL database that Respawn resets before every test. The components are rendered with bUnit, which has no web view: what only shows in the app's window (focus, typing, drag and drop, printing, the dialogs, the Vim keys' script and the title bar) is checked there ([Checking a screen in the app's window](#checking-a-screen-in-the-apps-window)).
+- **Each database-backed project has its own database**: `tinapayanrms_test_infrastructure`, `tinapayanrms_test_presentation`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp` and `tinapayanrms_test_recipeapi`. `dotnet test --solution` runs the projects side by side, and a shared database would be reset under the other project's running test. `Presentation.Tests` and `Infrastructure.Tests` have four database collections each, `DatabaseCollection.A` to `D`, and each collection has a database of its own (the project's, then `_2` to `_4`), so their database tests run four at a time (2026-11-05). With one collection, those tests ran one after another and took about 7 of the suite's 7½ minutes. It now takes 4 to 6 on this PC, depending on what else is running: with everything at once its processor is the limit (85% on average, paging hard with 8 GB).
 - **Each database is migrated once per test run**, by the fixture's `MigrateAsync`.
 - **Respawn clears every table** except `__EFMigrationsHistory` before each test (it truncates them, and tries again if PostgreSQL ends the truncate as a deadlock with a read the last test left running). That includes rows the migrations seeded, so a test creates every row it needs.
 
@@ -1118,8 +1187,7 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 | `Infrastructure.Tests` | `Persistence/` (repositories and the cascade), `Queries/` (`ColumnsTests`), `Upgrades/` (`DataUpgradesTests`), `Services/` (`JsonViewStateStoreTests`, and `DatabaseBackupsTests`, which run the real `pg_dump` and `pg_restore`) | PostgreSQL, with its command-line tools |
 | `Pricing.Tests` | `SavedProductReaderBulkTests` and `SavedProductSectionNameTests` on real repositories; `ProductCostSummaryTests` and `TriedPriceChangeTests` without a database | PostgreSQL for the first two |
 | `Presentation.Tests` | `ViewModels/` on real repositories, each screen driven on `UiThread` | PostgreSQL |
-| `UI.Tests` | The WPF app: `Controls/` in off-screen grids and windows, `Printing/`, `Exporting/`, `Converters/`, `Vim/`, `CompositionRootTests`, `AppStartupTests`, `SingleInstanceGuardTests` | The licence key for the tests that build Syncfusion controls |
-| `Components.Tests` | The MAUI app: `Shared/` and `Layout/` (components rendered with bUnit), `Vim/`, `ServiceRegistrationTests`, `ViewStateSeedTests` | Nothing |
+| `Components.Tests` | `Shared/` and `Layout/` (components rendered with bUnit, the title bar on a `FakeAppWindow`), `Vim/`, `ServiceRegistrationTests`, `ViewStateSeedTests` | Nothing |
 | `Mcp.Tests` | `Tools/` (`CostingToolsTests`): the tools read through the server's read-only connection, priced as the screens price, and the connection refusing a write | PostgreSQL |
 | `RecipeApi.Tests` | `Endpoints/` (`RecipeApiTests`): each endpoint served in memory on the API's read-only connection, the key when one is set, and the connection refusing a write | PostgreSQL |
 | `Tests.Common` | Nothing: it's the shared fixture library | — |
@@ -1128,10 +1196,11 @@ Retired on 2026-10-31: production planning moved to TinapayanBMS (`../TinapayanB
 
 The whole suite takes 4 to 6 minutes on this PC. While you work, two scripts run less of it (2026-11-05). Before a commit or a merge, run it all: both pick by project or by name, so they can miss a test of something a change reaches some other way.
 
-- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the UI runs `UI.Tests` alone (about 3 minutes, where all of them take 4 to 6); one to `Pricing` runs Pricing, UI, Mcp and RecipeApi's tests; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the UI's `appsettings.json` reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran" (it passes `--ignore-exit-code 8`, the platform's exit code for that).
-- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter, a XAML file) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class`, `-Method` or both, which it joins into one `--treenode-filter`; with neither, the whole project runs after each save. Hot reload runs the tests again in the same test session, and TUnit 1.81.10 completes the session's dynamic test queue at the end of every run, so the second run's completion threw and every run after the first reported a failure of TUnit's own, "ChannelClosedException: The channel has been closed." [tests/HotReloadReruns.cs](../tests/HotReloadReruns.cs), compiled into every test project, works around it: under hot reload only (`TESTINGPLATFORM_HOTRELOAD_ENABLED`), a `[BeforeEvery(Test)]` hook gives that queue a new channel when the run before completed it, reaching it through TUnit's internals by name. If the failure comes back after a TUnit upgrade, TUnit has renamed what it reaches for; if TUnit fixes it, delete the file. Stop it with Ctrl+C.
+- **[scripts/Test-Changed.ps1](../scripts/Test-Changed.ps1) runs the test projects your changes can reach.** It takes the files changed since `-Since` (`HEAD` by default, so what isn't committed yet, new files included; `-Since main` for the whole branch) and runs every test project that references, directly or through others, a project one of them is in. It reads the references from the `.csproj` files, so it needs no list of its own. A change to the screens (`Components`) runs `Components.Tests` alone; one to `Presentation` runs `Presentation.Tests` and `Components.Tests`; one to `Pricing` or `Infrastructure` runs every project's but `ApplicationCore.Tests`, since `Tests.Common` references both; one to `Domain`, `ApplicationCore`, a build setting (`Directory.Build.props`, `Directory.Packages.props`, `global.json`, `.editorconfig`, the solution) or a file outside the projects runs them all. A file another project links in counts for it too: the app's `appsettings.json` (in `src/TinapayanRMS.Maui`) reaches every database test project, through `Tests.Common`. Docs, `scripts/` and `.claude/` run nothing. Several projects run side by side from one `dotnet test`, through a solution filter it writes to `%TEMP%`. `-List` says what it would run and why, and runs nothing; `-Class "*ProductsViewModel*"` runs only matching classes, a project with none passing with "Zero tests ran" (it passes `--ignore-exit-code 8`, the platform's exit code for that).
+- **[scripts/Watch-Tests.ps1](../scripts/Watch-Tests.ps1) runs one class again each time you save**, by Microsoft.Testing.Platform's hot reload (`Microsoft.Testing.Extensions.HotReload`, in every test project; it does nothing unless `TESTINGPLATFORM_HOTRELOAD_ENABLED` is `1`, which only this script sets). It starts the project under `dotnet watch`: a change to a method's body, in a test or the code it tests, is applied to the running tests, which run again; anything hot reload can't apply (a new method, type or parameter) makes `dotnet watch` rebuild and start them again (`DOTNET_WATCH_RESTART_ON_RUDE_EDIT`). Measured on `SubAssemblyRolesViewModelTests` (8 tests): 94 seconds to start, most of it the build, then a broken assertion failed 17 seconds after the save and passed 7 seconds after it was put back. Give it `-Class`, `-Method` or both, which it joins into one `--treenode-filter`; with neither, the whole project runs after each save. Hot reload runs the tests again in the same test session, and TUnit 1.81.10 completes the session's dynamic test queue at the end of every run, so the second run's completion threw and every run after the first reported a failure of TUnit's own, "ChannelClosedException: The channel has been closed." [tests/HotReloadReruns.cs](../tests/HotReloadReruns.cs), compiled into every test project, works around it: under hot reload only (`TESTINGPLATFORM_HOTRELOAD_ENABLED`), a `[BeforeEvery(Test)]` hook gives that queue a new channel when the run before completed it, reaching it through TUnit's internals by name. If the failure comes back after a TUnit upgrade, TUnit has renamed what it reaches for; if TUnit fixes it, delete the file. Stop it with Ctrl+C.
 - **Don't run a project two ways at once.** A watcher holds its project's build, so a `dotnet build` of it fails on locked files, and it uses the project's test databases, so a second run would reset them under its tests. `Test-Changed.ps1` and `Watch-Tests.ps1` refuse to start while that project's tests are running already.
 - **Both hand `dotnet` the repo's path as your terminal spells it.** The build records each project's folder with its drive letter's case, so `C:\…` after `c:\…` would recompile every project (see "Build configuration").
+
 ### The database fixtures
 
 - **[DatabaseFixtureBase](../tests/TinapayanRMS.Tests.Common/Fixtures/DatabaseFixtureBase.cs)** (in Tests.Common) reads the app's connection string, swaps in the project's database name, migrates the database, and resets it with Respawn.
@@ -1209,7 +1278,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         ReactiveUIBootstrapper.EnsureInitialized();
         var viewModel = new SubAssemblyRolesViewModel(
             new SubAssemblyRoleRepository(CreateDbContextFactory()), new SubAssemblyRoleValidator(), new LoggerConfiguration().CreateLogger());
-        viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(confirm));   // stands in for the MessageBox
+        viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(confirm));   // stands in for the dialog
         return viewModel;
     }
 
@@ -1229,7 +1298,7 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
 }
 ```
 
-Some loads start from a selection, with nothing to await. A test waits for the screen to settle with [Settle](../tests/TinapayanRMS.UI.Tests/Fixtures/Settle.cs): `await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady)` awaits the screen's `WhenIdleAsync` (everything it started has finished, and its results are on the screen), then requires the condition, failing at once if it doesn't hold. `Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = …, condition)` picks first. Don't poll for a condition: a test then waits as long as the polling does, and can pass on a moment that doesn't last. Only something on a timer, which isn't the screen's work, polls, with `Settle.EventuallyAsync` (the folders written to the view state half a second after a change).
+Some loads start from a selection, with nothing to await. A test waits for the screen to settle with [Settle](../tests/TinapayanRMS.Presentation.Tests/Fixtures/Settle.cs): `await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady)` awaits the screen's `WhenIdleAsync` (everything it started has finished, and its results are on the screen), then requires the condition, failing at once if it doesn't hold. `Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = …, condition)` picks first. Don't poll for a condition: a test then waits as long as the polling does, and can pass on a moment that doesn't last. Only something on a timer, which isn't the screen's work, polls, with `Settle.EventuallyAsync` (the folders written to the view state half a second after a change).
 
 A data-driven test's `decimal` values with decimals come from a `[MethodDataSource]` method, written as `decimal` literals (`0.0525m`), never from `[Arguments]`. An attribute can't hold a `decimal`, so `[Arguments(0.0525)]` passes a `double`, which since .NET 11 arrives as 0.0524999999999999980571097069. Whole numbers are safe in `[Arguments]`. The method returns one value, or a tuple for several parameters; a row holding something mutable, such as an array, is a `Func<…>` that builds it afresh for its test (TUnit0046). See `StandardUnitRulesTests`:
 
@@ -1245,17 +1314,65 @@ public static IEnumerable<(string, string, decimal)> MassUnits() =>
 public void A_mass_unit_of_an_ingredient_is_fixed_in_grams(string name, string abbreviation, decimal grams)
 ```
 
-**Every async ViewModel test runs on `UiThread.RunAsync(async () => …)`** (`public Task X() => UiThread.RunAsync(async () => { … });`, Presentation.Tests' `Fixtures/`): a thread of its own with a synchronization context that runs one thing at a time, in order, as either app's UI thread does. A screen only ever runs on its UI thread, and a test runs it the same way: a read nothing awaits (`_ = FetchComponentCostsAsync(…)`, a composite's Products table, the Scaling tab) or a recalculation that checks it's still the latest (`PriceSimulatorViewModelTests`) would otherwise come back on the thread pool and change the screen while the test did: about one run in three lost a line's cost or threw "An item with the same key has already been added". They ran on a WPF dispatcher (`StaThread.RunAsync`) until the ViewModels moved out of the WPF app on 2026-11-07.
+**Every async ViewModel test runs on `UiThread.RunAsync(async () => …)`** (`public Task X() => UiThread.RunAsync(async () => { … });`, Presentation.Tests' `Fixtures/`): a thread of its own with a synchronization context that runs one thing at a time, in order, as the app's UI thread does. A screen only ever runs on its UI thread, and a test runs it the same way: a read nothing awaits (`_ = FetchComponentCostsAsync(…)`, a composite's Products table, the Scaling tab) or a recalculation that checks it's still the latest (`PriceSimulatorViewModelTests`) would otherwise come back on the thread pool and change the screen while the test did: about one run in three lost a line's cost or threw "An item with the same key has already been added". They ran on a WPF dispatcher (`StaThread.RunAsync`) until the ViewModels moved out of the WPF app on 2026-11-07.
 
-A test that creates WPF objects (in `UI.Tests`) runs on an STA thread:
+A component test renders the component in a bUnit context that has the app's own services, and drives it through its markup. Abridged from [LineGridTests](../tests/TinapayanRMS.Components.Tests/Shared/LineGridTests.cs):
 
-- `StaThread.Run(() => …)` for plain WPF objects.
-- `StaThread.RunLicensed(() => …)` when it builds Syncfusion controls. It's skipped if `SYNCFUSION_LICENSE_KEY` isn't set, because an unlicensed control shows a dialog.
-- `StaThread.RunThemed(() => …)` when it themes a window. All such tests share one STA thread, with the app's theme settings, because SfSkinManager ties a theme's resources to the thread that loaded them.
+```csharp
+public class LineGridTests
+{
+    private readonly ObservableCollection<Line> _lines = [new() { Name = "Flour" }, new() { Name = "Water" }];
+    private readonly List<Line> _drafts = [];
+
+    [Test]
+    public async Task Typing_in_the_add_row_makes_it_a_line_and_a_new_add_row_takes_its_place()
+    {
+        await using var context = AppServices.NewContext();
+        var grid = context.Render<LineGrid<Line>>(parameters => parameters
+            .Add(g => g.Items, _lines)
+            .Add(g => g.NewItem, NewDraft)
+            .Add(g => g.Header, "<th>Name</th>")
+            .Add(g => g.Row, line => $"<td class=\"name\">{line.Name}</td>"));
+
+        await grid.InvokeAsync(() => _drafts[0].Name = "Yeast");
+
+        grid.WaitForAssertion(() => _lines.Select(line => line.Name).Should().Equal("Flour", "Water", "Yeast"));
+        grid.FindAll("tbody tr")[^1].ClassList.Should().Contain("add-row");
+    }
+}
+```
+
+- [AppServices.NewContext()](../tests/TinapayanRMS.Components.Tests/Fixtures/AppServices.cs) makes a bUnit context with `ServiceRegistration.AddTinapayanRMS`, Syncfusion's services, loose JavaScript interop (calls into `app.js` do nothing), an in-memory view state, and a `FakeAppWindow` for `IAppWindow`, which records what the title bar asked of the window. Nothing in it opens a database connection.
+- A test that draws a Syncfusion dialog calls `RenderingAsTheWebView()` on the context once its services are added: the dialog asks the renderer whether it's interactive, and bUnit's says it isn't.
+- bUnit's own `TestContext` is aliased away in the project file: `TestContext` is TUnit's.
+- Change a ViewModel or a row from a test inside `InvokeAsync`, as the app changes it on the UI thread.
+
+Other helpers:
+
 - `VersionRecorders.Create(factory)` (in Tests.Common's `Fixtures/`) builds a `ProductVersionRecorder` over real repositories, and `CreateSaves` the `VersionedSaves` over one, for a test that constructs `SubAssembliesViewModel` or tests the saves themselves (`Pricing.Tests/Versions`).
 - `FailingDbContextFactory` (in Presentation.Tests' `Fixtures/`) wraps a factory and refuses every context while its `Fail` is set: for a test that a screen survives a database that stops answering, and recovers once it answers. A test that a write is all or nothing fails it part-way with an EF Core save interceptor instead (`CostCascadeTransactionPersistenceTests`).
 - `SqlCommandCounter` (in Tests.Common's `Fixtures/`) counts the SQL commands sent from where it's started (the activities Npgsql reports on its `Npgsql` ActivitySource): for a test that a read's round trips don't grow with what it reads. Work started in the background from there counts too, so after a ViewModel command read `await counter.SettledAsync()` (no new command for 300 ms), not `Commands`: a load's background reads, such as the Products list's below-markup flags, are often still going when the command returns.
-- `OffscreenGrid.Run(create, test)` shows a real grid off-screen. Every test class that builds a real `SfDataGrid` or `SfTreeGrid`, themed ones included, carries `[NotInParallel(OffscreenGridCollection.Name)]`, so they run one at a time: their windows competed for focus, and Syncfusion keeps whether the current cell has been validated in one static flag for the whole process, so a grid beside an edit could make its commit skip writing the value.
+
+### Checking a screen in the app's window
+
+bUnit renders a component's markup and raises its events; it has no web view. Focus, typing at a person's speed, drag and drop, the print styles, the dialogs, all of `vim.js` and the title bar are only seen in the app's window. Check a change to a page or a shared component there before you call it done.
+
+Run the app (`dotnet run --project src/TinapayanRMS.Maui`) and use the screen as a person would: type quickly, tab through it, undo, drag, print. For a check you can repeat, drive the window from a script with the `run-tinapayanrms` skill's driver ([.claude/skills/run-tinapayanrms/](../.claude/skills/run-tinapayanrms/); its `SKILL.md` lists the commands). `driver.ps1 launch` starts the built app with WebView2's debugging port open (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`), and `driver.js` attaches Node's `playwright-core` to it, with no browser to download:
+
+```js
+const { chromium } = require('playwright-core');
+const browser = await chromium.connectOverCDP('http://localhost:9222');
+const page = browser.contexts()[0].pages()[0];   // the window's page, at https://0.0.0.1/
+```
+
+- Its clicks, keys and screenshots go to the page, not the mouse or the screen, so nothing else on the computer is touched. The window opens on the monitor the mouse is on.
+- The page's screenshot leaves out the window's frame. `driver.ps1 window` captures the whole window with `PrintWindow`, and `driver.ps1 hit` asks Windows' hit test (`WM_NCHITTEST`) at points on the title bar: caption in the gaps, client on the buttons.
+- Wait for what you expect to appear, not a fixed time. Type with `page.keyboard.type`, not `fill`, to send real keystrokes at speed.
+- `drag_to` scrolls the target into view between pressing and moving, which makes the web view start the drag from whatever is then under the pointer. Drag between rows that are both on screen.
+- Collect the console's errors (`page.on("console", …)`): a broken page says so there. In a Debug build, F12 in the window opens the developer tools.
+- The dialogs (Save, Open, folder, print) are the computer's, outside the page, so a script can't answer them: check them by hand.
+- Windows PowerShell's web requests look for a proxy first, which can take longer than a short timeout, so the driver tests the debugging port with a TCP connect.
+- **The check runs against the dev database, the user's real data.** Save nothing: leave an edit with No when the window asks, and check afterwards that nothing's `updated_at` moved.
 
 ### Naming
 
@@ -1273,18 +1390,18 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 
 - **Use modern C# 15 and .NET 11 idioms**: primary constructors (every repository has one), collection expressions, `record` and `record struct` for immutable shapes (drafts, snapshots, printouts), `required` members, file-scoped namespaces and pattern matching.
   - **A fixed set of cases is a `closed` class or record** (C# 15): the list trees' nodes, `RecipeTab`, `PlanIssue`, `PrintScope`, `RecipeTabChoice`, `PackagingLinkDraft`, `PackagingLinkTarget`, `SectionPlacement`. Each case is a sealed record nested in it, with only its own data, in place of a `Kind` enum, nullable fields that only some cases use, or flags that overlap. A switch over one names every case, and `null` when null can come, never `_`, so a new case is a CS8509 warning wherever it's missed.
-  - **No `union` for anything XAML binds.** A union is a struct holding its case in `Value`, which bindings don't see through. A union suits a value that's one of some types already there: `PreparedPrintout(ProductPrintout, PrintProblem)`, what `PreparePrintout` gives the Print tab, empty (`default`, matched by `case null`) while there's nothing to print. In a `?:` whose other branch is a case, write `default(PreparedPrintout)`, since a bare `default` takes the case's type. Tests read the case through `Value`.
+  - **A `union`** (a struct holding its case in `Value`) suits a value that's one of some types already there: `PreparedPrintout(ProductPrintout, PrintProblem)`, what `PreparePrintout` gives the Print tab, empty (`default`, matched by `case null`) while there's nothing to print. In a `?:` whose other branch is a case, write `default(PreparedPrintout)`, since a bare `default` takes the case's type. Tests read the case through `Value`.
   - **A closed record that's shown seals its `ToString`** (`PrintScope`), or each case reads "Folder { Label = … }".
   - **`BeEquivalentTo` over a closed base type** needs `o => o.ComparingByValue<TBase>()`, since the base has no members to compare.
   - **`[with(comparer), ..]`** for a collection made with a comparer or capacity, and **labeled `break`/`continue`** in place of a flag or `goto` out of nested loops (IDE0410).
-  - **.NET 11's library additions in place of hand-written code**: `Enumerable.FullJoin` for a full outer join by a key that comes once on each side (`ProductVersionRules.Paired`), `Process.RunAndCaptureTextAsync` to run a tool and read what it writes (`PostgresTools.RunAsync`), and `Process.StartAndForget` to start a process the app doesn't watch (the restart after a restore).
+  - **.NET 11's library additions in place of hand-written code**: `Enumerable.FullJoin` for a full outer join by a key that comes once on each side (`ProductVersionRules.Paired`), and `Process.RunAndCaptureTextAsync` to run a tool and read what it writes (`PostgresTools.RunAsync`).
 - **Nullable reference types are on everywhere.** Treat their warnings as real.
 - **Everything that touches the database is `async`** and takes a `CancellationToken`. ViewModels pass `CancellationToken.None`.
 - **A rule throws `BusinessRuleException` with a message written for the shop's staff**, because `RunSafelyAsync` shows it exactly as written. That goes for a repository's checks and a screen's own form checks too. A plain `InvalidOperationException` reads as a bug: EF Core and Npgsql throw those for failures.
 - **Strings**: compare names with `StringComparison.OrdinalIgnoreCase`; sort for display with `StringComparer.CurrentCultureIgnoreCase`; format display dates with `CultureInfo.CurrentCulture`, and log output with `CultureInfo.InvariantCulture`.
 - **Correctness and performance come before brevity.** Query only the rows and columns you need, rather than loading more and filtering in memory. Avoid needless intermediate collections in hot paths such as the cascade.
 - **Comments explain why.** Types and non-obvious members have XML doc comments that give their domain meaning. Inline comments record a decision and its reason. A comment says what's true now, in the present tense, with no date and no account of who asked for it or how a bug was found: the build plan's change log and git keep that. Match the comment density of the code around yours.
-- **Seal every class that isn't a base class** (`AppWindow` is the one base class in `src`), so the JIT can devirtualize calls and type checks are cheaper. A fixed lookup table is a `FrozenDictionary`, and a lookup by a trimmed name uses its span-keyed `GetAlternateLookup<ReadOnlySpan<char>>()` rather than allocating the trimmed string (`StandardUnitRules`).
+- **Seal every class that isn't a base class** (`ViewModelBase`, `ObservableRow` and `ScreenBase` are the base classes in `src`), so the JIT can devirtualize calls and type checks are cheaper. A fixed lookup table is a `FrozenDictionary`, and a lookup by a trimmed name uses its span-keyed `GetAlternateLookup<ReadOnlySpan<char>>()` rather than allocating the trimmed string (`StandardUnitRules`).
 - **Keep the build free of warnings.** To look for more performance problems than the default rule set finds, rebuild with `-p:AnalysisLevelPerformance=latest-all`. On 2026-10-29 that left only CA1849 on FluentValidation's `Validate` (an in-memory check; `ValidateAsync` only wraps it) and on tests calling the synchronous methods deliberately.
 
 ### Documentation and process
@@ -1292,7 +1409,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 - **The user manual follows the app.** A change users can see updates [docs/user-manual.md](user-manual.md) in the same change. The manual is written for the shop's staff: it describes current behaviour only, shows labels in bold exactly as the screen does, gives amounts without a currency symbol, and uses no code names.
 - **PLAN.md is the living plan.** Record each decision there, with its reason and date, and keep its sections current. History belongs in PLAN.md; the manuals describe only what's true now.
 - **This manual follows the code.** A change to anything it describes (the setup, commands, solution layout, architecture, a pattern or convention, or a type or file it names) updates it in the same change. Like the user manual, it describes only what's true now.
-- **Verify a UI change in the running app**, not just in the tests. Close any copy you already have open first.
+- **Verify a UI change in the app's window**, not just in the tests ([Checking a screen in the app's window](#checking-a-screen-in-the-apps-window)). Close any copy you already have open first.
 - **Commit messages** are short sentences in the imperative that describe the change, as in "Let a raw material have any number of alternative units".
 
 ---
@@ -1307,7 +1424,7 @@ Coverage comes from Microsoft's MTP coverage extension (see the [command referen
 4. Copy it in the repository's write path: the `UpdateAsync` that loads and then applies, and the field copy at the top of the aggregate `SaveAsync`, if there is one.
 5. Add any rule it needs to the right `*Rules` class (and its tests), and run it from the validator (`Satisfies`) if a form edits it.
 6. Generate, read and apply the migration, and regenerate the compiled model (see [Migrations](#migrations)).
-7. In the ViewModel, add the editing property, its load and save mapping, and its place in the form snapshot (so undo and the dirty check include it). Bind it in the view.
+7. In the ViewModel, add the editing property, its load and save mapping, and its place in the form snapshot (so undo and the dirty check include it). Bind it on the page, with the shared field for its kind (`TextField`, `NumberField`, `PickField`).
 8. Add tests: rules, persistence, and the ViewModel.
 9. Update the user manual if users can see the field, and PLAN.md's Domain Model section.
 
@@ -1318,7 +1435,7 @@ Everything in the previous recipe, plus:
 1. A `DbSet` in `TinapayanRMSDbContext`, named as the table should be.
 2. An `IEntityTypeConfiguration<T>` in `Configurations/`, with the unique indexes, delete behaviours and check constraints the rules need.
 3. A repository interface in `ApplicationCore/Interfaces`, and its implementation in `Infrastructure/Repositories`, taking `IDbContextFactory<TinapayanRMSDbContext>` through its primary constructor. Reads use Dapper and `Columns`; writes use EF Core, in a transaction begun with `BeginOrJoinTransactionAsync` when they need one.
-4. Registrations: the repository as a singleton in `DatabaseHost`, and `IValidator<T>` in `CompositionRoot` if the entity has a Save form.
+4. Registrations: the repository as a singleton in `DatabaseHost`, and `IValidator<T>` in `ServiceRegistration` if the entity has a Save form.
 
 Respawn picks up the new table by itself.
 
@@ -1341,38 +1458,46 @@ Respawn picks up the new table by itself.
 
 ### Add a screen
 
-1. Write the ViewModel in `ViewModels/`, deriving from `ViewModelBase`. Make it `sealed`, and `IDisposable` if it owns a `SourceCache`. Give it a fetch-then-merge `LoadCommand`. Register it as a singleton in `CompositionRoot`.
-2. Write the view in `Views/`: a `UserControl` whose constructor takes the ViewModel, sets `DataContext` and calls `RegisterNativeMessageBoxHandler()`. Give it an `ErrorToast`.
-3. In `MainWindow.xaml`, add a `TabItemExt` to `MainTabControl`, and a `ListBoxItem` to the navigation menu with an `AutomationProperties.Name`.
-4. In `MainWindow.xaml.cs`, add a factory for the tab's view to `_screenFactories`, its `LoadCommand` to `_loadCommands`, and add its `HistoryScreen` to `_historyScreens`, with a new `AppScreen` value.
-5. Add a resolve check to `CompositionRootTests`, and ViewModel tests.
-6. Add a section to the user manual.
+1. Write the ViewModel in `Presentation/ViewModels/`, deriving from `ViewModelBase`. Make it `sealed`, and `IDisposable` if it owns a `SourceCache`. Give it a fetch-then-merge `LoadCommand`. Register it as **scoped** in `ServiceRegistration`.
+2. Write the page in `Components/Pages/`: `@page "/your-screen"`, `@inherits ScreenBase<YourViewModel>`, a `<PageTitle>`, and an override of `LoadCommand`. Build it from the shared components. A record screen also takes `/{Id:int}`, as Products does.
+3. Add it to `NavMenu`'s items and to `ScreenTabs`' list, which needs an `AppScreen` value and its address in `VimKeysState.UrlOf`. If the Vim keys should reach it by name, add a command in `VimCommandLine.Commands`.
+4. If another screen opens it, expose the request as an observable on that screen's ViewModel and subscribe in `ScreenLinks`.
+5. Add its ViewModel to `ServiceRegistrationTests`, and write ViewModel tests.
+6. Check it in the app's window, and add a section to the user manual.
 
 ### Add a Settings tab
 
-1. Write the ViewModel and view as for a screen, and register the ViewModel.
-2. Add the tab to `SettingsWindow.xaml`. In `SettingsWindow`'s constructor, set its content, add its `RegisterNativeMessageBoxHandler()` to the disposables, and run its `LoadCommand` on `Loaded`. A view that answers interactions of its own (file dialogs, as the Database tab's does) registers them in its constructor and is `IDisposable`; add the view itself to the disposables, so its handlers go when Settings closes.
-3. Pass the ViewModel through `MainWindow` to `OpenSettings`.
+1. Write the ViewModel and register it, as for a screen.
+2. Write the page in `Components/Pages/Settings/`, with `@page "/settings/your-tab"` and `<SettingsTabs />` at the top.
+3. Add its link to `SettingsTabs`.
 
-### Export a grid to Excel
+### Export a table to Excel
 
-1. Give the grid an `x:Name`.
-2. In the ViewModel, add a command that runs `ExportToExcelAsync("<title>")`. The title names the file and lets the view tell several exports apart.
-3. In the view's constructor, call `viewModel.RegisterExcelExport(this, title => [new ExcelSheet("<sheet>", TheGrid)])`, and give the view a `SuccessToast` for the "Saved … in …" notice.
-4. Add an **Export to Excel** `ButtonAdv` with `ExportIconTemplate`, bound to the command.
-5. Test the command with a handler of your own on `ExportToExcel`.
+1. In the ViewModel, add a command that runs `ExportToExcelAsync("<title>")`. The title names the file and lets the page tell several exports apart.
+2. In the page's `OnInitialized`, after `base.OnInitialized()`, register a handler on `ViewModel.ExportToExcel` with `AddSubscription`. Ask where with `IFileDialogs.ChooseSaveFileAsync`, answering null if it's cancelled. For an `SfGrid`, set `AllowExcelExport` and write what its `ExportToExcelAsync(asMemoryStream: true, …)` returns there. Otherwise build the sheets with `ExcelWorkbook` and save them with `IFileDialogs.SaveAsync`. Answer with the path.
+3. Add an **Export to Excel** `CommandButton` with `Glyphs.Export`.
+4. Test the command with a handler of your own on `ExportToExcel`.
 
-### Use a new Syncfusion control
+### Use a new Syncfusion component
 
-1. Add its package to the UI project, as in [Working with Syncfusion](#working-with-syncfusion).
-2. Learn how it's meant to be set up from its skill, then the `syncfusion-wpf` MCP server, then the Sample Browser, then `ilspycmd`.
-3. Check that it doesn't change how other controls are themed (remember the `SfTreeGrid` trap).
-4. Check it in the running app at the app's text size.
+1. Add its package to the Components project, as in [Working with Syncfusion](#working-with-syncfusion).
+2. Learn how it's meant to be set up from the `syncfusion-blazor` MCP server (Syncfusion's Blazor documentation), then `ilspycmd`.
+3. If the user types into it, check the [three rules](#typing-three-rules) hold: type quickly into it in the app's window while the ViewModel changes under it.
+4. Check it at the app's text size, and that the theme's colours reach it.
 
-### Add a grid behaviour
+### Add a shared component
 
-1. Write a static class in `Controls/` with an attached property, such as `IsEnabled` or `Recorder`. In the property's change callback, hook the grid's events, and unhook them when the grid unloads.
-2. Test it in a real grid with `OffscreenGrid`, in `UI.Tests/Controls`.
+1. Write it in `Components/Shared/`, with a comment at the top saying what it's for and what it takes care of. Take state as parameters; keep only view state (focus, a drag in progress) in the component.
+2. If it's typed into, take `[CascadingParameter] IUndoRecorder? Recorder` and mark the undo step as the fields do. If it keeps its own text while it has the cursor, give the box up when `Recorder.FormVersion` changes, as `TextField` does.
+3. Test it in `Components.Tests/Shared` with bUnit, and in the app's window.
+4. Add it to the table in [The shared components](#the-shared-components).
+
+### Ask something of the window
+
+1. Add the member to the interface in `Components/Shared/` (`IAppWindow` for the window's frame, `IFileDialogs`, `IPagePrinter`), with a comment saying what it does, not how Windows does it.
+2. Implement it in `Maui/Platforms/Windows/` (`AppWindowChrome`, `FileDialogs`), on the window's thread: WinUI's window and pickers only answer there.
+3. Teach the fake in `Components.Tests/Fixtures/` (`FakeAppWindow`) to record it, and test the component that asks.
+4. Check it in the app's window: `driver.ps1 window` and `hit` see the frame.
 
 ---
 
@@ -1380,40 +1505,32 @@ Respawn picks up the new table by itself.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| The app closes at startup, and the log says there's no Syncfusion licence key | It was built while `SYNCFUSION_LICENSE_KEY` wasn't visible to the build | Set the user environment variable, restart your terminal or IDE, then rebuild |
-| `dotnet publish` fails asking for `SYNCFUSION_LICENSE_KEY` | The variable isn't visible to the build, and an app published without it couldn't start | The same |
-| A screen says "Couldn't reach the database.", and the log has "Failed to connect" or "password authentication failed" | PostgreSQL isn't running, or the password file has no line for the server and role | Start the `postgresql-x64-18` service, and check `appsettings.json` and `%APPDATA%postgresqlpgpass.conf` |
-| A message at startup says the database is out of date | A migration hasn't been applied to it | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
-| A message says something went wrong and the app is still running | An exception nothing else caught | Read the log for its stack |
+| The window shows Syncfusion's licence notice, and the log says no licence key was found | It was built while `SYNCFUSION_LICENSE_KEY` wasn't visible to the build | Set the user environment variable, restart your terminal or IDE, then rebuild |
+| `dotnet publish` fails asking for `SYNCFUSION_LICENSE_KEY` | The variable isn't visible to the build, and an app published without it would show the licence notice | The same |
+| The app doesn't open at all | It failed before its window: the log's last lines say why | Read `%LocalAppData%\TinapayanRMS\Maui\logs\`. A missing MAUI workload shows at build time instead (NETSDK1147): install it |
+| The app doesn't open, and there's nothing new in the log | A copy from the same folder is still running, and it brought that one forward | Find it with `Get-Process TinapayanRMS.Maui`; one with no window is stuck, so end it |
+| A screen says "Couldn't reach the database.", and the log has "Failed to connect" or "password authentication failed" | PostgreSQL isn't running, or the password file has no line for the server and role | Start the `postgresql-x64-18` service, and check `appsettings.json` and `%APPDATA%\postgresql\pgpass.conf` |
+| A banner under the title bar says the database is out of date | A migration hasn't been applied to it | Stop the app, run `dotnet ef database update --project src/TinapayanRMS.Infrastructure`, start it again |
+| A bar at the bottom of the window says something went wrong and the page needs reloading | An exception escaped a component and broke the page | Read the log for its stack; in a Debug build the developer tools' console (F12) has it too |
+| "More than one sibling of element 'tr' has the same key value" in the log | One object drawn as two rows in a keyed loop | See [Typing: three rules](#typing-three-rules) |
+| Characters go missing when typing quickly | Something wrote into the box while it had the cursor | Use `TextField` or `NumberField`; see the three rules |
+| A picker shows blank for the first item of a list | It's bound by value | Use `PickField` |
+| A change to a `.css` or `.js` file doesn't show | The app is still the build from before | Close it and run it again |
+| A strip across the top of the window, over the page's title bar | MAUI's own title bar row is back: an update renamed what `AppWindowChrome` reaches for | The log has a warning naming it. Find the new name with `ilspycmd` in MAUI's Windows assembly ([docs/plan/maui-app.md](plan/maui-app.md), "The window") |
+| The title bar's gaps don't drag the window, or a button doesn't click | The caption region is out of step with the page | `driver.ps1 hit` at the points; a new clickable element on the bar must be a `button`, `a` or `input` |
 | Timings vary widely from run to run | Other programs on the PC compete for memory and disk | Compare timings in one process, alternating before and after |
 | `dotnet ef` can't connect | The design-time factory's connection string is hard-coded | Check the password file, or edit `TinapayanRMSDbContextFactory.DevelopmentConnectionString` |
 | Settings → Database says backups need `pg_dump` and `pg_restore` | PostgreSQL's command-line tools aren't in `C:\Program Files\PostgreSQL\<version>\bin` or on the `PATH` | Install them, or set `Backups:ToolsFolder` in `appsettings.json` |
-| The build fails with `CS0103: The name 'InitializeComponent' does not exist`, or `CS2001` for `*.g.cs` files, all against a `*_wpftmp.csproj` | The WPF markup pass has gone stale | Run `dotnet clean src/TinapayanRMS.UI`, build the UI project on its own, then build the solution |
-| The build can't copy `TinapayanRMS.UI.exe` or a DLL | The app is running | Close it |
+| The build can't copy `TinapayanRMS.Maui.exe` or a DLL | The app is running | Close it, or `Get-Process TinapayanRMS.Maui \| Stop-Process` |
+| CS0104, an ambiguous reference, in a `.razor` file | Two imported namespaces share a name | Add an alias to `Components/_Imports.razor` |
 | An AI assistant's TinapayanRMS tools give figures from before your change | The MCP server is still running the build it started with | Restart it (`/mcp` in Claude Code). It builds again as it starts |
 | `--filter` isn't recognised, or zero tests ran | VSTest flags under Microsoft.Testing.Platform | Use `--treenode-filter "/*/*/<class>/<test>"` and `--coverage` |
 | A test passes alone but fails now and then in a full run | TUnit runs it beside another test, even one of its own class, that shares something with it | Give them a shared `[NotInParallel]` key |
-| Some UI tests are reported as skipped | No licence key | Set `SYNCFUSION_LICENSE_KEY` |
-| A binding silently does nothing | A binding error | Check the Debug build's log for `WPF binding` warnings |
-| Every `SfDataGrid` suddenly looks unthemed | An `SfTreeGrid` is themed through its window | Theme it locally |
-| The UI freezes | Something blocks the UI thread | `dotnet-stack report -p <pid>`. Find the PID with `dotnet-trace ps`. |
+| The window stops responding | Something blocks the UI thread | `dotnet-stack report -p <pid>`. Find the PID with `dotnet-trace ps`. |
 | A crash, deadlock or memory growth | | `dotnet-dump collect -p <pid>`, then `dotnet-dump analyze <file>` |
 | Something is slow | | `dotnet-trace collect -p <pid>` |
-| A test harness stalls for seconds while building a view with a chart | Syncfusion's telemetry blocks when there's no `SynchronizationContext` | Build views inside a running dispatcher (`Dispatcher.CurrentDispatcher.InvokeAsync` after `Dispatcher.Run()`), or call `Syncfusion.Telemetry.Telemetry.Disable()` first |
 
-When you compare the behaviour of two versions of the code, clean the UI project before each build and check that the output says "Build succeeded": a stale markup pass can leave the previous binaries in place. If it matters, confirm what was built with `ilspycmd -t <Type> <dll>`.
-
-### Driving the UI from a script
-
-To drive the running app (launch it on the secondary monitor, click, type, capture the window or a popup), use [.claude/skills/run-tinapayanrms/driver.ps1](../.claude/skills/run-tinapayanrms/driver.ps1); its SKILL.md lists the commands and what trips them up. Off-screen harnesses and UI-automation scripts have pitfalls that PLAN.md records in detail (Application Architecture and Development Environment, and [docs/plan/syncfusion.md](plan/syncfusion.md)). In short:
-
-- Make the script's thread per-monitor DPI-aware before it places, clicks or captures anything, because the app is per-monitor DPI-aware ([app.manifest](../src/TinapayanRMS.UI/app.manifest)).
-- Find the main window by its class and title. `Process.MainWindowHandle` can pick one of the app's hidden windows.
-- Syncfusion's buttons, pickers and number boxes need real clicks: `ButtonAdv` has no Invoke pattern, and `ValuePattern.SetValue` doesn't commit a `DoubleTextBox`.
-- Bring the app to the foreground before you send keystrokes, and check it's still there, or the keys go to whatever window is in front.
-- UI Automation's `FocusedElement` reports the window, not the grid, while an `SfDataGrid` has the keyboard. Judge a grid's focus from the screen instead, for example by whether the current cell's border moves with the keys.
-- `new App()` posts WPF's startup to the dispatcher, so a harness that runs the dispatcher also runs `OnStartup`, which shows the real main window. Collect what it posts and abort it first.
-- A file-based harness also needs `#:property PublishAot=false` (WPF can't be trimmed), a `DispatcherSynchronizationContext` on its thread (or a ViewModel's `await` comes back on the thread pool and the screen stays empty), and the UI assembly as `Application.ResourceAssembly`, where a view's `/Assets/...` images are.
+When you compare the behaviour of two versions of the code, check that the output says "Build succeeded" before each run, and close the app between them: a running copy keeps the old build's files. If it matters, confirm what was built with `ilspycmd -t <Type> <dll>`.
 
 ### Checking costs from an AI assistant
 
@@ -1444,8 +1561,10 @@ Each tool takes a product or material by its name, or by a part of it that names
 | [Tech Stack](../PLAN.md#tech-stack) | You touch a package, the ReactiveUI bootstrap, or the test runner |
 | [Solution Structure](../PLAN.md#solution-structure) | You add a project or a folder |
 | [Domain Model](../PLAN.md#domain-model) | You change an entity or a rule. Each entity's bullets give its rules and the reasons for them. |
-| [Syncfusion notes](plan/syncfusion.md) | You use a Syncfusion control, or change the theme, the windows, the DPI handling, printing, the toasts or the Reports screen |
-| [Application Architecture](../PLAN.md#application-architecture) | You change a screen, a repository pattern or a migration |
+| [Syncfusion UI Framework](../PLAN.md#syncfusion-ui-framework) | You use a Syncfusion component, or change the theme |
+| [The app](plan/maui-app.md) | You change the window, the title bar, how a screen is built, printing, or the view state; or want to know where the app came from |
+| [Reports](plan/reports-screen.md) | You change the Reports screen |
+| [Application Architecture](../PLAN.md#application-architecture) | You change a ViewModel, a repository pattern or a migration |
 | [Products](plan/products-screen.md), [Raw Materials](plan/raw-materials-screen.md), [Sub-Assemblies](plan/sub-assemblies-screen.md) | You change one of the three main screens: each one's design notes |
 | [Reactive Costing Cascade](../PLAN.md#reactive-costing-cascade) | You change any cost |
 | [Development Environment](../PLAN.md#development-environment) | You set up a machine, or change the tests' infrastructure |
@@ -1461,7 +1580,10 @@ Each tool takes a product or material by its name, or by a part of it that names
 - PostgreSQL: <https://www.postgresql.org/docs/18/> (`pg_dump` and `pg_restore` under "Client Applications")
 - Dapper: <https://github.com/DapperLib/Dapper>
 - FluentValidation: <https://docs.fluentvalidation.net/>
-- Syncfusion WPF: <https://help.syncfusion.com/wpf/welcome-to-syncfusion-essential-wpf>
+- Syncfusion Blazor: <https://blazor.syncfusion.com/documentation/introduction>
+- .NET MAUI Blazor Hybrid: <https://learn.microsoft.com/aspnet/core/blazor/hybrid/>
+- bUnit: <https://bunit.dev/>
+- Playwright (`connectOverCDP`): <https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp>
 - TUnit: <https://tunit.dev/>
 - Respawn: <https://github.com/jbogard/Respawn>
 - Serilog: <https://serilog.net/>

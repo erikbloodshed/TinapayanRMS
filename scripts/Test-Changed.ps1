@@ -5,9 +5,9 @@
 
 .DESCRIPTION
     Takes the files changed since -Since (HEAD by default: what isn't committed yet, new files included), and runs every
-    test project that references, directly or through others, a project one of them is in. A change to the WPF UI runs
-    UI.Tests alone; one to Domain or ApplicationCore runs them all. A file another project links in (the UI's
-    appsettings.json) counts for that project too.
+    test project that references, directly or through others, a project one of them is in. A change to the screens runs
+    Components.Tests alone; one to Domain or ApplicationCore runs them all. A file another project links in (the MAUI
+    app's appsettings.json) counts for that project too.
 
     A build setting (Directory.Build.props, Directory.Packages.props, global.json, .editorconfig, the solution) runs them
     all, and so does any other file outside a project, to be safe. Docs, scripts\ and .claude\ run nothing: no test reads

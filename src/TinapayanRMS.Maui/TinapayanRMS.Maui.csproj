@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
-  <!-- The .NET MAUI Blazor Hybrid app: a window that draws the screens (TinapayanRMS.Components) in its WebView2, beside
-       the WPF app (TinapayanRMS.UI) until it replaces it. Windows only. Ported from the TinapayanRMS_Web repo's on
-       2026-11-07, without its shop accounts or its Mac target. -->
+  <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2.
+       Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target,
+       and the WPF app it ran beside was dropped. -->
   <PropertyGroup>
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <OutputType>Exe</OutputType>
@@ -30,8 +30,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The database to use, the WPF app's own file, built into the app (MauiProgram reads it). -->
-    <EmbeddedResource Include="..\TinapayanRMS.UI\appsettings.json" Link="appsettings.json" LogicalName="appsettings.json" />
+    <!-- The database to use, built into the app (MauiProgram reads it). The two servers and the test fixtures link it too. -->
+    <EmbeddedResource Include="appsettings.json" LogicalName="appsettings.json" />
+    <None Remove="appsettings.json" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,7 +48,7 @@
   </ItemGroup>
 
   <!-- The Syncfusion licence key, taken from the SYNCFUSION_LICENSE_KEY environment variable when the app is built, so
-       the installed app doesn't need the variable, as the WPF app's is. MauiProgram reads it back by its key. -->
+       the installed app doesn't need the variable, as the WPF app's was. MauiProgram reads it back by its key. -->
   <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
     <AssemblyMetadata Include="SyncfusionLicenseKey" Value="$(SYNCFUSION_LICENSE_KEY)" />
   </ItemGroup>
