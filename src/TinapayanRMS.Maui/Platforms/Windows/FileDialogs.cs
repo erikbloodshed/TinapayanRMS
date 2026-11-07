@@ -1,11 +1,12 @@
+using System.Diagnostics;
 using Windows.Storage.Pickers;
 using TinapayanRMS.Components.Shared;
 
 namespace TinapayanRMS.Maui.WinUI;
 
 /// <summary>
-/// Windows' own Save, Open and folder dialogs, over the app's window. An unpackaged app has to give each its window's
-/// handle before showing it.
+/// Windows' own Save, Open and folder dialogs, over the app's window, and File Explorer. An unpackaged app has to give
+/// each dialog its window's handle before showing it.
 /// </summary>
 public sealed class FileDialogs : IFileDialogs
 {
@@ -36,6 +37,10 @@ public sealed class FileDialogs : IFileDialogs
         OverWindow(picker);
         return (await picker.PickSingleFolderAsync())?.Path;
     }
+
+    /// <summary>As the WPF app's Open Folder did: Explorer, which takes a quoted path as the folder to open.</summary>
+    public void ShowFolder(string folder) =>
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true })?.Dispose();
 
     private static void OverWindow(object picker)
     {

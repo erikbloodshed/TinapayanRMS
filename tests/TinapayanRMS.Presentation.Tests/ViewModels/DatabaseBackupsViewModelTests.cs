@@ -11,6 +11,7 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -67,7 +68,27 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     });
 
     [Test]
-    public Task Copy_to_puts_the_picked_backup_where_the_user_chose() => UiThread.RunAsync(async () =>
+    public Task Open_Folder_shows_the_backups_folder_made_before_any_backup_has() => UiThread.RunAsync(async () =>
+    {
+        var viewModel = CreateViewModel();
+        string? shown = null;
+        var existed = false;
+        viewModel.ShowFolder.RegisterHandler(interaction =>
+        {
+            shown = interaction.Input;
+            existed = Directory.Exists(interaction.Input);
+            interaction.SetOutput(RxVoid.Default);
+        });
+
+        await viewModel.OpenFolderCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        shown.Should().Be(_folder);
+        existed.Should().BeTrue("File Explorer opens somewhere else on a folder that isn't there");
+    });
+
+    [Test]
+    public Task Copy_to_puts_the_picked_backup_where_the_user_chose() =>UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
         await viewModel.BackUpNowCommand.Execute();

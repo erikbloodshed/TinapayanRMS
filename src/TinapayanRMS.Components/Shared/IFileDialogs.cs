@@ -2,8 +2,8 @@ namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
 /// The computer's own file dialogs, in place of the web app's downloads and uploads: the WPF app's Save, Open and folder
-/// dialogs, which the ViewModels' interactions were written for. Each answers with a path, or null when cancelled. The
-/// MAUI app gives each platform's (Platforms/Windows, Platforms/MacCatalyst).
+/// dialogs, which the ViewModels' interactions were written for, and File Explorer. Each dialog answers with a path, or
+/// null when cancelled. The MAUI app gives Windows' (Platforms/Windows).
 /// </summary>
 public interface IFileDialogs
 {
@@ -15,6 +15,9 @@ public interface IFileDialogs
     Task<string?> ChooseFileToOpenAsync(string extension, string kind);
 
     Task<string?> ChooseFolderAsync();
+
+    /// <summary>Opens <paramref name="folder"/>, which exists, in a File Explorer window of its own, and returns at once.</summary>
+    void ShowFolder(string folder);
 }
 
 public static class FileDialogsExtensions

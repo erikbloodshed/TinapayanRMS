@@ -52,6 +52,7 @@ The user's request: "port that .net maui blazor hybrid ui here giving the simila
 
 - **The app keeps its own view state**: `%LocalAppData%\TinapayanRMS\Maui\view-state.json`, beside the WPF app's `view-state.json`, which `main` and an installed WPF copy still write. Each app reads its file once and writes it whole (`JsonViewStateStore`), so two sharing one would write over each other's changes. The first time it runs for a Windows user it starts as a copy of the WPF app's (`ViewStateSeed`), so it opens with the lists' folders as they were left, the Vim keys as they were set, and the backups' second folder; from then on each keeps its own.
 - **The backups are the WPF app's folder** (`DatabaseBackups.DefaultFolder`, in ProgramData), since it's the same database, so either app lists, restores and takes the same backups. Each takes the day's automatic backup only when the folder has none for the day, so with both open the day still gets one.
+- **Settings → Database's Open Folder is the WPF tab's**, which the web app, whose folder was the user's own, had left out: File Explorer on the backups folder (`IFileDialogs.ShowFolder`, `explorer.exe` as the WPF app started it). The folder is made first if no backup has made it yet, as a backup makes it (`IDatabaseBackups.EnsureFolder`), so it has the entry that lets every Windows user in.
 - **Its log** is `%LocalAppData%\TinapayanRMS\Maui\logs\tinapayanrms-<date>.log`. It holds warnings and errors, and nothing at Information on a start that goes well.
 
 ## How it's built
@@ -95,7 +96,6 @@ bUnit has no web view, so focus, typing, drag and drop, printing, the dialogs, t
 
 - **An install script**, as the web repo's `Install-TinapayanRMS.ps1` (an unpackaged publish with the Windows App SDK beside it, and shortcuts), and with it, at the shop, the WPF copy installed from `main` taken off. The app is run from source until then.
 - **Settings is a tab**, where the WPF app has a dialog. Kept from the web app, whose user asked for it.
-- **Settings → Database has no Open Folder**, which the WPF tab had (it showed the backups folder in File Explorer): the web app, whose folder was the user's own, left it out. The user manual says to open the folder in File Explorer. Adding it back would be a member of `IFileDialogs` that starts `explorer.exe` on the folder.
 - **Later changes to the web repo's screens** are ported by hand, as these were.
 - **The screen notes** (`products-screen.md`, `raw-materials-screen.md`, `sub-assemblies-screen.md`) still name the WPF controls their parts were first built with, under a preface saying what each means now; rewrite them in the Blazor components' terms as those parts change.
 - **`main`** still has the WPF app; merging this branch drops it there too.

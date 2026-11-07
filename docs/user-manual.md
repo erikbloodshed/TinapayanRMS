@@ -360,7 +360,7 @@ The setting is kept for you on this computer, not in the bakeshop's data. Turnin
 
 Backups of all of the app's data: every raw material, price, sub-assembly, product and setting.
 
-- **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. Open it in File Explorer to see the files. Everyone who uses the app on this computer shares the folder.
+- **Folder** shows where the backups are kept, *C:\ProgramData\TinapayanRMS\Backups*. **Open Folder** shows it in File Explorer. Everyone who uses the app on this computer shares the folder.
 - The list shows every backup, newest first: when it was **Taken**, its **Kind** and its **Size (MB)**.
   - **Manual**: taken with **Back Up Now**.
   - **Automatic**: the app takes one by itself each day, while it's open: when it starts, and if it's left open overnight, within the hour after midnight. The newest 14 are kept, and older automatic ones are deleted.

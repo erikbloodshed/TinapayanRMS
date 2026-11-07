@@ -6,16 +6,17 @@
 
 <SettingsTabs />
 
-@* The WPF Database tab, with the computer's own dialogs: Copy To… saves the picked backup where the Save dialog says,
-   and Restore from File… opens one, which the ViewModel copies into the backups folder and restores. Also Copy To is a
-   folder each automatic backup is copied to as well (a USB stick left in, or a synced cloud folder). What went wrong
-   with the last automatic backup, or its copy, shows in amber. *@
+@* The WPF Database tab, with the computer's own dialogs: Open Folder shows the backups folder in File Explorer, Copy
+   To… saves the picked backup where the Save dialog says, and Restore from File… opens one, which the ViewModel copies
+   into the backups folder and restores. Also Copy To is a folder each automatic backup is copied to as well (a USB stick
+   left in, or a synced cloud folder). What went wrong with the last automatic backup, or its copy, shows in amber. *@
 <section class="card list-card">
     <h2 class="section-header">Database Backups</h2>
     <p class="caption">Copies of all of the app's data. One is taken automatically each day: as the app starts, and within the hour after midnight while it runs. The newest 14 of those are kept. Set Also Copy To, or copy one to a USB stick now and then, so a broken computer doesn't take every copy with it.</p>
 
     <FormRow Label="Folder">
         <span class="read-only-text" title="@ViewModel!.Folder">@ViewModel!.Folder</span>
+        <CommandButton Command="ViewModel!.OpenFolderCommand" Glyph="@Glyphs.Folder" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
     </FormRow>
     @if (ViewModel!.BackupProblemText is { } backupProblem)
     {
@@ -66,7 +67,13 @@
     {
         base.OnInitialized();
 
-        // Copy To…, Restore from File… and Also Copy To's Choose…: the computer's Save, Open and folder dialogs.
+        // Copy To…, Restore from File… and Also Copy To's Choose…: the computer's Save, Open and folder dialogs. Open
+        // Folder: File Explorer.
+        AddSubscription(ViewModel!.ShowFolder.RegisterHandler(interaction =>
+        {
+            Dialogs.ShowFolder(interaction.Input);
+            interaction.SetOutput(RxVoid.Default);
+        }));
         AddSubscription(ViewModel!.ChooseCopyDestination.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseSaveFileAsync(interaction.Input, BackupKind))));
         AddSubscription(ViewModel!.ChooseBackupFile.RegisterHandler(async interaction =>

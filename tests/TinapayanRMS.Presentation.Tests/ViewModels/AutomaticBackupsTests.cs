@@ -220,6 +220,8 @@ public sealed class AutomaticBackupsTests : IDisposable
 
         public string Folder => folder;
 
+        public void EnsureFolder() => throw new NotSupportedException();
+
         public IReadOnlyList<DatabaseBackup> List() => [];
 
         public Task<DatabaseBackup?> NewestAsync(CancellationToken cancellationToken) => Task.FromResult(Newest);

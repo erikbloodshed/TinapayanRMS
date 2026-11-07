@@ -57,12 +57,28 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
     {
         await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
 
-        var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
-        new DirectoryInfo(_folder).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>()
-            .Should().Contain(rule => rule.IdentityReference == users
-                && rule.AccessControlType == AccessControlType.Allow
-                && (rule.FileSystemRights & FileSystemRights.Modify) == FileSystemRights.Modify);
+        FolderRules().Should().Contain(rule => AllowsUsersToModify(rule));
     }
+
+    [Test]
+    [SupportedOSPlatform("windows")]
+    public void The_folder_made_before_any_backup_is_one_every_windows_user_can_use()
+    {
+        _backups.EnsureFolder();
+
+        FolderRules().Should().Contain(rule => AllowsUsersToModify(rule));
+        _backups.List().Should().BeEmpty("making the folder takes no backup");
+    }
+
+    [SupportedOSPlatform("windows")]
+    private IEnumerable<FileSystemAccessRule> FolderRules() =>
+        new DirectoryInfo(_folder).GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier)).OfType<FileSystemAccessRule>();
+
+    [SupportedOSPlatform("windows")]
+    private static bool AllowsUsersToModify(FileSystemAccessRule rule) =>
+        rule.IdentityReference == new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null)
+        && rule.AccessControlType == AccessControlType.Allow
+        && (rule.FileSystemRights & FileSystemRights.Modify) == FileSystemRights.Modify;
 
     [Test]
     public async Task A_backup_is_written_to_the_folder_and_listed()

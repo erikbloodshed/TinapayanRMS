@@ -28,8 +28,8 @@ public sealed class DatabaseBackupRow(DatabaseBackup backup)
 }
 
 /// <summary>
-/// The Settings dialog's Database tab: the backups in the backups folder, newest first, and what can be done
-/// with them. Back Up Now takes one; Copy to… puts one elsewhere, such as a USB stick; Restore and Restore from File…
+/// Settings' Database tab: the backups in the backups folder, newest first, and what can be done with them. Open Folder
+/// shows the folder in File Explorer; Back Up Now takes one; Copy to… puts one elsewhere, such as a USB stick; Restore and Restore from File…
 /// put one back over the database, after a confirmation, and restart the app, whose screens all hold what was there before.
 /// </summary>
 public sealed class DatabaseBackupsViewModel : ViewModelBase
@@ -48,6 +48,12 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
 
     /// <summary>Where the backups are kept, shown so they can be found in File Explorer.</summary>
     public string Folder => _backups.Folder;
+
+    /// <summary>Input: the backups folder, to show. The View opens it in File Explorer.</summary>
+    public Interaction<string, RxVoid> ShowFolder { get; } = new();
+
+    /// <summary>Shows the backups folder in File Explorer, making it first if no backup has yet.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> OpenFolderCommand { get; }
 
     private string? _busyText;
     /// <summary>What's being done while a backup, copy or restore runs, which can take a while; null otherwise.</summary>
@@ -102,7 +108,13 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
         _restartApp = restartApp;
         _automatic = automatic;
 
-        ChooseCopyFolderCommand = ReactiveCommand.CreateFromTask(
+        OpenFolderCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        {
+            _backups.EnsureFolder();
+            await ShowFolder.Handle(Folder);
+        }));
+
+        ChooseCopyFolderCommand =ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(async () =>
             {
                 var folder = await ChooseCopyFolder.Handle(RxVoid.Default);

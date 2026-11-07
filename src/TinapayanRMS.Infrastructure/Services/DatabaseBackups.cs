@@ -92,7 +92,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     public async Task<DatabaseBackup> CopyInAsync(string sourcePath, CancellationToken cancellationToken)
     {
         var target = await TargetAsync(cancellationToken);
-        PrepareFolder();
+        EnsureFolder();
         var path = FreePath(target.Database, BackupKind.CopiedIn, DateTime.Now);
         await CopyAsync(sourcePath, path, cancellationToken);
         return Describe(new FileInfo(path));
@@ -149,7 +149,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
             File.Exists(Path.Combine(folder, name)) || File.Exists(Path.Combine(folder, name + BackupRules.PartialSuffix))));
 
     /// <summary>Creates the folder if it's missing, open to every Windows user of the computer (BackupFolder).</summary>
-    private void PrepareFolder()
+    public void EnsureFolder()
     {
         if (OperatingSystem.IsWindows())
         {
@@ -175,7 +175,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// </summary>
     private async Task<DatabaseBackup> BackUpInTurnAsync(Target target, BackupKind kind, DateTime takenAt, CancellationToken cancellationToken)
     {
-        PrepareFolder();
+        EnsureFolder();
         var path = FreePath(target.Database, kind, takenAt);
         var partial = path + BackupRules.PartialSuffix;
         try

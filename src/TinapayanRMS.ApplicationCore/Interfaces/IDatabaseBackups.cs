@@ -10,6 +10,12 @@ public interface IDatabaseBackups
     /// <summary>Where the backups are kept.</summary>
     string Folder { get; }
 
+    /// <summary>
+    /// Makes <see cref="Folder"/> if it's missing, as taking a backup does, so it can be shown before any backup has made
+    /// it: made by the app, it's open to every Windows user of the computer.
+    /// </summary>
+    void EnsureFolder();
+
     /// <summary>Every backup in <see cref="Folder"/>, newest first; none while the folder doesn't exist yet.</summary>
     IReadOnlyList<DatabaseBackup> List();
 
