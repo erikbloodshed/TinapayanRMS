@@ -11,10 +11,10 @@
     </div>
 
     <div class="list-toolbar">
-        <ActionButton Glyph="@Glyphs.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.NewSubAssemblyInCommand, null)" />
-        <CommandButton Command="ViewModel.NewRoleCommand" Glyph="@Glyphs.NewFolder" Tooltip="New Role…" Flat="true" />
-        <CommandButton Command="ViewModel.ExpandAllCommand" Glyph="@Glyphs.ExpandAll" Tooltip="Expand All" Flat="true" />
-        <CommandButton Command="ViewModel.CollapseAllCommand" Glyph="@Glyphs.CollapseAll" Tooltip="Collapse All" Flat="true" />
+        <ActionButton Icon="AppIcon.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.NewSubAssemblyInCommand, null)" />
+        <CommandButton Command="ViewModel.NewRoleCommand" Icon="AppIcon.NewFolder" Tooltip="New Role…" Flat="true" />
+        <CommandButton Command="ViewModel.ExpandAllCommand" Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" />
+        <CommandButton Command="ViewModel.CollapseAllCommand" Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" />
     </div>
 
     <FolderTree TNode="SubAssemblyTreeNode"
@@ -33,7 +33,7 @@
         <RowTemplate Context="node">
             @if (node.IsFolder)
             {
-                <span class="glyph tree-glyph" aria-hidden="true">@node.Glyph</span>
+                <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
             <span class="tree-title">@node.Title</span>
             @if (node.IsFolder)

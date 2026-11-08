@@ -26,9 +26,9 @@
                         <div class="report-heading">
                             <h2 class="section-header">Product Cost Summary</h2>
                             <div class="button-row">
-                                <CommandButton Command="ViewModel!.ExportProductCostsCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                                <CommandButton Command="ViewModel!.ExportProductCostsCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown: in its order, with its filters, and with only the columns showing." />
-                                <ActionButton Glyph="@Glyphs.Columns" Label="Columns" Tooltip="Choose which columns show. Product always does." OnClick="OpenColumnChooserAsync" />
+                                <ActionButton Icon="AppIcon.Columns" Label="Columns" Tooltip="Choose which columns show. Product always does." OnClick="OpenColumnChooserAsync" />
                             </div>
                         </div>
                         <p class="caption">Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost, and Short By how far it falls short of the Target Markup %. Filter by product, stage or category from the funnel in its heading, and double-click a product to open it.</p>
@@ -70,7 +70,7 @@
                     <div class="report">
                         <div class="report-heading">
                             <h2 class="section-header">Raw Materials Price Summary</h2>
-                            <CommandButton Command="ViewModel!.ExportRawMaterialPricesCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                            <CommandButton Command="ViewModel!.ExportRawMaterialPricesCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                            Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                         </div>
                         <p class="caption">Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it. Double-click a material to open it.</p>
@@ -103,9 +103,9 @@
                             <h2 class="section-header">Cost Buffers</h2>
                             <div class="button-row">
                                 <SfCheckBox Label="Only below target" @bind-Checked="ViewModel!.OnlyBelowTarget" />
-                                <CommandButton Command="ViewModel!.ReapplyTargetBuffersCommand" Glyph="@Glyphs.Apply" Label="Re-apply Target Buffer"
+                                <CommandButton Command="ViewModel!.ReapplyTargetBuffersCommand" Icon="AppIcon.Apply" Label="Re-apply Target Buffer"
                                                Tooltip="Puts the target buffer back on top of the brand each one is costed at (its Cost From brand, else the dearest) for the materials picked, or for every one shown below target. Asks first." />
-                                <CommandButton Command="ViewModel!.ExportCostBuffersCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                                <CommandButton Command="ViewModel!.ExportCostBuffersCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                             </div>
                         </div>
@@ -140,7 +140,7 @@
                     <div class="report">
                         <div class="report-heading">
                             <h2 class="section-header">Cost Drivers</h2>
-                            <CommandButton Command="ViewModel!.ExportCostDriversCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                            <CommandButton Command="ViewModel!.ExportCostDriversCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                            Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                         </div>
                         <p class="caption">The purchased materials that make up most of the products in Production's material cost, one sellable unit of each, at buffered costs: a material is counted however it gets into a product, through a made or linked ingredient too. Cumulative % adds each row to those above it, so the top few that make up most of the cost show where a price rise would hurt. Double-click a material to open it.</p>
@@ -177,7 +177,7 @@
                                 <SfDatePicker ID="margin-erosion-since" TValue="DateTime" Value="ViewModel!.MarginErosionSince" ValueChanged="d => ViewModel!.MarginErosionSince = d"
                                               Format="MMM d, yyyy" Width="150px" ShowClearButton="false" />
                                 <SfCheckBox Label="Only dropped" @bind-Checked="ViewModel!.OnlyDropped" />
-                                <CommandButton Command="ViewModel!.ExportMarginErosionCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                                <CommandButton Command="ViewModel!.ExportMarginErosionCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                             </div>
                         </div>

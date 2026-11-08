@@ -7,8 +7,8 @@
 {
     <div class="move-notice" @onmouseenter="() => _hovered = true" @onmouseleave="() => _hovered = false">
         <span class="move-notice-text">@Notice</span>
-        <CommandButton Command="UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" />
-        <CommandButton Command="DismissCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Close" />
+        <CommandButton Command="UndoCommand" Icon="AppIcon.Undo" Label="Undo" />
+        <CommandButton Command="DismissCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Close" />
     </div>
 }
 

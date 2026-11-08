@@ -68,7 +68,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             : dbContextFactory.QueryAsync<int>(
                 // The app refuses a loop of packaging links (PackagingLinkRules), but one left by an edit outside it would run
                 // until the command timed out, and a save waits on this, so chain stops where a product comes round again
-                // (CYCLE, as RawMaterialRepository.UsedBySql does).
+                // (CYCLE, as RawMaterialRepository.ConsumersSql does).
                 """
                 WITH RECURSIVE seeds AS (
                     SELECT unnest(@productIds) AS product_id

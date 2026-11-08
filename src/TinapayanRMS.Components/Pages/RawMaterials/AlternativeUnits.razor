@@ -22,7 +22,7 @@
             </Row>
         </LineGrid>
         <div class="button-row align-right form-extra">
-            <CommandButton Command="ViewModel.DeleteUnitCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove" />
+            <CommandButton Command="ViewModel.DeleteUnitCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
         </div>
     </div>
 
@@ -39,7 +39,7 @@
                 {
                     <div class="conversion">
                         <span class="conversion-unit">1 @row.UnitName</span>
-                        <span class="glyph conversion-arrow" aria-hidden="true">&#xE72A;</span>
+                        <Icon Of="AppIcon.ConvertsTo" CssClass="conversion-arrow" />
                         <span class="conversion-base">@row.BaseEquivalentText</span>
                     </div>
                 }

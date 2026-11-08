@@ -34,40 +34,6 @@ public class ProductTreeTests
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);
 
     [Test]
-    [Arguments("Breads", ProductIcon.Breads)]
-    [Arguments("Loaves", ProductIcon.Loaves)]
-    [Arguments("Cakes", ProductIcon.Cakes)]
-    [Arguments("Pastries", ProductIcon.Pastries)]
-    [Arguments(" pastries ", ProductIcon.Pastries)]
-    [Arguments("Rolls", ProductIcon.Rolls)]
-    [Arguments("Cookies", ProductIcon.None)]
-    public void A_products_icon_is_its_categorys(string category, ProductIcon kind) =>
-        new ProductLeafNode(ProductOf(1, "Pandesal", ProductStage.Production, new ProductCategory { Id = 9, Name = category }))
-            .IconKind.Should().Be(kind);
-
-    [Test]
-    public void A_composite_has_its_own_icon_whatever_its_category_one_without_a_category_has_none_and_a_folder_never_does()
-    {
-        var composite = ProductOf(1, "Pasalubong Box", ProductStage.Production, Breads);
-        composite.IsComposite = true;
-        var uncategorized = new ProductLeafNode(ProductOf(2, "Pandesal", ProductStage.Production, null));
-
-        new ProductLeafNode(composite).IconKind.Should().Be(ProductIcon.Composite);
-        uncategorized.IconKind.Should().Be(ProductIcon.None);
-        ProductFolderNode.ForStage(ProductStage.Production).IconKind.Should().Be(ProductIcon.None);
-
-        // A refresh with the product recategorized keeps its row, which takes its new category's picture.
-        var tree = new ProductTree();
-        tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, null)], isFiltered: false);
-        var leaf = Folder(tree, ProductStage.Production, ProductRules.UncategorizedTitle).Children.OfType<ProductLeafNode>().Single();
-
-        tree.Refresh([Cakes], [ProductOf(2, "Pandesal", ProductStage.Production, Cakes)], isFiltered: false);
-
-        Folder(tree, ProductStage.Production, "Cakes").Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
-        leaf.IconKind.Should().Be(ProductIcon.Cakes);
-    }
-
-    [Test]
     public void The_stages_are_the_top_level_folders_Production_first_then_Deleted()
     {
         var tree = new ProductTree();
@@ -93,7 +59,7 @@ public class ProductTreeTests
 
         TitlesIn(tree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
         tree.DeletedFolder.ProductCount.Should().Be(2);
-        tree.DeletedFolder.Glyph.Should().Be("\ue74d", "the bin, open or not");
+        tree.DeletedFolder.Icon.Should().Be(AppIcon.Delete, "the bin, open or not");
         TitlesIn(Folder(tree, ProductStage.Production, "Cakes")).Should().BeEmpty();
         Root(tree, ProductStage.Production).ProductCount.Should().Be(1, "a stage counts only its own");
         tree.Find(2)!.IsDeleted.Should().BeTrue();
@@ -204,30 +170,28 @@ public class ProductTreeTests
     }
 
     [Test]
-    public void A_folder_shows_the_open_folder_glyph_only_while_it_is_open_on_its_rows()
+    public void A_folder_shows_the_open_folder_icon_only_while_it_is_open_on_its_rows()
     {
-        const string folderGlyph = "";
-        const string openFolderGlyph = "";
         var tree = new ProductTree();
         tree.Refresh([Breads, Cakes], [ProductOf(1, "Pandesal", ProductStage.Production, Breads)], isFiltered: false);
         tree.CollapseAll(null);
         var breads = Folder(tree, ProductStage.Production, "Breads");
-        var glyphChanges = 0;
-        breads.PropertyChanged += (_, e) => glyphChanges += e.PropertyName == nameof(ProductFolderNode.Glyph) ? 1 : 0;
+        var iconChanges = 0;
+        breads.PropertyChanged += (_, e) => iconChanges += e.PropertyName == nameof(ProductFolderNode.Icon) ? 1 : 0;
 
-        breads.Glyph.Should().Be(folderGlyph);
+        breads.Icon.Should().Be(AppIcon.Folder);
         breads.IsExpanded = true;
-        breads.Glyph.Should().Be(openFolderGlyph);
-        glyphChanges.Should().BeGreaterThan(0, "the row's icon follows it");
+        breads.Icon.Should().Be(AppIcon.FolderOpen);
+        iconChanges.Should().BeGreaterThan(0, "the row's icon follows it");
 
         breads.IsExpanded = false;
-        breads.Glyph.Should().Be(folderGlyph);
+        breads.Icon.Should().Be(AppIcon.Folder);
 
         var cakes = Folder(tree, ProductStage.Production, "Cakes");
         cakes.IsExpanded = true;
-        cakes.Glyph.Should().Be(folderGlyph, "an empty folder has nothing to show open");
+        cakes.Icon.Should().Be(AppIcon.Folder, "an empty folder has nothing to show open");
         tree.Refresh([Breads, Cakes], [ProductOf(1, "Pandesal", ProductStage.Production, Cakes)], isFiltered: false);
-        cakes.Glyph.Should().Be(openFolderGlyph, "a product moved in fills it");
+        cakes.Icon.Should().Be(AppIcon.FolderOpen, "a product moved in fills it");
     }
 
     [Test]

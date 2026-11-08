@@ -49,11 +49,11 @@
                             <ContentTemplate><UsageExample ViewModel="ViewModel!" /></ContentTemplate>
                         </TabItem>
                         <TabItem>
-                            <ChildContent><TabHeader Text="Used By" /></ChildContent>
+                            <ChildContent><TabHeader Text="Consumer" /></ChildContent>
                             <ContentTemplate>
                                 <div class="tab-card">
-                                    <h2 class="section-header">Used By</h2>
-                                    <UsedByTiles Products="ViewModel!.UsedBy" Caption="@ViewModel!.UsedByText" Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" />
+                                    <h2 class="section-header">Consumer</h2>
+                                    <ConsumerTiles Products="ViewModel!.Consumers" Caption="@ViewModel!.ConsumersText" Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" />
                                 </div>
                             </ContentTemplate>
                         </TabItem>

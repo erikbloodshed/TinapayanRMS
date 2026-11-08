@@ -19,18 +19,18 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
             dbContext => RawMaterialReads.GetWithDetailsAsync(dbContext, "WHERE m.id = @id", new { id }, cancellationToken), cancellationToken))
         .SingleOrDefault();
 
-    public async Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken) =>
+    public async Task<IReadOnlyList<LinkingProduct>> GetConsumersAsync(int id, CancellationToken cancellationToken) =>
         [
-            .. (await dbContextFactory.QueryAsync<UsedByRow>(UsedBySql, new { id }, cancellationToken))
+            .. (await dbContextFactory.QueryAsync<ConsumerRow>(ConsumersSql, new { id }, cancellationToken))
                 .Select(p => new LinkingProduct(p.Id, ProductRules.ListedName(p.Name, p.DeletedAt is not null), p.CategoryName, p.IsComposite))
                 .OrderBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase),
         ];
 
-    /// <summary>A product GetUsedByAsync finds. One in the Deleted folder still holds the material, and is named as deleted.</summary>
-    private sealed record UsedByRow(int Id, string Name, string? CategoryName, DateTime? DeletedAt, bool IsComposite);
+    /// <summary>A product GetConsumersAsync finds. One in the Deleted folder still holds the material, and is named as deleted.</summary>
+    private sealed record ConsumerRow(int Id, string Name, string? CategoryName, DateTime? DeletedAt, bool IsComposite);
 
     /// <summary>
-    /// GetUsedByAsync's products. feeds is the material and every ingredient whose cost it feeds: a made one with it in its
+    /// GetConsumersAsync's products. feeds is the material and every ingredient whose cost it feeds: a made one with it in its
     /// BOM (a line of the sub-assembly it's made from, or one of its add-ins: IngredientBoms), a linked one cut from it, and on up (both kinds are rejected when they'd close a loop). PostgreSQL lets a
     /// recursive query name itself only once in its recursive part, so feeds follows both kinds of link through one union
     /// of them. A recipe takes an
@@ -46,7 +46,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// of times too high, and that made this read about 20 ms slower. packaging_users can't meet a loop: it climbs from
     /// products that link no other product, and a product links one at most, so one in a loop links only inside it.
     /// </summary>
-    private const string UsedBySql = """
+    private const string ConsumersSql = """
         WITH RECURSIVE feeds AS (
             SELECT @id AS id
             UNION ALL

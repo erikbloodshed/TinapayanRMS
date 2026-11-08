@@ -123,7 +123,7 @@ You'll be productive sooner if you're comfortable with the following.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Windows | 10 or 11 | The app only runs on Windows. Icons use Segoe Fluent Icons (Windows 11), and fall back to Segoe MDL2 Assets on Windows 10. |
+| Windows | 10 or 11 | The app only runs on Windows. |
 | The web view | WebView2 (the Evergreen runtime, which Windows 10 and 11 have) | The app's window draws its screens in it. |
 | .NET MAUI workload | `maui-windows` 11.0.0-rc.2 (`MauiPackagesVersion` in [Directory.Packages.props](../Directory.Packages.props)) | From an administrator terminal, since the SDK is in Program Files: `dotnet workload install maui-windows --skip-manifest-update`; `dotnet workload list` shows it. A build that asks for `maui-tizen` (NETSDK1147) is missing it. |
 | .NET SDK | 11.0.100-rc.3.26522.148 (a preview), or a later 11.0 feature band | Pinned in [global.json](../global.json) with `allowPrerelease` and `rollForward: latestFeature`. |
@@ -278,7 +278,6 @@ Every folder in a project is a sub-namespace: `src/TinapayanRMS.Presentation/Vie
 | Part of a printout | `Components/Printing/` | — |
 | Part of the Vim keys | `Components/Vim/`, and `Maui/wwwroot/vim.js` | `Components.Tests/Vim/` |
 | A style | The screen family's stylesheet in `Maui/wwwroot/css/`, or `Maui/wwwroot/app.css` | — |
-| Icon image file | `Maui/wwwroot/icons/` | — |
 
 A file can hold a few small, closely related types, such as a tree's rows in `ProductTree.cs`. The screen ViewModels hold only their screen: the row and edit types a screen uses have files of their own beside it, such as `ProductUsageEdit.cs` and `PackagingLineRow.cs` for Products.
 
@@ -562,7 +561,7 @@ PER PRODUCT
 A product is deleted in two steps, so a delete can be taken back. `IProductRepository.DeleteAsync` stamps `Product.DeletedAt` and changes nothing else, which moves the product to the Products list's **Deleted** folder. `RestoreAsync` clears it. `DeletePermanentlyAsync` is the hard delete, with its cascades.
 
 - **Reads leave deleted products out by default.** `GetAllAsync` returns the products in use, and `GetDeletedAsync` returns the deleted ones. `GetByIdAsync` and `GetByIdsAsync` return either, since a holder reads what it holds by id. Every screen except Products reads through `GetAllAsync`, so a deleted product is in no list, picker, report, print, the Price Simulator or plan. There's no global query filter: one would also drop the rows of the "in use" checks below.
-- **A deleted product still holds what it uses.** Its usages, packaging lines, links and composite lines stay, so a restore brings it back whole. The `Restrict` keys keep refusing deletes of what it uses. The checks that name products (`SubAssemblyRepository`'s Used By and refusals, `RawMaterialRepository.GetUsedByAsync`, a composite's role refusals) name it "Cheese Roll (deleted)", through `ProductRules.ListedName`.
+- **A deleted product still holds what it uses.** Its usages, packaging lines, links and composite lines stay, so a restore brings it back whole. The `Restrict` keys keep refusing deletes of what it uses. The checks that name products (`SubAssemblyRepository`'s Consumer and refusals, `RawMaterialRepository.GetConsumersAsync`, a composite's role refusals) name it "Cheese Roll (deleted)", through `ProductRules.ListedName`.
 - **The checks on what leans on a product run for both deletes.** Neither a soft nor a hard delete goes through while another product, deleted or not, links its packaging or holds it in a composite (`ProductRepository.EnsureNothingLeansOnAsync`). Nothing in use ever leans on a deleted product, so a restore never needs a check.
 - **A deleted product can't be newly linked or held.** `PackagingLinkRepository` and `ProductComponentRepository.SetComponentsAsync` refuse it by name. Its name stays taken: Add, Update and Rename refuse it first (`ProductRules.EnsureNameNotHeldByDeleted`), so the message points to the Deleted folder instead of the unique index's "That name is already in use."
 - **On the Products screen**, `ProductsViewModel.DeletedProducts` feeds `ProductTree.DeletedFolder` and nothing else. A deleted row (`ProductLeafNode.IsDeleted`) is picked the way a folder is: the form doesn't open it. Its menu has Restore and Delete Permanently, and `ProductTree.MoveTo` refuses it as a drag source or a drop target. `OpenProduct` on a deleted id picks its row in the Deleted folder.
@@ -723,7 +722,7 @@ The rules for reads:
 - **A collection navigation, such as a material's `Units`, is a second query stitched on by id,** not a join, because Dapper's multi-mapping over several result sets is synchronous only.
 - **There's no identity resolution.** A material on two lines is two objects.
 - **Every read has an explicit `ORDER BY`.** Lines are read `ORDER BY sort_order, id`.
-- **A recursive query over links people make stops at a loop.** The app refuses a loop of made and linked ingredients, composites or packaging links, but one made outside it (a hand edit, say) would run until the command timed out. Put `CYCLE <column> SET is_cycle USING path` after the recursive CTE, as [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs)'s `UsedBySql` does, and test it with a loop put in past the repository, as `RawMaterialUsedByPersistenceTests` does. `UNION` in place of `UNION ALL` ends a loop too, but PostgreSQL sizes its hash table from the planner's row estimate, which made Used By about 20 ms slower.
+- **A recursive query over links people make stops at a loop.** The app refuses a loop of made and linked ingredients, composites or packaging links, but one made outside it (a hand edit, say) would run until the command timed out. Put `CYCLE <column> SET is_cycle USING path` after the recursive CTE, as [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs)'s `ConsumersSql` does, and test it with a loop put in past the repository, as `RawMaterialConsumersPersistenceTests` does. `UNION` in place of `UNION ALL` ends a loop too, but PostgreSQL sizes its hash table from the planner's row estimate, which made Consumer about 20 ms slower.
 - Dapper maps a `date` column to `DateOnly`, and an enum stored as a string back to the enum, on its own.
 
 Never write through Dapper. A Dapper write would skip the cost propagator and the `CostUpdatedAt` stamp, leaving stored costs stale.
@@ -867,9 +866,9 @@ A screen's page inherits [ScreenBase&lt;TViewModel&gt;](../src/TinapayanRMS.Comp
             <SfTextBox ID="unit-name" @bind-Value="ViewModel!.EditingName" />
         </FormRow>
         <div class="button-row">
-            <CommandButton Command="ViewModel!.NewCommand" Glyph="@Glyphs.Add" Label="New" />
-            <CommandButton Command="ViewModel!.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" />
-            <CommandButton Command="ViewModel!.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+            <CommandButton Command="ViewModel!.NewCommand" Icon="AppIcon.Add" Label="New" />
+            <CommandButton Command="ViewModel!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+            <CommandButton Command="ViewModel!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </section>
 </div>
@@ -998,7 +997,7 @@ The rules for ViewModels:
 - **A table an `SfGrid` draws is a [TableRows](../src/TinapayanRMS.Presentation/ViewModels/TableRows.cs) of its rows, filled with `ReplaceWith`**, which replaces every row in one change (a single Reset). The grid refreshes and draws all its rows again for each change to its list, and an `ObservableCollection`'s `Clear` and each `Add` are a change apiece: DynamicData's `AddRange` adds a row at a time, and so does `ObservableCollectionExtended`'s. Filled that way, Reports' five tables were drawn some 330 times a visit and held the window for 7 seconds of the 9 a visit took (2026-11-07). Rows that show the same as those it holds, in the same order, are no change: it keeps its own and says nothing, comparing a row class by its public scalar properties (`CollectionMerge.HasSameValues`) and a record or a value by its `Equals`, so a reload that finds nothing new doesn't draw the table again. `ReplaceWith` says whether it changed; what follows the grid's rows, such as the rows picked in it, follows that.
 - **Several reads at once** start in parallel with `Task.Run`, are awaited together with `Task.WhenAll`, and are applied in one step, back on the UI thread. Code inside `Task.Run` calls repositories only and never touches ViewModel state. (`ProductsViewModel`'s `LoadCommand` starts about a dozen reads at once this way.)
 - **Dialogs, prompts and files** are `Interaction`s that the page handles: `ConfirmDelete` and `ConfirmUnsavedChanges` (`ScreenBase` answers them, through `Confirmations`), `PromptForName` and `PromptForNewCategory` (the page answers through `Prompts`), `PromptForMadeIngredient` (Move to In-House and Make In-House Ingredient: a name and a Made category, `Prompts.AskChoiceAsync`), `ExportToExcel` (the page asks where with the Save dialog, then builds or exports the workbook there), `ChooseCopyDestination`, `ChooseBackupFile`, `ChooseCopyFolder` and `ShowFolder` (the Database page answers with the Save, Open and folder dialogs and File Explorer, `IFileDialogs`), and `ShowPrint` (the Price Simulator hands its printouts to `PrintPreviews` and navigates to the preview). Tests register handlers of their own.
-- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies, Reports and the Price Simulator), `RawMaterialOpenRequests` (from Reports, and Sub-Assemblies' Used By for a made ingredient), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` (from Products, and a made ingredient's Made from badge on Raw Materials) and `PrintRequests` (from Products). [ScreenLinks](../src/TinapayanRMS.Components/Shared/ScreenLinks.cs), one per page the window loads and started by the layout, subscribes to them and navigates to the target's address, so the ViewModels never know about each other.
+- **One screen asks another for something** through an `IObservable<T>` backed by a `Subject<T>`: `ProductOpenRequests` (from Raw Materials, Sub-Assemblies, Reports and the Price Simulator), `RawMaterialOpenRequests` (from Reports, and Sub-Assemblies' Consumer for a made ingredient), `NewProductRequests` (from Sub-Assemblies' New Product, handled by `ProductsViewModel.StartNewProductFrom`), `SubAssemblyOpenRequests` (from Products, and a made ingredient's Made from badge on Raw Materials) and `PrintRequests` (from Products). [ScreenLinks](../src/TinapayanRMS.Components/Shared/ScreenLinks.cs), one per page the window loads and started by the layout, subscribes to them and navigates to the target's address, so the ViewModels never know about each other.
 
 ### Loading and refreshing
 
@@ -1045,9 +1044,9 @@ The pages are built from the components in [Shared/](../src/TinapayanRMS.Compone
 | `ActionButton` | A button for a command with a parameter, or a page's own action | Pair it with `Commands.Run(command, parameter)`. |
 | `MenuButton` | A button that drops a short list of commands | Closes its list once one is clicked. |
 | `FormRow` | A label on the left of its field, in a stacked form | Lines the labels up. |
-| `UsedByTiles` | The products or sub-assemblies using a record | Each tile opens the record on its screen. |
+| `ConsumerTiles` | The products or sub-assemblies using a record | Each tile opens the record on its screen. |
 | `UndoKeys` | A record screen | Ctrl+Z and Ctrl+Y (see above). |
-| `Glyphs`, `ProductIcons` | Icons | The icons' code points by name (Segoe Fluent Icons', the WPF app's); a product category's picture. |
+| `Icon`, `AppIcons` | Icons | One of the app's icons (`SfIcon`); the Syncfusion icon each `AppIcon` is drawn with. |
 
 How a page runs a command:
 
@@ -1096,8 +1095,7 @@ An optional layer of Vim-style keys over the whole app, in the manner of Vimium.
 - **The theme** is Syncfusion's Fluent 2, its lite file (`_content/Syncfusion.Blazor.Themes/fluent2-lite.css`, linked in `wwwroot/index.html`): `fluent2.css` without the rules for Syncfusion's bigger, touch size (`e-bigger`), which nothing here uses, 4.3 MB rather than 5.5. The Maui project leaves the package's other themes out of the build. Then [app.css](../src/TinapayanRMS.Maui/wwwroot/app.css), which recolours it and draws the app's own cards, tiles and forms.
 - **Colours** are CSS variables at the top of `app.css`: the Catppuccin Latte palette, the Sky accent, and design tokens named for what they're for (`--page-background`, `--card-background`, `--card-border`, `--heading-foreground`, `--muted-foreground`, `--accent-soft`). Syncfusion's own variables (`--color-sf-primary` and the rest) are set from them. Styles use the tokens, never a hex colour of their own.
 - **One stylesheet per screen family**, in `wwwroot/css/`: `record-screens.css` (the three record screens and the shared components), `products.css`, `reports.css` (Reports and the Price Simulator) and `print.css`. They're linked in `wwwroot/index.html`.
-- **Icons** are characters in a `<span class="glyph">`, named in [Glyphs](../src/TinapayanRMS.Components/Shared/Glyphs.cs) and drawn in Segoe Fluent Icons (Segoe MDL2 Assets on Windows 10; `--icon-font` in `app.css`), at the WPF app's code points, so the icons are the WPF app's. The icons Syncfusion's components draw themselves (a grid's sort arrows, a picker's arrow) come from the Fluent 2 theme.
-- **Icon files**: a picture that has to be an image (the product categories' breads and cakes) goes in `wwwroot/icons/`, at 64 and 128 px, and is shown smaller.
+- **Icons** are Syncfusion's own, from the Fluent 2 theme's icon font, the same one its components draw their arrows and buttons with, so they look the same on any system. Each is named by what it stands for in [AppIcon](../src/TinapayanRMS.Presentation/ViewModels/AppIcon.cs) (Presentation, so a ViewModel can give a menu item, tree row or tab one), and [AppIcons](../src/TinapayanRMS.Components/Shared/AppIcons.cs) picks the Syncfusion icon (`IconName`) for each: change an icon there, everywhere at once. A page draws one with `<Icon Of="AppIcon.Warning" />`, which is Syncfusion's `SfIcon`, and a button takes `Icon="AppIcon.Save"`. A row drawn hundreds of times (a folder tree's) puts `AppIcons.CssOf(...)` on a span instead, which is what `SfIcon` draws, without a component per row. An icon takes the size of where it sits (`.glyph` in `app.css`), not `SfIcon`'s own; a rule that sizes one by a class of its own names `.glyph` with it (`.glyph.confirm-glyph`). `AppIconsTests` checks the theme draws every `AppIcon`, so a Syncfusion upgrade that drops one fails there. The window's Minimize, Maximize, Restore Down and Close are inline SVG in `TitleBar.razor`, as Syncfusion's icons have none.
 - **Forms**: an input's label goes on its left in a stacked form (`FormRow`). A row of fields side by side keeps each label beside its field (`header-fields`). A value that can never be typed is text, not a read-only box.
 - **Amounts** have no currency symbol, and use the decimals in [Precision and rounding](#precision-and-rounding).
 - **Keep it plain.** Use the plainest standard control and the fewest columns. Fold a derived or helper value into a figure that's already shown rather than giving it a column of its own. A real cost component, though, gets its own column, and the line's total includes it.
@@ -1503,7 +1501,7 @@ Respawn picks up the new table by itself.
 
 1. In the ViewModel, add a command that runs `ExportToExcelAsync("<title>")`. The title names the file and lets the page tell several exports apart.
 2. In the page's `OnInitialized`, after `base.OnInitialized()`, register a handler on `ViewModel.ExportToExcel` with `AddSubscription`. Ask where with `IFileDialogs.ChooseSaveFileAsync`, answering null if it's cancelled. For an `SfGrid`, set `AllowExcelExport` and write what its `ExportToExcelAsync(asMemoryStream: true, …)` returns there. Otherwise build the sheets with `ExcelWorkbook` and save them with `IFileDialogs.SaveAsync`. Answer with the path.
-3. Add an **Export to Excel** `CommandButton` with `Glyphs.Export`.
+3. Add an **Export to Excel** `CommandButton` with `Icon="AppIcon.ExportToExcel"`.
 4. Test the command with a handler of your own on `ExportToExcel`.
 
 ### Use a new Syncfusion component

@@ -20,7 +20,7 @@
                    Value="ViewModel.Scaling.HaveUnit" ValueChanged="u => ViewModel.Scaling.HaveUnit = u" Tooltip="Grams, or one of the ingredient's own units." CssClass="field-narrow" />
         @if (ViewModel.Scaling.HasHaveMakes)
         {
-            <CommandButton Command="ViewModel.Scaling.ScaleToHaveCommand" Glyph="@Glyphs.Apply" Label="@ViewModel.Scaling.ScaleToHaveLabel" Tooltip="Puts this in Sellable Units, so the table shows it." />
+            <CommandButton Command="ViewModel.Scaling.ScaleToHaveCommand" Icon="AppIcon.Apply" Label="@ViewModel.Scaling.ScaleToHaveLabel" Tooltip="Puts this in Sellable Units, so the table shows it." />
         }
         <span class="caption">@ViewModel.Scaling.HaveText</span>
     </div>

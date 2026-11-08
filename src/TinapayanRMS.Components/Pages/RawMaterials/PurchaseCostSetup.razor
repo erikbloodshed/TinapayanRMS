@@ -31,7 +31,7 @@
         <PickField ID="rm-cost-from" TItem="CostFromOption" Items="ViewModel.CostFromOptions" TextOf="o => o.Label"
                    Value="ViewModel.CostFrom" ValueChanged="o => ViewModel.CostFrom = o" CssClass="cost-from-picker"
                    Tooltip="The brand the material is costed at. Dearest brand costs it at the most it's bought for; pick a brand to cost it at that brand's price (its dearest unit, if it's priced in more than one). Save keeps it." />
-        <CommandButton Command="ViewModel.RemoveBrandPriceCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove" />
+        <CommandButton Command="ViewModel.RemoveBrandPriceCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
     </div>
 
     <div class="buffer-row">
@@ -55,7 +55,7 @@
     {
         <div class="target-buffer-row">
             <span>@ViewModel.TargetBufferText</span>
-            <CommandButton Command="ViewModel.ReapplyTargetBufferCommand" Glyph="@Glyphs.Apply" Label="Re-apply Target"
+            <CommandButton Command="ViewModel.ReapplyTargetBufferCommand" Icon="AppIcon.Apply" Label="Re-apply Target"
                            Tooltip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Cost From) with it on top. Save keeps it." />
         </div>
     }

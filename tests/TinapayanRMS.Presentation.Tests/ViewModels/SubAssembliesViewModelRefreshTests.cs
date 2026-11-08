@@ -111,10 +111,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         await viewModel.LoadCommand.Execute();
 
-        viewModel.Rows.Single().UsedByText.Should().Be("Cream Loaf");
+        viewModel.Rows.Single().ConsumersText.Should().Be("Cream Loaf");
         viewModel.SelectedRow = viewModel.Rows.Single();
         await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
-        var creamLoaf = viewModel.UsedBy.Should().ContainSingle().Subject;
+        var creamLoaf = viewModel.Consumers.Should().ContainSingle().Subject;
         creamLoaf.Name.Should().Be("Cream Loaf");
         int? opened = null;
         using (viewModel.ProductOpenRequests.Subscribe(productId => opened = productId))
@@ -123,7 +123,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         }
 
         opened.Should().Be(creamLoaf.Id, "a tile hands its product's id on, for the main window to open it");
-        viewModel.UsedByText.Should().StartWith("These products follow every change");
+        viewModel.ConsumersText.Should().StartWith("These products follow every change");
 
         await viewModel.DeleteCommand.Execute();
 
@@ -221,7 +221,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.Lines.Should().BeEmpty();
         viewModel.PackagingLines.Single().BaseUnitAbbreviation.Should().Be("pc");
         viewModel.SetCost.Should().Be(66m);
-        viewModel.UsedByText.Should().Contain("Add Sub-Assembly");
+        viewModel.ConsumersText.Should().Contain("Add Sub-Assembly");
     });
 
     [Test]
@@ -249,7 +249,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.EditingRole!.Name.Should().Be("Glaze", "the copy keeps the original's role, not a new form's first one");
         viewModel.Lines.Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase)).Should().Equal((flourId, 100m, true), (sugarId, 50m, false));
         viewModel.BatchCost.Should().Be(9.5m);
-        viewModel.UsedBy.Should().BeEmpty();
+        viewModel.Consumers.Should().BeEmpty();
         viewModel.History.IsDirty.Should().BeTrue("Save is offered straight away");
         viewModel.History.CanUndo.Should().BeFalse();
 
@@ -322,7 +322,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.EditingName.Should().Be("Gift Set Copy");
         viewModel.PackagingLines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
         viewModel.SetCost.Should().Be(66m);
-        viewModel.UsedByText.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
+        viewModel.ConsumersText.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
 
         await viewModel.SaveCommand.Execute();
 

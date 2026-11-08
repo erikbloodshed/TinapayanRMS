@@ -14,7 +14,7 @@
             @if (Tabs.CanClose)
             {
                 <button type="button" class="screen-tab-close" title="Close" aria-label="Close @tab.Label" @onclick="() => Close(tab)">
-                    <span class="glyph" aria-hidden="true">@Glyphs.Cancel</span>
+                    <Icon Of="AppIcon.Cancel" />
                 </button>
             }
         </div>

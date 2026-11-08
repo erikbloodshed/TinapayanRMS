@@ -11,7 +11,7 @@ public static class ProductRules
     public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Research and Development";
 
     /// <summary>
-    /// How a product is named where it's in the way of something (a refusal, a Used By tile): "Cheese Roll (deleted)" for
+    /// How a product is named where it's in the way of something (a refusal, a Consumer tile): "Cheese Roll (deleted)" for
     /// one in the Deleted folder, which still holds what it uses until it's deleted permanently.
     /// </summary>
     public static string ListedName(string name, bool isDeleted) => isDeleted ? $"{name} (deleted)" : name;

@@ -653,11 +653,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
     public bool ShowPriceHistory => _showPriceHistory.Value;
 
-    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Used By, then Price History.</summary>
+    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Consumer, then Price History.</summary>
     public const int PriceHistoryTab = 4;
 
-    /// <summary>Used By: the products the material goes into, with what it makes up of each one's material cost.</summary>
-    public const int UsedByTab = 3;
+    /// <summary>Consumer: the products the material goes into, with what it makes up of each one's material cost.</summary>
+    public const int ConsumerTab = 3;
 
     /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
     private int _selectedDetailsTab;
@@ -923,23 +923,23 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
-    private IReadOnlyList<LinkingProduct> _usedBy = [];
+    private IReadOnlyList<LinkingProduct> _consumers = [];
     /// <summary>
-    /// The products the material showing goes into, by name (IRawMaterialRepository.GetUsedByAsync): one tile each on the
-    /// Used By tab, which opens it. Empty for a new material.
+    /// The products the material showing goes into, by name (IRawMaterialRepository.GetConsumersAsync): one tile each on the
+    /// Consumer tab, which opens it. Empty for a new material.
     /// </summary>
-    public IReadOnlyList<LinkingProduct> UsedBy
+    public IReadOnlyList<LinkingProduct> Consumers
     {
-        get => _usedBy;
-        private set => this.RaiseAndSetIfChanged(ref _usedBy, value);
+        get => _consumers;
+        private set => this.RaiseAndSetIfChanged(ref _consumers, value);
     }
 
-    private string _usedByText = NotUsedText;
-    /// <summary>The caption under the Used By tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
-    public string UsedByText
+    private string _consumersText = NotUsedText;
+    /// <summary>The caption under the Consumer tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
+    public string ConsumersText
     {
-        get => _usedByText;
-        private set => this.RaiseAndSetIfChanged(ref _usedByText, value);
+        get => _consumersText;
+        private set => this.RaiseAndSetIfChanged(ref _consumersText, value);
     }
 
     private const string NotUsedText = "No product uses it yet.";
@@ -947,13 +947,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private const string UsedText =
         "These products use it in their recipe or packaging, directly or through a made or linked ingredient, so a change to its cost reaches each of them.";
 
-    /// <summary>A Used By tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    /// <summary>A Consumer tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
 
     private readonly Subject<int> _productOpenRequests = new();
 
     /// <summary>
-    /// The products Used By tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each on
+    /// The products Consumer tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each on
     /// the Products screen, as it does for Sub-Assemblies' tiles.
     /// </summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
@@ -1221,7 +1221,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // pick never gets the first one's details added to its own. One that fails shows why, and the next pick loads as usual.
         LoadLatest(_picks, LoadDetailsAsync);
 
-        // The Used By tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
+        // The Consumer tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
         LoadLatest(
             _costSharesWanted.Merge(this.WhenAnyValue(x => x.SelectedDetailsTab).Select(_ => RxVoid.Default)),
             (_, cancellationToken) => ShowCostSharesAsync(cancellationToken));
@@ -1335,10 +1335,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // showing are still that material's once the read is back.
             if (_detailMaterialId is { } detailMaterialId)
             {
-                var usedBy = await _rawMaterialRepository.GetUsedByAsync(detailMaterialId, CancellationToken.None);
+                var consumers = await _rawMaterialRepository.GetConsumersAsync(detailMaterialId, CancellationToken.None);
                 if (_detailMaterialId == detailMaterialId)
                 {
-                    ShowUsedBy(usedBy);
+                    ShowConsumers(consumers);
                 }
             }
 
@@ -1958,7 +1958,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IReadOnlyList<RawMaterialPriceHistory> PriceHistory,
         IReadOnlyList<RawMaterialBrandPrice> BrandPrices,
         IReadOnlyList<IngredientBomLine> BomLines,
-        IReadOnlyList<LinkingProduct> UsedBy)
+        IReadOnlyList<LinkingProduct> Consumers)
     {
         public static readonly RawMaterialDetail None = new([], [], [], []);
     }
@@ -1969,16 +1969,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken)
     {
-        var usedBy = await _rawMaterialRepository.GetUsedByAsync(material.Id, cancellationToken);
+        var consumers = await _rawMaterialRepository.GetConsumersAsync(material.Id, cancellationToken);
         return material.Source switch
         {
             RawMaterialSource.Purchased => new RawMaterialDetail(
                 await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
                 await _brandPriceRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
                 [],
-                usedBy),
-            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), usedBy),
-            _ => RawMaterialDetail.None with { UsedBy = usedBy },
+                consumers),
+            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), consumers),
+            _ => RawMaterialDetail.None with { Consumers = consumers },
         };
     }
 
@@ -2001,7 +2001,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
         _savedBrandPriceCount = detail.BrandPrices.Count;
 
-        ShowUsedBy(detail.UsedBy);
+        ShowConsumers(detail.Consumers);
 
         UpdateCanChangeBaseUnit();
         RebuildBufferedCostUnitOptions();
@@ -2016,29 +2016,29 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         History.MarkClean();
     }
 
-    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products)
+    private void ShowConsumers(IReadOnlyList<LinkingProduct> products)
     {
-        UsedBy = products;
-        UsedByText = products.Count == 0 ? NotUsedText : UsedText;
+        Consumers = products;
+        ConsumersText = products.Count == 0 ? NotUsedText : UsedText;
         _costSharesWanted.OnNext(RxVoid.Default);
     }
 
-    /// <summary>What each Used By product's share is worked out by; null in a screen built without it (tests that don't need it).</summary>
+    /// <summary>What each Consumer product's share is worked out by; null in a screen built without it (tests that don't need it).</summary>
     private readonly MaterialCostShares? _costShares;
 
-    /// <summary>Asks for the Used By tiles' shares again: the tiles changed, or the tab showed.</summary>
+    /// <summary>Asks for the Consumer tiles' shares again: the tiles changed, or the tab showed.</summary>
     private readonly Subject<RxVoid> _costSharesWanted = new();
 
     /// <summary>
-    /// The Used By tiles' "38% of materials", worked out only while the tab shows, since it reads every product
+    /// The Consumer tiles' "38% of materials", worked out only while the tab shows, since it reads every product
     /// the material goes into: the material at no cost against as it is (MaterialCostShares). Kept on the tiles until they change.
     /// </summary>
     private async Task ShowCostSharesAsync(CancellationToken cancellationToken)
     {
         if (_costShares is null
-            || SelectedDetailsTab != UsedByTab
+            || SelectedDetailsTab != ConsumerTab
             || SelectedRawMaterial is not { } material
-            || UsedBy is not { Count: > 0 } tiles
+            || Consumers is not { Count: > 0 } tiles
             || tiles.All(t => t.CostShareText is not null))
         {
             return;
@@ -2046,9 +2046,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         var shares = await Task.Run(() => _costShares.ReadAsync(material.Id, [.. tiles.Select(t => t.Id)], cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (ReferenceEquals(UsedBy, tiles))
+        if (ReferenceEquals(Consumers, tiles))
         {
-            UsedBy = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
+            Consumers = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
         }
     }
 
@@ -2953,13 +2953,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             : $"Moved {what}";
     }
 
-    // Segoe Fluent Icons glyphs for the list's menu, as the Products list's menu has them.
-    private const string AddGlyph = "";
-    private const string NewFolderGlyph = "";
-    private const string MoveGlyph = "";
-    private const string RenameGlyph = "";
-    private const string DeleteGlyph = "";
-
     /// <summary>
     /// The menu a right-click opens on the list (MaterialList): on <paramref name="node"/>'s row, which the list picks
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
@@ -3031,7 +3024,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             ];
             items.Add(new($"Move {(isOne ? string.Empty : $"{materials.Count} Materials ")}to")
             {
-                Glyph = MoveGlyph,
+                Icon = AppIcon.Move,
                 Items = folders,
                 IsEnabled = folders.Any(f => f.IsEnabled),
             });
@@ -3043,9 +3036,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("Rename…", RenameMaterialCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph },
+                new("Rename…", RenameMaterialCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
                 TreeMenuItem.Separator,
-                new("Delete", DeleteMaterialCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
+                new("Delete", DeleteMaterialCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete },
             ]);
         }
 
@@ -3058,15 +3051,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var isIngredients = typeFolder.Type == RawMaterialType.Ingredient;
         List<TreeMenuItem> items =
         [
-            new($"New {MaterialNoun(typeFolder)} Here", NewMaterialInCommand, typeFolder) { Glyph = AddGlyph },
+            new($"New {MaterialNoun(typeFolder)} Here", NewMaterialInCommand, typeFolder) { Icon = AppIcon.Add },
             new("New Category…", NewCategoryCommand, isIngredients ? RawMaterialCategoryType.Ingredient : RawMaterialCategoryType.Packaging)
             {
-                Glyph = NewFolderGlyph,
+                Icon = AppIcon.NewFolder,
             },
         ];
         if (isIngredients)
         {
-            items.Add(new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Glyph = NewFolderGlyph });
+            items.Add(new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder });
         }
 
         items.AddRange(
@@ -3084,14 +3077,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var holds = RawMaterials.Count(m => m.CategoryId == folder.CategoryId);
         return
         [
-            new($"New {MaterialNoun(folder)} Here", NewMaterialInCommand, folder) { Glyph = AddGlyph },
+            new($"New {MaterialNoun(folder)} Here", NewMaterialInCommand, folder) { Icon = AppIcon.Add },
             TreeMenuItem.Separator,
-            new("New Category…", NewCategoryCommand, folder.CategoryType!.Value) { Glyph = NewFolderGlyph },
-            new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
+            new("New Category…", NewCategoryCommand, folder.CategoryType!.Value) { Icon = AppIcon.NewFolder },
+            new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
             new(holds == 0 ? "Delete Category" : $"Delete Category (holds {holds})", DeleteCategoryCommand, folder)
             {
                 Gesture = "Del",
-                Glyph = DeleteGlyph,
+                Icon = AppIcon.Delete,
                 IsEnabled = holds == 0,
             },
         ];
@@ -3099,10 +3092,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
-        new("New Raw Material", NewMaterialInCommand) { Glyph = AddGlyph },
-        new("New Ingredient Category…", NewCategoryCommand, RawMaterialCategoryType.Ingredient) { Glyph = NewFolderGlyph },
-        new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Glyph = NewFolderGlyph },
-        new("New Packaging Category…", NewCategoryCommand, RawMaterialCategoryType.Packaging) { Glyph = NewFolderGlyph },
+        new("New Raw Material", NewMaterialInCommand) { Icon = AppIcon.Add },
+        new("New Ingredient Category…", NewCategoryCommand, RawMaterialCategoryType.Ingredient) { Icon = AppIcon.NewFolder },
+        new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder },
+        new("New Packaging Category…", NewCategoryCommand, RawMaterialCategoryType.Packaging) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),

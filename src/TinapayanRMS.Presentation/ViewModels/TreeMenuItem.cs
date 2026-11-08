@@ -18,8 +18,8 @@ public sealed record TreeMenuItem(string Header, ICommand? Command = null, objec
     /// <summary>The key that does the same with the row picked, shown at the item's right: "F2", "Del".</summary>
     public string? Gesture { get; init; }
 
-    /// <summary>The Segoe Fluent Icons glyph before the header, or null for none.</summary>
-    public string? Glyph { get; init; }
+    /// <summary>The icon before the header, or null for none.</summary>
+    public AppIcon? Icon { get; init; }
 
     /// <summary>False for an item that's there to show what can't be done here: moving a row to the folder it's in.</summary>
     public bool IsEnabled { get; init; } = true;

@@ -45,8 +45,8 @@
                                         <TextField ID="clone-name" @bind-Value="ViewModel!.EditingCloneName" />
                                     </FormRow>
                                     <div class="button-row">
-                                        <CommandButton Command="ViewModel!.CloneCommand" Glyph="@Glyphs.Copy" Label="Clone" />
-                                        <CommandButton Command="ViewModel!.CreateVariantCommand" Glyph="@Glyphs.Link" Label="Create Variant" />
+                                        <CommandButton Command="ViewModel!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
+                                        <CommandButton Command="ViewModel!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
                                     </div>
                                     <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Research and Development.</p>
                                 </div>

@@ -4,9 +4,9 @@
 @* A button bound to a ViewModel's command, as the WPF ButtonAdvs were through Command="{Binding …}": enabled while the
    command can run, and running it on a click. The screen redraws it when the command's CanExecute changes (ScreenBase). *@
 <SfButton CssClass="@Css" Disabled="@(!((ICommand)Command).CanExecute(null) || Disabled)" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
-    @if (Glyph is not null)
+    @if (Icon is { } icon)
     {
-        <span class="glyph" aria-hidden="true">@Glyph</span>
+        <Icon Of="icon" />
     }
     @if (Label is not null)
     {
@@ -19,8 +19,8 @@
 
     [Parameter] public string? Label { get; set; }
 
-    /// <summary>A Segoe Fluent Icons glyph before the label, as the WPF IconTemplates had.</summary>
-    [Parameter] public string? Glyph { get; set; }
+    /// <summary>The icon before the label.</summary>
+    [Parameter] public AppIcon? Icon { get; set; }
 
     [Parameter] public bool Primary { get; set; }
 

@@ -16,7 +16,7 @@
 
     <FormRow Label="Folder">
         <span class="read-only-text" title="@ViewModel!.Folder">@ViewModel!.Folder</span>
-        <CommandButton Command="ViewModel!.OpenFolderCommand" Glyph="@Glyphs.Folder" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
+        <CommandButton Command="ViewModel!.OpenFolderCommand" Icon="AppIcon.FolderOpen" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
     </FormRow>
     @if (ViewModel!.BackupProblemText is { } backupProblem)
     {
@@ -24,9 +24,9 @@
     }
     <FormRow Label="Also Copy To">
         <span class="read-only-text" title="Each automatic backup is copied here as well, and the newest 14 are kept here too. Nothing else in the folder is touched.">@ViewModel!.CopyFolderText</span>
-        <CommandButton Command="ViewModel!.ChooseCopyFolderCommand" Glyph="@Glyphs.Folder" Label="Choose…"
+        <CommandButton Command="ViewModel!.ChooseCopyFolderCommand" Icon="AppIcon.FolderOpen" Label="Choose…"
                        Tooltip="A folder on this computer each automatic backup is copied to as well: a USB stick that stays plugged in, or a OneDrive folder. The newest automatic backup is copied there straight away." />
-        <CommandButton Command="ViewModel!.ClearCopyFolderCommand" Glyph="@Glyphs.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
+        <CommandButton Command="ViewModel!.ClearCopyFolderCommand" Icon="AppIcon.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
     </FormRow>
     @if (ViewModel!.CopyProblemText is { } copyProblem)
     {
@@ -34,11 +34,11 @@
     }
 
     <div class="button-row form-extra">
-        <CommandButton Command="ViewModel!.BackUpNowCommand" Glyph="@Glyphs.Save" Label="Back Up Now" Primary="true" />
-        <CommandButton Command="ViewModel!.CopyToCommand" Glyph="@Glyphs.Download" Label="Copy To…"
+        <CommandButton Command="ViewModel!.BackUpNowCommand" Icon="AppIcon.Save" Label="Back Up Now" Primary="true" />
+        <CommandButton Command="ViewModel!.CopyToCommand" Icon="AppIcon.Download" Label="Copy To…"
                        Tooltip="Saves a copy of the picked backup where you choose, such as a USB stick." />
-        <CommandButton Command="ViewModel!.RestoreCommand" Glyph="@Glyphs.Restore" Label="Restore" />
-        <CommandButton Command="ViewModel!.RestoreFromFileCommand" Glyph="@Glyphs.Upload" Label="Restore from File…"
+        <CommandButton Command="ViewModel!.RestoreCommand" Icon="AppIcon.Restore" Label="Restore" />
+        <CommandButton Command="ViewModel!.RestoreFromFileCommand" Icon="AppIcon.Upload" Label="Restore from File…"
                        Tooltip="Restores a backup file from elsewhere, such as one copied to a USB stick." />
         @if (ViewModel!.BusyText is { } busy)
         {

@@ -30,15 +30,15 @@
                     title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
                     @if (isDraft)
                     {
-                        <span class="glyph" aria-hidden="true">&#xE710;</span>
+                        <Icon Of="AppIcon.Add" />
                     }
                     else if (ReferenceEquals(row, SelectedItem))
                     {
-                        <span class="glyph" aria-hidden="true">&#xE76C;</span>
+                        <Icon Of="AppIcon.CurrentRow" />
                     }
                     else if (Reorderable)
                     {
-                        <span class="glyph drag-handle" aria-hidden="true">&#xE76F;</span>
+                        <Icon Of="AppIcon.DragHandle" CssClass="drag-handle" />
                     }
                 </td>
                 @Row(row)

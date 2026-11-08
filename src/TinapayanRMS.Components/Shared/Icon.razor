@@ -1,0 +1,12 @@
+@* One of the app's icons, drawn by Syncfusion's SfIcon (AppIcons picks which). It takes the size and colour of where it
+   sits (app.css's .glyph), not SfIcon's own sizes. *@
+<SfIcon Name="AppIcons.NameOf(Of)" class="@Css" aria-hidden="true" />
+
+@code {
+    [Parameter, EditorRequired] public AppIcon Of { get; set; }
+
+    /// <summary>Classes of its own, beside the glyph's: confirm-glyph, tree-menu-glyph.</summary>
+    [Parameter] public string? CssClass { get; set; }
+
+    private string Css => CssClass is null ? "glyph" : "glyph " + CssClass;
+}

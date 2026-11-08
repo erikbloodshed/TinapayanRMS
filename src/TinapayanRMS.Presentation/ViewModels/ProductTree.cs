@@ -14,8 +14,8 @@ public closed class ProductTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
-    /// <summary>The Segoe Fluent Icons glyph before the title, or empty for none.</summary>
-    public abstract string Glyph { get; }
+    /// <summary>The icon before the title, or null for none.</summary>
+    public abstract AppIcon? Icon { get; }
 
     public abstract bool IsFolder { get; }
 
@@ -28,9 +28,6 @@ public closed class ProductTreeNode : ReactiveObject
     /// <summary>How many products a folder holds, shown after its title; always 0 for a product, which shows none.</summary>
     public virtual int ProductCount => 0;
 
-    /// <summary>Which image goes before a product's name (ProductListCard); always none for a folder.</summary>
-    public virtual ProductIcon IconKind => ProductIcon.None;
-
     private bool _isBelowTargetMarkup;
     /// <summary>
     /// A product whose current price earns less than its target markup (ProductCostSummary.IsBelowTargetMarkup): a flag after
@@ -41,21 +38,6 @@ public closed class ProductTreeNode : ReactiveObject
         get => _isBelowTargetMarkup;
         set => this.RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
     }
-}
-
-/// <summary>
-/// The full-colour image the Products list puts before a product's name (Assets/Icons/*_64px.png): one each for Breads, Loaves, Cakes, Pastries and Rolls, and a bag of breads for a
-/// composite whatever its category.
-/// </summary>
-public enum ProductIcon
-{
-    None,
-    Breads,
-    Loaves,
-    Cakes,
-    Pastries,
-    Rolls,
-    Composite,
 }
 
 /// <summary>
@@ -73,7 +55,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         IsStage = isStage;
         IsDeletedFolder = isDeletedFolder;
         _title = title;
-        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Glyph));
+        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
     }
 
     /// <summary>A stage's folder.</summary>
@@ -146,10 +128,10 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
     }
 
     /// <summary>
-    /// Segoe Fluent Icons' FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included; the
-    /// Deleted folder's is always Delete, the bin.
+    /// FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included; the Deleted folder's is
+    /// always Delete, the bin.
     /// </summary>
-    public override string Glyph => IsDeletedFolder ? "" : IsExpanded && Children.Count > 0 ? "" : "";
+    public override AppIcon? Icon => IsDeletedFolder ? AppIcon.Delete : IsExpanded && Children.Count > 0 ? AppIcon.FolderOpen : AppIcon.Folder;
 
     public override bool IsFolder => true;
 
@@ -166,7 +148,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         set
         {
             this.RaiseAndSetIfChanged(ref _isExpanded, value);
-            this.RaisePropertyChanged(nameof(Glyph));
+            this.RaisePropertyChanged(nameof(Icon));
         }
     }
 
@@ -196,31 +178,13 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
                 _product = value;
                 this.RaisePropertyChanged();
                 this.RaisePropertyChanged(nameof(Title));
-                this.RaisePropertyChanged(nameof(IconKind));
             }
         }
     }
 
     public override string Title => Product.Name;
 
-    public override string Glyph => string.Empty;
-
-    /// <summary>
-    /// A composite's present, whatever its category, else its category's, matched by name whatever the case; none for
-    /// any other category, or no category.
-    /// </summary>
-    public override ProductIcon IconKind =>
-        Product.IsComposite
-            ? ProductIcon.Composite
-            : Product.Category?.Name.Trim().ToUpperInvariant() switch
-            {
-                "BREADS" => ProductIcon.Breads,
-                "LOAVES" => ProductIcon.Loaves,
-                "CAKES" => ProductIcon.Cakes,
-                "PASTRIES" => ProductIcon.Pastries,
-                "ROLLS" => ProductIcon.Rolls,
-                _ => ProductIcon.None,
-            };
+    public override AppIcon? Icon => null;
 
     public override bool IsFolder => false;
 

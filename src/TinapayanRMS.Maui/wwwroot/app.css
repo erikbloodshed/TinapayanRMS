@@ -19,8 +19,6 @@
     --muted-foreground: #5c5f77;  /* Latte Subtext 1 */
     --accent-foreground: #036b95; /* Latte Sky, deep */
     --accent-soft: #d8e9f3;       /* Latte Sky, tint */
-    /* The WPF app's icons (its IconFontFamily), at the same code points (Shared/Glyphs.cs). */
-    --icon-font: "Segoe Fluent Icons", "Segoe MDL2 Assets";
 
     /* How tall a button, a box, a picker and a table's row and heading are ("Control heights" below). */
     --control-height: 24px;
@@ -35,10 +33,16 @@ html, body {
     background: var(--page-background);
 }
 
+/* An icon (Shared/Icon.razor, AppIcons): Syncfusion's, drawn in the theme's icon font. It takes the size of where it sits,
+   as the rules below give it, and not SfIcon's own (e-medium, 16px); so a rule that sizes an icon by a class of its own
+   names .glyph with it, to outweigh this one. */
 .glyph {
-    font-family: var(--icon-font);
     font-style: normal;
     line-height: 1;
+}
+
+.glyph.e-medium {
+    font-size: inherit;
 }
 
 .muted {
@@ -124,8 +128,13 @@ html, body {
     margin-left: 4px;
 }
 
-.caption-button .glyph {
-    font-size: 10px;
+/* Minimize, Maximize, Restore Down and Close, drawn in 1px lines (TitleBar.razor). */
+.caption-glyph {
+    width: 10px;
+    height: 10px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1;
 }
 
 .caption-close:hover:not(:disabled) {
@@ -432,7 +441,7 @@ html, body {
     align-items: flex-start;
 }
 
-.confirm-glyph {
+.glyph.confirm-glyph {
     font-size: 24px;
     color: #df8e1d; /* Latte Yellow */
 }

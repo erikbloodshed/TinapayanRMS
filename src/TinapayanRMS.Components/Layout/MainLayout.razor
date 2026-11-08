@@ -2,7 +2,7 @@
 @implements IDisposable
 @inject AppStatus Status
 @inject NavigationManager Navigation
-@* Started here, once per page, so one screen can open another (a Used By tile, a Print). *@
+@* Started here, once per page, so one screen can open another (a Consumer tile, a Print). *@
 @inject ScreenLinks Links
 
 <div class="app-shell">
@@ -12,14 +12,14 @@
     @if (Status.DatabaseWarning is { } warning)
     {
         <div class="app-banner" role="alert">
-            <span class="glyph" aria-hidden="true">@Glyphs.Warning</span>
+            <Icon Of="AppIcon.Warning" />
             <span>@warning</span>
         </div>
     }
     @if (Status.BackupWarning is { } backupWarning)
     {
         <div class="app-banner app-banner-text" role="alert">
-            <span class="glyph" aria-hidden="true">@Glyphs.Warning</span>
+            <Icon Of="AppIcon.Warning" />
             <span>@backupWarning</span>
         </div>
     }

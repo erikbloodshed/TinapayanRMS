@@ -1312,7 +1312,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var viewModel = CreateViewModel();
 
-        // As a Sub-Assemblies Used By tile does before the Products screen was ever shown.
+        // As a Sub-Assemblies Consumer tile does before the Products screen was ever shown.
         viewModel.OpenProduct(ensaymadaId);
         viewModel.SelectedProduct.Should().BeNull("the list is empty until the screen loads");
 

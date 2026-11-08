@@ -21,9 +21,9 @@
             <div class="report-heading">
                 <h2 class="section-header">Scenarios</h2>
                 <div class="button-row">
-                    <CommandButton Command="ViewModel!.SaveScenarioCommand" Glyph="@Glyphs.Save" Label="Save Scenario"
+                    <CommandButton Command="ViewModel!.SaveScenarioCommand" Icon="AppIcon.Save" Label="Save Scenario"
                                    Tooltip="Saves the price changes in the table under a name. Keep the open scenario's name to update it." />
-                    <CommandButton Command="ViewModel!.DeleteScenarioCommand" Glyph="@Glyphs.Delete" Label="Delete Scenario"
+                    <CommandButton Command="ViewModel!.DeleteScenarioCommand" Icon="AppIcon.Delete" Label="Delete Scenario"
                                    Tooltip="Deletes the open scenario, after asking. Its changes stay in the table." />
                 </div>
             </div>
@@ -53,8 +53,8 @@
             <div class="report-heading">
                 <h2 class="section-header">Price Changes</h2>
                 <div class="button-row">
-                    <CommandButton Command="ViewModel!.RemoveChangeCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
-                    <CommandButton Command="ViewModel!.ClearCommand" Glyph="@Glyphs.Cancel" Label="Clear All"
+                    <CommandButton Command="ViewModel!.RemoveChangeCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                    <CommandButton Command="ViewModel!.ClearCommand" Icon="AppIcon.Cancel" Label="Clear All"
                                    Tooltip="Takes every price change away, so the figures are today's again, and closes the open scenario." />
                 </div>
             </div>
@@ -96,10 +96,10 @@
             </h2>
             <div class="button-row">
                 <SfCheckBox Label="Only affected products" @bind-Checked="ViewModel!.OnlyAffected" />
-                <CommandButton Command="ViewModel!.ToggleCostBasisCommand" Glyph="@Glyphs.Calculate" Label="@ViewModel!.CostBasisButtonLabel" Tooltip="@ViewModel!.CostBasisButtonTooltip" />
-                <CommandButton Command="ViewModel!.PrintCommand" Glyph="@Glyphs.Print" Label="Print Report"
+                <CommandButton Command="ViewModel!.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@ViewModel!.CostBasisButtonLabel" Tooltip="@ViewModel!.CostBasisButtonTooltip" />
+                <CommandButton Command="ViewModel!.PrintCommand" Icon="AppIcon.Print" Label="Print Report"
                                Tooltip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows." />
-                <CommandButton Command="ViewModel!.ExportCommand" Glyph="@Glyphs.Export" Label="Export to Excel"
+                <CommandButton Command="ViewModel!.ExportCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                Tooltip="Saves the products as shown, and the price changes, to an Excel workbook." />
             </div>
         </div>

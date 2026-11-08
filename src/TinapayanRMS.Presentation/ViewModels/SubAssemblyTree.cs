@@ -12,8 +12,8 @@ public closed class SubAssemblyTreeNode : ReactiveObject
 {
     public abstract string Title { get; }
 
-    /// <summary>The Segoe Fluent Icons glyph before the title, or empty for none.</summary>
-    public abstract string Glyph { get; }
+    /// <summary>The icon before the title, or null for none.</summary>
+    public abstract AppIcon? Icon { get; }
 
     public abstract bool IsFolder { get; }
 
@@ -33,7 +33,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         RoleId = role.Id;
         IsPackaging = role.IsPackaging;
         _title = role.Name;
-        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Glyph));
+        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
     }
 
     public int RoleId { get; }
@@ -72,8 +72,8 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         }
     }
 
-    /// <summary>Segoe Fluent Icons' FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included.</summary>
-    public override string Glyph => IsExpanded && Children.Count > 0 ? "" : "";
+    /// <summary>FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included.</summary>
+    public override AppIcon? Icon => IsExpanded && Children.Count > 0 ? AppIcon.FolderOpen : AppIcon.Folder;
 
     public override bool IsFolder => true;
 
@@ -90,7 +90,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         set
         {
             this.RaiseAndSetIfChanged(ref _isExpanded, value);
-            this.RaisePropertyChanged(nameof(Glyph));
+            this.RaisePropertyChanged(nameof(Icon));
         }
     }
 
@@ -127,7 +127,7 @@ public sealed class SubAssemblyLeafNode(StandaloneSubAssemblyRow row) : SubAssem
 
     public override string Title => Row.Name;
 
-    public override string Glyph => string.Empty;
+    public override AppIcon? Icon => null;
 
     public override bool IsFolder => false;
 }

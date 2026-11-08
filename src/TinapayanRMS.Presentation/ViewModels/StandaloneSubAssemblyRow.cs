@@ -9,7 +9,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// it. "Used by" is kept as text: CollectionMerge compares a row's scalar properties, so a changed list of products or
 /// made ingredients shows up as a changed row.
 /// </summary>
-public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> usedBy, IReadOnlyList<MadeIngredientUse>? madeIngredients = null)
+public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyList<LinkingProduct> consumers, IReadOnlyList<MadeIngredientUse>? madeIngredients = null)
 {
     private readonly IReadOnlyList<MadeIngredientUse> _madeIngredients = madeIngredients ?? [];
 
@@ -22,14 +22,14 @@ public sealed class StandaloneSubAssemblyRow(SubAssembly subAssembly, IReadOnlyL
     public string RoleName => SubAssembly.Role?.Name ?? string.Empty;
 
     /// <summary>The products linking it, e.g. "Cream Loaf, Cream Loaf Mini", or empty when none do.</summary>
-    public string UsedByText { get; } = string.Join(", ", usedBy.Select(p => p.Name));
+    public string ConsumersText { get; } = string.Join(", ", consumers.Select(p => p.Name));
 
     /// <summary>The products linking it, by name. A method, not a property: CollectionMerge would compare the list by its scalar properties only.</summary>
-    public IReadOnlyList<LinkingProduct> GetUsedBy() => usedBy;
+    public IReadOnlyList<LinkingProduct> GetConsumers() => consumers;
 
     /// <summary>The made ingredients made from it, e.g. "Butter Icing, Breads", or empty when none are.</summary>
     public string MadeIngredientsText { get; } = string.Join(", ", (madeIngredients ?? []).Select(m => m.Name));
 
-    /// <summary>The made ingredients made from it, by name. A method for the same reason as <see cref="GetUsedBy"/>.</summary>
+    /// <summary>The made ingredients made from it, by name. A method for the same reason as <see cref="GetConsumers"/>.</summary>
     public IReadOnlyList<MadeIngredientUse> GetMadeIngredients() => _madeIngredients;
 }

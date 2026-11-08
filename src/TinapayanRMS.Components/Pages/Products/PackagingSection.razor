@@ -23,7 +23,7 @@
             <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.Costing.Costs.OwnPackaging.ToString("N2")</span>
             @if (ViewModel.Packaging.CanMovePackaging)
             {
-                <CommandButton Command="ViewModel.MovePackagingToSubAssembliesCommand" Glyph="@Glyphs.Link" Label="Move to Sub-Assemblies"
+                <CommandButton Command="ViewModel.MovePackagingToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
                                Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
             }
         </div>
@@ -36,13 +36,13 @@
         @if (ViewModel.Packaging.IsPackagingLinked)
         {
             <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
-            <CommandButton Command="ViewModel.CopyPackagingCommand" Glyph="@Glyphs.Copy" Label="Make a Copy"
+            <CommandButton Command="ViewModel.CopyPackagingCommand" Icon="AppIcon.Copy" Label="Make a Copy"
                            Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
         }
         else
         {
             <span></span>
-            <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+            <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
         }
     </div>
 </div>

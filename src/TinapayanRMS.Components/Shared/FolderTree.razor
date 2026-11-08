@@ -46,6 +46,10 @@
     private readonly Dictionary<object, Action> _watched = new(ReferenceEqualityComparer.Instance);
     private RedrawGate? _redraws;
 
+    // A folder's expander, on a span rather than an Icon: a tree draws one per folder on each redraw.
+    private static readonly string OpenExpander = "tree-expander " + AppIcons.CssOf(AppIcon.Expanded);
+    private static readonly string ClosedExpander = "tree-expander " + AppIcons.CssOf(AppIcon.Collapsed);
+
     /// <summary>The top-level folders.</summary>
     [Parameter, EditorRequired] public IEnumerable<TNode> Roots { get; set; } = [];
 
@@ -134,8 +138,7 @@
         builder.AddEventPreventDefaultAttribute(seq++, "ondrop", true);
 
         builder.OpenElement(seq++, "span");
-        builder.AddAttribute(seq++, "class", "tree-expander glyph");
-        builder.AddContent(seq++, isFolder && children!.Count > 0 ? (isOpen ? "" : "") : "");
+        builder.AddAttribute(seq++, "class", isFolder && children!.Count > 0 ? (isOpen ? OpenExpander : ClosedExpander) : "tree-expander glyph");
         builder.CloseElement();
         builder.AddContent(seq++, RowTemplate(node));
         builder.CloseElement();

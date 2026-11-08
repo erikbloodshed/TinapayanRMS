@@ -23,7 +23,7 @@ public interface IRawMaterialRepository
     /// its packaging links, and so does every product whose packaging links that product's, down the chain; a composite's
     /// products bring their packaging into it only when it includes theirs, however deep.
     /// </summary>
-    Task<IReadOnlyList<LinkingProduct>> GetUsedByAsync(int id, CancellationToken cancellationToken);
+    Task<IReadOnlyList<LinkingProduct>> GetConsumersAsync(int id, CancellationToken cancellationToken);
 
     /// <summary>
     /// Rejects fields that don't fit the material's type or source (RawMaterialRules), and a linked

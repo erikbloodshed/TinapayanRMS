@@ -10,12 +10,12 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// Raw Materials' Used By (IRawMaterialRepository.GetUsedByAsync): every product a material's cost goes into, through a
+/// Raw Materials' Consumer (IRawMaterialRepository.GetConsumersAsync): every product a material's cost goes into, through a
 /// recipe or packaging, directly or through the made and linked ingredients, packaging sets and packaging links between.
 /// </summary>
 [NotInParallel(DatabaseCollection.B)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
-public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+public class RawMaterialConsumersPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());
 
@@ -23,8 +23,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
 
     private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
-    private async Task<IReadOnlyList<string>> UsedByNamesAsync(int rawMaterialId) =>
-        [.. (await CreateRepository().GetUsedByAsync(rawMaterialId, Cancellation)).Select(p => p.Name)];
+    private async Task<IReadOnlyList<string>> ConsumerNamesAsync(int rawMaterialId) =>
+        [.. (await CreateRepository().GetConsumersAsync(rawMaterialId, Cancellation)).Select(p => p.Name)];
 
     /// <summary>A linked ingredient taking a share of <paramref name="linkedToId"/>'s weight and cost.</summary>
     private async Task<int> AddLinkedIngredientAsync(string name, int linkedToId)
@@ -84,10 +84,10 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
                 .ExecuteUpdateAsync(s => s.SetProperty(p => p.CategoryId, breads.Id), Cancellation);
         }
 
-        (await CreateRepository().GetUsedByAsync(flourId, Cancellation)).Should().Equal(
+        (await CreateRepository().GetConsumersAsync(flourId, Cancellation)).Should().Equal(
             new LinkingProduct(ensaymadaId, "Ensaymada", null),
             new LinkingProduct(pandesalId, "Pandesal", "Breads"));
-        (await UsedByNamesAsync(sugarId)).Should().Equal("Ensaymada");
+        (await ConsumerNamesAsync(sugarId)).Should().Equal("Ensaymada");
     }
 
     [Test]
@@ -97,8 +97,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         var boxId = await AddBoxAsync("Box");
         await AddProductAsync("Pandesal");
 
-        (await UsedByNamesAsync(flourId)).Should().BeEmpty();
-        (await UsedByNamesAsync(boxId)).Should().BeEmpty();
+        (await ConsumerNamesAsync(flourId)).Should().BeEmpty();
+        (await ConsumerNamesAsync(boxId)).Should().BeEmpty();
     }
 
     [Test]
@@ -113,9 +113,9 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         await AddProductWithSubAssemblyAsync("Custard Cake", fillingRoleId, [(custardId, 300m)]);
         await AddProductWithSubAssemblyAsync("Leche Flan", fillingRoleId, [(eggId, 200m)]);
 
-        (await UsedByNamesAsync(eggId)).Should().Equal("Custard Cake", "Leche Flan");
-        (await UsedByNamesAsync(milkId)).Should().Equal("Custard Cake");
-        (await UsedByNamesAsync(custardId)).Should().Equal("Custard Cake");
+        (await ConsumerNamesAsync(eggId)).Should().Equal("Custard Cake", "Leche Flan");
+        (await ConsumerNamesAsync(milkId)).Should().Equal("Custard Cake");
+        (await ConsumerNamesAsync(custardId)).Should().Equal("Custard Cake");
     }
 
     [Test]
@@ -129,7 +129,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         await rawMaterials.SaveAsync((await rawMaterials.GetByIdAsync(custardId, Cancellation))!, [], brandPrices: null, [(vanillaId, 5m)], Cancellation);
         await AddProductWithSubAssemblyAsync("Custard Cake", fillingRoleId, [(custardId, 300m)]);
 
-        (await UsedByNamesAsync(vanillaId)).Should().Equal("Custard Cake");
+        (await ConsumerNamesAsync(vanillaId)).Should().Equal("Custard Cake");
     }
 
     [Test]
@@ -144,8 +144,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
             [],
             [new LinkedUsageDraft(glazeId, UsageAuthoredField.WeightPerPiece, 5m) { AddIns = [(ubeId, 20m)] }]));
 
-        (await UsedByNamesAsync(ubeId)).Should().Equal("Ube Loaf");
-        (await UsedByNamesAsync(sugarId)).Should().Equal("Cream Loaf", "Ube Loaf");
+        (await ConsumerNamesAsync(ubeId)).Should().Equal("Ube Loaf");
+        (await ConsumerNamesAsync(sugarId)).Should().Equal("Cream Loaf", "Ube Loaf");
     }
 
     [Test]
@@ -169,8 +169,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         await links.SetSubAssemblyLinkAsync(giftId, giftSetId, Cancellation);
         await links.SetLinkAsync(giftMiniId, giftId, Cancellation);    // Gift Mini -> Gift -> Gift Set
 
-        (await UsedByNamesAsync(boxId)).Should().Equal("Big", "Mini", "Small");
-        (await UsedByNamesAsync(ribbonId)).Should().Equal("Gift", "Gift Mini");
+        (await ConsumerNamesAsync(boxId)).Should().Equal("Big", "Mini", "Small");
+        (await ConsumerNamesAsync(ribbonId)).Should().Equal("Gift", "Gift Mini");
     }
 
     [Test]
@@ -195,14 +195,14 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
             new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
             null, null, null, Cancellation);
 
-        (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
-        (await CreateRepository().GetUsedByAsync(flourId, Cancellation)).Select(p => p.IsComposite)
+        (await ConsumerNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await CreateRepository().GetConsumersAsync(flourId, Cancellation)).Select(p => p.IsComposite)
             .Should().Equal([false, true, true], "a composite's tile shows the composite icon");
-        (await UsedByNamesAsync(sugarId)).Should().Equal("Cheese Roll", "Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(sugarId)).Should().Equal("Cheese Roll", "Party Package", "Pasalubong Box");
 
         // A product brings its recipe into a composite, not its packaging: the composite's packaging is its own.
-        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada");
-        (await UsedByNamesAsync(giftBoxId)).Should().Equal("Pasalubong Box");
+        (await ConsumerNamesAsync(bagId)).Should().Equal("Ensaymada");
+        (await ConsumerNamesAsync(giftBoxId)).Should().Equal("Pasalubong Box");
     }
 
     [Test]
@@ -232,8 +232,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
         var giftSetId = await AddProductAsync("Gift Set");
         await CreatePackagingLinkRepository().SetLinkAsync(giftSetId, boxId, Cancellation);
 
-        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
-        (await UsedByNamesAsync(giftBoxId)).Should().Equal("Gift Set", "Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(giftBoxId)).Should().Equal("Gift Set", "Party Package", "Pasalubong Box");
     }
 
     [Test]
@@ -256,7 +256,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
             new RecipeDraft([], []) { Components = [(boxId, 2), (rollId, 6)] },
             null, null, null, Cancellation);
 
-        (await UsedByNamesAsync(icingId)).Should().Equal("Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(icingId)).Should().Equal("Party Package", "Pasalubong Box");
     }
 
     [Test]
@@ -271,8 +271,8 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
 
         await CreatePackagingLinkRepository().SetLinkAsync(smallId, bigId, Cancellation);
 
-        (await UsedByNamesAsync(boxId)).Should().BeEmpty("Small's packaging reads through to Big's, which has no box");
-        (await UsedByNamesAsync(ribbonId)).Should().Equal("Big", "Small");
+        (await ConsumerNamesAsync(boxId)).Should().BeEmpty("Small's packaging reads through to Big's, which has no box");
+        (await ConsumerNamesAsync(ribbonId)).Should().Equal("Big", "Small");
     }
 
     [Test]
@@ -293,7 +293,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        (await UsedByNamesAsync(milkId)).Should().Equal("Custard Cake");
+        (await ConsumerNamesAsync(milkId)).Should().Equal("Custard Cake");
     }
 
     /// <summary>
@@ -330,7 +330,7 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     {
         var (flourId, _) = await AddLoopOfCompositesAsync();
 
-        (await UsedByNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(flourId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
     }
 
     [Test]
@@ -338,6 +338,6 @@ public class RawMaterialUsedByPersistenceTests(DatabaseFixture fixture) : Persis
     {
         var (_, bagId) = await AddLoopOfCompositesAsync();
 
-        (await UsedByNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
+        (await ConsumerNamesAsync(bagId)).Should().Equal("Ensaymada", "Party Package", "Pasalubong Box");
     }
 }

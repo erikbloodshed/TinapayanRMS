@@ -21,6 +21,10 @@
              Link="syncfusion-blazor-base.min.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- AppIconsTests: the theme the page links, which defines Syncfusion's icons. -->
+    <Content Include="$(NuGetPackageRoot)syncfusion.blazor.themes\$(SyncfusionVersion)\staticwebassets\fluent2-lite.css" Link="fluent2-lite.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

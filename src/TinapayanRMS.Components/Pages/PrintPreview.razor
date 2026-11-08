@@ -10,7 +10,7 @@
 <section class="card print-card">
     <PrintPane Set="_choice?.Set" Empty="Nothing to preview. Print a report from the Price Simulator.">
         <Options>
-            <ActionButton Glyph="@Glyphs.Back" Label="Back" OnClick="() => Navigation.NavigateTo(Previews.ReturnTo)" />
+            <ActionButton Icon="AppIcon.Back" Label="Back" OnClick="() => Navigation.NavigateTo(Previews.ReturnTo)" />
             @if (Previews.Choices.Count > 1)
             {
                 <label class="form-label" for="preview-choice">Print</label>

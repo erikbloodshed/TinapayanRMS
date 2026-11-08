@@ -10,7 +10,7 @@
         <Header>@(Confirmations.HasCancel ? "Unsaved Changes" : "Confirm")</Header>
         <Content>
             <div class="confirm-message">
-                <span class="glyph confirm-glyph" aria-hidden="true">&#xE7BA;</span>
+                <Icon Of="AppIcon.Warning" CssClass="confirm-glyph" />
                 <span class="confirm-text">@Confirmations.Question</span>
             </div>
         </Content>

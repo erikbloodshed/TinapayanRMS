@@ -145,12 +145,6 @@
     color: var(--muted-foreground);
 }
 
-.tree-icon {
-    width: 16px;
-    height: 16px;
-    flex: none;
-}
-
 .tree-menu-item {
     display: flex;
     align-items: center;
@@ -158,7 +152,7 @@
     min-width: 200px;
 }
 
-.tree-menu-glyph {
+.glyph.tree-menu-glyph {
     width: 16px;
     font-size: 14px;
 }
@@ -537,7 +531,7 @@
     color: var(--muted-foreground);
 }
 
-/* ---- Unit Conversion Overview, Usage Example and Used By. ---- */
+/* ---- Unit Conversion Overview, Usage Example and Consumer. ---- */
 
 .conversions {
     display: flex;
@@ -554,7 +548,7 @@
     background: var(--list-background);
 }
 
-.conversion-arrow {
+.glyph.conversion-arrow {
     color: var(--muted-foreground);
     font-size: 12px;
 }
@@ -601,13 +595,13 @@
     font-weight: 600;
 }
 
-.used-by-tiles {
+.consumer-tiles {
     display: grid;
     grid-template-columns: repeat(auto-fill, 124px);
     gap: 8px;
 }
 
-.used-by-tile {
+.consumer-tile {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -621,17 +615,12 @@
     cursor: pointer;
 }
 
-.used-by-tile:hover {
+.consumer-tile:hover {
     border-color: var(--color-sf-primary);
     background: var(--accent-soft);
 }
 
-.used-by-glyph {
-    font-size: 28px;
-    color: var(--accent-foreground);
-}
-
-.used-by-name {
+.consumer-name {
     text-align: center;
     overflow-wrap: anywhere;
 }
@@ -656,7 +645,7 @@
     color: transparent;
 }
 
-.used-by-tiles + .caption {
+.consumer-tiles + .caption {
     margin-top: 8px;
 }
 .buffer-row + .caption { margin-top: 6px; }
@@ -789,8 +778,8 @@
     width: 110px;
 }
 
-/* What a material makes up of a product's material cost, under the product's name on a Used By tile. */
-.used-by-share {
+/* What a material makes up of a product's material cost, under the product's name on a Consumer tile. */
+.consumer-share {
     font-size: 12px;
     color: var(--muted-foreground);
 }

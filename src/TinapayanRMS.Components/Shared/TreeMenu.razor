@@ -1,14 +1,21 @@
 @using System.Windows.Input
 
 @* The menu a right-click opens on a folder tree, built from the ViewModel's TreeMenuItems (TreeMenuFor), as the WPF
-   app's TreeContextMenu built its MenuItems: each item's glyph, its header, the key that does the same at its right,
+   app's TreeContextMenu built its MenuItems: each item's icon, its header, the key that does the same at its right,
    a submenu in place of a command, and the lines between groups. Picking one runs its command with its parameter. *@
 <SfContextMenu @ref="_menu" TValue="MenuItem" Items="_items" CssClass="tree-menu">
     <MenuEvents TValue="MenuItem" ItemSelected="OnItemSelected" />
     <MenuTemplates TValue="MenuItem">
         <Template>
             <span class="tree-menu-item">
-                <span class="glyph tree-menu-glyph" aria-hidden="true">@(_glyphs.GetValueOrDefault(context.Id ?? ""))</span>
+                @if (_icons.TryGetValue(context.Id ?? "", out var icon))
+                {
+                    <Icon Of="icon" CssClass="tree-menu-glyph" />
+                }
+                else
+                {
+                    <span class="glyph tree-menu-glyph"></span>
+                }
                 <span class="tree-menu-text">@context.Text</span>
                 @if (_gestures.GetValueOrDefault(context.Id ?? "") is { } gesture)
                 {
@@ -26,14 +33,14 @@
     private SfContextMenu<MenuItem>? _menu;
     private List<MenuItem> _items = [];
     private readonly Dictionary<string, TreeMenuItem> _byId = [];
-    private readonly Dictionary<string, string> _glyphs = [];
+    private readonly Dictionary<string, AppIcon> _icons = [];
     private readonly Dictionary<string, string> _gestures = [];
 
     /// <summary>Opens <paramref name="items"/> at the window position given (a mouse event's ClientX and ClientY).</summary>
     public async Task OpenAsync(IReadOnlyList<TreeMenuItem> items, double x, double y)
     {
         _byId.Clear();
-        _glyphs.Clear();
+        _icons.Clear();
         _gestures.Clear();
         _items = Build(items, "m");
         if (_items.Count == 0 || _menu is null)
@@ -60,9 +67,9 @@
             }
 
             _byId[id] = item;
-            if (item.Glyph is { } glyph)
+            if (item.Icon is { } icon)
             {
-                _glyphs[id] = glyph;
+                _icons[id] = icon;
             }
 
             if (item.Gesture is { } gesture)

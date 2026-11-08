@@ -285,11 +285,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _costPerGram, value);
     }
 
-    /// <summary>The details tabs along the bottom: Recipe, then Used By.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, then Consumer.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Used By: the products and made ingredients the sub-assembly goes into.</summary>
-    public const int UsedByTab = 1;
+    /// <summary>Consumer: the products and made ingredients the sub-assembly goes into.</summary>
+    public const int ConsumerTab = 1;
 
     private int _selectedDetailsTab = RecipeTab;
     /// <summary>
@@ -302,17 +302,17 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
     }
 
-    private IReadOnlyList<LinkingProduct> _usedBy = [];
-    /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Used By, which opens it.</summary>
-    public IReadOnlyList<LinkingProduct> UsedBy
+    private IReadOnlyList<LinkingProduct> _consumers = [];
+    /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Consumer, which opens it.</summary>
+    public IReadOnlyList<LinkingProduct> Consumers
     {
-        get => _usedBy;
-        private set => this.RaiseAndSetIfChanged(ref _usedBy, value);
+        get => _consumers;
+        private set => this.RaiseAndSetIfChanged(ref _consumers, value);
     }
 
     private IReadOnlyList<MadeIngredientUse> _madeIngredients = [];
     /// <summary>
-    /// The made ingredients made from the sub-assembly the form shows, by name: one tile each under Used By, after the
+    /// The made ingredients made from the sub-assembly the form shows, by name: one tile each under Consumer, after the
     /// products, which opens it on Raw Materials.
     /// </summary>
     public IReadOnlyList<MadeIngredientUse> MadeIngredients
@@ -321,12 +321,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _madeIngredients, value);
     }
 
-    private string _usedByText = NotUsedText;
-    /// <summary>The caption under the Used By tiles: what linking means for editing it, or how to link it when nothing does.</summary>
-    public string UsedByText
+    private string _consumersText = NotUsedText;
+    /// <summary>The caption under the Consumer tiles: what linking means for editing it, or how to link it when nothing does.</summary>
+    public string ConsumersText
     {
-        get => _usedByText;
-        private set => this.RaiseAndSetIfChanged(ref _usedByText, value);
+        get => _consumersText;
+        private set => this.RaiseAndSetIfChanged(ref _consumersText, value);
     }
 
     private const string NotUsedText = "No product uses it yet. Link or copy it from a product's recipe on the Products screen.";
@@ -337,12 +337,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     private const string MadeFromText = "These follow every change saved here, and it can't be deleted while they use it: the products link it, and the made ingredients are made from it.";
 
-    /// <summary>A made ingredient's Used By tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
+    /// <summary>A made ingredient's Consumer tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
 
     private readonly Subject<int> _rawMaterialOpenRequests = new();
 
-    /// <summary>The made ingredients Used By tiles ask to open, by id. The main window subscribes and opens each on Raw Materials.</summary>
+    /// <summary>The made ingredients Consumer tiles ask to open, by id. The main window subscribes and opens each on Raw Materials.</summary>
     public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
@@ -402,13 +402,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// </summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
-    /// <summary>A Used By tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    /// <summary>A Consumer tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
 
     private readonly Subject<int> _productOpenRequests = new();
 
     /// <summary>
-    /// The products Used By tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each
+    /// The products Consumer tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each
     /// on the Products screen. Raised as the tile is clicked, not on the main-thread scheduler a command's own results
     /// wait for.
     /// </summary>
@@ -424,7 +424,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     /// <summary>
     /// The sub-assemblies New Product asks a new product to link, by id. The main window subscribes and starts the new
-    /// product on the Products screen, as it opens a Used By tile's product.
+    /// product on the Products screen, as it opens a Consumer tile's product.
     /// </summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
@@ -578,7 +578,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 RepointSelection(Rows.FirstOrDefault(r => r.Id == selectedId));
                 if (_editingId > 0)
                 {
-                    ShowUsedBy(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
+                    ShowConsumers(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
                 }
             });
 
@@ -928,7 +928,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Lines.Clear();
         SelectedPackagingLine = null;
         PackagingLines.Clear();
-        ShowUsedBy([], []);
+        ShowConsumers([], []);
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
         History.MarkClean();
@@ -949,7 +949,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         ClearForm();
         RestoreSnapshot(source with { EditingId = 0, Name = name });
         HeaderTitle = $"Copy of {sourceName}";
-        ShowUsedBy([], []);
+        ShowConsumers([], []);
         History.RefreshDirty();
     }
 
@@ -1008,7 +1008,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SelectedPackagingLine = null;
         PackagingLines.Clear();
         PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
-        ShowUsedBy(row.GetUsedBy(), row.GetMadeIngredients());
+        ShowConsumers(row.GetConsumers(), row.GetMadeIngredients());
 
         // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
         // end: the lines land after the name and role, and a form measured before them would read as changed
@@ -1016,11 +1016,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         History.MarkClean();
     }
 
-    private void ShowUsedBy(IReadOnlyList<LinkingProduct> products, IReadOnlyList<MadeIngredientUse> madeIngredients)
+    private void ShowConsumers(IReadOnlyList<LinkingProduct> products, IReadOnlyList<MadeIngredientUse> madeIngredients)
     {
-        UsedBy = products;
+        Consumers = products;
         MadeIngredients = madeIngredients;
-        UsedByText = madeIngredients.Count > 0 ? MadeFromText
+        ConsumersText = madeIngredients.Count > 0 ? MadeFromText
             : products.Count == 0 ? IsPackaging ? SetNotUsedText : NotUsedText
             : UsedText;
     }
@@ -1265,14 +1265,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             : $"Moved {what}";
     }
 
-    // Segoe Fluent Icons glyphs for the list's menu, as the Raw Materials and Products lists' menus have them.
-    private const string InHouseGlyph = "";
-    private const string AddGlyph = "";
-    private const string NewFolderGlyph = "";
-    private const string MoveGlyph = "";
-    private const string RenameGlyph = "";
-    private const string DeleteGlyph = "";
-
     /// <summary>
     /// The menu a right-click opens on the list (SubAssemblyList): on <paramref name="node"/>'s row, which the list
     /// picks first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null.
@@ -1335,7 +1327,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             ];
             items.Add(new($"Move {(isOne ? string.Empty : $"{subAssemblies.Count} Sub-Assemblies ")}to")
             {
-                Glyph = MoveGlyph,
+                Icon = AppIcon.Move,
                 Items = roles,
                 IsEnabled = roles.Any(r => r.IsEnabled),
             });
@@ -1349,15 +1341,15 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 items.Add(TreeMenuItem.Separator);
             }
 
-            items.Add(new("Rename…", RenameSubAssemblyCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph });
+            items.Add(new("Rename…", RenameSubAssemblyCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename });
 
             // A made ingredient can be made from a recipe; a packaging set's lines are packaging.
             if (!SubAssemblyTree.IsPackagingSet(leaf.SubAssembly))
             {
-                items.Add(new("Make In-House Ingredient…", MakeInHouseIngredientCommand, leaf) { Glyph = InHouseGlyph });
+                items.Add(new("Make In-House Ingredient…", MakeInHouseIngredientCommand, leaf) { Icon = AppIcon.InHouse });
             }
 
-            items.AddRange([TreeMenuItem.Separator, new("Delete", DeleteSubAssemblyCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph }]);
+            items.AddRange([TreeMenuItem.Separator, new("Delete", DeleteSubAssemblyCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete }]);
         }
 
         return items;
@@ -1367,10 +1359,10 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     {
         List<TreeMenuItem> items =
         [
-            new(folder.IsPackaging ? "New Packaging Set Here" : "New Sub-Assembly Here", NewSubAssemblyInCommand, folder) { Glyph = AddGlyph },
+            new(folder.IsPackaging ? "New Packaging Set Here" : "New Sub-Assembly Here", NewSubAssemblyInCommand, folder) { Icon = AppIcon.Add },
             TreeMenuItem.Separator,
-            new("New Role…", NewRoleCommand) { Glyph = NewFolderGlyph },
-            new("Rename Role…", RenameRoleCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
+            new("New Role…", NewRoleCommand) { Icon = AppIcon.NewFolder },
+            new("Rename Role…", RenameRoleCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
         ];
 
         // The Packaging role is never deleted, so it isn't offered. Every sub-assembly in it counts, not just a search's
@@ -1381,7 +1373,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
             items.Add(new(holds == 0 ? "Delete Role" : $"Delete Role (holds {holds})", DeleteRoleCommand, folder)
             {
                 Gesture = "Del",
-                Glyph = DeleteGlyph,
+                Icon = AppIcon.Delete,
                 IsEnabled = holds == 0,
             });
         }
@@ -1392,8 +1384,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
-        new("New Sub-Assembly", NewSubAssemblyInCommand) { Glyph = AddGlyph },
-        new("New Role…", NewRoleCommand) { Glyph = NewFolderGlyph },
+        new("New Sub-Assembly", NewSubAssemblyInCommand) { Icon = AppIcon.Add },
+        new("New Role…", NewRoleCommand) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),
@@ -1403,7 +1395,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// The list's Make In-House Ingredient, saved at once once the prompt is answered: a new made ingredient made from the
     /// recipe, in the Made category picked, with no add-ins and no weight loss. The
     /// recipe stays here as it is, and the products linking it are
-    /// left alone; it shows under Used By. The form's unsaved changes to it have to be saved or undone first: the made
+    /// left alone; it shows under Consumer. The form's unsaved changes to it have to be saved or undone first: the made
     /// ingredient is made from it as it's saved.
     /// </summary>
     private async Task MakeInHouseIngredientAsync(StandaloneSubAssemblyRow row)

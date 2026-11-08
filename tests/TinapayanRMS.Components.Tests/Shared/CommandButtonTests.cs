@@ -4,6 +4,7 @@ using AwesomeAssertions;
 using ReactiveUI;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -47,14 +48,15 @@ public class CommandButtonTests
     }
 
     [Test]
-    public async Task A_button_with_only_a_glyph_is_an_icon_button()
+    public async Task A_button_with_only_an_icon_is_an_icon_button()
     {
         await using var context = AppServices.NewContext();
         var command = ReactiveCommand.Create(() => { });
 
-        var button = context.Render<CommandButton>(parameters => parameters.Add(b => b.Command, command).Add(b => b.Glyph, Glyphs.Add).Add(b => b.Flat, true));
+        var button = context.Render<CommandButton>(parameters => parameters.Add(b => b.Command, command).Add(b => b.Icon, AppIcon.Add).Add(b => b.Flat, true));
 
         button.Find("button").ClassList.Should().Contain(["icon-only", "e-flat"]);
+        button.Find("button .glyph").ClassList.Should().Contain(["e-icons", "e-plus"], "Syncfusion's icon draws it");
         button.FindAll(".command-label").Should().BeEmpty();
     }
 }

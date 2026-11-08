@@ -21,23 +21,23 @@
         </div>
         <div class="button-row">
             <div class="split-button">
-                <CommandButton Command="ViewModel.NewCommand" Glyph="@Glyphs.Add" Label="New" Tooltip="A new product. The arrow offers a composite product, made of other products, too." />
+                <CommandButton Command="ViewModel.NewCommand" Icon="AppIcon.Add" Label="New" Tooltip="A new product. The arrow offers a composite product, made of other products, too." />
                 <MenuButton CssClass="split-arrow" Tooltip="New product, or new composite product">
-                    <CommandButton Command="ViewModel.NewCommand" Glyph="@Glyphs.Add" Label="New product" Flat="true"
+                    <CommandButton Command="ViewModel.NewCommand" Icon="AppIcon.Add" Label="New product" Flat="true"
                                   Tooltip="A product made of sub-assemblies: its recipe, its packaging and its costing." />
-                    <CommandButton Command="ViewModel.NewCompositeCommand" Glyph="@Glyphs.Composite" Label="New composite product" Flat="true"
+                    <CommandButton Command="ViewModel.NewCompositeCommand" Icon="AppIcon.Composite" Label="New composite product" Flat="true"
                                   Tooltip="A product made of two or more other products, such as a Pasalubong Box, with its own packaging and any topping or filling over the whole. Each product brings its recipe cost." />
                 </MenuButton>
             </div>
-            <CommandButton Command="ViewModel.SaveCommand" Glyph="@Glyphs.Save" Label="Save" Primary="true" Tooltip="Saves the details, recipe, packaging and costing together." />
-            <CommandButton Command="ViewModel.UndoCommand" Glyph="@Glyphs.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed, a sub-assembly put in. Ctrl+Z." />
-            <CommandButton Command="ViewModel.RedoCommand" Glyph="@Glyphs.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
-            <CommandButton Command="ViewModel.RevertCommand" Glyph="@Glyphs.Cancel" Label="Revert"
+            <CommandButton Command="ViewModel.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the details, recipe, packaging and costing together." />
+            <CommandButton Command="ViewModel.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed, a sub-assembly put in. Ctrl+Z." />
+            <CommandButton Command="ViewModel.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+            <CommandButton Command="ViewModel.RevertCommand" Icon="AppIcon.Cancel" Label="Revert"
                            Tooltip="Puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited." />
-            <CommandButton Command="ViewModel.PrintCommand" Glyph="@Glyphs.Print" Label="Print"
+            <CommandButton Command="ViewModel.PrintCommand" Icon="AppIcon.Print" Label="Print"
                            Tooltip="Opens the Print screen, which previews and prints this product's recipe and costing as this screen shows them. On the Scaling tab, it prints the recipe scaled instead." />
-            <CommandButton Command="ViewModel.ToggleCostBasisCommand" Glyph="@Glyphs.Calculate" Label="@ViewModel.CostBasisButtonLabel" Tooltip="@ViewModel.CostBasisButtonTooltip" />
-            <CommandButton Command="ViewModel.DeleteCommand" Glyph="@Glyphs.Delete" Label="Delete" />
+            <CommandButton Command="ViewModel.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@ViewModel.CostBasisButtonLabel" Tooltip="@ViewModel.CostBasisButtonTooltip" />
+            <CommandButton Command="ViewModel.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </div>
 

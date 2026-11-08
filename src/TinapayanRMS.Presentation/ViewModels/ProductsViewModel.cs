@@ -606,8 +606,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>The products other than this one that use <paramref name="subAssemblyId"/>, by name.</summary>
-    private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> usedBy) =>
-        [.. usedBy.GetValueOrDefault(subAssemblyId, [])
+    private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> consumers) =>
+        [.. consumers.GetValueOrDefault(subAssemblyId, [])
             .Where(p => p.Id != _detailProductId)
             .Select(p => p.Name)
             .Order(StringComparer.CurrentCultureIgnoreCase)];
@@ -691,7 +691,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// The sub-assemblies linked badges ask to open, by id. The main window, which owns the tabs, subscribes and opens
-    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Used By tiles open their products here.
+    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Consumer tiles open their products here.
     /// </summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
@@ -1894,7 +1894,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Used By tiles). A search
+    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Consumer tiles). A search
     /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
     /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
     /// </summary>
@@ -2032,7 +2032,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private bool TrySelectProduct(int productId)
     {
-        // A deleted one (a Used By tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
+        // A deleted one (a Consumer tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
         if (DeletedProducts.Any(p => p.Id == productId))
         {
             if (ProductTree.Find(productId) is null)
@@ -2944,12 +2944,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return true;
         }
 
-        var usedBy = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
+        var consumers = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
         var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
         var shared = edited
             .Select(u => (u.LinkedName, Others: (IReadOnlyList<string>)
             [
-                .. OtherProductsUsing(u.SubAssemblyId, usedBy),
+                .. OtherProductsUsing(u.SubAssemblyId, consumers),
                 .. (madeFrom.GetValueOrDefault(u.SubAssemblyId) ?? []).Select(m => m.Name),
             ]))
             .Where(s => s.Others.Count > 0)
@@ -4554,21 +4554,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         };
     }
 
-    // Segoe Fluent Icons glyphs for the list's menu, the ones the screen's buttons use where there's one.
-    private const string CompositeGlyph = "";
-    private const string AddGlyph = "";
-    private const string NewFolderGlyph = "";
-    private const string MoveGlyph = "";
-    private const string PromoteGlyph = "";
-    private const string SendBackGlyph = "";
-    private const string RenameGlyph = "";
-    private const string CopyGlyph = "";
-    private const string LinkGlyph = "";
-    private const string DeleteGlyph = "";
-    private const string RestoreGlyph = "";
-    private const string PrintGlyph = "";
-    private const string CostingGlyph = "";
-
     /// <summary>
     /// The menu a right-click opens on the list (ProductList): on <paramref name="node"/>'s row, which the list picks
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
@@ -4624,22 +4609,22 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         List<TreeMenuItem> items = [];
         if (toProduction.Count > 0)
         {
-            items.Add(new($"Promote {HowMany(toProduction)}to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
+            items.Add(new($"Promote {HowMany(toProduction)}to Production", MoveProductsCommand, toProduction) { Icon = AppIcon.MoveUp });
         }
 
         if (toResearch.Count > 0)
         {
-            items.Add(new($"Send {HowMany(toResearch)}Back to Research and Development", MoveProductsCommand, toResearch) { Glyph = SendBackGlyph });
+            items.Add(new($"Send {HowMany(toResearch)}Back to Research and Development", MoveProductsCommand, toResearch) { Icon = AppIcon.MoveDown });
         }
 
         items.Add(new($"Move {(isOne ? string.Empty : $"{products.Count} Products ")}to")
         {
-            Glyph = MoveGlyph,
+            Icon = AppIcon.Move,
             Items = [MoveToStage(ProductStage.Production), MoveToStage(ProductStage.ResearchAndDevelopment)],
         });
         items.Add(new($"Apply Costing Defaults{(isOne ? string.Empty : $" to {products.Count} Products")}…", ApplyCostingDefaultsCommand, products)
         {
-            Glyph = CostingGlyph,
+            Icon = AppIcon.Calculate,
         });
 
         if (isOne)
@@ -4648,11 +4633,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("Rename…", RenameProductCommand, leaf) { Gesture = "F2", Glyph = RenameGlyph },
-                new("Clone…", CloneProductCommand, leaf) { Glyph = CopyGlyph },
-                new("Create Variant…", CreateVariantOfCommand, leaf) { Glyph = LinkGlyph },
+                new("Rename…", RenameProductCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("Clone…", CloneProductCommand, leaf) { Icon = AppIcon.Copy },
+                new("Create Variant…", CreateVariantOfCommand, leaf) { Icon = AppIcon.Link },
                 TreeMenuItem.Separator,
-                new("Delete", DeleteProductCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
+                new("Delete", DeleteProductCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete },
             ]);
         }
 
@@ -4683,18 +4668,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A product in the Deleted folder: it can only come back, or go for good.</summary>
     private List<TreeMenuItem> DeletedProductMenu(ProductLeafNode leaf) =>
     [
-        new("Restore", RestoreProductCommand, leaf) { Glyph = RestoreGlyph },
+        new("Restore", RestoreProductCommand, leaf) { Icon = AppIcon.Undo },
         TreeMenuItem.Separator,
-        new("Delete Permanently", DeletePermanentlyCommand, leaf) { Gesture = "Del", Glyph = DeleteGlyph },
+        new("Delete Permanently", DeletePermanentlyCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete },
     ];
 
     private List<TreeMenuItem> StageMenu(ProductFolderNode stage) =>
     [
-        new("New Product Here", NewProductInCommand, stage) { Glyph = AddGlyph },
-        new("New Composite Product Here", NewCompositeProductInCommand, stage) { Glyph = CompositeGlyph },
-        new("New Category…", NewCategoryCommand, stage) { Glyph = NewFolderGlyph },
+        new("New Product Here", NewProductInCommand, stage) { Icon = AppIcon.Add },
+        new("New Composite Product Here", NewCompositeProductInCommand, stage) { Icon = AppIcon.Composite },
+        new("New Category…", NewCategoryCommand, stage) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
-        new("Print Stage", PrintFolderCommand, stage) { Glyph = PrintGlyph },
+        new("Print Stage", PrintFolderCommand, stage) { Icon = AppIcon.Print },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand, stage),
         new("Collapse All", CollapseAllCommand, stage),
@@ -4704,27 +4689,27 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         List<TreeMenuItem> items =
         [
-            new("New Product Here", NewProductInCommand, folder) { Glyph = AddGlyph },
-            new("New Composite Product Here", NewCompositeProductInCommand, folder) { Glyph = CompositeGlyph },
+            new("New Product Here", NewProductInCommand, folder) { Icon = AppIcon.Add },
+            new("New Composite Product Here", NewCompositeProductInCommand, folder) { Icon = AppIcon.Composite },
         ];
 
         // What the folder shows: with a search on, its matches.
         var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, folder.Products.Select(l => l.Product));
         if (toProduction.Count > 0)
         {
-            items.Add(new("Promote All to Production", MoveProductsCommand, toProduction) { Glyph = PromoteGlyph });
+            items.Add(new("Promote All to Production", MoveProductsCommand, toProduction) { Icon = AppIcon.MoveUp });
         }
 
-        items.Add(new("Print Folder", PrintFolderCommand, folder) { Glyph = PrintGlyph });
+        items.Add(new("Print Folder", PrintFolderCommand, folder) { Icon = AppIcon.Print });
 
         if (folder.IsCategory)
         {
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("New Category…", NewCategoryCommand, folder) { Glyph = NewFolderGlyph },
-                new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Glyph = RenameGlyph },
-                new("Delete Category", DeleteCategoryCommand, folder) { Gesture = "Del", Glyph = DeleteGlyph },
+                new("New Category…", NewCategoryCommand, folder) { Icon = AppIcon.NewFolder },
+                new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("Delete Category", DeleteCategoryCommand, folder) { Gesture = "Del", Icon = AppIcon.Delete },
             ]);
         }
 
@@ -4733,11 +4718,11 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
-        new("New Product", NewProductInCommand) { Glyph = AddGlyph },
-        new("New Composite Product", NewCompositeProductInCommand) { Glyph = CompositeGlyph },
-        new("New Category…", NewCategoryCommand) { Glyph = NewFolderGlyph },
+        new("New Product", NewProductInCommand) { Icon = AppIcon.Add },
+        new("New Composite Product", NewCompositeProductInCommand) { Icon = AppIcon.Composite },
+        new("New Category…", NewCategoryCommand) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
-        new("Print All Products", PrintAllCommand) { Glyph = PrintGlyph },
+        new("Print All Products", PrintAllCommand) { Icon = AppIcon.Print },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),

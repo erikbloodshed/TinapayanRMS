@@ -19,11 +19,11 @@
                     title="Open it on the Sub-Assemblies screen, where its lines are changed. Every made ingredient and product using it follows.">
                 @ViewModel.SubAssemblyBadgeText
             </button>
-            <CommandButton Command="ViewModel.StartChangingSubAssemblyCommand" Glyph="@Glyphs.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
+            <CommandButton Command="ViewModel.StartChangingSubAssemblyCommand" Icon="AppIcon.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
         }
         @if (ViewModel.IsChangingSubAssembly)
         {
-            <CommandButton Command="ViewModel.CancelChangingSubAssemblyCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Keep the sub-assembly as it is" />
+            <CommandButton Command="ViewModel.CancelChangingSubAssemblyCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the sub-assembly as it is" />
         }
     </div>
 
@@ -70,9 +70,9 @@
         </Row>
     </LineGrid>
     <div class="button-row align-right form-extra">
-        <ActionButton Glyph="@Glyphs.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
+        <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
                       Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
-        <CommandButton Command="ViewModel.RemoveAddInCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Add-In" />
+        <CommandButton Command="ViewModel.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
     </div>
 </div>
 

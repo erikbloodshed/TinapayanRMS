@@ -12,8 +12,8 @@ public closed class RecipeTab : ReactiveObject
 {
     public abstract string Header { get; }
 
-    /// <summary>The Segoe Fluent Icons glyph before the header.</summary>
-    public abstract string Glyph { get; }
+    /// <summary>The icon before the header.</summary>
+    public abstract AppIcon Icon { get; }
 }
 
 /// <summary>
@@ -31,7 +31,7 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
         {
             this.RaiseAndSetIfChanged(ref _usage, value);
             this.RaisePropertyChanged(nameof(Header));
-            this.RaisePropertyChanged(nameof(Glyph));
+            this.RaisePropertyChanged(nameof(Icon));
         }
     }
 
@@ -42,7 +42,7 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
     public void RefreshHeader() => this.RaisePropertyChanged(nameof(Header));
 
     /// <summary>A list for a new section, whose lines are typed in here; a link for a linked one.</summary>
-    public override string Glyph => Usage.IsLinked ? "" : "";
+    public override AppIcon Icon => Usage.IsLinked ? AppIcon.Link : AppIcon.Section;
 }
 
 /// <summary>
@@ -53,7 +53,7 @@ public sealed class AddSubAssemblyRecipeTab : RecipeTab
 {
     public override string Header => "New Sub-Assembly";
 
-    public override string Glyph => "";
+    public override AppIcon Icon => AppIcon.Add;
 }
 
 /// <summary>
@@ -64,8 +64,8 @@ public sealed class ComponentsRecipeTab : RecipeTab
 {
     public override string Header => "Products";
 
-    /// <summary>Segoe Fluent Icons' AllApps: several things together.</summary>
-    public override string Glyph => "";
+    /// <summary>Several products together.</summary>
+    public override AppIcon Icon => AppIcon.Composite;
 }
 
 /// <summary>The packaging's tab, with its lines and form. There's always exactly one.</summary>
@@ -73,5 +73,5 @@ public sealed class PackagingRecipeTab : RecipeTab
 {
     public override string Header => "Packaging";
 
-    public override string Glyph => "";
+    public override AppIcon Icon => AppIcon.Packaging;
 }

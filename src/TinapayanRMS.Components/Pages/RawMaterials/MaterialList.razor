@@ -12,17 +12,17 @@
     </div>
 
     <div class="list-toolbar">
-        <ActionButton Glyph="@Glyphs.Add" Tooltip="New Raw Material" Flat="true" OnClick="() => Commands.Run(ViewModel.NewMaterialInCommand, null)" />
+        <ActionButton Icon="AppIcon.Add" Tooltip="New Raw Material" Flat="true" OnClick="() => Commands.Run(ViewModel.NewMaterialInCommand, null)" />
         <MenuButton CssClass="e-flat icon-only" Tooltip="New Category: an ingredient, Made or packaging category">
-            <Face><span class="glyph" aria-hidden="true">@Glyphs.NewFolder</span></Face>
+            <Face><Icon Of="AppIcon.NewFolder" /></Face>
             <ChildContent>
-                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Ingredient Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Ingredient)" />
-                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Made Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Made)" />
-                <ActionButton Glyph="@Glyphs.NewFolder" Label="New Packaging Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Packaging)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Ingredient Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Ingredient)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Made Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Made)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Packaging Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Packaging)" />
             </ChildContent>
         </MenuButton>
-        <ActionButton Glyph="@Glyphs.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
-        <ActionButton Glyph="@Glyphs.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
+        <ActionButton Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
+        <ActionButton Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
     </div>
 
     <FolderTree TNode="RawMaterialTreeNode"
@@ -41,7 +41,7 @@
         <RowTemplate Context="node">
             @if (node.IsFolder)
             {
-                <span class="glyph tree-glyph" aria-hidden="true">@node.Glyph</span>
+                <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
             <span class="tree-title">@node.Title</span>
             @if (node.IsFolder)

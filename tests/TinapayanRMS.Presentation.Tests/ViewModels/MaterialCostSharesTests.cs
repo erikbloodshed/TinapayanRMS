@@ -9,7 +9,7 @@ using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
-/// <summary>What a raw material makes up of each product's material cost, for Raw Materials' Used By tiles.</summary>
+/// <summary>What a raw material makes up of each product's material cost, for Raw Materials' Consumer tiles.</summary>
 [NotInParallel(DatabaseCollection.C)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class MaterialCostSharesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)

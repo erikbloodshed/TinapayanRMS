@@ -5,9 +5,9 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// One screen opening another, as the WPF MainWindow wired them: a Used By tile (Raw Materials, Sub-Assemblies) or a
+/// One screen opening another, as the WPF MainWindow wired them: a Consumer tile (Raw Materials, Sub-Assemblies) or a
 /// double-clicked row (Reports, the Price Simulator) opens its product on Products; Sub-Assemblies' New Product starts a product
-/// there that links it; a Reports row, or a made ingredient's tile on Sub-Assemblies' Used By, opens its material on Raw
+/// there that links it; a Reports row, or a made ingredient's tile on Sub-Assemblies' Consumer, opens its material on Raw
 /// Materials; a linked badge on Products, or a made ingredient's Made from badge, opens its sub-assembly on
 /// Sub-Assemblies; and a Print on Products goes to the Print screen with that choice. One per page the window loads, started by
 /// the layout. The record goes into the screen's address, and the screen opens it from there.

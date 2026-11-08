@@ -42,14 +42,14 @@
                         title="@linked.LinkedFromToolTip">
                     @linked.LinkedFromText
                 </button>
-                <CommandButton Command="ViewModel.StartChangingLinkCommand" Glyph="@Glyphs.Edit" Flat="true"
+                <CommandButton Command="ViewModel.StartChangingLinkCommand" Icon="AppIcon.Edit" Flat="true"
                                Tooltip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept." />
             }
             @if (ViewModel.UsageForm.IsChangingLink)
             {
                 <PickField TItem="LinkableSubAssemblyOption" Items="ViewModel.UsageForm.ChangeLinkOptions" TextField="DisplayName" @bind-Value="ViewModel.UsageForm.ChangeLinkTarget"
                            Placeholder="Link instead…" CssClass="change-link" Tooltip="A sub-assembly from the Sub-Assemblies screen to link in this one's place" />
-                <CommandButton Command="ViewModel.CancelChangingLinkCommand" Glyph="@Glyphs.Cancel" Flat="true" Tooltip="Keep the link as it is" />
+                <CommandButton Command="ViewModel.CancelChangingLinkCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the link as it is" />
             }
         </div>
 
@@ -81,19 +81,19 @@
             {
                 @if (ViewModel.UsageForm.IsEditingLinkedUsage)
                 {
-                    <ActionButton Glyph="@Glyphs.Unlink" Label="Unlink" OnClick="() => Commands.Run(ViewModel.UnlinkCommand, usage)" Disabled="!Commands.CanRun(ViewModel.UnlinkCommand, usage)"
+                    <ActionButton Icon="AppIcon.Unlink" Label="Unlink" OnClick="() => Commands.Run(ViewModel.UnlinkCommand, usage)" Disabled="!Commands.CanRun(ViewModel.UnlinkCommand, usage)"
                                   Tooltip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it." />
-                    <ActionButton Glyph="@Glyphs.Copy" Label="Copy" OnClick="() => Commands.Run(ViewModel.MakeCopyCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MakeCopyCommand, usage)"
+                    <ActionButton Icon="AppIcon.Copy" Label="Copy" OnClick="() => Commands.Run(ViewModel.MakeCopyCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MakeCopyCommand, usage)"
                                   Tooltip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
                 }
                 @if (ViewModel.UsageForm.IsEditingOwnedUsage)
                 {
-                    <ActionButton Glyph="@Glyphs.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(ViewModel.MoveToSubAssembliesCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToSubAssembliesCommand, usage)"
+                    <ActionButton Icon="AppIcon.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(ViewModel.MoveToSubAssembliesCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToSubAssembliesCommand, usage)"
                                   Tooltip="Save puts it on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
                 }
                 @if (ViewModel.UsageForm.CanMoveEditingUsageToInHouse)
                 {
-                    <ActionButton Glyph="@Glyphs.Export" Label="Move to In-House" OnClick="() => Commands.Run(ViewModel.MoveToInHouseCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToInHouseCommand, usage)"
+                    <ActionButton Icon="AppIcon.InHouse" Label="Move to In-House" OnClick="() => Commands.Run(ViewModel.MoveToInHouseCommand, usage)" Disabled="!Commands.CanRun(ViewModel.MoveToInHouseCommand, usage)"
                                   Tooltip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there at the same piece size." />
                 }
             }
@@ -114,7 +114,7 @@
                 <span class="caption">Cost per piece · @ViewModel.UsageForm.UsageFormCostPerPieceText</span>
                 @if (ViewModel.UsageForm.IsFormEditingPackaging)
                 {
-                    <CommandButton Command="ViewModel.RemoveFormPackagingLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                    <CommandButton Command="ViewModel.RemoveFormPackagingLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                 }
             </div>
         </div>
@@ -135,9 +135,9 @@
                         @if (ViewModel.UsageForm.IsFormLinesEditable)
                         {
                             <div class="button-row">
-                                <ActionButton Glyph="@Glyphs.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
+                                <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
                                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                                <CommandButton Command="ViewModel.RemoveFormLineCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Line" />
+                                <CommandButton Command="ViewModel.RemoveFormLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                             </div>
                         }
                     </div>
@@ -156,9 +156,9 @@
                         <div class="lines-footer">
                             <p class="caption">@ViewModel.UsageForm.UsageFormAddInsCaption</p>
                             <div class="button-row">
-                                <ActionButton Glyph="@Glyphs.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
+                                <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
                                               Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
-                                <CommandButton Command="ViewModel.RemoveFormAddInCommand" CssClass="remove-line" Glyph="@Glyphs.Remove" Label="Remove Add-In" />
+                                <CommandButton Command="ViewModel.RemoveFormAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
                             </div>
                         </div>
                     </div>

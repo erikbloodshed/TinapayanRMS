@@ -1,8 +1,8 @@
 @* A button for something a CommandButton can't bind: a command with a parameter, or a screen's own action. *@
 <SfButton CssClass="@Css" Disabled="Disabled" @onclick="OnClick" title="@Tooltip" IsPrimary="Primary">
-    @if (Glyph is not null)
+    @if (Icon is { } icon)
     {
-        <span class="glyph" aria-hidden="true">@Glyph</span>
+        <Icon Of="icon" />
     }
     @if (Label is not null)
     {
@@ -13,7 +13,7 @@
 @code {
     [Parameter] public string? Label { get; set; }
 
-    [Parameter] public string? Glyph { get; set; }
+    [Parameter] public AppIcon? Icon { get; set; }
 
     [Parameter] public bool Primary { get; set; }
 
