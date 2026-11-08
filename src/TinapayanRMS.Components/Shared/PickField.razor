@@ -6,8 +6,11 @@
    each item's place in the list rather than the item, since it reads an enum's first value as no value at all. Within
    an undo screen the pick is one undo step. A picker on a screen that adds what's typed (the Category pickers) passes
    OnTyped and OnLeave, and the screen settles the text itself. As the WPF pickers highlighted the best match for what's
-   typed (PickerMatchHighlight), the first match fills in as it's typed (Autofill), so Enter or Tab picks it. *@
-<SfComboBox ID="@ID" TValue="int?" TItem="Choice" DataSource="_choices" Value="SelectedIndex" ValueChanged="OnValueChanged"
+   typed (PickerMatchHighlight), the first match fills in as it's typed (Autofill), so Enter or Tab picks it. The list
+   filters on every key (DebounceDelay 0): Syncfusion's default held each filter back 300 ms after the key, so the list
+   and the fill-in trailed the typing, and a late fill-in could put back text just rubbed out. The lists are in memory,
+   and a filter takes the window a few milliseconds. *@
+<SfComboBox ID="@ID" TValue="int?" TItem="Choice" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
             AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="true" Placeholder="@Placeholder"
             Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
     <ComboBoxFieldSettings Text="Text" Value="Index" />
@@ -71,6 +74,15 @@
 
     private int? SelectedIndex => Value is null ? null : _choices.FindIndex(c => EqualityComparer<TItem>.Default.Equals(c.Item, Value)) is >= 0 and var i ? i : null;
 
+    // While the box has the cursor it's given what the typing last picked, not the ViewModel's pick drawn over it: a pick
+    // refused there (text rubbed out, or matching nothing, where one is needed) wrote the old one back into the box under
+    // the cursor, so Backspace seemed to do nothing. The ViewModel's pick shows again once the box is left.
+    private bool _hasCursor;
+
+    private int? _typedIndex;
+
+    private int? ShownIndex => _hasCursor ? _typedIndex : SelectedIndex;
+
     protected override void OnParametersSet()
     {
         var items = Items.ToList();
@@ -87,22 +99,26 @@
 
     private async Task OnFocus(object args)
     {
+        _typedIndex = SelectedIndex;
+        _hasCursor = true;
         Recorder?.BeginUndoStep();
         await OnArrive.InvokeAsync();
     }
 
     private async Task OnBlur(object args)
     {
+        _hasCursor = false;
         Recorder?.EndUndoStep();
         await OnLeave.InvokeAsync();
     }
 
     private async Task OnFiltering(FilteringEventArgs args) => await OnTyped.InvokeAsync(args.Text ?? "");
 
-    // Text that matched nothing, where a pick is needed, leaves the pick as it was, and the box shows it again as the field
-    // is drawn after the change.
+    // Text that matched nothing, where a pick is needed, leaves the pick as it was, and the box shows it again once it's
+    // left.
     private async Task OnValueChanged(int? index)
     {
+        _typedIndex = index;
         if (index is { } i && i >= 0 && i < _choices.Count)
         {
             await ValueChanged.InvokeAsync(_choices[i].Item);

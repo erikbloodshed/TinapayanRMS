@@ -810,11 +810,13 @@ window.tinapayanVim = (() => {
                 return;
             }
             if (isEscape) {
-                // Typing stops, and what was typed stays. An open list closes first, without the window around it
-                // hearing of the key; a window closes on the next Esc.
+                // Typing stops, and what was typed stays. An open list closes first; a window closes on the next Esc.
+                // The key the list is given bubbles: a Syncfusion list hears keys through Blazor, which listens at the
+                // page's root, so one that didn't bubble left the list open. A Syncfusion window around the list
+                // hears it too, but doesn't close on an Esc while a list is open.
                 swallow(event);
                 if (popupIsOpen()) {
-                    press(element, "Escape", {}, false);
+                    press(element, "Escape");
                 } else {
                     commit(element);
                 }

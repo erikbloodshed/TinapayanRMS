@@ -1,5 +1,6 @@
 using System.Globalization;
 using AwesomeAssertions;
+using Syncfusion.Blazor.DropDowns;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
@@ -7,8 +8,8 @@ using TinapayanRMS.Components.Tests.Fixtures;
 namespace TinapayanRMS.Components.Tests.Shared;
 
 /// <summary>
-/// TextField and NumberField: what's typed reaches the ViewModel as it's typed, and the server never writes into a box
-/// that has the cursor, since a redraw for an earlier keystroke would drop the ones typed since.
+/// TextField, NumberField and PickField: what's typed reaches the ViewModel as it's typed, and the server never writes
+/// into a box that has the cursor, since a redraw for an earlier keystroke would drop the ones typed since.
 /// </summary>
 public class FieldTests
 {
@@ -323,5 +324,38 @@ public class FieldTests
         field.Find("input").Blur();
 
         field.Find("input").GetAttribute("value").Should().Be("460.0");
+    }
+
+    [Test]
+    public async Task A_picker_with_the_cursor_isnt_given_back_a_pick_it_refused_until_its_left()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Flour", "Salt", "Water"])
+            .Add(f => f.Value, "Salt")
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+        box.Instance.Value.Should().Be(1);
+
+        // The text rubbed out: the combo box has no pick, and a line's ingredient can't be left without one.
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+
+        picked.Should().BeEmpty("the pick stays as it was");
+        box.Instance.Value.Should().BeNull("the old pick written back into the box under the cursor would undo the rubbing out");
+
+        // Something picked as it's typed still passes on at once.
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(2));
+        picked.Should().Equal("Water");
+
+        // Refused again, then left: the box shows the pick again.
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+        field.Render(parameters => parameters.Add(f => f.Value, "Water"));
+        box.Instance.Value.Should().BeNull();
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        box.Instance.Value.Should().Be(2);
     }
 }
