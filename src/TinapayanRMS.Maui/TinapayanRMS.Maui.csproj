@@ -1,5 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
+  <!-- Satori GC, an experiment (2026-11-08): github.com/VSadov/Satori, a low-pause garbage collector that isn't .NET's.
+       The SDK swaps the runtime's own files (coreclr, the JIT, System.Private.CoreLib) for Satori's builds of them, so it
+       only works for a self-contained app. Off unless asked for: -p:UseSatoriGC=true (below). Its runtime is built from
+       .NET's release/11.0, so choose an 11.0.0-satori.* version (nuget.org/packages/PublishWithSatoriGC). -->
+  <Sdk Name="PublishWithSatoriGC" Version="11.0.0-satori.42242472725.2" />
+
   <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2.
        Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target,
        and the WPF app it ran beside was dropped. -->
@@ -27,6 +33,19 @@
 
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+  </PropertyGroup>
+
+  <!-- Satori GC stays off: its SDK turns it on by default, and a -p:UseSatoriGC=true on the command line still wins over
+       this. With it on, the app is built self-contained, with its own copy of .NET (Satori's runtime over it), into
+       bin\Satori\ rather than bin\, so it never mixes with the everyday build. dotnet build, run and publish all take
+       it. The app logs which collector it started with (MauiProgram). -->
+  <PropertyGroup>
+    <UseSatoriGC>false</UseSatoriGC>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(UseSatoriGC)' == 'true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <OutputPath>bin\Satori\$(Configuration)\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>

@@ -33,6 +33,8 @@ A `TinapayanRMS.Maui` from `..\TinapayanRMS_Web` is another repo's app: leave it
 dotnet build src/TinapayanRMS.Maui
 ```
 
+The Satori GC experiment builds with `-p:UseSatoriGC=true` into `bin\Satori\Debug\…`; set `TINAPAYANRMS_SATORI=1` for every `driver.ps1` call to drive that build instead.
+
 ## Run (agent path)
 
 One command per call, from the repo root:

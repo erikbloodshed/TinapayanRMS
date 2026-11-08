@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
@@ -55,6 +56,13 @@ public static class MauiProgram
                 retainedFileCountLimit: 31,
                 formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
+
+        // Which garbage collector this copy runs on: Satori's in a build with -p:UseSatoriGC=true (the Maui project's
+        // experiment), which lists its settings under its own name, or .NET's own.
+        Log.Information(
+            "Garbage collector: {Collector}, latency mode {LatencyMode}",
+            GC.GetConfigurationVariables().ContainsKey("SatoriGC") ? "Satori" : ".NET's own",
+            GCSettings.LatencyMode);
 
         try
         {
