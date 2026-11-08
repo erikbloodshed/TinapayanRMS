@@ -72,16 +72,20 @@
 
     [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
 
-    private int? SelectedIndex => Value is null ? null : _choices.FindIndex(c => EqualityComparer<TItem>.Default.Equals(c.Item, Value)) is >= 0 and var i ? i : null;
+    private int? SelectedIndex => IndexOf(Value);
+
+    private int? IndexOf(TItem? item) =>
+        item is null ? null : _choices.FindIndex(c => EqualityComparer<TItem>.Default.Equals(c.Item, item)) is >= 0 and var i ? i : null;
 
     // While the box has the cursor it's given what the typing last picked, not the ViewModel's pick drawn over it: a pick
     // refused there (text rubbed out, or matching nothing, where one is needed) wrote the old one back into the box under
-    // the cursor, so Backspace seemed to do nothing. The ViewModel's pick shows again once the box is left.
+    // the cursor, so Backspace seemed to do nothing. The ViewModel's pick shows again once the box is left. The typed pick
+    // is kept as the item, not its place: a list rebuilt under the cursor would put another item at that place.
     private bool _hasCursor;
 
-    private int? _typedIndex;
+    private Choice? _typed;
 
-    private int? ShownIndex => _hasCursor ? _typedIndex : SelectedIndex;
+    private int? ShownIndex => _hasCursor ? (_typed is null ? null : IndexOf(_typed.Item)) : SelectedIndex;
 
     protected override void OnParametersSet()
     {
@@ -99,7 +103,7 @@
 
     private async Task OnFocus(object args)
     {
-        _typedIndex = SelectedIndex;
+        _typed = SelectedIndex is { } i ? _choices[i] : null;
         _hasCursor = true;
         Recorder?.BeginUndoStep();
         await OnArrive.InvokeAsync();
@@ -118,10 +122,10 @@
     // left.
     private async Task OnValueChanged(int? index)
     {
-        _typedIndex = index;
-        if (index is { } i && i >= 0 && i < _choices.Count)
+        _typed = index is { } i && i >= 0 && i < _choices.Count ? _choices[i] : null;
+        if (_typed is not null)
         {
-            await ValueChanged.InvokeAsync(_choices[i].Item);
+            await ValueChanged.InvokeAsync(_typed.Item);
         }
         else if (AllowEmpty)
         {

@@ -358,4 +358,25 @@ public class FieldTests
 
         box.Instance.Value.Should().Be(2);
     }
+
+    [Test]
+    public async Task A_picker_whose_list_is_rebuilt_under_the_cursor_keeps_showing_the_item_it_picked()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Bread", "Pastry"])
+            .Add(f => f.Value, "Pastry")
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+
+        // A category added in its sorted place while the box has the cursor moves Pastry from 1 to 2.
+        field.Render(parameters => parameters.Add(f => f.Items, ["Bread", "Cake", "Pastry"]));
+
+        box.Instance.Value.Should().Be(2, "the box still shows Pastry, not Cake, which took its old place");
+        picked.Should().BeEmpty();
+    }
 }
