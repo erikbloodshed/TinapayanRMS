@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using AwesomeAssertions;
 using TinapayanRMS.Presentation.ViewModels;
 
@@ -28,6 +30,24 @@ public static class Settle
         }
 
         condition().Should().BeTrue($"the screen settled, so what it shows now is final: {describe?.Invoke()}");
+    }
+
+    /// <summary>
+    /// Waits until a command that has just run is offered again. ReactiveUI marks a command finished on its main-thread
+    /// scheduler, after Execute's caller has its result, and that isn't the screen's work, so <see cref="UntilAsync"/>
+    /// would find the screen idle and read it before the mark lands: this waits on the command's own CanExecute instead.
+    /// </summary>
+    /// <param name="what">The command as the screen names it, for the failure's message.</param>
+    public static async Task UntilOfferedAsync(IObservable<bool> canExecute, string what)
+    {
+        try
+        {
+            await canExecute.FirstAsync(offered => offered).ToTask().WaitAsync(Limit);
+        }
+        catch (TimeoutException)
+        {
+            throw new TimeoutException($"{what} wasn't offered within {Limit.TotalSeconds:0} s");
+        }
     }
 
     /// <summary>

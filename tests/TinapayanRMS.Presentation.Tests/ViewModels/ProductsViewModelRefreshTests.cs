@@ -1629,9 +1629,10 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.IsAddingUsage.Should().BeTrue();
         viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal(["Dough", "Filling", "Topping"]);
         viewModel.UsageForm.EditingUsageRole!.Name.Should().Be("Dough");
-        // The command has just run, and ReactiveUI says it's done on its main-thread scheduler, the thread pool here: waited
-        // for, as a click reads it once the screen has drawn, rather than read before the pool gets to it.
-        await Settle.UntilAsync(viewModel, () => ((System.Windows.Input.ICommand)viewModel.AddUsageCommand).CanExecute(null), () => "Add Sub-Assembly isn't offered");
+        // The command has just run, and ReactiveUI marks it done on its main-thread scheduler: waited for on the command
+        // itself, as a click reads it once the screen has drawn. Settle.UntilAsync waited only for the screen's own work,
+        // which was already over, so under the full suite's load it could still read the command as running.
+        await Settle.UntilOfferedAsync(viewModel.AddUsageCommand.CanExecute, "Add Sub-Assembly");
         (await viewModel.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeFalse();
 
         // Left with nothing entered, as a click on another tab leaves it: the form closes and the tab goes.
