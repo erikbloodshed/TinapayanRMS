@@ -143,6 +143,71 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal");
     }
 
+    [Test]
+    public async Task A_run_cancelled_for_a_save_beside_it_is_run_again_and_sees_what_that_save_committed()
+    {
+        var productId = await AddProductAsync("Pandesal");
+        var products = new ProductRepository(CreateDbContextFactory());
+        var cancellation = Cancellation;
+        var attempts = 0;
+
+        var readFirst = await CreateUnitOfWork().RunAsync(async () =>
+        {
+            attempts++;
+            var name = (await products.GetByIdAsync(productId, cancellation))!.Name;
+            if (attempts == 1)
+            {
+                // Committed after the run read the product: its own write to the product can't be serialized after it.
+                await OutsideAsync(() => products.RenameAsync(productId, "Pandesal Classic", cancellation));
+            }
+
+            await products.RenameAsync(productId, name + " Special", cancellation);
+            return name;
+        }, Cancellation);
+
+        attempts.Should().Be(2);
+        readFirst.Should().Be("Pandesal Classic", "the second try read what the other save committed");
+        (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal Classic Special");
+    }
+
+    [Test]
+    public async Task A_run_cancelled_every_time_gives_up_after_its_attempts_with_what_postgresql_said()
+    {
+        var productId = await AddProductAsync("Pandesal");
+        var products = new ProductRepository(CreateDbContextFactory());
+        var cancellation = Cancellation;
+        var attempts = 0;
+
+        var run = () => CreateUnitOfWork().RunAsync(async () =>
+        {
+            attempts++;
+            var name = (await products.GetByIdAsync(productId, cancellation))!.Name;
+            await OutsideAsync(() => products.RenameAsync(productId, $"Pandesal {attempts}", cancellation));
+            await products.RenameAsync(productId, name + " Special", cancellation);
+            return 0;
+        }, Cancellation);
+
+        (await run.Should().ThrowAsync<Microsoft.EntityFrameworkCore.DbUpdateException>())
+            .Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be(Npgsql.PostgresErrorCodes.SerializationFailure);
+        attempts.Should().Be(Infrastructure.Services.SharedTransactionDbContextFactory.Attempts);
+    }
+
+    [Test]
+    public async Task A_run_refused_by_a_rule_isnt_run_again()
+    {
+        var attempts = 0;
+
+        var run = () => CreateUnitOfWork().RunAsync<int>(() =>
+        {
+            attempts++;
+            throw new BusinessRuleException("Refused.");
+        }, Cancellation);
+
+        await run.Should().ThrowAsync<BusinessRuleException>();
+        attempts.Should().Be(1);
+    }
+
     /// <summary>
     /// Runs <paramref name="work"/> without the run this is called in, as another copy of the app saves. TestContext.Current
     /// doesn't flow there either, so <paramref name="work"/> takes its cancellation from its caller.
