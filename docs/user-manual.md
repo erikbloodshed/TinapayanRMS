@@ -178,7 +178,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to the names that contain what you typed, and fills in the first name that starts with it. **Enter** or **Tab** picks that name, so "marg" and Enter picks Margarine. **Down** and **Up** move to the other names. **Backspace** takes off the filled-in part first, then a letter at a time, and you can empty the picker to see the whole list. If what you typed matches nothing, or you leave the picker empty where a name is needed (a recipe line's ingredient), it shows what it had again once you leave it. **Esc** closes the list and puts back what it had. Clicking or tabbing into a picker selects its text, so what you type replaces it.
 - **New** starts a blank record. **Delete** asks before deleting anything.
-- **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another screen (from the tabs, the menu or Find, or by closing the tab showing), pick another item in the list, press **New**, click a **Consumer** tile or another link, go **Back** or **Forward**, use **Clone** or **Create Variant**, or close the window. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
+- **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another screen (from the tabs, the menu or Find, or by closing the tab showing), pick another item in the list, press **New**, click a **Dependents** tile or another link, go **Back** or **Forward**, use **Clone** or **Create Variant**, or close the window. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
   - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
@@ -506,7 +506,7 @@ Correcting a multiplier reprices any brand bought in that unit.
 
 This tab is a calculator. Type a **Use Quantity**, pick a unit and press **Calculate**. It shows the quantity in the base unit, the cost per base unit, the calculated cost, the buffer, and the buffered cost.
 
-### Consumer tab
+### Dependents tab
 
 This tab lists every product the material ends up in as tiles, including products that use it indirectly, such as through a made ingredient, a linked part or a packaging set. An ingredient's list includes every composite product holding a product that uses it. A packaging material's list includes every composite product that holds such a product and has **Include each product's packaging** ticked. Click a tile to open that product.
 
@@ -567,7 +567,7 @@ The form has two cards. The header at the top holds the name and **New**, **Copy
 The card under it has two tabs along its bottom. Each scrolls while the header stays put:
 
 - **Recipe**: the **Lines**, with **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
-- **Consumer**: a tile for each product that links this sub-assembly. Click one to open it.
+- **Dependents**: a tile for each product that links this sub-assembly. Click one to open it.
 
 The tab you were on stays picked when you pick another sub-assembly, and when you go to another screen and come back, as on Products and Raw Materials.
 
@@ -579,7 +579,7 @@ The tab you were on stays picked when you pick another sub-assembly, and when yo
 
 Changing a sub-assembly here changes every product that links it, and every made ingredient made from it. When saving new lines would change what any of those products cost, **Save** asks first and lists each one's base cost now and after, for one sellable unit, such as *Pandesal x 8: 2.58 → 2.32 (-0.26)*, biggest change first. **No** leaves the changes unsaved in the form. When made ingredients are made from it, the question says they change too. A sub-assembly that a product links, or that a made ingredient is made from, **can't be deleted**. The message names them.
 
-The **Consumer** tab shows a tile for each product that links the sub-assembly, then one for each made ingredient made from it. Click a product's tile to open it on the Products screen, and a made ingredient's to open it on the Raw Materials screen. Saving lines here refuses a line that's a made ingredient made from this sub-assembly, directly or further down, because that ingredient would contain itself.
+The **Dependents** tab shows a tile for each product that links the sub-assembly, then one for each made ingredient made from it. Click a product's tile to open it on the Products screen, and a made ingredient's to open it on the Raw Materials screen. Saving lines here refuses a line that's a made ingredient made from this sub-assembly, directly or further down, because that ingredient would contain itself.
 
 ### Packaging sets
 
@@ -650,7 +650,7 @@ Deleting a product asks first, then moves it to the **Deleted** folder at the bo
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
-- A deleted product **still holds everything it uses**, so it can come back whole. A sub-assembly it links, an ingredient in its recipe, or a product it holds or whose packaging it links can't be deleted until you delete the deleted product permanently. **Consumer** tiles and refusal messages name it with "(deleted)" after its name. Clicking its tile picks it in the Deleted folder.
+- A deleted product **still holds everything it uses**, so it can come back whole. A sub-assembly it links, an ingredient in its recipe, or a product it holds or whose packaging it links can't be deleted until you delete the deleted product permanently. **Dependents** tiles and refusal messages name it with "(deleted)" after its name. Clicking its tile picks it in the Deleted folder.
 - A deleted product keeps its name, so no other product can take that name until it's deleted permanently.
 - A product can't be deleted, to the Deleted folder or permanently, while another product's packaging links it, or while a composite product holds it. That includes a deleted product.
 
@@ -1167,7 +1167,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 2. On **Cost Setup**, change the brand's **Purchase Price**, or add a row for a new brand.
 3. The buffered cost stays where it was. To carry the new price into recipes with the buffer on top, **type the Cost Buffer % again**, or press **Re-apply Target**. Alternatively, type a new Buffered Cost. After a round of price rises, **Reports → Cost Buffers** finds every material whose buffer they wore down, and re-applies them all at once.
 4. Press **Save**. The change is logged in **Price History** and carried up to every product that uses the material.
-5. Check the effect on the material's **Consumer** tab, or open a product and look at its Costing tab.
+5. Check the effect on the material's **Dependents** tab, or open a product and look at its Costing tab.
 
 ### Start a new product from an existing one
 
@@ -1177,8 +1177,8 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ### See which products use an ingredient
 
-- **Raw Materials** → pick the ingredient → **Consumer** tab.
-- For a shared sub-assembly: **Sub-Assemblies** → pick it → **Consumer**.
+- **Raw Materials** → pick the ingredient → **Dependents** tab.
+- For a shared sub-assembly: **Sub-Assemblies** → pick it → **Dependents**.
 
 ### Check whether a product's price still earns enough
 

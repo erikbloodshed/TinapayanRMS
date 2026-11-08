@@ -285,11 +285,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _costPerGram, value);
     }
 
-    /// <summary>The details tabs along the bottom: Recipe, then Consumer.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, then Dependents.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Consumer: the products and made ingredients the sub-assembly goes into.</summary>
-    public const int ConsumerTab = 1;
+    /// <summary>Dependents: the products and made ingredients the sub-assembly goes into.</summary>
+    public const int DependentsTab = 1;
 
     private int _selectedDetailsTab = RecipeTab;
     /// <summary>
@@ -302,17 +302,17 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
     }
 
-    private IReadOnlyList<LinkingProduct> _consumers = [];
-    /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Consumer, which opens it.</summary>
-    public IReadOnlyList<LinkingProduct> Consumers
+    private IReadOnlyList<LinkingProduct> _dependents = [];
+    /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Dependents, which opens it.</summary>
+    public IReadOnlyList<LinkingProduct> Dependents
     {
-        get => _consumers;
-        private set => this.RaiseAndSetIfChanged(ref _consumers, value);
+        get => _dependents;
+        private set => this.RaiseAndSetIfChanged(ref _dependents, value);
     }
 
     private IReadOnlyList<MadeIngredientUse> _madeIngredients = [];
     /// <summary>
-    /// The made ingredients made from the sub-assembly the form shows, by name: one tile each under Consumer, after the
+    /// The made ingredients made from the sub-assembly the form shows, by name: one tile each under Dependents, after the
     /// products, which opens it on Raw Materials.
     /// </summary>
     public IReadOnlyList<MadeIngredientUse> MadeIngredients
@@ -321,12 +321,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _madeIngredients, value);
     }
 
-    private string _consumersText = NotUsedText;
-    /// <summary>The caption under the Consumer tiles: what linking means for editing it, or how to link it when nothing does.</summary>
-    public string ConsumersText
+    private string _dependentsText = NotUsedText;
+    /// <summary>The caption under the Dependents tiles: what linking means for editing it, or how to link it when nothing does.</summary>
+    public string DependentsText
     {
-        get => _consumersText;
-        private set => this.RaiseAndSetIfChanged(ref _consumersText, value);
+        get => _dependentsText;
+        private set => this.RaiseAndSetIfChanged(ref _dependentsText, value);
     }
 
     private const string NotUsedText = "No product uses it yet. Link or copy it from a product's recipe on the Products screen.";
@@ -337,12 +337,12 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     private const string MadeFromText = "These follow every change saved here, and it can't be deleted while they use it: the products link it, and the made ingredients are made from it.";
 
-    /// <summary>A made ingredient's Consumer tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
+    /// <summary>A made ingredient's Dependents tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
 
     private readonly Subject<int> _rawMaterialOpenRequests = new();
 
-    /// <summary>The made ingredients Consumer tiles ask to open, by id. The main window subscribes and opens each on Raw Materials.</summary>
+    /// <summary>The made ingredients Dependents tiles ask to open, by id. The main window subscribes and opens each on Raw Materials.</summary>
     public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
@@ -402,13 +402,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// </summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
-    /// <summary>A Consumer tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    /// <summary>A Dependents tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
 
     private readonly Subject<int> _productOpenRequests = new();
 
     /// <summary>
-    /// The products Consumer tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each
+    /// The products Dependents tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each
     /// on the Products screen. Raised as the tile is clicked, not on the main-thread scheduler a command's own results
     /// wait for.
     /// </summary>
@@ -424,7 +424,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
 
     /// <summary>
     /// The sub-assemblies New Product asks a new product to link, by id. The main window subscribes and starts the new
-    /// product on the Products screen, as it opens a Consumer tile's product.
+    /// product on the Products screen, as it opens a Dependents tile's product.
     /// </summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
@@ -578,7 +578,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 RepointSelection(Rows.FirstOrDefault(r => r.Id == selectedId));
                 if (_editingId > 0)
                 {
-                    ShowConsumers(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
+                    ShowDependents(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? []);
                 }
             });
 
@@ -928,7 +928,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         Lines.Clear();
         SelectedPackagingLine = null;
         PackagingLines.Clear();
-        ShowConsumers([], []);
+        ShowDependents([], []);
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
         History.MarkClean();
@@ -949,7 +949,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         ClearForm();
         RestoreSnapshot(source with { EditingId = 0, Name = name });
         HeaderTitle = $"Copy of {sourceName}";
-        ShowConsumers([], []);
+        ShowDependents([], []);
         History.RefreshDirty();
     }
 
@@ -1008,7 +1008,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SelectedPackagingLine = null;
         PackagingLines.Clear();
         PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
-        ShowConsumers(row.GetConsumers(), row.GetMadeIngredients());
+        ShowDependents(row.GetDependents(), row.GetMadeIngredients());
 
         // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
         // end: the lines land after the name and role, and a form measured before them would read as changed
@@ -1016,11 +1016,11 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         History.MarkClean();
     }
 
-    private void ShowConsumers(IReadOnlyList<LinkingProduct> products, IReadOnlyList<MadeIngredientUse> madeIngredients)
+    private void ShowDependents(IReadOnlyList<LinkingProduct> products, IReadOnlyList<MadeIngredientUse> madeIngredients)
     {
-        Consumers = products;
+        Dependents = products;
         MadeIngredients = madeIngredients;
-        ConsumersText = madeIngredients.Count > 0 ? MadeFromText
+        DependentsText = madeIngredients.Count > 0 ? MadeFromText
             : products.Count == 0 ? IsPackaging ? SetNotUsedText : NotUsedText
             : UsedText;
     }
@@ -1395,7 +1395,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// The list's Make In-House Ingredient, saved at once once the prompt is answered: a new made ingredient made from the
     /// recipe, in the Made category picked, with no add-ins and no weight loss. The
     /// recipe stays here as it is, and the products linking it are
-    /// left alone; it shows under Consumer. The form's unsaved changes to it have to be saved or undone first: the made
+    /// left alone; it shows under Dependents. The form's unsaved changes to it have to be saved or undone first: the made
     /// ingredient is made from it as it's saved.
     /// </summary>
     private async Task MakeInHouseIngredientAsync(StandaloneSubAssemblyRow row)

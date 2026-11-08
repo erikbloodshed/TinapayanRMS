@@ -531,7 +531,7 @@
     color: var(--muted-foreground);
 }
 
-/* ---- Unit Conversion Overview, Usage Example and Consumer. ---- */
+/* ---- Unit Conversion Overview, Usage Example and Dependents. ---- */
 
 .conversions {
     display: flex;
@@ -595,13 +595,13 @@
     font-weight: 600;
 }
 
-.consumer-tiles {
+.dependent-tiles {
     display: grid;
     grid-template-columns: repeat(auto-fill, 124px);
     gap: 8px;
 }
 
-.consumer-tile {
+.dependent-tile {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -615,12 +615,12 @@
     cursor: pointer;
 }
 
-.consumer-tile:hover {
+.dependent-tile:hover {
     border-color: var(--color-sf-primary);
     background: var(--accent-soft);
 }
 
-.consumer-name {
+.dependent-name {
     text-align: center;
     overflow-wrap: anywhere;
 }
@@ -645,7 +645,7 @@
     color: transparent;
 }
 
-.consumer-tiles + .caption {
+.dependent-tiles + .caption {
     margin-top: 8px;
 }
 .buffer-row + .caption { margin-top: 6px; }
@@ -778,8 +778,8 @@
     width: 110px;
 }
 
-/* What a material makes up of a product's material cost, under the product's name on a Consumer tile. */
-.consumer-share {
+/* What a material makes up of a product's material cost, under the product's name on a Dependents tile. */
+.dependent-share {
     font-size: 12px;
     color: var(--muted-foreground);
 }

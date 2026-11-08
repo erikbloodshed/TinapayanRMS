@@ -1,24 +1,24 @@
 @using TinapayanRMS.ApplicationCore.Interfaces
 
-@* The Consumer tiles (the WPF app's UsedByTilesStyle): one per product that uses the record, in rows and columns of
+@* The Dependents tiles (the WPF app's UsedByTilesStyle): one per product that uses the record, in rows and columns of
    equal width, each with the product's name, wrapping when long, and under it, on Raw
    Materials, what the material makes up of the product's material cost. A tile opens its product on the Products screen.
    On Sub-Assemblies, a tile follows for each made ingredient made from it, which opens it on Raw Materials. *@
-<div class="consumer-tiles">
+<div class="dependent-tiles">
     @foreach (var product in Products)
     {
-        <button type="button" class="consumer-tile" title="Open on the Products screen" @onclick="() => Open.InvokeAsync(product.Id)">
-            <span class="consumer-name">@product.Name</span>
+        <button type="button" class="dependent-tile" title="Open on the Products screen" @onclick="() => Open.InvokeAsync(product.Id)">
+            <span class="dependent-name">@product.Name</span>
             @if (product.CostShareText is { } share)
             {
-                <span class="consumer-share" title="What the material makes up of this product's material cost, its ingredients and packaging at buffered costs, however it gets into it">@share</span>
+                <span class="dependent-share" title="What the material makes up of this product's material cost, its ingredients and packaging at buffered costs, however it gets into it">@share</span>
             }
         </button>
     }
     @foreach (var ingredient in MadeIngredients)
     {
-        <button type="button" class="consumer-tile" title="A made ingredient made from it. Open on the Raw Materials screen" @onclick="() => OpenMadeIngredient.InvokeAsync(ingredient.Id)">
-            <span class="consumer-name">@ingredient.Name</span>
+        <button type="button" class="dependent-tile" title="A made ingredient made from it. Open on the Raw Materials screen" @onclick="() => OpenMadeIngredient.InvokeAsync(ingredient.Id)">
+            <span class="dependent-name">@ingredient.Name</span>
         </button>
     }
 </div>

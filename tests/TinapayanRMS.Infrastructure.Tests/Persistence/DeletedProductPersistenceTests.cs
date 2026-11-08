@@ -131,7 +131,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
 
         await CreateRepository().DeleteAsync(productId, Cancellation);
 
-        (await new RawMaterialRepository(CreateDbContextFactory()).GetConsumersAsync(flourId, Cancellation))
+        (await new RawMaterialRepository(CreateDbContextFactory()).GetDependentsAsync(flourId, Cancellation))
             .Should().Equal(new LinkingProduct(productId, "Ensaymada (deleted)", null));
     }
 

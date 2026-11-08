@@ -8,7 +8,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// What a raw material makes up of each product's material cost (its ingredients and packaging for one sellable unit, at
-/// buffered costs), for Raw Materials' Consumer tiles ("flour is 38% of Pandesal's cost").
+/// buffered costs), for Raw Materials' Dependents tiles ("flour is 38% of Pandesal's cost").
 /// Worked out the way the Price Simulator prices a change: every product priced with the material at no cost
 /// (IngredientCostRules.Reprice, which carries it into the made and linked ingredients it's in) against as it is. Costs
 /// go up with prices in step, so the difference is exactly what the material brings, however it gets there: a line, an

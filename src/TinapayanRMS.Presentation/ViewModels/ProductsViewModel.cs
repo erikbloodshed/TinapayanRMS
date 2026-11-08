@@ -606,8 +606,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>The products other than this one that use <paramref name="subAssemblyId"/>, by name.</summary>
-    private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> consumers) =>
-        [.. consumers.GetValueOrDefault(subAssemblyId, [])
+    private List<string> OtherProductsUsing(int subAssemblyId, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> dependents) =>
+        [.. dependents.GetValueOrDefault(subAssemblyId, [])
             .Where(p => p.Id != _detailProductId)
             .Select(p => p.Name)
             .Order(StringComparer.CurrentCultureIgnoreCase)];
@@ -691,7 +691,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// The sub-assemblies linked badges ask to open, by id. The main window, which owns the tabs, subscribes and opens
-    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Consumer tiles open their products here.
+    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Dependents tiles open their products here.
     /// </summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
@@ -1894,7 +1894,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>
-    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Consumer tiles). A search
+    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Dependents tiles). A search
     /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
     /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
     /// </summary>
@@ -2032,7 +2032,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     private bool TrySelectProduct(int productId)
     {
-        // A deleted one (a Consumer tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
+        // A deleted one (a Dependents tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
         if (DeletedProducts.Any(p => p.Id == productId))
         {
             if (ProductTree.Find(productId) is null)
@@ -2944,12 +2944,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return true;
         }
 
-        var consumers = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
+        var dependents = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
         var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
         var shared = edited
             .Select(u => (u.LinkedName, Others: (IReadOnlyList<string>)
             [
-                .. OtherProductsUsing(u.SubAssemblyId, consumers),
+                .. OtherProductsUsing(u.SubAssemblyId, dependents),
                 .. (madeFrom.GetValueOrDefault(u.SubAssemblyId) ?? []).Select(m => m.Name),
             ]))
             .Where(s => s.Others.Count > 0)

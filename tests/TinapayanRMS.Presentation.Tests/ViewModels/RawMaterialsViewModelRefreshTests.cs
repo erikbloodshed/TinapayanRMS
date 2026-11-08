@@ -415,13 +415,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == flourId));
-        viewModel.Consumers.Select(p => p.Name).Should().Equal("Pandesal");
-        viewModel.ConsumersText.Should().StartWith("These products use it");
+        viewModel.Dependents.Select(p => p.Name).Should().Equal("Pandesal");
+        viewModel.DependentsText.Should().StartWith("These products use it");
 
         // A product made on the Products tab while this screen kept Flour open.
         await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m), (sugarId, 100m)]);
         await viewModel.LoadCommand.Execute();
-        viewModel.Consumers.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
+        viewModel.Dependents.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
 
         var opened = new List<int>();
         using (viewModel.ProductOpenRequests.Subscribe(opened.Add))
@@ -432,8 +432,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         opened.Should().Equal(pandesalId);
 
         await viewModel.NewCommand.Execute();
-        viewModel.Consumers.Should().BeEmpty("a new material isn't used by anything");
-        viewModel.ConsumersText.Should().Be("No product uses it yet.");
+        viewModel.Dependents.Should().BeEmpty("a new material isn't used by anything");
+        viewModel.DependentsText.Should().Be("No product uses it yet.");
     });
 
     [Test]

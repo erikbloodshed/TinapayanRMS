@@ -452,7 +452,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedRow!.Id.Should().Be(baseId, "it stays on the list, and on the form");
         viewModel.Lines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal(("Ube", 300m), ("Milk", 100m));
         viewModel.BatchCost.Should().Be(70m, "₱60 of ube and ₱10 of milk, as before");
-        viewModel.Consumers.Select(p => p.Name).Should().Equal("Ube Bun");
+        viewModel.Dependents.Select(p => p.Name).Should().Equal("Ube Bun");
         viewModel.MadeIngredients.Select(m => m.Name).Should().Equal("Ube Filling");
         viewModel.History.IsDirty.Should().BeFalse("the form shows it as it's saved");
         await using var dbContext = CreateDbContext();

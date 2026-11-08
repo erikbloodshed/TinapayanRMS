@@ -653,11 +653,11 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
     public bool ShowPriceHistory => _showPriceHistory.Value;
 
-    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Consumer, then Price History.</summary>
+    /// <summary>The details tabs along the bottom: Cost Setup, Alternative Units, Usage Example, Dependents, then Price History.</summary>
     public const int PriceHistoryTab = 4;
 
-    /// <summary>Consumer: the products the material goes into, with what it makes up of each one's material cost.</summary>
-    public const int ConsumerTab = 3;
+    /// <summary>Dependents: the products the material goes into, with what it makes up of each one's material cost.</summary>
+    public const int DependentsTab = 3;
 
     /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
     private int _selectedDetailsTab;
@@ -923,23 +923,23 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
-    private IReadOnlyList<LinkingProduct> _consumers = [];
+    private IReadOnlyList<LinkingProduct> _dependents = [];
     /// <summary>
-    /// The products the material showing goes into, by name (IRawMaterialRepository.GetConsumersAsync): one tile each on the
-    /// Consumer tab, which opens it. Empty for a new material.
+    /// The products the material showing goes into, by name (IRawMaterialRepository.GetDependentsAsync): one tile each on the
+    /// Dependents tab, which opens it. Empty for a new material.
     /// </summary>
-    public IReadOnlyList<LinkingProduct> Consumers
+    public IReadOnlyList<LinkingProduct> Dependents
     {
-        get => _consumers;
-        private set => this.RaiseAndSetIfChanged(ref _consumers, value);
+        get => _dependents;
+        private set => this.RaiseAndSetIfChanged(ref _dependents, value);
     }
 
-    private string _consumersText = NotUsedText;
-    /// <summary>The caption under the Consumer tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
-    public string ConsumersText
+    private string _dependentsText = NotUsedText;
+    /// <summary>The caption under the Dependents tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
+    public string DependentsText
     {
-        get => _consumersText;
-        private set => this.RaiseAndSetIfChanged(ref _consumersText, value);
+        get => _dependentsText;
+        private set => this.RaiseAndSetIfChanged(ref _dependentsText, value);
     }
 
     private const string NotUsedText = "No product uses it yet.";
@@ -947,13 +947,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private const string UsedText =
         "These products use it in their recipe or packaging, directly or through a made or linked ingredient, so a change to its cost reaches each of them.";
 
-    /// <summary>A Consumer tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
+    /// <summary>A Dependents tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
     public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
 
     private readonly Subject<int> _productOpenRequests = new();
 
     /// <summary>
-    /// The products Consumer tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each on
+    /// The products Dependents tiles ask to open, by id. The main window, which owns the tabs, subscribes and opens each on
     /// the Products screen, as it does for Sub-Assemblies' tiles.
     /// </summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
@@ -1221,7 +1221,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // pick never gets the first one's details added to its own. One that fails shows why, and the next pick loads as usual.
         LoadLatest(_picks, LoadDetailsAsync);
 
-        // The Consumer tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
+        // The Dependents tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
         LoadLatest(
             _costSharesWanted.Merge(this.WhenAnyValue(x => x.SelectedDetailsTab).Select(_ => RxVoid.Default)),
             (_, cancellationToken) => ShowCostSharesAsync(cancellationToken));
@@ -1335,10 +1335,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             // showing are still that material's once the read is back.
             if (_detailMaterialId is { } detailMaterialId)
             {
-                var consumers = await _rawMaterialRepository.GetConsumersAsync(detailMaterialId, CancellationToken.None);
+                var dependents = await _rawMaterialRepository.GetDependentsAsync(detailMaterialId, CancellationToken.None);
                 if (_detailMaterialId == detailMaterialId)
                 {
-                    ShowConsumers(consumers);
+                    ShowDependents(dependents);
                 }
             }
 
@@ -1958,7 +1958,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         IReadOnlyList<RawMaterialPriceHistory> PriceHistory,
         IReadOnlyList<RawMaterialBrandPrice> BrandPrices,
         IReadOnlyList<IngredientBomLine> BomLines,
-        IReadOnlyList<LinkingProduct> Consumers)
+        IReadOnlyList<LinkingProduct> Dependents)
     {
         public static readonly RawMaterialDetail None = new([], [], [], []);
     }
@@ -1969,16 +1969,16 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken)
     {
-        var consumers = await _rawMaterialRepository.GetConsumersAsync(material.Id, cancellationToken);
+        var dependents = await _rawMaterialRepository.GetDependentsAsync(material.Id, cancellationToken);
         return material.Source switch
         {
             RawMaterialSource.Purchased => new RawMaterialDetail(
                 await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
                 await _brandPriceRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
                 [],
-                consumers),
-            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), consumers),
-            _ => RawMaterialDetail.None with { Consumers = consumers },
+                dependents),
+            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), dependents),
+            _ => RawMaterialDetail.None with { Dependents = dependents },
         };
     }
 
@@ -2001,7 +2001,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             new BrandPriceRow(this, p.Brand, p.Unit?.UnitOfMeasureId ?? PurchaseUnitChoice.BaseUnitKey, p.Price)));
         _savedBrandPriceCount = detail.BrandPrices.Count;
 
-        ShowConsumers(detail.Consumers);
+        ShowDependents(detail.Dependents);
 
         UpdateCanChangeBaseUnit();
         RebuildBufferedCostUnitOptions();
@@ -2016,29 +2016,29 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         History.MarkClean();
     }
 
-    private void ShowConsumers(IReadOnlyList<LinkingProduct> products)
+    private void ShowDependents(IReadOnlyList<LinkingProduct> products)
     {
-        Consumers = products;
-        ConsumersText = products.Count == 0 ? NotUsedText : UsedText;
+        Dependents = products;
+        DependentsText = products.Count == 0 ? NotUsedText : UsedText;
         _costSharesWanted.OnNext(RxVoid.Default);
     }
 
-    /// <summary>What each Consumer product's share is worked out by; null in a screen built without it (tests that don't need it).</summary>
+    /// <summary>What each Dependents product's share is worked out by; null in a screen built without it (tests that don't need it).</summary>
     private readonly MaterialCostShares? _costShares;
 
-    /// <summary>Asks for the Consumer tiles' shares again: the tiles changed, or the tab showed.</summary>
+    /// <summary>Asks for the Dependents tiles' shares again: the tiles changed, or the tab showed.</summary>
     private readonly Subject<RxVoid> _costSharesWanted = new();
 
     /// <summary>
-    /// The Consumer tiles' "38% of materials", worked out only while the tab shows, since it reads every product
+    /// The Dependents tiles' "38% of materials", worked out only while the tab shows, since it reads every product
     /// the material goes into: the material at no cost against as it is (MaterialCostShares). Kept on the tiles until they change.
     /// </summary>
     private async Task ShowCostSharesAsync(CancellationToken cancellationToken)
     {
         if (_costShares is null
-            || SelectedDetailsTab != ConsumerTab
+            || SelectedDetailsTab != DependentsTab
             || SelectedRawMaterial is not { } material
-            || Consumers is not { Count: > 0 } tiles
+            || Dependents is not { Count: > 0 } tiles
             || tiles.All(t => t.CostShareText is not null))
         {
             return;
@@ -2046,9 +2046,9 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         var shares = await Task.Run(() => _costShares.ReadAsync(material.Id, [.. tiles.Select(t => t.Id)], cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (ReferenceEquals(Consumers, tiles))
+        if (ReferenceEquals(Dependents, tiles))
         {
-            Consumers = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
+            Dependents = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
         }
     }
 

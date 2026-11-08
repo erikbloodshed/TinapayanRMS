@@ -281,7 +281,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// The products the Product Cost Summary asks to open, by id. The main window, which owns the tabs, subscribes and
-    /// opens each on the Products screen, as it does for the Consumer tiles on Raw Materials and Sub-Assemblies.
+    /// opens each on the Products screen, as it does for the Dependents tiles on Raw Materials and Sub-Assemblies.
     /// </summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 

@@ -237,7 +237,7 @@ public interface IProductRepository
 
     /// <summary>
     /// Moves the product to the Deleted folder: it's stamped DeletedAt and kept whole, so RestoreAsync brings it back as it
-    /// was. Everything it uses stays held by it, as the Consumer lists and refusals show ("Cheese Roll (deleted)"). Refused
+    /// was. Everything it uses stays held by it, as the Dependents lists and refusals show ("Cheese Roll (deleted)"). Refused
     /// while another product links its packaging, or while a composite holds it, deleted or not.
     /// </summary>
     Task DeleteAsync(int id, CancellationToken cancellationToken);

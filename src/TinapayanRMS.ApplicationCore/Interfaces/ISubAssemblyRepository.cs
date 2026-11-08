@@ -74,5 +74,5 @@ public interface ISubAssemblyRepository
     Task<int> AddMadeIngredientAsync(int id, MadeIngredientDraft made, CancellationToken cancellationToken);
 }
 
-/// <summary>A made ingredient made from a sub-assembly, for its Consumer: one tile each, which opens it on Raw Materials.</summary>
+/// <summary>A made ingredient made from a sub-assembly, for its Dependents: one tile each, which opens it on Raw Materials.</summary>
 public sealed record MadeIngredientUse(int Id, string Name);
