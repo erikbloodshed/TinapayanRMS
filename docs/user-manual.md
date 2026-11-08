@@ -4,7 +4,7 @@ TinapayanRMS keeps the recipes and costs of the bakeshop's products in one place
 
 This manual is for the people who use the app day to day. It doesn't assume any technical knowledge.
 
-> **Amounts are shown without a currency symbol.** Every amount in the app is in pesos. Costs are shown to 4 decimal places where small figures matter, such as the cost per gram, and to 2 decimal places elsewhere.
+> **Amounts are shown without a currency symbol.** Every amount in the app is in pesos. Costs are shown to 4 decimal places where small figures matter, such as the cost per gram, and to 2 decimal places elsewhere. Numbers always use a dot for decimals and commas between thousands, as in **1,250.50**, whatever Windows' region setting uses, and you type them the same way. Dates and the names of months follow the region.
 
 ## Contents
 

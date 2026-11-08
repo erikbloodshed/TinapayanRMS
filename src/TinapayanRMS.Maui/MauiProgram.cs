@@ -41,6 +41,9 @@ public static class MauiProgram
         // controls did. Off before any Syncfusion type is touched, as the WPF app had it (2026-11-06).
         Syncfusion.Telemetry.Telemetry.Disable();
 
+        // Numbers shown as the number boxes read them, whatever the Windows region writes them with: before anything is drawn.
+        NumberCulture.Apply();
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
