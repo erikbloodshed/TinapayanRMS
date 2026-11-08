@@ -19,6 +19,7 @@ powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1               
 powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -Class "*X*"   # rerun a class on each save, by hot reload
 dotnet run --project src/TinapayanRMS.Maui                                        # the app's window
 dotnet run --project src/TinapayanRMS.RecipeApi                                   # the Recipe API, http://localhost:5290/api/v1
+powershell -ExecutionPolicy Bypass -File scripts/Install-TinapayanRMS.ps1         # install or update the app for this Windows user (Remove-WpfApp.ps1 takes the old WPF copy off)
 
 dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure
 dotnet ef database update --project src/TinapayanRMS.Infrastructure

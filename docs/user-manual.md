@@ -1260,6 +1260,24 @@ Right-click the category's folder in the Products list and choose **Print Folder
 
 Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
 
+### Install or update TinapayanRMS
+
+TinapayanRMS is installed from its source folder, on the PC that holds its database, for the Windows user who'll use it. That PC needs what building the app needs (see the developer manual's setup): the .NET SDK, its MAUI workload, PostgreSQL with the app's sign-in, and the Syncfusion licence key.
+
+1. Close TinapayanRMS if it's open. If you forget, the script closes it for you, unless it's asking whether to save changes: then it stops, and you answer, close the app and run it again.
+2. Open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-TinapayanRMS.ps1`. It builds the app, which takes a few minutes, copies it to `%LocalAppData%\Programs\TinapayanRMS`, and puts a **TinapayanRMS** shortcut in the Start menu and on the Desktop. Add `-NoDesktopShortcut` to leave the Desktop as it is.
+3. If the update changed the database, the script's last lines say how to apply it. Do that before opening the app, or some screens show an error.
+
+Run the same command again to update the app after the code changes. How the lists were left, your Vim keys setting, the backups and the database all stay as they are. To remove the app, run `scripts\Uninstall-TinapayanRMS.ps1` the same way.
+
+**Taking the old app off.** The older TinapayanRMS this one replaced was put on the PC by hand. Once the new one is installed and working, take the old one off so nobody opens it by mistake:
+
+1. Close the old app.
+2. Run `powershell -ExecutionPolicy Bypass -File scripts\Remove-WpfApp.ps1`. It only lists what it finds: the old app's folder, its shortcuts, and whether it's running. The install script runs it too, at the end.
+3. If the list is right, run it again with `-Remove` at the end. It deletes the old app and its shortcuts, and keeps its `logs` folder. If it says it found nothing but the old app is still on the PC, add `-Folder` and the folder it's in, such as `-Folder C:\TinapayanRMS`.
+
+It never touches the database or the backups, and it keeps the old app's record of how the lists were left, which the new app copies the first time it opens. A shortcut pinned to the taskbar has to be unpinned by hand: right-click it and choose **Unpin from taskbar**.
+
 ### Share the recipes with TinapayanBMS
 
 TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.

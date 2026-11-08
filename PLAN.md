@@ -54,7 +54,8 @@ TinapayanRMS.slnx
 ├── global.json                       — the pinned SDK, and test.runner (Microsoft.Testing.Platform)
 ├── .mcp.json                         — how an AI assistant starts the MCP servers (src/TinapayanRMS.Mcp, and Syncfusion's Blazor docs server)
 ├── scripts/                          — Install-RecipeApi.ps1, Uninstall-RecipeApi.ps1 and New-DatabaseReader.ps1 (the Recipe API);
-│                                       Start-McpServer.ps1 (which .mcp.json runs); Test-Changed.ps1 and Watch-Tests.ps1 (fewer tests while developing)
+│                                       Start-McpServer.ps1 (which .mcp.json runs); Test-Changed.ps1 and Watch-Tests.ps1 (fewer tests while developing);
+│                                       Install-TinapayanRMS.ps1, Uninstall-TinapayanRMS.ps1 and Remove-WpfApp.ps1 (the app, and the WPF one it replaced)
 ├── README.md                         — what the app is, and where the manuals and these guides are
 ├── docs/
 │   ├── user-manual.md                — for the shop's staff: every screen, and how costs are worked out
