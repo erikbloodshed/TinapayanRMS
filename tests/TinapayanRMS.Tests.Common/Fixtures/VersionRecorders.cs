@@ -16,14 +16,16 @@ public static class VersionRecorders
     public static ProductVersionRecorder Create(IDbContextFactory<TinapayanRMSDbContext> factory)
     {
         var productRepository = new ProductRepository(factory);
-        return new ProductVersionRecorder(Reader(factory, productRepository), productRepository, new ProductVersionRepository(factory));
+        var unitOfWork = factory as IUnitOfWork
+            ?? throw new ArgumentException("The app's factory is its unit of work too (SharedTransactionDbContextFactory).", nameof(factory));
+        return new ProductVersionRecorder(Reader(factory, productRepository, unitOfWork), productRepository, new ProductVersionRepository(factory));
     }
 
     public static VersionedSaves CreateSaves(IDbContextFactory<TinapayanRMSDbContext> factory, IUnitOfWork unitOfWork)
     {
         var productRepository = new ProductRepository(factory);
         var versionRepository = new ProductVersionRepository(factory);
-        var reader = Reader(factory, productRepository);
+        var reader = Reader(factory, productRepository, unitOfWork);
         return new VersionedSaves(
             unitOfWork,
             productRepository,
@@ -33,12 +35,13 @@ public static class VersionRecorders
             new ProductVersionRecorder(reader, productRepository, versionRepository));
     }
 
-    private static SavedProductReader Reader(IDbContextFactory<TinapayanRMSDbContext> factory, ProductRepository productRepository) => new(
+    private static SavedProductReader Reader(IDbContextFactory<TinapayanRMSDbContext> factory, ProductRepository productRepository, IUnitOfWork unitOfWork) => new(
         new PackagingLinkRepository(factory),
         new ProductSubAssemblyUsageRepository(factory),
         new PackagingLineRepository(factory),
         new CostingParametersRepository(factory),
         new SubAssemblyLineRepository(factory),
         productRepository,
-        new CostingDefaultsRepository(factory));
+        new CostingDefaultsRepository(factory),
+        unitOfWork);
 }

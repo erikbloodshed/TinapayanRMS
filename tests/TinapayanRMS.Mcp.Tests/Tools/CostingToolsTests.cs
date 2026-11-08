@@ -223,7 +223,8 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
                 productRepository,
-                new CostingDefaultsRepository(factory)));
+                new CostingDefaultsRepository(factory),
+                CreateUnitOfWork()));
     }
 
     private async Task<SavedProduct> ReadAsync(int productId)
@@ -237,7 +238,8 @@ public class CostingToolsTests(DatabaseFixture fixture) : PersistenceTestBase(fi
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
             productRepository,
-            new CostingDefaultsRepository(factory));
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
         return await reader.ReadAsync((await productRepository.GetByIdAsync(productId, Cancellation))!, Cancellation);
     }
 }

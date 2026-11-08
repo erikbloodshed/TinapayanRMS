@@ -350,7 +350,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private static ReportsViewModel CreateReportsViewModel(FailingDbContextFactory factory)
+    private ReportsViewModel CreateReportsViewModel(FailingDbContextFactory factory)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
         var productRepository = new ProductRepository(factory);
@@ -365,7 +365,8 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
                 productRepository,
-                new CostingDefaultsRepository(factory)),
+                new CostingDefaultsRepository(factory),
+                CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
     }
 }

@@ -50,7 +50,8 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
                 new CostingParametersRepository(factory),
                 new SubAssemblyLineRepository(factory),
                 new ProductRepository(factory),
-                new CostingDefaultsRepository(factory)),
+                new CostingDefaultsRepository(factory),
+                CreateUnitOfWork()),
             new LoggerConfiguration().CreateLogger());
     }
 

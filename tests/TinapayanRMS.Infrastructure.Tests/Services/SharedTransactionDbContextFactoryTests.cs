@@ -108,6 +108,54 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
     }
 
     [Test]
+    public async Task A_snapshot_reads_as_of_its_first_query_whatever_commits_after()
+    {
+        var productId = await AddProductAsync("Pandesal");
+        var products = new ProductRepository(CreateDbContextFactory());
+        var cancellation = Cancellation;
+
+        var (before, after) = await CreateUnitOfWork().ReadSnapshotAsync(async () =>
+        {
+            var before = (await products.GetByIdAsync(productId, cancellation))!.Name;
+            await OutsideAsync(() => products.RenameAsync(productId, "Pandesal Classic", cancellation));
+            return (before, (await products.GetByIdAsync(productId, cancellation))!.Name);
+        }, Cancellation);
+
+        (before, after).Should().Be(("Pandesal", "Pandesal"));
+        (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal Classic", "the rename was committed all the same");
+    }
+
+    [Test]
+    public async Task A_write_in_a_snapshot_is_refused()
+    {
+        var productId = await AddProductAsync("Pandesal");
+        var products = new ProductRepository(CreateDbContextFactory());
+
+        var writing = () => CreateUnitOfWork().ReadSnapshotAsync(async () =>
+        {
+            await products.RenameAsync(productId, "Pandesal Classic", Cancellation);
+            return 0;
+        }, Cancellation);
+
+        (await writing.Should().ThrowAsync<Microsoft.EntityFrameworkCore.DbUpdateException>())
+            .Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be(Npgsql.PostgresErrorCodes.ReadOnlySqlTransaction);
+        (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal");
+    }
+
+    /// <summary>
+    /// Runs <paramref name="work"/> without the run this is called in, as another copy of the app saves. TestContext.Current
+    /// doesn't flow there either, so <paramref name="work"/> takes its cancellation from its caller.
+    /// </summary>
+    private static Task OutsideAsync(Func<Task> work)
+    {
+        using (ExecutionContext.SuppressFlow())
+        {
+            return Task.Run(work, CancellationToken.None);
+        }
+    }
+
+    [Test]
     public async Task After_a_run_that_threw_a_repository_writes_on_its_own_again()
     {
         var productId = await AddProductAsync("Pandesal");

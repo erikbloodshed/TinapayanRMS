@@ -539,12 +539,13 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             new LoggerConfiguration().CreateLogger());
     }
 
-    private static SavedProductReader SavedProducts(Microsoft.EntityFrameworkCore.IDbContextFactory<Infrastructure.TinapayanRMSDbContext> factory) => new(
+    private SavedProductReader SavedProducts(Microsoft.EntityFrameworkCore.IDbContextFactory<Infrastructure.TinapayanRMSDbContext> factory) => new(
         new PackagingLinkRepository(factory),
         new ProductSubAssemblyUsageRepository(factory),
         new PackagingLineRepository(factory),
         new CostingParametersRepository(factory),
         new SubAssemblyLineRepository(factory),
         new ProductRepository(factory),
-        new CostingDefaultsRepository(factory));
+        new CostingDefaultsRepository(factory),
+        CreateUnitOfWork());
 }

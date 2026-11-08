@@ -896,7 +896,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
-            costingDefaultsRepository);
+            costingDefaultsRepository, unitOfWork);
         Packaging = new ProductPackaging(FindPackagingMaterial, () => CostBasis);
         UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), FindPackagingMaterial, () => CostBasis);
         ComponentsTable = new ProductComponents(

@@ -41,7 +41,17 @@ public sealed class SharedTransactionDbContextFactory(string connectionString, T
     /// Serializable, as IProductVersionRepository numbers versions: a version written in the run has to be numbered as
     /// if nothing else were writing them.
     /// </summary>
-    public async Task<T> RunAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken)
+    public Task<T> RunAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken) =>
+        InTransactionAsync(work, IsolationLevel.Serializable, readOnly: false, cancellationToken);
+
+    /// <summary>
+    /// Repeatable Read and read only: PostgreSQL takes the snapshot at the first query and every later one reads from it,
+    /// and such a transaction never fails for a write made beside it, nor makes one fail.
+    /// </summary>
+    public Task<T> ReadSnapshotAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken) =>
+        InTransactionAsync(work, IsolationLevel.RepeatableRead, readOnly: true, cancellationToken);
+
+    private async Task<T> InTransactionAsync<T>(Func<Task<T>> work, IsolationLevel isolationLevel, bool readOnly, CancellationToken cancellationToken)
     {
         if (Shared() is not null)
         {
@@ -50,7 +60,12 @@ public sealed class SharedTransactionDbContextFactory(string connectionString, T
 
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
+        if (readOnly)
+        {
+            await using var command = new NpgsqlCommand("SET TRANSACTION READ ONLY", connection, transaction);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         // Set here, so it reaches the work, and gone again when this returns: an AsyncLocal set in an async method never
         // flows back out to its caller.

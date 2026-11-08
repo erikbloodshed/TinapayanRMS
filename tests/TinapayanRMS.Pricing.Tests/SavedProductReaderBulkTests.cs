@@ -185,6 +185,79 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         details[productIds[1]].WastagePercent.Should().Be(CostingDefaults.DefaultWastagePercent, "no category: Settings' shop-wide one");
     }
 
+    [Test]
+    public async Task A_recipe_saved_while_its_product_is_being_read_is_wholly_in_the_read_or_not_at_all()
+    {
+        var setup = await SetUpAsync();
+        var (_, subAssemblyIds) = await AddProductsAsync(setup, "Bread", count: 1);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.10m);
+        var productId = await AddProductAsync("Sweet Bread");
+        RecipeDraft WithSugar(decimal grams) => new(
+            [], [new LinkedUsageDraft(subAssemblyIds[0], UsageAuthoredField.WeightPerPiece, 50m) { AddIns = [(sugarId, grams)] }]);
+        await SaveRecipeAsync(productId, WithSugar(100m));
+
+        // The save replaces the product's sections with new rows, and commits after the reader has read the add-ins but
+        // before it reads the sections they hang off.
+        var products = new ProductRepository(CreateDbContextFactory());
+        var product = (await products.GetByIdAsync(productId, Cancellation))!;
+        var cancellation = Cancellation;
+        var factory = CreateDbContextFactory();
+        var usages = new SavingAfterTheAddIns(
+            new ProductSubAssemblyUsageRepository(factory),
+            () => products.SaveAsync(product, WithSugar(200m), null, null, null, cancellation));
+        var reader = new SavedProductReader(
+            new PackagingLinkRepository(factory),
+            usages,
+            new PackagingLineRepository(factory),
+            new CostingParametersRepository(factory),
+            new SubAssemblyLineRepository(factory),
+            new ProductRepository(factory),
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
+
+        var detail = await reader.ReadDetailAsync(productId, Cancellation);
+
+        usages.HasSaved.Should().BeTrue("the save went in between the reads");
+        detail.AddIns.Should().ContainSingle().Which.Grams.Should().Be(100m, "the read began before the save committed");
+        detail.Usages.Should().ContainSingle().Which.Id.Should().Be(detail.AddIns[0].UsageId, "the add-ins and their section are of one moment");
+        (await CreateReader().ReadDetailAsync(productId, Cancellation)).AddIns.Should().ContainSingle().Which.Grams.Should().Be(200m);
+    }
+
+    /// <summary>The usages as read, with <paramref name="save"/> committed, outside the reader's transaction, once the add-ins have been.</summary>
+    private sealed class SavingAfterTheAddIns(IProductSubAssemblyUsageRepository inner, Func<Task> save) : IProductSubAssemblyUsageRepository
+    {
+        public bool HasSaved { get; private set; }
+
+        public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
+            inner.GetForProductAsync(productId, cancellationToken);
+
+        public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+            inner.GetForProductsAsync(productIds, cancellationToken);
+
+        public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
+            inner.GetAddInsForProductAsync(productId, cancellationToken);
+
+        public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+        {
+            var addIns = await inner.GetAddInsForProductsAsync(productIds, cancellationToken);
+            if (!HasSaved)
+            {
+                HasSaved = true;
+
+                // Without the reader's transaction, as another copy of the app, or the app beside a server, saves.
+                Task saving;
+                using (ExecutionContext.SuppressFlow())
+                {
+                    saving = Task.Run(save, CancellationToken.None);
+                }
+
+                await saving;
+            }
+
+            return addIns;
+        }
+    }
+
     private sealed record Setup(int RoleId, int FlourId, int BoxId);
 
     /// <summary>A Dough role, flour at 0.05 a gram, and a box at 5.00 a piece.</summary>
@@ -231,6 +304,7 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
             new ProductRepository(factory),
-            new CostingDefaultsRepository(factory));
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
     }
 }

@@ -12,4 +12,11 @@ public interface IUnitOfWork
     /// one already, it joins that one. Its reads share one connection, so they must run one at a time, never side by side.
     /// </summary>
     Task<T> RunAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="work"/>'s reads as of one moment, in one read-only transaction: a save that commits while it
+    /// runs is either wholly in what it reads or not at all, however many queries it takes. Inside a run already, it joins
+    /// that one. Its reads share one connection too, so they run one at a time; a write in it is refused.
+    /// </summary>
+    Task<T> ReadSnapshotAsync<T>(Func<Task<T>> work, CancellationToken cancellationToken);
 }

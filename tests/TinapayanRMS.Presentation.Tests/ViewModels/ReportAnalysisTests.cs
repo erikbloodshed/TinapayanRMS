@@ -118,6 +118,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
             new ProductRepository(factory),
-            new CostingDefaultsRepository(factory));
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
     }
 }

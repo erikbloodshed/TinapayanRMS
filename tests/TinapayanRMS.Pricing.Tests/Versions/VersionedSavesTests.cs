@@ -139,7 +139,8 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
             productRepository,
-            new CostingDefaultsRepository(factory));
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
         return new VersionedSaves(
             CreateUnitOfWork(), productRepository, versions, new CostingParametersRepository(factory), reader, new ProductVersionRecorder(reader, productRepository, versions));
     }

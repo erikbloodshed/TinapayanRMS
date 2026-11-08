@@ -98,6 +98,12 @@ public sealed record SavedProduct(
 /// Reads a product as it's saved, and turns it into what the Products screen shows: the one place a saved product is
 /// read and priced. The Products screen reads the product it opens through it, Reports prices every product with it,
 /// and Print reads a set of products with it, so all three agree. Repositories only: a read runs off the UI thread.
+/// <para>
+/// A read takes a dozen queries, and they read as of one moment (IUnitOfWork.ReadSnapshotAsync): a
+/// Save replaces a product's sections with new rows, and one that committed between two of the queries had left add-ins
+/// whose section the next query no longer found, which failed the whole read (Reports, Print, the Recipe API's recipes)
+/// and could mix figures from before and after it.
+/// </para>
 /// </summary>
 public sealed class SavedProductReader(
     IPackagingLinkRepository packagingLinkRepository,
@@ -106,7 +112,8 @@ public sealed class SavedProductReader(
     ICostingParametersRepository costingParametersRepository,
     ISubAssemblyLineRepository subAssemblyLineRepository,
     IProductRepository productRepository,
-    ICostingDefaultsRepository costingDefaultsRepository)
+    ICostingDefaultsRepository costingDefaultsRepository,
+    IUnitOfWork unitOfWork)
 {
     /// <summary>
     /// The product's saved detail: its packaging link and lines, its recipe with its sections' lines and add-ins, a
@@ -118,8 +125,12 @@ public sealed class SavedProductReader(
     /// <summary>
     /// Several products' saved details at once, by id: <see cref="ReadDetailAsync"/>'s, in a dozen or so queries however
     /// many products there are, rather than nine or so a product, which for Reports and Print would grow with the list. The products a composite among them holds are read with it, however deep, and are in the result too.
+    /// Every query reads as of one moment (IUnitOfWork.ReadSnapshotAsync).
     /// </summary>
-    public async Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+    public Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+        unitOfWork.ReadSnapshotAsync(() => ReadDetailsInSnapshotAsync(productIds, cancellationToken), cancellationToken);
+
+    private async Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsInSnapshotAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
         // The products the composites among them hold, and the ones those hold: one read for each level of holding.
         Dictionary<int, IReadOnlyList<ProductComponent>> componentsByHolder = [];
@@ -136,8 +147,8 @@ public sealed class SavedProductReader(
             holders = [.. components.Select(c => c.ComponentProductId).Where(productIdsRead.Add)];
         }
 
-        // The rest one at a time, not side by side: a Save reads through here inside its unit of work, whose reads share one
-        // connection (IUnitOfWork). It costs little: every product's detail, 68 of them, in 31 ms against 22 side by side.
+        // The rest one at a time, not side by side: they share the snapshot's connection, or a Save's inside its unit of work
+        // (IUnitOfWork). It costs little: every product's detail, 68 of them, in 31 ms against 22 side by side.
         List<int> ids = [.. productIdsRead];
         var linksByProduct = (await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(l => l.ProductId);
         var packaging = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
@@ -231,10 +242,14 @@ public sealed class SavedProductReader(
             return new Dictionary<int, ComponentCosts>();
         }
 
-        // Read again rather than taken from the screen's list, which may be older than a quantity required saved since.
-        var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
-        var details = await ReadDetailsAsync(productIds, cancellationToken);
-        return products.ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
+        // Read again rather than taken from the screen's list, which may be older than a quantity required saved since: the
+        // products and their details as of the same moment.
+        return await unitOfWork.ReadSnapshotAsync<IReadOnlyDictionary<int, ComponentCosts>>(async () =>
+        {
+            var products = await productRepository.GetByIdsAsync(productIds, cancellationToken);
+            var details = await ReadDetailsAsync(productIds, cancellationToken);
+            return products.ToDictionary(p => p.Id, p => ComponentCostsOf(p, details[p.Id]));
+        }, cancellationToken);
     }
 
     /// <summary>

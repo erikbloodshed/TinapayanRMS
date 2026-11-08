@@ -47,6 +47,7 @@ public class SavedProductSectionNameTests(DatabaseFixture fixture) : Persistence
             new CostingParametersRepository(factory),
             new SubAssemblyLineRepository(factory),
             new ProductRepository(factory),
-            new CostingDefaultsRepository(factory));
+            new CostingDefaultsRepository(factory),
+            CreateUnitOfWork());
     }
 }
