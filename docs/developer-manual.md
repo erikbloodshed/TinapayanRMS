@@ -45,7 +45,7 @@ PLAN.md is long: an overview ("At a glance"), then about 650 lines of long bulle
 
 It's a single-user desktop app. There's no server, no login and no network service of its own.
 
-**It was a WPF app until 2026-11-07.** Its screens were ported that day from the shop's web copy of it (`../TinapayanRMS_Web`, without that copy's shop accounts or its Mac target), ran beside the WPF app for a day, and replaced it on the `maui-blazor-hybrid` branch; `main` still has the WPF app. The ViewModels (`src/TinapayanRMS.Presentation`) are the WPF app's, kept. [docs/plan/maui-app.md](plan/maui-app.md) has the story. The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
+**It was a WPF app until 2026-11-07.** Its screens were ported that day from the shop's web copy of it (`../TinapayanRMS_Web`, without that copy's shop accounts or its Mac target), ran beside the WPF app for a day, and replaced it the same day, on the `maui-blazor-hybrid` branch, which became `main` on 2026-11-08. The tag `wpf-final` marks the last commit with the WPF app. The ViewModels (`src/TinapayanRMS.Presentation`) are the WPF app's, kept. [docs/plan/maui-app.md](plan/maui-app.md) has the story. The database is a local PostgreSQL server, reached as the `tinapayanrms` role with the password in the password file.
 
 ### Screens
 
@@ -181,7 +181,7 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 ### Where the app writes
 
 - **Logs**: `%LocalAppData%\TinapayanRMS\Maui\logs\tinapayanrms-<date>.log`. There's one file a day, and the last 31 are kept.
-- **View state**: `%LocalAppData%\TinapayanRMS\Maui\view-state.json` remembers which tree folders were left closed (`FolderMemory`, so a folder new since opens), whether the Vim keys are on (`"vim-keys": ["on"]`), the Reports grids' filters, sort and hidden columns (`reports-*`, through `GridLayouts`), and the automatic backups' copy folder and last problems. It's safe to delete. On its first run the app starts it as a copy of the WPF app's, `%LocalAppData%\TinapayanRMS\view-state.json` (`ViewStateSeed`), which `main` and an installed WPF copy still write: each app reads its file once and writes it whole, so two sharing one would write over each other's changes.
+- **View state**: `%LocalAppData%\TinapayanRMS\Maui\view-state.json` remembers which tree folders were left closed (`FolderMemory`, so a folder new since opens), whether the Vim keys are on (`"vim-keys": ["on"]`), the Reports grids' filters, sort and hidden columns (`reports-*`, through `GridLayouts`), and the automatic backups' copy folder and last problems. It's safe to delete. On its first run the app starts it as a copy of the WPF app's, `%LocalAppData%\TinapayanRMS\view-state.json` (`ViewStateSeed`), which an installed WPF copy, or one run from `wpf-final`, still writes: each app reads its file once and writes it whole, so two sharing one would write over each other's changes.
 - **Backups**: `%ProgramData%\TinapayanRMS\Backups`, one folder for every Windows user of the computer. `pg_dump` writes the `.backup` files as the user running the app. The app creates this folder and, as its owner, gives `BUILTIN\Users` Modify on it, inherited by every file, so anyone using the app can copy, restore and delete any backup ([BackupFolder](../src/TinapayanRMS.Infrastructure/Services/BackupFolder.cs)). The `.bak` files SQL Server wrote before the move to PostgreSQL (2026-10-21) are no longer listed and can't be restored. The tests use `%ProgramData%\TinapayanRMS\Test Backups\<guid>` and delete it afterwards.
 
 ### Command reference
@@ -213,7 +213,7 @@ The tests run on Microsoft.Testing.Platform, which `global.json` turns on (`test
 
 Close any copy of the app you have running before you build. A running app locks its own output files: its process is `TinapayanRMS.Maui`.
 
-There's no install script for the app yet: it's run from source, and the shop's computer still has the WPF app, installed from `main`. An unpackaged publish with the Windows App SDK beside it, as the web repo's `Install-TinapayanRMS.ps1` makes, is an open item in [docs/plan/maui-app.md](plan/maui-app.md).
+There's no install script for the app yet: it's run from source, and the shop's computer still has the WPF app, installed from what is now the `wpf-final` tag. An unpackaged publish with the Windows App SDK beside it, as the web repo's `Install-TinapayanRMS.ps1` makes, is an open item in [docs/plan/maui-app.md](plan/maui-app.md).
 
 ### When a change is done
 
@@ -384,7 +384,7 @@ The window is [App](../src/TinapayanRMS.Maui/App.cs)'s, over [MainPage](../src/T
 Nothing in the database notices a row changing after a screen read it (there are no concurrency tokens), so two copies side by side would save over each other with neither saying so, and each would run its own hourly backups and write the same view-state file. [SingleInstance](../src/TinapayanRMS.Maui/Platforms/Windows/SingleInstance.cs) keeps the app to one copy from each folder for each Windows sign-in, with a named mutex (`Local\TinapayanRMS.Maui-<the folder's hash>`). Windows frees it when a copy crashes or is ended, so there's nothing to clear up.
 
 - **A second copy** brings the open one's window forward (restoring it if it's minimized) and exits, before building anything.
-- **A copy from another folder is another app**: one run from source doesn't stop an installed copy, nor the other way round, so the two can be open at once, and so can the WPF app (from `main`, or installed), which keeps to one copy of its own.
+- **A copy from another folder is another app**: one run from source doesn't stop an installed copy, nor the other way round, so the two can be open at once, and so can the WPF app (run from the `wpf-final` tag, or installed), which keeps to one copy of its own.
 - **It doesn't reach further than the sign-in.** Another Windows user on this PC, or another PC on the same database, can still save over this one: only a check made when saving could catch those.
 
 ### Rendering, scopes and lifetimes
