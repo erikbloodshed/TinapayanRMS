@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The MAUI app's screens (TinapayanRMS.Components): the DI wiring, the Vim keys' C#, and the shared components
-       rendered with bUnit, with no database, no web view and no MAUI. -->
+  <!-- The MAUI app's screens (TinapayanRMS.Components): the DI wiring, the page's list of Syncfusion scripts, the Vim
+       keys' C#, and the shared components rendered with bUnit, with no database, no web view and no MAUI. -->
 
   <ItemGroup>
     <PackageReference Include="bunit" />
@@ -9,6 +9,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- SyncfusionScriptsTests: the page's list of the Syncfusion components whose scripts it loads, and Syncfusion's
+         loader, from the package at SyncfusionVersion, that it's checked against. -->
+    <Content Include="..\..\src\TinapayanRMS.Maui\wwwroot\syncfusion.js" Link="syncfusion.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="$(NuGetPackageRoot)syncfusion.blazor.core\$(SyncfusionVersion)\staticwebassets\scripts\syncfusion-blazor-base.min.js"
+             Link="syncfusion-blazor-base.min.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

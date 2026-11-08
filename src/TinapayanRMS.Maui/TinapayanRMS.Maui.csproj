@@ -58,13 +58,18 @@
     <Error Text="Set the SYNCFUSION_LICENSE_KEY environment variable before publishing. The key is compiled into the app." />
   </Target>
 
-  <!-- The Syncfusion themes package's static files are every theme Syncfusion makes, some 240 MB; the app links one,
-       fluent2.css (index.html). The rest are left out, so they're neither copied beside the app nor read by Windows'
-       resource indexer (MakePri), which takes their names (bootstrap5.3-dark.css) for resource qualifiers and warns. -->
-  <Target Name="KeepOnlyTheAppsSyncfusionTheme" AfterTargets="UpdateExistingPackageStaticWebAssets">
+  <!-- Syncfusion's static files the app doesn't use are left out, so they're neither copied beside the app nor read by
+       Windows' resource indexer (MakePri):
+       - every theme but the one the app links, fluent2-lite.css (index.html): the themes package has every theme
+         Syncfusion makes, some 240 MB, whose names (bootstrap5.3-dark.css) MakePri takes for resource qualifiers and
+         warns about;
+       - the all-components script, syncfusion-blazor.min.js (7 MB): the page loads only its components' scripts
+         (wwwroot/syncfusion.js). -->
+  <Target Name="LeaveOutUnusedSyncfusionFiles" AfterTargets="UpdateExistingPackageStaticWebAssets">
     <ItemGroup>
-      <_UnusedSyncfusionTheme Include="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Syncfusion.Blazor.Themes' and '%(RelativePath)' != 'fluent2.css'" />
-      <StaticWebAsset Remove="@(_UnusedSyncfusionTheme)" />
+      <_UnusedSyncfusionFile Include="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Syncfusion.Blazor.Themes' and '%(RelativePath)' != 'fluent2-lite.css'" />
+      <_UnusedSyncfusionFile Include="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Syncfusion.Blazor.Core' and '%(RelativePath)' == 'scripts/syncfusion-blazor.min.js'" />
+      <StaticWebAsset Remove="@(_UnusedSyncfusionFile)" />
     </ItemGroup>
   </Target>
 

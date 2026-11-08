@@ -6,12 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TinapayanRMS</title>
     <base href="/" />
-    <link rel="stylesheet" href="_content/Syncfusion.Blazor.Themes/fluent2.css" />
+    <link rel="stylesheet" href="_content/Syncfusion.Blazor.Themes/fluent2-lite.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="css/record-screens.css" />
     <link rel="stylesheet" href="css/products.css" />
     <link rel="stylesheet" href="css/reports.css" />
     <link rel="stylesheet" href="css/print.css" />
+    <!-- Syncfusion's scripts for the screens' components, started as the page is parsed; Blazor's start waits for them. -->
+    <script type="module" src="syncfusion.js" async></script>
 </head>
 
 <body>
@@ -23,7 +25,6 @@
         <span class="dismiss">🗙</span>
     </div>
 
-    <script src="_content/Syncfusion.Blazor.Core/scripts/syncfusion-blazor.min.js"></script>
     <script src="app.js"></script>
     <script src="vim.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
