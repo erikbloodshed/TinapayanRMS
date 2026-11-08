@@ -48,6 +48,20 @@ public class RawMaterialUpdatedDatesPersistenceTests(DatabaseFixture fixture) : 
     }
 
     [Test]
+    public async Task A_price_change_is_logged_in_price_history_on_the_day_its_saved_by_the_saves_clock()
+    {
+        var categoryId = await SeedCategoryAsync();
+        var flourId = await CreateRepository().SaveAsync(PurchasedIngredient("Flour", categoryId), [], brandPrices: null, addIns: null, Cancellation);
+        _clock.Advance(TimeSpan.FromDays(-400));
+
+        await CreateClockedBrandPriceRepository().SetAsync(flourId, [new RawMaterialBrandPrice { Price = 0.05m }], Cancellation);
+
+        await using var dbContext = CreateDbContext();
+        var logged = await dbContext.RawMaterialPriceHistories.AsNoTracking().SingleAsync(h => h.RawMaterialId == flourId, Cancellation);
+        logged.Date.Should().Be(DateOnly.FromDateTime(_clock.Now), "it's the save's own day, not the computer's");
+    }
+
+    [Test]
     public async Task A_new_material_is_stamped_as_saved_but_has_no_cost_date_until_it_costs_something()
     {
         var categoryId = await SeedCategoryAsync();

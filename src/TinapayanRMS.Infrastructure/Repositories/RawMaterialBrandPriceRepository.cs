@@ -149,7 +149,8 @@ public sealed class RawMaterialBrandPriceRepository(IDbContextFactory<TinapayanR
             dbContext.RawMaterialPriceHistories.Add(new RawMaterialPriceHistory
             {
                 RawMaterialId = material.Id,
-                Date = DateOnly.FromDateTime(DateTime.Today),
+                // The context's clock, as every time a save stamps (TinapayanRMSDbContext.Clock).
+                Date = DateOnly.FromDateTime(dbContext.LocalNow()),
                 UnitId = brandPrices[index].UnitId,
                 Brand = brandPrices[index].Brand,
                 Price = brandPrices[index].Price,
