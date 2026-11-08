@@ -3,12 +3,20 @@
 // A number box's text, and a picker's, is selected as it takes the cursor, so what's typed replaces it, as the WPF
 // DoubleTextBoxes and ComboBoxAdvs did: without it a picker's typing is added to the name it holds, and matches nothing.
 // Done here, in the browser, so it's in place before the first key: the server can't be asked in time. A click puts the
-// caret where it lands after focus arrives, so the selection is made again once the click is over.
+// caret where it lands after focus arrives, so when the cursor came in by that click, the selection is made again once
+// the click is over. Only then: a box the cursor came into by Tab (or the Vim keys) is clicked in to put the caret
+// somewhere, and selecting it all then had the next key replace the whole number.
+let pressedOn = null;
+document.addEventListener("pointerdown", e => { pressedOn = e.target; }, true);
+document.addEventListener("pointerup", () => { pressedOn = null; }, true);
+document.addEventListener("pointercancel", () => { pressedOn = null; }, true);
 document.addEventListener("focusin", e => {
     const input = e.target;
     if (input instanceof HTMLInputElement && !input.readOnly && (input.closest(".number-field") || input.classList.contains("e-combobox"))) {
         input.select();
-        input.addEventListener("mouseup", () => input.select(), { once: true });
+        if (pressedOn instanceof Node && input.contains(pressedOn)) {
+            input.addEventListener("mouseup", () => input.select(), { once: true });
+        }
     }
 });
 
