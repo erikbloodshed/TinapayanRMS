@@ -18,7 +18,25 @@ public static class IngredientCostGraph
     /// but the visiting guard is cheap insurance against a data-integrity bug
     /// turning into an infinite loop.
     /// </summary>
-    public static IReadOnlyList<int> GetDependentsInOrder(int changedIngredientId, IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId)
+    public static IReadOnlyList<int> GetDependentsInOrder(int changedIngredientId, IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId) =>
+        GetDependentsInOrder([changedIngredientId], componentIdsByIngredientId);
+
+    /// <summary>
+    /// The same for several changed ingredients at once: every one depending on any of them, each once, in dependency
+    /// order, the graph turned round and walked once however many changed (a changed one is in it only when it depends on
+    /// another that changed).
+    /// </summary>
+    public static IReadOnlyList<int> GetDependentsInOrder(IEnumerable<int> changedIngredientIds, IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId)
+    {
+        var affected = GetDependents(changedIngredientIds, DependentsOf(componentIdsByIngredientId));
+        return affected.Count == 0 ? [] : InDependencyOrder(affected, componentIdsByIngredientId);
+    }
+
+    /// <summary>
+    /// The graph turned round: each ingredient's direct dependents, the made ingredients it's a component of and the
+    /// linked ones cut from it. Made once for many walks (<see cref="GetDependents"/>).
+    /// </summary>
+    public static IReadOnlyDictionary<int, IReadOnlyList<int>> DependentsOf(IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId)
     {
         var directDependents = new Dictionary<int, List<int>>();
         foreach (var (ingredientId, componentIds) in componentIdsByIngredientId)
@@ -35,13 +53,21 @@ public static class IngredientCostGraph
             }
         }
 
+        return directDependents.ToDictionary(e => e.Key, e => (IReadOnlyList<int>)e.Value);
+    }
+
+    /// <summary>
+    /// Every ingredient depending on any of <paramref name="changedIngredientIds"/>, however deeply, in no order, from the
+    /// graph turned round (<see cref="DependentsOf"/>). Each is visited once, so a cycle can't loop it.
+    /// </summary>
+    public static HashSet<int> GetDependents(IEnumerable<int> changedIngredientIds, IReadOnlyDictionary<int, IReadOnlyList<int>> dependentsByIngredientId)
+    {
         var affected = new HashSet<int>();
-        var queue = new Queue<int>();
-        queue.Enqueue(changedIngredientId);
+        var queue = new Queue<int>(changedIngredientIds);
 
         while (queue.TryDequeue(out var current))
         {
-            if (!directDependents.TryGetValue(current, out var dependents))
+            if (!dependentsByIngredientId.TryGetValue(current, out var dependents))
             {
                 continue;
             }
@@ -55,7 +81,7 @@ public static class IngredientCostGraph
             }
         }
 
-        return affected.Count == 0 ? [] : InDependencyOrder(affected, componentIdsByIngredientId);
+        return affected;
     }
 
     /// <summary>

@@ -325,7 +325,8 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
                 }
 
                 IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, now[p.Id].Costs, simulatedById[p.Id].Costs))];
-                List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => IngredientCostRules.ReachedBy(data.Materials.Values, data.BomLines, c.MaterialId))];
+                var reachedBy = IngredientCostRules.ReachedBy(data.Materials.Values, data.BomLines, [.. newCosts.Select(c => c.MaterialId)]);
+                List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => reachedBy[c.MaterialId])];
                 return (rows, simulatedById, reaches);
             },
             cancellationToken);

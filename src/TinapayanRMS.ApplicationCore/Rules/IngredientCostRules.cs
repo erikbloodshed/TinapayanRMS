@@ -67,7 +67,30 @@ public static class IngredientCostRules
     /// "price changes applied" to a product).
     /// </summary>
     public static IReadOnlySet<int> ReachedBy(IEnumerable<RawMaterial> materials, IEnumerable<IngredientBomLine> bomLines, int materialId) =>
-        IngredientCostGraph.GetDependentsInOrder(materialId, Dependencies(materials, bomLines)).Prepend(materialId).ToHashSet();
+        ReachedBy(materials, bomLines, [materialId])[materialId];
+
+    /// <summary>
+    /// <see cref="ReachedBy(IEnumerable{RawMaterial}, IEnumerable{IngredientBomLine}, int)"/> for each of
+    /// <paramref name="materialIds"/>, by id, from one graph: what a list of price changes, or every material in Reports'
+    /// Cost Drivers, asks for.
+    /// </summary>
+    public static IReadOnlyDictionary<int, IReadOnlySet<int>> ReachedBy(
+        IEnumerable<RawMaterial> materials, IEnumerable<IngredientBomLine> bomLines, IReadOnlyCollection<int> materialIds)
+    {
+        var dependents = IngredientCostGraph.DependentsOf(Dependencies(materials, bomLines));
+        Dictionary<int, IReadOnlySet<int>> reached = [];
+        foreach (var materialId in materialIds)
+        {
+            if (!reached.ContainsKey(materialId))
+            {
+                var set = IngredientCostGraph.GetDependents([materialId], dependents);
+                set.Add(materialId);
+                reached[materialId] = set;
+            }
+        }
+
+        return reached;
+    }
 
     /// <summary>
     /// What <paramref name="materials"/> would cost with <paramref name="newCosts"/> (purchased materials' true and buffered
@@ -91,7 +114,7 @@ public static class IngredientCostRules
         }
 
         var dependencies = Dependencies(materials.Values, bomLines);
-        var affected = newCosts.Keys.SelectMany(id => IngredientCostGraph.GetDependentsInOrder(id, dependencies)).ToHashSet();
+        var affected = IngredientCostGraph.GetDependents(newCosts.Keys, IngredientCostGraph.DependentsOf(dependencies));
         var linesByIngredientId = bomLines.ToLookup(l => l.IngredientId);
         foreach (var id in IngredientCostGraph.InDependencyOrder(affected, dependencies))
         {

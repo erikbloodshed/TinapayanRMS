@@ -80,6 +80,39 @@ public class IngredientCostGraphTests
     }
 
     [Test]
+    public void GetDependentsInOrder_for_several_changes_is_what_each_reaches_together_each_once_in_dependency_order()
+    {
+        // 1 sugar -> 3 syrup -> 5 caramel; 2 butter -> 4 frosting, and 5 caramel goes in 6 cake with 4 frosting. Sugar
+        // and butter change together.
+        var componentIdsByIngredientId = new Dictionary<int, IReadOnlyList<int>>
+        {
+            [3] = [1],
+            [4] = [2],
+            [5] = [3],
+            [6] = [4, 5],
+        };
+
+        var order = IngredientCostGraph.GetDependentsInOrder([1, 2], componentIdsByIngredientId).ToList();
+
+        order.Should().BeEquivalentTo(
+            IngredientCostGraph.GetDependentsInOrder(1, componentIdsByIngredientId).Union(IngredientCostGraph.GetDependentsInOrder(2, componentIdsByIngredientId)));
+        order.Should().OnlyHaveUniqueItems();
+        order.IndexOf(3).Should().BeLessThan(order.IndexOf(5));
+        order.IndexOf(5).Should().BeLessThan(order.IndexOf(6));
+        order.IndexOf(4).Should().BeLessThan(order.IndexOf(6));
+    }
+
+    [Test]
+    public void A_changed_ingredient_is_among_the_dependents_only_when_it_depends_on_another_that_changed()
+    {
+        // 2 syrup is made from 1 sugar, and both change.
+        var componentIdsByIngredientId = new Dictionary<int, IReadOnlyList<int>> { [2] = [1] };
+
+        IngredientCostGraph.GetDependentsInOrder([1, 2], componentIdsByIngredientId).Should().Equal(2);
+        IngredientCostGraph.GetDependents([2], IngredientCostGraph.DependentsOf(componentIdsByIngredientId)).Should().BeEmpty();
+    }
+
+    [Test]
     public void InDependencyOrder_puts_each_ingredient_after_everything_in_the_set_it_is_made_from()
     {
         // 5 custard from 4 (a link to 3) and 2 syrup; 2 syrup from 1 sugar; 6 glaze from 5. Asked for in the worst order.

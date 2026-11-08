@@ -59,9 +59,11 @@ public static class CostDriverAnalysis
 
         var materialsOf = counted.ToDictionary(p => p.Id, p => PriceSimulatorReport.MaterialIdsOf(p.Id, details));
         List<(RawMaterial Material, int Products, decimal Cost, decimal LargestShare, string LargestIn)> found = [];
-        foreach (var material in materials.Values.Where(m => m.Source == RawMaterialSource.Purchased))
+        List<RawMaterial> purchased = [.. materials.Values.Where(m => m.Source == RawMaterialSource.Purchased)];
+        var reachedBy = IngredientCostRules.ReachedBy(materials.Values, bomLines, [.. purchased.Select(m => m.Id)]);
+        foreach (var material in purchased)
         {
-            var reached = IngredientCostRules.ReachedBy(materials.Values, bomLines, material.Id);
+            var reached = reachedBy[material.Id];
             List<Product> using_ = [.. counted.Where(p => materialsOf[p.Id].Overlaps(reached))];
             if (using_.Count == 0)
             {

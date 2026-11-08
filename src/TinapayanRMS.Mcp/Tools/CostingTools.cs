@@ -102,6 +102,7 @@ public sealed class CostingTools(
                     SavedProductReader.Build(p, pricedDetails[p.Id], basis, repriced).Costs)),
             ];
 
+            var reachedBy = IngredientCostRules.ReachedBy(materials.Values, bomLines, [.. rows.Select(r => r.Material.Id)]);
             List<PriceChangeTried> tried =
             [
                 .. rows.Select(r => new PriceChangeTried(
@@ -111,7 +112,7 @@ public sealed class CostingTools(
                     r.NewPrice,
                     r.ChangePercent,
                     [
-                        .. IngredientCostRules.ReachedBy(materials.Values, bomLines, r.Material.Id)
+                        .. reachedBy[r.Material.Id]
                             .Where(id => id != r.Material.Id)
                             .Select(id => materials[id].Name)
                             .Order(StringComparer.OrdinalIgnoreCase),

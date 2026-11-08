@@ -110,6 +110,21 @@ public class IngredientCostRulesTests
         IngredientCostRules.ReachedBy(materials, lines, 5).Should().BeEquivalentTo([5], "nothing is made from the syrup");
     }
 
+    [Test]
+    public void What_several_changes_reach_is_what_each_reaches_alone()
+    {
+        RawMaterial[] materials = [Purchased(1, 0.014m, 0.014m), Linked(2, linkedToId: 1, weightShare: 70m, costShare: 30m), Purchased(3, 0.08m, 0.08m), Made(4), Made(5)];
+        IngredientBomLine[] lines = [Line(4, 2, 700m), Line(4, 3, 300m), Line(5, 3, 1000m)];
+
+        var reached = IngredientCostRules.ReachedBy(materials, lines, [1, 3, 5, 3]);
+
+        reached.Keys.Should().BeEquivalentTo([1, 3, 5]);
+        foreach (var id in reached.Keys)
+        {
+            reached[id].Should().BeEquivalentTo(IngredientCostRules.ReachedBy(materials, lines, id));
+        }
+    }
+
     private static RawMaterial Purchased(int id, decimal cost, decimal buffered, decimal bufferPercent = 0m) => new()
     {
         Id = id, Name = $"Purchased {id}", Source = RawMaterialSource.Purchased, CostPerBaseUnit = cost, BufferedCostPerBaseUnit = buffered,

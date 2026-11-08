@@ -51,10 +51,7 @@ internal static class IngredientCostPropagator
         [
             .. changedIngredientIds.Where(id => graph.Ingredients.TryGetValue(id, out var changed) && changed.Source != RawMaterialSource.Purchased),
         ];
-        foreach (var id in changedIngredientIds)
-        {
-            affected.UnionWith(IngredientCostGraph.GetDependentsInOrder(id, graph.DependencyIdsByIngredientId));
-        }
+        affected.UnionWith(IngredientCostGraph.GetDependents(changedIngredientIds, IngredientCostGraph.DependentsOf(graph.DependencyIdsByIngredientId)));
 
         if (affected.Count == 0)
         {
