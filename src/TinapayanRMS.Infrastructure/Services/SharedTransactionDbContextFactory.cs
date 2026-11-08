@@ -38,16 +38,14 @@ public sealed class SharedTransactionDbContextFactory(string connectionString, T
     }
 
     /// <summary>
-    /// Serializable, as IProductVersionRepository numbers versions: a version written in the run has to be numbered as
-    /// if nothing else were writing them.
-    /// </summary>
-    /// <summary>
     /// How many times a run is tried when PostgreSQL cancels it for a write beside it (<see cref="IsCancelledForAnother"/>):
     /// the first, and two more.
     /// </summary>
     public const int Attempts = 3;
 
     /// <summary>
+    /// Serializable, as IProductVersionRepository numbers versions: a version written in the run has to be numbered as
+    /// if nothing else were writing them.
     /// A run PostgreSQL cancels because a transaction beside it got there first (Serializable's "could not serialize access",
     /// or a deadlock) is run again from the start, on a new connection, up to <see cref="Attempts"/> times: nothing it wrote
     /// was kept, and run again it sees what the other committed. So the work must do nothing but its repositories' calls,
