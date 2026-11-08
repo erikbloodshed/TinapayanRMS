@@ -599,6 +599,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         // its components' buffered costs, which the cascade redoes, and it adds no buffer of its own, so its
         // percent is stored as 0. A linked one's buffer is the linked-to ingredient's, not the form's.
         var costBufferPercent = RawMaterialRules.StoredCostBufferPercent(existing.Source, inheritedBuffer, material.CostBufferPercent);
+        // Either one reaches what's linked to it: its parts copy its buffer percent, and cut from its buffered cost.
         var bufferChanged = existing.CostBufferPercent != costBufferPercent;
         existing.CostBufferPercent = costBufferPercent;
         existing.TargetCostBufferPercent = StoredTarget(
@@ -611,7 +612,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
             var bufferedCost = RawMaterialRules.StoredCost(material.BufferedCostPerBaseUnit > 0
                 ? material.BufferedCostPerBaseUnit
                 : RawMaterialRules.BufferedCost(existing.CostPerBaseUnit, existing.CostBufferPercent));
-            bufferChanged = existing.BufferedCostPerBaseUnit != bufferedCost;
+            bufferChanged |= existing.BufferedCostPerBaseUnit != bufferedCost;
             existing.BufferedCostPerBaseUnit = bufferedCost;
         }
 

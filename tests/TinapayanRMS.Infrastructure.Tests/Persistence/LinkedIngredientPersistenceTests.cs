@@ -159,6 +159,29 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
     }
 
     [Test]
+    public async Task A_buffer_percent_changed_on_the_egg_reaches_its_parts_when_its_buffered_cost_stays_the_same()
+    {
+        var categoryId = await SeedCategoryAsync();
+
+        // Not priced yet: its buffered cost is 0 at any percent.
+        var eggId = await SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 10m));
+        var yolkId = await SaveAsync(Linked("Egg Yolk", categoryId, eggId, weightShare: 30m, costShare: 70m));
+
+        await SaveAsync(Purchased("Egg", categoryId, costBufferPercent: 25m, id: eggId));
+
+        (await GetMaterialAsync(eggId)).BufferedCostPerBaseUnit.Should().Be(0m);
+        (await GetMaterialAsync(yolkId)).CostBufferPercent.Should().Be(25m, "the part shows the egg's buffer, as it is now");
+
+        // Priced, with its buffered cost typed and sent again as it was: the percent alone changes, and still reaches it.
+        await SetPriceAsync(eggId, null, 0.09m);
+        var egg = Purchased("Egg", categoryId, costBufferPercent: 40m, id: eggId);
+        egg.BufferedCostPerBaseUnit = (await GetMaterialAsync(eggId)).BufferedCostPerBaseUnit;
+        await CreateRepository().SaveAsync(egg, [], brandPrices: null, addIns: null, Cancellation);
+
+        (await GetMaterialAsync(yolkId)).CostBufferPercent.Should().Be(40m);
+    }
+
+    [Test]
     public async Task A_part_takes_its_share_of_the_eggs_fixed_buffered_cost_not_of_a_new_price()
     {
         var categoryId = await SeedCategoryAsync();
