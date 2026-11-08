@@ -285,6 +285,23 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         private set => this.RaiseAndSetIfChanged(ref _costPerGram, value);
     }
 
+    /// <summary>The details tabs along the bottom: Recipe, then Used By.</summary>
+    public const int RecipeTab = 0;
+
+    /// <summary>Used By: the products and made ingredients the sub-assembly goes into.</summary>
+    public const int UsedByTab = 1;
+
+    private int _selectedDetailsTab = RecipeTab;
+    /// <summary>
+    /// The details tab showing, kept here so the screen comes back on the tab it was left on, as Products and Raw
+    /// Materials do. Both tabs always show, so nothing moves it but the user.
+    /// </summary>
+    public int SelectedDetailsTab
+    {
+        get => _selectedDetailsTab;
+        set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+    }
+
     private IReadOnlyList<LinkingProduct> _usedBy = [];
     /// <summary>The products linking the sub-assembly the form shows, by name: one tile each under Used By, which opens it.</summary>
     public IReadOnlyList<LinkingProduct> UsedBy

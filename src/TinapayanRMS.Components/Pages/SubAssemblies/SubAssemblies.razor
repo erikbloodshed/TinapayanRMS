@@ -71,7 +71,7 @@
             </section>
 
             <section class="card tabs-card">
-                <SfTab HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+                <SfTab @bind-SelectedItem="ViewModel!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
                     <TabItems>
                         <TabItem>
                             <ChildContent><TabHeader Text="Recipe" /></ChildContent>
