@@ -7,7 +7,7 @@ namespace TinapayanRMS.Tests;
 /// Lets scripts/Watch-Tests.ps1 rerun the tests by hot reload without a failure of TUnit's own. tests/Directory.Build.props
 /// compiles this file into every test project.
 /// <para>
-/// Microsoft.Testing.Platform's hot reload runs the tests again in the same test session each time, and TUnit 1.81.10
+/// Microsoft.Testing.Platform's hot reload runs the tests again in the same test session each time, and TUnit 1.81.16
 /// keeps one DynamicTestQueue per session, which it completes at the end of every run. The second run's completion threw
 /// "ChannelClosedException: The channel has been closed.", which TUnit reports as a failed test, so every run after the
 /// first ended "Failed!". Before a test of such a run, this gives the queue a new channel, as a new session would have.
