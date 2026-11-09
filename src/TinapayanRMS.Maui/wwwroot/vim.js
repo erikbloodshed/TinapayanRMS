@@ -430,16 +430,21 @@ window.tinapayanVim = (() => {
             return;
         }
 
+        // Every position read before any label goes in: a read after a change makes the page lay itself out again, once
+        // per label. The labels are put together off the page and added at once.
+        const boxes = targets.map(element => element.getBoundingClientRect());
+        const tags = document.createDocumentFragment();
         targets.forEach((element, index) => {
-            const box = element.getBoundingClientRect();
+            const box = boxes[index];
             const tag = document.createElement("span");
             tag.className = "vim-hint";
             tag.textContent = labels[index];
             tag.style.left = Math.max(0, Math.min(box.left, innerWidth - 30)) + "px";
             tag.style.top = Math.max(0, box.top) + "px";
-            layer.appendChild(tag);
+            tags.appendChild(tag);
             mine.items.push({ label: labels[index], element, tag });
         });
+        layer.appendChild(tags);
     }
 
     function closeHints() {
