@@ -12,7 +12,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// </summary>
 /// <param name="ProductName">The header's title: the product's name, or "New product" for one not named yet.</param>
 /// <param name="CategoryName">Its category, or "Uncategorized".</param>
-/// <param name="StageTitle">"Production" or "Research and Development" (ProductRules.StageTitle).</param>
+/// <param name="StageTitle">"Production" or "Innovation" (ProductRules.StageTitle).</param>
 /// <param name="CostUnitCaption">What the costing is for: "Per piece", or "Per unit of 8 pieces".</param>
 /// <param name="LastUpdatedText">When it was last saved, "Sep 14, 2026, 6:27 PM", or "—".</param>
 /// <param name="SaveNote"><see cref="NotSavedNote"/>, <see cref="UnsavedChangesNote"/>, or null when it's the product as saved.</param>

@@ -9,8 +9,9 @@
    (SelectedTreeNodes, which this changes as rows are clicked: alone, or with Ctrl or Shift). Clicking a folder opens or
    closes it. Rows that can be dragged are dragged onto a folder (or a row in one) to move them there, which the screen
    saves at once. A right-click opens the menu for the row, or for the list in its empty space; F2 and Del do what the
-   row's menu shows beside them, Enter opens or closes a folder, and the arrows move through the rows. A row picked from
-   elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
+   row's menu shows beside them, Enter opens or closes a folder, and the arrows move through the rows. Where the screen
+   says (RenamesOnSecondClick), a slow second click on the name of the row picked does what F2 does, as in File Explorer.
+   A row picked from elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
 <div @ref="_element" class="folder-tree" tabindex="0" role="tree" aria-multiselectable="true"
      @onkeydown="OnKeyDown" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
      @ondragover="OnListDragOver" @ondragover:preventDefault="true" @ondrop="OnListDrop" @ondrop:preventDefault="true">
@@ -36,6 +37,11 @@
     // What the tree last scrolled to, so a pick from elsewhere can be told from one made here.
     private object? _shownSelection;
     private bool _pickedHere;
+
+    // A slow second click on a row's name: whether the click landed on the name (the row's content, not its expander or the
+    // space around it), and the rename it's waiting to make.
+    private bool _clickedName;
+    private CancellationTokenSource? _secondClick;
 
     // Dragging: the rows being dragged, and the row they're over.
     private IReadOnlyList<TNode> _dragging = [];
@@ -73,6 +79,12 @@
 
     [Parameter] public Func<TNode, bool>? CanDrag { get; set; }
 
+    /// <summary>
+    /// Whether a row's name is being typed in place (a TreeNameBox in its RowTemplate): it isn't dragged, since a row
+    /// that can be keeps the mouse from selecting the text in it, and a click, F2 or Del on it does nothing.
+    /// </summary>
+    [Parameter] public Func<TNode, bool>? IsEditing { get; set; }
+
     /// <summary>Whether dropping the rows dragged on a row (or the list's empty space, null) would move any of them.</summary>
     [Parameter] public Func<IReadOnlyList<TNode>, TNode?, bool>? CanDrop { get; set; }
 
@@ -83,6 +95,19 @@
 
     /// <summary>What a key (F2, Del) does to the row picked, as its menu shows: TreeShortcut.</summary>
     [Parameter] public Func<string, TreeMenuItem?>? Shortcut { get; set; }
+
+    /// <summary>
+    /// The rows a slow second click on the name renames, as in File Explorer: a click on the name of the one row picked
+    /// already, not part of a double-click, runs what F2 does (<see cref="Shortcut"/>) once <see cref="SecondClickWait"/>
+    /// is over, unless another click, a key, a drag or a menu comes first. None when it's null.
+    /// </summary>
+    [Parameter] public Func<TNode, bool>? RenamesOnSecondClick { get; set; }
+
+    /// <summary>
+    /// What a second click waits for before it renames, so a double-click's second click can call it off: half a second,
+    /// Windows' double-click time, unless a test gives its own.
+    /// </summary>
+    [Parameter] public Func<CancellationToken, Task> SecondClickWait { get; set; } = cancellation => Task.Delay(500, cancellation);
 
     /// <summary>Changes the tree's rows can't be watched for on their own; the screen passes something that changes with them.</summary>
     [Parameter] public object? Version { get; set; }
@@ -97,9 +122,11 @@
         var isFolder = children is not null;
         var isOpen = isFolder && IsExpanded(node);
         var isSelected = Selected.Contains(node);
-        var draggable = CanDrag?.Invoke(node) == true;
+        var isEditing = IsEditing?.Invoke(node) == true;
+        var draggable = !isEditing && CanDrag?.Invoke(node) == true;
         var classes = "tree-row"
             + (isSelected ? " selected" : "")
+            + (isEditing ? " editing" : "")
             + (ReferenceEquals(node, _dropTarget) ? " drop-target" : "")
             + (RowClass?.Invoke(node) is { } extra ? " " + extra : "");
 
@@ -140,7 +167,11 @@
         builder.OpenElement(seq++, "span");
         builder.AddAttribute(seq++, "class", isFolder && children!.Count > 0 ? (isOpen ? OpenExpander : ClosedExpander) : "tree-expander glyph");
         builder.CloseElement();
+        builder.OpenElement(seq++, "span");
+        builder.AddAttribute(seq++, "class", "tree-row-content");
+        builder.AddAttribute(seq++, "onclick", new EventCallback(NoRedraw.Receiver, (Action)(() => _clickedName = true)));
         builder.AddContent(seq++, RowTemplate(node));
+        builder.CloseElement();
         builder.CloseElement();
 
         if (isOpen)
@@ -225,6 +256,14 @@
 
     private void OnRowClick(TNode node, MouseEventArgs e)
     {
+        var onName = _clickedName;
+        _clickedName = false;
+        CancelSecondClick();
+        if (IsEditing?.Invoke(node) == true)
+        {
+            return;
+        }
+
         _pickedHere = true;
 
         // Ctrl-click adds a row to the rows picked, or takes it out (Cmd-click too, as the web app took it on a Mac).
@@ -256,11 +295,70 @@
             }
         }
 
-        // A plain click picks the row alone; on a folder it also opens or closes it.
+        // A plain click picks the row alone; on a folder it also opens or closes it. On the name of the row picked alone
+        // already, once more and not as a double-click's second (Detail 2), it renames the row in a moment, as in File
+        // Explorer.
+        var wasPickedAlone = Selected.Count == 1 && ReferenceEquals(Selected[0], node);
         PickAlone(node);
         if (ChildrenOf(node) is not null)
         {
             SetExpanded(node, !IsExpanded(node));
+        }
+        else if (onName && wasPickedAlone && e.Detail <= 1 && RenamesOnSecondClick?.Invoke(node) == true)
+        {
+            _ = RenameAfterWaitAsync(node);
+        }
+    }
+
+    /// <summary>
+    /// Renames <paramref name="node"/> as F2 would, once <see cref="SecondClickWait"/> is over, if nothing called it off
+    /// meanwhile and the row is still the one picked. Nothing awaits it: it deals with its own end.
+    /// </summary>
+    private async Task RenameAfterWaitAsync(TNode node)
+    {
+        var waiting = _secondClick = new CancellationTokenSource();
+        try
+        {
+            await SecondClickWait(waiting.Token);
+            await InvokeAsync(() =>
+            {
+                if (waiting.IsCancellationRequested || Selected.Count != 1 || !ReferenceEquals(Selected[0], node))
+                {
+                    return;
+                }
+
+                CancelSecondClick();
+                if (Shortcut?.Invoke("F2") is { Command: { } command } item && command.CanExecute(item.Parameter))
+                {
+                    command.Execute(item.Parameter);
+                }
+            });
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Called off by another click or key, or the tree went.
+        }
+    }
+
+    /// <summary>
+    /// Runs an event's handler without drawing the tree again, as Blazor's docs advise for one that changes nothing shown:
+    /// the click on a row's name only notes where it landed, and a redraw then retired the row's own handler for the
+    /// same click before it ran.
+    /// </summary>
+    private sealed class NoRedraw : IHandleEvent
+    {
+        public static readonly NoRedraw Receiver = new();
+
+        public Task HandleEventAsync(EventCallbackWorkItem item, object? arg) => item.InvokeAsync(arg);
+    }
+
+    private void CancelSecondClick()
+    {
+        if (_secondClick is { } waiting)
+        {
+            _secondClick = null;
+            waiting.Cancel();
+            waiting.Dispose();
         }
     }
 
@@ -275,6 +373,7 @@
 
     private async Task OnRowContextMenu(TNode node, MouseEventArgs e)
     {
+        CancelSecondClick();
         if (MenuFor is null || _menu is null)
         {
             return;
@@ -292,6 +391,7 @@
 
     private async Task OnListContextMenu(MouseEventArgs e)
     {
+        CancelSecondClick();
         if (MenuFor is not null && _menu is not null)
         {
             await _menu.OpenAsync(MenuFor(null), e.ClientX, e.ClientY);
@@ -300,6 +400,7 @@
 
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
+        CancelSecondClick();
         if (e.CtrlKey || e.AltKey || e.MetaKey)
         {
             return;
@@ -340,7 +441,7 @@
             case "Enter" or " " when current is not null && ChildrenOf(current) is not null:
                 SetExpanded(current, !IsExpanded(current));
                 break;
-            case "F2" or "Delete":
+            case "F2" or "Delete" when current is null || IsEditing?.Invoke(current) != true:
                 if (Shortcut?.Invoke(e.Key == "F2" ? "F2" : "Del") is { Command: { } command } item && command.CanExecute(item.Parameter))
                 {
                     command.Execute(item.Parameter);
@@ -355,6 +456,7 @@
 
     private void OnDragStart(TNode node)
     {
+        CancelSecondClick();
         // Dragging a row that's picked drags every row picked that can be dragged; any other drags alone.
         if (!Selected.Contains(node))
         {
@@ -422,6 +524,7 @@
 
     public ValueTask DisposeAsync()
     {
+        CancelSecondClick();
         foreach (var unwatch in _watched.Values)
         {
             unwatch();

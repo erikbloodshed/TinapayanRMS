@@ -46,7 +46,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         await AddProductWithSubAssemblyAsync("Test Bun", doughRoleId, [(flourId, 1000m)], weightPerPiece: 10m);
 
-        (await AnalyseCostDriversAsync()).Should().BeEmpty("a product still in Research and Development isn't counted");
+        (await AnalyseCostDriversAsync()).Should().BeEmpty("a product still in Innovation isn't counted");
     });
 
     [Test]

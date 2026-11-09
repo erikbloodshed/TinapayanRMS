@@ -11,8 +11,8 @@ using TinapayanRMS.Tests.Common.Fixtures;
 namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
-/// A product's stage, Production or Research and Development: the Products list's top-level folder for it. A new product
-/// starts in Research and Development, and only a move (dragging it to another folder, IProductRepository.MoveAsync)
+/// A product's stage, Production or Innovation: the Products list's top-level folder for it. A new product
+/// starts in Innovation, and only a move (dragging it to another folder, IProductRepository.MoveAsync)
 /// changes it.
 /// </summary>
 [NotInParallel(DatabaseCollection.D)]
@@ -32,12 +32,12 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         CreateRepository().SaveAsync(new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
     [Test]
-    public async Task A_new_product_starts_in_research_and_development()
+    public async Task A_new_product_starts_in_innovation()
     {
         var id = await SaveNewAsync("Ube Cheese Pandesal");
 
-        (await CreateRepository().GetByIdAsync(id, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
-        (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
+        (await CreateRepository().GetByIdAsync(id, Cancellation))!.Stage.Should().Be(ProductStage.Innovation);
+        (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.Innovation);
     }
 
     [Test]
@@ -85,10 +85,10 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         var breads = await SeedCategoryAsync("Breads");
         var id = await SaveNewAsync("Pandesal", breads.Id);
 
-        await CreateRepository().MoveAsync([new ProductMove(id, ProductStage.ResearchAndDevelopment, null)], Cancellation);
+        await CreateRepository().MoveAsync([new ProductMove(id, ProductStage.Innovation, null)], Cancellation);
 
         var moved = (await CreateRepository().GetByIdAsync(id, Cancellation))!;
-        moved.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
+        moved.Stage.Should().Be(ProductStage.Innovation);
         moved.CategoryId.Should().BeNull();
     }
 
@@ -117,7 +117,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
     }
 
     [Test]
-    public async Task A_clone_starts_in_research_and_development_whatever_its_sources_stage()
+    public async Task A_clone_starts_in_innovation_whatever_its_sources_stage()
     {
         var sourceId = await SaveNewAsync("Chocolate Cake");
         await CreateRepository().MoveAsync([new ProductMove(sourceId, ProductStage.Production, null)], Cancellation);
@@ -125,8 +125,8 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         var cloneId = await new ProductCloner(CreateDbContextFactory()).CloneAsync(sourceId, "Chocolate Cake Mini", Cancellation);
         var variantId = await new ProductCloner(CreateDbContextFactory()).CreateVariantAsync(sourceId, "Chocolate Cake Ube", Cancellation);
 
-        (await CreateRepository().GetByIdAsync(cloneId, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
-        (await CreateRepository().GetByIdAsync(variantId, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
+        (await CreateRepository().GetByIdAsync(cloneId, Cancellation))!.Stage.Should().Be(ProductStage.Innovation);
+        (await CreateRepository().GetByIdAsync(variantId, Cancellation))!.Stage.Should().Be(ProductStage.Innovation);
     }
 
     [Test]
@@ -144,7 +144,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         var products = (await CreateRepository().GetAllAsync(Cancellation)).ToDictionary(p => p.Id);
         (products[mamonId].Stage, products[mamonId].CategoryId).Should().Be((ProductStage.Production, cakes.Id));
         (products[pandesalId].Stage, products[pandesalId].CategoryId).Should().Be((ProductStage.Production, (int?)null));
-        (products[ensaymadaId].Stage, products[ensaymadaId].CategoryId).Should().Be((ProductStage.ResearchAndDevelopment, breads.Id), "it wasn't moved");
+        (products[ensaymadaId].Stage, products[ensaymadaId].CategoryId).Should().Be((ProductStage.Innovation, breads.Id), "it wasn't moved");
     }
 
     [Test]
@@ -158,7 +158,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
             [new ProductMove(mamonId, ProductStage.Production, breads.Id), new ProductMove(pandesalId, ProductStage.Production, breads.Id + 999)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*no longer exists*");
-        (await CreateRepository().GetAllAsync(Cancellation)).Should().OnlyContain(p => p.Stage == ProductStage.ResearchAndDevelopment && p.CategoryId == null);
+        (await CreateRepository().GetAllAsync(Cancellation)).Should().OnlyContain(p => p.Stage == ProductStage.Innovation && p.CategoryId == null);
     }
 
     [Test]
@@ -170,7 +170,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
             [new ProductMove(mamonId, ProductStage.Production, null), new ProductMove(999_999, ProductStage.Production, null)], Cancellation);
 
         await act.Should().ThrowAsync<InvalidOperationException>();
-        (await CreateRepository().GetByIdAsync(mamonId, Cancellation))!.Stage.Should().Be(ProductStage.ResearchAndDevelopment);
+        (await CreateRepository().GetByIdAsync(mamonId, Cancellation))!.Stage.Should().Be(ProductStage.Innovation);
     }
 
     [Test]
@@ -183,7 +183,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
 
         // A saved one's stage is only ever a move's to change.
         await CreateRepository().SaveAsync(
-            new Product { Id = id, Name = "Pan de Sal", Stage = ProductStage.ResearchAndDevelopment }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+            new Product { Id = id, Name = "Pan de Sal", Stage = ProductStage.Innovation }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
         (await CreateRepository().GetByIdAsync(id, Cancellation))!.Stage.Should().Be(ProductStage.Production);
     }
 

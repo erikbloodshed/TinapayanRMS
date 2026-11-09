@@ -2067,7 +2067,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         var tree = viewModel.ProductTree;
-        var breads = TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads");
+        var breads = TreeFolder(viewModel, ProductStage.Innovation, "Breads");
         breads.Children.Should().Equal(tree.Find(ensaymadaId)!, tree.Find(mamonId)!);
 
         viewModel.SelectedTreeNode = tree.Find(mamonId);
@@ -2088,7 +2088,9 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "its row comes back with it");
 
         await viewModel.NewCommand.Execute();
-        viewModel.SelectedTreeNode.Should().BeNull();
+        viewModel.SelectedTreeNode.Should().BeSameAs(tree.PendingProduct, "New picks the new product's row, its name to be typed");
+        viewModel.CancelTreeName();
+        viewModel.SelectedTreeNode.Should().BeNull("Esc takes the row away, and the blank form has none");
     });
 
     [Test]
@@ -2117,7 +2119,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var leaf = viewModel.ProductTree.Find(mamonId);
         TreeFolder(viewModel, ProductStage.Production, "Cakes").Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
-        TreeFolder(viewModel, ProductStage.ResearchAndDevelopment, "Breads").Children.Should().BeEmpty();
+        TreeFolder(viewModel, ProductStage.Innovation, "Breads").Children.Should().BeEmpty();
         viewModel.SelectedTreeNode.Should().BeSameAs(leaf);
         viewModel.SelectedProduct!.Stage.Should().Be(ProductStage.Production, "the selection is the product as it's saved now");
         viewModel.EditingCategory!.Name.Should().Be("Cakes", "the Category picker follows the move");
@@ -2294,7 +2296,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.Products.CountAsync(Cancellation)).Should().Be(1);
     });
 
-    /// <summary>A product with nothing but its name and category, saved through the repository, which files it in Research and Development.</summary>
+    /// <summary>A product with nothing but its name and category, saved through the repository, which files it in Innovation.</summary>
     private Task<int> SaveProductAsync(string name, int? categoryId) =>
         new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);

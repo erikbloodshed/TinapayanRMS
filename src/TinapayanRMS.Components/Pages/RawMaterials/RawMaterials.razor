@@ -86,13 +86,8 @@
         AddSubscription(viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
 
-        // A name asked for by the list's menu: a material's new name, or a category's.
-        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
-
-        // New clears the form, as New … Here does: the cursor goes to Name, so typing can start straight away.
-        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-        AddSubscription(viewModel.NewMaterialInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        // Copy fills the form with a name to change: the cursor goes to Name. New names the material in the list instead,
+        // where its row's box has the cursor.
         AddSubscription(viewModel.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
 
         // The material in the address is the load's to open, at its end: the list is fresh only then. New clicked

@@ -35,7 +35,7 @@ public sealed record BomLineInfo(int IngredientId, int ComponentIngredientId, de
 /// <summary>An ingredient category (Type Ingredient) or a made ingredients' one (Type Made).</summary>
 public sealed record CategoryInfo(int Id, string Name, string Type);
 
-/// <summary>A product, not deleted. Stage is Production or ResearchAndDevelopment.</summary>
+/// <summary>A product, not deleted. Stage is Production or Innovation (ResearchAndDevelopment until 2026-11-09).</summary>
 /// <param name="QuantityRequired">How many pieces make one sellable unit.</param>
 public sealed record ProductInfo(int Id, string Name, string? Category, string Stage, bool IsComposite, int QuantityRequired);
 

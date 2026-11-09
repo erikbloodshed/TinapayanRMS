@@ -1,7 +1,9 @@
 @using TinapayanRMS.Domain.Enums
 @* Raw Materials' list (the WPF MaterialListCard): a search box; the list's commands as icons; the materials in a folder
    for their type, then their category; and, under the tree, what the last move did, with Undo. Dragging materials onto
-   another category of their type moves them there, saved at once; a right-click opens the row's menu, or the list's. *@
+   another category of their type moves them there, saved at once; a right-click opens the row's menu, or the list's. A
+   name is typed in place, as in a file explorer (TreeNameEdit): a material or category renamed, or a new material or
+   folder named. *@
 <section class="card list-card tree-card">
     <div class="list-heading">
         <h2 class="section-header">Raw Materials</h2>
@@ -13,12 +15,12 @@
 
     <div class="list-toolbar">
         <ActionButton Icon="AppIcon.Add" Tooltip="New Raw Material" Flat="true" OnClick="() => Commands.Run(ViewModel.NewMaterialInCommand, null)" />
-        <MenuButton CssClass="e-flat icon-only" Tooltip="New Category: an ingredient, Made or packaging category">
+        <MenuButton CssClass="e-flat icon-only" Tooltip="New Folder: for ingredients, made ingredients or packaging">
             <Face><Icon Of="AppIcon.NewFolder" /></Face>
             <ChildContent>
-                <ActionButton Icon="AppIcon.NewFolder" Label="New Ingredient Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Ingredient)" />
-                <ActionButton Icon="AppIcon.NewFolder" Label="New Made Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Made)" />
-                <ActionButton Icon="AppIcon.NewFolder" Label="New Packaging Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Packaging)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Ingredient Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Ingredient)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Made Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Made)" />
+                <ActionButton Icon="AppIcon.NewFolder" Label="New Packaging Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, RawMaterialCategoryType.Packaging)" />
             </ChildContent>
         </MenuButton>
         <ActionButton Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
@@ -33,7 +35,9 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="@(n => n.IsTypeFolder ? "top-level" : null)"
-                CanDrag="n => n is RawMaterialLeafNode"
+                CanDrag="n => n is RawMaterialLeafNode { IsNew: false }"
+                IsEditing="IsEditing"
+                RenamesOnSecondClick="n => n is RawMaterialLeafNode { IsNew: false }"
                 CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
                 OnDrop="DropAsync"
                 MenuFor="ViewModel.TreeMenuFor"
@@ -43,10 +47,19 @@
             {
                 <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
-            <span class="tree-title">@node.Title</span>
-            @if (node.IsFolder)
+            @if (ViewModel.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
             {
-                <span class="tree-count">(@node.MaterialCount)</span>
+                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
+                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
+                             OnCommit="ViewModel.CommitTreeNameAsync" OnCancel="ViewModel.CancelTreeName" />
+            }
+            else
+            {
+                <span class="tree-title">@node.Title</span>
+                @if (node.IsFolder)
+                {
+                    <span class="tree-count">(@node.MaterialCount)</span>
+                }
             }
         </RowTemplate>
     </FolderTree>
@@ -63,6 +76,8 @@
         RawMaterialLeafNode leaf => "material-" + leaf.RawMaterial.Id,
         _ => node.Title,
     };
+
+    private bool IsEditing(RawMaterialTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
     private static IReadOnlyList<RawMaterialMove> MovesFor(IReadOnlyList<RawMaterialTreeNode> dragged, RawMaterialTreeNode? target) =>
         dragged.All(n => n is RawMaterialLeafNode)

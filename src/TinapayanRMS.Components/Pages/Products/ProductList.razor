@@ -1,7 +1,8 @@
 @* Products' list (the WPF ProductListCard): a search box; the list's commands as icons; the products in a folder for
-   their stage (Production, Research and Development), then their category, each with an image saying what it is; the
+   their stage (Production, Innovation), then their category, each with an image saying what it is; the
    deleted ones in a Deleted folder at the end; and what the last move did, with Undo. Dragging products onto a folder
-   moves them there, saved at once; a deleted product only comes back by Restore, from its menu. *@
+   moves them there, saved at once; a deleted product only comes back by Restore, from its menu. A name is typed in
+   place, as in a file explorer (TreeNameEdit): a product or category renamed, or a new product or folder named. *@
 <section class="card list-card tree-card">
     <div class="list-heading">
         <h2 class="section-header">Products</h2>
@@ -14,7 +15,7 @@
     <div class="list-toolbar">
         <ActionButton Icon="AppIcon.Add" Tooltip="New Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewProductInCommand, null)" />
         <ActionButton Icon="AppIcon.Composite" Tooltip="New Composite Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCompositeProductInCommand, null)" />
-        <ActionButton Icon="AppIcon.NewFolder" Tooltip="New Category…" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, null)" />
+        <ActionButton Icon="AppIcon.NewFolder" Tooltip="New Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, null)" />
         <CommandButton Command="ViewModel.PrintAllCommand" Icon="AppIcon.Print" Tooltip="Print All Products" Flat="true" />
         <ActionButton Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
         <ActionButton Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
@@ -28,7 +29,9 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="RowClass"
-                CanDrag="n => n is ProductLeafNode { IsDeleted: false }"
+                CanDrag="n => n is ProductLeafNode { IsDeleted: false, IsNew: false }"
+                IsEditing="IsEditing"
+                RenamesOnSecondClick="n => n is ProductLeafNode { IsDeleted: false, IsNew: false }"
                 CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
                 OnDrop="DropAsync"
                 MenuFor="ViewModel.TreeMenuFor"
@@ -38,14 +41,23 @@
             {
                 <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
-            <span class="tree-title">@node.Title</span>
-            @if (node.IsBelowTargetMarkup)
+            @if (ViewModel.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
             {
-                <span class="@AppIcons.CssOf(AppIcon.Warning) tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup"></span>
+                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
+                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
+                             OnCommit="ViewModel.CommitTreeNameAsync" OnCancel="ViewModel.CancelTreeName" />
             }
-            @if (node.IsFolder)
+            else
             {
-                <span class="tree-count">(@node.ProductCount)</span>
+                <span class="tree-title">@node.Title</span>
+                @if (node.IsBelowTargetMarkup)
+                {
+                    <span class="@AppIcons.CssOf(AppIcon.Warning) tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup"></span>
+                }
+                @if (node.IsFolder)
+                {
+                    <span class="tree-count">(@node.ProductCount)</span>
+                }
             }
         </RowTemplate>
     </FolderTree>
@@ -69,6 +81,8 @@
         ProductLeafNode { IsDeleted: true } => "deleted",
         _ => null,
     };
+
+    private bool IsEditing(ProductTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
     private static IReadOnlyList<ProductMove> MovesFor(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target) =>
         dragged.All(n => n is ProductLeafNode)

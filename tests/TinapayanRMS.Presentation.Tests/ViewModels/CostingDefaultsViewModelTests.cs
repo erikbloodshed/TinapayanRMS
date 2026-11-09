@@ -39,7 +39,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingMarginPercent = 40m;
         viewModel.EditingVatPercent = 12m;
         viewModel.EditingWastagePercent = 4.5m;
-        viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
+        viewModel.EditingNewProductStage = ProductStage.Innovation;
         viewModel.EditingCostBufferPercent = 8m;
         viewModel.EditingPriceRounding = viewModel.PriceRoundingOptions.Single(o => o.Step == 0.25m);
 
@@ -52,7 +52,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarginPercent, reloaded.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m));
         reloaded.EditingWastagePercent.Should().Be(4.5m);
-        reloaded.EditingNewProductStage.Should().Be(ProductStage.ResearchAndDevelopment);
+        reloaded.EditingNewProductStage.Should().Be(ProductStage.Innovation);
         reloaded.EditingCostBufferPercent.Should().Be(8m);
         reloaded.EditingPriceRounding.Should().Be(new PriceRoundingOption(0.25m, "Up to the next 0.25"));
         reloaded.PriceRoundingOptions[0].Label.Should().Be("None", "rounding is off until it's chosen");
@@ -78,12 +78,12 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     public Task Load_files_new_products_in_Production_before_anything_is_saved_and_offers_both_stages() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        viewModel.EditingNewProductStage = ProductStage.ResearchAndDevelopment;
+        viewModel.EditingNewProductStage = ProductStage.Innovation;
 
         await viewModel.LoadCommand.Execute();
 
         viewModel.EditingNewProductStage.Should().Be(ProductStage.Production);
-        viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Research and Development");
+        viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Innovation");
     });
 
     [Test]

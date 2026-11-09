@@ -55,11 +55,11 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     }
 
     [Test]
-    public async Task SetAsync_keeps_the_stage_picked_for_new_products_even_Research_and_Development()
+    public async Task SetAsync_keeps_the_stage_picked_for_new_products_even_Innovation()
     {
-        await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.ResearchAndDevelopment }, Cancellation);
+        await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.Innovation }, Cancellation);
         (await CreateRepository().GetAsync(Cancellation)).NewProductStage.Should().Be(
-            ProductStage.ResearchAndDevelopment, "the CLR default isn't left for the store default to make Production");
+            ProductStage.Innovation, "the CLR default isn't left for the store default to make Production");
 
         await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
         (await CreateRepository().GetAsync(Cancellation)).NewProductStage.Should().Be(ProductStage.Production);

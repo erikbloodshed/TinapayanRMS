@@ -28,13 +28,25 @@ public closed class SubAssemblyTreeNode : ReactiveObject
 /// </summary>
 public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<SubAssemblyTreeNode>
 {
-    internal SubAssemblyFolderNode(SubAssemblyRole role)
+    internal SubAssemblyFolderNode(SubAssemblyRole role, bool isNewFolder = false)
     {
         RoleId = role.Id;
         IsPackaging = role.IsPackaging;
+        IsNewFolder = isNewFolder;
         _title = role.Name;
         Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
     }
+
+    /// <summary>
+    /// The row New Folder adds after the roles while its name is typed into it (SubAssemblyTree.BeginNewFolder): a role
+    /// once the name typed saves one, and none at all if it's cancelled. Its RoleId is 0.
+    /// </summary>
+    public static SubAssemblyFolderNode NewFolder() => new(new SubAssemblyRole { Name = NewFolderTitle }, isNewFolder: true);
+
+    public const string NewFolderTitle = "New folder";
+
+    /// <summary>The row New Folder adds, named in the list before it's a role: nothing is dropped on it, and it has no menu.</summary>
+    public bool IsNewFolder { get; }
 
     public int RoleId { get; }
 
@@ -42,7 +54,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
     public bool IsPackaging { get; }
 
     /// <summary>What names the folder from one run to the next, for remembering whether it was left closed: the role's id, "12".</summary>
-    public string Key => RoleId.ToString(CultureInfo.InvariantCulture);
+    public string Key => IsNewFolder ? "New" : RoleId.ToString(CultureInfo.InvariantCulture);
 
     public IEnumerable<SubAssemblyLeafNode> SubAssemblies => Children.OfType<SubAssemblyLeafNode>();
 
@@ -130,6 +142,12 @@ public sealed class SubAssemblyLeafNode(StandaloneSubAssemblyRow row) : SubAssem
     public override AppIcon? Icon => null;
 
     public override bool IsFolder => false;
+
+    /// <summary>
+    /// The row New adds while its name is typed into it, and until the sub-assembly is saved (SubAssemblyTree.BeginNewSubAssembly),
+    /// over the one the form starts: it has no menu, isn't dragged, and picking it loads nothing.
+    /// </summary>
+    public bool IsNew => Row.Id == 0;
 }
 
 /// <summary>
@@ -190,6 +208,66 @@ public sealed class SubAssemblyTree : IDisposable
         }
     }
 
+    /// <summary>The row New Folder added, while its name is being typed; null otherwise.</summary>
+    public SubAssemblyFolderNode? PendingFolder { get; private set; }
+
+    /// <summary>The row New added, while its name is being typed and until the sub-assembly is saved; null otherwise.</summary>
+    public SubAssemblyLeafNode? PendingSubAssembly { get; private set; }
+
+    /// <summary>
+    /// Adds a "New folder" row after the roles, for its name to be typed into. A refresh keeps it there until
+    /// <see cref="EndNewFolder"/>. Any earlier one goes first: there's one at a time.
+    /// </summary>
+    public SubAssemblyFolderNode BeginNewFolder()
+    {
+        EndNewFolder();
+        var folder = PendingFolder = SubAssemblyFolderNode.NewFolder();
+        Roots.Add(folder);
+        return folder;
+    }
+
+    /// <summary>Takes away the row <see cref="BeginNewFolder"/> added, if there is one.</summary>
+    public void EndNewFolder()
+    {
+        if (PendingFolder is { } folder)
+        {
+            PendingFolder = null;
+            Roots.Remove(folder);
+        }
+    }
+
+    /// <summary>
+    /// Adds a row for the new sub-assembly the form starts, <paramref name="subAssembly"/> (no id yet, its role set), last in
+    /// its role's folder, which opens to show it. A refresh keeps it there, uncounted, until <see cref="EndNewSubAssembly"/>.
+    /// Any earlier one goes first. Null when its role has no folder.
+    /// </summary>
+    public SubAssemblyLeafNode? BeginNewSubAssembly(SubAssembly subAssembly)
+    {
+        EndNewSubAssembly();
+        if (Folder(subAssembly.RoleId) is not { } folder)
+        {
+            return null;
+        }
+
+        var row = PendingSubAssembly = new SubAssemblyLeafNode(new StandaloneSubAssemblyRow(subAssembly, []));
+        folder.Children.Add(row);
+        folder.IsExpanded = true;
+        return row;
+    }
+
+    /// <summary>Takes away the row <see cref="BeginNewSubAssembly"/> added, if there is one.</summary>
+    public void EndNewSubAssembly()
+    {
+        if (PendingSubAssembly is { } row)
+        {
+            PendingSubAssembly = null;
+            foreach (var folder in _folders.Values)
+            {
+                folder.Children.Remove(row);
+            }
+        }
+    }
+
     public void Dispose() => _memory.Dispose();
 
     /// <summary>
@@ -199,8 +277,9 @@ public sealed class SubAssemblyTree : IDisposable
     /// </summary>
     public static SubAssemblyMove? MoveTo(SubAssemblyTreeNode? target, SubAssembly subAssembly)
     {
-        (int RoleId, bool IsPackaging)? place = target switch
+        (int RoleId, bool IsPackaging)? place = subAssembly.Id == 0 ? null : target switch
         {
+            SubAssemblyFolderNode { IsNewFolder: true } or SubAssemblyLeafNode { IsNew: true } => null,
             SubAssemblyFolderNode folder => (folder.RoleId, folder.IsPackaging),
             SubAssemblyLeafNode leaf => (leaf.SubAssembly.RoleId, IsPackagingSet(leaf.SubAssembly)),
             null => null,
@@ -270,10 +349,29 @@ public sealed class SubAssemblyTree : IDisposable
         List<(SubAssemblyFolderNode Folder, List<SubAssemblyTreeNode> Rows)> wanted =
             [.. allRoles.Select(role => (_folders[role.Id], (List<SubAssemblyTreeNode>)[.. _leaves.RowsOf(byRole[role.Id])]))];
 
+        // The rows being named stay where they were added: a new folder after the roles, a new sub-assembly last in its role's.
+        var pendingAt = PendingSubAssembly is { } pending ? wanted.FindIndex(w => w.Folder.RoleId == pending.SubAssembly.RoleId) : -1;
+        if (pendingAt >= 0)
+        {
+            wanted[pendingAt].Rows.Add(PendingSubAssembly!);
+        }
+
+        if (PendingFolder is { } newFolder)
+        {
+            wanted.Add((newFolder, []));
+        }
+
         // Everything leaving the tree goes before anything arrives, so a sub-assembly moving from one folder to another is
         // never in both at once. The roles come in before their sub-assemblies on a load, so on the first one every folder
         // is shown empty and filled a moment later.
         TreeRows.RemoveLeaving(Roots, wanted, isFiltered);
         TreeRows.LayFolders(Roots, wanted, isFiltered);
+
+        // A new sub-assembly isn't one yet: its folder counts only the saved ones.
+        if (pendingAt >= 0)
+        {
+            var folder = wanted[pendingAt].Folder;
+            folder.ShowCount(folder.SubAssemblyCount - 1);
+        }
     }
 }

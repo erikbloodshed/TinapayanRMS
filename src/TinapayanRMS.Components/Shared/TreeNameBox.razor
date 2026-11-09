@@ -1,0 +1,130 @@
+@inject IJSRuntime JS
+
+@* The box a list's row's name becomes while it's typed in place, as in a file explorer (the ViewModel's TreeNameEdit):
+   Rename on a record or folder, or a new one being named. It takes the cursor with its text selected. Enter, or leaving
+   the box, gives the name typed to OnCommit; Esc gives up (OnCancel); only the first of them counts. The keys and clicks
+   in it stay in it, so the tree around it doesn't move, open a folder or pick a row as they're typed. After Enter or Esc
+   the cursor goes back to the tree, so the arrows carry on from the row, as in a file explorer. *@
+<span @ref="_element" class="tree-name-box" title="@Hint"
+      @onkeydown:stopPropagation="true" @onclick:stopPropagation="true" @onmousedown="() => _used = true" @onmousedown:stopPropagation="true"
+      @ondblclick:stopPropagation="true" @oncontextmenu:stopPropagation="true">
+    @* Not one of the form's boxes: it has no undo step, and it keeps what's typed until it's given back. *@
+    <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+        <TextField ID="@_id" Value="@_text" ValueChanged="OnTyped" OnEnter="OnEnterAsync" OnLeave="OnLeaveAsync" OnKey="OnKeyAsync"
+                   CssClass="tree-name-field" />
+    </CascadingValue>
+</span>
+
+@code {
+    private static int _boxes;
+    private readonly string _id = "tree-name-" + Interlocked.Increment(ref _boxes);
+    private ElementReference _element;
+    private string _text = "";
+    private bool _done;
+
+    // A cursor taken away before the box is used (typed or clicked in), in its first moments, isn't the box being left:
+    // whatever started the naming can take it as it closes, a drop-down (New's arrow) or the dialog asking about unsaved
+    // changes, a moment after the box has it. The box takes it back. Counted as left, it had saved "New product" there
+    // and then, the name a new row starts with.
+    private readonly System.Diagnostics.Stopwatch _shown = new();
+    private bool _used;
+
+    /// <summary>What the box starts with, selected: the row's name, or what a new one is called until it's typed.</summary>
+    [Parameter, EditorRequired] public string InitialText { get; set; } = "";
+
+    /// <summary>The box's tooltip, saying what the name is for.</summary>
+    [Parameter] public string? Hint { get; set; }
+
+    /// <summary>The name typed, on Enter or on leaving the box.</summary>
+    [Parameter] public EventCallback<string> OnCommit { get; set; }
+
+    /// <summary>Esc.</summary>
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    /// <summary>
+    /// How long a cursor taken away from the box before it's used, from when it shows, is taken back rather than counted
+    /// as leaving it. A second covers a dialog's closing; a test passes none.
+    /// </summary>
+    [Parameter] public TimeSpan SettleTime { get; set; } = TimeSpan.FromSeconds(1);
+
+    protected override void OnInitialized() => _text = InitialText;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _shown.Start();
+        await JS.InvokeVoidAsync("tinapayan.focus", _id);
+    }
+
+    private void OnTyped(string text)
+    {
+        _text = text;
+        _used = true;
+    }
+
+    private async Task OnEnterAsync()
+    {
+        if (TryFinish())
+        {
+            await BackToTreeAsync();
+            await OnCommit.InvokeAsync(_text);
+        }
+    }
+
+    private async Task OnLeaveAsync()
+    {
+        if (_done)
+        {
+            return;
+        }
+
+        if (!_used && _shown.Elapsed < SettleTime)
+        {
+            // Taken by whatever started the naming, as it closed: the box takes the cursor back, its text selected again.
+            await JS.InvokeVoidAsync("tinapayan.focusIfAway", _id);
+            return;
+        }
+
+        if (TryFinish())
+        {
+            await OnCommit.InvokeAsync(_text);
+        }
+    }
+
+    private async Task OnKeyAsync(KeyboardEventArgs e)
+    {
+        _used = true;
+        if (e.Key == "Escape" && TryFinish())
+        {
+            await BackToTreeAsync();
+            await OnCancel.InvokeAsync();
+        }
+    }
+
+    private bool TryFinish()
+    {
+        if (_done)
+        {
+            return false;
+        }
+
+        _done = true;
+        return true;
+    }
+
+    private async Task BackToTreeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("tinapayan.focusClosest", _element, ".folder-tree");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The page is going: there's no tree to go back to.
+        }
+    }
+}

@@ -58,9 +58,9 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Loaf");
 
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.ResearchAndDevelopment)));
+        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.Innovation)));
         await tab.LoadCommand.Execute();
-        tab.PrintSet!.Title.Should().Be("Research and Development");
+        tab.PrintSet!.Title.Should().Be("Innovation");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
     });
 
@@ -194,7 +194,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
 
     /// <summary>
     /// Two categories and five products: Production's Breads (Pan de Coco, Cheese Roll), Cakes (Mocha Roll) and Uncategorized
-    /// (Loaf), and Research and Development's Breads (Test Bread). Named out of order, so the list's order is the test's.
+    /// (Loaf), and Innovation's Breads (Test Bread). Named out of order, so the list's order is the test's.
     /// </summary>
     private async Task<(ProductCategory Breads, ProductCategory Cakes)> AddCatalogueAsync()
     {
@@ -204,7 +204,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         dbContext.ProductCategories.AddRange(cakes, breads);
         dbContext.Products.AddRange(
             new Product { Name = "Pan de Coco", Stage = ProductStage.Production, Category = breads },
-            new Product { Name = "Test Bread", Stage = ProductStage.ResearchAndDevelopment, Category = breads },
+            new Product { Name = "Test Bread", Stage = ProductStage.Innovation, Category = breads },
             new Product { Name = "Mocha Roll", Stage = ProductStage.Production, Category = cakes },
             new Product { Name = "Loaf", Stage = ProductStage.Production },
             new Product { Name = "Cheese Roll", Stage = ProductStage.Production, Category = breads });

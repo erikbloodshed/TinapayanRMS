@@ -4,6 +4,7 @@ using AwesomeAssertions;
 using Microsoft.AspNetCore.Components.Web;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -244,5 +245,143 @@ public class FolderTreeTests
 
         await list.KeyDownAsync(Key.Enter);
         _breads.IsExpanded.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task A_row_being_named_isnt_dragged_and_the_keys_and_clicks_in_its_box_stay_there()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var pandesal = _breads.Children![1];
+        var shortcuts = 0;
+        var tree = context.Render<FolderTree<Node>>(parameters => parameters
+            .Add(t => t.Roots, [_breads, _cakes])
+            .Add(t => t.ChildrenOf, node => node.Children)
+            .Add(t => t.IsExpanded, node => node.IsExpanded)
+            .Add(t => t.SetExpanded, (node, open) => node.IsExpanded = open)
+            .Add(t => t.Selected, _selected)
+            .Add(t => t.KeyOf, node => node.Name)
+            .Add(t => t.CanDrag, _ => true)
+            .Add(t => t.IsEditing, node => node == pandesal)
+            .Add(t => t.Shortcut, _ =>
+            {
+                shortcuts++;
+                return null;
+            })
+            .Add(t => t.RowTemplate, node => builder =>
+            {
+                if (node == pandesal)
+                {
+                    builder.OpenComponent<TreeNameBox>(0);
+                    builder.AddComponentParameter(1, nameof(TreeNameBox.InitialText), node.Name);
+                    builder.AddComponentParameter(2, nameof(TreeNameBox.SettleTime), TimeSpan.Zero);
+                    builder.CloseComponent();
+                }
+                else
+                {
+                    builder.AddMarkupContent(0, $"<span class=\"title\">{node.Name}</span>");
+                }
+            }));
+
+        var row = tree.FindAll(".tree-row")[2];
+        row.ClassList.Should().Contain("editing");
+        row.GetAttribute("draggable").Should().Be("false", "a row that can be dragged keeps the mouse from selecting its text");
+        tree.FindAll(".tree-row")[1].GetAttribute("draggable").Should().Be("true");
+
+        var input = tree.Find(".tree-row.editing input");
+        await input.KeyDownAsync(Key.Down);
+        await input.KeyDownAsync(Key.Home);
+        await input.KeyDownAsync(new KeyboardEventArgs { Key = "F2" });
+        _selected.Should().BeEmpty("the keys are the box's");
+        shortcuts.Should().Be(0);
+
+        await tree.FindAll(".tree-row")[2].ClickAsync(new MouseEventArgs());
+        _selected.Should().BeEmpty("a click on the row being named, around its box, picks nothing either");
+
+        _selected.Add(pandesal);
+        await tree.Find(".folder-tree").KeyDownAsync(new KeyboardEventArgs { Key = "F2" });
+        shortcuts.Should().Be(0, "F2 on the row being named renames nothing more");
+    }
+
+    /// <summary>What F2 runs, counted.</summary>
+    private sealed class CountingCommand : System.Windows.Input.ICommand
+    {
+        public int Runs { get; private set; }
+
+        public event EventHandler? CanExecuteChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public bool CanExecute(object? parameter) => true;
+
+        public void Execute(object? parameter) => Runs++;
+    }
+
+    /// <summary>The tree, with a record's F2 counted and a slow second click's wait held until <paramref name="wait"/> ends.</summary>
+    private IRenderedComponent<FolderTree<Node>> RenderRenaming(BunitContext context, CountingCommand rename, Task wait) =>
+        context.Render<FolderTree<Node>>(parameters => parameters
+            .Add(tree => tree.Roots, [_breads, _cakes])
+            .Add(tree => tree.ChildrenOf, node => node.Children)
+            .Add(tree => tree.IsExpanded, node => node.IsExpanded)
+            .Add(tree => tree.SetExpanded, (node, open) => node.IsExpanded = open)
+            .Add(tree => tree.Selected, _selected)
+            .Add(tree => tree.KeyOf, node => node.Name)
+            .Add(tree => tree.RowTemplate, node => $"<span class=\"title\">{node.Name}</span>")
+            .Add(tree => tree.Shortcut, key => key == "F2" ? new TreeMenuItem("Rename", rename) : null)
+            .Add(tree => tree.RenamesOnSecondClick, node => node.Children is null)
+            .Add(tree => tree.SecondClickWait, cancellation => wait.WaitAsync(cancellation)));
+
+    private static Task ClickNameAsync(IRenderedComponent<FolderTree<Node>> tree, int row, long detail = 1) =>
+        tree.FindAll(".tree-row-content")[row].ClickAsync(new MouseEventArgs { Detail = detail });
+
+    [Test]
+    public async Task A_slow_second_click_on_the_picked_records_name_renames_it_once_the_wait_is_over()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var rename = new CountingCommand();
+        var wait = new TaskCompletionSource();
+        var tree = RenderRenaming(context, rename, wait.Task);
+
+        await ClickNameAsync(tree, 1);
+        _selected.Should().Equal(_breads.Children![0]);
+        await ClickNameAsync(tree, 1);
+        rename.Runs.Should().Be(0, "it waits, in case the click is a double-click's");
+
+        wait.SetResult();
+
+        tree.WaitForAssertion(() => rename.Runs.Should().Be(1));
+    }
+
+    [Test]
+    public async Task A_double_click_a_key_a_click_beside_the_name_or_a_folder_renames_nothing()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var rename = new CountingCommand();
+        var wait = new TaskCompletionSource();
+        var tree = RenderRenaming(context, rename, wait.Task);
+
+        // The first click picks it, so the next is a second click; a double-click's second click (Detail 2) calls it off.
+        await ClickNameAsync(tree, 1);
+        await ClickNameAsync(tree, 1);
+        await ClickNameAsync(tree, 1, detail: 2);
+
+        // A key pressed while it waits.
+        await ClickNameAsync(tree, 1);
+        await tree.Find(".folder-tree").KeyDownAsync(Key.Enter);
+
+        // A click on the row beside the name, then a folder's name twice, which opens and closes it.
+        await tree.FindAll(".tree-row")[1].ClickAsync(new MouseEventArgs { Detail = 1 });
+        await ClickNameAsync(tree, 3);
+        await ClickNameAsync(tree, 3);
+        _cakes.IsExpanded.Should().BeFalse("a folder's clicks open and close it");
+
+        wait.SetResult();
+        await tree.InvokeAsync(() => { });
+
+        rename.Runs.Should().Be(0);
     }
 }

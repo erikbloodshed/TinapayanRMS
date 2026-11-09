@@ -42,7 +42,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         printout.ProductName.Should().Be("Ube Roll");
         printout.CategoryName.Should().Be("Uncategorized");
-        printout.StageTitle.Should().Be("Research and Development");
+        printout.StageTitle.Should().Be("Innovation");
         printout.CostUnitCaption.Should().Be("Per piece");
         printout.SaveNote.Should().BeNull("nothing was changed since it was saved");
 

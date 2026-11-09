@@ -172,4 +172,56 @@ public class SubAssemblyTreeTests
         tree.Roots.Should().OnlyContain(r => r.IsExpanded);
         tree.ClosedFolderKeys().Should().BeEmpty();
     }
+
+    [Test]
+    public void A_new_folder_sits_after_the_roles_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new SubAssemblyTree();
+        tree.Refresh(Roles, [], isFiltered: false);
+
+        var folder = tree.BeginNewFolder();
+
+        tree.PendingFolder.Should().BeSameAs(folder);
+        folder.Should().Match<SubAssemblyFolderNode>(f => f.IsNewFolder && f.RoleId == 0 && !f.IsPackaging && f.Title == "New folder");
+        folder.Key.Should().Be("New");
+        tree.Roots.Select(r => r.Title).Should().Equal("Sponge", "Dough", "Filling", "Packaging", "New folder");
+
+        tree.Refresh(Roles, [], isFiltered: false);
+        tree.Roots.Select(r => r.Title).Should().Equal("Sponge", "Dough", "Filling", "Packaging", "New folder");
+        SubAssemblyTree.MoveTo(folder, RowOf(1, "Pandesal Dough", Dough).SubAssembly).Should().BeNull("nothing is dropped on a folder that isn't a role yet");
+
+        tree.EndNewFolder();
+        tree.PendingFolder.Should().BeNull();
+        tree.Roots.Select(r => r.Title).Should().Equal("Sponge", "Dough", "Filling", "Packaging");
+        tree.ClosedFolderKeys().Should().NotContain("New");
+    }
+
+    [Test]
+    public void A_new_sub_assembly_sits_last_in_its_roles_folder_uncounted_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new SubAssemblyTree();
+        var pandesal = RowOf(1, "Pandesal Dough", Dough);
+        tree.Refresh(Roles, [pandesal], isFiltered: false);
+        var dough = tree.Folder(Dough.Id)!;
+        dough.IsExpanded = false;
+
+        var row = tree.BeginNewSubAssembly(new SubAssembly { Name = "New sub-assembly", RoleId = Dough.Id, Role = Dough })!;
+
+        tree.PendingSubAssembly.Should().BeSameAs(row);
+        row.IsNew.Should().BeTrue();
+        TitlesIn(dough).Should().Equal("Pandesal Dough", "New sub-assembly");
+        dough.IsExpanded.Should().BeTrue("its folder opens to show it");
+
+        tree.Refresh(Roles, [pandesal], isFiltered: false);
+        TitlesIn(dough).Should().Equal("Pandesal Dough", "New sub-assembly");
+        dough.SubAssemblyCount.Should().Be(1, "it isn't a sub-assembly until it's saved");
+        tree.Find(0).Should().BeNull();
+        SubAssemblyTree.MoveTo(row, RowOf(2, "Ube Halaya", Filling).SubAssembly).Should().BeNull("nothing is dropped on it");
+        SubAssemblyTree.MoveTo(tree.Folder(Filling.Id), row.SubAssembly).Should().BeNull("and it isn't moved");
+
+        tree.EndNewSubAssembly();
+        tree.PendingSubAssembly.Should().BeNull();
+        TitlesIn(dough).Should().Equal("Pandesal Dough");
+        tree.BeginNewSubAssembly(new SubAssembly { Name = "New sub-assembly", RoleId = 99 }).Should().BeNull("a role with no folder has nowhere to put it");
+    }
 }

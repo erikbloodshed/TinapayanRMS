@@ -118,7 +118,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     }
 
     /// <summary>The products picked in the list, in the order they were picked, deleted ones left out.</summary>
-    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted)];
+    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted && !l.IsNew)];
+
+    private TreeNameEdit? _treeNameEdit;
+    /// <summary>
+    /// The row of the list whose name is being typed in place, as in a file explorer, or null: a product or category being
+    /// renamed (Rename, F2), or a new product or folder being named (New Product, New Folder). The list draws a box on it,
+    /// which gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
+    /// </summary>
+    public TreeNameEdit? TreeNameEdit
+    {
+        get => _treeNameEdit;
+        private set => this.RaiseAndSetIfChanged(ref _treeNameEdit, value);
+    }
 
     private string? _moveNotice;
     /// <summary>
@@ -466,7 +478,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly ObservableAsPropertyHelper<string?> _newProductTag;
     /// <summary>
     /// The tag beside the header's title while the form holds a product not saved yet: where Save will file it, "Goes in
-    /// Production" or "Goes in Research and Development". Null while a saved product is showing.
+    /// Production" or "Goes in Innovation". Null while a saved product is showing.
     /// </summary>
     public string? NewProductTag => _newProductTag.Value;
 
@@ -619,6 +631,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
     /// <summary>
+    /// What Save does, to be run in RunSafelyAsync: also how a new product named in the list is saved, which has no
+    /// unsaved change for SaveCommand to be on for.
+    /// </summary>
+    private readonly Func<Task> _saveForm;
+
+    /// <summary>
     /// Revert: reads the product back as it was last saved, throwing away everything staged since — the details, the
     /// recipe's sections and their lines, the packaging, the packs and the costing. The sub-assembly form has no
     /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
@@ -704,8 +722,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> DismissMoveNoticeCommand { get; }
 
     /// <summary>
-    /// New Product Here on a folder of the list: a new product, as New starts one, whose Save files it in that folder's
-    /// stage and category. Null, from the list's empty space, is New itself.
+    /// New Product Here on a folder of the list: a new product, as New starts one, filed in that folder's stage and
+    /// category. Null, from the list's empty space, is New itself. Like New, it adds the product's row to the list for its
+    /// name to be typed into (TreeNameEdit), and the name typed saves it.
     /// </summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> NewProductInCommand { get; }
 
@@ -718,7 +737,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The Products table's Remove Line: takes out the line selected.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveComponentCommand { get; }
 
-    /// <summary>Rename on a product of the list: saves the new name at once, like a move (IProductRepository.RenameAsync).</summary>
+    /// <summary>
+    /// Rename on a product of the list: its name becomes a box to type into, in place (TreeNameEdit), and the name typed is
+    /// saved at once, like a move (IProductRepository.RenameAsync).
+    /// </summary>
     public ReactiveCommand<ProductLeafNode, RxVoid> RenameProductCommand { get; }
 
     /// <summary>Clone on a product of the list: asks for the new product's name, then clones it as saved, as the Clone tab does.</summary>
@@ -736,10 +758,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>Delete Permanently on a product in the Deleted folder: asks first, then deletes it for good.</summary>
     public ReactiveCommand<ProductLeafNode, RxVoid> DeletePermanentlyCommand { get; }
 
-    /// <summary>New Category on the list: asks for its name and adds it, a folder in both stages. Its parameter is the folder asked on.</summary>
+    /// <summary>
+    /// New Folder on the list: adds a "New folder" row to a stage for its name to be typed into (TreeNameEdit), and the
+    /// name typed adds a category, a folder in both stages. Its parameter is the folder it was asked on; from the list's
+    /// empty space, the stage of the row picked, or Production.
+    /// </summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> NewCategoryCommand { get; }
 
-    /// <summary>Rename Category on a category's folder: renames the category, and so its folder in both stages.</summary>
+    /// <summary>Rename Category on a category's folder: its name becomes a box to type into, in place, and the name typed renames the category, and so its folder in both stages.</summary>
     public ReactiveCommand<ProductFolderNode, RxVoid> RenameCategoryCommand { get; }
 
     /// <summary>Delete Category on a category's folder: asks first, then deletes it, leaving its products uncategorized.</summary>
@@ -753,8 +779,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// Input: what the prompt is for, its box's label, the name it starts with, and a line saying more. Output: the name
-    /// typed, or null if it was cancelled. The View shows a TextPromptWindow. Asked by the list's Rename, Clone, Create
-    /// Variant, New Category and Rename Category.
+    /// typed, or null if it was cancelled. The View shows a TextPromptWindow. Asked by the list's Clone and Create Variant;
+    /// the list names everything else in place (TreeNameEdit).
     /// </summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
@@ -946,10 +972,18 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .SortAndBind(out _visibleProducts, byName)
             .Subscribe(_ => RefreshProductTree());
 
-        // The search decides whether empty folders show, even when it leaves the same products showing.
+        // The search decides whether empty folders show, even when it leaves the same products showing. A name being typed
+        // into a row is given up first: the search may hide the row.
+        this.WhenAnyValue(x => x.SearchText)
+            .Skip(1)
+            .Subscribe(_ => CancelTreeName());
         this.WhenAnyValue(x => x.SearchText)
             .Subscribe(_ => RefreshProductTree());
 
+        // A product opened, by its Save included, ends the new product's row: the form no longer shows the new one.
+        this.WhenAnyValue(x => x.SelectedProduct)
+            .Where(product => product is not null)
+            .Subscribe(_ => EndNewProductRow());
         this.WhenAnyValue(x => x.SelectedProduct)
             .Subscribe(_ => SyncTreeSelection());
 
@@ -1311,9 +1345,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }));
 
         // A new product replaces the one showing, so its unsaved changes are asked about first.
-        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProduct()));
-        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProduct(isComposite: true)));
-        NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewProduct(
+        // Each adds the new product's row to the list, for its name to be typed into.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProductInList()));
+        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProductInList(isComposite: true)));
+        NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewProductInList(
             folder?.Stage, folder?.CategoryId, isComposite: true)));
         RemoveComponentCommand = ReactiveCommand.Create(
             () => AsUndoStep(() => ComponentsTable.ComponentEdits.Remove(ComponentsTable.SelectedComponentEdit!)),
@@ -1327,23 +1362,23 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveProductsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
         NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(
-            () => NewProduct(folder?.Stage, folder?.CategoryId)));
-        RenameProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(RenameProductAsync);
+            () => NewProductInList(folder?.Stage, folder?.CategoryId)));
+        RenameProductCommand = ReactiveCommand.Create<ProductLeafNode>(BeginRenameProduct);
         CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
-            new TextPromptRequest("Clone Product", "Name", $"{leaf.Product.Name} Copy", $"A copy of {leaf.Product.Name} as last saved, filed in Research and Development."),
+            new TextPromptRequest("Clone Product", "Name", $"{leaf.Product.Name} Copy", $"A copy of {leaf.Product.Name} as last saved, filed in Innovation."),
             _productCloner.CloneAsync,
             ClonedFrom));
         CreateVariantOfCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
-            new TextPromptRequest("Create Variant", "Name", $"{leaf.Product.Name} Copy", $"A new product that links {leaf.Product.Name}'s recipe and packaging, filed in Research and Development."),
+            new TextPromptRequest("Create Variant", "Name", $"{leaf.Product.Name} Copy", $"A new product that links {leaf.Product.Name}'s recipe and packaging, filed in Innovation."),
             _productCloner.CreateVariantAsync,
             VariantOf));
         DeleteProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => DeleteProductAsync(leaf.Product));
         RestoreProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => RestoreProductAsync(leaf.Product));
         DeletePermanentlyCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => DeletePermanentlyAsync(leaf.Product));
-        NewCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(NewCategoryAsync);
-        RenameCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(RenameCategoryAsync);
+        NewCategoryCommand = ReactiveCommand.Create<ProductFolderNode?>(BeginNewFolder);
+        RenameCategoryCommand = ReactiveCommand.Create<ProductFolderNode>(BeginRenameCategory);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
         PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => _printRequests.OnNext(new PrintScope.Folder(folder)));
@@ -1363,7 +1398,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             }
         });
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        _saveForm = async () =>
         {
             // The picked product's details haven't replaced the previous one's yet: saving now would write that recipe
             // under this product's name. Save is off then, since the history records nothing until they come, so nothing
@@ -1456,8 +1491,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 SuccessMessage = message;
             }
-        }),
-        History.WhenAnyValue(h => h.IsDirty));
+        };
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(_saveForm), History.WhenAnyValue(h => h.IsDirty));
 
         // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
         RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
@@ -1941,6 +1976,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         if (SelectedProduct is not { } product)
         {
+            // A new composite named in the list keeps its row until it's saved: put back blank, it has none.
+            EndNewProductRow();
             StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
             return;
         }
@@ -2040,7 +2077,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
     /// </summary>
     private void SyncTreeSelection() =>
-        _treeSelection.BringFirst(SelectedProduct is { } product ? ProductTree.Find(product.Id) : null);
+        _treeSelection.BringFirst(SelectedProduct is { } product ? ProductTree.Find(product.Id) : ProductTree.PendingProduct);
 
     /// <summary>
     /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
@@ -2061,7 +2098,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // The tree calls this in the middle of changing SelectedItems: picking the product leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
         // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
-        if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
+        // So is the new product's, which is the form's already.
+        if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false, IsNew: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
             if (History.IsDirty)
             {
@@ -2233,6 +2271,41 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _productToOpen = null;
         _subAssemblyToStartFrom = null;
         StartNewProduct(stage, categoryId, isComposite);
+    }
+
+    /// <summary>
+    /// New and New Product Here: <see cref="NewProduct"/>, and the new product's row in the list, in the folder Save would
+    /// file it in, picked, with its name ready to be typed, as a new file in a file explorer. The name typed saves it
+    /// (<see cref="CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
+    /// </summary>
+    private void NewProductInList(ProductStage? stage = null, int? categoryId = null, bool isComposite = false)
+    {
+        CancelTreeName();
+        SearchText = string.Empty;
+        NewProduct(stage, categoryId, isComposite);
+        var row = ProductTree.BeginNewProduct(NewProductStage, _newProductCategoryId, IsEditingComposite);
+        SelectedTreeNode = row;
+        TreeNameEdit = new TreeNameEdit(row, row.Product.Name);
+    }
+
+    /// <summary>
+    /// Takes the new product's row out of the list (<see cref="NewProductInList"/>), and the rows picked, and stops the
+    /// naming in it. The form is left as it is.
+    /// </summary>
+    private void EndNewProductRow()
+    {
+        if (ProductTree.PendingProduct is not { } row)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(TreeNameEdit?.Node, row))
+        {
+            TreeNameEdit = null;
+        }
+
+        ProductTree.EndNewProduct();
+        _treeSelection.Quietly(() => SelectedTreeNodes.Remove(row));
     }
 
     /// <summary>
@@ -4509,7 +4582,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public IReadOnlyList<TreeMenuItem> TreeMenuFor(ProductTreeNode? node) => node switch
     {
         ProductLeafNode { IsDeleted: true } leaf => DeletedProductMenu(leaf),
-        ProductFolderNode { IsDeletedFolder: true } => [],
+        ProductFolderNode { IsDeletedFolder: true } or ProductFolderNode { IsNewFolder: true } or ProductLeafNode { IsNew: true } => [],
         ProductLeafNode leaf => ProductsMenu(SelectedTreeProducts is var picked && picked.Contains(leaf) ? picked : [leaf]),
         ProductFolderNode { IsStage: true } stage => StageMenu(stage),
         ProductFolderNode folder => FolderMenu(folder),
@@ -4528,7 +4601,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or ProductTreeNode ? TreeMenuFor(node as ProductTreeNode) : [];
 
     /// <summary>Only products can be dragged, one or several: the folders are fixed, and a deleted product only comes back by Restore.</summary>
-    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is ProductLeafNode { IsDeleted: false });
+    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is ProductLeafNode { IsDeleted: false, IsNew: false });
 
     bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
 
@@ -4551,7 +4624,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         var products = leaves.Select(l => l.Product).ToList();
         var isOne = products.Count == 1;
         var toProduction = ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, products);
-        var toResearch = ProductTree.MovesTo(ProductStage.ResearchAndDevelopment, null, keepCategory: true, products);
+        var toInnovation = ProductTree.MovesTo(ProductStage.Innovation, null, keepCategory: true, products);
 
         List<TreeMenuItem> items = [];
         if (toProduction.Count > 0)
@@ -4559,15 +4632,15 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             items.Add(new($"Promote {HowMany(toProduction)}to Production", MoveProductsCommand, toProduction) { Icon = AppIcon.MoveUp });
         }
 
-        if (toResearch.Count > 0)
+        if (toInnovation.Count > 0)
         {
-            items.Add(new($"Send {HowMany(toResearch)}Back to Research and Development", MoveProductsCommand, toResearch) { Icon = AppIcon.MoveDown });
+            items.Add(new($"Send {HowMany(toInnovation)}Back to Innovation", MoveProductsCommand, toInnovation) { Icon = AppIcon.MoveDown });
         }
 
         items.Add(new($"Move {(isOne ? string.Empty : $"{products.Count} Products ")}to")
         {
             Icon = AppIcon.Move,
-            Items = [MoveToStage(ProductStage.Production), MoveToStage(ProductStage.ResearchAndDevelopment)],
+            Items = [MoveToStage(ProductStage.Production), MoveToStage(ProductStage.Innovation)],
         });
         items.Add(new($"Apply Costing Defaults{(isOne ? string.Empty : $" to {products.Count} Products")}…", ApplyCostingDefaultsCommand, products)
         {
@@ -4580,7 +4653,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("Rename…", RenameProductCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("Rename", RenameProductCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
                 new("Clone…", CloneProductCommand, leaf) { Icon = AppIcon.Copy },
                 new("Create Variant…", CreateVariantOfCommand, leaf) { Icon = AppIcon.Link },
                 TreeMenuItem.Separator,
@@ -4624,7 +4697,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     [
         new("New Product Here", NewProductInCommand, stage) { Icon = AppIcon.Add },
         new("New Composite Product Here", NewCompositeProductInCommand, stage) { Icon = AppIcon.Composite },
-        new("New Category…", NewCategoryCommand, stage) { Icon = AppIcon.NewFolder },
+        new("New Folder", NewCategoryCommand, stage) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
         new("Print Stage", PrintFolderCommand, stage) { Icon = AppIcon.Print },
         TreeMenuItem.Separator,
@@ -4654,8 +4727,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("New Category…", NewCategoryCommand, folder) { Icon = AppIcon.NewFolder },
-                new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("New Folder", NewCategoryCommand, folder) { Icon = AppIcon.NewFolder },
+                new("Rename Category", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
                 new("Delete Category", DeleteCategoryCommand, folder) { Gesture = "Del", Icon = AppIcon.Delete },
             ]);
         }
@@ -4667,7 +4740,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     [
         new("New Product", NewProductInCommand) { Icon = AppIcon.Add },
         new("New Composite Product", NewCompositeProductInCommand) { Icon = AppIcon.Composite },
-        new("New Category…", NewCategoryCommand) { Icon = AppIcon.NewFolder },
+        new("New Folder", NewCategoryCommand) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
         new("Print All Products", PrintAllCommand) { Icon = AppIcon.Print },
         TreeMenuItem.Separator,
@@ -4676,102 +4749,258 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     ];
 
     /// <summary>
-    /// The list's Rename: asks for the new name, and saves it at once. On the product the form shows, the name box takes
-    /// it, and the form's undo steps take it as given, as a move gives them its category: whatever else is typed there
-    /// stays to be saved, and no undo brings the old name back for a Save to write.
+    /// The list's Rename: the product's name becomes a box to type into, in place (TreeNameEdit), and the name typed is
+    /// saved at once (<see cref="RenameProductToAsync"/>). A deleted product isn't renamed.
     /// </summary>
-    private async Task RenameProductAsync(ProductLeafNode leaf)
+    private void BeginRenameProduct(ProductLeafNode leaf)
     {
-        var product = leaf.Product;
-        var name = (await PromptForName.Handle(new TextPromptRequest("Rename Product", "Name", product.Name)))?.Trim();
-        if (string.IsNullOrEmpty(name) || string.Equals(name, product.Name, StringComparison.Ordinal))
+        if (leaf.IsDeleted || leaf.IsNew)
         {
             return;
         }
 
-        await RunSafelyAsync(async () =>
-        {
-            await _productRepository.RenameAsync(product.Id, name, CancellationToken.None);
-
-            // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
-            await LoadCommand.Execute();
-            if (_editingId == product.Id)
-            {
-                // The Clone tab's name follows too, while it's still the one it started with.
-                var oldCloneName = $"{product.Name} Copy";
-                var newCloneName = $"{name} Copy";
-                ApplyRefresh(() =>
-                {
-                    EditingName = name;
-                    if (EditingCloneName == oldCloneName)
-                    {
-                        EditingCloneName = newCloneName;
-                    }
-                });
-                History.RewriteAll(snapshot => snapshot with
-                {
-                    Name = name,
-                    CloneName = snapshot.CloneName == oldCloneName ? newCloneName : snapshot.CloneName,
-                });
-            }
-        });
+        CancelTreeName();
+        SelectedTreeNode = leaf;
+        TreeNameEdit = new TreeNameEdit(leaf, leaf.Product.Name);
     }
 
     /// <summary>
-    /// The list's New Category: asks for a name and adds it, then picks its folder in the stage it was asked in. A name
-    /// that's a category already picks that one's folder instead.
+    /// The list's Rename Category: the folder's name becomes a box to type into, in place, and the name typed renames the
+    /// category (<see cref="RenameCategoryToAsync"/>), which is its folder in both stages.
     /// </summary>
-    private async Task NewCategoryAsync(ProductFolderNode? from)
-    {
-        var name = (await PromptForName.Handle(new TextPromptRequest(
-            "New Category", "Name", string.Empty, "A category is a folder in both Production and Research and Development.")))?.Trim();
-        if (string.IsNullOrEmpty(name))
-        {
-            return;
-        }
-
-        await RunSafelyAsync(async () =>
-        {
-            var category = Categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
-                ?? await SaveNewCategoryAsync(name);
-            if (category is not null
-                && from is not null
-                && ProductTree.CategoryFolder(from.Stage, category.Id) is { } folder
-                && ProductTree.StageFolder(from.Stage).Children.Contains(folder))
-            {
-                SelectedTreeNode = folder;
-            }
-        });
-    }
-
-    /// <summary>The list's Rename Category: renames the category, which is its folder in both stages.</summary>
-    private async Task RenameCategoryAsync(ProductFolderNode folder)
+    private void BeginRenameCategory(ProductFolderNode folder)
     {
         if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
         {
             return;
         }
 
-        var name = (await PromptForName.Handle(new TextPromptRequest(
-            "Rename Category", "Name", category.Name, $"{category.Name} is a folder in both Production and Research and Development: it's renamed in both.")))?.Trim();
-        if (string.IsNullOrEmpty(name) || string.Equals(name, category.Name, StringComparison.Ordinal))
+        CancelTreeName();
+        SelectedTreeNode = folder;
+        TreeNameEdit = new TreeNameEdit(folder, category.Name, CategoryHint);
+    }
+
+    /// <summary>
+    /// The list's New Folder: a "New folder" row in a stage, picked, with its name ready to be typed, as in a file explorer;
+    /// the name typed adds a category (<see cref="CommitTreeNameAsync"/>). The stage is <paramref name="from"/>'s; from the
+    /// list's empty space, the stage of the row picked, or Production. The search is cleared first, so the row shows.
+    /// </summary>
+    private void BeginNewFolder(ProductFolderNode? from)
+    {
+        var stage = from?.Stage
+            ?? (SelectedTreeNode as ProductTreeNode) switch
+            {
+                ProductFolderNode { IsDeletedFolder: false } folder => folder.Stage,
+                ProductLeafNode { IsDeleted: false } leaf => leaf.Product.Stage,
+                _ => ProductStage.Production,
+            };
+        BeginNewFolderIn(stage, ProductFolderNode.NewFolderTitle);
+    }
+
+    private void BeginNewFolderIn(ProductStage stage, string text)
+    {
+        CancelTreeName();
+        SearchText = string.Empty;
+        var row = ProductTree.BeginNewFolder(stage);
+        SelectedTreeNode = row;
+        TreeNameEdit = new TreeNameEdit(row, text, CategoryHint);
+    }
+
+    /// <summary>What the name box on a category's folder says when pointed at: the prompts used to say it.</summary>
+    private const string CategoryHint = "A category is a folder in both Production and Innovation.";
+
+    /// <summary>
+    /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it: saves it, at once, as the
+    /// row's. A product's or a category's is renamed; a new folder's adds a category, or picks the one of that name there
+    /// already; a new product's is saved with the form as it is, which is the costing defaults and nothing else, then
+    /// opened. An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name refused shows why, and
+    /// the box comes back with it, to be put right. A second call for the same box, as Enter's box is left, does nothing.
+    /// </summary>
+    public async Task CommitTreeNameAsync(string text)
+    {
+        if (TreeNameEdit is not { } edit)
         {
             return;
         }
 
-        await RunSafelyAsync(async () =>
+        var name = text.Trim();
+        if (name.Length == 0 || (edit.Node is not (ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true })
+            && string.Equals(name, edit.InitialText, StringComparison.Ordinal)))
         {
-            var renamed = new ProductCategory { Id = category.Id, Name = name };
-            var validation = _categoryValidator.Validate(renamed);
-            if (!validation.IsValid)
-            {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                return;
-            }
+            CancelTreeName();
+            return;
+        }
 
-            await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
-            await ReloadCategoriesAsync();
-        });
+        TreeNameEdit = null;
+        switch (edit.Node)
+        {
+            case ProductLeafNode { IsNew: true, Product.IsComposite: true } row:
+                NameNewComposite(row, name);
+                break;
+
+            case ProductLeafNode { IsNew: true } row:
+                await SaveNewProductAsync(name);
+                if (ProductTree.PendingProduct == row)
+                {
+                    TreeNameEdit = edit with { InitialText = text };
+                }
+
+                break;
+
+            case ProductLeafNode leaf:
+                await RunSafelyAsync(() => RenameProductToAsync(leaf, name));
+                if (ErrorMessage is not null && ProductTree.Find(leaf.Product.Id) is { } stillListed)
+                {
+                    TreeNameEdit = edit with { Node = stillListed, InitialText = text };
+                }
+
+                break;
+
+            case ProductFolderNode { IsNewFolder: true } folder:
+                ProductTree.EndNewFolder();
+                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                ProductCategory? category = null;
+                await RunSafelyAsync(async () =>
+                {
+                    category = Categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                        ?? await SaveNewCategoryAsync(name);
+                });
+                if (category is not null && ProductTree.CategoryFolder(folder.Stage, category.Id) is { } saved)
+                {
+                    SelectedTreeNode = saved;
+                }
+                else if (ErrorMessage is not null)
+                {
+                    BeginNewFolderIn(folder.Stage, text);
+                }
+
+                break;
+
+            case ProductFolderNode folder:
+                await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
+                if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
+                {
+                    TreeNameEdit = edit with { InitialText = text };
+                }
+
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Esc in the list's name box: the name stays as it was, and a new product's or folder's row goes, with nothing saved.
+    /// The form stays on the new product, blank, as New leaves it.
+    /// </summary>
+    public void CancelTreeName()
+    {
+        if (TreeNameEdit is not { } edit)
+        {
+            return;
+        }
+
+        TreeNameEdit = null;
+        switch (edit.Node)
+        {
+            case ProductLeafNode { IsNew: true }:
+                EndNewProductRow();
+                ApplyRefresh(() => EditingName = string.Empty);
+                break;
+            case ProductFolderNode { IsNewFolder: true } folder:
+                ProductTree.EndNewFolder();
+                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The name typed into a new product's row: the form, as New left it, is saved under it, as Save saves it, with its
+    /// first version, and opened, and the row gives way to the product's own (EndNewProductRow, as it opens). Refused (a
+    /// name taken), the row stays, and why shows.
+    /// </summary>
+    private async Task SaveNewProductAsync(string name)
+    {
+        // Not an edit of the user's: there's no undo step for it, and nothing unsaved to ask about if the save is refused.
+        ApplyRefresh(() => EditingName = name);
+        await RunSafelyAsync(_saveForm);
+        if (_editingId == 0 && ErrorMessage is null)
+        {
+            // Save turned it down without a reason of its own (the details weren't ready yet).
+            ErrorMessage = $"{name} couldn't be saved yet. Press Enter to try again.";
+        }
+    }
+
+    /// <summary>
+    /// The name typed into a new composite's row. A composite can't be saved until it holds two products, so the name goes
+    /// into the form, as typed there (an undo step, which Save is offered for), and the row keeps it until Save files the
+    /// composite, or the form leaves it, unsaved.
+    /// </summary>
+    private void NameNewComposite(ProductLeafNode row, string name)
+    {
+        var recorder = (IUndoRecorder)this;
+        recorder.BeginUndoStep();
+        EditingName = name;
+        recorder.EndUndoStep();
+        row.Product = new Product
+        {
+            Name = name,
+            Stage = row.Product.Stage,
+            CategoryId = row.Product.CategoryId,
+            IsComposite = true,
+        };
+        SuccessMessage = $"Add the products {name} holds in its Products table, then Save it.";
+    }
+
+    /// <summary>
+    /// Saves <paramref name="name"/> as the product's at once. On the product the form shows, the name box takes it, and the
+    /// form's undo steps take it as given, as a move gives them its category: whatever else is typed there stays to be
+    /// saved, and no undo brings the old name back for a Save to write.
+    /// </summary>
+    private async Task RenameProductToAsync(ProductLeafNode leaf, string name)
+    {
+        var product = leaf.Product;
+        await _productRepository.RenameAsync(product.Id, name, CancellationToken.None);
+
+        // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
+        await LoadCommand.Execute();
+        if (_editingId == product.Id)
+        {
+            // The Clone tab's name follows too, while it's still the one it started with.
+            var oldCloneName = $"{product.Name} Copy";
+            var newCloneName = $"{name} Copy";
+            ApplyRefresh(() =>
+            {
+                EditingName = name;
+                if (EditingCloneName == oldCloneName)
+                {
+                    EditingCloneName = newCloneName;
+                }
+            });
+            History.RewriteAll(snapshot => snapshot with
+            {
+                Name = name,
+                CloneName = snapshot.CloneName == oldCloneName ? newCloneName : snapshot.CloneName,
+            });
+        }
+    }
+
+    /// <summary>Renames the folder's category to <paramref name="name"/>: its folder in both stages. A name refused shows why.</summary>
+    private async Task RenameCategoryToAsync(ProductFolderNode folder, string name)
+    {
+        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        {
+            return;
+        }
+
+        var renamed = new ProductCategory { Id = category.Id, Name = name };
+        var validation = _categoryValidator.Validate(renamed);
+        if (!validation.IsValid)
+        {
+            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            return;
+        }
+
+        await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
+        await ReloadCategoriesAsync();
     }
 
     /// <summary>
@@ -4794,7 +5023,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         };
 
         return RunWithConfirmationAsync(
-            $"Delete the '{category.Name}' category? Its folder goes from both Production and Research and Development, and {products}. This can't be undone.",
+            $"Delete the '{category.Name}' category? Its folder goes from both Production and Innovation, and {products}. This can't be undone.",
             async () =>
             {
                 await _categoryRepository.DeleteAsync(category.Id, CancellationToken.None);

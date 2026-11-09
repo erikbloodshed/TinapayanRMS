@@ -53,8 +53,8 @@ public sealed class CostingDefaults
     public decimal CostBufferPercent { get; set; } = DefaultCostBufferPercent;
 
     /// <summary>
-    /// Where the Products screen's New files a product (Production or Research and Development). New Product Here keeps
-    /// its folder's stage, and a clone or variant starts in Research and Development whatever this is.
+    /// Where the Products screen's New files a product (Production or Innovation). New Product Here keeps
+    /// its folder's stage, and a clone or variant starts in Innovation whatever this is.
     /// </summary>
     public ProductStage NewProductStage { get; set; } = DefaultNewProductStage;
 

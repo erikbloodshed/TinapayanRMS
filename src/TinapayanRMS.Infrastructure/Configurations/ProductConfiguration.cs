@@ -32,10 +32,11 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         });
 
         // The database default is only for the products there before stages were: the column is added to them as
-        // Production. A new one is Research and Development, the CLR default, so HasSentinel moves the "leave it to
-        // the database" value off that: EF always writes the stage the product holds.
+        // Production. A new one is Innovation, the CLR default, so HasSentinel moves the "leave it to
+        // the database" value off that: EF always writes the stage the product holds. It's stored by name, reading
+        // Innovation's former name too (ProductStageConverter).
         builder.Property(p => p.Stage)
-            .HasConversion<string>()
+            .HasConversion<ProductStageConverter>()
             .HasMaxLength(30)
             .HasDefaultValue(ProductStage.Production)
             .HasSentinel((ProductStage)(-1));

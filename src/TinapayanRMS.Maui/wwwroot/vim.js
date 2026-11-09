@@ -52,7 +52,8 @@ window.tinapayanVim = (() => {
         if (!(element instanceof HTMLElement) || element === document.body) {
             return "Other";
         }
-        if (element.closest(".folder-tree")) {
+        // A row's name typed in place (TreeNameBox) is a field: its keys are text, not the tree's.
+        if (element.closest(".folder-tree") && !isEditable(element)) {
             return "Tree";
         }
         if (lineGridOf(element) || pickGridOf(element)) {

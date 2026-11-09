@@ -24,7 +24,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
 
     /// <summary>What the New Products In picker offers, Production first, each with its folder's title.</summary>
     public IReadOnlyList<KeyValuePair<ProductStage, string>> Stages { get; } =
-        [.. new[] { ProductStage.Production, ProductStage.ResearchAndDevelopment }.Select(s => KeyValuePair.Create(s, ProductRules.StageTitle(s)))];
+        [.. new[] { ProductStage.Production, ProductStage.Innovation }.Select(s => KeyValuePair.Create(s, ProductRules.StageTitle(s)))];
 
     private ProductStage _editingNewProductStage = CostingDefaults.DefaultNewProductStage;
     /// <summary>The stage the Products screen's New files a product in.</summary>

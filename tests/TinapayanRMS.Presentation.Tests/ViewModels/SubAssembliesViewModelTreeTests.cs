@@ -39,8 +39,8 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         var menu = viewModel.TreeMenuFor(leaf);
 
-        Headers(menu).Should().Equal("Move to", "Rename…", "Make In-House Ingredient…", "Delete");
-        menu.Single(i => i.Header == "Rename…").Gesture.Should().Be("F2");
+        Headers(menu).Should().Equal("Move to", "Rename", "Make In-House Ingredient…", "Delete");
+        menu.Single(i => i.Header == "Rename").Gesture.Should().Be("F2");
         menu.Single(i => i.Header == "Delete").Gesture.Should().Be("Del");
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
         moveTo.Select(i => i.Header).Should().Equal(["Dough", "Filling"], "only the recipe roles, in their order");
@@ -57,7 +57,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await LoadedViewModelAsync();
         var set = viewModel.SubAssemblyTree.Find(setId)!;
 
-        Headers(viewModel.TreeMenuFor(set)).Should().Equal("Rename…", "Delete");
+        Headers(viewModel.TreeMenuFor(set)).Should().Equal("Rename", "Delete");
 
         viewModel.SelectedTreeNode = viewModel.SubAssemblyTree.Find(doughId);
         viewModel.SelectedTreeNodes.Add(set);
@@ -191,27 +191,27 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
     [Test]
-    public Task Rename_on_the_one_showing_saves_the_name_and_leaves_what_else_is_typed_to_save() => UiThread.RunAsync(async () =>
+    public Task Rename_types_the_name_in_place_saves_it_and_leaves_what_else_is_typed_to_save() => UiThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         var viewModel = await OpenedViewModelAsync(halayaId);
-        TextPromptRequest? asked = null;
-        viewModel.PromptForName.RegisterHandler(interaction =>
-        {
-            asked = interaction.Input;
-            interaction.SetOutput("Ube Spread");
-        });
         Edit(viewModel, () => viewModel.Lines[0].Grams = 250m);
+        var halaya = viewModel.SubAssemblyTree.Find(halayaId)!;
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(halayaId)).Single(i => i.Header == "Rename…"));
+        await RunAsync(viewModel.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
+
+        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "Ube Halaya"));
+
+        await viewModel.CommitTreeNameAsync(" Ube Spread ");
+        await viewModel.CommitTreeNameAsync("Ube Spread Again");
 
         viewModel.ErrorMessage.Should().BeNull();
-        asked.Should().Be(new TextPromptRequest("Rename Sub-Assembly", "Name", "Ube Halaya"));
+        viewModel.TreeNameEdit.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var saved = await dbContext.SubAssemblies.SingleAsync(s => s.Id == halayaId, Cancellation);
-            saved.Name.Should().Be("Ube Spread");
+            saved.Name.Should().Be("Ube Spread", "leaving the box after Enter saves nothing more");
             (await SubAssemblyTotalsAsync(halayaId)).TotalWeight.Should().Be(100m, "the rename saves the name alone");
         }
 
@@ -227,18 +227,103 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
     [Test]
-    public Task A_rename_to_a_name_in_use_is_refused_and_says_why() => UiThread.RunAsync(async () =>
+    public Task A_rename_to_a_name_in_use_is_refused_says_why_and_brings_the_box_back() => UiThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         await AddRecipeAsync("Ube Jam", doughRoleId);
         var viewModel = await LoadedViewModelAsync();
-        viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput("ube jam"));
+        var halaya = viewModel.SubAssemblyTree.Find(halayaId)!;
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Find(halayaId)).Single(i => i.Header == "Rename…"));
+        await RunAsync(viewModel.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
+        await viewModel.CommitTreeNameAsync("ube jam");
 
         viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
         viewModel.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Halaya");
+        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "ube jam"));
+
+        // Esc, an empty name and the same name leave it be; so does a search.
+        viewModel.CancelTreeName();
+        viewModel.SelectedTreeNode = halaya;
+        await RunAsync(viewModel.TreeShortcut("F2")!);
+        await viewModel.CommitTreeNameAsync(" ");
+        await RunAsync(viewModel.TreeShortcut("F2")!);
+        await viewModel.CommitTreeNameAsync("Ube Halaya");
+        await RunAsync(viewModel.TreeShortcut("F2")!);
+        viewModel.SearchText = "ube";
+        viewModel.TreeNameEdit.Should().BeNull();
+        (await NameOfAsync(halayaId)).Should().Be("Ube Halaya");
+    });
+
+    [Test]
+    public Task New_names_the_sub_assembly_in_its_roles_folder_and_the_row_stays_until_Save_files_it() => UiThread.RunAsync(async () =>
+    {
+        await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 3, isPackaging: true);
+        var ubeId = await AddIngredientAsync("Ube");
+        var viewModel = await LoadedViewModelAsync();
+        var filling = viewModel.SubAssemblyTree.Folder(fillingRoleId)!;
+        viewModel.SearchText = "nothing like it";
+
+        await RunAsync(viewModel.TreeMenuFor(filling).Single(i => i.Header == "New Sub-Assembly Here"));
+
+        viewModel.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
+        var row = viewModel.SubAssemblyTree.PendingSubAssembly!;
+        filling.Children.Should().Equal(row);
+        filling.SubAssemblyCount.Should().Be(0, "it isn't a sub-assembly until it's saved");
+        viewModel.SelectedTreeNode.Should().BeSameAs(row);
+        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New sub-assembly"));
+        viewModel.TreeMenuFor(row).Should().BeEmpty();
+        viewModel.SelectedTreeSubAssemblies.Should().BeEmpty();
+        viewModel.EditingRole!.Id.Should().Be(fillingRoleId);
+
+        await viewModel.CommitTreeNameAsync("Ube Halaya");
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.TreeNameEdit.Should().BeNull();
+        row.Title.Should().Be("Ube Halaya");
+        viewModel.EditingName.Should().Be("Ube Halaya");
+        viewModel.History.IsDirty.Should().BeTrue("Save is offered for it");
+
+        await viewModel.LoadCommand.Execute();
+        filling.Children.Should().Equal([row], "a load keeps it");
+
+        Edit(viewModel, () => viewModel.Lines.Add(new IngredientLineRow(viewModel.Ingredients.Single(i => i.Id == ubeId), 100m)));
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SubAssemblyTree.PendingSubAssembly.Should().BeNull();
+        filling.SubAssemblies.Select(l => l.Title).Should().Equal("Ube Halaya");
+        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Find(viewModel.SelectedRow!.Id));
+
+        // In the Packaging role, a packaging set; Esc takes its row away, and Copy the form's.
+        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Folder(packagingRoleId)).Single(i => i.Header == "New Packaging Set Here"));
+        viewModel.TreeNameEdit!.InitialText.Should().Be("New packaging set");
+        viewModel.CancelTreeName();
+        viewModel.SubAssemblyTree.Folder(packagingRoleId)!.Children.Should().BeEmpty();
+        viewModel.SelectedTreeNode.Should().BeNull();
+    });
+
+    [Test]
+    public Task New_from_the_header_names_the_sub_assembly_in_the_first_role_and_Dont_Save_takes_the_row_away() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        await AddRoleAsync("Filling", sortOrder: 2);
+        var viewModel = await LoadedViewModelAsync();
+        AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+        var dough = viewModel.SubAssemblyTree.Folder(doughRoleId)!;
+
+        await viewModel.NewCommand.Execute();
+        await viewModel.CommitTreeNameAsync("Sweet Dough");
+
+        dough.Children.Select(c => c.Title).Should().Equal("Sweet Dough");
+
+        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("Don't Save puts the form back blank");
+
+        viewModel.SubAssemblyTree.PendingSubAssembly.Should().BeNull("put back blank, it has no row");
+        dough.Children.Should().BeEmpty();
+        viewModel.Rows.Should().BeEmpty();
     });
 
     [Test]
@@ -276,11 +361,11 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         var dough = viewModel.SubAssemblyTree.Folder(doughRoleId)!;
 
         Headers(viewModel.TreeMenuFor(dough))
-            .Should().Equal("New Sub-Assembly Here", "New Role…", "Rename Role…", "Delete Role", "Expand All", "Collapse All");
+            .Should().Equal("New Sub-Assembly Here", "New Folder", "Rename Role", "Delete Role", "Expand All", "Collapse All");
         Headers(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Folder(packagingRoleId)))
-            .Should().Equal(["New Packaging Set Here", "New Role…", "Rename Role…", "Expand All", "Collapse All"], "the Packaging role is never deleted");
+            .Should().Equal(["New Packaging Set Here", "New Folder", "Rename Role", "Expand All", "Collapse All"], "the Packaging role is never deleted");
         var listMenu = viewModel.TreeMenuFor(null);
-        Headers(listMenu).Should().Equal("New Sub-Assembly", "New Role…", "Expand All", "Collapse All");
+        Headers(listMenu).Should().Equal("New Sub-Assembly", "New Folder", "Expand All", "Collapse All");
 
         await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
         viewModel.SubAssemblyTree.Roots.Should().OnlyContain(f => !f.IsExpanded);
@@ -290,36 +375,59 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     });
 
     [Test]
-    public Task New_Role_adds_a_folder_after_the_others_and_picks_it() => UiThread.RunAsync(async () =>
+    public Task New_Folder_names_a_role_in_place_after_the_others_and_picks_it() => UiThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
         var viewModel = await LoadedViewModelAsync();
-        var answer = "Glaze";
-        viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput(answer));
 
-        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Role…"));
+        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+
+        var folder = viewModel.SubAssemblyTree.PendingFolder!;
+        viewModel.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "New folder");
+        viewModel.SelectedTreeNode.Should().BeSameAs(folder);
+        viewModel.TreeNameEdit!.Node.Should().BeSameAs(folder);
+        viewModel.TreeNameEdit.Hint.Should().Contain("a section in the recipes that use it");
+        viewModel.TreeMenuFor(folder).Should().BeEmpty();
+
+        await viewModel.LoadCommand.Execute();
+        viewModel.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal(["Dough", "New folder"], "a load keeps it");
+
+        await viewModel.CommitTreeNameAsync("Glaze");
 
         viewModel.ErrorMessage.Should().BeNull();
+        viewModel.SubAssemblyTree.PendingFolder.Should().BeNull();
         viewModel.Roles.Select(r => r.Name).Should().Equal("Dough", "Glaze");
         viewModel.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Roots[1]);
 
-        answer = "dough";
-        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Role…"));
+        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        await viewModel.CommitTreeNameAsync("dough");
 
         viewModel.Roles.Should().HaveCount(2, "a name that's a role already adds none");
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.SubAssemblyTree.Roots[0]);
+
+        // Esc and an empty name add nothing.
+        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        viewModel.CancelTreeName();
+        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        await viewModel.CommitTreeNameAsync(string.Empty);
+        viewModel.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
+        viewModel.Roles.Should().HaveCount(2);
     });
 
     [Test]
-    public Task Rename_Role_renames_its_folder_keeps_it_product_owned_and_the_picker_follows() => UiThread.RunAsync(async () =>
+    public Task Rename_Role_types_the_name_in_place_keeps_it_product_owned_and_the_picker_follows() => UiThread.RunAsync(async () =>
     {
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
         var glazeId = await AddRecipeAsync("Glaze", toppingRoleId);
         var viewModel = await OpenedViewModelAsync(glazeId);
-        viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput("Toppings"));
+        var topping = viewModel.SubAssemblyTree.Folder(toppingRoleId)!;
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.SubAssemblyTree.Folder(toppingRoleId)).Single(i => i.Header == "Rename Role…"));
+        await RunAsync(viewModel.TreeMenuFor(topping).Single(i => i.Header == "Rename Role"));
+
+        viewModel.TreeNameEdit!.Node.Should().BeSameAs(topping);
+        viewModel.TreeNameEdit.InitialText.Should().Be("Topping");
+        await viewModel.CommitTreeNameAsync("Toppings");
 
         viewModel.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())

@@ -38,7 +38,7 @@ public class ProductTreeTests
     {
         var tree = new ProductTree();
 
-        tree.Roots.Select(r => r.Title).Should().Equal("Production", "Research and Development", "Deleted");
+        tree.Roots.Select(r => r.Title).Should().Equal("Production", "Innovation", "Deleted");
         tree.Stages.Should().Equal(tree.Roots.Take(2));
         tree.Stages.Should().OnlyContain(r => r.IsStage && r.IsTopLevel && r.CategoryId == null && !r.IsDeletedFolder);
         tree.DeletedFolder.Should().BeSameAs(tree.Roots[2]);
@@ -53,7 +53,7 @@ public class ProductTreeTests
         var tree = new ProductTree();
         var pandesal = ProductOf(1, "Pandesal", ProductStage.Production, Breads);
         var mamon = Deleted(ProductOf(2, "Mamon", ProductStage.Production, Cakes));
-        var ensaymada = Deleted(ProductOf(3, "Ensaymada", ProductStage.ResearchAndDevelopment, null));
+        var ensaymada = Deleted(ProductOf(3, "Ensaymada", ProductStage.Innovation, null));
 
         tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false, [ensaymada, mamon]);
 
@@ -107,7 +107,7 @@ public class ProductTreeTests
         var mamon = Deleted(ProductOf(2, "Mamon", ProductStage.Production, Cakes));
         tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false, [mamon]);
 
-        ProductTree.MoveTo(Folder(tree, ProductStage.ResearchAndDevelopment, "Breads"), mamon).Should().BeNull();
+        ProductTree.MoveTo(Folder(tree, ProductStage.Innovation, "Breads"), mamon).Should().BeNull();
         ProductTree.MoveTo(tree.DeletedFolder, pandesal).Should().BeNull();
         ProductTree.MoveTo(tree.Find(2), pandesal).Should().BeNull("dropped on a deleted product is dropped in Deleted");
     }
@@ -121,9 +121,9 @@ public class ProductTreeTests
             [Breads, Cakes],
             [
                 ProductOf(1, "Ensaymada", ProductStage.Production, Breads),
-                ProductOf(2, "Mamon", ProductStage.ResearchAndDevelopment, Cakes),
+                ProductOf(2, "Mamon", ProductStage.Innovation, Cakes),
                 ProductOf(3, "Pandesal", ProductStage.Production, Breads),
-                ProductOf(4, "Test Loaf", ProductStage.ResearchAndDevelopment, null),
+                ProductOf(4, "Test Loaf", ProductStage.Innovation, null),
             ],
             isFiltered: false);
 
@@ -134,8 +134,8 @@ public class ProductTreeTests
 
         TitlesIn(Folder(tree, ProductStage.Production, "Breads")).Should().Equal("Ensaymada", "Pandesal");
         TitlesIn(Folder(tree, ProductStage.Production, "Cakes")).Should().BeEmpty("an empty folder still shows, to be dropped on");
-        TitlesIn(Folder(tree, ProductStage.ResearchAndDevelopment, "Cakes")).Should().Equal("Mamon");
-        TitlesIn(Folder(tree, ProductStage.ResearchAndDevelopment, "Uncategorized")).Should().Equal("Test Loaf");
+        TitlesIn(Folder(tree, ProductStage.Innovation, "Cakes")).Should().Equal("Mamon");
+        TitlesIn(Folder(tree, ProductStage.Innovation, "Uncategorized")).Should().Equal("Test Loaf");
     }
 
     [Test]
@@ -146,7 +146,7 @@ public class ProductTreeTests
         tree.Refresh([Breads, Cakes], [ProductOf(1, "Pandesal", ProductStage.Production, Breads)], isFiltered: true);
 
         TitlesIn(Root(tree, ProductStage.Production)).Should().Equal("Breads");
-        TitlesIn(Root(tree, ProductStage.ResearchAndDevelopment)).Should().BeEmpty("the stages always show, even with no match");
+        TitlesIn(Root(tree, ProductStage.Innovation)).Should().BeEmpty("the stages always show, even with no match");
     }
 
     [Test]
@@ -258,9 +258,9 @@ public class ProductTreeTests
     public void A_product_moved_to_another_stage_and_category_takes_its_row_to_the_new_folder()
     {
         var tree = new ProductTree();
-        tree.Refresh([Breads, Cakes], [ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads)], isFiltered: false);
+        tree.Refresh([Breads, Cakes], [ProductOf(1, "Mamon", ProductStage.Innovation, Breads)], isFiltered: false);
         var leaf = tree.Find(1)!;
-        var from = Folder(tree, ProductStage.ResearchAndDevelopment, "Breads");
+        var from = Folder(tree, ProductStage.Innovation, "Breads");
         var to = Folder(tree, ProductStage.Production, "Cakes");
         var arrivedWhileStillInOld = false;
         ((INotifyCollectionChanged)to.Children).CollectionChanged += (_, _) => arrivedWhileStillInOld |= from.Children.Contains(leaf);
@@ -310,20 +310,20 @@ public class ProductTreeTests
     public void MoveTo_a_category_folder_files_the_product_under_its_stage_and_category()
     {
         var tree = new ProductTree();
-        var mamon = ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads);
+        var mamon = ProductOf(1, "Mamon", ProductStage.Innovation, Breads);
         tree.Refresh([Breads, Cakes], [mamon], isFiltered: false);
 
         ProductTree.MoveTo(Folder(tree, ProductStage.Production, "Cakes"), mamon)
             .Should().Be(new ProductMove(1, ProductStage.Production, Cakes.Id));
-        ProductTree.MoveTo(Folder(tree, ProductStage.ResearchAndDevelopment, "Uncategorized"), mamon)
-            .Should().Be(new ProductMove(1, ProductStage.ResearchAndDevelopment, null));
+        ProductTree.MoveTo(Folder(tree, ProductStage.Innovation, "Uncategorized"), mamon)
+            .Should().Be(new ProductMove(1, ProductStage.Innovation, null));
     }
 
     [Test]
     public void MoveTo_a_stage_folder_changes_only_the_stage()
     {
         var tree = new ProductTree();
-        var mamon = ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads);
+        var mamon = ProductOf(1, "Mamon", ProductStage.Innovation, Breads);
         tree.Refresh([Breads], [mamon], isFiltered: false);
 
         ProductTree.MoveTo(Root(tree, ProductStage.Production), mamon).Should().Be(new ProductMove(1, ProductStage.Production, Breads.Id));
@@ -333,7 +333,7 @@ public class ProductTreeTests
     public void MoveTo_another_product_files_it_in_that_products_folder()
     {
         var tree = new ProductTree();
-        var mamon = ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads);
+        var mamon = ProductOf(1, "Mamon", ProductStage.Innovation, Breads);
         var sansRival = ProductOf(2, "Sans Rival", ProductStage.Production, Cakes);
         tree.Refresh([Breads, Cakes], [mamon, sansRival], isFiltered: false);
 
@@ -344,12 +344,12 @@ public class ProductTreeTests
     public void MoveTo_where_the_product_is_already_or_nowhere_is_no_move()
     {
         var tree = new ProductTree();
-        var mamon = ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads);
-        var ensaymada = ProductOf(2, "Ensaymada", ProductStage.ResearchAndDevelopment, Breads);
+        var mamon = ProductOf(1, "Mamon", ProductStage.Innovation, Breads);
+        var ensaymada = ProductOf(2, "Ensaymada", ProductStage.Innovation, Breads);
         tree.Refresh([Breads], [mamon, ensaymada], isFiltered: false);
 
-        ProductTree.MoveTo(Folder(tree, ProductStage.ResearchAndDevelopment, "Breads"), mamon).Should().BeNull();
-        ProductTree.MoveTo(Root(tree, ProductStage.ResearchAndDevelopment), mamon).Should().BeNull();
+        ProductTree.MoveTo(Folder(tree, ProductStage.Innovation, "Breads"), mamon).Should().BeNull();
+        ProductTree.MoveTo(Root(tree, ProductStage.Innovation), mamon).Should().BeNull();
         ProductTree.MoveTo(tree.Find(2), mamon).Should().BeNull();
         ProductTree.MoveTo(null, mamon).Should().BeNull();
     }
@@ -363,7 +363,7 @@ public class ProductTreeTests
             ProductOf(1, "Ensaymada", ProductStage.Production, Breads),
             ProductOf(2, "Pandesal", ProductStage.Production, Breads),
             ProductOf(3, "Mamon", ProductStage.Production, Cakes),
-            ProductOf(4, "Test Loaf", ProductStage.ResearchAndDevelopment, null),
+            ProductOf(4, "Test Loaf", ProductStage.Innovation, null),
         ];
 
         tree.Refresh([Breads, Cakes], products, isFiltered: false);
@@ -372,7 +372,7 @@ public class ProductTreeTests
         Folder(tree, ProductStage.Production, "Cakes").ProductCount.Should().Be(1);
         Folder(tree, ProductStage.Production, "Uncategorized").ProductCount.Should().Be(0, "an empty folder says so");
         Root(tree, ProductStage.Production).ProductCount.Should().Be(3);
-        Root(tree, ProductStage.ResearchAndDevelopment).ProductCount.Should().Be(1);
+        Root(tree, ProductStage.Innovation).ProductCount.Should().Be(1);
         tree.Find(1)!.ProductCount.Should().Be(0, "a product counts nothing");
 
         tree.Refresh([Breads, Cakes], [products[1]], isFiltered: true);
@@ -393,7 +393,7 @@ public class ProductTreeTests
 
         production.IsExpanded.Should().BeTrue();
         production.Children.Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded);
-        Root(tree, ProductStage.ResearchAndDevelopment).Children.Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded, "the other stage is left alone");
+        Root(tree, ProductStage.Innovation).Children.Cast<ProductFolderNode>().Should().OnlyContain(f => !f.IsExpanded, "the other stage is left alone");
 
         tree.ExpandAll(null);
         tree.Stages.SelectMany(r => r.Children).Cast<ProductFolderNode>().Should().OnlyContain(f => f.IsExpanded, "null is both stages");
@@ -411,23 +411,23 @@ public class ProductTreeTests
         var first = new ProductTree();
         first.Refresh([Breads, Cakes], [], isFiltered: false);
         Folder(first, ProductStage.Production, "Cakes").IsExpanded = false;
-        Folder(first, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded = false;
-        Root(first, ProductStage.ResearchAndDevelopment).IsExpanded = false;
+        Folder(first, ProductStage.Innovation, "Uncategorized").IsExpanded = false;
+        Root(first, ProductStage.Innovation).IsExpanded = false;
 
         var closedFolders = first.ClosedFolderKeys();
 
-        closedFolders.Should().Equal("Deleted", "Production/2", "ResearchAndDevelopment", "ResearchAndDevelopment/Uncategorized");
+        closedFolders.Should().Equal("Deleted", "Innovation", "Innovation/Uncategorized", "Production/2");
 
         var next = new ProductTree(new FolderMemory(closedFolders));
         next.ClosedFolderKeys().Should().Equal(closedFolders, "before the first Refresh it keeps what it was given");
         ProductCategory pastries = new() { Id = 3, Name = "Pastries" };
         next.Refresh([Breads, Cakes, pastries], [], isFiltered: false);
         Root(next, ProductStage.Production).IsExpanded.Should().BeTrue();
-        Root(next, ProductStage.ResearchAndDevelopment).IsExpanded.Should().BeFalse("a stage left closed starts closed");
+        Root(next, ProductStage.Innovation).IsExpanded.Should().BeFalse("a stage left closed starts closed");
         Folder(next, ProductStage.Production, "Cakes").IsExpanded.Should().BeFalse("a category's folder made on the first Refresh starts as it was left");
         Folder(next, ProductStage.Production, "Breads").IsExpanded.Should().BeTrue();
         Folder(next, ProductStage.Production, "Pastries").IsExpanded.Should().BeTrue("a category new since opens");
-        Folder(next, ProductStage.ResearchAndDevelopment, "Uncategorized").IsExpanded.Should().BeFalse();
+        Folder(next, ProductStage.Innovation, "Uncategorized").IsExpanded.Should().BeFalse();
         next.DeletedFolder.IsExpanded.Should().BeFalse();
         next.ClosedFolderKeys().Should().Equal(closedFolders);
     }
@@ -457,7 +457,7 @@ public class ProductTreeTests
         using var subscription = tree.ExpansionChanged.Subscribe(_ => reports++);
 
         Folder(tree, ProductStage.Production, "Breads").IsExpanded = false;
-        Root(tree, ProductStage.ResearchAndDevelopment).IsExpanded = false;
+        Root(tree, ProductStage.Innovation).IsExpanded = false;
         tree.Refresh([Breads, Cakes], [], isFiltered: false);
         Folder(tree, ProductStage.Production, "Cakes").IsExpanded = false;
 
@@ -468,9 +468,9 @@ public class ProductTreeTests
     public void MovesTo_several_products_leaves_out_the_ones_there_already()
     {
         var tree = new ProductTree();
-        var mamon = ProductOf(1, "Mamon", ProductStage.ResearchAndDevelopment, Breads);
+        var mamon = ProductOf(1, "Mamon", ProductStage.Innovation, Breads);
         var pandesal = ProductOf(2, "Pandesal", ProductStage.Production, Breads);
-        var sansRival = ProductOf(3, "Sans Rival", ProductStage.ResearchAndDevelopment, Cakes);
+        var sansRival = ProductOf(3, "Sans Rival", ProductStage.Innovation, Cakes);
         tree.Refresh([Breads, Cakes], [mamon, pandesal, sansRival], isFiltered: false);
 
         ProductTree.MovesTo(Folder(tree, ProductStage.Production, "Breads"), [mamon, pandesal, sansRival])
@@ -478,8 +478,73 @@ public class ProductTreeTests
 
         ProductTree.MovesTo(ProductStage.Production, null, keepCategory: true, [mamon, pandesal, sansRival])
             .Should().Equal([new ProductMove(1, ProductStage.Production, Breads.Id), new ProductMove(3, ProductStage.Production, Cakes.Id)], "a Promote keeps each one's category");
-        ProductTree.MovesTo(ProductStage.ResearchAndDevelopment, null, keepCategory: false, [mamon, sansRival])
-            .Should().Equal(new ProductMove(1, ProductStage.ResearchAndDevelopment, null), new ProductMove(3, ProductStage.ResearchAndDevelopment, null));
+        ProductTree.MovesTo(ProductStage.Innovation, null, keepCategory: false, [mamon, sansRival])
+            .Should().Equal(new ProductMove(1, ProductStage.Innovation, null), new ProductMove(3, ProductStage.Innovation, null));
         ProductTree.MovesTo(ProductStage.Production, Breads.Id, keepCategory: false, [pandesal]).Should().BeEmpty();
+    }
+
+    [Test]
+    public void A_new_folder_sits_before_Uncategorized_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new ProductTree();
+        tree.Refresh([Breads, Cakes], [], isFiltered: false);
+        var innovation = Root(tree, ProductStage.Innovation);
+        innovation.IsExpanded = false;
+
+        var folder = tree.BeginNewFolder(ProductStage.Innovation);
+
+        tree.PendingFolder.Should().BeSameAs(folder);
+        folder.Should().Match<ProductFolderNode>(f => f.IsNewFolder && !f.IsCategory && f.Stage == ProductStage.Innovation && f.Title == "New folder");
+        folder.Key.Should().Be("Innovation/New");
+        TitlesIn(innovation).Should().Equal("Breads", "Cakes", "New folder", "Uncategorized");
+        innovation.IsExpanded.Should().BeTrue("the stage opens to show it");
+        TitlesIn(Root(tree, ProductStage.Production)).Should().NotContain("New folder");
+
+        tree.Refresh([Breads, Cakes], [], isFiltered: false);
+        TitlesIn(innovation).Should().Equal("Breads", "Cakes", "New folder", "Uncategorized");
+
+        var pandesal = ProductOf(1, "Pandesal", ProductStage.Innovation, Breads);
+        ProductTree.MoveTo(folder, pandesal).Should().BeNull("nothing is dropped on a folder that isn't a category yet");
+
+        tree.BeginNewFolder(ProductStage.Production);
+        TitlesIn(innovation).Should().NotContain("New folder", "there's one at a time");
+
+        tree.EndNewFolder();
+        tree.PendingFolder.Should().BeNull();
+        TitlesIn(Root(tree, ProductStage.Production)).Should().Equal("Breads", "Cakes", "Uncategorized");
+        tree.ClosedFolderKeys().Should().NotContain(k => k.EndsWith("/New"));
+    }
+
+    [Test]
+    public void A_new_product_sits_last_in_its_folder_uncounted_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new ProductTree();
+        var pandesal = ProductOf(1, "Pandesal", ProductStage.Production, Breads);
+        tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false);
+        var breads = Folder(tree, ProductStage.Production, "Breads");
+        breads.IsExpanded = false;
+
+        var row = tree.BeginNewProduct(ProductStage.Production, Breads.Id, isComposite: true);
+
+        tree.PendingProduct.Should().BeSameAs(row);
+        row.IsNew.Should().BeTrue();
+        row.Product.Should().Match<Product>(p => p.Id == 0 && p.Name == "New composite product" && p.CategoryId == Breads.Id && p.IsComposite);
+        TitlesIn(breads).Should().Equal("Pandesal", "New composite product");
+        breads.IsExpanded.Should().BeTrue("its folder opens to show it");
+
+        tree.Refresh([Breads, Cakes], [pandesal], isFiltered: false);
+        TitlesIn(breads).Should().Equal("Pandesal", "New composite product");
+        breads.ProductCount.Should().Be(1, "it isn't a product until it's saved");
+        Root(tree, ProductStage.Production).ProductCount.Should().Be(1);
+        tree.Find(0).Should().BeNull();
+        ProductTree.MoveTo(row, ProductOf(2, "Mamon", ProductStage.Innovation, null)).Should().BeNull("nothing is dropped on it");
+        ProductTree.MoveTo(breads, row.Product).Should().BeNull("and it isn't moved");
+
+        tree.EndNewProduct();
+        tree.PendingProduct.Should().BeNull();
+        TitlesIn(breads).Should().Equal("Pandesal");
+
+        tree.BeginNewProduct(ProductStage.Innovation, categoryId: 99, isComposite: false);
+        TitlesIn(Folder(tree, ProductStage.Innovation, "Uncategorized")).Should().Equal(["New product"], "a category with no folder files it in Uncategorized");
     }
 }

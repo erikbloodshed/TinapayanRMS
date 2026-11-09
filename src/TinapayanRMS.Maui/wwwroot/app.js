@@ -39,6 +39,21 @@ window.tinapayan = {
         }
     },
 
+    // focus, unless the element has the cursor already: what's typed into it since is left as it is (TreeNameBox, taking
+    // the cursor back from a drop-down that closed after it).
+    focusIfAway(id) {
+        const element = document.getElementById(id);
+        if (element && document.activeElement !== element) {
+            tinapayan.focus(id);
+        }
+    },
+
+    // Puts the cursor on the nearest element around this one that matches the selector: a list's name box giving it back
+    // to its tree (TreeNameBox).
+    focusClosest(element, selector) {
+        element?.closest(selector)?.focus();
+    },
+
     // Find's Ctrl+K, from anywhere in the tab, a field or a table included; Cmd+K on a Mac. Returns an object whose
     // dispose() unregisters it.
     registerFindKey(dotNet) {

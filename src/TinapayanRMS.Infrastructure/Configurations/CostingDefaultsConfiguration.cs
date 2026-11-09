@@ -13,10 +13,11 @@ public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<Cost
         builder.Property(d => d.Id).ValueGeneratedNever();
 
         // The database default is only for the row saved before this was: the column is added to it as Production. As on
-        // Products.Stage, HasSentinel moves the "leave it to the database" value off Research and Development, the CLR
-        // default, so EF always writes the stage picked.
+        // Products.Stage, HasSentinel moves the "leave it to the database" value off Innovation, the CLR
+        // default, so EF always writes the stage picked. It's stored by name, reading Innovation's former name too
+        // (ProductStageConverter).
         builder.Property(d => d.NewProductStage)
-            .HasConversion<string>()
+            .HasConversion<ProductStageConverter>()
             .HasMaxLength(30)
             .HasDefaultValue(CostingDefaults.DefaultNewProductStage)
             .HasSentinel((ProductStage)(-1));

@@ -1,6 +1,7 @@
 @* Sub-Assemblies' list (the WPF SubAssemblyListCard): a search box; the list's commands as icons; the standalone
    sub-assemblies in a folder for each role; and what the last move did, with Undo. Dragging sub-assemblies onto another
-   role's folder gives them that role, saved at once; a right-click opens the row's menu, or the list's. *@
+   role's folder gives them that role, saved at once; a right-click opens the row's menu, or the list's. A name is typed
+   in place, as in a file explorer (TreeNameEdit): a sub-assembly or role renamed, or a new sub-assembly or folder named. *@
 <section class="card list-card tree-card">
     <div class="list-heading">
         <h2 class="section-header">Sub-Assemblies</h2>
@@ -12,7 +13,7 @@
 
     <div class="list-toolbar">
         <ActionButton Icon="AppIcon.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.NewSubAssemblyInCommand, null)" />
-        <CommandButton Command="ViewModel.NewRoleCommand" Icon="AppIcon.NewFolder" Tooltip="New Role…" Flat="true" />
+        <CommandButton Command="ViewModel.NewRoleCommand" Icon="AppIcon.NewFolder" Tooltip="New Folder: a role" Flat="true" />
         <CommandButton Command="ViewModel.ExpandAllCommand" Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" />
         <CommandButton Command="ViewModel.CollapseAllCommand" Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" />
     </div>
@@ -25,7 +26,9 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="@(n => n.IsFolder ? "top-level" : null)"
-                CanDrag="n => n is SubAssemblyLeafNode"
+                CanDrag="n => n is SubAssemblyLeafNode { IsNew: false }"
+                IsEditing="IsEditing"
+                RenamesOnSecondClick="n => n is SubAssemblyLeafNode { IsNew: false }"
                 CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
                 OnDrop="DropAsync"
                 MenuFor="ViewModel.TreeMenuFor"
@@ -35,10 +38,19 @@
             {
                 <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
-            <span class="tree-title">@node.Title</span>
-            @if (node.IsFolder)
+            @if (ViewModel.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
             {
-                <span class="tree-count">(@node.SubAssemblyCount)</span>
+                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
+                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
+                             OnCommit="ViewModel.CommitTreeNameAsync" OnCancel="ViewModel.CancelTreeName" />
+            }
+            else
+            {
+                <span class="tree-title">@node.Title</span>
+                @if (node.IsFolder)
+                {
+                    <span class="tree-count">(@node.SubAssemblyCount)</span>
+                }
             }
         </RowTemplate>
     </FolderTree>
@@ -55,6 +67,8 @@
         SubAssemblyLeafNode leaf => "sub-assembly-" + leaf.SubAssembly.Id,
         _ => node.Title,
     };
+
+    private bool IsEditing(SubAssemblyTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
     private static IReadOnlyList<SubAssemblyMove> MovesFor(IReadOnlyList<SubAssemblyTreeNode> dragged, SubAssemblyTreeNode? target) =>
         dragged.All(n => n is SubAssemblyLeafNode)

@@ -3,7 +3,6 @@
 @inherits ScreenBase<ProductsViewModel>
 @inject NavigationManager Navigation
 @inject Prompts Prompts
-@inject IJSRuntime JS
 
 <PageTitle>@(ViewModel!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
 
@@ -44,7 +43,7 @@
                                         <CommandButton Command="ViewModel!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
                                         <CommandButton Command="ViewModel!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
                                     </div>
-                                    <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Research and Development.</p>
+                                    <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Innovation.</p>
                                 </div>
                             </ContentTemplate>
                         </TabItem>
@@ -77,19 +76,13 @@
         AddSubscription(viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
 
-        // A name asked for by the list's menu: a product's new name, a clone's, or a category's.
+        // A name asked for by the list's menu: a clone's or a variant's. The list names everything else in place.
         AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
 
         // Move to In-House: the made ingredient's name and the Made category it goes in.
         AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
-
-        // New clears the form: the cursor goes to Product Name, so typing can start straight away.
-        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-        AddSubscription(viewModel.NewProductInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-        AddSubscription(viewModel.NewCompositeCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-        AddSubscription(viewModel.NewCompositeProductInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
 
         // The product in the address is the load's to open, at its end: the list is fresh only then. New clicked
         // meanwhile is the later word.
@@ -129,13 +122,4 @@
 
     // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
     protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);
-
-    private async Task FocusNameAsync()
-    {
-        await RedrawNowAsync();
-
-        // After a moment: New's drop-down takes the cursor back to its arrow as it closes.
-        await Task.Delay(120);
-        await JS.InvokeVoidAsync("tinapayan.focus", "product-name");
-    }
 }

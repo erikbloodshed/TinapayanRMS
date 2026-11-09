@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Configurations;
 
 #pragma warning disable 219, 612, 618
 #nullable disable
@@ -87,7 +88,7 @@ public partial class CostingDefaultsEntityType
             fieldInfo: typeof(CostingDefaults).GetField("<NewProductStage>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             valueGenerated: ValueGenerated.OnAdd,
             maxLength: 30,
-            providerPropertyType: typeof(string));
+            valueConverter: new ProductStageConverter());
         newProductStage.SetSentinelFromProviderValue("-1");
         newProductStage.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         newProductStage.AddAnnotation("Relational:ColumnName", "new_product_stage");

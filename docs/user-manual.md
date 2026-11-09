@@ -105,7 +105,7 @@ A **product** is something the shop sells. It is made from:
 Other terms you'll see on a product:
 
 - **Quantity Required** is how many finished pieces make one sellable unit. It's 1 for a product sold by the piece, and 8 for a "Box of 8". The recipe is always written per piece. The costing is per sellable unit.
-- **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
+- **Stage**: every product is either in **Innovation** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
 - **Versions**: each Save that changes a product's recipe or price is kept as a version you can compare with and go back to. See [History tab](#history-tab).
 
@@ -330,7 +330,7 @@ A role can't be deleted while any sub-assembly uses it.
 
 ### Costing Defaults
 
-**New Products In** is where **New** on the Products screen files a product when you save it: **Production** (the default) or **Research and Development**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Research and Development.
+**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation.
 
 Under it are the four percentages a **new** product's costing starts with:
 
@@ -393,12 +393,18 @@ The list has two top-level folders, **Ingredients** and **Packaging**, with a fo
 
 Right-click menus:
 
-- **A material**: **Move to** (another category of the same type: a made ingredient's are the Made ones), **Rename…** (F2), **Copy** and **Delete** (Del).
-- **A type's folder**: **New Ingredient Here** or **New Packaging Material Here**, **New Category…**, **New Made Category…** (Ingredients only), **Expand All** and **Collapse All**.
-- **A category's folder**: **New … Here**, **New Category…**, **Rename Category…** (F2) and **Delete Category** (Del). In a Made category's folder, **New Made Ingredient Here** starts a made ingredient in that category, and **New Category…** adds another Made category. You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
-- **The empty space**: **New Raw Material**, **New Ingredient Category…**, **New Made Category…**, **New Packaging Category…**, **Expand All** and **Collapse All**.
+- **A material**: **Move to** (another category of the same type: a made ingredient's are the Made ones), **Rename** (F2), **Copy** and **Delete** (Del).
+- **A type's folder**: **New Ingredient Here** or **New Packaging Material Here**, **New Folder**, **New Made Folder** (Ingredients only), **Expand All** and **Collapse All**.
+- **A category's folder**: **New … Here**, **New Folder**, **Rename Category** (F2) and **Delete Category** (Del). In a Made category's folder, **New Made Ingredient Here** starts a made ingredient in that category, and **New Folder** adds another Made category. You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
+- **The empty space**: **New Raw Material**, **New Ingredient Folder**, **New Made Folder**, **New Packaging Folder**, **Expand All** and **Collapse All**.
 
-The same commands are buttons under the search box: **New Raw Material**, **New Category** (its arrow offers an ingredient, a Made or a packaging category), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
+The same commands are buttons under the search box: **New Raw Material**, **New Folder** (its arrow offers an ingredient, a Made or a packaging folder), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
+
+**Names are typed straight into the list**, as on the Products screen:
+
+- **Rename** (or F2, or clicking the name of the material you've already picked, slowly, not as a double-click) turns its name into a box. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves it as it was. **Rename Category** does the same for a category's folder.
+- **New Folder** adds a *New folder* row, its name selected. Type the category's name and press **Enter**: the category is saved. **Esc**, or an empty name, adds nothing.
+- **New**, **New Raw Material** and **New … Here** add a row for the new material, its name selected: in the folder you picked, or at the end of **Ingredients** when it has no category yet. Type its name and press **Enter**. The name goes into the form, and the row keeps it, but **the material isn't saved yet**: fill in the rest (its category, its prices, a packaging material's base unit, a made ingredient's sub-assembly) and press **Save**. **Esc** adds nothing.
 
 Dragging materials onto another category moves them straight away. A material can't be dragged into a category of another type, so a made ingredient only drops into a Made category, and nothing else does.
 
@@ -536,15 +542,17 @@ The list has a folder for each role, in the order set in Settings → Roles, wit
 
 Right-click menus:
 
-- **A sub-assembly**: **Move to** (another role), **Rename…** (F2), **Make In-House Ingredient…** and **Delete** (Del). A packaging set has no **Move to** or **Make In-House Ingredient…**: it always stays in the Packaging role.
-- **A role's folder**: **New Sub-Assembly Here** (**New Packaging Set Here** on the Packaging role), **New Role…**, **Rename Role…** (F2), **Delete Role** (Del), **Expand All** and **Collapse All**. You can only delete a role when no sub-assembly here is in it. Otherwise the menu shows how many it holds. The Packaging role can't be deleted.
-- **The empty space**: **New Sub-Assembly**, **New Role…**, **Expand All** and **Collapse All**.
+- **A sub-assembly**: **Move to** (another role), **Rename** (F2), **Make In-House Ingredient…** and **Delete** (Del). A packaging set has no **Move to** or **Make In-House Ingredient…**: it always stays in the Packaging role.
+- **A role's folder**: **New Sub-Assembly Here** (**New Packaging Set Here** on the Packaging role), **New Folder**, **Rename Role** (F2), **Delete Role** (Del), **Expand All** and **Collapse All**. You can only delete a role when no sub-assembly here is in it. Otherwise the menu shows how many it holds. The Packaging role can't be deleted.
+- **The empty space**: **New Sub-Assembly**, **New Folder**, **Expand All** and **Collapse All**.
 
 The same commands are buttons under the search box. Each button shows only its icon; point at it to see its name.
 
 Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
 
-**Rename…** saves the new name straight away, and so does a move. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved.
+**Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the name of the sub-assembly you've already picked, slowly) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
+
+**New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New**, **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New**, the first role's): type its name and press **Enter**. The name goes into the form, but **it isn't saved yet**: add its lines and press **Save**. **Esc** adds nothing.
 
 A new role from the list goes after the others and isn't product-owned. Change its place and **Product-owned** in Settings → Roles.
 
@@ -599,27 +607,34 @@ The Products screen has the product list on the left. On the right are the selec
 
 ### The list
 
-The top-level folders are **Production** and **Research and Development**. Each has a folder for every product category, plus **Uncategorized**. Drag products between folders to change their stage or category.
+The top-level folders are **Production** and **Innovation**. Each has a folder for every product category, plus **Uncategorized**. Drag products between folders to change their stage or category.
 
 Below them is the **Deleted** folder 🗑, where deleted products wait, by name, until you restore them or delete them permanently. Clicking a deleted product doesn't open it. It can't be dragged, and nothing can be dropped on the folder.
 
 Right-click menus:
 
 - **A product**:
-  - **Promote to Production** or **Send Back to Research and Development**
+  - **Promote to Production** or **Send Back to Innovation**
   - **Move to** (any stage and category)
   - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
-  - **Rename…** (F2)
+  - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
   - **Delete** (Del)
 
   With several products picked, the menu offers to promote or move them all, or to apply the costing defaults to them all.
-- **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Category…**, **Print Stage**, **Expand All** and **Collapse All**.
-- **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Category…**, **Rename Category…** and **Delete Category**.
-- **The empty space**: **New Product**, **New Composite Product**, **New Category…**, **Print All Products**, **Expand All** and **Collapse All**. These are also buttons under the search box. Each button shows only its icon; point at it to see its name.
+- **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Folder**, **Print Stage**, **Expand All** and **Collapse All**.
+- **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Folder**, **Rename Category** (F2) and **Delete Category** (Del).
+- **The empty space**: **New Product**, **New Composite Product**, **New Folder**, **Print All Products**, **Expand All** and **Collapse All**. These are also buttons under the search box. Each button shows only its icon; point at it to see its name.
 - **A product in the Deleted folder**: **Restore** and **Delete Permanently** (Del).
 
-**New Product Here** and **New Composite Product Here** file the new product in that folder when you save it. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it.
+**Names are typed straight into the list**, as in File Explorer:
+
+- **Rename** (or F2, or clicking the name of the product you've already picked, slowly, not as a double-click) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename Category** does the same for a category's folder, and renames it in both Production and Innovation.
+- **New Folder** adds a *New folder* row, its name selected, to the stage you right-clicked (from the button under the search box, the stage of the row you've picked). Type the category's name and press **Enter**: the category is saved, and gets a folder in both Production and Innovation. **Esc**, or an empty name, adds nothing. A name that's already a category picks that category's folder.
+- **New Product Here**, **New Composite Product Here** and **New** in the header add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc** adds nothing. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it, under Uncategorized.
+- **A composite product can't be saved until it holds two products**, so its name goes into the form instead. Its row keeps the name until you press **Save**.
+
+If the name is already taken, a message says so and the box stays open with what you typed, to change it.
 
 A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new mark the next time the Products tab opens.
 
@@ -791,7 +806,7 @@ A section that's this product's own shows in the variant with a badge such as "E
 
 While a variant links one of this product's own sub-assemblies, this product can't remove that sub-assembly and can't be deleted. Make a copy of it in the variant, or remove it there, first.
 
-The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Research and Development, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Innovation, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
 
 A composite product's clone or variant is a composite too, holding the same products at the same quantities. A clone copies its own sections and a variant links them, as for any product.
 
@@ -876,7 +891,7 @@ Reports has five tabs along the bottom: **Product Cost Summary**, **Raw Material
 
 One row for every product, as it's saved:
 
-- **Product**, its **Stage** (Production or Research and Development) and its **Category**.
+- **Product**, its **Stage** (Production or Innovation) and its **Category**.
 - **Pieces**: how many pieces make one sellable unit (1 for a product sold by the piece). Every amount after it is for one sellable unit. Blank for a composite product, which is one unit made of other products.
 - **Ingredients Cost**: the recipe's cost, the **Sub-assemblies (ingredients)** row of the product's Costing tab. For a composite product, it's what its products bring (and its own sub-assemblies).
 - **Wastage Cost**: the Costing tab's **Wastage** row, the product's Wastage % (its category's, or the shop's) of the ingredients cost.
@@ -1237,7 +1252,7 @@ Right-click the category's folder in the Products list and choose **Print Folder
 ### Make a composite product, such as a gift box of several products
 
 1. In the Products header, press the arrow beside **New** and choose **New composite product**. Or right-click a folder in the list and choose **New Composite Product Here**.
-2. Type its **Product Name**.
+2. Type its name into the *New composite product* row the list shows, and press **Enter**. It's saved once you press **Save** in step 6.
 3. On the **Products** tab, add a line for each product: pick the product, then type how many go in under **Qty**.
 4. Use **Add Sub-Assembly** with the **Packaging** role for the box, and for anything wrapping the pieces inside it. The products' own packaging isn't included. If the pieces go in already in their own packaging, tick **Include each product's packaging** under the Products table instead of listing it again.
 5. For a topping or filling over the whole composite, use **Add Sub-Assembly** in that role. Its **Weight/piece** is what one whole composite takes.
@@ -1245,7 +1260,7 @@ Right-click the category's folder in the Products list and choose **Print Folder
 
 ### Give a product a box for a pack of several pieces
 
-1. On **Sub-Assemblies**, press **New**, pick the **Packaging** role, and list the box and the bags one pack takes. Save.
+1. On **Sub-Assemblies**, right-click the **Packaging** folder, choose **New Packaging Set Here**, type its name and press **Enter**. List the box and the bags one pack takes, then Save.
 2. Make the pack product. For example, use **Create Variant** of the single and set **Quantity Required** to 8.
 3. In its recipe, use **Add Sub-Assembly → Link an existing one** with the **Packaging** role, and pick the set. Save.
 

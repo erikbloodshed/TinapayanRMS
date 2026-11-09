@@ -209,7 +209,7 @@ public interface IProductRepository
     /// </summary>
     /// <param name="product">
     /// Only its Id, Name, Description, CategoryId, QuantityRequired, CurrentPrice and IsComposite are read, and a new one's
-    /// Stage; it's never given an id. A new product goes in the stage it holds (Research and Development unless it's set),
+    /// Stage; it's never given an id. A new product goes in the stage it holds (Innovation unless it's set),
     /// and a saved one keeps its stage. Whether it's a composite is a new one's to say; a saved one's can't change.
     /// </param>
     /// <param name="recipe">

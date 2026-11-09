@@ -3,7 +3,6 @@
 @inherits ScreenBase<SubAssembliesViewModel>
 @inject NavigationManager Navigation
 @inject Prompts Prompts
-@inject IJSRuntime JS
 
 <PageTitle>@(ViewModel!.SelectedRow?.Name ?? "Sub-Assemblies") · TinapayanRMS</PageTitle>
 
@@ -153,17 +152,9 @@
         base.OnInitialized();
         var viewModel = ViewModel!;
 
-        // A name asked for by the list's menu: a sub-assembly's new name, or a role's.
-        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
-
         // Make In-House Ingredient: the made ingredient's name and the Made category it goes in.
         AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
-
-        // New clears the form: the cursor goes to Name, so typing can start straight away.
-        AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-        AddSubscription(viewModel.NewSubAssemblyInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
 
         // The sub-assembly in the address is the load's to open, at its end: the list is fresh only then. New clicked
         // meanwhile is the later word.
@@ -200,10 +191,4 @@
     }
 
     protected override bool IsOwnAddress(string path) => path.StartsWith("sub-assemblies", StringComparison.OrdinalIgnoreCase);
-
-    private async Task FocusNameAsync()
-    {
-        await RedrawNowAsync();
-        await JS.InvokeVoidAsync("tinapayan.focus", "sa-name");
-    }
 }

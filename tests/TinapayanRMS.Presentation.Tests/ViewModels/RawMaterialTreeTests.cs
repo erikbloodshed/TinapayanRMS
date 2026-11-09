@@ -215,4 +215,63 @@ public class RawMaterialTreeTests
         Categories.Select(c => tree.CategoryFolder(c.Id)!).Should().OnlyContain(f => !f.IsExpanded);
         tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the types stay open on their folders");
     }
+
+    [Test]
+    public void A_new_folder_sits_last_in_its_type_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new RawMaterialTree();
+        tree.Refresh(Categories, [], isFiltered: false);
+        var ingredients = tree.TypeFolder(RawMaterialType.Ingredient);
+
+        var folder = tree.BeginNewFolder(RawMaterialCategoryType.Made);
+
+        tree.PendingFolder.Should().BeSameAs(folder);
+        folder.Should().Match<RawMaterialFolderNode>(f => f.IsNewFolder && !f.IsTypeFolder && !f.IsCategory && f.Type == RawMaterialType.Ingredient);
+        folder.Key.Should().Be("Ingredient/New");
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New folder");
+
+        tree.Refresh(Categories, [], isFiltered: false);
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New folder");
+        RawMaterialTree.MoveTo(folder, MaterialOf(1, "Bread Flour", Flour)).Should().BeNull("nothing is dropped on a folder that isn't a category yet");
+
+        tree.EndNewFolder();
+        tree.PendingFolder.Should().BeNull();
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour");
+        tree.ClosedFolderKeys().Should().NotContain(k => k.EndsWith("/New"));
+    }
+
+    [Test]
+    public void A_new_material_sits_last_in_its_category_or_its_type_uncounted_until_it_ends_and_a_refresh_keeps_it()
+    {
+        var tree = new RawMaterialTree();
+        var breadFlour = MaterialOf(1, "Bread Flour", Flour);
+        tree.Refresh(Categories, [breadFlour], isFiltered: false);
+        var flour = Folder(tree, RawMaterialType.Ingredient, "Flour");
+        var ingredients = tree.TypeFolder(RawMaterialType.Ingredient);
+
+        var row = tree.BeginNewMaterial(new RawMaterial { Name = "New ingredient", Type = RawMaterialType.Ingredient, CategoryId = Flour.Id });
+
+        tree.PendingMaterial.Should().BeSameAs(row);
+        row.IsNew.Should().BeTrue();
+        TitlesIn(flour).Should().Equal("Bread Flour", "New ingredient");
+
+        tree.Refresh(Categories, [breadFlour], isFiltered: false);
+        TitlesIn(flour).Should().Equal("Bread Flour", "New ingredient");
+        flour.MaterialCount.Should().Be(1, "it isn't a material until it's saved");
+        ingredients.MaterialCount.Should().Be(1);
+        tree.Find(0).Should().BeNull();
+        RawMaterialTree.MoveTo(row, MaterialOf(2, "Cake Flour", Dairy)).Should().BeNull("nothing is dropped on it");
+        RawMaterialTree.MoveTo(Folder(tree, RawMaterialType.Ingredient, "Dairy"), row.RawMaterial).Should().BeNull("and it isn't moved");
+
+        // With no category yet (New from the header), last in its type's folder, where a refresh keeps it too.
+        tree.BeginNewMaterial(new RawMaterial { Name = "New ingredient", Type = RawMaterialType.Ingredient });
+        TitlesIn(flour).Should().Equal(["Bread Flour"], "there's one at a time");
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New ingredient");
+        tree.Refresh(Categories, [breadFlour], isFiltered: false);
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New ingredient");
+
+        tree.EndNewMaterial();
+        tree.PendingMaterial.Should().BeNull();
+        TitlesIn(ingredients).Should().Equal("Dairy", "Flour");
+    }
 }

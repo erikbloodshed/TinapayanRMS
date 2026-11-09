@@ -35,14 +35,27 @@ public closed class RawMaterialTreeNode : ReactiveObject
 /// </summary>
 public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<RawMaterialTreeNode>
 {
-    private RawMaterialFolderNode(RawMaterialType type, int? categoryId, RawMaterialCategoryType? categoryType, string title)
+    private RawMaterialFolderNode(RawMaterialType type, int? categoryId, RawMaterialCategoryType? categoryType, string title, bool isNewFolder = false)
     {
         Type = type;
         CategoryId = categoryId;
         CategoryType = categoryType;
+        IsNewFolder = isNewFolder;
         _title = title;
         Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
     }
+
+    /// <summary>
+    /// The row New Folder adds to a type's folder while its name is typed into it (RawMaterialTree.BeginNewFolder): a
+    /// category of <paramref name="categoryType"/> once the name typed saves one, and none at all if it's cancelled.
+    /// </summary>
+    public static RawMaterialFolderNode NewFolder(RawMaterialCategoryType categoryType) =>
+        new(RawMaterialRules.MaterialTypeOf(categoryType), null, categoryType, NewFolderTitle, isNewFolder: true);
+
+    public const string NewFolderTitle = "New folder";
+
+    /// <summary>The row New Folder adds, named in the list before it's a category: nothing is dropped on it, and it has no menu.</summary>
+    public bool IsNewFolder { get; }
 
     /// <summary>A type's folder.</summary>
     public static RawMaterialFolderNode ForType(RawMaterialType type) => new(type, null, null, TypeTitle(type));
@@ -62,7 +75,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
     /// <summary>The type of the category a category folder holds, or null for a type's folder.</summary>
     public RawMaterialCategoryType? CategoryType { get; }
 
-    public override bool IsTypeFolder => CategoryId is null;
+    public override bool IsTypeFolder => CategoryId is null && !IsNewFolder;
 
     /// <summary>A category's folder, which can be renamed or deleted (the category with it), as a type's can't.</summary>
     public bool IsCategory => CategoryId is not null;
@@ -71,7 +84,10 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
     /// What names the folder from one run to the next, for remembering whether it was left closed: "Ingredient",
     /// "Packaging", and "Ingredient/12" for category 12.
     /// </summary>
-    public string Key => CategoryId is { } id ? $"{Type}/{id.ToString(CultureInfo.InvariantCulture)}" : Type.ToString();
+    public string Key =>
+        IsNewFolder ? $"{Type}/New"
+        : CategoryId is { } id ? $"{Type}/{id.ToString(CultureInfo.InvariantCulture)}"
+        : Type.ToString();
 
     /// <summary>The materials the folder shows: none for a type's folder, whose rows are folders.</summary>
     public IEnumerable<RawMaterialLeafNode> Materials => Children.OfType<RawMaterialLeafNode>();
@@ -160,6 +176,12 @@ public sealed class RawMaterialLeafNode(RawMaterial rawMaterial) : RawMaterialTr
     public override bool IsFolder => false;
 
     public override bool IsTypeFolder => false;
+
+    /// <summary>
+    /// The row New adds while its name is typed into it, and until the material is saved (RawMaterialTree.BeginNewMaterial),
+    /// over the material the form starts: it has no menu, isn't dragged, and picking it loads nothing.
+    /// </summary>
+    public bool IsNew => RawMaterial.Id == 0;
 }
 
 /// <summary>
@@ -247,6 +269,71 @@ public sealed class RawMaterialTree : IDisposable
 
     private IEnumerable<RawMaterialFolderNode> FoldersIn(RawMaterialType type) => _categoryFolders.Values.Where(f => f.Type == type);
 
+    /// <summary>The row New Folder added, while its name is being typed; null otherwise.</summary>
+    public RawMaterialFolderNode? PendingFolder { get; private set; }
+
+    /// <summary>The row New added, while its name is being typed and until the material is saved; null otherwise.</summary>
+    public RawMaterialLeafNode? PendingMaterial { get; private set; }
+
+    /// <summary>
+    /// Adds a "New folder" row, for a category of <paramref name="categoryType"/>, last in its type's folder, for its name
+    /// to be typed into; the type's folder opens to show it. A refresh keeps it there until <see cref="EndNewFolder"/>.
+    /// Any earlier one goes first: there's one at a time.
+    /// </summary>
+    public RawMaterialFolderNode BeginNewFolder(RawMaterialCategoryType categoryType)
+    {
+        EndNewFolder();
+        var folder = PendingFolder = RawMaterialFolderNode.NewFolder(categoryType);
+        var root = TypeFolder(folder.Type);
+        root.Children.Add(folder);
+        root.IsExpanded = true;
+        return folder;
+    }
+
+    /// <summary>Takes away the row <see cref="BeginNewFolder"/> added, if there is one.</summary>
+    public void EndNewFolder()
+    {
+        if (PendingFolder is { } folder)
+        {
+            PendingFolder = null;
+            TypeFolder(folder.Type).Children.Remove(folder);
+        }
+    }
+
+    /// <summary>
+    /// Adds a row for the new material the form starts, <paramref name="material"/> (no id yet), last in its category's
+    /// folder, or with no category yet (New from the header), last in its type's folder; its folders open to show it. A
+    /// refresh keeps it there, uncounted, until <see cref="EndNewMaterial"/>. Any earlier one goes first.
+    /// </summary>
+    public RawMaterialLeafNode BeginNewMaterial(RawMaterial material)
+    {
+        EndNewMaterial();
+        var row = PendingMaterial = new RawMaterialLeafNode(material);
+        var root = TypeFolder(material.Type);
+        var folder = FolderOf(material) ?? root;
+        folder.Children.Add(row);
+        root.IsExpanded = true;
+        folder.IsExpanded = true;
+        return row;
+    }
+
+    /// <summary>Takes away the row <see cref="BeginNewMaterial"/> added, if there is one.</summary>
+    public void EndNewMaterial()
+    {
+        if (PendingMaterial is { } row)
+        {
+            PendingMaterial = null;
+            foreach (var folder in Roots.Concat(_categoryFolders.Values))
+            {
+                folder.Children.Remove(row);
+            }
+        }
+    }
+
+    /// <summary>The category folder a material goes in, if it has a category with a folder in its type's.</summary>
+    private RawMaterialFolderNode? FolderOf(RawMaterial material) =>
+        material.CategoryId is { } id && _categoryFolders.GetValueOrDefault(id) is { } folder && folder.Type == material.Type ? folder : null;
+
     public void Dispose() => _memory.Dispose();
 
     /// <summary>
@@ -258,8 +345,9 @@ public sealed class RawMaterialTree : IDisposable
     /// </summary>
     public static RawMaterialMove? MoveTo(RawMaterialTreeNode? target, RawMaterial material)
     {
-        (RawMaterialCategoryType Type, int CategoryId)? place = target switch
+        (RawMaterialCategoryType Type, int CategoryId)? place = material.Id == 0 ? null : target switch
         {
+            RawMaterialLeafNode { IsNew: true } => null,
             RawMaterialFolderNode { CategoryId: { } categoryId, CategoryType: { } categoryType } => (categoryType, categoryId),
             RawMaterialLeafNode leaf => (
                 leaf.RawMaterial.Category?.Type ?? RawMaterialRules.CategoryTypeFor(leaf.RawMaterial.Type, leaf.RawMaterial.Source),
@@ -333,10 +421,27 @@ public sealed class RawMaterialTree : IDisposable
         // Each type's folders as they should show, and each folder's materials. A material whose category isn't among the
         // folders (it can't happen while the foreign key holds) isn't shown rather than put in the wrong one.
         var layout = Roots.ToDictionary(root => root, root =>
-            allCategories
+        {
+            var wanted = allCategories
                 .Where(c => RawMaterialRules.MaterialTypeOf(c.Type) == root.Type)
                 .Select(c => (Folder: _categoryFolders[c.Id], Rows: RowsOf(byCategory[c.Id].Where(m => m.Type == root.Type))))
-                .ToList());
+                .ToList();
+
+            // The rows being named stay where they were added: a new folder last in its type's, a new material last in its
+            // category's folder (one with no category yet is put back in its type's folder below).
+            if (PendingFolder is { } newFolder && newFolder.Type == root.Type)
+            {
+                wanted.Add((newFolder, []));
+            }
+
+            if (PendingMaterial is { } newMaterial && newMaterial.RawMaterial.Type == root.Type
+                && FolderOf(newMaterial.RawMaterial) is { } into && wanted.FindIndex(w => w.Folder == into) is var at and >= 0)
+            {
+                wanted[at].Rows.Add(newMaterial);
+            }
+
+            return wanted;
+        });
 
         // Everything leaving the tree goes before anything arrives, so a material moving from one folder to another is
         // never in both at once.
@@ -348,6 +453,22 @@ public sealed class RawMaterialTree : IDisposable
         foreach (var (root, wanted) in layout)
         {
             TreeRows.LayTopFolder(root, wanted, isFiltered);
+        }
+
+        // A new material isn't one yet: its folder and type count only the saved ones. With no category yet, it's last in
+        // its type's folder, among the category folders, which the layout above takes it out of.
+        if (PendingMaterial is { } pending)
+        {
+            var root = TypeFolder(pending.RawMaterial.Type);
+            if (FolderOf(pending.RawMaterial) is { } folder && folder.Children.Contains(pending))
+            {
+                folder.ShowCount(folder.MaterialCount - 1);
+                root.ShowCount(root.MaterialCount - 1);
+            }
+            else if (FolderOf(pending.RawMaterial) is null && !root.Children.Contains(pending))
+            {
+                root.Children.Add(pending);
+            }
         }
 
         _isFilled |= allCategories.Count > 0 || materials.Count > 0;

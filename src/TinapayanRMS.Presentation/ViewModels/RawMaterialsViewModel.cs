@@ -95,7 +95,19 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     }
 
     /// <summary>The materials picked in the list, in the order they were picked.</summary>
-    public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>()];
+    public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>().Where(l => !l.IsNew)];
+
+    private TreeNameEdit? _treeNameEdit;
+    /// <summary>
+    /// The row of the list whose name is being typed in place, as in a file explorer, or null: a material or category being
+    /// renamed (Rename, F2), or a new material or folder being named (New, New Folder). The list draws a box on it, which
+    /// gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
+    /// </summary>
+    public TreeNameEdit? TreeNameEdit
+    {
+        get => _treeNameEdit;
+        private set => this.RaiseAndSetIfChanged(ref _treeNameEdit, value);
+    }
 
     private string? _moveNotice;
     /// <summary>
@@ -893,11 +905,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     /// <summary>
     /// The list's New … Here: a new material of the folder's type, in its category when it's a category's folder. With no
-    /// folder (the list's empty space), a new ingredient, as New starts one.
+    /// folder (the list's empty space), a new ingredient, as New starts one. Like New, it adds the material's row to the list
+    /// for its name to be typed into (TreeNameEdit).
     /// </summary>
     public ReactiveCommand<RawMaterialFolderNode?, RxVoid> NewMaterialInCommand { get; }
 
-    /// <summary>The list's Rename: asks for a new name and saves it at once.</summary>
+    /// <summary>The list's Rename: the material's name becomes a box to type into, in place, and the name typed is saved at once.</summary>
     public ReactiveCommand<RawMaterialLeafNode, RxVoid> RenameMaterialCommand { get; }
 
     /// <summary>
@@ -909,9 +922,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The list's Delete, as the header's: asks first.</summary>
     public ReactiveCommand<RawMaterialLeafNode, RxVoid> DeleteMaterialCommand { get; }
 
-    /// <summary>The list's New Category, for materials of the type given.</summary>
+    /// <summary>
+    /// The list's New Folder, for materials of the type given: a "New folder" row for its name to be typed into
+    /// (TreeNameEdit), and the name typed adds the category.
+    /// </summary>
     public ReactiveCommand<RawMaterialCategoryType, RxVoid> NewCategoryCommand { get; }
 
+    /// <summary>The list's Rename Category: the folder's name becomes a box to type into, in place, and the name typed renames the category.</summary>
     public ReactiveCommand<RawMaterialFolderNode, RxVoid> RenameCategoryCommand { get; }
 
     /// <summary>The list's Delete Category, offered only for a category no material is in.</summary>
@@ -922,12 +939,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
     /// <summary>Closes every category folder of a type's, or of both types' with no folder given.</summary>
     public ReactiveCommand<RawMaterialFolderNode?, RxVoid> CollapseAllCommand { get; }
-
-    /// <summary>
-    /// A name asked for by the list's menu: a material's new name, or a category's. Output: the name, or null if the
-    /// prompt was cancelled. The View shows a TextPromptWindow for it.
-    /// </summary>
-    public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
     private IReadOnlyList<LinkingProduct> _dependents = [];
     /// <summary>
@@ -1054,10 +1065,18 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             .SortAndBind(out _visibleRawMaterials, byName)
             .Subscribe(_ => RefreshTree());
 
-        // The search decides whether empty folders show, even when it leaves the same materials showing.
+        // The search decides whether empty folders show, even when it leaves the same materials showing. A name being typed
+        // into a row is given up first: the search may hide the row.
+        this.WhenAnyValue(x => x.SearchText)
+            .Skip(1)
+            .Subscribe(_ => CancelTreeName());
         this.WhenAnyValue(x => x.SearchText)
             .Subscribe(_ => RefreshTree());
 
+        // A material opened, by its Save included, ends the new material's row: the form no longer shows the new one.
+        this.WhenAnyValue(x => x.SelectedRawMaterial)
+            .Where(material => material is not null)
+            .Subscribe(_ => EndNewMaterialRow());
         this.WhenAnyValue(x => x.SelectedRawMaterial)
             .Subscribe(_ => SyncTreeSelection());
 
@@ -1357,7 +1376,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }));
 
         // A new material replaces the one showing, so its unsaved changes are asked about first.
-        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => StartNewMaterial()));
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewMaterialInList()));
 
         // The target buffer beside the Cost Buffer % box shows while the buffer has drifted from it.
         this.WhenAnyValue(x => x.EditingCostBufferPercent, x => x.EditingBufferedCost, x => x.DearestPurchaseCost)
@@ -1508,15 +1527,15 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
-        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => AfterUnsavedChangesAsync(() => StartNewMaterial(
+        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewMaterialInList(
             folder?.Type ?? RawMaterialType.Ingredient,
             folder?.CategoryId,
             folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
-        RenameMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(RenameMaterialAsync);
+        RenameMaterialCommand = ReactiveCommand.Create<RawMaterialLeafNode>(BeginRenameMaterial);
         CopyMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => AfterUnsavedChangesAsync(() => StartCopyOf(leaf.RawMaterial)));
         DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => DeleteRawMaterialAsync(leaf.RawMaterial));
-        NewCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialCategoryType>(NewCategoryAsync);
-        RenameCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(RenameCategoryAsync);
+        NewCategoryCommand = ReactiveCommand.Create<RawMaterialCategoryType>(BeginNewFolder);
+        RenameCategoryCommand = ReactiveCommand.Create<RawMaterialFolderNode>(BeginRenameCategory);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(DeleteCategoryAsync);
         ExpandAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.ExpandAll);
         CollapseAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.CollapseAll);
@@ -1823,6 +1842,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private void ClearForm(
         RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null, RawMaterialSource source = RawMaterialSource.Purchased)
     {
+        // The new material's row, if one was named in the list, goes with the form it stood for.
+        EndNewMaterialRow();
         History.Clear();
         FormVersion++;
         _editingId = 0;
@@ -2895,7 +2916,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// unless it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
     /// </summary>
     private void SyncTreeSelection() =>
-        _treeSelection.BringFirst(SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : null);
+        _treeSelection.BringFirst(SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : RawMaterialTree.PendingMaterial);
 
     /// <summary>
     /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
@@ -2915,7 +2936,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         // The tree calls this in the middle of changing SelectedItems: picking the material leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
+        // The new material's row is the form's already.
+        if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
         {
             if (History.IsDirty)
             {
@@ -2998,6 +3020,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     public IReadOnlyList<TreeMenuItem> TreeMenuFor(RawMaterialTreeNode? node) => node switch
     {
+        RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true } => [],
         RawMaterialLeafNode leaf => MaterialsMenu(SelectedTreeMaterials is var picked && picked.Contains(leaf) ? picked : [leaf]),
         RawMaterialFolderNode { IsTypeFolder: true } typeFolder => TypeFolderMenu(typeFolder),
         RawMaterialFolderNode folder => CategoryFolderMenu(folder),
@@ -3016,7 +3039,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or RawMaterialTreeNode ? TreeMenuFor(node as RawMaterialTreeNode) : [];
 
     /// <summary>Only materials can be dragged, one or several: the folders are fixed.</summary>
-    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is RawMaterialLeafNode);
+    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is RawMaterialLeafNode { IsNew: false });
 
     bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
 
@@ -3074,7 +3097,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             items.AddRange(
             [
                 TreeMenuItem.Separator,
-                new("Rename…", RenameMaterialCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("Rename", RenameMaterialCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
                 new("Copy", CopyMaterialCommand, leaf) { Icon = AppIcon.Copy },
                 TreeMenuItem.Separator,
                 new("Delete", DeleteMaterialCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete },
@@ -3091,14 +3114,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         List<TreeMenuItem> items =
         [
             new($"New {MaterialNoun(typeFolder)} Here", NewMaterialInCommand, typeFolder) { Icon = AppIcon.Add },
-            new("New Category…", NewCategoryCommand, isIngredients ? RawMaterialCategoryType.Ingredient : RawMaterialCategoryType.Packaging)
+            new("New Folder", NewCategoryCommand, isIngredients ? RawMaterialCategoryType.Ingredient : RawMaterialCategoryType.Packaging)
             {
                 Icon = AppIcon.NewFolder,
             },
         ];
         if (isIngredients)
         {
-            items.Add(new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder });
+            items.Add(new("New Made Folder", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder });
         }
 
         items.AddRange(
@@ -3118,8 +3141,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         [
             new($"New {MaterialNoun(folder)} Here", NewMaterialInCommand, folder) { Icon = AppIcon.Add },
             TreeMenuItem.Separator,
-            new("New Category…", NewCategoryCommand, folder.CategoryType!.Value) { Icon = AppIcon.NewFolder },
-            new("Rename Category…", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
+            new("New Folder", NewCategoryCommand, folder.CategoryType!.Value) { Icon = AppIcon.NewFolder },
+            new("Rename Category", RenameCategoryCommand, folder) { Gesture = "F2", Icon = AppIcon.Rename },
             new(holds == 0 ? "Delete Category" : $"Delete Category (holds {holds})", DeleteCategoryCommand, folder)
             {
                 Gesture = "Del",
@@ -3132,115 +3155,287 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     private List<TreeMenuItem> EmptySpaceMenu() =>
     [
         new("New Raw Material", NewMaterialInCommand) { Icon = AppIcon.Add },
-        new("New Ingredient Category…", NewCategoryCommand, RawMaterialCategoryType.Ingredient) { Icon = AppIcon.NewFolder },
-        new("New Made Category…", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder },
-        new("New Packaging Category…", NewCategoryCommand, RawMaterialCategoryType.Packaging) { Icon = AppIcon.NewFolder },
+        new("New Ingredient Folder", NewCategoryCommand, RawMaterialCategoryType.Ingredient) { Icon = AppIcon.NewFolder },
+        new("New Made Folder", NewCategoryCommand, RawMaterialCategoryType.Made) { Icon = AppIcon.NewFolder },
+        new("New Packaging Folder", NewCategoryCommand, RawMaterialCategoryType.Packaging) { Icon = AppIcon.NewFolder },
         TreeMenuItem.Separator,
         new("Expand All", ExpandAllCommand),
         new("Collapse All", CollapseAllCommand),
     ];
 
     /// <summary>
-    /// The list's Rename: asks for the new name, and saves it at once. On the material the form shows, the name box takes
-    /// it, and the form's undo steps take it as given, as a move gives them its category: whatever else is typed there
-    /// stays to be saved, and no undo brings the old name back for a Save to write.
+    /// The list's Rename: the material's name becomes a box to type into, in place (TreeNameEdit), and the name typed is
+    /// saved at once (<see cref="RenameMaterialToAsync"/>).
     /// </summary>
-    private async Task RenameMaterialAsync(RawMaterialLeafNode leaf)
+    private void BeginRenameMaterial(RawMaterialLeafNode leaf)
     {
-        var material = leaf.RawMaterial;
-        var name = (await PromptForName.Handle(new TextPromptRequest("Rename Raw Material", "Name", material.Name)))?.Trim();
-        if (string.IsNullOrEmpty(name) || string.Equals(name, material.Name, StringComparison.Ordinal))
+        if (leaf.IsNew)
         {
             return;
         }
 
-        await RunSafelyAsync(async () =>
-        {
-            await _rawMaterialRepository.RenameAsync(material.Id, name, CancellationToken.None);
-            await LoadCommand.Execute();
-            if (_editingId == material.Id)
-            {
-                ApplyRefresh(() => EditingName = name);
-                History.RewriteAll(snapshot => snapshot with { Name = name });
-            }
-        });
+        CancelTreeName();
+        SelectedTreeNode = leaf;
+        TreeNameEdit = new TreeNameEdit(leaf, leaf.RawMaterial.Name);
     }
 
     /// <summary>
-    /// The list's New Category: asks for a name and adds a category of <paramref name="type"/>, then picks its folder. A
-    /// name that's one of that type's categories already picks that one's folder instead.
+    /// The list's Rename Category: the folder's name becomes a box to type into, in place, and the name typed renames the
+    /// category (<see cref="RenameCategoryToAsync"/>), keeping its type.
     /// </summary>
-    private async Task NewCategoryAsync(RawMaterialCategoryType type)
-    {
-        var isMade = type == RawMaterialCategoryType.Made;
-        var typeTitle = RawMaterialFolderNode.TypeTitle(RawMaterialRules.MaterialTypeOf(type));
-        var name = (await PromptForName.Handle(new TextPromptRequest(
-            isMade ? "New Made Category" : "New Category",
-            "Name",
-            string.Empty,
-            isMade ? $"A folder in {typeTitle}, for made ingredients only." : $"A folder in {typeTitle}.")))?.Trim();
-        if (string.IsNullOrEmpty(name))
-        {
-            return;
-        }
-
-        await RunSafelyAsync(async () =>
-        {
-            var category = Categories.FirstOrDefault(c => c.Type == type && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (category is null)
-            {
-                var added = new RawMaterialCategory { Name = name, Type = type };
-                var validation = _categoryValidator.Validate(added);
-                if (!validation.IsValid)
-                {
-                    ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
-                    return;
-                }
-
-                // AddAsync fills in the saved Id, which the copy read back is found by.
-                await _categoryRepository.AddAsync(added, CancellationToken.None);
-                await LoadCommand.Execute();
-                category = Categories.FirstOrDefault(c => c.Id == added.Id);
-            }
-
-            if (category is not null
-                && RawMaterialTree.CategoryFolder(category.Id) is { } folder
-                && RawMaterialTree.TypeFolder(RawMaterialRules.MaterialTypeOf(type)).Children.Contains(folder))
-            {
-                SelectedTreeNode = folder;
-            }
-        });
-    }
-
-    /// <summary>The list's Rename Category: renames the category, keeping its type.</summary>
-    private async Task RenameCategoryAsync(RawMaterialFolderNode folder)
+    private void BeginRenameCategory(RawMaterialFolderNode folder)
     {
         if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
         {
             return;
         }
 
-        var name = (await PromptForName.Handle(new TextPromptRequest("Rename Category", "Name", category.Name)))?.Trim();
-        if (string.IsNullOrEmpty(name) || string.Equals(name, category.Name, StringComparison.Ordinal))
+        CancelTreeName();
+        SelectedTreeNode = folder;
+        TreeNameEdit = new TreeNameEdit(folder, category.Name);
+    }
+
+    /// <summary>
+    /// The list's New Folder: a "New folder" row last in the type's folder for <paramref name="type"/>, picked, with its
+    /// name ready to be typed, as in a file explorer; the name typed adds a category of that type
+    /// (<see cref="CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
+    /// </summary>
+    private void BeginNewFolder(RawMaterialCategoryType type) => BeginNewFolderIn(type, RawMaterialFolderNode.NewFolderTitle);
+
+    private void BeginNewFolderIn(RawMaterialCategoryType type, string text)
+    {
+        CancelTreeName();
+        SearchText = string.Empty;
+        var row = RawMaterialTree.BeginNewFolder(type);
+        SelectedTreeNode = row;
+        TreeNameEdit = new TreeNameEdit(row, text, NewFolderHint(type));
+    }
+
+    /// <summary>What the name box on a new folder says when pointed at: the prompts used to say it.</summary>
+    private static string NewFolderHint(RawMaterialCategoryType type)
+    {
+        var typeTitle = RawMaterialFolderNode.TypeTitle(RawMaterialRules.MaterialTypeOf(type));
+        return type == RawMaterialCategoryType.Made ? $"A folder in {typeTitle}, for made ingredients only." : $"A folder in {typeTitle}.";
+    }
+
+    /// <summary>
+    /// New and New … Here: <see cref="StartNewMaterial"/>, and the new material's row in the list, in its category's folder
+    /// (with none yet, from the header or the list's empty space, last in its type's folder), picked, with its name ready to
+    /// be typed, as a new file in a file explorer. The name typed goes into the form (<see cref="CommitTreeNameAsync"/>),
+    /// and the row stays until Save files the material or the form leaves it. The search is cleared first, so the row shows.
+    /// </summary>
+    private void NewMaterialInList(
+        RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null, RawMaterialSource source = RawMaterialSource.Purchased)
+    {
+        CancelTreeName();
+        SearchText = string.Empty;
+        StartNewMaterial(type, categoryId, source);
+        var title = NewMaterialTitle(type, source);
+        var row = RawMaterialTree.BeginNewMaterial(new RawMaterial
+        {
+            Name = title,
+            Type = type,
+            Source = source,
+            CategoryId = EditingCategory?.Id ?? 0,
+        });
+        SelectedTreeNode = row;
+        TreeNameEdit = new TreeNameEdit(row, title);
+    }
+
+    /// <summary>"New ingredient", "New made ingredient" or "New packaging material": what a new material's row reads until it's named.</summary>
+    private static string NewMaterialTitle(RawMaterialType type, RawMaterialSource source) =>
+        type == RawMaterialType.Packaging ? "New packaging material"
+        : source == RawMaterialSource.Made ? "New made ingredient"
+        : "New ingredient";
+
+    /// <summary>
+    /// Takes the new material's row out of the list (<see cref="NewMaterialInList"/>), and the rows picked, and stops the
+    /// naming in it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left
+    /// as it is.
+    /// </summary>
+    private void EndNewMaterialRow()
+    {
+        if (RawMaterialTree.PendingMaterial is not { } row)
         {
             return;
         }
 
-        await RunSafelyAsync(async () =>
+        if (ReferenceEquals(TreeNameEdit?.Node, row))
         {
-            var renamed = new RawMaterialCategory { Id = category.Id, Name = name, Type = category.Type };
-            var validation = _categoryValidator.Validate(renamed);
+            TreeNameEdit = null;
+        }
+
+        RawMaterialTree.EndNewMaterial();
+        _treeSelection.Quietly(() => SelectedTreeNodes.Remove(row));
+    }
+
+    /// <summary>
+    /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it. A material's or a
+    /// category's is renamed at once; a new folder's adds a category of its type, or picks the one of that name there
+    /// already; a new material's goes into the form, as typed there, and its row takes it: a material needs more than a
+    /// name before Save can file it. An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name
+    /// refused shows why, and the box comes back with it. A second call for the same box, as Enter's box is left, does nothing.
+    /// </summary>
+    public async Task CommitTreeNameAsync(string text)
+    {
+        if (TreeNameEdit is not { } edit)
+        {
+            return;
+        }
+
+        var name = text.Trim();
+        if (name.Length == 0 || (edit.Node is not (RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true })
+            && string.Equals(name, edit.InitialText, StringComparison.Ordinal)))
+        {
+            CancelTreeName();
+            return;
+        }
+
+        TreeNameEdit = null;
+        switch (edit.Node)
+        {
+            case RawMaterialLeafNode { IsNew: true } row:
+                NameNewMaterial(row, name);
+                break;
+
+            case RawMaterialLeafNode leaf:
+                await RunSafelyAsync(() => RenameMaterialToAsync(leaf, name));
+                if (ErrorMessage is not null && RawMaterialTree.Find(leaf.RawMaterial.Id) is { } stillListed)
+                {
+                    TreeNameEdit = edit with { Node = stillListed, InitialText = text };
+                }
+
+                break;
+
+            case RawMaterialFolderNode { IsNewFolder: true, CategoryType: { } type } folder:
+                RawMaterialTree.EndNewFolder();
+                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                await RunSafelyAsync(() => AddCategoryAsync(type, name));
+                if (ErrorMessage is not null)
+                {
+                    BeginNewFolderIn(type, text);
+                }
+
+                break;
+
+            case RawMaterialFolderNode folder:
+                await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
+                if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
+                {
+                    TreeNameEdit = edit with { InitialText = text };
+                }
+
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Esc in the list's name box: the name stays as it was, and a new material's or folder's row goes, with nothing saved.
+    /// The form stays on the new material, blank, as New leaves it.
+    /// </summary>
+    public void CancelTreeName()
+    {
+        if (TreeNameEdit is not { } edit)
+        {
+            return;
+        }
+
+        TreeNameEdit = null;
+        switch (edit.Node)
+        {
+            case RawMaterialLeafNode { IsNew: true }:
+                EndNewMaterialRow();
+                ApplyRefresh(() => EditingName = string.Empty);
+                break;
+            case RawMaterialFolderNode { IsNewFolder: true } folder:
+                RawMaterialTree.EndNewFolder();
+                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The name typed into a new material's row: it goes into the form, as typed there (an undo step, which Save is offered
+    /// for), and the row takes it, until Save files the material or the form leaves it.
+    /// </summary>
+    private void NameNewMaterial(RawMaterialLeafNode row, string name)
+    {
+        var recorder = (IUndoRecorder)this;
+        recorder.BeginUndoStep();
+        EditingName = name;
+        recorder.EndUndoStep();
+        var material = row.RawMaterial;
+        row.RawMaterial = new RawMaterial { Name = name, Type = material.Type, Source = material.Source, CategoryId = material.CategoryId };
+    }
+
+    /// <summary>
+    /// Saves <paramref name="name"/> as the material's at once. On the material the form shows, the name box takes it, and
+    /// the form's undo steps take it as given, as a move gives them its category: whatever else is typed there stays to be
+    /// saved, and no undo brings the old name back for a Save to write.
+    /// </summary>
+    private async Task RenameMaterialToAsync(RawMaterialLeafNode leaf, string name)
+    {
+        var material = leaf.RawMaterial;
+        await _rawMaterialRepository.RenameAsync(material.Id, name, CancellationToken.None);
+        await LoadCommand.Execute();
+        if (_editingId == material.Id)
+        {
+            ApplyRefresh(() => EditingName = name);
+            History.RewriteAll(snapshot => snapshot with { Name = name });
+        }
+    }
+
+    /// <summary>
+    /// Adds a category of <paramref name="type"/> named <paramref name="name"/>, then picks its folder. A name that's one of
+    /// that type's categories already picks that one's folder instead. A name refused shows why.
+    /// </summary>
+    private async Task AddCategoryAsync(RawMaterialCategoryType type, string name)
+    {
+        var category = Categories.FirstOrDefault(c => c.Type == type && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (category is null)
+        {
+            var added = new RawMaterialCategory { Name = name, Type = type };
+            var validation = _categoryValidator.Validate(added);
             if (!validation.IsValid)
             {
                 ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
                 return;
             }
 
-            // Everything is read again, the materials with it, which carry their category's name. The Category picker keeps
-            // the category it holds (LoadCommand), under its new name.
-            await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
+            // AddAsync fills in the saved Id, which the copy read back is found by.
+            await _categoryRepository.AddAsync(added, CancellationToken.None);
             await LoadCommand.Execute();
-        });
+            category = Categories.FirstOrDefault(c => c.Id == added.Id);
+        }
+
+        if (category is not null
+            && RawMaterialTree.CategoryFolder(category.Id) is { } folder
+            && RawMaterialTree.TypeFolder(RawMaterialRules.MaterialTypeOf(type)).Children.Contains(folder))
+        {
+            SelectedTreeNode = folder;
+        }
+    }
+
+    /// <summary>Renames the folder's category to <paramref name="name"/>, keeping its type. A name refused shows why.</summary>
+    private async Task RenameCategoryToAsync(RawMaterialFolderNode folder, string name)
+    {
+        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        {
+            return;
+        }
+
+        var renamed = new RawMaterialCategory { Id = category.Id, Name = name, Type = category.Type };
+        var validation = _categoryValidator.Validate(renamed);
+        if (!validation.IsValid)
+        {
+            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            return;
+        }
+
+        // Everything is read again, the materials with it, which carry their category's name. The Category picker keeps
+        // the category it holds (LoadCommand), under its new name.
+        await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
+        await LoadCommand.Execute();
     }
 
     /// <summary>

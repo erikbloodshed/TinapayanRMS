@@ -1,6 +1,8 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Infrastructure.Upgrades;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -22,7 +24,7 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
 
         await dbContext.Database.MigrateAsync(Cancellation);
 
-        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers"]);
+        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers", "2026-11-09 innovation stage"]);
     }
 
     [Test]
@@ -100,6 +102,43 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         }
 
         (await TargetOfAsync(flourId)).Should().BeNull();
+    }
+
+    [Test]
+    public async Task The_innovation_stage_upgrade_renames_the_stage_stored_by_its_former_name()
+    {
+        var testLoafId = await AddProductAsync("Test Loaf");
+        var pandesalId = await AddProductAsync("Pandesal");
+        await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(new CostingDefaults { NewProductStage = ProductStage.Innovation }, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            // As stored before the rename, or by a copy of the app built before it.
+            await dbContext.Database.ExecuteSqlAsync($"UPDATE products SET stage = 'ResearchAndDevelopment' WHERE id = {testLoafId}", Cancellation);
+            await dbContext.Database.ExecuteSqlAsync($"UPDATE products SET stage = 'Production' WHERE id = {pandesalId}", Cancellation);
+            await dbContext.Database.ExecuteSqlAsync($"UPDATE costing_defaults SET new_product_stage = 'ResearchAndDevelopment'", Cancellation);
+        }
+
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.SingleAsync(p => p.Id == testLoafId, Cancellation)).Stage.Should().Be(ProductStage.Innovation, "the former name still reads as Innovation");
+            (await dbContext.CostingDefaults.SingleAsync(Cancellation)).NewProductStage.Should().Be(ProductStage.Innovation);
+            await DataUpgrades.RunAsync(dbContext, Cancellation);
+        }
+
+        (await StoredAsync($"SELECT stage AS \"Value\" FROM products WHERE id = {testLoafId}")).Should().Be("Innovation");
+        (await StoredAsync($"SELECT stage AS \"Value\" FROM products WHERE id = {pandesalId}")).Should().Be("Production");
+        (await StoredAsync($"SELECT new_product_stage AS \"Value\" FROM costing_defaults")).Should().Be("Innovation");
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.Products.CountAsync(p => p.Stage == ProductStage.Innovation, Cancellation)).Should().Be(1, "EF's queries find it by its new name");
+        }
+    }
+
+    /// <summary>The one text <paramref name="sql"/> reads, as stored.</summary>
+    private async Task<string> StoredAsync(FormattableString sql)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.Database.SqlQuery<string>(sql).SingleAsync(Cancellation);
     }
 
     private async Task<decimal?> TargetOfAsync(int materialId)

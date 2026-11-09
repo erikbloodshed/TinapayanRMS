@@ -7,8 +7,8 @@ public static class ProductRules
     /// <summary>What a product with no category is filed under: its folder in the list, and its category on a report or a printout.</summary>
     public const string UncategorizedTitle = "Uncategorized";
 
-    /// <summary>What a stage is called: "Production" or "Research and Development".</summary>
-    public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Research and Development";
+    /// <summary>What a stage is called: "Production" or "Innovation".</summary>
+    public static string StageTitle(ProductStage stage) => stage == ProductStage.Production ? "Production" : "Innovation";
 
     /// <summary>
     /// How a product is named where it's in the way of something (a refusal, a Dependents tile): "Cheese Roll (deleted)" for

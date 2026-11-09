@@ -141,8 +141,35 @@
     text-overflow: ellipsis;
 }
 
+/* What a row's template draws, in a span only so a click on it can be told from one beside it (a slow second click on the
+   name renames): no box of its own, so the glyph, title and count stay the row's own flex items. */
+.tree-row-content {
+    display: contents;
+}
+
 .tree-count {
     color: var(--muted-foreground);
+}
+
+/* A row's name typed in place (TreeNameBox): the box takes the rest of the row, inside its height, so the row doesn't jump. */
+.tree-name-box {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+}
+
+.tree-name-box .e-input-group.tree-name-field {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    min-height: 24px;
+    margin: 0;
+}
+
+.tree-name-box .e-input-group.tree-name-field input.e-input {
+    height: 22px;
+    min-height: 22px;
+    padding: 0 4px;
 }
 
 .tree-menu-item {
