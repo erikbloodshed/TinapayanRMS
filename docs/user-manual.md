@@ -402,7 +402,7 @@ The same commands are buttons under the search box: **New Raw Material**, **New 
 
 **Names are typed straight into the list**, as on the Products screen:
 
-- **Rename** (or F2, or clicking the name of the material you've already picked, slowly, not as a double-click) turns its name into a box. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves it as it was. **Rename Category** does the same for a category's folder.
+- **Rename** (or F2, or clicking the material you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves it as it was. **Rename Category** does the same for a category's folder.
 - **New Folder** adds a *New folder* row, its name selected. Type the category's name and press **Enter**: the category is saved. **Esc**, or an empty name, adds nothing.
 - **New**, **New Raw Material** and **New … Here** add a row for the new material, its name selected: in the folder you picked, or at the end of **Ingredients** when it has no category yet. Type its name and press **Enter**. The name goes into the form, and the row keeps it, but **the material isn't saved yet**: fill in the rest (its category, its prices, a packaging material's base unit, a made ingredient's sub-assembly) and press **Save**. **Esc** adds nothing.
 
@@ -550,7 +550,7 @@ The same commands are buttons under the search box. Each button shows only its i
 
 Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
 
-**Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the name of the sub-assembly you've already picked, slowly) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
+**Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the sub-assembly you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
 
 **New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New**, **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New**, the first role's): type its name and press **Enter**. The name goes into the form, but **it isn't saved yet**: add its lines and press **Save**. **Esc** adds nothing.
 
@@ -629,7 +629,7 @@ Right-click menus:
 
 **Names are typed straight into the list**, as in File Explorer:
 
-- **Rename** (or F2, or clicking the name of the product you've already picked, slowly, not as a double-click) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename Category** does the same for a category's folder, and renames it in both Production and Innovation.
+- **Rename** (or F2, or clicking the product you've already picked once more, slowly: a double-click doesn't rename) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename Category** does the same for a category's folder, and renames it in both Production and Innovation.
 - **New Folder** adds a *New folder* row, its name selected, to the stage you right-clicked (from the button under the search box, the stage of the row you've picked). Type the category's name and press **Enter**: the category is saved, and gets a folder in both Production and Innovation. **Esc**, or an empty name, adds nothing. A name that's already a category picks that category's folder.
 - **New Product Here**, **New Composite Product Here** and **New** in the header add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc** adds nothing. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it, under Uncategorized.
 - **A composite product can't be saved until it holds two products**, so its name goes into the form instead. Its row keeps the name until you press **Save**.

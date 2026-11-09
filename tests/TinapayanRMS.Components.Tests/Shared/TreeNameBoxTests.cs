@@ -30,7 +30,7 @@ public class TreeNameBoxTests
 
         box.Find("input").GetAttribute("value").Should().Be("Mamon");
         box.Find(".tree-name-box").GetAttribute("title").Should().Be("What it's called");
-        context.JSInterop.VerifyInvoke("tinapayan.focus");
+        context.JSInterop.VerifyInvoke("tinapayan.showNameBox");
     }
 
     [Test]
@@ -77,22 +77,27 @@ public class TreeNameBoxTests
         _committed.Should().Equal("Mamon Tostado");
     }
 
-    [Test]
-    public async Task The_cursor_taken_before_the_box_is_used_is_taken_back_not_counted_as_leaving()
-    {
-        await using var context = AppServices.NewContext();
-        var input = context.Render<TreeNameBox>(parameters => parameters
+    private IRenderedComponent<TreeNameBox> RenderSettling(BunitContext context) =>
+        context.Render<TreeNameBox>(parameters => parameters
             .Add(box => box.InitialText, "New product")
             .Add(box => box.SettleTime, TimeSpan.FromHours(1))
             .Add(box => box.OnCommit, (string text) => _committed.Add(text))
-            .Add(box => box.OnCancel, () => _cancelled++)).Find("input");
+            .Add(box => box.OnCancel, () => _cancelled++));
 
-        // A dialog or drop-down closing takes the cursor as the box shows: nothing is named "New product" by it.
+    [Test]
+    public async Task The_cursor_taken_before_the_box_is_used_with_no_click_is_taken_back_not_counted_as_leaving()
+    {
+        await using var context = AppServices.NewContext();
+
+        // The page finds no click since the box showed: a dialog or drop-down closing took the cursor.
+        context.JSInterop.Setup<bool>("tinapayan.takeFocusBack", _ => true).SetResult(true);
+        var input = RenderSettling(context).Find("input");
+
         await input.FocusAsync(new());
         await input.BlurAsync(new());
 
-        _committed.Should().BeEmpty();
-        context.JSInterop.VerifyInvoke("tinapayan.focusIfAway");
+        _committed.Should().BeEmpty("nothing is named \"New product\" by it");
+        context.JSInterop.VerifyInvoke("tinapayan.takeFocusBack");
 
         // Once it's typed into, leaving it gives the name back.
         await input.FocusAsync(new());
@@ -100,5 +105,20 @@ public class TreeNameBoxTests
         await input.BlurAsync(new());
 
         _committed.Should().Equal("Pan de Coco");
+    }
+
+    [Test]
+    public async Task A_click_elsewhere_since_the_box_showed_leaves_it_at_once()
+    {
+        await using var context = AppServices.NewContext();
+
+        // The page found a click since the box showed: another row picked, or a field clicked.
+        context.JSInterop.Setup<bool>("tinapayan.takeFocusBack", _ => true).SetResult(false);
+        var input = RenderSettling(context).Find("input");
+
+        await input.FocusAsync(new());
+        await input.BlurAsync(new());
+
+        _committed.Should().Equal(["New product"], "the box gives back what it holds, which the screen takes for unchanged");
     }
 }

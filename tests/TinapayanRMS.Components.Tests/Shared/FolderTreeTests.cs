@@ -333,11 +333,11 @@ public class FolderTreeTests
             .Add(tree => tree.RenamesOnSecondClick, node => node.Children is null)
             .Add(tree => tree.SecondClickWait, cancellation => wait.WaitAsync(cancellation)));
 
-    private static Task ClickNameAsync(IRenderedComponent<FolderTree<Node>> tree, int row, long detail = 1) =>
-        tree.FindAll(".tree-row-content")[row].ClickAsync(new MouseEventArgs { Detail = detail });
+    private static Task ClickRowAsync(IRenderedComponent<FolderTree<Node>> tree, int row, long detail = 1) =>
+        tree.FindAll(".tree-row")[row].ClickAsync(new MouseEventArgs { Detail = detail });
 
     [Test]
-    public async Task A_slow_second_click_on_the_picked_records_name_renames_it_once_the_wait_is_over()
+    public async Task A_slow_second_click_anywhere_on_the_picked_records_row_renames_it_once_the_wait_is_over()
     {
         await using var context = AppServices.NewContext();
         _breads.IsExpanded = true;
@@ -345,9 +345,10 @@ public class FolderTreeTests
         var wait = new TaskCompletionSource();
         var tree = RenderRenaming(context, rename, wait.Task);
 
-        await ClickNameAsync(tree, 1);
+        // On the row, not only on its name text, which is short beside the row: on the text alone it worked now and then.
+        await ClickRowAsync(tree, 1);
         _selected.Should().Equal(_breads.Children![0]);
-        await ClickNameAsync(tree, 1);
+        await ClickRowAsync(tree, 1);
         rename.Runs.Should().Be(0, "it waits, in case the click is a double-click's");
 
         wait.SetResult();
@@ -356,7 +357,7 @@ public class FolderTreeTests
     }
 
     [Test]
-    public async Task A_double_click_a_key_a_click_beside_the_name_or_a_folder_renames_nothing()
+    public async Task A_double_click_a_key_or_a_folder_renames_nothing()
     {
         await using var context = AppServices.NewContext();
         _breads.IsExpanded = true;
@@ -364,19 +365,19 @@ public class FolderTreeTests
         var wait = new TaskCompletionSource();
         var tree = RenderRenaming(context, rename, wait.Task);
 
-        // The first click picks it, so the next is a second click; a double-click's second click (Detail 2) calls it off.
-        await ClickNameAsync(tree, 1);
-        await ClickNameAsync(tree, 1);
-        await ClickNameAsync(tree, 1, detail: 2);
+        // A double-click's second click (Detail 2) calls the first's off, picked already or not (the user's choice).
+        await ClickRowAsync(tree, 1);
+        await ClickRowAsync(tree, 1, detail: 2);
+        await ClickRowAsync(tree, 1);
+        await ClickRowAsync(tree, 1, detail: 2);
 
-        // A key pressed while it waits.
-        await ClickNameAsync(tree, 1);
+        // A key pressed while a slow second click waits.
+        await ClickRowAsync(tree, 1);
         await tree.Find(".folder-tree").KeyDownAsync(Key.Enter);
 
-        // A click on the row beside the name, then a folder's name twice, which opens and closes it.
-        await tree.FindAll(".tree-row")[1].ClickAsync(new MouseEventArgs { Detail = 1 });
-        await ClickNameAsync(tree, 3);
-        await ClickNameAsync(tree, 3);
+        // A folder's row twice, which opens and closes it.
+        await ClickRowAsync(tree, 3);
+        await ClickRowAsync(tree, 3);
         _cakes.IsExpanded.Should().BeFalse("a folder's clicks open and close it");
 
         wait.SetResult();

@@ -10,7 +10,7 @@
    closes it. Rows that can be dragged are dragged onto a folder (or a row in one) to move them there, which the screen
    saves at once. A right-click opens the menu for the row, or for the list in its empty space; F2 and Del do what the
    row's menu shows beside them, Enter opens or closes a folder, and the arrows move through the rows. Where the screen
-   says (RenamesOnSecondClick), a slow second click on the name of the row picked does what F2 does, as in File Explorer.
+   says (RenamesOnSecondClick), a slow second click on the row picked does what F2 does, as in File Explorer.
    A row picked from elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
 <div @ref="_element" class="folder-tree" tabindex="0" role="tree" aria-multiselectable="true"
      @onkeydown="OnKeyDown" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
@@ -38,9 +38,7 @@
     private object? _shownSelection;
     private bool _pickedHere;
 
-    // A slow second click on a row's name: whether the click landed on the name (the row's content, not its expander or the
-    // space around it), and the rename it's waiting to make.
-    private bool _clickedName;
+    // The rename a slow second click on a row is waiting to make.
     private CancellationTokenSource? _secondClick;
 
     // Dragging: the rows being dragged, and the row they're over.
@@ -97,9 +95,10 @@
     [Parameter] public Func<string, TreeMenuItem?>? Shortcut { get; set; }
 
     /// <summary>
-    /// The rows a slow second click on the name renames, as in File Explorer: a click on the name of the one row picked
-    /// already, not part of a double-click, runs what F2 does (<see cref="Shortcut"/>) once <see cref="SecondClickWait"/>
-    /// is over, unless another click, a key, a drag or a menu comes first. None when it's null.
+    /// The rows a slow second click renames, as in File Explorer: a click anywhere on the one row picked already, not part
+    /// of a double-click, runs what F2 does (<see cref="Shortcut"/>) once <see cref="SecondClickWait"/> is over, unless
+    /// another click, a key, a drag or a menu comes first. A double-click renames nothing (the user's choice). None when
+    /// it's null.
     /// </summary>
     [Parameter] public Func<TNode, bool>? RenamesOnSecondClick { get; set; }
 
@@ -167,11 +166,7 @@
         builder.OpenElement(seq++, "span");
         builder.AddAttribute(seq++, "class", isFolder && children!.Count > 0 ? (isOpen ? OpenExpander : ClosedExpander) : "tree-expander glyph");
         builder.CloseElement();
-        builder.OpenElement(seq++, "span");
-        builder.AddAttribute(seq++, "class", "tree-row-content");
-        builder.AddAttribute(seq++, "onclick", new EventCallback(NoRedraw.Receiver, (Action)(() => _clickedName = true)));
         builder.AddContent(seq++, RowTemplate(node));
-        builder.CloseElement();
         builder.CloseElement();
 
         if (isOpen)
@@ -256,8 +251,6 @@
 
     private void OnRowClick(TNode node, MouseEventArgs e)
     {
-        var onName = _clickedName;
-        _clickedName = false;
         CancelSecondClick();
         if (IsEditing?.Invoke(node) == true)
         {
@@ -295,18 +288,27 @@
             }
         }
 
-        // A plain click picks the row alone; on a folder it also opens or closes it. On the name of the row picked alone
-        // already, once more and not as a double-click's second (Detail 2), it renames the row in a moment, as in File
-        // Explorer.
+        // A plain click picks the row alone; on a folder it also opens or closes it. On the row picked alone already, once
+        // more and not as a double-click's second (Detail 2), it renames the row in a moment, as in File Explorer. Anywhere
+        // on the row: on its name text alone, which is short beside the row, it worked only now and then.
         var wasPickedAlone = Selected.Count == 1 && ReferenceEquals(Selected[0], node);
         PickAlone(node);
         if (ChildrenOf(node) is not null)
         {
             SetExpanded(node, !IsExpanded(node));
         }
-        else if (onName && wasPickedAlone && e.Detail <= 1 && RenamesOnSecondClick?.Invoke(node) == true)
+        else if (wasPickedAlone && e.Detail <= 1 && RenamesOnSecondClick?.Invoke(node) == true)
         {
             _ = RenameAfterWaitAsync(node);
+        }
+    }
+
+    /// <summary>Does what F2 does on the row picked: renames it, where the screen gives F2 that.</summary>
+    private void Rename()
+    {
+        if (Shortcut?.Invoke("F2") is { Command: { } command } item && command.CanExecute(item.Parameter))
+        {
+            command.Execute(item.Parameter);
         }
     }
 
@@ -328,28 +330,13 @@
                 }
 
                 CancelSecondClick();
-                if (Shortcut?.Invoke("F2") is { Command: { } command } item && command.CanExecute(item.Parameter))
-                {
-                    command.Execute(item.Parameter);
-                }
+                Rename();
             });
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
         {
             // Called off by another click or key, or the tree went.
         }
-    }
-
-    /// <summary>
-    /// Runs an event's handler without drawing the tree again, as Blazor's docs advise for one that changes nothing shown:
-    /// the click on a row's name only notes where it landed, and a redraw then retired the row's own handler for the
-    /// same click before it ran.
-    /// </summary>
-    private sealed class NoRedraw : IHandleEvent
-    {
-        public static readonly NoRedraw Receiver = new();
-
-        public Task HandleEventAsync(EventCallbackWorkItem item, object? arg) => item.InvokeAsync(arg);
     }
 
     private void CancelSecondClick()

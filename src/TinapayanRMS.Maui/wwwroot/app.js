@@ -7,7 +7,11 @@
 // the click is over. Only then: a box the cursor came into by Tab (or the Vim keys) is clicked in to put the caret
 // somewhere, and selecting it all then had the next key replace the whole number.
 let pressedOn = null;
-document.addEventListener("pointerdown", e => { pressedOn = e.target; }, true);
+
+// When the mouse was last pressed anywhere in the page: a list's name box (TreeNameBox) tells the cursor taken by a click
+// of the user's from one taken by a drop-down or dialog closing, which presses nothing.
+let lastPressedAt = -1;
+document.addEventListener("pointerdown", e => { pressedOn = e.target; lastPressedAt = performance.now(); }, true);
 document.addEventListener("pointerup", () => { pressedOn = null; }, true);
 document.addEventListener("pointercancel", () => { pressedOn = null; }, true);
 document.addEventListener("focusin", e => {
@@ -39,13 +43,30 @@ window.tinapayan = {
         }
     },
 
-    // focus, unless the element has the cursor already: what's typed into it since is left as it is (TreeNameBox, taking
-    // the cursor back from a drop-down that closed after it).
-    focusIfAway(id) {
+    // A list's name box (TreeNameBox) as it shows: focus, and the time it showed, for takeFocusBack.
+    showNameBox(id) {
         const element = document.getElementById(id);
-        if (element && document.activeElement !== element) {
+        if (element) {
+            element.__shownAt = performance.now();
             tinapayan.focus(id);
         }
+    },
+
+    // A list's name box that lost the cursor before it was used: takes it back, unless the mouse was pressed anywhere since
+    // the box showed, when the user moved on (picked another row, clicked a field) and the box is to close. The cursor taken
+    // with no press was taken by whatever started the naming as it closed: a drop-down, or the dialog about unsaved changes.
+    // True when it took it back.
+    takeFocusBack(id) {
+        const element = document.getElementById(id);
+        if (!element || lastPressedAt > (element.__shownAt ?? Infinity)) {
+            return false;
+        }
+
+        if (document.activeElement !== element) {
+            tinapayan.focus(id);
+        }
+
+        return true;
     },
 
     // Puts the cursor on the nearest element around this one that matches the selector: a list's name box giving it back

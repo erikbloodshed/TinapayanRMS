@@ -141,12 +141,6 @@
     text-overflow: ellipsis;
 }
 
-/* What a row's template draws, in a span only so a click on it can be told from one beside it (a slow second click on the
-   name renames): no box of its own, so the glyph, title and count stay the row's own flex items. */
-.tree-row-content {
-    display: contents;
-}
-
 .tree-count {
     color: var(--muted-foreground);
 }

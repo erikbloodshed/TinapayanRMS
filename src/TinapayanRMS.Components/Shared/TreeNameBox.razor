@@ -22,10 +22,12 @@
     private string _text = "";
     private bool _done;
 
-    // A cursor taken away before the box is used (typed or clicked in), in its first moments, isn't the box being left:
-    // whatever started the naming can take it as it closes, a drop-down (New's arrow) or the dialog asking about unsaved
-    // changes, a moment after the box has it. The box takes it back. Counted as left, it had saved "New product" there
-    // and then, the name a new row starts with.
+    // A cursor taken away before the box is used (typed or clicked in), in its first moments, with no click of the user's
+    // since it showed, isn't the box being left: whatever started the naming can take it as it closes, a drop-down (New's
+    // arrow) or the dialog asking about unsaved changes, a moment after the box has it. The box takes it back
+    // (tinapayan.takeFocusBack). Counted as left, it had saved "New product" there and then, the name a new row starts
+    // with. A click anywhere since it showed (another row picked) is the user moving on, and the box closes at once: taken
+    // back then too, it had stayed open on the old row while the new one was picked.
     private readonly System.Diagnostics.Stopwatch _shown = new();
     private bool _used;
 
@@ -57,7 +59,7 @@
         }
 
         _shown.Start();
-        await JS.InvokeVoidAsync("tinapayan.focus", _id);
+        await JS.InvokeVoidAsync("tinapayan.showNameBox", _id);
     }
 
     private void OnTyped(string text)
@@ -82,10 +84,10 @@
             return;
         }
 
-        if (!_used && _shown.Elapsed < SettleTime)
+        // Taken by whatever started the naming, as it closed, rather than by a click: the box takes the cursor back, its
+        // text selected again.
+        if (!_used && _shown.Elapsed < SettleTime && await TakeFocusBackAsync())
         {
-            // Taken by whatever started the naming, as it closed: the box takes the cursor back, its text selected again.
-            await JS.InvokeVoidAsync("tinapayan.focusIfAway", _id);
             return;
         }
 
@@ -102,6 +104,18 @@
         {
             await BackToTreeAsync();
             await OnCancel.InvokeAsync();
+        }
+    }
+
+    private async Task<bool> TakeFocusBackAsync()
+    {
+        try
+        {
+            return await JS.InvokeAsync<bool>("tinapayan.takeFocusBack", _id);
+        }
+        catch (JSDisconnectedException)
+        {
+            return false;
         }
     }
 
