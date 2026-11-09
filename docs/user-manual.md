@@ -341,7 +341,7 @@ Under it are the four percentages a **new** product's costing starts with:
 
 Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Like the VAT, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
 
-**Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, in the last row of a product's Costing tab, under the **Suggested Selling Price** (*Rounded up to the next 0.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
+**Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, in the last row of a product's Costing tab, under the **Suggested Price** (*Rounded up to the next 0.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
 
 **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
@@ -762,12 +762,12 @@ On the right, the **Costing Summary** lists each component of the base cost with
 
 Under it, a second table puts the price the costing suggests beside the price the shop charges now, so you can compare the two. Its columns are:
 
-- **Suggested Selling Price**, named for the unit the figures are for: *Suggested Selling Price per Piece*, *per Unit of 8 Pieces* when Quantity Required is 8, or *per Unit* for a composite product.
-- **Current Store Price**: the product's **Current Price**, as typed in the header.
+- **Suggested Price**: the price the costing works out, for the unit the figures are for (one piece, a unit of 8 pieces when Quantity Required is 8, or one unit of a composite product). Point at the heading to see which, such as *Suggested Selling Price per Unit of 8 Pieces*.
+- **Current Price**: the product's **Current Price**, as typed in the header.
 
 Each column shows, for its price:
 
-| Row | Suggested Selling Price | Current Store Price |
+| Row | Suggested Price | Current Price |
 |---|---|---|
 | **Markup %** | The Markup Metric | What the store price earns on the base cost, once VAT is taken out |
 | **Markup** | The markup in pesos, over the base cost | What the store price leaves over the base cost, once VAT is taken out |
@@ -851,6 +851,7 @@ Press **Print** in the Products header to open the **Print** tab. It shows the p
 - **Print** (the picker at the top left) chooses **This product**, the folder last asked for, or **All products**.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
+- The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup %, Markup, VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup % and Markup print amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
 - **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
 To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**.
@@ -882,7 +883,7 @@ One row for every product, as it's saved:
 - **Packaging Cost**: the **Packaging** row of the Costing tab. For a composite product that includes its products' packaging, theirs is counted too.
 - **Labor Cost**, **Overhead Cost** and **Admin Cost**: the Costing tab's Labor, Overhead and Admin metrics in pesos, each a percentage of the ingredients cost.
 - **Base Cost** and **Suggested Price**: as the product's Costing tab works them out.
-- **Rounded Price**: the suggested price rounded up as Settings → Costing Defaults → **Price Rounding** says; the same as the suggested price with no rounding set. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Suggested Selling Price**.
+- **Rounded Price**: the suggested price rounded up as Settings → Costing Defaults → **Price Rounding** says; the same as the suggested price with no rounding set. The base cost is the six costs before it added up, and the suggested price is the Costing tab's **Suggested Price**.
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 - **Target Markup %**: the **Markup Metric** on the product's Costing tab, what you're aiming for.
@@ -1002,7 +1003,7 @@ The lower table shows every product for one sellable unit, at buffered costs, no
 
 - **Raw Material Cost** and **Simulated Raw Material Cost**, and the **Change %** between them: the ingredients and packaging, before wastage, labor, overhead and administrative. This is the Products screen's **Material Cost**.
 - **Base Cost** and **Simulated Base Cost**, and the **Change %** between them.
-- **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Suggested Selling Price.
+- **Suggested Price** and **Simulated Suggested Price**: the Costing tab's Suggested Price.
 - **Current Price**: what you charge now, VAT included, as entered on **Products**. Blank when none is entered.
 - **Markup %** and **Simulated Markup %**: what the product's current price earns, now and with the changes. Blank for a product with no current price.
 - **Price to Keep Markup**: the price that earns today's **Markup %** with the changes. It moves with the base cost: a base cost up 5% gives a price 5% higher. A product no change reaches keeps its current price. Blank for a product with no current price. The figure isn't rounded, so round it to a price you'd charge.

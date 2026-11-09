@@ -129,10 +129,13 @@
     margin: 8px 0 4px;
 }
 
+/* Each figure centred in its tile, as the Products header's tiles are. */
 .print-figures > div {
     flex: 1;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    text-align: center;
     padding: 6px 8px;
     border: 1px solid #ccd0da;
     border-radius: 4px;
@@ -210,6 +213,20 @@
 .print-table .print-total td {
     font-size: 11.5pt;
     padding: 6px;
+}
+
+/* A product's suggested price beside its current one, under the costing's base cost. */
+.print-price-comparison {
+    margin-top: 10px;
+}
+
+.print-price-comparison th.n {
+    width: 28%;
+}
+
+/* The suggested price rounded up, under the price row, in line with the rows above it. */
+.print-price-comparison .print-part-row td {
+    padding-left: 6px;
 }
 
 .print-table thead {

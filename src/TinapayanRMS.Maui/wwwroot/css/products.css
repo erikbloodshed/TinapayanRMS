@@ -364,7 +364,7 @@
 
 .cost-summary th,
 .cost-summary td {
-    padding: 6px 8px;
+    padding: 4px 8px;
     text-align: left;
     border-bottom: 1px solid var(--card-border);
 }
@@ -384,7 +384,7 @@
 }
 
 .cost-summary .part-row td {
-    padding: 2px 8px 2px 24px;
+    padding: 1px 8px 1px 24px;
     border-bottom: none;
     color: var(--muted-foreground);
     font-size: 13px;
@@ -399,7 +399,7 @@
 
 .cost-summary .total-row td {
     font-size: 15px;
-    padding: 10px 8px;
+    padding: 5px 8px;
 }
 
 /* The History tab: the versions on the left, what changed and the chart beside them. */
