@@ -107,7 +107,6 @@ Other terms you'll see on a product:
 - **Quantity Required** is how many finished pieces make one sellable unit. It's 1 for a product sold by the piece, and 8 for a "Box of 8". The recipe is always written per piece. The costing is per sellable unit.
 - **Stage**: every product is either in **Research and Development** (still being worked out) or in **Production** (made and sold). A new product goes in Production, unless you change that in Settings → Costing Defaults.
 - **Clone** and **Create Variant** start a new product from an existing one. See [Clone tab](#clone-tab).
-- **Scaling** works out the ingredients and packaging for any number of sellable units. See [Scaling tab](#scaling-tab).
 - **Versions**: each Save that changes a product's recipe or price is kept as a version you can compare with and go back to. See [History tab](#history-tab).
 
 ### Composite products
@@ -338,11 +337,11 @@ Under it are the four percentages a **new** product's costing starts with:
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
 - **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
 
-**VAT %** is the shop's VAT, added on top of every product's marked-up price. It isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's suggested price. A product's Costing tab shows it, but you change it only here.
+**VAT %** is the shop's VAT, added on top of every product's marked-up price. It isn't where a new product starts: **every** product is priced with it, saved ones included, so changing it changes every product's suggested price. A product's Costing Summary shows what it adds to the price, but you change it only here.
 
 Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Like the VAT, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
 
-**Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, under the **Suggested Selling Price** on a product's Costing tab (*Rounded up to the next 0.25: 43.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
+**Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, in the last row of a product's Costing tab, under the **Suggested Selling Price** (*Rounded up to the next 0.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
 
 **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
@@ -394,7 +393,7 @@ The list has two top-level folders, **Ingredients** and **Packaging**, with a fo
 
 Right-click menus:
 
-- **A material**: **Move to** (another category of the same type: a made ingredient's are the Made ones), **Rename…** (F2) and **Delete** (Del).
+- **A material**: **Move to** (another category of the same type: a made ingredient's are the Made ones), **Rename…** (F2), **Copy** and **Delete** (Del).
 - **A type's folder**: **New Ingredient Here** or **New Packaging Material Here**, **New Category…**, **New Made Category…** (Ingredients only), **Expand All** and **Collapse All**.
 - **A category's folder**: **New … Here**, **New Category…**, **Rename Category…** (F2) and **Delete Category** (Del). In a Made category's folder, **New Made Ingredient Here** starts a made ingredient in that category, and **New Category…** adds another Made category. You can only delete a category when it's empty. Otherwise the menu shows how many materials it holds.
 - **The empty space**: **New Raw Material**, **New Ingredient Category…**, **New Made Category…**, **New Packaging Category…**, **Expand All** and **Collapse All**.
@@ -402,6 +401,8 @@ Right-click menus:
 The same commands are buttons under the search box: **New Raw Material**, **New Category** (its arrow offers an ingredient, a Made or a packaging category), **Expand All** and **Collapse All**. Each button shows only its icon; point at it to see its name.
 
 Dragging materials onto another category moves them straight away. A material can't be dragged into a category of another type, so a made ingredient only drops into a Made category, and nothing else does.
+
+**Copy** starts a new material from the one you right-clicked, named after it with *Copy* on the end (*Disposable Spoon* becomes *Disposable Spoon Copy*, or *Disposable Spoon Copy 2* if that name is taken). Only its type, its category and its base unit come with it. Its prices, alternative units, cost buffer and the rest start empty, as for **New**. A copy of a made ingredient is a made ingredient in the same Made category, but you still pick its sub-assembly. Change the name if you like, fill in the rest, then press **Save**: nothing is saved until you do. If the material showing has unsaved changes, you're asked about them first.
 
 ### The header
 
@@ -439,6 +440,7 @@ Enter one row per brand you buy:
 | **Purchase Unit** | The unit you buy it in: the base unit or an alternative unit. Picking a unit the material doesn't have yet adds it as an alternative unit. If you then make that unit a packaging material's base unit, the price moves to the base unit and the added alternative unit goes. |
 | **Qty per Purchase Unit** | How many base units one purchase unit holds. It's filled in for saved and standard units. |
 | **Purchase Price** | What one purchase unit costs. |
+| **Unit Price** | Read-only. What one base unit costs at this price: the Purchase Price divided by the Qty per Purchase Unit. A case of 600 at 900.00 is 1.5000 a piece. Use it to compare brands bought in different units. |
 | **Buffer %** | Read-only. How far the buffered cost is above this brand's price. |
 
 The material's **current cost** comes from the **dearest** brand: its price divided by the base units in its purchase unit. For example, a 25 kg bag at 1,250.00 costs 1,250 ÷ 25,000 = 0.05 per gram.
@@ -593,7 +595,7 @@ A sub-assembly can't be switched between a recipe role and the Packaging role on
 
 ## 7. Products
 
-The Products screen has the product list on the left. On the right are the selected product's header, its details, and five tabs: **Recipe**, **Costing**, **Scaling**, **Clone** and **History**.
+The Products screen has the product list on the left. On the right are the selected product's header, its details, and four tabs: **Recipe**, **Costing**, **Clone** and **History**.
 
 ### The list
 
@@ -739,7 +741,7 @@ Save needs at least **two different products** in a composite.
 
 ### Costing tab
 
-On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**, then the shop's **VAT %**. A new product's metrics start with the Costing Defaults. The VAT is the same for every product: it's shown greyed here, and changed only in Settings → Costing Defaults.
+On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**. A new product's metrics start with the Costing Defaults. The VAT is the same for every product, so it isn't set here: the summary on the right shows what it adds to the price, and it's changed only in Settings → Costing Defaults.
 
 Each metric has two boxes. The first is its percentage, shown to one decimal with its % sign. The second is what that percentage comes to in pesos for one sellable unit, shown to two decimals. Type in either box and the other one follows. For example, with ₱20.00 of sub-assemblies, typing **5.00** in Labor Metric's peso box sets its percentage to **25.0%**.
 
@@ -748,37 +750,35 @@ Each metric has two boxes. The first is its percentage, shown to one decimal wit
 - Only the percentage is saved. If the recipe's cost changes later, the percentage stays and the peso amount changes with it.
 - A product with nothing in its recipe yet has no cost to take a percentage of, so its peso boxes stay at 0.00. Type the percentage instead.
 
-Under each metric is its share of the price. Under the VAT are its amount in pesos and its share of the price.
+Under each metric is its share of the price.
 
-On the right, the **Costing Summary** lists each component with its amount and its **% of Price**:
+On the right, the **Costing Summary** lists each component of the base cost with its amount and its **% of Price**:
 
 - **Sub-assemblies (ingredients)**, with each sub-assembly listed under it. For a composite product this row is **Products (ingredients)**, with each product and its quantity listed under it, such as *Ensaymada × 6*. When the composite has sections of its own, the row is **Products and sub-assemblies (ingredients)** and lists them after the products. Its Labor, Overhead and Admin are a percentage of that row.
 - **Wastage**, labelled with the [Wastage %](#wastage) the product is priced with: its category's own, or the shop's if its category doesn't set one. It's set in Settings (Product Categories, or Costing Defaults), not here. Picking another **Category** on the product changes it at once.
 - **Packaging**. For a composite product that includes its products' packaging, this row is **Packaging (own and products')**.
 - **Labor**, **Overhead** and **Administrative**, each labelled with its percentage
 - **Subtotal (base cost)**
-- **Markup**
-- **VAT**
-- **Suggested Selling Price**, named for the unit the figures are for: *Suggested Selling Price per Piece*, *per Unit of 8 Pieces* when Quantity Required is 8, or *per Unit* for a composite product
+
+Under it, a second table puts the price the costing suggests beside the price the shop charges now, so you can compare the two. Its columns are:
+
+- **Suggested Selling Price**, named for the unit the figures are for: *Suggested Selling Price per Piece*, *per Unit of 8 Pieces* when Quantity Required is 8, or *per Unit* for a composite product.
+- **Current Store Price**: the product's **Current Price**, as typed in the header.
+
+Each column shows, for its price:
+
+| Row | Suggested Selling Price | Current Store Price |
+|---|---|---|
+| **Markup %** | The Markup Metric | What the store price earns on the base cost, once VAT is taken out |
+| **Markup** | The markup in pesos, over the base cost | What the store price leaves over the base cost, once VAT is taken out |
+| **VAT** | The VAT added on top | The VAT inside the store price |
+| **Selling price** | The suggested price | The store price |
+
+For example, with a base cost of ₱100.00, a Markup Metric of 30% and 12% VAT, the suggested price is ₱145.60: ₱30.00 of markup and ₱15.60 of VAT. A store price of ₱134.40 is ₱120.00 before VAT, so it earns ₱20.00 (20%) and holds ₱14.40 of VAT.
+
+The store price's Markup % and Markup turn **amber** when it earns less than the Markup Metric, and **red** when it doesn't cover the base cost, as the header's Markup % does. With no Current Price entered, its column shows dashes. When Settings sets a [price rounding](#costing-defaults), a last row shows the suggested price rounded up, such as *Rounded up to the next 0.25*.
 
 Everything updates as you type, before you save. See [How costs are worked out](#12-how-costs-are-worked-out).
-
-### Scaling tab
-
-The Scaling tab works out how much of everything a production run takes. Type how many to make in **Sellable Units**: boxes for a product like *Ensaymada Box of 8*, pieces for a product sold by the piece. When a unit holds more than one piece, the pieces it comes to show beside the box, such as **= 160 pieces**. The number isn't saved, and it stays when you open another product.
-
-The table below it lists, with each row's **Amount** and **Cost**:
-
-- **Each section**, such as *Dough*, made in **whole batches**. Beside its name is how many batches that is and how many pieces they make, with the pieces to spare: *2 batches · 200 pcs (40 extra)*. Its amount is the weight of those batches. Under it are its ingredients, then its add-ins, each for that many batches. A section with no piece size yet has nothing to scale, and says so.
-- **A made ingredient** opens into what it's made from, for the grams the recipe takes, allowing for its weight loss. A made ingredient inside it opens in turn.
-- **Packaging**: each material for that many sellable units, in the unit it's typed in on the Packaging tab.
-- **A composite product** lists each of its products first, such as *Ensaymada × 6*, with how many of it that comes to. Under each is that product's own recipe scaled the same way, as it's saved. Its packaging is included only when the composite includes its products' packaging. The composite's own sections and packaging come after its products.
-
-**Total Cost**, at the top right, adds up the table. Because each section is made in whole batches, it includes the extra pieces, so it can be more than the Costing tab's figures times the number of units. Costs follow **Unbuffered**, and the table follows changes to the recipe, packaging and Quantity Required as you make them, before you save.
-
-**From What You Have** works the other way round: how many you can make from what there is of one ingredient. Pick the ingredient (any in the recipe, including what its made ingredients are made of), type how much there is, and pick its unit: grams, or one of the ingredient's own units, such as a kilogram or a bag. The tab says how many sellable units that makes and how much of it they use, such as *Makes 168 pcs, using 5,000 g of the 5,000 g*, or that there isn't enough for one. Because sections are made in whole batches, it's the most units whose batches the amount covers. Press **Scale to 168** to put that number in Sellable Units. Nothing here is saved.
-
-Press **Print** while this tab is showing to print the scaled recipe instead of the recipe and costing. See [Printing](#8-printing-recipes-and-costings).
 
 ### Clone tab
 
@@ -846,7 +846,7 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the Scaling tab, it shows the scaled recipe instead (see [Printing a scaled recipe](#printing-a-scaled-recipe)). On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
+Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
 - **Print** (the picker at the top left) chooses **This product**, the folder last asked for, or **All products**.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
@@ -864,14 +864,6 @@ While the Products screen shows unbuffered costs, everything printed, a single p
 Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, or by closing the **Print** tab with its **✕**.
 
 A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
-
-### Printing a scaled recipe
-
-If the Products screen is showing the [Scaling tab](#scaling-tab) when you press **Print**, the Print tab shows the **scaled recipe** instead of the recipe and costing. It has the **Sellable Units**, the pieces they come to and the **Total Cost**, then the tab's table: each section in whole batches, with its ingredients indented under it, made ingredients opened into what they're made from, and the packaging. Each row has its **Amount** and **Cost**.
-
-**Include** then has a single tick box, **Costs**. Clear it to print only the amounts, for example for the kitchen.
-
-The Print tab always follows the Products screen. If you go back to Products, change to another of its tabs and press **Print** again, it shows the recipe and costing again.
 
 ---
 

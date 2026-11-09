@@ -5,8 +5,8 @@
 
 <PageTitle>Print · TinapayanRMS</PageTitle>
 
-@* The Print screen (the WPF Print tab): what to print — the product Products has open, unsaved edits included (or its
-   recipe scaled while Products shows its Scaling tab), a folder, or every product as saved — then the preview. Products'
+@* The Print screen (the WPF Print tab): what to print — the product Products has open, unsaved edits included, a
+   folder, or every product as saved — then the preview. Products'
    Print, a folder's and Print All Products open it with that choice made. It shows Products' form, so going back there
    asks nothing about its unsaved changes, and going anywhere else asks about them, as leaving Products would. *@
 <section class="card print-card">
@@ -14,7 +14,7 @@
         <Options>
             <label class="form-label" for="print-scope">Print</label>
             <PickField ID="print-scope" TItem="PrintScope" Items="ViewModel!.Scopes" TextField="Label" @bind-Value="ViewModel!.SelectedScope" CssClass="print-scope"
-                       Tooltip="This product prints the product Products has open, unsaved edits included, or its recipe scaled while Products shows its Scaling tab. A folder or all products print as they're saved, each on pages of its own after a contents page." />
+                       Tooltip="This product prints the product Products has open, unsaved edits included. A folder or all products print as they're saved, each on pages of its own after a contents page." />
         </Options>
     </PrintPane>
 </section>

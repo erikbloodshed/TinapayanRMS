@@ -900,6 +900,12 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The list's Rename: asks for a new name and saves it at once.</summary>
     public ReactiveCommand<RawMaterialLeafNode, RxVoid> RenameMaterialCommand { get; }
 
+    /// <summary>
+    /// The list's Copy: a new material with the material's type, category and base unit, named "… Copy", and nothing else.
+    /// It isn't saved until Save is clicked.
+    /// </summary>
+    public ReactiveCommand<RawMaterialLeafNode, RxVoid> CopyMaterialCommand { get; }
+
     /// <summary>The list's Delete, as the header's: asks first.</summary>
     public ReactiveCommand<RawMaterialLeafNode, RxVoid> DeleteMaterialCommand { get; }
 
@@ -1507,6 +1513,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             folder?.CategoryId,
             folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
         RenameMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(RenameMaterialAsync);
+        CopyMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => AfterUnsavedChangesAsync(() => StartCopyOf(leaf.RawMaterial)));
         DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => DeleteRawMaterialAsync(leaf.RawMaterial));
         NewCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialCategoryType>(NewCategoryAsync);
         RenameCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(RenameCategoryAsync);
@@ -1772,6 +1779,37 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         _rawMaterialToOpen = null;
         ClearForm(type, categoryId, source);
+    }
+
+    /// <summary>
+    /// Copy, from the list: a new material of <paramref name="material"/>'s type, in its category, with its base unit,
+    /// named "… Copy" ("… Copy 2" when that's taken). A made ingredient's copy is a made one, as its category holds only
+    /// those; a linked one's is purchased. The name and the base unit come after the form is settled, so the copy is
+    /// there to be saved, and leaving it asks first.
+    /// </summary>
+    private void StartCopyOf(RawMaterial material)
+    {
+        StartNewMaterial(
+            material.Type,
+            material.CategoryId,
+            material.Source == RawMaterialSource.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased);
+        EditingName = CopyNameFor(material.Name);
+        if (material.Type == RawMaterialType.Packaging)
+        {
+            EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
+        }
+    }
+
+    /// <summary>"Disposable Spoon Copy", or the first of "… Copy 2", "… Copy 3" and on that no material has yet.</summary>
+    private string CopyNameFor(string name)
+    {
+        var copy = $"{name} Copy";
+        for (var n = 2; RawMaterials.Any(m => string.Equals(m.Name, copy, StringComparison.OrdinalIgnoreCase)); n++)
+        {
+            copy = $"{name} Copy {n}";
+        }
+
+        return copy;
     }
 
     /// <summary>
@@ -3037,6 +3075,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             [
                 TreeMenuItem.Separator,
                 new("Rename…", RenameMaterialCommand, leaf) { Gesture = "F2", Icon = AppIcon.Rename },
+                new("Copy", CopyMaterialCommand, leaf) { Icon = AppIcon.Copy },
                 TreeMenuItem.Separator,
                 new("Delete", DeleteMaterialCommand, leaf) { Gesture = "Del", Icon = AppIcon.Delete },
             ]);

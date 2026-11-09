@@ -1,8 +1,8 @@
 @* A product's Costing tab (the WPF CostingCard): on the left, the four costing metrics, each as a percentage and the
-   amount it comes to, either of which can be typed, with its share of the price under it, then the shop's VAT, set in
-   Settings; on the right the Costing Summary, from the parts and their wastage through labor, overhead and administrative
-   to the base cost, then markup and VAT to the suggested selling price, each with its share of the price, and the price
-   rounded up as Settings → Costing Defaults → Price Rounding says. *@
+   amount it comes to, either of which can be typed, with its share of the price under it; on the right the Costing
+   Summary, from the parts and their wastage through labor, overhead and administrative to the base cost, each with its
+   share of the price; under it, the suggested selling price beside the current store price, each as its markup, VAT and
+   price, the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
 <div class="costing">
     <h2 class="panel-header">Costing Summary</h2>
     <div class="costing-columns">
@@ -31,92 +31,120 @@
                 <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingMarkupAmount" Format="N2" Min="0" Tooltip="@($"The markup, {ViewModel.CostUnitCaption}, before VAT. Typing it sets the percentage.")" />
                 <span class="tile-caption">@ViewModel.Costing.Costs.MarkupShare.ToString("N1")% of the price</span>
             </div>
-            <div class="cost-tile cost-vat">
-                <span class="form-label" title="The shop's VAT, on top of the marked-up price. It's the same for every product: set it in Settings → Costing Defaults.">VAT %</span>
-                <span class="read-only-figure" title="The shop's VAT, the same for every product. Set it in Settings → Costing Defaults.">@ViewModel.Costing.Costs.VatPercent.ToString("0.#")%</span>
-                <span></span>
-                <span class="tile-caption">@ViewModel.Costing.Costs.Vat.ToString("N2") · @ViewModel.Costing.Costs.VatShare.ToString("N1")% of the price</span>
-            </div>
         </div>
 
-        <table class="cost-summary">
-            <thead>
-                <tr>
-                    <th>Component</th>
-                    <th class="number">@ViewModel.CostUnitCaption</th>
-                    <th class="number">% of Price</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>@ViewModel.Costing.Costs.PartsTitle</td>
-                    <td class="number">@ViewModel.Costing.Costs.SubAssemblies.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.SubAssembliesShare.ToString("N1")%</td>
-                </tr>
-                @foreach (var line in ViewModel.Costing.Costs.SubAssemblyLines)
-                {
-                    <tr class="part-row">
-                        <td>@line.Name</td>
-                        <td class="number">@line.Cost.ToString("N2")</td>
-                        <td class="number">@line.Share.ToString("N1")%</td>
+        <div class="cost-summary-tables">
+            <table class="cost-summary">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th class="number">@ViewModel.CostUnitCaption</th>
+                        <th class="number">% of Price</th>
                     </tr>
-                }
-                <tr title="What's lost making the product, as a cost: the Wastage % of its category, or the shop's in Settings → Costing Defaults when its category sets none.">
-                    <td>Wastage (@ViewModel.Costing.Costs.WastagePercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Wastage.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.WastageShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>@ViewModel.Costing.Costs.PackagingTitle</td>
-                    <td class="number">@ViewModel.Costing.Costs.Packaging.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.PackagingShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>Labor (@ViewModel.Costing.Costs.LaborPercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Labor.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.LaborShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>Overhead (@ViewModel.Costing.Costs.OverheadPercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Overhead.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.OverheadShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>Administrative (@ViewModel.Costing.Costs.AdministrativePercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Administrative.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.AdministrativeShare.ToString("N1")%</td>
-                </tr>
-                <tr class="subtotal-row">
-                    <td>Subtotal (base cost)</td>
-                    <td class="number">@ViewModel.Costing.Costs.BaseCost.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.BaseCostShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>Markup (@ViewModel.Costing.Costs.MarginPercent.ToString("0.##")%)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Markup.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.MarkupShare.ToString("N1")%</td>
-                </tr>
-                <tr>
-                    <td>VAT (@ViewModel.Costing.Costs.VatPercent.ToString("0.##")%)</td>
-                    <td class="number">@ViewModel.Costing.Costs.Vat.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.VatShare.ToString("N1")%</td>
-                </tr>
-                <tr class="total-row">
-                    <td>@ViewModel.SuggestedSellingPriceLabel</td>
-                    <td class="number">@ViewModel.Costing.Costs.SellingPrice.ToString("N2")</td>
-                    <td class="number share">@ViewModel.Costing.Costs.SellingPriceShare.ToString("N0")%</td>
-                </tr>
-                @if (ViewModel.Costing.Costs.HasPriceRounding)
-                {
-                    <tr class="rounded-row">
-                        <td colspan="3" class="caption">@ViewModel.Costing.Costs.RoundedSellingPriceText</td>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@ViewModel.Costing.Costs.PartsTitle</td>
+                        <td class="number">@ViewModel.Costing.Costs.SubAssemblies.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.SubAssembliesShare.ToString("N1")%</td>
                     </tr>
-                }
-            </tbody>
-        </table>
+                    @foreach (var line in ViewModel.Costing.Costs.SubAssemblyLines)
+                    {
+                        <tr class="part-row">
+                            <td>@line.Name</td>
+                            <td class="number">@line.Cost.ToString("N2")</td>
+                            <td class="number">@line.Share.ToString("N1")%</td>
+                        </tr>
+                    }
+                    <tr title="What's lost making the product, as a cost: the Wastage % of its category, or the shop's in Settings → Costing Defaults when its category sets none.">
+                        <td>Wastage (@ViewModel.Costing.Costs.WastagePercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
+                        <td class="number">@ViewModel.Costing.Costs.Wastage.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.WastageShare.ToString("N1")%</td>
+                    </tr>
+                    <tr>
+                        <td>@ViewModel.Costing.Costs.PackagingTitle</td>
+                        <td class="number">@ViewModel.Costing.Costs.Packaging.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.PackagingShare.ToString("N1")%</td>
+                    </tr>
+                    <tr>
+                        <td>Labor (@ViewModel.Costing.Costs.LaborPercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
+                        <td class="number">@ViewModel.Costing.Costs.Labor.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.LaborShare.ToString("N1")%</td>
+                    </tr>
+                    <tr>
+                        <td>Overhead (@ViewModel.Costing.Costs.OverheadPercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
+                        <td class="number">@ViewModel.Costing.Costs.Overhead.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.OverheadShare.ToString("N1")%</td>
+                    </tr>
+                    <tr>
+                        <td>Administrative (@ViewModel.Costing.Costs.AdministrativePercent.ToString("0.##")% of @ViewModel.Costing.Costs.PartsBase)</td>
+                        <td class="number">@ViewModel.Costing.Costs.Administrative.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.AdministrativeShare.ToString("N1")%</td>
+                    </tr>
+                    <tr class="subtotal-row">
+                        <td>Subtotal (base cost)</td>
+                        <td class="number">@ViewModel.Costing.Costs.BaseCost.ToString("N2")</td>
+                        <td class="number share">@ViewModel.Costing.Costs.BaseCostShare.ToString("N1")%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table class="cost-summary price-comparison">
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th class="number" title="What the costing works out: the base cost, the Markup Metric on it, then VAT">@ViewModel.SuggestedSellingPriceLabel</th>
+                        <th class="number" title="@CurrentPriceTooltip">Current Store Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Markup %</td>
+                        <td class="number">@Costs.MarginPercent.ToString("N2")%</td>
+                        <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"{percent:N2}%" : "—")</td>
+                    </tr>
+                    <tr>
+                        <td>Markup</td>
+                        <td class="number">@Costs.Markup.ToString("N2")</td>
+                        <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
+                    </tr>
+                    <tr>
+                        <td>VAT (@Costs.VatPercent.ToString("0.##")%)</td>
+                        <td class="number">@Costs.Vat.ToString("N2")</td>
+                        <td class="number">@(Costs.CurrentVat?.ToString("N2") ?? "—")</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>Selling price</td>
+                        <td class="number">@Costs.SellingPrice.ToString("N2")</td>
+                        <td class="number">@(Costs.CurrentPrice?.ToString("N2") ?? "—")</td>
+                    </tr>
+                    @if (Costs.HasPriceRounding)
+                    {
+                        <tr class="rounded-row">
+                            <td>@Costs.PriceRoundingLabel</td>
+                            <td class="number">@Costs.RoundedSellingPrice.ToString("N2")</td>
+                            <td></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    private ProductCostSummary Costs => ViewModel.Costing.Costs;
+
+    private string CurrentPriceTooltip => Costs.CurrentPrice is null
+        ? $"No current price yet: type what the shop charges, {ViewModel.CostUnitCaption.ToLowerInvariant()} with VAT, in Current Price above to compare."
+        : $"What the shop charges now, {ViewModel.CostUnitCaption.ToLowerInvariant()} with VAT (Current Price above), and what it earns once VAT is taken out.";
+
+    // Red when the price doesn't cover the base cost, amber when it earns less than the Markup Metric, as the header's Markup %.
+    private string CurrentMarkupClass => Costs.IsCurrentPriceBelowCost ? "figure-error" : Costs.IsBelowTargetMarkup ? "figure-warning" : "";
+
+    private string? CurrentMarkupTooltip => Costs.IsCurrentPriceBelowCost
+        ? "The current price doesn't cover the base cost."
+        : Costs.IsBelowTargetMarkup ? "Less than the Markup Metric." : null;
 }

@@ -212,10 +212,6 @@
     padding: 6px;
 }
 
-.print-table .print-group td {
-    font-weight: 600;
-}
-
 .print-table thead {
     display: table-header-group;
 }

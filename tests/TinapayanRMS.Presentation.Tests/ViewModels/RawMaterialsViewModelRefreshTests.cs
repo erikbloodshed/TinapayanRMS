@@ -1046,6 +1046,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
         viewModel.PurchaseBufferedCostText.Should().Contain("1,312.50/bag");
         brand.BufferPercent.Should().Be(5m, "the brand's Buffer % column is the buffered cost over its price");
+        brand.CostPerBaseUnit.Should().Be(0.05m, "the brand's Unit Price: ₱1,250 a bag of 25,000 g");
 
         await viewModel.SaveCommand.Execute();
 
@@ -1075,6 +1076,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBufferedCost.Should().Be(0.0525m, "a new price doesn't move the amount");
         viewModel.EditingCostBufferPercent.Should().Be(0m, "₱1,312.50 is under ₱1,500, so the buffer's gone");
         viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(-12.5m, "₱1,312.50 is 12.5% under ₱1,500");
+        viewModel.BrandPriceRows.Single().CostPerBaseUnit.Should().Be(0.06m);
         viewModel.BufferedCostWarningText.Should().NotBeEmpty();
 
         // Typing the percent works the buffered cost out from the new dearest price.
@@ -1297,6 +1299,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // A cheaper brand is further under the same buffered cost: ₱1.05 over ₱0.84 is 25%.
         var cheaper = AddBrandPrice(viewModel, "Cheap", "gram", 0.84m);
         cheaper.BufferPercent.Should().Be(25m);
+        (dearer.CostPerBaseUnit, cheaper.CostPerBaseUnit).Should().Be((1m, 0.84m), "each brand's own Unit Price, beside it");
 
         // Typing the buffered cost works the percent out against the dearest brand, and every row follows.
         viewModel.EditingBufferedCostInUnit = 1.2m;
@@ -1304,7 +1307,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         dearer.BufferPercent.Should().Be(20m);
         cheaper.BufferPercent.Should().BeApproximately(42.857m, 0.001m, "₱1.20 over ₱0.84");
 
+        List<string?> changed = [];
+        dearer.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         dearer.Price = 1.5m;
+        changed.Should().Contain(nameof(BrandPriceRow.CostPerBaseUnit), "the Unit Price shows the new price");
+        dearer.CostPerBaseUnit.Should().Be(1.5m);
         viewModel.EditingBufferedCost.Should().Be(1.2m, "a new price doesn't move it");
         dearer.BufferPercent.Should().Be(-20m);
         viewModel.EditingCostBufferPercent.Should().Be(0m, "the % follows the price: ₱1.20 is under ₱1.50, so it pins at 0");

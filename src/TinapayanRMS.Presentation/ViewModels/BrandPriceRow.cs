@@ -78,6 +78,7 @@ public sealed class BrandPriceRow : ReactiveObject
         set
         {
             this.RaiseAndSetIfChanged(ref _price, value);
+            this.RaisePropertyChanged(nameof(CostPerBaseUnit));
             this.RaisePropertyChanged(nameof(BufferPercent));
         }
     }
@@ -122,7 +123,10 @@ public sealed class BrandPriceRow : ReactiveObject
             ? RawMaterialRules.CostBufferPercentOf(Price.Value, buffered * Quantity.Value)
             : null;
 
-    /// <summary>What the price comes to per base unit, once there's a price and a quantity.</summary>
+    /// <summary>
+    /// What the price comes to per base unit, once there's a price and a quantity: the grid's Unit Price, so brands bought in
+    /// different units can be compared. ₱900 a case of 600 is ₱1.50 a piece.
+    /// </summary>
     public decimal? CostPerBaseUnit =>
         Price is > 0 && Quantity is > 0 ? UnitConversionRules.CostPerBaseUnit(Price.Value, Quantity) : null;
 
@@ -131,6 +135,7 @@ public sealed class BrandPriceRow : ReactiveObject
     {
         this.RaisePropertyChanged(nameof(Quantity));
         this.RaisePropertyChanged(nameof(CanTypeQuantity));
+        this.RaisePropertyChanged(nameof(CostPerBaseUnit));
         this.RaisePropertyChanged(nameof(BufferPercent));
     }
 

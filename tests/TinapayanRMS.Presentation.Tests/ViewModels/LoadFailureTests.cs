@@ -302,7 +302,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
             new RawMaterialRepository(factory),
-            new IngredientBomLineRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
             new ProductVersionRepository(factory),

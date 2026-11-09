@@ -93,11 +93,12 @@ public static class CostingRules
     /// The markup a price with VAT actually earns, as a percentage of the base cost: VAT taken out first, as
     /// CalculateSellingPrice adds it last. The price CalculateSellingPrice works out gives back its margin.
     /// </summary>
-    public static decimal CalculateMarkupPercentFromPrice(decimal baseCost, decimal sellingPrice, decimal vatPercent)
-    {
-        var preVatPrice = sellingPrice / (1 + vatPercent / 100m);
-        return PercentOf(preVatPrice - baseCost, baseCost);
-    }
+    public static decimal CalculateMarkupPercentFromPrice(decimal baseCost, decimal sellingPrice, decimal vatPercent) =>
+        PercentOf(PreVatPriceFrom(sellingPrice, vatPercent) - baseCost, baseCost);
+
+    /// <summary>A price with VAT, the VAT taken out: ₱145.60 at 12% is ₱130. The reverse of CalculateSellingPrice's last step.</summary>
+    public static decimal PreVatPriceFrom(decimal sellingPrice, decimal vatPercent) =>
+        sellingPrice / (1 + vatPercent / 100m);
 
     /// <summary><paramref name="part"/> as a percentage of <paramref name="whole"/>, or 0 when there's nothing to share.</summary>
     public static decimal PercentOf(decimal part, decimal whole) =>

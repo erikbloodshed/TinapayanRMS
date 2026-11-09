@@ -230,6 +230,13 @@ public class CostingRulesTests
     }
 
     [Test]
+    public void PreVatPriceFrom_takes_the_VAT_out_of_a_price()
+    {
+        CostingRules.PreVatPriceFrom(sellingPrice: 145.60m, vatPercent: 12m).Should().Be(130m);
+        CostingRules.PreVatPriceFrom(sellingPrice: 26m, vatPercent: 0m).Should().Be(26m);
+    }
+
+    [Test]
     public void CalculateMarkupPercentFromPrice_is_zero_with_no_base_cost()
     {
         CostingRules.CalculateMarkupPercentFromPrice(baseCost: 0m, sellingPrice: 10m, vatPercent: 12m).Should().Be(0m);

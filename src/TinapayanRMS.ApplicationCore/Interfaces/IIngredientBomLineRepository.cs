@@ -14,7 +14,8 @@ public interface IIngredientBomLineRepository
 
     /// <summary>
     /// Every made ingredient's lines, without their components (the caller has the ingredients already): each BOM's in
-    /// its order, by made ingredient. What the Products screen's Scaling tab opens a made ingredient into.
+    /// its order, by made ingredient: what a product's cost is traced back to its raw materials through (Reports, the
+    /// Price Simulator, a material's cost shares), and what the Recipe API serves.
     /// </summary>
     Task<IReadOnlyList<IngredientBomLine>> GetAllAsync(CancellationToken cancellationToken);
 }

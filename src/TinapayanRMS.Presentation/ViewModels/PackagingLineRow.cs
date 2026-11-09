@@ -193,7 +193,7 @@ public sealed class PackagingLineRow : ObservableRow
     private static IReadOnlyList<PackagingUnitChoice> OptionsFor(RawMaterial? material, CostBasis basis) =>
         PricedPackagingLine.UnitChoices(material, basis);
 
-    /// <summary>The row as it stands, priced at its <see cref="CostBasis"/>: what printouts, scaling and saved products read.</summary>
+    /// <summary>The row as it stands, priced at its <see cref="CostBasis"/>: what printouts and saved products read.</summary>
     public PricedPackagingLine ToPriced() =>
         PricedPackagingLine.Price(PackagingMaterialId, PackagingMaterial, QtyPerUnit, UnitKey, CostBasis);
 

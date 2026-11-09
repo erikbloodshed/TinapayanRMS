@@ -3,7 +3,7 @@
 @using TinapayanRMS.Domain.Enums
 
 @* A printout as a document the browser prints (the WPF app's ProductPrintLayout, built from the same ProductPrintSet):
-   one product's recipe and costing, or its recipe scaled; a set of products, each starting a page of its own after a
+   one product's recipe and costing; a set of products, each starting a page of its own after a
    title and contents; or a Price Simulator report, with today's figures beside the simulated ones.
    Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
    one the browser breaks the pages (print.css keeps a heading with its table and repeats table headings), and it numbers
@@ -79,19 +79,18 @@
     /// <summary>Each sub-assembly's ingredients and piece size, then the packaging.</summary>
     [Parameter] public bool IncludeRecipe { get; set; } = true;
 
-    /// <summary>The costing breakdown, and the costs beside the recipe's lines; for a scaled recipe, each row's cost and the total.</summary>
+    /// <summary>The costing breakdown, and the costs beside the recipe's lines.</summary>
     [Parameter] public bool IncludeCosting { get; set; } = true;
 
     private bool IsSimulation => Set.PriceChanges is not null || Set.Products.Any(p => p.Simulation is not null);
 
     /// <summary>What the printout is, naming only the parts included, as the WPF print job was named.</summary>
-    private string Parts => Set.IsScaling ? "Scaling"
-        : (IncludeRecipe, IncludeCosting) switch
-        {
-            (true, true) => "Recipe and Costing",
-            (true, false) => "Recipe",
-            _ => "Costing",
-        };
+    private string Parts => (IncludeRecipe, IncludeCosting) switch
+    {
+        (true, true) => "Recipe and Costing",
+        (true, false) => "Recipe",
+        _ => "Costing",
+    };
 
     private static string Printed(DateTime at) => at.ToString("MMM d, yyyy, h:mm tt", CultureInfo.CurrentCulture);
 
@@ -142,44 +141,37 @@
             <p class="print-small">Last updated @printout.LastUpdatedText · Printed @Printed(Set.PrintedAt)@(printout.SaveNote is { } note ? " · " + note : "")</p>
         </header>
 
-        @if (printout.Scaling is { } scaling)
+        @if (IncludeCosting)
         {
-            @ScalingPart(scaling)
+            @Figures(printout)
         }
-        else
+        @if (printout.Simulation is { } simulated)
         {
-            @if (IncludeCosting)
+            @PriceChanges("Price Changes Applied", simulated.Changes, "No price change reaches this product: its figures are today's.")
+        }
+        @if (IncludeRecipe)
+        {
+            <h2 class="print-part">Recipe</h2>
+            @if (printout.Components is { } components)
             {
-                @Figures(printout)
+                @ComponentsPart(printout, components)
             }
-            @if (printout.Simulation is { } simulated)
+            @if (printout.Sections.Count == 0 && printout.Components is null)
             {
-                @PriceChanges("Price Changes Applied", simulated.Changes, "No price change reaches this product: its figures are today's.")
+                <p class="print-muted">No sub-assemblies yet.</p>
             }
-            @if (IncludeRecipe)
+            @foreach (var section in printout.Sections)
             {
-                <h2 class="print-part">Recipe</h2>
-                @if (printout.Components is { } components)
-                {
-                    @ComponentsPart(printout, components)
-                }
-                @if (printout.Sections.Count == 0 && printout.Components is null)
-                {
-                    <p class="print-muted">No sub-assemblies yet.</p>
-                }
-                @foreach (var section in printout.Sections)
-                {
-                    @SectionPart(printout, section)
-                }
-                @if (printout.Packaging is { } packaging)
-                {
-                    @PackagingPart(printout, packaging)
-                }
+                @SectionPart(printout, section)
             }
-            @if (IncludeCosting)
+            @if (printout.Packaging is { } packaging)
             {
-                @CostingPart(printout)
+                @PackagingPart(printout, packaging)
             }
+        }
+        @if (IncludeCosting)
+        {
+            @CostingPart(printout)
         }
     </text>;
 
@@ -406,48 +398,5 @@
         @if (now is { } before) { <td class="n">@Money(before)</td><td class="n">@Money(amount)</td><td class="n">@Change(before, amount)</td> } else { <td class="n">@Money(amount)</td> }
         <td class="n">@Share(share)</td>
     </tr>;
-
-    private RenderFragment ScalingPart(PrintedScaling scaling) => @<section class="print-block">
-        <h2 class="print-part">Scaling</h2>
-        <div class="print-figures">
-            <div><span>Sellable Units</span><strong>@scaling.Units.ToString("N0")</strong></div>
-            @if (scaling.Pieces is { } pieces)
-            {
-                <div><span>Pieces</span><strong>@pieces.ToString("#,0.##")</strong></div>
-            }
-            @if (IncludeCosting)
-            {
-                <div><span>Total Cost</span><strong>@Money(scaling.TotalCost)</strong></div>
-            }
-        </div>
-        @if (scaling.Rows.Count == 0)
-        {
-            <p class="print-muted">Nothing to scale yet.</p>
-        }
-        else
-        {
-            <table class="print-table">
-                <thead><tr><th>Item</th><th class="n">Amount</th>@if (IncludeCosting) { <th class="n">Cost</th> }</tr></thead>
-                <tbody>
-                    @foreach (var row in scaling.Rows)
-                    {
-                        @ScalingRowPart(row, 0)
-                    }
-                </tbody>
-            </table>
-        }
-    </section>;
-
-    private RenderFragment ScalingRowPart(ScalingRow row, int depth) => @<text>
-        <tr class="@(row.IsGroup ? "print-group" : "")">
-            <td style="padding-left:@(6 + depth * 16)px">@row.Name @if (!string.IsNullOrEmpty(row.Detail)) { <span class="print-source">@row.Detail</span> }</td>
-            <td class="n">@row.AmountText</td>
-            @if (IncludeCosting) { <td class="n">@Money(row.Cost)</td> }
-        </tr>
-        @foreach (var child in row.Children)
-        {
-            @ScalingRowPart(child, depth + 1)
-        }
-    </text>;
 
 }

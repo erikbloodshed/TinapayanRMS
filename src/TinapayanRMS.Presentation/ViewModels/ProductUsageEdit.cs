@@ -105,7 +105,7 @@ public sealed class ProductUsageEdit : ObservableRow
     /// <summary>The section's batch and piece figures, at both costs.</summary>
     public SectionFigures Figures { get; }
 
-    /// <summary>The section as it stands now, called what it's called now: what printouts and scaling read.</summary>
+    /// <summary>The section as it stands now, called what it's called now: what printouts read.</summary>
     public PricedSection ToPriced() =>
         new(SubAssemblyId, Role, Label, SectionName, LinkedName, LinkedOwner, AuthoredField, AuthoredValue, Lines, AddIns, Figures);
 

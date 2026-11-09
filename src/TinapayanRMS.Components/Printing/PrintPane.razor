@@ -9,18 +9,10 @@
         @if (Set is not null)
         {
             <span class="form-label">Include</span>
-            @if (Set.IsScaling)
-            {
-                <SfCheckBox Label="Costs" @bind-Checked="_includeCosting"
-                            title="Each row's cost, and the total cost. Without them it shows only the amounts." />
-            }
-            else
-            {
-                <SfCheckBox Label="Recipe" @bind-Checked="_includeRecipe" Disabled="!_includeCosting"
-                            title="Each sub-assembly's ingredients and piece size, then the packaging." />
-                <SfCheckBox Label="Costing" @bind-Checked="_includeCosting" Disabled="!_includeRecipe"
-                            title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
-            }
+            <SfCheckBox Label="Recipe" @bind-Checked="_includeRecipe" Disabled="!_includeCosting"
+                        title="Each sub-assembly's ingredients and piece size, then the packaging." />
+            <SfCheckBox Label="Costing" @bind-Checked="_includeCosting" Disabled="!_includeRecipe"
+                        title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
         }
         <span class="print-bar-space"></span>
         @if (Status is not null)

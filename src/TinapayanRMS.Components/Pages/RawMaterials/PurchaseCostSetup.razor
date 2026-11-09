@@ -1,5 +1,5 @@
 @* A purchased material's prices (the WPF PurchaseCostSetupCard): one line per brand, each in a purchase unit it's bought
-   in; Cost From, the brand it's costed at (the dearest unless one is picked); then the Cost Buffer % and the fixed
+   in, with what it comes to per base unit (Unit Price); Cost From, the brand it's costed at (the dearest unless one is picked); then the Cost Buffer % and the fixed
    Buffered Cost, which follow each other as either is typed, in a unit picked to show it in. While prices have moved the
    buffer off the target last typed, the target shows, with Re-apply Target to type it again. *@
 <div class="tab-card">
@@ -11,6 +11,7 @@
             <th class="col-unit">Purchase Unit</th>
             <th class="col-number col-wide">Qty per Purchase Unit</th>
             <th class="col-number">Purchase Price</th>
+            <th class="col-number" title="What one @ViewModel.BaseUnitName costs at this price: Purchase Price ÷ Qty per Purchase Unit">Unit Price</th>
             <th class="col-number">Buffer %</th>
         </Header>
         <Row Context="row">
@@ -23,6 +24,7 @@
             </td>
             <td><NumberField TValue="decimal?" Value="row.Quantity" ValueChanged="v => row.Quantity = v" Format="#,0.####" Min="0" ReadOnly="!row.CanTypeQuantity" CssClass="cell-field" /></td>
             <td><NumberField TValue="decimal?" Value="row.Price" ValueChanged="v => row.Price = v" Format="N2" Min="0" CssClass="cell-field" /></td>
+            <td class="cell-number">@row.CostPerBaseUnit?.ToString("N4")</td>
             <td class="cell-number">@row.BufferPercent?.ToString("N2")</td>
         </Row>
     </LineGrid>

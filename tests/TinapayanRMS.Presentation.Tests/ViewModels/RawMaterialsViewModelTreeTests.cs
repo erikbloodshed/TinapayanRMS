@@ -37,7 +37,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         var menu = viewModel.TreeMenuFor(leaf);
 
-        Headers(menu).Should().Equal("Move to", "Rename…", "Delete");
+        Headers(menu).Should().Equal("Move to", "Rename…", "Copy", "Delete");
         menu.Single(i => i.Header == "Rename…").Gesture.Should().Be("F2");
         menu.Single(i => i.Header == "Delete").Gesture.Should().Be("Del");
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
@@ -233,6 +233,63 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Select(l => l.Title).Should().Equal("Rye Flour");
         viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id));
         (await CategoryOfAsync(viewModel.SelectedRawMaterial.Id)).Should().Be(flourId);
+    });
+
+    [Test]
+    public Task Copy_starts_a_new_material_with_only_the_type_category_and_base_unit_that_Save_adds() => UiThread.RunAsync(async () =>
+    {
+        var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
+        var spoonId = await AddPackagingAsync("Disposable Spoon", boxesId);
+        var viewModel = await OpenedViewModelAsync(spoonId);
+        Edit(viewModel, () => viewModel.EditingCostBufferPercent = 25m);
+        var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(spoonId)).Single(i => i.Header == "Copy"));
+
+        asked.Should().HaveCount(1, "the spoon's unsaved buffer is asked about first");
+        viewModel.SelectedRawMaterial.Should().BeNull("the copy is a new material");
+        viewModel.EditingName.Should().Be("Disposable Spoon Copy");
+        viewModel.EditingType.Should().Be(RawMaterialType.Packaging);
+        viewModel.EditingCategory!.Id.Should().Be(boxesId);
+        viewModel.EditingBaseUnit!.Name.Should().Be("piece");
+        viewModel.EditingCostBufferPercent.Should().Be(10m, "the buffer is the new material's default, not the spoon's");
+        viewModel.BrandPriceRows.Should().BeEmpty();
+        viewModel.CanChangeTypeAndSource.Should().BeTrue();
+        viewModel.History.IsDirty.Should().BeTrue("the copy is there to be saved");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").Materials.Select(l => l.Title).Should().Equal("Disposable Spoon", "Disposable Spoon Copy");
+        await using var dbContext = CreateDbContext();
+        var copy = await dbContext.RawMaterials.SingleAsync(m => m.Id == viewModel.SelectedRawMaterial!.Id, Cancellation);
+        (copy.Type, copy.CategoryId, copy.BaseUnitId).Should().Be((RawMaterialType.Packaging, boxesId, viewModel.RawMaterialTree.Find(spoonId)!.RawMaterial.BaseUnitId));
+    });
+
+    [Test]
+    public Task Copy_names_past_a_copy_already_there_and_keeps_a_made_ingredient_made() => UiThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var inHouseId = await AddCategoryAsync("In-House", RawMaterialCategoryType.Made);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        await AddIngredientAsync("bread flour copy", flourId);
+        var syrupId = await AddIngredientAsync("Simple Syrup", inHouseId, RawMaterialSource.Made);
+        var viewModel = await LoadedViewModelAsync();
+        AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Copy"));
+
+        viewModel.EditingName.Should().Be("Bread Flour Copy 2", "names are told apart without their case");
+        (viewModel.EditingType, viewModel.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Purchased));
+        viewModel.EditingCategory!.Id.Should().Be(flourId);
+        viewModel.EditingBaseUnit.Should().BeNull("an ingredient's base unit is always the gram");
+
+        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Copy"));
+
+        viewModel.EditingName.Should().Be("Simple Syrup Copy");
+        (viewModel.EditingType, viewModel.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
+        viewModel.EditingCategory!.Id.Should().Be(inHouseId);
+        viewModel.EditingSubAssembly.Should().BeNull("its recipe isn't copied");
     });
 
     [Test]

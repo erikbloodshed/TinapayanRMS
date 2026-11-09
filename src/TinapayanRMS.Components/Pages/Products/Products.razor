@@ -10,7 +10,7 @@
 <UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
 
 @* The Products screen (the WPF ProductsView): the list beside the picked product's header and its tabs along the bottom.
-   Every tab but Scaling, Clone and History is part of the one form Save writes. Clone and History only apply to a saved
+   Every tab but Clone and History is part of the one form Save writes. Clone and History only apply to a saved
    product. Between
    picking a product and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each product has its own
    address, so the browser's Back and Forward step between the products opened. *@
@@ -31,10 +31,6 @@
                         <TabItem>
                             <ChildContent><TabHeader Text="Costing" /></ChildContent>
                             <ContentTemplate><Costing ViewModel="ViewModel!" /></ContentTemplate>
-                        </TabItem>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Scaling" /></ChildContent>
-                            <ContentTemplate><Scaling ViewModel="ViewModel!" /></ContentTemplate>
                         </TabItem>
                         <TabItem Visible="ViewModel!.ShowLinks">
                             <ChildContent><TabHeader Text="Clone" /></ChildContent>

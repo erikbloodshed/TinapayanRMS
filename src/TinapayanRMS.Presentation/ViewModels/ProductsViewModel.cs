@@ -27,17 +27,14 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// </summary>
 public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen, IListTreeScreen
 {
-    /// <summary>The details tabs along the bottom: Recipe, Costing, Scaling, then Clone.</summary>
+    /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
 
-    /// <summary>Recipe 0, Costing 1, then Scaling: the recipe scaled to a number of sellable units.</summary>
-    public const int ScalingTab = 2;
-
-    /// <summary>Recipe 0, Costing 1, Scaling 2, then Clone.</summary>
-    public const int LinksTab = 3;
+    /// <summary>Recipe 0, Costing 1, then Clone.</summary>
+    public const int LinksTab = 2;
 
     /// <summary>After Clone: the product's versions (ProductVersionHistory). A saved product's only, as Clone is.</summary>
-    public const int HistoryTab = 4;
+    public const int HistoryTab = 3;
 
     /// <summary>How a clone's first version names where it came from: "Cloned from Pandesal, version 4".</summary>
     public const string ClonedFrom = "Cloned from";
@@ -54,7 +51,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private readonly IProductCloner _productCloner;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IIngredientBomLineRepository _ingredientBomLineRepository;
     private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
     private readonly IProductVersionRepository _versionRepository;
 
@@ -563,26 +559,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The add/edit sub-assembly form: the section it edits or adds, its fields and tables, and what it shows.</summary>
     public ProductUsageForm UsageForm { get; }
 
-    /// <summary>The Scaling tab: the recipe as the form holds it, scaled to a number of sellable units.</summary>
-    public ProductScaling Scaling { get; }
-
-    /// <summary>What the Scaling tab scales: the recipe as the form holds it (as the Costing tab takes it), and a composite's products.</summary>
-    private ScalingInput ScalingInputNow()
-    {
-        List<ProductComponentRow> components = IsEditingComposite
-            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
-            : [];
-        return new ScalingInput(
-            new ScalingRecipe(
-                [.. UsageEdits.Select(u => u.ToPriced())],
-                [.. Packaging.LineEdits.Select(l => l.ToPriced())],
-                [.. components.Select(r => (r.Product!, r.Quantity!.Value))],
-                EditingQuantityRequired,
-                IsEditingComposite && EditingIncludesComponentPackaging),
-            _detailProductId,
-            [.. components.Select(r => r.Product!)]);
-    }
-
     /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
     private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
 
@@ -651,8 +627,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
-    /// screen shows them, unsaved edits included, or its recipe scaled while the Scaling tab shows
-    /// (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
+    /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
     /// refusing it shows its message here and the tab doesn't open.
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
@@ -871,7 +846,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ISubAssemblyLineRepository subAssemblyLineRepository,
         ISubAssemblyRoleRepository subAssemblyRoleRepository,
         IRawMaterialRepository rawMaterialRepository,
-        IIngredientBomLineRepository ingredientBomLineRepository,
         IRawMaterialCategoryRepository rawMaterialCategoryRepository,
         IProductCategoryRepository categoryRepository,
         IProductVersionRepository versionRepository,
@@ -892,7 +866,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         _productCloner = productCloner;
         _subAssemblyRepository = subAssemblyRepository;
         _subAssemblyLineRepository = subAssemblyLineRepository;
-        _ingredientBomLineRepository = ingredientBomLineRepository;
         _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
@@ -924,13 +897,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             },
             () => CostBasis,
             RunSafelyAsync);
-        Scaling = new ProductScaling(
-            ScalingInputNow,
-            () => Ingredients.ToDictionary(i => i.Id),
-            () => CostBasis,
-            _savedProducts,
-            (ex, text) => ShowFailure(ex, text),
-            Work);
         _versionedSaves = new VersionedSaves(
             unitOfWork,
             productRepository,
@@ -1009,10 +975,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         LoadLatest(_versionReads, (productId, cancellationToken) => VersionHistory.ReadAsync(
             productId, () => SelectedProduct?.Id == productId, cancellationToken));
 
-        // The Scaling tab is worked out while it shows, and again as anything it scales changes: every change to the
-        // recipe, the packaging, a composite's products, the quantity required or the cost basis gives new Costs.
-        this.WhenAnyValue(x => x.SelectedDetailsTab).Subscribe(tab => Scaling.IsShowing = tab == ScalingTab);
-        this.WhenAnyValue(x => x.Costing.Costs).Subscribe(_ => Scaling.Refresh());
         // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
         LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
 
@@ -1229,10 +1191,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 : Task.FromResult<PackagingLink?>(null);
             var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
             var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
-            var bomLinesRead = Task.Run(() => _ingredientBomLineRepository.GetAllAsync(CancellationToken.None));
             await Task.WhenAll(
                 rolesRead, categoriesRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
-                linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead, bomLinesRead);
+                linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
 
             var roles = await rolesRead;
             var categories = await categoriesRead;
@@ -1247,7 +1208,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             var packagingLink = await packagingLinkRead;
             var componentLinks = await componentLinksRead;
             var componentCosts = await componentCostsRead;
-            var bomLines = await bomLinesRead;
 
             // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
             // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
@@ -1292,10 +1252,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
                 ComponentsTable.TakeFresh(componentCosts, componentLinks);
                 RefreshComponentOptions();
-
-                // The Scaling tab opens made ingredients into their BOMs as they are now, and a composite's products
-                // into their recipes as they're saved now, which it reads again when it next shows them.
-                Scaling.TakeLoaded(bomLines.ToLookup(l => l.IngredientId));
 
                 RepointSelection(Products.FirstOrDefault(p => p.Id == selectedId));
                 if (SelectedProduct is not null)
@@ -2351,7 +2307,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // A composite's lines, and what its products were read to bring, are that composite's.
         ComponentsTable.Clear();
-        Scaling.Forget();
         _savedRecipe = new RecipeDraft([], []);
         Costing.Load(null);
         RefreshLinkableOptions();
@@ -4482,7 +4437,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             return default;
         }
 
-        // With the History tab showing, the pages are the version picked there, as the Scaling tab's are the recipe scaled.
+        // With the History tab showing, the pages are the version picked there.
         if (SelectedDetailsTab == HistoryTab)
         {
             return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
@@ -4505,8 +4460,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
     /// <summary>
     /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
-    /// packaging and its costing, with a note when that isn't what's saved. With the Scaling tab showing, the pages are
-    /// that tab instead, the recipe scaled. Its rows are already worked out: the tab is worked out again on every change while it shows.
+    /// packaging and its costing, with a note when that isn't what's saved.
     /// </summary>
     private ProductPrintout CurrentPrintout() => new(
         string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
@@ -4526,13 +4480,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
     {
         CostBasis = CostBasis,
-        Scaling = SelectedDetailsTab == ScalingTab
-            ? new PrintedScaling(
-                this.Scaling.Units,
-                EditingQuantityRequired > 1 ? RecipeScalingRules.PiecesFor(this.Scaling.Units, EditingQuantityRequired) : null,
-                this.Scaling.Rows,
-                this.Scaling.TotalCost)
-            : null,
     };
 
     /// <summary>

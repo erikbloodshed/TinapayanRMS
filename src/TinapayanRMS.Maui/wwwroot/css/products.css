@@ -1,5 +1,5 @@
 /* The Products screen's own pieces: the header's tags and New split button, the Recipe Structure's section tabs and
-   form, and the Costing and Scaling tabs. */
+   form, and the Costing tab. */
 
 .header-title-group {
     display: flex;
@@ -328,19 +328,32 @@
 .cost-overhead { border-left-color: #df8e1d; }        /* Latte Yellow */
 .cost-administrative { border-left-color: #40a02b; }  /* Latte Green */
 .cost-markup { border-left-color: #179299; }          /* Latte Teal */
-.cost-vat { border-left-color: #04a5e5; }             /* Latte Sky */
 
-/* The shop's VAT, set in Settings: shown greyed where the metrics' boxes are, as a figure no one types here. */
-.cost-tile .read-only-figure {
-    color: var(--muted-foreground);
-    text-align: right;
-    padding-right: 8px;
+/* The breakdown down to the base cost, and under it the suggested price beside the store's. */
+.cost-summary-tables {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Its two price columns share the width, their long headings wrapping. */
+.price-comparison th.number {
+    width: 32%;
+    white-space: normal;
+    vertical-align: bottom;
 }
 
 /* The suggested price rounded up to a price you'd charge, under the price itself. */
 .cost-summary .rounded-row td {
-    text-align: right;
+    color: var(--muted-foreground);
+    font-size: 13px;
     padding-top: 4px;
+    white-space: nowrap;
+}
+
+/* The store price's markup when it earns less than the Markup Metric, though it covers the base cost. */
+.price-comparison .figure-warning {
+    color: #df8e1d; /* Latte Yellow */
 }
 
 .cost-summary {
@@ -387,70 +400,6 @@
 .cost-summary .total-row td {
     font-size: 15px;
     padding: 10px 8px;
-}
-
-/* ---- Scaling. ---- */
-
-.scaling {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    padding: 12px;
-    box-sizing: border-box;
-}
-
-.scaling-heading {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-}
-
-.scaling-heading .field-narrow,
-.scaling-have .field-narrow {
-    width: 90px;
-    flex: none;
-}
-
-.scaling-heading .caption {
-    margin: 0;
-}
-
-.scaling-total {
-    margin-left: auto;
-    color: var(--muted-foreground);
-}
-
-.scaling-total strong {
-    color: var(--heading-foreground);
-    margin-left: 8px;
-}
-
-.scaling-table {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-}
-
-.tree-grid .group-row .scaling-name {
-    font-weight: 600;
-}
-
-.scaling-detail {
-    margin-left: 10px;
-}
-
-/* From What You Have: an ingredient, how much of it, and its unit, then how many units it makes. */
-.scaling-have {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 8px 0;
-}
-
-.scaling-have .field-wide {
-    width: 260px;
 }
 
 /* The History tab: the versions on the left, what changed and the chart beside them. */

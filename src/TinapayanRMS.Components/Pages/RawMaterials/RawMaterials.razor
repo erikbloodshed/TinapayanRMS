@@ -93,6 +93,7 @@
         // New clears the form, as New … Here does: the cursor goes to Name, so typing can start straight away.
         AddSubscription(viewModel.NewCommand.Subscribe(created => { _ = FocusNameAsync(); }));
         AddSubscription(viewModel.NewMaterialInCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
 
         // The material in the address is the load's to open, at its end: the list is fresh only then. New clicked
         // meanwhile is the later word.

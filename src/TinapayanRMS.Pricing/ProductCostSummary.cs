@@ -55,6 +55,9 @@ public sealed class ProductCostSummary
         CurrentMarkupPercent = inputs.CurrentPrice is { } price
             ? CostingRules.CalculateMarkupPercentFromPrice(BaseCost, price, inputs.VatPercent)
             : null;
+        CurrentPreVatPrice = inputs.CurrentPrice is { } withVat
+            ? CostingRules.PreVatPriceFrom(withVat, inputs.VatPercent)
+            : null;
         SubAssemblyLines = [.. inputs.Parts.Select(u =>
         {
             var cost = u.CostPerPiece * quantityRequired;
@@ -154,6 +157,18 @@ public sealed class ProductCostSummary
     /// </summary>
     public decimal? CurrentMarkupPercent { get; }
 
+    /// <summary>CurrentPrice with its VAT taken out (as PreVatPrice is SellingPrice's); null when no current price is entered.</summary>
+    public decimal? CurrentPreVatPrice { get; }
+
+    /// <summary>
+    /// What CurrentPrice earns over the base cost, VAT taken out, beside <see cref="Markup"/>: the Costing Summary's
+    /// comparison. Negative when it doesn't cover the base cost; null when no current price is entered.
+    /// </summary>
+    public decimal? CurrentMarkup => CurrentPreVatPrice - BaseCost;
+
+    /// <summary>The VAT in CurrentPrice, beside <see cref="Vat"/>; null when no current price is entered.</summary>
+    public decimal? CurrentVat => CurrentPrice - CurrentPreVatPrice;
+
     /// <summary>What the selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep); 0 for none.</summary>
     public decimal PriceRoundingStep { get; }
 
@@ -166,9 +181,9 @@ public sealed class ProductCostSummary
     /// </summary>
     public decimal RoundedSellingPrice => CostingRules.RoundPriceUp(SellingPrice, PriceRoundingStep);
 
-    /// <summary>"Rounded up to the next 0.25: 43.25"; empty without rounding.</summary>
-    public string RoundedSellingPriceText => HasPriceRounding
-        ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Rounded up to the next {PriceRoundingStep:0.00}: {RoundedSellingPrice:N2}")
+    /// <summary>The row <see cref="RoundedSellingPrice"/> is on: "Rounded up to the next 0.25"; empty without rounding.</summary>
+    public string PriceRoundingLabel => HasPriceRounding
+        ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Rounded up to the next {PriceRoundingStep:0.00}")
         : string.Empty;
 
     /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>

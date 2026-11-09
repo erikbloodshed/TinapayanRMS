@@ -61,12 +61,6 @@ public sealed record ProductPrintout(
     public PrintedSimulation? Simulation { get; init; }
 
     /// <summary>
-    /// The Scaling tab, when Print was pressed with it showing: the pages are then the recipe scaled to its number of
-    /// sellable units, in place of the recipe and the costing. Null otherwise.
-    /// </summary>
-    public PrintedScaling? Scaling { get; init; }
-
-    /// <summary>
     /// What a product's figures are for, as its header says it: "Per piece", or "Per unit of 8 pieces"; a composite's are
     /// "Per unit", the one sellable unit it always is.
     /// </summary>
@@ -123,9 +117,6 @@ public sealed record ProductPrintSet(string? Title, IReadOnlyList<ProductPrintou
     /// other set. Its products' figures are at those prices (<see cref="ProductPrintout.Simulation"/>).
     /// </summary>
     public IReadOnlyList<PrintedPriceChange>? PriceChanges { get; init; }
-
-    /// <summary>The Products screen's Scaling tab: one product's recipe scaled, which a set never is.</summary>
-    public bool IsScaling => Products.Any(p => p.Scaling is not null);
 }
 
 /// <summary>
@@ -138,15 +129,6 @@ public sealed record PrintChoice(string Label, ProductPrintSet Set)
     public override string ToString() => Label;
 }
 
-/// <summary>
-/// The Scaling tab on paper:the recipe scaled to a number of sellable units, as the tab's tree shows it, each section in
-/// whole batches and each made ingredient opened into what it's made from.
-/// </summary>
-/// <param name="Units">The sellable units it's scaled to: the tab's Sellable Units.</param>
-/// <param name="Pieces">What they come to in pieces, when a unit holds more than one; null for a product sold by the piece.</param>
-/// <param name="Rows">The tab's tree (RecipeScaler), as it shows.</param>
-/// <param name="TotalCost">What everything in it costs, the extra pieces whole batches make included.</param>
-public sealed record PrintedScaling(int Units, decimal? Pieces, IReadOnlyList<ScalingRow> Rows, decimal TotalCost);
 
 /// <summary>
 /// One sub-assembly of the recipe on paper: its lines and add-ins, each with its share of the formula, the batch they make
