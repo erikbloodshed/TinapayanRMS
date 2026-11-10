@@ -6,7 +6,8 @@
    were: shown in its Format, selected whole on taking the cursor (so it's typed over), right-aligned, and kept between
    Min and Max. As TextField, it's never written to while it has the cursor. Each number typed reaches the ViewModel as it's typed (UpdateSourceTrigger=PropertyChanged),
    so totals and percentages follow it; a box that LandsOnLeave passes its value only once it's left, and keeps Save
-   offered meanwhile (IUndoRecorder.IsEditPending). An empty box is null where the value can be, and 0 where it can't.
+   offered from the first key typed until then (IUndoRecorder.IsEditPending), not merely for having the cursor: an undo
+   puts the cursor back where it was, and the form it put back read as unsaved. An empty box is null where the value can be, and 0 where it can't.
    A number beyond Largest is read as no number at all. Within an undo screen the edit is one undo step. As TextField,
    the box is given up when another record takes the form's place under the cursor. *@
 <span class="e-input-group field number-field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
@@ -124,10 +125,6 @@
         _givenUp = false;
         _form = Recorder?.FormVersion ?? 0;
         Recorder?.BeginUndoStep();
-        if (LandsOnLeave && Recorder is not null)
-        {
-            Recorder.IsEditPending = true;
-        }
     }
 
     private async Task OnInput(ChangeEventArgs e)
@@ -141,6 +138,12 @@
         var text = _typed.Trim();
         if (LandsOnLeave)
         {
+            // Nothing has reached the form yet, so Save is kept offered until the box is left.
+            if (Recorder is not null)
+            {
+                Recorder.IsEditPending = true;
+            }
+
             return;
         }
 

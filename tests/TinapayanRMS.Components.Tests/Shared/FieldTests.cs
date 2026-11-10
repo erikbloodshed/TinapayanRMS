@@ -126,7 +126,9 @@ public class FieldTests
             .Add(f => f.LandsOnLeave, true)
             .Add(f => f.ValueChanged, typed.Add));
         field.Find("input").Focus();
-        form.IsEditPending.Should().BeTrue();
+        form.IsEditPending.Should().BeFalse("nothing is typed yet");
+        field.Find("input").Input("4");
+        form.IsEditPending.Should().BeTrue("what's typed lands only once the box is left");
 
         form.FormVersion++;
         field.Find("input").Input("45");
