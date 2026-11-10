@@ -78,4 +78,13 @@ public sealed record RawMaterialFormSnapshot
         && UnitRows.SequenceEqual(other.UnitRows)
         && BrandPrices.SequenceEqual(other.BrandPrices)
         && AddIns.SequenceEqual(other.AddIns);
+
+    /// <summary>
+    /// True when two snapshots would be saved the same, which is what the Save button is enabled by. It's
+    /// <see cref="ShowsSameAs"/> bar the unit the buffered cost is shown in (the Purchase Cost Setup's Per), which no
+    /// Save writes: the buffered cost is kept per base unit whatever unit it's shown in. A unit picked there is still an
+    /// undo step.
+    /// </summary>
+    public bool SavesSameAs(RawMaterialFormSnapshot other) =>
+        (this with { BufferedCostUnitKey = other.BufferedCostUnitKey }).ShowsSameAs(other);
 }

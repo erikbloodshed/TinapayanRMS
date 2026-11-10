@@ -9,7 +9,8 @@
    typed (PickerMatchHighlight), the first match fills in as it's typed (Autofill), so Enter or Tab picks it. The list
    filters on every key (DebounceDelay 0): Syncfusion's default held each filter back 300 ms after the key, so the list
    and the fill-in trailed the typing, and a late fill-in could put back text just rubbed out. The lists are in memory,
-   and a filter takes the window a few milliseconds. *@
+   and a filter takes the window a few milliseconds. Only a pick made with the cursor in the box is passed on: the combo
+   box also hands back values of its own as it settles on a list it was given (OnValueChanged). *@
 <SfComboBox ID="@ID" TValue="int?" TItem="Choice" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
             AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="true" Placeholder="@Placeholder"
             Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
@@ -122,6 +123,18 @@
     // left.
     private async Task OnValueChanged(int? index)
     {
+        // A pick comes from the box while it has the cursor: a hand picks with the cursor in it, and the combo box passes on
+        // a pick typed or filled in, on Tab or a click elsewhere, before it says the box was left. Without the cursor, a
+        // value is the combo box settling on a list it was given, handing back the place it was given with it a drawing
+        // before: a Raw Materials pick shows the base unit in the Buffered Cost "Per" list until the material's details
+        // put its purchase unit there, and the combo box's late answer put the base unit back under a form already
+        // settled, which then had changes to save. It's no pick: left out, the box is drawn again (as after any of its
+        // events) with the ViewModel's pick. Only the clear button, which no picker shows, empties the box without it.
+        if (!_hasCursor && !(index is null && ShowClearButton))
+        {
+            return;
+        }
+
         _typed = index is { } i && i >= 0 && i < _choices.Count ? _choices[i] : null;
         if (_typed is not null)
         {

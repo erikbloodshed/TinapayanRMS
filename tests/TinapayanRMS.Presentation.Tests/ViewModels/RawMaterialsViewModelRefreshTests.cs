@@ -1821,6 +1821,65 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (await dbContext.RawMaterialUnits.SingleAsync(Cancellation)).BaseUnitsPerUnit.Should().Be(20000m);
     });
 
+    [Test]
+    public Task Picking_materials_priced_in_units_of_their_own_in_turn_leaves_nothing_to_save() => UiThread.RunAsync(async () =>
+    {
+        var trayId = await SeedUnitOfMeasureAsync("tray", "tray");
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        var eggId = await SeedPricedIngredientAsync("Egg Whole", trayId, 1800m, 235m);
+        var flourId = await SeedPricedIngredientAsync("All Purpose Flour", bagId, 25000m, 1200m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+
+        // Picked one after the other, as in the list: each shows its buffered cost per its own purchase unit, with nothing
+        // to save, however often.
+        for (var round = 0; round < 5; round++)
+        {
+            foreach (var (id, unit) in new[] { (eggId, "tray"), (flourId, "bag") })
+            {
+                await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == id));
+                await viewModel.WhenIdleAsync();
+
+                viewModel.BufferedCostUnit!.Name.Should().Be(unit, $"round {round + 1}");
+                viewModel.History.IsDirty.Should().BeFalse($"round {round + 1}: nothing was typed into {viewModel.EditingName}");
+            }
+        }
+    });
+
+    [Test]
+    public Task The_unit_the_buffered_cost_is_shown_in_is_nothing_to_save_but_an_undo_step() => UiThread.RunAsync(async () =>
+    {
+        var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
+        var flourId = await SeedPricedIngredientAsync("All Purpose Flour", bagId, 25000m, 1200m);
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == flourId));
+        IUndoRecorder recorder = viewModel;
+
+        // Picked in the Per box, as its picker does: one undo step.
+        recorder.BeginUndoStep();
+        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Key == PurchaseUnitChoice.BaseUnitKey);
+        recorder.EndUndoStep();
+
+        viewModel.HeaderCostUnitText.Should().Be("g");
+        viewModel.History.IsDirty.Should().BeFalse("the buffered cost is kept per base unit, whatever it's shown in");
+        viewModel.History.CanUndo.Should().BeTrue();
+
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.BufferedCostUnit!.Name.Should().Be("bag");
+        viewModel.History.IsDirty.Should().BeFalse();
+    });
+
+    /// <summary>A purchased ingredient with one alternative unit and one brand priced in it, saved as the screen saves.</summary>
+    private async Task<int> SeedPricedIngredientAsync(string name, int unitOfMeasureId, decimal baseUnitsPerUnit, decimal price)
+    {
+        var id = await SeedPurchasedIngredientAsync(name, (unitOfMeasureId, baseUnitsPerUnit));
+        var repository = new RawMaterialRepository(CreateDbContextFactory());
+        var material = (await repository.GetByIdAsync(id, Cancellation))!;
+        await repository.SaveAsync(material, [.. material.Units], [("House", unitOfMeasureId, price)], null, Cancellation);
+        return id;
+    }
+
     private RawMaterialsViewModel CreateViewModel()
     {
         ReactiveUIBootstrapper.EnsureInitialized();

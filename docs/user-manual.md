@@ -458,7 +458,7 @@ The material's **current cost** comes from the **dearest** brand: its price divi
 - A new material's **Cost Buffer %** starts at the default in Settings → Costing Defaults, 10% unless you change it there. Set it to 0 for no buffer.
 - Typing the **Cost Buffer %** works out the **Buffered Cost** as the brand it's costed at (see Cost From) plus that percentage.
 - Typing the **Buffered Cost** works out the percentage.
-- **Per** chooses the unit the buffered cost is shown and typed in, such as per gram or per bag. It's always stored per base unit.
+- **Per** chooses the unit the buffered cost is shown and typed in, such as per gram or per bag. It's always stored per base unit, so choosing another unit there isn't a change to save: **Save** doesn't light up for it, though **Undo** takes it back. A material opens on the unit of the brand it's costed at.
 
 The buffered cost stays **fixed** when brand prices change. The percentage then follows, showing how far the fixed amount now sits above the price it's costed at. If that brand goes above the buffered cost, a warning says so. **To put the buffer back on top of a new price, type the Cost Buffer % again**, then Save.
 

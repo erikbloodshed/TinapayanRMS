@@ -360,6 +360,29 @@ public class FieldTests
     }
 
     [Test]
+    public async Task A_value_the_combo_box_hands_back_without_the_cursor_is_no_pick()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["gram", "bag"])
+            .Add(f => f.Value, "bag")
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+
+        // Another record picked: its list comes with the base unit showing, then its own unit, as a Raw Materials pick's
+        // Buffered Cost "Per" does as the details arrive.
+        field.Render(parameters => parameters.Add(f => f.Items, ["gram", "tray"]).Add(f => f.Value, "gram"));
+        field.Render(parameters => parameters.Add(f => f.Value, "tray"));
+
+        // The combo box, settling on the list it was given, hands back the place it was given with it: nobody picked.
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(0));
+
+        picked.Should().BeEmpty("the box didn't have the cursor");
+        box.Instance.Value.Should().Be(1, "the box shows the ViewModel's pick");
+    }
+
+    [Test]
     public async Task A_picker_whose_list_is_rebuilt_under_the_cursor_keeps_showing_the_item_it_picked()
     {
         await using var context = AppServices.NewContext();

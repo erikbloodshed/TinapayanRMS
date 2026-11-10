@@ -1174,7 +1174,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // wholesale: the brand prices and the BOM land a moment after the pick (AreDetailsReady), and a step taken
         // before they do would put the empty grids back over them.
         History = new UndoHistory<RawMaterialFormSnapshot>(
-            CaptureSnapshot, (before, after) => before.ShowsSameAs(after), () => AreDetailsReady && !IsBusyApplying);
+            CaptureSnapshot,
+            (before, after) => before.ShowsSameAs(after),
+            () => AreDetailsReady && !IsBusyApplying,
+            (settled, now) => settled.SavesSameAs(now));
 
         UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
         RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
