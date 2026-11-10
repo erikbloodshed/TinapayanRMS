@@ -168,6 +168,29 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
         },
         revert ? RevertToSavedAsync : null);
 
+    /// <summary>
+    /// A record picked in the list, by <paramref name="id"/>: shown at once (<paramref name="pick"/>), or, while the form holds
+    /// unsaved changes, once they're saved or thrown away. The list calls this in the middle of changing its selection, so
+    /// the question waits for that to finish, puts the list back on the record showing (<paramref name="showListOnShowing"/>),
+    /// then opens the one picked through <paramref name="openAsync"/>, which asks. Nothing awaits it: what fails shows on the
+    /// form (RunSafelyAsync).
+    /// </summary>
+    protected void PickFromList(int id, Action pick, Action showListOnShowing, Func<int, Task> openAsync)
+    {
+        if (!History.IsDirty)
+        {
+            pick();
+            return;
+        }
+
+        _ = RunSafelyAsync(async () =>
+        {
+            await Task.Yield();
+            showListOnShowing();
+            await openAsync(id);
+        });
+    }
+
     /// <summary>Runs <paramref name="then"/>, which replaces the record showing, once its unsaved changes are saved or thrown away.</summary>
     protected async Task AfterUnsavedChangesAsync(Action then)
     {

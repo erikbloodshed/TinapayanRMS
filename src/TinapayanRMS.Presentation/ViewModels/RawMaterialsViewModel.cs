@@ -2856,28 +2856,8 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         // The new material's row is the form's already.
         if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
         {
-            if (History.IsDirty)
-            {
-                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.RawMaterial.Id));
-            }
-            else
-            {
-                SelectedRawMaterial = leaf.RawMaterial;
-            }
+            PickFromList(leaf.RawMaterial.Id, () => SelectedRawMaterial = leaf.RawMaterial, SyncTreeSelection, OpenRawMaterialAsync);
         }
-    }
-
-    /// <summary>
-    /// Another material's row picked while the form holds unsaved changes: the list goes back to the row of the material
-    /// showing, and the one picked opens once the changes are saved or thrown away.
-    /// </summary>
-    private async Task PickAfterAskingAsync(int rawMaterialId)
-    {
-        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
-        // list take the row of the material showing back.
-        await Task.Yield();
-        SyncTreeSelection();
-        await OpenRawMaterialAsync(rawMaterialId);
     }
 
     /// <summary>

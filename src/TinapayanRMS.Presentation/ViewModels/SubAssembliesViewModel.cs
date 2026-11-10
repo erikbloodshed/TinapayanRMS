@@ -1125,28 +1125,8 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         // The new sub-assembly's row is the form's already.
         if (!_treeSelection.IsSyncing && first is SubAssemblyLeafNode { IsNew: false } leaf && leaf.Row.Id != SelectedRow?.Id)
         {
-            if (History.IsDirty)
-            {
-                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.Row.Id));
-            }
-            else
-            {
-                SelectedRow = leaf.Row;
-            }
+            PickFromList(leaf.Row.Id, () => SelectedRow = leaf.Row, SyncTreeSelection, OpenSubAssemblyAsync);
         }
-    }
-
-    /// <summary>
-    /// Another sub-assembly's row picked while the form holds unsaved changes: the list goes back to the row of the one
-    /// showing, and the one picked opens once the changes are saved or thrown away.
-    /// </summary>
-    private async Task PickAfterAskingAsync(int subAssemblyId)
-    {
-        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
-        // list take the row of the sub-assembly showing back.
-        await Task.Yield();
-        SyncTreeSelection();
-        await OpenSubAssemblyAsync(subAssemblyId);
     }
 
     /// <summary>

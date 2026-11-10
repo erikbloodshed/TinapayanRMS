@@ -2081,28 +2081,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         // So is the new product's, which is the form's already.
         if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false, IsNew: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
-            if (History.IsDirty)
-            {
-                _ = RunSafelyAsync(() => PickAfterAskingAsync(leaf.Product.Id));
-            }
-            else
-            {
-                SelectedProduct = leaf.Product;
-            }
+            PickFromList(leaf.Product.Id, () => SelectedProduct = leaf.Product, SyncTreeSelection, OpenProductAsync);
         }
-    }
-
-    /// <summary>
-    /// Another product's row picked while the form holds unsaved changes: the list goes back to the row of the product
-    /// showing, and the one picked opens once the changes are saved or thrown away.
-    /// </summary>
-    private async Task PickAfterAskingAsync(int productId)
-    {
-        // The tree calls TreeSelectionChanged in the middle of changing its selection: going on once that's over lets the
-        // list take the row of the product showing back.
-        await Task.Yield();
-        SyncTreeSelection();
-        await OpenProductAsync(productId);
     }
 
     /// <summary>
