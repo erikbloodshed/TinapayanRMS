@@ -7,7 +7,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// set's cost, the formula base caption and the percentage header — which the one recompute at the end of a restore
 /// works out again, and the row picked in the list, which an undo never changes.
 /// </summary>
-public sealed record SubAssemblyFormSnapshot
+public sealed record SubAssemblyFormSnapshot : IFormSnapshot<SubAssemblyFormSnapshot>
 {
     public required int EditingId { get; init; }
     public required string Name { get; init; }

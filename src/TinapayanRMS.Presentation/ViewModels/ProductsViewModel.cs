@@ -25,7 +25,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IUnsavedChangesScreen, IListTreeScreen
+public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IListTreeScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -685,17 +685,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// </summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
-    /// <summary>
-    /// The form's undo and redo stacks. One step is one finished change — a cell edit committed, a row added or
-    /// taken out, a sub-assembly applied, a field typed and left — never a keystroke. It holds what the screen
-    /// shows, not what Save writes: undoing never touches the baselines Save compares against, so a change undone
-    /// and one never made come to the same thing. Cleared whenever the form stops being the one it recorded:
-    /// another product picked, a new one started, a Save, or a Revert.
-    /// </summary>
-    public UndoHistory<ProductFormSnapshot> History { get; }
-
-    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
     /// <summary>
@@ -1033,17 +1022,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             .Select(tab => tab is ComponentsRecipeTab)
             .ToProperty(this, x => x.IsComponentsShowing);
 
-        // Nothing is recorded until a product's details have arrived, or while the screen is being written to
-        // wholesale: a load merging in fresh data and a restore putting a form back are neither of them edits.
-        // Set up before the subscriptions below rather than beside the Undo and Redo commands: the selection ones
-        // run as they're wired, with nothing selected, and the load that fires takes the blank form as the
-        // settled one - a history that didn't exist yet would take the whole subscription down with it.
-        History = new UndoHistory<ProductFormSnapshot>(
-            CaptureSnapshot,
-            (before, after) => before.ShowsSameAs(after),
-            () => AreDetailsReady && !IsBusyApplying,
-            (settled, now) => settled.SavesSameAs(now));
-
         // A pick loads the product into the form, in these three steps, in this order. Only a pick does (_picks): a load
         // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
         // Another product's name and price land in the form ahead of its details, so its history goes first, as
@@ -1180,9 +1158,6 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 this.RaisePropertyChanged(nameof(MaterialCostTooltip));
                 this.RaisePropertyChanged(nameof(MetricBaseTooltip));
             });
-
-        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
-        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
         // Save offers itself only when the form holds something the saved product doesn't. Re-read on every
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
@@ -1961,28 +1936,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         return true;
     }
 
-    public bool HasUnsavedChanges => History.IsDirty;
+    /// <summary>Nothing is recorded until a product's details have arrived, nor while the screen is being written to wholesale.</summary>
+    protected override bool CanRecordUndo => AreDetailsReady && !IsBusyApplying;
 
-    /// <inheritdoc/>
-    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
-        History.IsDirty,
+    protected override string UnsavedChangesName =>
         !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim()
-            : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product"),
-        async () =>
-        {
-            await SaveCommand.Execute();
-            return !History.IsDirty;
-        },
-        revert ? RevertToSavedAsync : null);
+            : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product");
 
-    /// <summary>Runs <paramref name="then"/>, which replaces the product showing, once its unsaved changes are saved or thrown away.</summary>
-    private async Task AfterUnsavedChangesAsync(Action then)
-    {
-        if (await ResolveUnsavedChangesAsync(revert: false))
-        {
-            then();
-        }
-    }
+    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
 
     /// <summary>
     /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
@@ -1990,7 +1951,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// unsaved goes: a section added or edited in the form included, since the form has no discard of its own. A new
     /// product was never saved, so it goes back to being a blank one.
     /// </summary>
-    private async Task RevertToSavedAsync()
+    protected override async Task RevertToSavedAsync()
     {
         if (SelectedProduct is not { } product)
         {
@@ -2602,71 +2563,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ReselectRecipeTab(previousTab, previousUsage, previousIds);
     }
 
-    /// <summary>
-    /// Follows <paramref name="rows"/> for Save's sake: a row added, removed or replaced can be something to
-    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
-    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening - and
-    /// these collections are changed from inside their own notifications, so a second CollectionChanged listener
-    /// would turn a change the guard tolerates today into an exception. What's typed into a row reaches Save
-    /// another way: the grid closes the cell's undo step, which re-reads whether there's anything to save.
-    /// </summary>
-    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
-
-    void IUndoRecorder.BeginUndoStep() => History.Begin();
-
-    void IUndoRecorder.EndUndoStep() => History.End();
-
-    /// <summary>IUndoRecorder: goes up as another product, or a new one, takes the form's place.</summary>
-    public int FormVersion { get; private set; }
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => History.IsEditPending;
-        set => History.IsEditPending = value;
-    }
-
-    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
-    private void AsUndoStep(Action change)
-    {
-        History.Begin();
-        try
-        {
-            change();
-        }
-        finally
-        {
-            History.End();
-        }
-    }
-
-    /// <summary>Settles whatever step is open, then puts the form back one step. False when there was nothing to undo.</summary>
-    public bool TryUndo()
-    {
-        History.End();
-        if (!History.TryUndo(out var restore, out var settled))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore, settled);
-        return true;
-    }
-
-    /// <summary>Steps forward again into what the last undo stepped off. False when there was nothing to redo.</summary>
-    public bool TryRedo()
-    {
-        History.End();
-        if (!History.TryRedo(out var restore, out var settled))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore, settled);
-        return true;
-    }
-
     /// <summary>The form as it stands: everything an undo step puts back. See ProductFormSnapshot for what's left out.</summary>
-    private ProductFormSnapshot CaptureSnapshot() => new()
+    protected override ProductFormSnapshot CaptureSnapshot() => new()
     {
         EditingId = _editingId,
         Name = EditingName,
@@ -2727,7 +2625,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// figures are worked out once from the restored form rather than over and over from a half-restored one.
     /// </summary>
     /// <param name="settledThen">What Save measured against when <paramref name="snapshot"/> was taken, or null.</param>
-    private void RestoreSnapshot(ProductFormSnapshot snapshot, ProductFormSnapshot? settledThen)
+    protected override void RestoreSnapshot(ProductFormSnapshot snapshot, ProductFormSnapshot? settledThen)
     {
         // A message about a form that no longer exists would outlive what it was about.
         ErrorMessage = null;

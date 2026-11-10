@@ -25,7 +25,7 @@ public readonly record struct BrandPriceState(string? Brand, int? UnitKey, decim
 /// The **usage example** is a calculator whose result belongs to the inputs it was worked out from; nothing about
 /// it is saved, so an undo has no business moving it.
 /// </summary>
-public sealed record RawMaterialFormSnapshot
+public sealed record RawMaterialFormSnapshot : IFormSnapshot<RawMaterialFormSnapshot>
 {
     public required int EditingId { get; init; }
     public required string Name { get; init; }

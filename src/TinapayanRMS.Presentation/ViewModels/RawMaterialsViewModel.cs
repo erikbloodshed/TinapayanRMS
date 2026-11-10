@@ -24,7 +24,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
 /// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
-public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IUnsavedChangesScreen, IListTreeScreen
+public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormSnapshot>, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IListTreeScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -983,15 +983,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// </summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
-    /// <summary>
-    /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change. The price
-    /// history is left out: its Delete writes to the database on the spot, so there is nothing unsaved to put back.
-    /// Cleared whenever the form stops being the one it recorded: another material picked, a new one, or a Save.
-    /// </summary>
-    public UndoHistory<RawMaterialFormSnapshot> History { get; }
-
-    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
 
     /// <summary>
     /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with so it
@@ -1169,18 +1160,6 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
 
         _savedBaseUnitText = this.WhenAnyValue(x => x.EditingType, x => x.SelectedRawMaterial, SavedBaseUnitTextOf)
             .ToProperty(this, x => x.SavedBaseUnitText, "gram (g)");
-
-        // Nothing is recorded until a material's details have arrived, or while the screen is being written to
-        // wholesale: the brand prices and the BOM land a moment after the pick (AreDetailsReady), and a step taken
-        // before they do would put the empty grids back over them.
-        History = new UndoHistory<RawMaterialFormSnapshot>(
-            CaptureSnapshot,
-            (before, after) => before.ShowsSameAs(after),
-            () => AreDetailsReady && !IsBusyApplying,
-            (settled, now) => settled.SavesSameAs(now));
-
-        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
-        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
         // Save offers itself only when the form holds something the saved material doesn't. Measured on every
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
@@ -1602,70 +1581,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return $"Also linked to {linkedTo.Name}: {parts}. With this one, {totals} (at most 100% each).";
     }
 
-    /// <summary>
-    /// Follows <paramref name="rows"/> for Save's sake: a row added, removed or replaced can be something to
-    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
-    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening — and
-    /// these collections are changed from inside their own notifications, so a second CollectionChanged listener
-    /// would turn a change the guard tolerates today into an exception. What's typed into a row reaches Save
-    /// another way: the grid closes the cell's undo step, which re-reads whether there's anything to save.
-    /// </summary>
-    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
-
-    void IUndoRecorder.BeginUndoStep() => History.Begin();
-
-    void IUndoRecorder.EndUndoStep() => History.End();
-
-    /// <summary>IUndoRecorder: goes up as another material, or a new one, takes the form's place.</summary>
-    public int FormVersion { get; private set; }
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => History.IsEditPending;
-        set => History.IsEditPending = value;
-    }
-
-    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
-    private void AsUndoStep(Action change)
-    {
-        History.Begin();
-        try
-        {
-            change();
-        }
-        finally
-        {
-            History.End();
-        }
-    }
-
-    /// <summary>Settles whatever step is open, then puts the form back one step.</summary>
-    public bool TryUndo()
-    {
-        History.End();
-        if (!History.TryUndo(out var restore))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore);
-        return true;
-    }
-
-    /// <summary>Steps forward again into what the last undo stepped off.</summary>
-    public bool TryRedo()
-    {
-        History.End();
-        if (!History.TryRedo(out var restore))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore);
-        return true;
-    }
-
-    private RawMaterialFormSnapshot CaptureSnapshot() => new()
+    protected override RawMaterialFormSnapshot CaptureSnapshot() => new()
     {
         EditingId = _editingId,
         Name = EditingName,
@@ -1700,7 +1616,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// Id - one that lost it would be saved as a new unit and the stored one deleted. The one recompute runs at the
     /// end, outside the guard, so the costs and captions are worked out once from the form that was put back.
     /// </summary>
-    private void RestoreSnapshot(RawMaterialFormSnapshot snapshot)
+    protected override void RestoreSnapshot(RawMaterialFormSnapshot snapshot, RawMaterialFormSnapshot? settledThen)
     {
         ErrorMessage = null;
 
@@ -2731,34 +2647,24 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         return true;
     }
 
-    public bool HasUnsavedChanges => History.IsDirty;
+    /// <summary>
+    /// Nothing is recorded until a material's details have arrived, or while the screen is being written to wholesale:
+    /// the brand prices and the BOM land a moment after the pick (AreDetailsReady), and a step taken before they do would
+    /// put the empty grids back over them.
+    /// </summary>
+    protected override bool CanRecordUndo => AreDetailsReady && !IsBusyApplying;
 
-    /// <inheritdoc/>
-    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
-        History.IsDirty,
-        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRawMaterial?.Name ?? "the new raw material",
-        async () =>
-        {
-            await SaveCommand.Execute();
-            return !History.IsDirty;
-        },
-        revert ? RevertToSavedAsync : null);
+    protected override string UnsavedChangesName =>
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRawMaterial?.Name ?? "the new raw material";
 
-    /// <summary>Runs <paramref name="then"/>, which replaces the material showing, once its unsaved changes are saved or thrown away.</summary>
-    private async Task AfterUnsavedChangesAsync(Action then)
-    {
-        if (await ResolveUnsavedChangesAsync(revert: false))
-        {
-            then();
-        }
-    }
+    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
 
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the material as it was last saved, read again, since its
     /// alternative units write through to the copy the list holds. A new material was never saved, so it goes back to a
     /// blank one.
     /// </summary>
-    private async Task RevertToSavedAsync()
+    protected override async Task RevertToSavedAsync()
     {
         if (SelectedRawMaterial is { } material)
         {

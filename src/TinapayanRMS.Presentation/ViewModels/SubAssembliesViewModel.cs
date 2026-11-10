@@ -22,7 +22,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// follow every change saved here) or copy them, from their recipe on the Products screen. One Save writes
 /// the name, the role and the lines together.
 /// </summary>
-public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDisposable, IRecordScreen, IUnsavedChangesScreen, IListTreeScreen
+public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyFormSnapshot>, IDisposable, IRecordScreen, IListTreeScreen
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -437,15 +437,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// </summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
-    /// <summary>
-    /// The form's undo and redo stacks, the same shape as Products'. One step is one finished change — a cell
-    /// committed, a line added or removed, a field typed and left. Cleared whenever the form stops being the one
-    /// it recorded: another sub-assembly picked, a new one started, or a Save.
-    /// </summary>
-    public UndoHistory<SubAssemblyFormSnapshot> History { get; }
-
-    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
 
     public SubAssembliesViewModel(
         ISubAssemblyRepository subAssemblyRepository,
@@ -479,14 +470,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
-
-        // Before any subscription below: WhenAnyValue fires straight away with the value it finds, and the one on
-        // SelectedRow reaches ClearForm, which clears the history.
-        History = new UndoHistory<SubAssemblyFormSnapshot>(
-            CaptureSnapshot, (before, after) => before.ShowsSameAs(after), () => !IsBusyApplying);
-
-        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, History.WhenAnyValue(h => h.CanUndo));
-        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, History.WhenAnyValue(h => h.CanRedo));
 
         // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
@@ -765,29 +748,6 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
     }
 
-    /// <summary>
-    /// Follows <paramref name="rows"/> for Save's sake: a line added, removed or replaced can be something to
-    /// save. Watched through the collection's own PropertyChanged rather than its CollectionChanged, because an
-    /// ObservableCollection only enforces its re-entrancy guard once more than one handler is listening, so a
-    /// listener added for this could turn a re-entrant change the guard tolerates today into an exception. What's
-    /// typed into a line reaches Save another way: the grid closes the cell's undo step, which re-reads whether
-    /// there's anything to save.
-    /// </summary>
-    private void WatchForSave(INotifyPropertyChanged rows) => rows.PropertyChanged += (_, _) => History.RefreshDirty();
-
-    void IUndoRecorder.BeginUndoStep() => History.Begin();
-
-    void IUndoRecorder.EndUndoStep() => History.End();
-
-    /// <summary>IUndoRecorder: goes up as another sub-assembly, or a new one, takes the form's place.</summary>
-    public int FormVersion { get; private set; }
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => History.IsEditPending;
-        set => History.IsEditPending = value;
-    }
-
     private void ScaleBatch()
     {
         ErrorMessage = null;
@@ -814,47 +774,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// <summary>What a Save of a recipe products link is asked about with; null in a screen built without it.</summary>
     private readonly SharedRecipeImpact? _recipeImpact;
 
-    /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
-    private void AsUndoStep(Action change)
-    {
-        History.Begin();
-        try
-        {
-            change();
-        }
-        finally
-        {
-            History.End();
-        }
-    }
-
-    /// <summary>Settles whatever step is open, then puts the form back one step.</summary>
-    public bool TryUndo()
-    {
-        History.End();
-        if (!History.TryUndo(out var restore))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore);
-        return true;
-    }
-
-    /// <summary>Steps forward again into what the last undo stepped off.</summary>
-    public bool TryRedo()
-    {
-        History.End();
-        if (!History.TryRedo(out var restore))
-        {
-            return false;
-        }
-
-        RestoreSnapshot(restore);
-        return true;
-    }
-
-    private SubAssemblyFormSnapshot CaptureSnapshot() => new()
+    protected override SubAssemblyFormSnapshot CaptureSnapshot() => new()
     {
         EditingId = _editingId,
         Name = EditingName,
@@ -869,7 +789,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// IngredientLineRow's setters drop a typed percentage — and the one recompute runs at the end, outside the
     /// guard, so the totals and the formula base are worked out once from the form that was put back.
     /// </summary>
-    private void RestoreSnapshot(SubAssemblyFormSnapshot snapshot)
+    protected override void RestoreSnapshot(SubAssemblyFormSnapshot snapshot, SubAssemblyFormSnapshot? settledThen)
     {
         ErrorMessage = null;
 
@@ -977,7 +897,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         var name = SubAssemblyRules.UniqueStandaloneName($"{source.Name.Trim()} Copy", [.. Rows.Select(r => r.Name)]);
 
         ClearForm();
-        RestoreSnapshot(source with { EditingId = 0, Name = name });
+        RestoreSnapshot(source with { EditingId = 0, Name = name }, settledThen: null);
         HeaderTitle = $"Copy of {sourceName}";
         ShowDependents([], []);
         History.RefreshDirty();
@@ -1108,33 +1028,16 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         return true;
     }
 
-    public bool HasUnsavedChanges => History.IsDirty;
+    protected override string UnsavedChangesName =>
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly";
 
-    /// <inheritdoc/>
-    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
-        History.IsDirty,
-        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly",
-        async () =>
-        {
-            await SaveCommand.Execute();
-            return !History.IsDirty;
-        },
-        revert ? RevertToSavedAsync : null);
-
-    /// <summary>Runs <paramref name="then"/>, which replaces the sub-assembly showing, once its unsaved changes are saved or thrown away.</summary>
-    private async Task AfterUnsavedChangesAsync(Action then)
-    {
-        if (await ResolveUnsavedChangesAsync(revert: false))
-        {
-            then();
-        }
-    }
+    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
 
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
     /// A new one (or a copy) was never saved, so it goes back to a blank one.
     /// </summary>
-    private Task RevertToSavedAsync() => LoadIntoFormAsync(SelectedRow);
+    protected override Task RevertToSavedAsync() => LoadIntoFormAsync(SelectedRow);
 
     /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the sub-assembly the name means best.</summary>
     public bool OpenByName(string text)

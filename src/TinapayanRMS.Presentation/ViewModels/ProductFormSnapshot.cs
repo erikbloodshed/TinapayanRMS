@@ -42,7 +42,7 @@ public readonly record struct ComponentLineState(int? ProductId, int? Quantity);
 /// the picked product, which an undo never changes; and everything derived (RecipeTabs, Costs), which the
 /// recompute at the end of a restore works out again.
 /// </summary>
-public sealed record ProductFormSnapshot
+public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
 {
     // The product
     public required int EditingId { get; init; }
