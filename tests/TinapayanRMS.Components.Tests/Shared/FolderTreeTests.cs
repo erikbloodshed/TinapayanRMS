@@ -385,4 +385,24 @@ public class FolderTreeTests
 
         rename.Runs.Should().Be(0);
     }
+
+    [Test]
+    public async Task The_cursor_leaving_the_tree_while_a_slow_second_click_waits_renames_nothing()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var rename = new CountingCommand();
+        var wait = new TaskCompletionSource();
+        var tree = RenderRenaming(context, rename, wait.Task);
+
+        // A field of the form clicked straight after the second click: the name box would take the cursor from it.
+        await ClickRowAsync(tree, 1);
+        await ClickRowAsync(tree, 1);
+        await tree.Find(".folder-tree").FocusOutAsync(new());
+
+        wait.SetResult();
+        await tree.InvokeAsync(() => { });
+
+        rename.Runs.Should().Be(0);
+    }
 }

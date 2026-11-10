@@ -2,7 +2,8 @@
 
 @* The box a list's row's name becomes while it's typed in place, as in a file explorer (the ViewModel's TreeNameEdit):
    Rename on a record or folder, or a new one being named. It takes the cursor with its text selected. Enter, or leaving
-   the box, gives the name typed to OnCommit; Esc gives up (OnCancel); only the first of them counts. The keys and clicks
+   the box with its text changed, gives the name typed to OnCommit; Esc, or leaving it unchanged, gives up (OnCancel);
+   only the first of them counts. The keys and clicks
    in it stay in it, so the tree around it doesn't move, open a folder or pick a row as they're typed. After Enter or Esc
    the cursor goes back to the tree, so the arrows carry on from the row, as in a file explorer. *@
 <span @ref="_element" class="tree-name-box" title="@Hint"
@@ -37,10 +38,10 @@
     /// <summary>The box's tooltip, saying what the name is for.</summary>
     [Parameter] public string? Hint { get; set; }
 
-    /// <summary>The name typed, on Enter or on leaving the box.</summary>
+    /// <summary>The name typed, on Enter, or on leaving the box with it changed.</summary>
     [Parameter] public EventCallback<string> OnCommit { get; set; }
 
-    /// <summary>Esc.</summary>
+    /// <summary>Esc, or leaving the box with its text as it started.</summary>
     [Parameter] public EventCallback OnCancel { get; set; }
 
     /// <summary>
@@ -91,7 +92,19 @@
             return;
         }
 
-        if (TryFinish())
+        if (!TryFinish())
+        {
+            return;
+        }
+
+        // Left holding what it started with, it's an Esc, but the cursor stays where it went. A rename's is the name the row
+        // has; a new row's is what a new one is called until it's named, which a click on the form or on another row isn't
+        // asking for: given back, it had saved a product called "New product" there and then. Enter still names it so.
+        if (string.Equals(_text, InitialText, StringComparison.Ordinal))
+        {
+            await OnCancel.InvokeAsync();
+        }
+        else
         {
             await OnCommit.InvokeAsync(_text);
         }

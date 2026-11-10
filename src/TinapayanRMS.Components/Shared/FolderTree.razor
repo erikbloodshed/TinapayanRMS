@@ -13,7 +13,7 @@
    says (RenamesOnSecondClick), a slow second click on the row picked does what F2 does, as in File Explorer.
    A row picked from elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
 <div @ref="_element" class="folder-tree" tabindex="0" role="tree" aria-multiselectable="true"
-     @onkeydown="OnKeyDown" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
+     @onkeydown="OnKeyDown" @onfocusout="CancelSecondClick" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
      @ondragover="OnListDragOver" @ondragover:preventDefault="true" @ondrop="OnListDrop" @ondrop:preventDefault="true">
     @{
         _visible.Clear();
@@ -314,7 +314,9 @@
 
     /// <summary>
     /// Renames <paramref name="node"/> as F2 would, once <see cref="SecondClickWait"/> is over, if nothing called it off
-    /// meanwhile and the row is still the one picked. Nothing awaits it: it deals with its own end.
+    /// meanwhile and the row is still the one picked. Another click, a key, a drag or a menu in the tree calls it off, and
+    /// so does the cursor leaving the tree: a click on a field straight after had the name box take the cursor from it, and
+    /// what was typed there renamed the record. Nothing awaits it: it deals with its own end.
     /// </summary>
     private async Task RenameAfterWaitAsync(TNode node)
     {

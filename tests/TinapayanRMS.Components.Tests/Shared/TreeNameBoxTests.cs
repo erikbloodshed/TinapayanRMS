@@ -108,7 +108,7 @@ public class TreeNameBoxTests
     }
 
     [Test]
-    public async Task A_click_elsewhere_since_the_box_showed_leaves_it_at_once()
+    public async Task A_click_elsewhere_since_the_box_showed_leaves_it_at_once_giving_up_a_name_left_as_it_started()
     {
         await using var context = AppServices.NewContext();
 
@@ -119,6 +119,21 @@ public class TreeNameBoxTests
         await input.FocusAsync(new());
         await input.BlurAsync(new());
 
-        _committed.Should().Equal(["New product"], "the box gives back what it holds, which the screen takes for unchanged");
+        _committed.Should().BeEmpty("a new product isn't saved as \"New product\" by a click on the form or another row");
+        _cancelled.Should().Be(1);
+        context.JSInterop.VerifyNotInvoke("tinapayan.focusClosest");
+    }
+
+    [Test]
+    public async Task Enter_gives_back_the_name_it_started_with()
+    {
+        await using var context = AppServices.NewContext();
+        var input = RenderSettling(context).Find("input");
+
+        await input.FocusAsync(new());
+        await input.KeyDownAsync(Key.Enter);
+
+        _committed.Should().Equal("New product");
+        _cancelled.Should().Be(0);
     }
 }
