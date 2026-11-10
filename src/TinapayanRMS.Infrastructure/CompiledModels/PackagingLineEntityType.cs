@@ -22,7 +22,7 @@ public partial class PackagingLineEntityType
             "TinapayanRMS.Domain.Entities.PackagingLine",
             typeof(PackagingLine),
             baseEntityType,
-            propertyCount: 8,
+            propertyCount: 9,
             navigationCount: 3,
             foreignKeyCount: 3,
             unnamedIndexCount: 3,
@@ -47,6 +47,15 @@ public partial class PackagingLineEntityType
         authoredField.SetSentinelFromProviderValue(0);
         authoredField.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         authoredField.AddAnnotation("Relational:ColumnName", "authored_field");
+
+        var isBulk = runtimeEntityType.AddProperty(
+            "IsBulk",
+            typeof(bool),
+            propertyInfo: typeof(PackagingLine).GetProperty("IsBulk", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PackagingLine).GetField("<IsBulk>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        isBulk.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        isBulk.AddAnnotation("Relational:ColumnName", "is_bulk");
 
         var packagingMaterialId = runtimeEntityType.AddProperty(
             "PackagingMaterialId",
@@ -120,9 +129,9 @@ public partial class PackagingLineEntityType
         index0.AddAnnotation("Relational:Name", "ix_packaging_lines_unit_id");
 
         var index1 = runtimeEntityType.AddIndex(
-            new[] { productId, packagingMaterialId },
+            new[] { productId, packagingMaterialId, isBulk },
             unique: true);
-        index1.AddAnnotation("Relational:Name", "ix_packaging_lines_product_id_packaging_material_id");
+        index1.AddAnnotation("Relational:Name", "ix_packaging_lines_product_id_packaging_material_id_is_bulk");
 
         return runtimeEntityType;
     }

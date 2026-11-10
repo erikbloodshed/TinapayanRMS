@@ -38,4 +38,12 @@ public sealed class PackagingLine
     /// writes each one's position. Lines are read in this order, then by Id.
     /// </summary>
     public int SortOrder { get; set; }
+
+    /// <summary>
+    /// A line of the product's bulk packaging: what one bulk pack takes (a box several units share, the tape that closes
+    /// it), shared out among the sellable units it holds (Product.BulkPackagingQuantity). Its <see cref="QtyPerUnit"/> is
+    /// per bulk pack, not per unit. Always the product's own, whether its packaging is its own lines or linked, and never
+    /// read through a link (IPackagingLineRepository).
+    /// </summary>
+    public bool IsBulk { get; set; }
 }

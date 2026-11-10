@@ -147,7 +147,7 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
             [.. lines.Select(l => (l.PackagingMaterialId, l.UnitId, ProductRules.ReconcileReciprocal(l.AuthoredField, l.AuthoredValue).QtyPerUnit))],
             cancellationToken);
 
-        await dbContext.PackagingLines.Where(l => l.ProductId == productId).ExecuteDeleteAsync(cancellationToken);
+        await dbContext.PackagingLines.Where(l => l.ProductId == productId && !l.IsBulk).ExecuteDeleteAsync(cancellationToken);
         await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
     }
 

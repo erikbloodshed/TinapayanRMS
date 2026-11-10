@@ -32,7 +32,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         var priceBefore = product.CurrentPrice;
         product.CurrentPrice = 7m;
 
-        var saved = await CreateSaves().SaveProductAsync(product, null, null, null, null, false, DateTime.Now, Cancellation);
+        var saved = await CreateSaves().SaveProductAsync(product, null, null, null, null, null, false, DateTime.Now, Cancellation);
 
         saved.Product.CurrentPrice.Should().Be(7m);
         saved.Detail.Usages.Should().ContainSingle();
@@ -73,12 +73,12 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
 
         // A version to start from, so its Save writes the product before the version that's refused.
         var versions = new ProductVersionRepository(CreateDbContextFactory());
-        await CreateSaves().SaveProductAsync((await products.GetByIdAsync(pandesalId, Cancellation))!, null, null, null, null, false, DateTime.Now, Cancellation);
+        await CreateSaves().SaveProductAsync((await products.GetByIdAsync(pandesalId, Cancellation))!, null, null, null, null, null, false, DateTime.Now, Cancellation);
         var versionCount = (await versions.GetForProductAsync(pandesalId, Cancellation)).Count;
 
         var product = (await products.GetByIdAsync(pandesalId, Cancellation))!;
         product.Name = "Pandesal Classic";
-        var save = () => CreateSaves(refuseVersions: true).SaveProductAsync(product, null, null, null, null, false, DateTime.Now, Cancellation);
+        var save = () => CreateSaves(refuseVersions: true).SaveProductAsync(product, null, null, null, null, null, false, DateTime.Now, Cancellation);
 
         await save.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
         (await products.GetByIdAsync(pandesalId, Cancellation))!.Name.Should().Be("Pandesal");

@@ -148,6 +148,51 @@ public class RecipeApiTests(DatabaseFixture fixture) : PersistenceTestBase(fixtu
     }
 
     [Test]
+    public async Task A_products_packaging_per_unit_takes_its_share_of_the_bulk_pack_one_entry_a_material()
+    {
+        var bakery = await AddBakeryAsync();
+        var tapeId = await AddPieceOfPackagingAsync("Tape");
+        var boxId = await AddPieceOfPackagingAsync("Box");
+        var products = new ProductRepository(CreateDbContextFactory());
+        await products.SaveAsync(
+            (await products.GetByIdAsync(bakery.PandesalId, Cancellation))!,
+            recipe: null,
+            packagingLink: null,
+            [(tapeId, null, Domain.Enums.PackagingLineAuthoredField.QtyPerUnit, 2m)],
+            new BulkPackagingDraft([(boxId, null, Domain.Enums.PackagingLineAuthoredField.QtyPerUnit, 1m), (tapeId, null, Domain.Enums.PackagingLineAuthoredField.QtyPerUnit, 6m)], 6),
+            costing: null,
+            Cancellation);
+        using var host = await StartAsync();
+
+        var recipes = await GetAsync<List<ProductRecipeInfo>>(host, "/api/v1/products/recipes");
+
+        recipes.Single().PackagingPerUnit.Should().BeEquivalentTo(
+            [new PackagingPerUnitInfo(tapeId, 3m), new PackagingPerUnitInfo(boxId, 1m / 6m)],
+            "2 pieces of tape on each, and a sixth of the box's pack of a box and 6 pieces of tape");
+    }
+
+    /// <summary>A packaging material bought by the piece, at ₱1 a piece.</summary>
+    private async Task<int> AddPieceOfPackagingAsync(string name)
+    {
+        var unitId = await GetOrCreateUnitOfMeasureAsync("pc", "pc");
+        await using var dbContext = CreateDbContext();
+        var category = await dbContext.RawMaterialCategories.FirstOrDefaultAsync(c => c.Name == "Boxes", Cancellation)
+            ?? new RawMaterialCategory { Name = "Boxes", Type = Domain.Enums.RawMaterialCategoryType.Packaging };
+        var material = new RawMaterial
+        {
+            Type = Domain.Enums.RawMaterialType.Packaging,
+            Name = name,
+            Category = category,
+            BaseUnitId = unitId,
+            CostPerBaseUnit = 1m,
+            BufferedCostPerBaseUnit = 1m,
+        };
+        dbContext.RawMaterials.Add(material);
+        await dbContext.SaveChangesAsync(Cancellation);
+        return material.Id;
+    }
+
+    [Test]
     public async Task Every_material_comes_with_its_base_unit_buffered_cost_and_what_its_bought_in()
     {
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.08m, bufferedCostPerGram: 0.09m);

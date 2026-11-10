@@ -33,7 +33,8 @@ public sealed class PackagingLineConfiguration : IEntityTypeConfiguration<Packag
             .HasForeignKey(l => l.UnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // One line per material per product: a material used twice belongs on a single line.
-        builder.HasIndex(l => new { l.ProductId, l.PackagingMaterialId }).IsUnique();
+        // One line per material per product, and per bulk pack: a material used twice by a unit belongs on a single line,
+        // but tape can close each unit's bag and the bulk box too.
+        builder.HasIndex(l => new { l.ProductId, l.PackagingMaterialId, l.IsBulk }).IsUnique();
     }
 }

@@ -52,6 +52,9 @@ public sealed record ProductCostSheet(
     string? PackagingLinkedTo,
     CostSummary Costs)
 {
+    /// <summary>Its bulk packaging: what one bulk pack takes, how many products it holds, and each one's share; null with none.</summary>
+    public BulkPackagingCosting? BulkPackaging { get; init; }
+
     public static ProductCostSheet From(SavedProduct saved) => new(
         saved.Product.Name,
         ProductListing.CategoryOf(saved.Product),
@@ -63,7 +66,10 @@ public sealed record ProductCostSheet(
         [.. saved.Components.Select(c => ComponentCosting.From(c, saved.CostBasis, saved.Product.IncludesComponentPackaging))],
         [.. saved.PackagingLines.Select(PackagingCosting.From)],
         saved.PackagingLinkedTo,
-        CostSummary.From(saved.Costs));
+        CostSummary.From(saved.Costs))
+    {
+        BulkPackaging = saved.BulkPackaging is { } bulk ? BulkPackagingCosting.From(bulk) : null,
+    };
 }
 
 /// <summary>
@@ -117,6 +123,16 @@ public sealed record PackagingCosting(string? Material, decimal? Quantity, strin
         line.QtyPerUnit,
         line.UnitAbbreviation,
         line.CostPerUnit);
+}
+
+/// <summary>
+/// A product's bulk packaging: each line's quantity and cost for one bulk pack, how many products the pack holds, what it
+/// costs, and each product's share (in the Packaging cost).
+/// </summary>
+public sealed record BulkPackagingCosting(IReadOnlyList<PackagingCosting> LinesPerPack, int? ProductsPerPack, decimal PackCost, decimal CostPerUnit)
+{
+    public static BulkPackagingCosting From(PricedBulkPackaging bulk) =>
+        new([.. bulk.Lines.Select(PackagingCosting.From)], bulk.Quantity, bulk.PackCost, bulk.CostPerUnit);
 }
 
 /// <summary>The Costing tab, from the materials down to the selling price.</summary>

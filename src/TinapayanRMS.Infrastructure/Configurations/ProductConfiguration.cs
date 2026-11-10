@@ -29,6 +29,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             t.HasCheckConstraint("CK_Products_QuantityRequired", "quantity_required > 0");
             t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "NOT is_composite OR quantity_required = 1");
             t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "is_composite OR NOT includes_component_packaging");
+
+            // A bulk pack holds at least one unit, which its cost is shared out among (ProductRules.EnsureValidBulkPackaging).
+            t.HasCheckConstraint("CK_Products_BulkPackagingQuantity", "bulk_packaging_quantity IS NULL OR bulk_packaging_quantity >= 1");
         });
 
         // The database default is only for the products there before stages were: the column is added to them as

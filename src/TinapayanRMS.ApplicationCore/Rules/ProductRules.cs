@@ -141,6 +141,27 @@ public static class ProductRules
     }
 
     /// <summary>
+    /// A product's bulk packaging (PackagingLine.IsBulk): <paramref name="lineCount"/> lines for one bulk pack need to know
+    /// how many sellable units the pack holds, a whole number of 1 or more, which their cost is shared out among. Its
+    /// lines are packaging lines too, so EnsureValidPackagingLines applies to them.
+    /// </summary>
+    public static void EnsureValidBulkPackaging(int lineCount, int? quantity)
+    {
+        if (lineCount > 0 && quantity is not >= 1)
+        {
+            throw new BusinessRuleException("Enter how many products one bulk pack holds: 1 or more.");
+        }
+    }
+
+    /// <summary>
+    /// What a product's bulk packaging costs one sellable unit: what one bulk pack's lines cost together,
+    /// <paramref name="packCost"/>, shared out among the <paramref name="quantity"/> units it holds. A ₱12 box and ₱0.60 of
+    /// tape holding 6 is ₱2.10 a unit. Nothing without a quantity, as with no bulk packaging.
+    /// </summary>
+    public static decimal CalculateBulkPackagingCost(decimal packCost, int? quantity) =>
+        quantity is >= 1 ? packCost / quantity.Value : 0m;
+
+    /// <summary>
     /// Derives QtyPerUnit and UnitsPerPackagingUnit — exact reciprocals of each other — from whichever one the user actually
     /// typed. 0 has no reciprocal, so it comes out as 0 rather than throwing: <see cref="EnsureValidPackagingLines"/> refuses
     /// it by name on the way in, and on the way out (a row only an edit outside the app could leave, since

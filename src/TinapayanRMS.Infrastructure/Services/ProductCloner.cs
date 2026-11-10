@@ -58,6 +58,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, cancellationToken);
+        var bulkLines = (await PackagingLineRepository.ReadBulkAsync(dbContext, [sourceProductId], cancellationToken))[sourceProductId];
 
         // A packaging set the source links directly stays linked, like its recipe's sub-assemblies: it's kept apart to
         // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.
@@ -101,12 +102,15 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         }
         else if (!asVariant && packagingLines.Count > 0)
         {
-            await PackagingLineRepository.SetLinesAsync(
-                dbContext,
-                newProduct.Id,
-                [.. packagingLines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
-                    l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))],
-                cancellationToken);
+            await PackagingLineRepository.SetLinesAsync(dbContext, newProduct.Id, AsTyped(packagingLines), cancellationToken);
+        }
+
+        // Its bulk packaging is its own, however its packaging is had, so a clone copies it.
+        if (!asVariant && bulkLines.Count > 0)
+        {
+            await PackagingLineRepository.SetBulkLinesAsync(dbContext, newProduct.Id, AsTyped(bulkLines), cancellationToken);
+            newProduct.BulkPackagingQuantity = source.BulkPackagingQuantity;
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         if (costing is not null)
@@ -133,6 +137,12 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
     /// sub-assemblies (lines, role, and its section name there, named after the new product by SetRecipeAsync), and a
     /// link to every one the source links, with the source's add-ins on it as the new product's own.
     /// </summary>
+    /// <summary>Saved packaging lines as SetLinesAsync takes them: each as it was typed.</summary>
+    private static List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> AsTyped(
+        IEnumerable<PackagingLine> lines) =>
+        [.. lines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
+            l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))];
+
     private static RecipeDraft DerivedRecipe(
         List<ProductSubAssemblyUsage> usages,
         ILookup<int, SubAssemblyLine> ownLines,

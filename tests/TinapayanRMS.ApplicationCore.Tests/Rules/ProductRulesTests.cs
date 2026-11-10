@@ -134,6 +134,30 @@ public class ProductRulesTests
     }
 
     [Test]
+    [Arguments(null)]
+    [Arguments(0)]
+    public void EnsureValidBulkPackaging_needs_how_many_products_a_pack_holds_once_it_has_lines(int? quantity)
+    {
+        var act = () => ProductRules.EnsureValidBulkPackaging(lineCount: 2, quantity);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("Enter how many products one bulk pack holds*");
+    }
+
+    [Test]
+    public void EnsureValidBulkPackaging_accepts_lines_with_a_quantity_and_no_lines_with_none()
+    {
+        ProductRules.EnsureValidBulkPackaging(lineCount: 2, quantity: 6);
+        ProductRules.EnsureValidBulkPackaging(lineCount: 0, quantity: null);
+    }
+
+    [Test]
+    public void CalculateBulkPackagingCost_shares_the_packs_cost_out_among_the_products_it_holds()
+    {
+        ProductRules.CalculateBulkPackagingCost(12.60m, 6).Should().Be(2.10m);
+        ProductRules.CalculateBulkPackagingCost(12.60m, null).Should().Be(0m, "no quantity is no bulk packaging");
+    }
+
+    [Test]
     public void EnsureValidPackagingLines_accepts_an_empty_list()
     {
         // Unlike EnsureValidUsages, an empty packaging line list is a valid state — a

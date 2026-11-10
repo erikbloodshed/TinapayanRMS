@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -11,7 +12,8 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// <summary>
 /// The Products screen's Packaging tab, in its Recipe Structure (PackagingSectionView, through ProductsViewModel.Packaging):
 /// the per-piece packaging lines, typed straight into its table, or what they link (another product's
-/// packaging, or a set on the Sub-Assemblies screen), a Move to Sub-Assemblies waiting for Save, and what was last loaded,
+/// packaging, or a set on the Sub-Assemblies screen), its bulk packaging (a box several units share, with how many it
+/// holds), a Move to Sub-Assemblies waiting for Save, and what was last loaded,
 /// which Save compares against. The screen keeps whether the product has packaging at all (HasPackaging, the tab), the
 /// undo history these are part of, and the commands that change them as undo steps.
 /// </summary>
@@ -25,6 +27,12 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// <summary>The lines last loaded, so Save only sends them when they changed.</summary>
     private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedLines = [];
 
+    /// <summary>The bulk lines last loaded, so Save only sends the bulk packaging when it changed.</summary>
+    private List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> _savedBulkLines = [];
+
+    /// <summary>How many products a bulk pack held as last loaded.</summary>
+    private int? _savedBulkQuantity;
+
     /// <summary>The packaging lines, typed straight into the Packaging tab's table.</summary>
     public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
 
@@ -37,6 +45,57 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         get => _selectedLineEdit;
         set => this.RaiseAndSetIfChanged(ref _selectedLineEdit, value);
     }
+
+    /// <summary>
+    /// The bulk packaging's lines, typed into the Packaging tab's Bulk Packaging table: what one bulk pack takes (a box
+    /// several units share, its tape), each quantity per pack (PackagingLine.IsBulk). The product's own, whatever its
+    /// packaging links.
+    /// </summary>
+    public ObservableCollection<PackagingLineRow> BulkEdits { get; } = [];
+
+    /// <summary>The line the Bulk Packaging table's add row edits, as <see cref="NewLineEdit"/> is for the lines.</summary>
+    public Func<PackagingLineRow> NewBulkEdit => () => new PackagingLineRow(findPackagingMaterial) { CostBasis = costBasis() };
+
+    private PackagingLineRow? _selectedBulkEdit;
+    public PackagingLineRow? SelectedBulkEdit
+    {
+        get => _selectedBulkEdit;
+        set => this.RaiseAndSetIfChanged(ref _selectedBulkEdit, value);
+    }
+
+    private int? _bulkQuantity;
+    /// <summary>How many products one bulk pack holds (Product.BulkPackagingQuantity), typed beside its table; null until it is.</summary>
+    public int? BulkQuantity
+    {
+        get => _bulkQuantity;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _bulkQuantity, value);
+            RaiseBulkCostChanged();
+        }
+    }
+
+    /// <summary>What one bulk pack's lines cost together, at the screen's cost basis.</summary>
+    public decimal BulkPackCost => BulkEdits.Sum(l => l.CostPerUnit);
+
+    /// <summary>What the bulk packaging costs one sellable unit: the pack's cost shared out among the products it holds.</summary>
+    public decimal BulkCostPerUnit => ProductRules.CalculateBulkPackagingCost(BulkPackCost, BulkQuantity);
+
+    /// <summary>The Bulk Packaging table's caption: "Pack cost 42.58 ÷ 6 products = 7.10 per unit".</summary>
+    public string BulkCostText => BulkQuantity is >= 1
+        ? $"Pack cost {BulkPackCost:N2} ÷ {BulkQuantity} {(BulkQuantity == 1 ? "product" : "products")} = {BulkCostPerUnit:N2} per unit"
+        : $"Pack cost {BulkPackCost:N2}. Enter how many products one pack holds.";
+
+    /// <summary>The bulk figures again, after a line or the quantity changed.</summary>
+    public void RaiseBulkCostChanged()
+    {
+        this.RaisePropertyChanged(nameof(BulkPackCost));
+        this.RaisePropertyChanged(nameof(BulkCostPerUnit));
+        this.RaisePropertyChanged(nameof(BulkCostText));
+    }
+
+    /// <summary>Every row the Packaging tab shows, its lines and then its bulk lines: what the screen prices and resolves.</summary>
+    public IEnumerable<PackagingLineRow> AllLineEdits => LineEdits.Concat(BulkEdits);
 
     /// <summary>
     /// What the per-piece packaging links as the form stands, saved or not (the Add Sub-Assembly form's Link sets it,
@@ -128,6 +187,15 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         LineEdits.AddRange(rows);
     }
 
+    /// <summary>Puts <paramref name="rows"/> in the Packaging tab's Bulk Packaging table, in place of whatever it held.</summary>
+    public void ShowBulkLines(IEnumerable<PackagingLineRow> rows)
+    {
+        SelectedBulkEdit = null;
+        BulkEdits.Clear();
+        BulkEdits.AddRange(rows);
+        RaiseBulkCostChanged();
+    }
+
     /// <summary>Shows <paramref name="lines"/> as saved, and makes them what Save compares against.</summary>
     public void LoadLines(IReadOnlyList<PackagingLine> lines)
     {
@@ -135,17 +203,45 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         _savedLines = CurrentLines();
     }
 
-    /// <summary>No packaging, lines or link, and none saved: a new product's, or the details cleared for another's.</summary>
+    /// <summary>
+    /// Shows the bulk packaging as saved, its lines for one pack and how many products it holds, and makes it what Save
+    /// compares against.
+    /// </summary>
+    public void LoadBulk(IReadOnlyList<PackagingLine> lines, int? quantity)
+    {
+        ShowBulkLines(lines.Select(PackagingLineRow.FromSaved));
+        BulkQuantity = lines.Count > 0 ? quantity : null;
+        _savedBulkLines = CurrentBulkLines();
+        _savedBulkQuantity = BulkQuantity;
+    }
+
+    /// <summary>No packaging, lines or link, no bulk packaging, and none saved: a new product's, or the details cleared for another's.</summary>
     public void Clear()
     {
         LineEdits.Clear();
         LoadLink(null);
         _savedLines = [];
+        LoadBulk([], null);
     }
 
     /// <summary>The packaging lines as they're typed, those filled in; a line half filled in is refused (BusinessRuleException).</summary>
     public List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentLines() =>
         [.. PackagingLineRow.CompleteLines(LineEdits).Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
+
+    /// <summary>The bulk lines as they're typed, each quantity per pack, those filled in; one half filled in is refused (BusinessRuleException).</summary>
+    public List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> CurrentBulkLines() =>
+        [.. PackagingLineRow.CompleteLines(BulkEdits, "pack").Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
+
+    /// <summary>
+    /// The bulk packaging, its lines and how many products a pack holds, when either differs from what was last loaded,
+    /// else null. Lines need the quantity (refused at Save, ProductRules.EnsureValidBulkPackaging); no lines saves none.
+    /// </summary>
+    public BulkPackagingDraft? ChangedBulk()
+    {
+        var lines = CurrentBulkLines();
+        var quantity = lines.Count > 0 ? BulkQuantity : null;
+        return lines.SequenceEqual(_savedBulkLines) && quantity == _savedBulkQuantity ? null : new BulkPackagingDraft(lines, quantity);
+    }
 
     /// <summary>
     /// The packaging lines when they differ from those last loaded, else null. Linked packaging is never saved here. Lines

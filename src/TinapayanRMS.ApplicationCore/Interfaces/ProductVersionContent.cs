@@ -36,6 +36,9 @@ public sealed record ProductVersionContent
     /// <summary>A composite's products brought their own packaging too (Product.IncludesComponentPackaging).</summary>
     public bool IncludesComponentPackaging { get; init; }
 
+    /// <summary>How many sellable units its bulk pack held (Product.BulkPackagingQuantity); null with no bulk packaging.</summary>
+    public int? BulkPackagingQuantity { get; init; }
+
     /// <summary>Its costing percentages; null when it had none saved, which prices as all zero.</summary>
     public VersionCosting? Costing { get; init; }
 
@@ -61,7 +64,7 @@ public sealed record ProductVersionContent
     /// <summary>What its packaging linked, or null for its own lines.</summary>
     public VersionPackagingLink? PackagingLink { get; init; }
 
-    /// <summary>The packaging lines it showed: its own, or those its link brought, resolved.</summary>
+    /// <summary>The packaging lines it showed: its own, or those its link brought, resolved; then its bulk packaging's (IsBulk).</summary>
     public IReadOnlyList<VersionPackagingLine> PackagingLines { get; init; } = [];
 
     /// <summary>A composite's products, each with what one of it brought then; none for a product of sub-assemblies.</summary>
@@ -136,8 +139,12 @@ public sealed record VersionAddIn(int IngredientId, decimal Grams);
 /// <summary>Another product's packaging (<see cref="ProductId"/>) or a packaging set (<see cref="SubAssemblyId"/>), by the name it had.</summary>
 public sealed record VersionPackagingLink(int? ProductId, int? SubAssemblyId, string Name);
 
-/// <summary>A packaging line, its quantity per sellable unit in <see cref="UnitId"/> (one of the material's units) or, when null, its base unit.</summary>
-public sealed record VersionPackagingLine(int MaterialId, int? UnitId, decimal QtyPerUnit);
+/// <summary>
+/// A packaging line, its quantity per sellable unit in <see cref="UnitId"/> (one of the material's units) or, when null, its
+/// base unit; or with <see cref="IsBulk"/>, a line of its bulk packaging, its quantity per bulk pack (2026-11-10: a
+/// version saved before reads as none).
+/// </summary>
+public sealed record VersionPackagingLine(int MaterialId, int? UnitId, decimal QtyPerUnit, bool IsBulk = false);
 
 /// <summary>One product in a composite, and what one sellable unit of it brought at each basis (SavedProductReader's ComponentCosts).</summary>
 public sealed record VersionComponent(

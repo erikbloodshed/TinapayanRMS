@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261105060247_DropStoredSubAssemblyTotals";
+    public override string LastMigrationId => "20261110083212_BulkPackaging";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -204,6 +204,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer")
                     .HasColumnName("authored_field");
 
+                b.Property<bool>("IsBulk")
+                    .HasColumnType("boolean")
+                    .HasColumnName("is_bulk");
+
                 b.Property<int>("PackagingMaterialId")
                     .HasColumnType("integer")
                     .HasColumnName("packaging_material_id");
@@ -239,9 +243,9 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("UnitId")
                     .HasDatabaseName("ix_packaging_lines_unit_id");
 
-                b.HasIndex("ProductId", "PackagingMaterialId")
+                b.HasIndex("ProductId", "PackagingMaterialId", "IsBulk")
                     .IsUnique()
-                    .HasDatabaseName("ix_packaging_lines_product_id_packaging_material_id");
+                    .HasDatabaseName("ix_packaging_lines_product_id_packaging_material_id_is_bulk");
 
                 b.ToTable("packaging_lines", t =>
                     {
@@ -379,6 +383,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<int?>("BulkPackagingQuantity")
+                    .HasColumnType("integer")
+                    .HasColumnName("bulk_packaging_quantity");
+
                 b.Property<int?>("CategoryId")
                     .HasColumnType("integer")
                     .HasColumnName("category_id");
@@ -443,6 +451,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 b.ToTable("products", t =>
                     {
+                        t.HasCheckConstraint("CK_Products_BulkPackagingQuantity", "bulk_packaging_quantity IS NULL OR bulk_packaging_quantity >= 1");
+
                         t.HasCheckConstraint("CK_Products_ComponentPackagingOnComposite", "is_composite OR NOT includes_component_packaging");
 
                         t.HasCheckConstraint("CK_Products_CompositeIsOneUnit", "NOT is_composite OR quantity_required = 1");

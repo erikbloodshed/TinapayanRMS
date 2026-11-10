@@ -200,22 +200,33 @@ public sealed record PrintedLine(string Ingredient, decimal Grams, decimal? Perc
 
 /// <summary>The product's packaging on paper: what one sellable unit takes of each material, as the Packaging tab shows it.</summary>
 /// <param name="LinkedTo">"Linked to Gift Box Set (Sub-Assemblies)" for linked packaging; null for the product's own lines.</param>
-/// <param name="Total">What the lines cost together, for one sellable unit.</param>
+/// <param name="Total">What the lines cost together, for one sellable unit; the bulk pack's share is its own (<see cref="Bulk"/>).</param>
 public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPackagingLine> Lines, decimal Total)
 {
-    /// <summary>The Packaging tab's lines, leaving out any without a material, which isn't a line yet.</summary>
-    public static PrintedPackaging From(IEnumerable<PricedPackagingLine> packagingLines, string? linkedTo)
+    /// <summary>Its bulk packaging, under the lines; null for a product without.</summary>
+    public PrintedBulkPackaging? Bulk { get; init; }
+
+    /// <summary>The Packaging tab's lines and its bulk packaging, leaving out any line without a material, which isn't a line yet.</summary>
+    public static PrintedPackaging From(IEnumerable<PricedPackagingLine> packagingLines, string? linkedTo, PricedBulkPackaging? bulk = null)
     {
-        IReadOnlyList<PrintedPackagingLine> lines =
+        var lines = LinesOf(packagingLines);
+        var printedBulk = bulk is null ? null : new PrintedBulkPackaging(LinesOf(bulk.Lines), bulk.Quantity, bulk.PackCost, bulk.CostPerUnit);
+        return new(linkedTo, lines, lines.Sum(l => l.Cost)) { Bulk = printedBulk };
+    }
+
+    private static IReadOnlyList<PrintedPackagingLine> LinesOf(IEnumerable<PricedPackagingLine> lines) =>
         [
-            .. packagingLines
+            .. lines
                 .Where(l => l.PackagingMaterial is not null)
                 .Select(l => new PrintedPackagingLine(l.PackagingMaterial!.Name, l.QtyPerUnit, l.UnitAbbreviation ?? string.Empty, l.UnitCost, l.CostPerUnit)),
         ];
-
-        return new(linkedTo, lines, lines.Sum(l => l.Cost));
-    }
 }
+
+/// <summary>
+/// A product's bulk packaging on paper: what one bulk pack takes of each material (each line's quantity and cost for the
+/// pack), how many products the pack holds, and each one's share of its cost.
+/// </summary>
+public sealed record PrintedBulkPackaging(IReadOnlyList<PrintedPackagingLine> Lines, int? Quantity, decimal PackCost, decimal CostPerUnit);
 
 /// <summary>One product in a composite, as its Products table shows it.</summary>
 /// <param name="Quantity">How many of the product's sellable units go in; null while nothing is typed for it.</param>
@@ -251,6 +262,7 @@ public sealed record PrintedPackagingLine(string Material, decimal? Qty, string 
 {
     /// <summary>On the Price Simulator report, what the line costs at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowCost { get; init; }
+
 }
 
 /// <summary>
@@ -282,7 +294,7 @@ public static class SavedProductPrintout
         null,
         printedAt,
         [.. saved.Sections.Select(s => PrintedSection.From(s, saved.CostBasis))],
-        saved.HasPackaging ? PrintedPackaging.From(saved.PackagingLines, saved.PackagingLinkedTo) : null,
+        saved.HasPackaging ? PrintedPackaging.From(saved.PackagingLines, saved.PackagingLinkedTo, saved.BulkPackaging) : null,
         saved.Costs,
         saved.Product.IsComposite
             ? [.. saved.Components.Select(c => saved.Product.IncludesComponentPackaging

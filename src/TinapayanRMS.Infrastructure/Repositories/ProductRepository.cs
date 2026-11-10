@@ -180,11 +180,21 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public Task<int> SaveAsync(
+        Product product,
+        RecipeDraft? recipe,
+        PackagingLinkDraft? packagingLink,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        CostingParameters? costing,
+        CancellationToken cancellationToken) =>
+        SaveAsync(product, recipe, packagingLink, packagingLines, bulkPackaging: null, costing, cancellationToken);
+
     public async Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,
         PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        BulkPackagingDraft? bulkPackaging,
         CostingParameters? costing,
         CancellationToken cancellationToken)
     {
@@ -254,6 +264,16 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             {
                 await PackagingLineRepository.SetLinesAsync(dbContext, fields.Id, packagingLines, cancellationToken);
             }
+        }
+
+        // The bulk packaging is the product's own whatever its packaging links, so it's written after the link, apart from
+        // the lines, with how many units a pack holds: none without lines.
+        if (bulkPackaging is not null)
+        {
+            ProductRules.EnsureValidBulkPackaging(bulkPackaging.Lines.Count, bulkPackaging.Quantity);
+            await PackagingLineRepository.SetBulkLinesAsync(dbContext, fields.Id, bulkPackaging.Lines, cancellationToken);
+            stored.BulkPackagingQuantity = bulkPackaging.Lines.Count > 0 ? bulkPackaging.Quantity : null;
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         if (costing is not null)

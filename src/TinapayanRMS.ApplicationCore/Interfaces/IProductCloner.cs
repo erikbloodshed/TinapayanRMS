@@ -7,7 +7,7 @@ public interface IProductCloner
     /// Its recipe links the sub-assemblies the source links, at the same piece sizes, with
     /// the source's add-ins as its own, and has its own copy of each of the source's own. Then its packaging lines as the source
     /// shows them (resolved through a packaging link, never inherited as a link; a packaging set the source
-    /// links stays linked), and its costing parameters. A composite's clone is a composite holding the same products at
+    /// links stays linked), its bulk packaging, and its costing parameters. A composite's clone is a composite holding the same products at
     /// the same quantities. One transaction: all of it, or none.
     /// </summary>
     Task<int> CloneAsync(int sourceProductId, string newProductName, CancellationToken cancellationToken);

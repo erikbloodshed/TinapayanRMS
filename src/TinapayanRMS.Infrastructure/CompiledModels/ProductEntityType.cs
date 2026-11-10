@@ -23,7 +23,7 @@ public partial class ProductEntityType
             "TinapayanRMS.Domain.Entities.Product",
             typeof(Product),
             baseEntityType,
-            propertyCount: 11,
+            propertyCount: 12,
             navigationCount: 1,
             foreignKeyCount: 1,
             unnamedIndexCount: 2,
@@ -39,6 +39,15 @@ public partial class ProductEntityType
             sentinel: 0);
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         id.AddAnnotation("Relational:ColumnName", "id");
+
+        var bulkPackagingQuantity = runtimeEntityType.AddProperty(
+            "BulkPackagingQuantity",
+            typeof(int?),
+            propertyInfo: typeof(Product).GetProperty("BulkPackagingQuantity", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(Product).GetField("<BulkPackagingQuantity>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true);
+        bulkPackagingQuantity.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        bulkPackagingQuantity.AddAnnotation("Relational:ColumnName", "bulk_packaging_quantity");
 
         var categoryId = runtimeEntityType.AddProperty(
             "CategoryId",

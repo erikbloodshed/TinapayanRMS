@@ -60,7 +60,26 @@ public static class ProductRecipeEndpoints
                 [.. s.AddIns.Select(a => new PlanLine(a.Ingredient.Id, a.Ingredient.Name, a.Grams))])),
         ],
         saved.Costs.WastagePercent,
-        [.. saved.PackagingLines.Where(l => l.PackagingMaterialId is not null && l.BaseQty is > 0m).Select(l => new PackagingPerUnitInfo(l.PackagingMaterialId!.Value, l.BaseQty!.Value))],
+        PackagingPerUnit(saved),
         saved.Product.IncludesComponentPackaging,
         new ProductCostingInfo(saved.Costs.CurrentPrice, saved.Costs.SellingPrice, saved.Costs.VatPercent, saved.Costs.BaseCost));
+
+    /// <summary>
+    /// What one sellable unit takes of each packaging material, in its base unit: its packaging lines, and its share of the
+    /// bulk pack's (each line's quantity for the pack over how many products it holds), one entry a material.
+    /// </summary>
+    private static List<PackagingPerUnitInfo> PackagingPerUnit(SavedProduct saved)
+    {
+        var bulk = saved.BulkPackaging is { Quantity: >= 1 } pack
+            ? pack.Lines.Select(l => (l.PackagingMaterialId, BaseQty: l.BaseQty / pack.Quantity!.Value))
+            : [];
+        return
+        [
+            .. saved.PackagingLines.Select(l => (l.PackagingMaterialId, l.BaseQty))
+                .Concat(bulk)
+                .Where(l => l.PackagingMaterialId is not null && l.BaseQty is > 0m)
+                .GroupBy(l => l.PackagingMaterialId!.Value)
+                .Select(g => new PackagingPerUnitInfo(g.Key, g.Sum(l => l.BaseQty!.Value))),
+        ];
+    }
 }

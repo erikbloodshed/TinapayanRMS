@@ -48,9 +48,10 @@ public static class ProductVersionSnapshot
         }
 
         // As the Packaging tab shows them (PackagingLineRow.FromSaved): a line saved as pieces per unit is its quantity per
-        // unit, in its unit while the material still has that unit, else in the base unit.
+        // unit, in its unit while the material still has that unit, else in the base unit. Its bulk packaging after, each
+        // line's quantity per bulk pack.
         List<VersionPackagingLine> packaging = [];
-        foreach (var line in detail.Lines)
+        foreach (var line in detail.Lines.Concat(detail.BulkLines))
         {
             Use(line.PackagingMaterial);
             var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
@@ -58,7 +59,7 @@ public static class ProductVersionSnapshot
             int? unitId = line.UnitId is { } id && PricedPackagingLine.UnitChoices(line.PackagingMaterial, CostBasis.Buffered).Any(c => c.Key == id)
                 ? id
                 : null;
-            packaging.Add(new VersionPackagingLine(line.PackagingMaterialId, unitId, qtyPerUnit));
+            packaging.Add(new VersionPackagingLine(line.PackagingMaterialId, unitId, qtyPerUnit, line.IsBulk));
         }
 
         var costing = detail.Costing;
@@ -69,6 +70,7 @@ public static class ProductVersionSnapshot
             QuantityRequired = product.QuantityRequired,
             CurrentPrice = product.CurrentPrice,
             IncludesComponentPackaging = product.IncludesComponentPackaging,
+            BulkPackagingQuantity = detail.BulkLines.Count > 0 ? product.BulkPackagingQuantity : null,
             Costing = costing is null
                 ? null
                 : new VersionCosting(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
@@ -121,6 +123,7 @@ public static class ProductVersionSnapshot
             QuantityRequired = content.QuantityRequired,
             CurrentPrice = content.CurrentPrice,
             IncludesComponentPackaging = content.IncludesComponentPackaging,
+            BulkPackagingQuantity = content.BulkPackagingQuantity,
         };
 
         List<ProductSubAssemblyUsage> usages = [];
@@ -177,9 +180,9 @@ public static class ProductVersionSnapshot
             }));
         }
 
-        List<PackagingLine> packaging =
+        List<PackagingLine> PackagingOf(bool isBulk) =>
         [
-            .. content.PackagingLines.Select((l, sortOrder) => new PackagingLine
+            .. content.PackagingLines.Where(l => l.IsBulk == isBulk).Select((l, sortOrder) => new PackagingLine
             {
                 ProductId = productId,
                 PackagingMaterialId = l.MaterialId,
@@ -188,8 +191,10 @@ public static class ProductVersionSnapshot
                 QtyPerUnit = l.QtyPerUnit,
                 AuthoredField = PackagingLineAuthoredField.QtyPerUnit,
                 SortOrder = sortOrder,
+                IsBulk = isBulk,
             }),
         ];
+        var packaging = PackagingOf(isBulk: false);
 
         var costing = content.Costing is { } c
             ? new CostingParameters
@@ -215,6 +220,7 @@ public static class ProductVersionSnapshot
 
         var detail = new ProductDetail(link, usages, packaging, costing, lines, addIns)
         {
+            BulkLines = PackagingOf(isBulk: true),
             WastagePercent = wastagePercentNow ?? content.WastagePercent ?? 0m,
             VatPercent = vatPercentNow ?? content.VatThen,
             Components =

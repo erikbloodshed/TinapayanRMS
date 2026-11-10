@@ -39,6 +39,13 @@ public sealed class Product
     public bool IncludesComponentPackaging { get; set; }
 
     /// <summary>
+    /// How many sellable units one bulk pack holds (6 for a box of 6): its bulk packaging lines (PackagingLine.IsBulk) cost
+    /// each unit their total over this (ProductRules.CalculateBulkPackagingCost). A whole number, 1 or more, set while it
+    /// has bulk packaging and null otherwise (ProductRules.EnsureValidBulkPackaging, CK_Products_BulkPackagingQuantity).
+    /// </summary>
+    public int? BulkPackagingQuantity { get; set; }
+
+    /// <summary>
     /// How many finished pieces make one sellable unit: 1 for a product sold by the piece, 8 for a "Box of 8".
     /// The recipe is authored per piece whatever this is; the costing multiplies by it, and the packaging lines
     /// are for one whole sellable unit. Always at least 1 (CK_Products_QuantityRequired).

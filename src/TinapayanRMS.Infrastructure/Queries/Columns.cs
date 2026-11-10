@@ -29,12 +29,12 @@ internal static class Columns
         [typeof(SubAssemblyLine)] = ["id", "sub_assembly_id", "ingredient_id", "grams", "is_formula_base", "authored_bakers_percent", "sort_order"],
         [typeof(SubAssemblyPackagingLine)] = ["id", "sub_assembly_id", "packaging_material_id", "unit_id", "qty_per_set", "sort_order"],
         [typeof(ProductCategory)] = ["id", "name", "wastage_percent"],
-        [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at"],
+        [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at", "bulk_packaging_quantity"],
         [typeof(ProductComponent)] = ["id", "product_id", "component_product_id", "quantity", "sort_order"],
         [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value"],
         [typeof(UsageAddInLine)] = ["id", "usage_id", "ingredient_id", "grams", "sort_order"],
         [typeof(PackagingLine)] =
-            ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order"],
+            ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order", "is_bulk"],
         [typeof(CostingParameters)] =
             ["id", "product_id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent"],
         [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent", "price_rounding_step"],

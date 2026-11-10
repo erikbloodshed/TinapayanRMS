@@ -155,6 +155,18 @@ public class ProductVersionRulesTests
     }
 
     [Test]
+    public void Bulk_packaging_is_listed_apart_from_the_lines_with_how_many_products_a_pack_holds()
+    {
+        // The paper bag is both a line for each unit and the bulk pack's, and each is told apart.
+        var bulked = Base with { PackagingLines = [.. Base.PackagingLines, new VersionPackagingLine(Bag, null, 2m, IsBulk: true)], BulkPackagingQuantity = 6 };
+        var bulkedFor8 = bulked with { BulkPackagingQuantity = 8 };
+
+        ProductVersionRules.Changes(Base, bulked).Should().Equal("Bulk packaging: Paper Bag added, 2 pc", "Bulk packaging: 6 products per pack");
+        ProductVersionRules.Changes(bulked, bulkedFor8).Should().Equal("Bulk packaging: 6 → 8 products per pack");
+        ProductVersionRules.Changes(bulked, Base).Should().Equal("Bulk packaging: Paper Bag removed");
+    }
+
+    [Test]
     public void A_packaging_link_is_listed_by_what_it_links()
     {
         var linked = Base with { PackagingLink = new VersionPackagingLink(null, 50, "Gift Box Set") };

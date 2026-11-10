@@ -1,6 +1,8 @@
 @* A product's packaging (the WPF PackagingSectionView): where it's linked from, as a tag, or a link that opens the
    packaging set on Sub-Assemblies; what it costs per sellable unit; its lines, typed into unless they're linked; and
-   Move to Sub-Assemblies for its own, or Make a Copy for a linked one. *@
+   Move to Sub-Assemblies for its own, or Make a Copy for a linked one. Under them, its bulk packaging: what one bulk pack
+   takes (a box several units share, its tape), and in a box of its own how many products the pack holds, which share
+   out its cost. *@
 <div class="section-view">
     <div class="section-heading">
         <div class="usage-badges">
@@ -45,8 +47,32 @@
             <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
         }
     </div>
+
+    <div class="add-ins bulk-packaging">
+        <div class="add-ins-heading">
+            <span class="group-heading">Bulk Packaging</span>
+            <div class="bulk-quantity">
+                <label class="form-label" for="bulk-quantity">Products per pack</label>
+                <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="ViewModel.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
+                             Tooltip="How many products one bulk pack holds: the pack's cost is shared out among them." />
+            </div>
+        </div>
+        <PackagingLinesGrid @ref="_bulk" Items="ViewModel.Packaging.BulkEdits" NewItem="ViewModel.Packaging.NewBulkEdit" Materials="ViewModel.PackagingMaterials"
+                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.CostBasis"
+                            EmptyText="No bulk packaging. Add what one bulk pack takes, such as a box several products share." />
+        <div class="lines-footer">
+            <p class="caption">@ViewModel.Packaging.BulkCostText</p>
+            <div class="button-row">
+                <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
+                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                <CommandButton Command="ViewModel.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+            </div>
+        </div>
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+
+    private PackagingLinesGrid? _bulk;
 }

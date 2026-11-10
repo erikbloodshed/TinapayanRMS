@@ -12,7 +12,8 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
 {
     public Task<IReadOnlyList<PackagingLine>> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(
-            dbContext => RawMaterialReads.GetPackagingLinesAsync(dbContext, "WHERE l.product_id = @productId", new { productId }, cancellationToken),
+            dbContext => RawMaterialReads.GetPackagingLinesAsync(
+                dbContext, "WHERE l.product_id = @productId AND NOT l.is_bulk", new { productId }, cancellationToken),
             cancellationToken);
 
     public async Task<IReadOnlyList<PackagingLine>> GetEffectiveForProductAsync(int productId, CancellationToken cancellationToken)
@@ -27,7 +28,8 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         HashSet<int> looping = [];
         var lines = await ResolveEffectiveAsync(dbContext, productIds, cancellationToken, looping);
-        return new EffectivePackaging(lines, looping);
+        var bulk = await ReadBulkAsync(dbContext, productIds, cancellationToken);
+        return new EffectivePackaging(lines, looping) { Bulk = bulk };
     }
 
     /// <summary><see cref="ResolveEffectiveAsync(TinapayanRMSDbContext, IReadOnlyCollection{int}, CancellationToken, ISet{int})"/> for one product.</summary>
@@ -38,6 +40,7 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
     /// <summary>
     /// Each product's packaging as it shows, by product id: its link chain (if any) is followed to an unlinked product,
     /// whose own lines it shows, or to a packaging set, whose lines it shows as its own (<see cref="SetLinesAsPackagingLines"/>).
+    /// Bulk packaging (PackagingLine.IsBulk) is never among them: it's each product's own, read by <see cref="ReadBulkAsync"/>.
     /// Every link is read in one query and followed in memory, then the lines at the chains' ends in one query for
     /// products and one for sets, however many products and however long their chains. A chain that comes round again,
     /// which only an edit outside the app can leave (SetLinkAsync refuses one), is refused, as a write that copies the
@@ -72,7 +75,7 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         var ownLines = ownerIds.Count == 0
             ? []
             : await RawMaterialReads.GetPackagingLinesAsync(
-                dbContext, $"WHERE l.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(ownerIds) }, cancellationToken);
+                dbContext, $"WHERE l.product_id IN ({DapperReads.IdsTable}) AND NOT l.is_bulk", new { ids = DapperReads.IdList(ownerIds) }, cancellationToken);
         var setLines = setIds.Count == 0 ? [] : await RawMaterialReads.GetSetLinesAsync(dbContext, setIds, cancellationToken);
 
         var ownLinesByProduct = ownLines.ToLookup(l => l.ProductId);
@@ -85,6 +88,22 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
                 { SetId: { } setId } end => SetLinesAsPackagingLines(end.ProductId, setLinesBySet[setId]),
                 var end => (IReadOnlyList<PackagingLine>)[.. ownLinesByProduct[end.Value.ProductId]],
             });
+    }
+
+    /// <summary>
+    /// Each product's bulk packaging (PackagingLine.IsBulk), by product id, in one query: its own, whatever its packaging
+    /// links, each line's quantity per bulk pack. A product with none has an empty list.
+    /// </summary>
+    internal static async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ReadBulkAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+    {
+        var ids = productIds.Distinct().ToList();
+        var lines = ids.Count == 0
+            ? []
+            : await RawMaterialReads.GetPackagingLinesAsync(
+                dbContext, $"WHERE l.product_id IN ({DapperReads.IdsTable}) AND l.is_bulk", new { ids = DapperReads.IdList(ids) }, cancellationToken);
+        var byProduct = lines.ToLookup(l => l.ProductId);
+        return ids.ToDictionary(id => id, id => (IReadOnlyList<PackagingLine>)[.. byProduct[id]]);
     }
 
     /// <summary>
@@ -154,12 +173,43 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
 
     /// <summary>
     /// Replaces the product's packaging lines on the caller's context and saves them, after every check
-    /// SetLinesAsync makes.
+    /// SetLinesAsync makes. Its bulk packaging stays as it is.
     /// </summary>
     internal static async Task SetLinesAsync(
         TinapayanRMSDbContext dbContext,
         int productId,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        CancellationToken cancellationToken)
+    {
+        var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
+        if (isLinked)
+        {
+            throw new BusinessRuleException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
+        }
+
+        await ReplaceLinesAsync(dbContext, productId, lines, isBulk: false, cancellationToken);
+    }
+
+    /// <summary>
+    /// Replaces the product's bulk packaging lines (PackagingLine.IsBulk), each quantity per bulk pack, on the caller's
+    /// context and saves them, after the checks SetLinesAsync makes on a line. Its other lines and its link stay as they are.
+    /// </summary>
+    internal static Task SetBulkLinesAsync(
+        TinapayanRMSDbContext dbContext,
+        int productId,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        CancellationToken cancellationToken) =>
+        ReplaceLinesAsync(dbContext, productId, lines, isBulk: true, cancellationToken);
+
+    /// <summary>
+    /// Checks <paramref name="lines"/> (each a packaging material, in one of its own units, at a positive quantity, no
+    /// material twice) and puts them in place of the product's lines of the same kind, bulk or not.
+    /// </summary>
+    private static async Task ReplaceLinesAsync(
+        TinapayanRMSDbContext dbContext,
+        int productId,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> lines,
+        bool isBulk,
         CancellationToken cancellationToken)
     {
         ProductRules.EnsureValidPackagingLines(
@@ -169,12 +219,6 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         if (!productExists)
         {
             throw new BusinessRuleException($"Product {productId} does not exist.");
-        }
-
-        var isLinked = await dbContext.PackagingLinks.AnyAsync(l => l.ProductId == productId, cancellationToken);
-        if (isLinked)
-        {
-            throw new BusinessRuleException("This product's packaging is linked to another product's — unlink it before editing its lines directly.");
         }
 
         var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
@@ -208,7 +252,7 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
         }
 
         await dbContext.PackagingLines
-            .Where(l => l.ProductId == productId)
+            .Where(l => l.ProductId == productId && l.IsBulk == isBulk)
             .ExecuteDeleteAsync(cancellationToken);
 
         dbContext.PackagingLines.AddRange(lines.Select((l, index) =>
@@ -223,6 +267,7 @@ public sealed class PackagingLineRepository(IDbContextFactory<TinapayanRMSDbCont
                 UnitsPerPackagingUnit = unitsPerPackagingUnit,
                 AuthoredField = l.AuthoredField,
                 SortOrder = index,
+                IsBulk = isBulk,
             };
         }));
 

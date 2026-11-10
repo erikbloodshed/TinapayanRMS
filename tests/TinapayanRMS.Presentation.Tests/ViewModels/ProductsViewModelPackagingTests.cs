@@ -367,6 +367,112 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.UsageForm.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
     });
 
+    [Test]
+    public Task Bulk_packaging_costs_each_product_its_share_of_the_pack_saves_and_reads_back() => UiThread.RunAsync(async () =>
+    {
+        var (wrapperId, boxId) = await AddWrapperSetAndBoxAsync();
+        var viewModel = await OpenLinkedAsync();
+        viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
+        viewModel.Packaging.BulkEdits.Should().BeEmpty();
+        viewModel.Costing.Costs.Packaging.Should().Be(2m);
+
+        // A ₱12 box for 6: typed as 1 box a pack, and 6 products in the box beside it. Its quantity stays as typed.
+        viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        viewModel.Packaging.BulkQuantity = 6;
+
+        await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 4m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
+        viewModel.Packaging.BulkEdits.Single().QtyPerUnit.Should().Be(1m);
+        viewModel.Packaging.BulkCostText.Should().Be("Pack cost 12.00 ÷ 6 products = 2.00 per unit");
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+
+        await using (var dbContext = CreateDbContext())
+        {
+            var line = await dbContext.PackagingLines.SingleAsync(Cancellation);
+            (line.PackagingMaterialId, line.IsBulk, line.QtyPerUnit).Should().Be((boxId, true, 1m));
+            (await dbContext.Products.SingleAsync(Cancellation)).BulkPackagingQuantity.Should().Be(6);
+            (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(1, "the set stays linked");
+        }
+
+        var reopened = await OpenLinkedAsync();
+        reopened.Packaging.LineEdits.Select(l => l.PackagingMaterialId).Should().Equal(wrapperId);
+        reopened.Packaging.BulkEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(1m);
+        reopened.Packaging.BulkQuantity.Should().Be(6);
+        reopened.Costing.Costs.Packaging.Should().Be(4m);
+
+        // Remove Line is one undo step.
+        reopened.Packaging.SelectedBulkEdit = reopened.Packaging.BulkEdits.Single();
+        await reopened.RemoveBulkLineCommand.Execute();
+        reopened.Packaging.BulkEdits.Should().BeEmpty();
+        reopened.Costing.Costs.Packaging.Should().Be(2m);
+        reopened.TryUndo().Should().BeTrue();
+        reopened.Packaging.BulkEdits.Should().ContainSingle();
+    });
+
+    [Test]
+    public Task Bulk_lines_without_how_many_products_a_pack_holds_are_refused_at_Save() => UiThread.RunAsync(async () =>
+    {
+        var (_, boxId) = await AddWrapperSetAndBoxAsync();
+        var viewModel = await OpenLinkedAsync();
+        viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        await Settle.UntilAsync(viewModel, () => viewModel.Packaging.BulkPackCost == 12m, () => $"pack={viewModel.Packaging.BulkPackCost}");
+        viewModel.Costing.Costs.Packaging.Should().Be(2m, "with no quantity the pack is shared among none yet");
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().StartWith("Enter how many products one bulk pack holds");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
+    });
+
+    [Test]
+    public Task Make_a_Copy_of_linked_packaging_keeps_the_bulk_packaging_apart() => UiThread.RunAsync(async () =>
+    {
+        var (wrapperId, boxId) = await AddWrapperSetAndBoxAsync();
+        var viewModel = await OpenLinkedAsync();
+        viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        viewModel.Packaging.BulkQuantity = 6;
+        await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 4m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
+
+        await viewModel.CopyPackagingCommand.Execute();
+
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Packaging.LineEdits.Select(l => l.PackagingMaterialId).Should().Equal(wrapperId);
+        viewModel.Packaging.BulkEdits.Select(l => l.PackagingMaterialId).Should().Equal(boxId);
+        viewModel.Costing.Costs.Packaging.Should().Be(4m);
+
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
+        (await dbContext.PackagingLines.OrderBy(l => l.IsBulk).Select(l => new { l.PackagingMaterialId, l.IsBulk }).ToListAsync(Cancellation))
+            .Should().BeEquivalentTo([new { PackagingMaterialId = wrapperId, IsBulk = false }, new { PackagingMaterialId = boxId, IsBulk = true }]);
+    });
+
+    /// <summary>A Wrapper Set (one ₱2 wrapper a unit), Ensaymada linking it, and a ₱12 box; returns the wrapper's and the box's ids.</summary>
+    private async Task<(int WrapperId, int BoxId)> AddWrapperSetAndBoxAsync()
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var wrapperId = await AddPackagingAsync("Wrapper", 2m);
+        var boxId = await AddPackagingAsync("Box", 12m);
+        var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Wrapper Set", RoleId = packagingRoleId }, [(wrapperId, null, 1m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
+        return (wrapperId, boxId);
+    }
+
+    /// <summary>A new screen open on Ensaymada's Packaging tab, its linked lines in.</summary>
+    private async Task<ProductsViewModel> OpenLinkedAsync()
+    {
+        var viewModel = await CreateLoadedViewModelAsync();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ensaymada");
+        await Settle.UntilAsync(viewModel,
+            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+        return viewModel;
+    }
+
     /// <summary>Ensaymada, with one <paramref name="boxId"/> a piece as its own packaging, open on its Packaging tab.</summary>
     private async Task<ProductsViewModel> OpenWithOwnPackagingAsync(int boxId)
     {

@@ -75,6 +75,7 @@ public sealed class VersionedSaves(
         RecipeDraft? recipe,
         PackagingLinkDraft? packagingLink,
         IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        BulkPackagingDraft? bulkPackaging,
         CostingParameters? costing,
         bool changesSharing,
         DateTime savedAt,
@@ -91,7 +92,7 @@ public sealed class VersionedSaves(
                 }
             }
 
-            var id = await productRepository.SaveAsync(product, recipe, packagingLink, packagingLines, costing, cancellationToken);
+            var id = await productRepository.SaveAsync(product, recipe, packagingLink, packagingLines, bulkPackaging, costing, cancellationToken);
             var saved = await productRepository.GetByIdAsync(id, cancellationToken)
                 ?? throw new InvalidOperationException($"Product {id} wasn't there to read back after its Save.");
             var detail = await savedProducts.ReadDetailAsync(id, cancellationToken);

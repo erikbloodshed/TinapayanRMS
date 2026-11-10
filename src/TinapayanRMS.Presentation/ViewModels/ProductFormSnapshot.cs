@@ -80,6 +80,12 @@ public sealed record ProductFormSnapshot
     public required bool IsPackagingMoving { get; init; }
     public required IReadOnlyList<PackagingLineState> Lines { get; init; }
 
+    /// <summary>The bulk packaging's lines, each for one bulk pack.</summary>
+    public required IReadOnlyList<PackagingLineState> BulkLines { get; init; }
+
+    /// <summary>How many products one bulk pack holds, as typed; null while nothing is.</summary>
+    public required int? BulkQuantity { get; init; }
+
     /// <summary>A composite's Products table; empty for a product made of sub-assemblies, which has no such table.</summary>
     public required IReadOnlyList<ComponentLineState> Components { get; init; }
 
@@ -127,6 +133,8 @@ public sealed record ProductFormSnapshot
         && Equals(PackagingLink, other.PackagingLink)
         && IsPackagingMoving == other.IsPackagingMoving
         && Lines.SequenceEqual(other.Lines)
+        && BulkLines.SequenceEqual(other.BulkLines)
+        && BulkQuantity == other.BulkQuantity
         && Components.SequenceEqual(other.Components)
         && IsUsageFormOpen == other.IsUsageFormOpen
         && IsAddingUsage == other.IsAddingUsage

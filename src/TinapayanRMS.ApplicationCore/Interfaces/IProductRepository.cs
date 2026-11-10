@@ -132,6 +132,15 @@ public closed record PackagingLinkDraft
 }
 
 /// <summary>
+/// A product's bulk packaging as Save writes it: the packaging one bulk pack takes (a box several units share, its tape),
+/// each line's quantity per pack, and how many sellable units one pack holds (Product.BulkPackagingQuantity), which its
+/// cost is shared out among. No lines is no bulk packaging, and the quantity is then stored as null.
+/// </summary>
+public sealed record BulkPackagingDraft(
+    IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> Lines,
+    int? Quantity);
+
+/// <summary>
 /// A product filed under another folder of the Products list: the stage and category it goes in from now on.
 /// <paramref name="CategoryId"/> null leaves it uncategorized.
 /// </summary>
@@ -226,7 +235,21 @@ public interface IProductRepository
     /// ("Ensaymada Packaging", numbered when taken), and links it: the product keeps no lines of its own.
     /// </param>
     /// <param name="packagingLines">The new packaging lines, as IPackagingLineRepository.SetLinesAsync takes them, or null to leave them as they are.</param>
+    /// <param name="bulkPackaging">
+    /// The new bulk packaging, its lines and how many units a pack holds (one needs the other:
+    /// ProductRules.EnsureValidBulkPackaging), or null to leave it as it is. The product's own, whatever its packaging links.
+    /// </param>
     /// <param name="costing">The new costing parameters (only their cost and percentage fields are read), or null to leave them as they are.</param>
+    Task<int> SaveAsync(
+        Product product,
+        RecipeDraft? recipe,
+        PackagingLinkDraft? packagingLink,
+        IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)>? packagingLines,
+        BulkPackagingDraft? bulkPackaging,
+        CostingParameters? costing,
+        CancellationToken cancellationToken);
+
+    /// <summary>SaveAsync leaving the bulk packaging as it is.</summary>
     Task<int> SaveAsync(
         Product product,
         RecipeDraft? recipe,

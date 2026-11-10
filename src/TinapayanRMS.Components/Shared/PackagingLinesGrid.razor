@@ -4,7 +4,7 @@
 @* Packaging lines, as the WPF packaging grids (a packaging set on Sub-Assemblies, a product's Packaging section): the
    material (picked from a list showing its category, base unit and cost per unit), how many, in any of the material's
    own units (its base unit or an alternative one), that unit's cost, and the line's cost. Dragged into order. *@
-<LineGrid TRow="PackagingLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
+<LineGrid @ref="_grid" TRow="PackagingLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
           Reorderable="!ReadOnly" ReadOnly="ReadOnly" EmptyText="@EmptyText" Footer="Footer">
     <Header>
         <th>Material</th>
@@ -73,4 +73,9 @@
     [Parameter] public string? EmptyText { get; set; }
 
     [Parameter] public RenderFragment? Footer { get; set; }
+
+    private LineGrid<PackagingLineRow>? _grid;
+
+    /// <summary>Insert Line: a blank line above the one picked, or at the bottom, ready to type. Undo takes it away.</summary>
+    public Task InsertLineAsync() => _grid?.InsertLineAsync() ?? Task.CompletedTask;
 }

@@ -827,6 +827,9 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; }
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
 
+    /// <summary>Removes the line picked in the Packaging tab's Bulk Packaging table, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveBulkLineCommand { get; }
+
     /// <summary>The add form's Remove Line under its packaging table.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormPackagingLineCommand { get; }
 
@@ -1083,6 +1086,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UsageForm.FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         UsageForm.FormPackagingLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         Packaging.LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
+        Packaging.BulkEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         UsageForm.FormLines.ToObservableChangeSet()
@@ -1126,6 +1130,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
         Packaging.LineEdits.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ => _updates.Run(PackagingLinesEdited));
+
+        // The same for a bulk packaging line, and the products a bulk pack holds.
+        Packaging.WhenAnyValue(p => p.BulkQuantity).Skip(1).Subscribe(_ => _updates.Run(PackagingLinesEdited));
+        Packaging.BulkEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ => _updates.Run(PackagingLinesEdited));
@@ -1183,6 +1194,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         UsageForm.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(UsageEdits);
         WatchForSave(Packaging.LineEdits);
+        WatchForSave(Packaging.BulkEdits);
         WatchForSave(ComponentsTable.ComponentEdits);
         WatchForSave(UsageForm.FormLines);
         WatchForSave(UsageForm.FormAddIns);
@@ -1460,11 +1472,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             // otherwise spend half a second reading every product sharing its dough, twice.
             var packagingLink = Packaging.ChangedLink();
             var packagingLines = Packaging.ChangedLines();
+            var bulkToSave = Packaging.ChangedBulk();
             var changesSharing = UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
             var recipeToSave = IsSameRecipe(recipe, _savedRecipe) ? null : recipe;
             var costingToSave = Costing.IsChanged ? costing : null;
             var saved = await Task.Run(() => _versionedSaves.SaveProductAsync(
-                product, recipeToSave, packagingLink, packagingLines, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
+                product, recipeToSave, packagingLink, packagingLines, bulkToSave, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
 
             // What's saved is the new starting point: stepping back past it would show changes already written.
             // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
@@ -1721,6 +1734,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             () => AsUndoStep(() => Packaging.LineEdits.Remove(Packaging.SelectedLineEdit!)),
             Packaging.WhenAnyValue(p => p.SelectedLineEdit, p => p.IsPackagingLinked, (line, linked) => line is not null && !linked));
 
+        RemoveBulkLineCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() => Packaging.BulkEdits.Remove(Packaging.SelectedBulkEdit!)),
+            Packaging.WhenAnyValue(p => p.SelectedBulkEdit).Select(line => line is not null));
+
         // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
         var canMakeFromSelected = this.WhenAnyValue(
             x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name));
@@ -1864,6 +1881,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         AreDetailsReady = true;
         CloseUsageForm();
         Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
 
         if (product?.Id != _detailProductId)
         {
@@ -1879,6 +1897,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         CloseUsageForm();
         Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
         VersionHistory.Clear();
         ClearDetails(keepRecipeTabs);
     }
@@ -1984,6 +2003,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         History.Clear();
         CloseUsageForm();
         Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
         LoadIntoForm(product);
         await LoadProductDetailAsync(product, CancellationToken.None);
     }
@@ -2319,6 +2339,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // first, so the tab ClearDetails picks is the new kind's.
         CloseUsageForm();
         Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
         SetComposite(isComposite);
         ClearDetails();
         RefreshComponentOptions();
@@ -2428,7 +2449,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
         Packaging.LoadLink(detail.PackagingLink);
         Packaging.LoadLines(detail.Lines);
-        SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0);
+        Packaging.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
+        SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0 || detail.BulkLines.Count > 0);
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         Costing.Load(detail.Costing);
         RefreshLinkableOptions();
@@ -2534,6 +2556,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SelectRecipeTab(RecipeTabs.OfType<SubAssemblyRecipeTab>().LastOrDefault() ?? ComponentsTabIfShown);
         Packaging.SelectedLineEdit = null;
         Packaging.LineEdits.Clear();
+        Packaging.ShowBulkLines([]);
+        Packaging.BulkQuantity = null;
         Packaging.ShowLink(null);
         SetHasPackaging(false);
         RefreshLinkableOptions();
@@ -2660,6 +2684,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         PackagingLink = Packaging.LinkTarget,
         IsPackagingMoving = Packaging.IsPackagingMoving,
         Lines = [.. Packaging.LineEdits.Select(CaptureLine)],
+        BulkLines = [.. Packaging.BulkEdits.Select(CaptureLine)],
+        BulkQuantity = Packaging.BulkQuantity,
         Components = ComponentsTable.Capture(),
         IsUsageFormOpen = UsageForm.IsUsageFormOpen,
         IsAddingUsage = UsageForm.IsAddingUsage,
@@ -2683,7 +2709,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
         new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
 
-    private static PackagingLineState CaptureLine(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
+    private static PackagingLineState CaptureLine(PackagingLineRow row) =>
+        new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 
     private RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
     {
@@ -2714,6 +2741,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             UsageForm.SelectedFormAddIn = null;
             UsageForm.SelectedFormPackagingLine = null;
             Packaging.SelectedLineEdit = null;
+            Packaging.SelectedBulkEdit = null;
             ComponentsTable.SelectedComponentEdit = null;
 
             // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
@@ -2739,6 +2767,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             {
                 Packaging.LineEdits.Add(RestoreLine(line));
             }
+
+            Packaging.BulkEdits.Clear();
+            foreach (var line in snapshot.BulkLines)
+            {
+                Packaging.BulkEdits.Add(RestoreLine(line));
+            }
+
+            Packaging.BulkQuantity = snapshot.BulkQuantity;
 
             SetHasPackaging(snapshot.HasPackaging);
 
@@ -3142,10 +3178,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 .Select(MaterialName));
         }
 
-        if (link is null)
-        {
-            missing.AddRange(content.PackagingLines.Where(l => !packagingById.ContainsKey(l.MaterialId)).Select(l => MaterialName(l.MaterialId)));
-        }
+        // The lines it owned, unless a link that's still there shows them, and its bulk packaging, its own either way.
+        missing.AddRange(content.PackagingLines
+            .Where(l => (link is null || l.IsBulk) && !packagingById.ContainsKey(l.MaterialId))
+            .Select(l => MaterialName(l.MaterialId)));
 
         missing.AddRange(content.Components.Where(c => Products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
         if (missing.Distinct().ToList() is { Count: > 0 } gone)
@@ -3154,11 +3190,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 $"{row.Title} can't be restored: it needs {string.Join(", ", gone)}, which {(gone.Count == 1 ? "is" : "are")} no longer there.");
         }
 
-        // The lines a link shows: those showing already when it's the link the form has, else as it has them now.
+        // The lines a link shows: those showing already when it's the link the form has, else as it has them now. The bulk
+        // packaging is the version's own, whatever it linked.
         IReadOnlyList<PackagingLineState> packagingLines;
+        IReadOnlyList<PackagingLineState> bulkLines = [.. content.PackagingLines.Where(l => l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
         if (link is null)
         {
-            packagingLines = [.. content.PackagingLines.Select(l => OwnPackagingLineOf(l, content, packagingById))];
+            packagingLines = [.. content.PackagingLines.Where(l => !l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
         }
         else if (link.Key == Packaging.LinkTarget?.Key)
         {
@@ -3172,7 +3210,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                     .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
                 PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(linkedProductId, CancellationToken.None)))
                     .Select(l => PackagingLineRow.FromSaved(l))
-                    .Select(r => new PackagingLineState(r.PackagingMaterialId, r.UnitId, r.QtyPerUnit))],
+                    .Select(CaptureLine)],
             };
         }
 
@@ -3246,10 +3284,12 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                         : product.IsComposite ? new RecipeTabChoice.Components()
                         : new RecipeTabChoice.Packaging(),
                     HasAddSubAssemblyTab = false,
-                    HasPackaging = link is not null || packagingLines.Count > 0,
+                    HasPackaging = link is not null || packagingLines.Count > 0 || bulkLines.Count > 0,
                     PackagingLink = link,
                     IsPackagingMoving = false,
                     Lines = packagingLines,
+                    BulkLines = bulkLines,
+                    BulkQuantity = bulkLines.Count > 0 ? content.BulkPackagingQuantity : null,
                     Components = [.. content.Components.Select(c => new ComponentLineState(c.ProductId, c.Quantity))],
                     IsUsageFormOpen = false,
                     IsAddingUsage = false,
@@ -3534,7 +3574,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 : "Add the packaging materials one piece takes.");
         }
 
-        Packaging.ShowLines(lines.Select(l => new PackagingLineRow(l.PackagingMaterial, l.QtyPerUnit)));
+        Packaging.ShowLines(lines.Select(l => new PackagingLineRow(l.PackagingMaterial, l.QtyPerUnit, l.UnitId)));
         Packaging.ShowLink(linking ? target : null);
         SetHasPackaging(true);
         CloseUsageForm();
@@ -3922,7 +3962,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.</summary>
     private void PackagingLinesEdited()
     {
-        PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        PackagingLineRow.Resolve(Packaging.AllLineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        Packaging.RaiseBulkCostChanged();
         RecomputeCosts();
     }
 
@@ -4360,7 +4401,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
-        PackagingLineRow.Resolve(Packaging.LineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        PackagingLineRow.Resolve(Packaging.AllLineEdits, PackagingMaterials.ToDictionary(m => m.Id));
     }
 
     /// <summary>
@@ -4417,7 +4458,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
             row.CostBasis = CostBasis;
         }
 
-        foreach (var row in UsageForm.FormPackagingLines.Concat(Packaging.LineEdits))
+        foreach (var row in UsageForm.FormPackagingLines.Concat(Packaging.AllLineEdits))
         {
             row.CostBasis = CostBasis;
         }
@@ -4451,7 +4492,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         {
             Parts = [.. components, .. UsageEdits.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
             QuantityRequired = EditingQuantityRequired,
-            PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit)],
+            PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
             ComponentPackaging = componentPackaging,
             WastagePercent = EditingCategory?.WastagePercent ?? _wastagePercent,
             VatPercent = _vatPercent,
@@ -4464,7 +4505,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         List<string> belowCost =
         [
             .. UsageEdits.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.LineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())
+                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())
                 .Where(RawMaterialRules.IsBufferedBelowCost)
                 .Select(m => m.Name)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
@@ -4531,7 +4572,10 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         DateTime.Now,
         [.. UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), CostBasis))],
         HasPackaging
-            ? PrintedPackaging.From(Packaging.LineEdits.Select(l => l.ToPriced()), Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null)
+            ? PrintedPackaging.From(
+                Packaging.LineEdits.Select(l => l.ToPriced()),
+                Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null,
+                Packaging.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.BulkEdits.Select(l => l.ToPriced())], Packaging.BulkQuantity))
             : null,
         Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)

@@ -246,6 +246,20 @@
     margin: 0;
 }
 
+.bulk-packaging {
+    margin-top: 14px;
+}
+
+.bulk-quantity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bulk-quantity .param-field {
+    width: 80px;
+}
+
 .stat-tiles {
     display: grid;
     grid-template-columns: 1fr 1fr;

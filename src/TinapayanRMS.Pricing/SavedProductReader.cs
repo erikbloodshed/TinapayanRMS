@@ -18,6 +18,9 @@ public sealed record ProductDetail(
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
 
+    /// <summary>Its bulk packaging (PackagingLine.IsBulk): its own lines for one bulk pack, in order; none for a product without.</summary>
+    public IReadOnlyList<PackagingLine> BulkLines { get; init; } = [];
+
     /// <summary>
     /// The Wastage % it's priced with: its category's when that sets one (ProductCategory.WastagePercent), else the shop-wide
     /// one (CostingDefaults.WastagePercent); today's, or a version's then.
@@ -92,6 +95,9 @@ public sealed record SavedProduct(
 {
     /// <summary>A composite's products, each with its recipe cost; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
+
+    /// <summary>Its bulk packaging, priced, whose share per unit is in its packaging cost; null for a product without.</summary>
+    public PricedBulkPackaging? BulkPackaging { get; init; }
 }
 
 /// <summary>
@@ -206,6 +212,7 @@ public sealed class SavedProductReader(
                 ],
                 HoldsItself = HoldsItself(productId),
                 PackagingLinkedRoundInALoop = packaging.LinkedRoundInALoop.Contains(productId),
+                BulkLines = packaging.Bulk.GetValueOrDefault(productId, []),
             };
             details[productId] = detail;
             return detail;
@@ -375,6 +382,7 @@ public sealed class SavedProductReader(
                 .Order(PricedSection.RecipeOrder),
         ];
         List<PricedPackagingLine> packagingLines = [.. detail.Lines.Select(l => PricedPackagingLine.FromSaved(l, basis, materialsById))];
+        var bulk = PricedBulkPackaging.FromSaved(detail.BulkLines, product.BulkPackagingQuantity, basis, materialsById);
 
         var costing = detail.Costing;
         var costs = new ProductCostSummary(new ProductCostInputs
@@ -385,7 +393,7 @@ public sealed class SavedProductReader(
                 .. sections.Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
             ],
             QuantityRequired = product.QuantityRequired,
-            PackagingCosts = [.. packagingLines.Select(l => l.CostPerUnit)],
+            PackagingCosts = [.. packagingLines.Select(l => l.CostPerUnit), .. bulk is null ? [] : new[] { bulk.CostPerUnit }],
             ComponentPackaging = product.IncludesComponentPackaging ? detail.Components.Sum(c => c.PackagingCostAt(basis)) : null,
             LaborPercent = costing?.LaborPercent ?? 0m,
             OverheadPercent = costing?.OverheadPercent ?? 0m,
@@ -403,12 +411,13 @@ public sealed class SavedProductReader(
             product,
             sections,
             packagingLines,
-            detail.PackagingLink is not null || detail.Lines.Count > 0,
+            detail.PackagingLink is not null || detail.Lines.Count > 0 || bulk is not null,
             detail.PackagingLink is { } link ? PackagingLinkTarget.From(link).LinkedToText : null,
             costs,
             basis)
         {
             Components = detail.Components,
+            BulkPackaging = bulk,
         };
     }
 }

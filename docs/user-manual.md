@@ -730,6 +730,17 @@ To add packaging, use **Add Sub-Assembly** and pick the **Packaging** role:
 
 The Packaging tab's table is typed into. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**.
 
+**Bulk Packaging**, under the packaging lines, is for packaging several products share, such as a box that holds 6 and the tape that closes it. It's on every product's Packaging tab, whether its packaging is its own lines or linked.
+
+- **Products per pack**, beside its heading, is how many products one bulk pack holds: a whole number, 1 or more.
+- Its table lists what one pack takes: **Material**, **Qty**, **Unit**, **Unit Cost** and **Cost per Pack**. Type each quantity for the whole pack, such as 1 box and 30 cm of tape. The quantities stay as you type them.
+- Under the table, the caption shows the sum: the pack's cost, divided by the products it holds, is what each product carries, as in "Pack cost 12.60 ÷ 6 products = 2.10 per unit". That share joins the **Packaging** figure on the Costing tab and the cost caption at the top of the Packaging tab.
+- **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
+- Save refuses bulk lines with no **Products per pack**. Take every line out to have no bulk packaging.
+- A material can be both one of the packaging lines and one of the bulk lines, such as tape on each product's bag and on the box.
+- Bulk packaging is this product's own. Linking a packaging set, **Make a Copy** and **Move to Sub-Assemblies** leave it as it is, and the packaging set never has it. **Clone** copies it; **Create Variant** doesn't, since a variant starts with no packaging.
+- **Delete Sub-Assembly** on the Packaging tab takes the bulk packaging out too.
+
 **Move to Sub-Assemblies**, at the top right of the Packaging tab while the packaging is this product's own lines, works as it does for the product's own sections. Save puts the lines on the Sub-Assemblies screen as a packaging set named after the product, such as *Ensaymada Packaging*, and this product links it there. The cost doesn't change. Until you save, a **Moves to Sub-Assemblies on Save** badge shows and you can still change the lines; Undo or Revert keeps them the product's own. Afterwards other products can link the set too, its lines are changed on the Sub-Assemblies screen, and **Make a Copy** makes them this product's own again.
 
 Packaging quantities are for one sellable unit. They aren't multiplied by Quantity Required. If you change Quantity Required, check the packaging yourself.
@@ -1100,7 +1111,7 @@ All figures below are per sellable unit.
 
 1. **Sub-assemblies** = the sum of the sections' cost per piece × Quantity Required.
 2. **Wastage** = the product's category's Wastage % (Settings → Product Categories), or the shop's (Settings → Costing Defaults) when its category doesn't set one, **of the sub-assemblies alone**.
-3. **Packaging** = the sum of the packaging lines. They're already per sellable unit.
+3. **Packaging** = the sum of the packaging lines, which are already per sellable unit, plus the bulk packaging's share: the cost of one bulk pack's lines ÷ **Products per pack**. A ₱12.00 box and ₱0.60 of tape for 6 products adds ₱2.10.
 4. **Labor**, **Overhead** and **Administrative** = their percentage **of the sub-assemblies alone**. Packaging and wastage aren't included.
 5. **Base cost** = sub-assemblies + wastage + packaging + labour + overhead + administrative.
 6. **Price before VAT** = base cost × (1 + Markup %).
@@ -1265,6 +1276,15 @@ Right-click the category's folder in the Products list and choose **Print Folder
 3. In its recipe, use **Add Sub-Assembly → Link an existing one** with the **Packaging** role, and pick the set. Save.
 
 Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
+
+### Add a box several products share
+
+For products packed in their own wrapper (their own lines or a linked packaging set) and then several to a box:
+
+1. Open the product on its **Packaging** tab. Under its packaging lines is **Bulk Packaging**.
+2. In **Products per pack**, type how many products one box holds, such as 6.
+3. In the Bulk Packaging table, add what one box takes: the box itself (Qty 1), and anything else for the whole box, such as its tape.
+4. Check the caption under the table, then Save. Each product now carries a sixth of the box's cost, on top of its own packaging.
 
 ### Install or update TinapayanRMS
 

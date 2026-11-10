@@ -261,20 +261,35 @@ public static class ProductVersionRules
                 break;
         }
 
-        foreach (var pair in Paired(newer.PackagingLines, older.PackagingLines, l => l.MaterialId))
+        // The per-unit lines, then the bulk pack's ("Bulk packaging: Box added, 1 pc"), each paired by material within its own.
+        foreach (var isBulk in new[] { false, true })
         {
-            switch (pair)
+            var label = isBulk ? "Bulk packaging" : "Packaging";
+            foreach (var pair in Paired([.. newer.PackagingLines.Where(l => l.IsBulk == isBulk)], [.. older.PackagingLines.Where(l => l.IsBulk == isBulk)], l => l.MaterialId))
             {
-                case ({ } added, null):
-                    changes.Add($"Packaging: {names.Of(added.MaterialId)} added, {names.Quantity(added)}");
-                    break;
-                case (null, { } removed):
-                    changes.Add($"Packaging: {names.Of(removed.MaterialId)} removed");
-                    break;
-                case ({ } line, { } old) when old.QtyPerUnit != line.QtyPerUnit || old.UnitId != line.UnitId:
-                    changes.Add($"Packaging: {names.Of(line.MaterialId)} {names.Quantity(old)} → {names.Quantity(line)}");
-                    break;
+                switch (pair)
+                {
+                    case ({ } added, null):
+                        changes.Add($"{label}: {names.Of(added.MaterialId)} added, {names.Quantity(added)}");
+                        break;
+                    case (null, { } removed):
+                        changes.Add($"{label}: {names.Of(removed.MaterialId)} removed");
+                        break;
+                    case ({ } line, { } old) when old.QtyPerUnit != line.QtyPerUnit || old.UnitId != line.UnitId:
+                        changes.Add($"{label}: {names.Of(line.MaterialId)} {names.Quantity(old)} → {names.Quantity(line)}");
+                        break;
+                }
             }
+        }
+
+        switch (older.BulkPackagingQuantity, newer.BulkPackagingQuantity)
+        {
+            case ({ } was, { } now) when was != now:
+                changes.Add($"Bulk packaging: {was} → {now} products per pack");
+                break;
+            case (null, { } now):
+                changes.Add($"Bulk packaging: {now} products per pack");
+                break;
         }
     }
 
