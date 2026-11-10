@@ -16,10 +16,15 @@ internal static class DapperReads
 {
     /// <summary>
     /// Maps a snake_case column (<c>cost_per_base_unit</c>) to its PascalCase property or constructor parameter
-    /// (<c>CostPerBaseUnit</c>). Every read goes through <see cref="Connection"/> or <see cref="Command"/>, so this is set
-    /// before the first.
+    /// (<c>CostPerBaseUnit</c>), and reads a product's stage as EF does (<see cref="ProductStageTypeHandler"/>). Every read
+    /// goes through <see cref="Connection"/> or <see cref="Command"/>, so these are set before the first.
     /// </summary>
-    static DapperReads() => DefaultTypeMap.MatchNamesWithUnderscores = true;
+    static DapperReads()
+    {
+        DefaultTypeMap.MatchNamesWithUnderscores = true;
+        SqlMapper.Settings.PreferTypeHandlersForEnums = true;
+        SqlMapper.AddTypeHandler(new ProductStageTypeHandler());
+    }
 
     /// <summary>
     /// The ids in <c>@ids</c> (an <see cref="IdList"/>) as a one-column table, for <c>WHERE x IN (…)</c>. Npgsql sends

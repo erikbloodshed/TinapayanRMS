@@ -4,6 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
@@ -430,6 +431,39 @@ public class ProductTreeTests
         Folder(next, ProductStage.Innovation, "Uncategorized").IsExpanded.Should().BeFalse();
         next.DeletedFolder.IsExpanded.Should().BeFalse();
         next.ClosedFolderKeys().Should().Equal(closedFolders);
+    }
+
+    [Test]
+    public void Folders_kept_under_innovations_former_name_start_as_they_were_left()
+    {
+        // As a build before the rename kept them.
+        var store = new InMemoryViewStateStore(new Dictionary<string, IReadOnlyList<string>>
+        {
+            [ProductsViewModel.ClosedFoldersKey] = ["Deleted", "ResearchAndDevelopment", $"ResearchAndDevelopment/{Cakes.Id}", "Production/Uncategorized"],
+        });
+
+        var tree = new ProductTree(FolderMemory.Read(
+            store, ProductsViewModel.ClosedFoldersKey, ProductsViewModel.OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
+        tree.Refresh([Breads, Cakes], [], isFiltered: false);
+
+        Root(tree, ProductStage.Innovation).IsExpanded.Should().BeFalse();
+        Folder(tree, ProductStage.Innovation, "Cakes").IsExpanded.Should().BeFalse();
+        Folder(tree, ProductStage.Innovation, "Breads").IsExpanded.Should().BeTrue();
+        Folder(tree, ProductStage.Production, "Uncategorized").IsExpanded.Should().BeFalse();
+        tree.ClosedFolderKeys().Should().Equal("Deleted", "Innovation", $"Innovation/{Cakes.Id}", "Production/Uncategorized");
+
+        // Kept as open folders, by an older build still.
+        var openStore = new InMemoryViewStateStore(new Dictionary<string, IReadOnlyList<string>>
+        {
+            [ProductsViewModel.OpenFoldersKey] = ["Production", "ResearchAndDevelopment", $"ResearchAndDevelopment/{Breads.Id}"],
+        });
+        var openTree = new ProductTree(FolderMemory.Read(
+            openStore, ProductsViewModel.ClosedFoldersKey, ProductsViewModel.OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
+        openTree.Refresh([Breads, Cakes], [], isFiltered: false);
+
+        Root(openTree, ProductStage.Innovation).IsExpanded.Should().BeTrue();
+        Folder(openTree, ProductStage.Innovation, "Breads").IsExpanded.Should().BeTrue();
+        Folder(openTree, ProductStage.Innovation, "Cakes").IsExpanded.Should().BeFalse();
     }
 
     [Test]

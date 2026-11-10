@@ -109,7 +109,11 @@ foreach ($found in $shortcuts) {
 foreach ($found in $running) { Write-Host "  Running:  $($found.Path)" }
 
 if (-not $Remove) {
+    # Since 2026-11-09 this app stores the Research and Development stage as Innovation, which the WPF app can't read: its
+    # Products list, and anything else reading the products, fails once a product is in Innovation.
     Write-Host ''
+    Write-Warning ("Don't run the WPF app on the same database as this one: once this app has opened it, the WPF app " +
+        "can't read a product in Innovation (the stage it calls Research and Development), and fails to load its products.")
     Write-Host 'To take it away (its folders, apart from their logs, and its shortcuts), run:'
     $named = if ($Folder) { " -Folder `"$($Folder -join ',')`"" } else { '' }
     Write-Host "  powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`"$named -Remove"

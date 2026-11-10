@@ -41,10 +41,17 @@ public sealed class FolderMemory : IDisposable
     /// What <paramref name="store"/> kept for a list: its closed folders under <paramref name="closedKey"/>, or failing
     /// those, its open ones under <paramref name="openKey"/>, where it kept them before.
     /// </summary>
-    public static FolderMemory Read(IViewStateStore store, string closedKey, string? openKey = null) =>
-        store.ReadList(closedKey) is { } closed
-            ? new FolderMemory(closed)
-            : new FolderMemory(openKeys: openKey is null ? null : store.ReadList(openKey));
+    /// <param name="currentKey">
+    /// A folder's key as kept, as its key now, for a list whose keys have changed since (ProductFolderNode.CurrentFolderKey):
+    /// read as they were, a folder left closed would open, its key not found.
+    /// </param>
+    public static FolderMemory Read(IViewStateStore store, string closedKey, string? openKey = null, Func<string, string>? currentKey = null)
+    {
+        var current = currentKey ?? (key => key);
+        return store.ReadList(closedKey) is { } closed
+            ? new FolderMemory(closed.Select(current))
+            : new FolderMemory(openKeys: openKey is null ? null : store.ReadList(openKey)?.Select(current));
+    }
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for keeping them (<see cref="ClosedKeys"/>).</summary>
     public IObservable<RxVoid> ExpansionChanged => _expansionChanged;

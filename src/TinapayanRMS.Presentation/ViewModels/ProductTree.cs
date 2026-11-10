@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Configurations;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -110,6 +111,19 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         : IsStage ? Stage.ToString()
         : IsNewFolder ? $"{Stage}/New"
         : $"{Stage}/{CategoryId?.ToString(CultureInfo.InvariantCulture) ?? ProductRules.UncategorizedTitle}";
+
+    /// <summary>
+    /// A folder's <see cref="Key"/> as kept before Innovation was renamed on 2026-11-09 ("ResearchAndDevelopment",
+    /// "ResearchAndDevelopment/12"), as its key now ("Innovation", "Innovation/12"); any other key as it is. Read as kept,
+    /// Innovation's folders left closed opened again (FolderMemory.Read).
+    /// </summary>
+    public static string CurrentFolderKey(string key)
+    {
+        const string former = ProductStageConverter.FormerInnovationName;
+        return key == former ? nameof(ProductStage.Innovation)
+            : key.StartsWith(former + "/", StringComparison.Ordinal) ? nameof(ProductStage.Innovation) + key[former.Length..]
+            : key;
+    }
 
     /// <summary>The products the folder shows: none for a stage's folder, whose rows are folders.</summary>
     public IEnumerable<ProductLeafNode> Products => Children.OfType<ProductLeafNode>();

@@ -53,6 +53,26 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
     }
 
     [Test]
+    public async Task A_stage_stored_by_innovations_former_name_reads_as_innovation_through_dapper_and_ef()
+    {
+        // As a copy of the app, the Recipe API or the MCP server built before the rename writes it.
+        var id = await SaveNewAsync("Ube Cheese Pandesal");
+        var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
+        await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("UPDATE products SET stage = 'ResearchAndDevelopment'", Cancellation);
+            await dbContext.Database.ExecuteSqlRawAsync("UPDATE costing_defaults SET new_product_stage = 'ResearchAndDevelopment'", Cancellation);
+        }
+
+        (await CreateRepository().GetByIdAsync(id, Cancellation))!.Stage.Should().Be(ProductStage.Innovation);
+        (await CreateRepository().GetAllAsync(Cancellation)).Should().ContainSingle().Which.Stage.Should().Be(ProductStage.Innovation);
+        (await defaults.GetAsync(Cancellation)).NewProductStage.Should().Be(ProductStage.Innovation);
+        await using var context = CreateDbContext();
+        (await context.Products.SingleAsync(p => p.Id == id, Cancellation)).Stage.Should().Be(ProductStage.Innovation);
+    }
+
+    [Test]
     public async Task MoveAsync_sets_the_stage_and_the_category_and_nothing_else()
     {
         var breads = await SeedCategoryAsync("Breads");

@@ -837,6 +837,25 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         store.ReadList(ProductsViewModel.ClosedFoldersKey).Should().Contain($"Production/{cakesId}").And.NotContain($"Production/{breadsId}");
     });
 
+    [Test]
+    public Task Innovations_folders_left_closed_under_its_former_name_stay_closed() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddProductCategoryAsync("Breads");
+        await AddProductCategoryAsync("Cakes");
+        var store = new InMemoryViewStateStore();
+        store.WriteList(ProductsViewModel.ClosedFoldersKey, ["Deleted", $"ResearchAndDevelopment/{breadsId}"]);
+
+        var viewModel = await LoadedViewModelAsync(store);
+
+        TreeFolder(viewModel, ProductStage.Innovation, "Breads").IsExpanded.Should().BeFalse("it was left closed before the rename");
+        TreeFolder(viewModel, ProductStage.Innovation, "Cakes").IsExpanded.Should().BeTrue();
+
+        // Kept by its key now once a folder is opened or closed.
+        TreeFolder(viewModel, ProductStage.Production, "Cakes").IsExpanded = false;
+        viewModel.Dispose();
+        store.ReadList(ProductsViewModel.ClosedFoldersKey).Should().Contain($"Innovation/{breadsId}").And.NotContain($"ResearchAndDevelopment/{breadsId}");
+    });
+
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
 
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);

@@ -936,7 +936,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
 
         // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
         // for next time (FolderStateWriter); Dispose writes any change still waiting.
-        ProductTree = new ProductTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey));
+        ProductTree = new ProductTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
         _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, ProductTree.ExpansionChanged, ProductTree.ClosedFolderKeys);
 
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();

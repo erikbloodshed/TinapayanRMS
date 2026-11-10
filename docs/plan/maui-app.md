@@ -108,7 +108,7 @@ bUnit has no web view, so focus, typing, drag and drop, printing, the dialogs, t
 
 ## Open items
 
-- **At the shop**: install the app (`scripts/Install-TinapayanRMS.ps1`), then take the WPF copy off (`scripts/Remove-WpfApp.ps1`, then again with `-Remove`). The scripts are the developer manual's "Installing the app".
+- **At the shop**: install the app (`scripts/Install-TinapayanRMS.ps1`), then take the WPF copy off (`scripts/Remove-WpfApp.ps1`, then again with `-Remove`). Don't run the two on one database meanwhile: once the app has opened it, the WPF app can't read a product in Innovation, the stage it calls Research and Development, and fails to load its products (`Remove-WpfApp.ps1` warns of it). The scripts are the developer manual's "Installing the app".
 - **Settings is a tab**, where the WPF app has a dialog. Kept from the web app, whose user asked for it.
 - **Later changes to the web repo's screens** are ported by hand, as these were.
 - **The screen notes** (`products-screen.md`, `raw-materials-screen.md`, `sub-assemblies-screen.md`) still name the WPF controls their parts were first built with, under a preface saying what each means now; rewrite them in the Blazor components' terms as those parts change.
