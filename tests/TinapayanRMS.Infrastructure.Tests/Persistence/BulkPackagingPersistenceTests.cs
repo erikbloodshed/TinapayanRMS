@@ -63,7 +63,7 @@ public class BulkPackagingPersistenceTests(DatabaseFixture fixture) : Persistenc
     private static BulkPackagingDraft Bulk(int? quantity, params (int MaterialId, decimal QtyPerPack)[] lines) =>
         new([.. lines.Select(l => (l.MaterialId, (int?)null, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerPack))], quantity);
 
-    private Task SaveBulkAsync(int productId, BulkPackagingDraft bulk) =>
+    private Task<int> SaveBulkAsync(int productId, BulkPackagingDraft bulk) =>
         CreateProductRepository().SaveAsync(
             new Product { Id = productId, Name = "Ensaymada" }, recipe: null, packagingLink: null, packagingLines: null, bulk, costing: null, Cancellation);
 
