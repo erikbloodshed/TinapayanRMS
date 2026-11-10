@@ -23,10 +23,11 @@
         @foreach (var row in RowsAndDraft())
         {
             var isDraft = ReferenceEquals(row, _draft);
+            var events = EventsOf(row);
             <tr @key="row" class="@(isDraft ? "add-row" : "") @(ReferenceEquals(row, SelectedItem) ? "selected" : "") @(ReferenceEquals(row, _dropTarget) ? "drop-target" : "")"
-                @onfocusin="() => SelectAsync(row)" @onclick="() => SelectAsync(row)"
-                @ondragover="() => OnDragOver(row)" @ondragover:preventDefault="true" @ondrop="() => OnDropAsync(row)" @ondrop:preventDefault="true">
-                <td class="row-header" draggable="@(Reorderable && !isDraft ? "true" : "false")" @ondragstart="() => _dragging = row" @ondragend="OnDragEnd"
+                @onfocusin="events.Select" @onclick="events.Select"
+                @ondragover="events.DragOver" @ondragover:preventDefault="true" @ondrop="events.Drop" @ondrop:preventDefault="true">
+                <td class="row-header" draggable="@(Reorderable && !isDraft ? "true" : "false")" @ondragstart="events.DragStart" @ondragend="OnDragEnd"
                     title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
                     @if (isDraft)
                     {
@@ -68,6 +69,43 @@
 
     /// <summary>The line just inserted, whose first cell takes the cursor once it's drawn.</summary>
     private int? _focusRow;
+
+    // Each line's handlers, made the first time it's drawn: made afresh on every drawing, each would be a new handler the
+    // page swaps in, for every line, each time anything on the screen changes (ASP.NET Core's rendering guidance: avoid
+    // recreating delegates for many repeated elements). A line that's gone loses its own after the next drawing.
+    private readonly Dictionary<object, RowEvents> _rowEvents = new(ReferenceEqualityComparer.Instance);
+
+    private sealed record RowEvents(Func<Task> Select, Action DragOver, Func<Task> Drop, Action DragStart);
+
+    private RowEvents EventsOf(TRow row)
+    {
+        if (!_rowEvents.TryGetValue(row, out var events))
+        {
+            events = new RowEvents(() => SelectAsync(row), () => OnDragOver(row), () => OnDropAsync(row), () => _dragging = row);
+            _rowEvents[row] = events;
+        }
+
+        return events;
+    }
+
+    private void ForgetGoneRows()
+    {
+        if (_rowEvents.Count <= Items.Count + 1)
+        {
+            return;
+        }
+
+        HashSet<object> drawn = new(ReferenceEqualityComparer.Instance);
+        foreach (var row in RowsAndDraft())
+        {
+            drawn.Add(row);
+        }
+
+        foreach (var gone in _rowEvents.Keys.Where(row => !drawn.Contains(row)).ToList())
+        {
+            _rowEvents.Remove(gone);
+        }
+    }
 
     [Parameter, EditorRequired] public ObservableCollection<TRow> Items { get; set; } = null!;
 
@@ -250,6 +288,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        ForgetGoneRows();
         if (_focusRow is { } row)
         {
             _focusRow = null;
@@ -257,5 +296,9 @@
         }
     }
 
-    public void Dispose() => Unwatch();
+    public void Dispose()
+    {
+        Unwatch();
+        _rowEvents.Clear();
+    }
 }

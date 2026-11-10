@@ -64,6 +64,45 @@ public class ScreenBaseTests
         }
     }
 
+    /// <summary>A ViewModel with worked-out properties, which count how often they're read.</summary>
+    private sealed class WorkedOut(ILogger logger) : ViewModelBase(logger)
+    {
+        public int Reads { get; private set; }
+
+        public ObservableCollection<int> Rows { get; } = [];
+
+        public string Caption => $"{++Reads} read";
+
+        public IReadOnlyList<int> Picked => [.. Rows.Where(_ => ++Reads > 0)];
+    }
+
+    /// <summary>A screen that shows only its ViewModel's rows.</summary>
+    private sealed class WorkedOutScreen : ScreenBase<WorkedOut>
+    {
+        protected override ReactiveCommand<RxVoid, RxVoid>? LoadCommand => null;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddContent(1, ViewModel!.Rows.Count);
+            builder.CloseElement();
+        }
+    }
+
+    [Test]
+    public async Task Finding_what_to_watch_reads_no_worked_out_property_and_still_watches_the_lists()
+    {
+        await using var context = AppServices.NewContext();
+        context.Services.AddScoped<WorkedOut>();
+        var screen = context.Render<WorkedOutScreen>();
+        var viewModel = context.Services.GetRequiredService<WorkedOut>();
+
+        await screen.InvokeAsync(() => viewModel.Rows.Add(1));
+
+        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("1"));
+        viewModel.Reads.Should().Be(0);
+    }
+
     private static (IRenderedComponent<LinesScreen> Screen, Lines ViewModel) Render(BunitContext context)
     {
         context.Services.AddScoped<Lines>();

@@ -1283,11 +1283,25 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         // while picking up what changed elsewhere, such as a unit renamed in Settings.
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            var units = await unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
-            var rawMaterials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
-            var costingDefaults = await _costingDefaultsRepository.GetAsync(CancellationToken.None);
-            var subAssemblies = await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None);
+            // All at once, on the thread pool, as Products reads its lists: one after another on the UI thread, each read came
+            // back to it before the next began, and waited its turn behind whatever the screen was drawing. The products
+            // using the material showing are read with them, since Products may have started or stopped using it meanwhile.
+            var detailMaterialId = _detailMaterialId;
+            var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
+            var unitsRead = Task.Run(() => unitOfMeasureRepository.GetAllAsync(CancellationToken.None));
+            var rawMaterialsRead = Task.Run(() => _rawMaterialRepository.GetAllAsync(CancellationToken.None));
+            var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+            var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
+            var dependentsRead = detailMaterialId is { } dependentsOf
+                ? Task.Run(() => _rawMaterialRepository.GetDependentsAsync(dependentsOf, CancellationToken.None))
+                : Task.FromResult<IReadOnlyList<LinkingProduct>>([]);
+            await Task.WhenAll(categoriesRead, unitsRead, rawMaterialsRead, costingDefaultsRead, subAssembliesRead, dependentsRead);
+
+            var categories = await categoriesRead;
+            var units = await unitsRead;
+            var rawMaterials = await rawMaterialsRead;
+            var costingDefaults = await costingDefaultsRead;
+            var subAssemblies = await subAssembliesRead;
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRawMaterial?.Id;
@@ -1355,15 +1369,10 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 await LoadRecipeLinesAsync(recipe, CancellationToken.None);
             }
 
-            // Products may have started or stopped using the material on another tab. Kept only if the details
-            // showing are still that material's once the read is back.
-            if (_detailMaterialId is { } detailMaterialId)
+            // The products using the material, read with the lists: kept only if the details showing are still that material's.
+            if (detailMaterialId is { } readFor && _detailMaterialId == readFor)
             {
-                var dependents = await _rawMaterialRepository.GetDependentsAsync(detailMaterialId, CancellationToken.None);
-                if (_detailMaterialId == detailMaterialId)
-                {
-                    ShowDependents(dependents);
-                }
+                ShowDependents(await dependentsRead);
             }
 
             // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the material's form.

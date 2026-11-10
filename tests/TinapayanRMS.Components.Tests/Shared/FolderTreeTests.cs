@@ -41,6 +41,43 @@ public class FolderTreeTests
     private static IEnumerable<string> Titles(IRenderedComponent<FolderTree<Node>> tree) =>
         tree.FindAll(".tree-row .title").Select(title => title.TextContent);
 
+    /// <summary>Each row's click handler, by the id the page knows it by: a different id is a handler swapped in.</summary>
+    private static List<string?> ClickHandlers(IRenderedComponent<FolderTree<Node>> tree) =>
+        [.. tree.FindAll(".tree-row").Select(row => row.GetAttribute("blazor:onclick"))];
+
+    [Test]
+    public async Task A_rows_handlers_are_kept_when_the_tree_is_drawn_again()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var tree = Render(context);
+        var before = ClickHandlers(tree);
+
+        // Drawn again, as its screen draws it for any change it shows, with the rows as they were.
+        tree.Render();
+
+        before.Should().HaveCount(4).And.NotContainNulls().And.OnlyHaveUniqueItems();
+        ClickHandlers(tree).Should().Equal(before);
+    }
+
+    [Test]
+    public async Task A_row_added_gets_its_own_handlers_and_the_others_keep_theirs()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var tree = Render(context);
+        var before = ClickHandlers(tree);
+
+        _breads.Children!.Add(new Node("Spanish Bread"));
+        tree.Render();
+
+        var after = ClickHandlers(tree);
+        Titles(tree).Should().Equal("Breads/", "Asado Roll", "Pandesal", "Spanish Bread", "Cakes/");
+        after.Should().HaveCount(5).And.OnlyHaveUniqueItems();
+        after.Take(3).Should().Equal(before.Take(3));
+        after[4].Should().Be(before[3]);
+    }
+
     [Test]
     public async Task A_closed_folders_rows_arent_drawn()
     {

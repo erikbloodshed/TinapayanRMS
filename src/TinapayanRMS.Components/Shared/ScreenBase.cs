@@ -1,6 +1,8 @@
+using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Reactive.Linq;
+using System.Reflection;
 using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
@@ -78,14 +80,10 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
         _subscriptions.Add(new Unsubscriber(() => viewModel.PropertyChanged -= OnViewModelPropertyChanged));
         WatchListsAndCommands(viewModel);
 
-        // Its parts: the ViewModels it holds for good (get-only), whose own changes the screen shows too. A list from their
-        // namespace (TableRows) isn't one: it's watched with the other lists.
-        foreach (var property in typeof(TViewModel).GetProperties())
+        // Its parts: the ViewModels it holds for good (get-only), whose own changes the screen shows too.
+        foreach (var property in WatchedOf(typeof(TViewModel)).Parts)
         {
-            if (!property.CanWrite
-                && property.GetIndexParameters().Length == 0
-                && property.PropertyType.Namespace == typeof(ViewModelBase).Namespace
-                && property.GetValue(viewModel) is INotifyPropertyChanged part and not ViewModelBase and not INotifyCollectionChanged)
+            if (property.GetValue(viewModel) is INotifyPropertyChanged part and not ViewModelBase and not INotifyCollectionChanged)
             {
                 part.PropertyChanged += OnPartPropertyChanged;
                 _subscriptions.Add(new Unsubscriber(() => part.PropertyChanged -= OnPartPropertyChanged));
@@ -195,26 +193,52 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
 
     private void WatchListsAndCommands(object source)
     {
-        foreach (var property in source.GetType().GetProperties())
+        var watched = WatchedOf(source.GetType());
+        foreach (var property in watched.Lists)
         {
-            if (property.GetIndexParameters().Length > 0)
+            if (property.GetValue(source) is INotifyCollectionChanged list)
             {
-                continue;
+                list.CollectionChanged += OnListChanged;
+                _subscriptions.Add(new Unsubscriber(() => list.CollectionChanged -= OnListChanged));
             }
+        }
 
-            switch (property.GetValue(source))
+        foreach (var property in watched.Commands)
+        {
+            if (property.GetValue(source) is ICommand command)
             {
-                case INotifyCollectionChanged list:
-                    list.CollectionChanged += OnListChanged;
-                    _subscriptions.Add(new Unsubscriber(() => list.CollectionChanged -= OnListChanged));
-                    break;
-                case ICommand command:
-                    command.CanExecuteChanged += OnCommandChanged;
-                    _subscriptions.Add(new Unsubscriber(() => command.CanExecuteChanged -= OnCommandChanged));
-                    break;
+                command.CanExecuteChanged += OnCommandChanged;
+                _subscriptions.Add(new Unsubscriber(() => command.CanExecuteChanged -= OnCommandChanged));
             }
         }
     }
+
+    /// <summary>
+    /// What a screen watches on a ViewModel or one of its parts, worked out once a type: the properties declared as a list
+    /// (INotifyCollectionChanged) or a command (ICommand), and the parts, get-only properties of a type from the ViewModels'
+    /// namespace that tells of its changes and is neither a list (TableRows is watched as one) nor a screen's ViewModel.
+    /// Chosen by the type a property is declared as, so a worked-out property (a caption, a filtered list) is never read for
+    /// it: a list or command the screen should redraw for is declared as one.
+    /// </summary>
+    private static Watched WatchedOf(Type type) => WatchedTypes.GetOrAdd(type, static type =>
+    {
+        PropertyInfo[] properties = [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead && p.GetIndexParameters().Length == 0)];
+        static bool Is<T>(PropertyInfo property) => typeof(T).IsAssignableFrom(property.PropertyType);
+        return new Watched(
+            [.. properties.Where(Is<INotifyCollectionChanged>)],
+            [.. properties.Where(p => Is<ICommand>(p) && !Is<INotifyCollectionChanged>(p))],
+            [
+                .. properties.Where(p => !p.CanWrite
+                    && p.PropertyType.Namespace == typeof(ViewModelBase).Namespace
+                    && Is<INotifyPropertyChanged>(p)
+                    && !Is<ViewModelBase>(p)
+                    && !Is<INotifyCollectionChanged>(p)),
+            ]);
+    });
+
+    private static readonly ConcurrentDictionary<Type, Watched> WatchedTypes = new();
+
+    private sealed record Watched(PropertyInfo[] Lists, PropertyInfo[] Commands, PropertyInfo[] Parts);
 
     // A move away while the form holds unsaved changes: asked about first. Another record of this screen's replaces the
     // form, so No leaves it for that one; another screen leaves it showing, so No puts it back as it was saved.

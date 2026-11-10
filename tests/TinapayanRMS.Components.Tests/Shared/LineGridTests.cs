@@ -62,6 +62,38 @@ public class LineGridTests
             more?.Invoke(parameters);
         });
 
+    /// <summary>Each row's click handler, by the id the page knows it by: a different id is a handler swapped in.</summary>
+    private static List<string?> ClickHandlers(IRenderedComponent<LineGrid<Line>> grid) =>
+        [.. grid.FindAll("tbody tr").Select(row => row.GetAttribute("blazor:onclick"))];
+
+    [Test]
+    public async Task A_lines_handlers_are_kept_when_the_table_is_drawn_again()
+    {
+        await using var context = AppServices.NewContext();
+        var grid = Render(context);
+        var before = ClickHandlers(grid);
+
+        // Drawn again, as its screen draws it for any change it shows, with the lines as they were.
+        grid.Render();
+
+        before.Should().HaveCount(3).And.NotContainNulls().And.OnlyHaveUniqueItems();
+        ClickHandlers(grid).Should().Equal(before);
+    }
+
+    [Test]
+    public async Task A_line_taken_out_leaves_the_others_their_handlers()
+    {
+        await using var context = AppServices.NewContext();
+        var grid = Render(context);
+        var before = ClickHandlers(grid);
+
+        await grid.InvokeAsync(() => _lines.RemoveAt(0));
+        grid.Render();
+
+        grid.FindAll("td.name").Select(cell => cell.TextContent).Should().Equal("Water", "");
+        ClickHandlers(grid).Should().Equal(before.Skip(1));
+    }
+
     [Test]
     public async Task The_lines_are_followed_by_an_add_row()
     {

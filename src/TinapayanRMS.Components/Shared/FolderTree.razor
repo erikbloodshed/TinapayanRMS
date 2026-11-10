@@ -50,6 +50,35 @@
     private readonly Dictionary<object, Action> _watched = new(ReferenceEqualityComparer.Instance);
     private RedrawGate? _redraws;
 
+    // Each row's handlers, made the first time it's drawn and kept with the tree, as _watched is. Made afresh on every
+    // drawing, each would be a new handler the page swaps in, for every row of the list, each time anything on the screen
+    // changes (ASP.NET Core's rendering guidance: avoid recreating delegates for many repeated elements).
+    private readonly Dictionary<object, RowEvents> _rowEvents = new(ReferenceEqualityComparer.Instance);
+    private EventCallback<DragEventArgs>? _dragEnd;
+
+    private sealed record RowEvents(
+        EventCallback<MouseEventArgs> Click,
+        EventCallback<MouseEventArgs> ContextMenu,
+        EventCallback<DragEventArgs> DragStart,
+        EventCallback<DragEventArgs> DragOver,
+        EventCallback<DragEventArgs> Drop);
+
+    private RowEvents EventsOf(TNode node)
+    {
+        if (!_rowEvents.TryGetValue(node, out var events))
+        {
+            events = new RowEvents(
+                EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowClick(node, e)),
+                EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)),
+                EventCallback.Factory.Create<DragEventArgs>(this, () => OnDragStart(node)),
+                EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDragOver(node)),
+                EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDrop(node)));
+            _rowEvents[node] = events;
+        }
+
+        return events;
+    }
+
     // A folder's expander, on a span rather than an Icon: a tree draws one per folder on each redraw.
     private static readonly string OpenExpander = "tree-expander " + AppIcons.CssOf(AppIcon.Expanded);
     private static readonly string ClosedExpander = "tree-expander " + AppIcons.CssOf(AppIcon.Collapsed);
@@ -143,8 +172,9 @@
 
         builder.AddAttribute(seq++, "style", $"padding-left:{8 + depth * 18}px");
         builder.AddAttribute(seq++, "draggable", draggable ? "true" : "false");
-        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowClick(node, e)));
-        builder.AddAttribute(seq++, "oncontextmenu", EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)));
+        var events = EventsOf(node);
+        builder.AddAttribute(seq++, "onclick", events.Click);
+        builder.AddAttribute(seq++, "oncontextmenu", events.ContextMenu);
         builder.AddEventStopPropagationAttribute(seq++, "oncontextmenu", true);
 
         // The row's own, because the list's is never reached: stopping the event here stops it before the list's
@@ -152,14 +182,14 @@
         builder.AddEventPreventDefaultAttribute(seq++, "oncontextmenu", true);
         if (draggable)
         {
-            builder.AddAttribute(seq++, "ondragstart", EventCallback.Factory.Create<DragEventArgs>(this, () => OnDragStart(node)));
-            builder.AddAttribute(seq++, "ondragend", EventCallback.Factory.Create<DragEventArgs>(this, OnDragEnd));
+            builder.AddAttribute(seq++, "ondragstart", events.DragStart);
+            builder.AddAttribute(seq++, "ondragend", _dragEnd ??= EventCallback.Factory.Create<DragEventArgs>(this, OnDragEnd));
         }
 
-        builder.AddAttribute(seq++, "ondragover", EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDragOver(node)));
+        builder.AddAttribute(seq++, "ondragover", events.DragOver);
         builder.AddEventStopPropagationAttribute(seq++, "ondragover", true);
         builder.AddEventPreventDefaultAttribute(seq++, "ondragover", true);
-        builder.AddAttribute(seq++, "ondrop", EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDrop(node)));
+        builder.AddAttribute(seq++, "ondrop", events.Drop);
         builder.AddEventStopPropagationAttribute(seq++, "ondrop", true);
         builder.AddEventPreventDefaultAttribute(seq++, "ondrop", true);
 
@@ -520,6 +550,7 @@
         }
 
         _watched.Clear();
+        _rowEvents.Clear();
         return ValueTask.CompletedTask;
     }
 }

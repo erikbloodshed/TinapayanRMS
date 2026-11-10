@@ -565,11 +565,20 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         // what changed elsewhere: a repriced ingredient, a renamed role, a product that links one.
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
-            var roles = await roleRepository.GetAllAsync(CancellationToken.None);
-            var rawMaterials = await rawMaterialRepository.GetAllAsync(CancellationToken.None);
-            var subAssemblies = await _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None);
-            var linkedBy = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
-            var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
+            // All at once, on the thread pool, as Products reads its lists: one after another on the UI thread, each read came
+            // back to it before the next began, and waited its turn behind whatever the screen was drawing.
+            var rolesRead = Task.Run(() => roleRepository.GetAllAsync(CancellationToken.None));
+            var rawMaterialsRead = Task.Run(() => rawMaterialRepository.GetAllAsync(CancellationToken.None));
+            var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
+            var linkedByRead = Task.Run(() => _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None));
+            var madeFromRead = Task.Run(() => _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None));
+            await Task.WhenAll(rolesRead, rawMaterialsRead, subAssembliesRead, linkedByRead, madeFromRead);
+
+            var roles = await rolesRead;
+            var rawMaterials = await rawMaterialsRead;
+            var subAssemblies = await subAssembliesRead;
+            var linkedBy = await linkedByRead;
+            var madeFrom = await madeFromRead;
 
             // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
             var selectedId = SelectedRow?.Id;
