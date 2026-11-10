@@ -86,17 +86,14 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// <summary>The sub-assemblies picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<SubAssemblyLeafNode> SelectedTreeSubAssemblies => [.. SelectedTreeNodes.OfType<SubAssemblyLeafNode>().Where(l => !l.IsNew)];
 
-    private TreeNameEdit? _treeNameEdit;
+    private readonly TreeNaming _treeNaming;
+
     /// <summary>
     /// The row of the list whose name is being typed in place, as in a file explorer, or null: a sub-assembly or role being
     /// renamed (Rename, F2), or a new sub-assembly or folder being named (New, New Folder). The list draws a box on it,
     /// which gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
     /// </summary>
-    public TreeNameEdit? TreeNameEdit
-    {
-        get => _treeNameEdit;
-        private set => this.RaiseAndSetIfChanged(ref _treeNameEdit, value);
-    }
+    public TreeNameEdit? TreeNameEdit => _treeNaming.Edit;
 
     private string? _moveNotice;
     /// <summary>
@@ -464,6 +461,8 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         SharedRecipeImpact? recipeImpact = null)
         : base(logger)
     {
+        _treeNaming = new TreeNaming(
+            _treeSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         _recipeImpact = recipeImpact;
         _subAssemblyRepository = subAssemblyRepository;
         _versionedSaves = versionedSaves;
@@ -1474,8 +1473,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         }
 
         CancelTreeName();
-        SelectedTreeNode = leaf;
-        TreeNameEdit = new TreeNameEdit(leaf, leaf.Row.Name);
+        _treeNaming.Start(leaf, leaf.Row.Name);
     }
 
     /// <summary>
@@ -1490,8 +1488,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         }
 
         CancelTreeName();
-        SelectedTreeNode = folder;
-        TreeNameEdit = new TreeNameEdit(folder, role.Name, RoleHint);
+        _treeNaming.Start(folder, role.Name, RoleHint);
     }
 
     /// <summary>
@@ -1504,9 +1501,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     {
         CancelTreeName();
         SearchText = string.Empty;
-        var row = SubAssemblyTree.BeginNewFolder();
-        SelectedTreeNode = row;
-        TreeNameEdit = new TreeNameEdit(row, text, RoleHint);
+        _treeNaming.Start(SubAssemblyTree.BeginNewFolder(), text, RoleHint);
     }
 
     /// <summary>What the name box on a role's folder says when pointed at: the prompts used to say it.</summary>
@@ -1532,8 +1527,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
         var title = inRole.IsPackaging ? "New packaging set" : "New sub-assembly";
         if (SubAssemblyTree.BeginNewSubAssembly(new SubAssembly { Name = title, RoleId = inRole.Id, Role = inRole }) is { } row)
         {
-            SelectedTreeNode = row;
-            TreeNameEdit = new TreeNameEdit(row, title);
+            _treeNaming.Start(row, title);
         }
     }
 
@@ -1542,21 +1536,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// the naming in it: the form no longer shows the new sub-assembly, or it's saved and has a row of its own. The form is
     /// left as it is.
     /// </summary>
-    private void EndNewSubAssemblyRow()
-    {
-        if (SubAssemblyTree.PendingSubAssembly is not { } row)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(TreeNameEdit?.Node, row))
-        {
-            TreeNameEdit = null;
-        }
-
-        SubAssemblyTree.EndNewSubAssembly();
-        _treeSelection.Quietly(() => SelectedTreeNodes.Remove(row));
-    }
+    private void EndNewSubAssemblyRow() => _treeNaming.EndNewRow(SubAssemblyTree.PendingSubAssembly, SubAssemblyTree.EndNewSubAssembly);
 
     /// <summary>
     /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it. A sub-assembly's or a
@@ -1565,22 +1545,14 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name refused shows why, and the box
     /// comes back with it. A second call for the same box, as Enter's box is left, does nothing.
     /// </summary>
-    public async Task CommitTreeNameAsync(string text)
+    public Task CommitTreeNameAsync(string text) => _treeNaming.CommitAsync(text);
+
+    /// <summary>Whether a row of the list is a new sub-assembly's or a new folder's, still to be named.</summary>
+    private static bool IsNewRow(object node) => node is SubAssemblyLeafNode { IsNew: true } or SubAssemblyFolderNode { IsNewFolder: true };
+
+    /// <summary>What a name typed into the list's box does (<see cref="CommitTreeNameAsync"/>), once it's taken for one.</summary>
+    private async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
-
-        var name = text.Trim();
-        if (name.Length == 0 || (edit.Node is not (SubAssemblyLeafNode { IsNew: true } or SubAssemblyFolderNode { IsNewFolder: true })
-            && string.Equals(name, edit.InitialText, StringComparison.Ordinal)))
-        {
-            CancelTreeName();
-            return;
-        }
-
-        TreeNameEdit = null;
         switch (edit.Node)
         {
             case SubAssemblyLeafNode { IsNew: true } row:
@@ -1591,14 +1563,13 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 await RunSafelyAsync(() => RenameSubAssemblyToAsync(leaf.Row, name));
                 if (ErrorMessage is not null && SubAssemblyTree.Find(leaf.Row.Id) is { } stillListed)
                 {
-                    TreeNameEdit = edit with { Node = stillListed, InitialText = text };
+                    _treeNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
 
                 break;
 
             case SubAssemblyFolderNode { IsNewFolder: true } folder:
-                SubAssemblyTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, SubAssemblyTree.EndNewFolder);
                 await RunSafelyAsync(() => AddRoleAsync(name));
                 if (ErrorMessage is not null)
                 {
@@ -1611,7 +1582,7 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
                 await RunSafelyAsync(() => RenameRoleToAsync(folder, name));
                 if (ErrorMessage is not null && Roles.Any(r => r.Id == folder.RoleId))
                 {
-                    TreeNameEdit = edit with { InitialText = text };
+                    _treeNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -1622,23 +1593,19 @@ public sealed class SubAssembliesViewModel : ViewModelBase, IUndoScreen, IDispos
     /// Esc in the list's name box: the name stays as it was, and a new sub-assembly's or folder's row goes, with nothing
     /// saved. The form stays on the new sub-assembly, blank, as New leaves it.
     /// </summary>
-    public void CancelTreeName()
-    {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
+    public void CancelTreeName() => _treeNaming.Cancel();
 
-        TreeNameEdit = null;
-        switch (edit.Node)
+    /// <summary>What Esc does to the row named (<see cref="CancelTreeName"/>), once its box is closed.</summary>
+    private void TreeNameCancelled(object node)
+    {
+        switch (node)
         {
             case SubAssemblyLeafNode { IsNew: true }:
                 EndNewSubAssemblyRow();
                 ApplyRefresh(() => EditingName = string.Empty);
                 break;
             case SubAssemblyFolderNode { IsNewFolder: true } folder:
-                SubAssemblyTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, SubAssemblyTree.EndNewFolder);
                 break;
         }
     }

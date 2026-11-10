@@ -97,17 +97,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// <summary>The materials picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>().Where(l => !l.IsNew)];
 
-    private TreeNameEdit? _treeNameEdit;
+    private readonly TreeNaming _treeNaming;
+
     /// <summary>
     /// The row of the list whose name is being typed in place, as in a file explorer, or null: a material or category being
     /// renamed (Rename, F2), or a new material or folder being named (New, New Folder). The list draws a box on it, which
     /// gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
     /// </summary>
-    public TreeNameEdit? TreeNameEdit
-    {
-        get => _treeNameEdit;
-        private set => this.RaiseAndSetIfChanged(ref _treeNameEdit, value);
-    }
+    public TreeNameEdit? TreeNameEdit => _treeNaming.Edit;
 
     private string? _moveNotice;
     /// <summary>
@@ -1022,6 +1019,8 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         MaterialCostShares? costShares = null)
         : base(logger)
     {
+        _treeNaming = new TreeNaming(
+            _treeSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         _costShares = costShares;
         _rawMaterialRepository = rawMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;
@@ -3175,8 +3174,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
 
         CancelTreeName();
-        SelectedTreeNode = leaf;
-        TreeNameEdit = new TreeNameEdit(leaf, leaf.RawMaterial.Name);
+        _treeNaming.Start(leaf, leaf.RawMaterial.Name);
     }
 
     /// <summary>
@@ -3191,8 +3189,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
         }
 
         CancelTreeName();
-        SelectedTreeNode = folder;
-        TreeNameEdit = new TreeNameEdit(folder, category.Name);
+        _treeNaming.Start(folder, category.Name);
     }
 
     /// <summary>
@@ -3206,9 +3203,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     {
         CancelTreeName();
         SearchText = string.Empty;
-        var row = RawMaterialTree.BeginNewFolder(type);
-        SelectedTreeNode = row;
-        TreeNameEdit = new TreeNameEdit(row, text, NewFolderHint(type));
+        _treeNaming.Start(RawMaterialTree.BeginNewFolder(type), text, NewFolderHint(type));
     }
 
     /// <summary>What the name box on a new folder says when pointed at: the prompts used to say it.</summary>
@@ -3238,8 +3233,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
             Source = source,
             CategoryId = EditingCategory?.Id ?? 0,
         });
-        SelectedTreeNode = row;
-        TreeNameEdit = new TreeNameEdit(row, title);
+        _treeNaming.Start(row, title);
     }
 
     /// <summary>"New ingredient", "New made ingredient" or "New packaging material": what a new material's row reads until it's named.</summary>
@@ -3253,21 +3247,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// naming in it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left
     /// as it is.
     /// </summary>
-    private void EndNewMaterialRow()
-    {
-        if (RawMaterialTree.PendingMaterial is not { } row)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(TreeNameEdit?.Node, row))
-        {
-            TreeNameEdit = null;
-        }
-
-        RawMaterialTree.EndNewMaterial();
-        _treeSelection.Quietly(() => SelectedTreeNodes.Remove(row));
-    }
+    private void EndNewMaterialRow() => _treeNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
 
     /// <summary>
     /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it. A material's or a
@@ -3276,22 +3256,14 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// name before Save can file it. An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name
     /// refused shows why, and the box comes back with it. A second call for the same box, as Enter's box is left, does nothing.
     /// </summary>
-    public async Task CommitTreeNameAsync(string text)
+    public Task CommitTreeNameAsync(string text) => _treeNaming.CommitAsync(text);
+
+    /// <summary>Whether a row of the list is a new material's or a new folder's, still to be named.</summary>
+    private static bool IsNewRow(object node) => node is RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true };
+
+    /// <summary>What a name typed into the list's box does (<see cref="CommitTreeNameAsync"/>), once it's taken for one.</summary>
+    private async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
-
-        var name = text.Trim();
-        if (name.Length == 0 || (edit.Node is not (RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true })
-            && string.Equals(name, edit.InitialText, StringComparison.Ordinal)))
-        {
-            CancelTreeName();
-            return;
-        }
-
-        TreeNameEdit = null;
         switch (edit.Node)
         {
             case RawMaterialLeafNode { IsNew: true } row:
@@ -3302,14 +3274,13 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 await RunSafelyAsync(() => RenameMaterialToAsync(leaf, name));
                 if (ErrorMessage is not null && RawMaterialTree.Find(leaf.RawMaterial.Id) is { } stillListed)
                 {
-                    TreeNameEdit = edit with { Node = stillListed, InitialText = text };
+                    _treeNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
 
                 break;
 
             case RawMaterialFolderNode { IsNewFolder: true, CategoryType: { } type } folder:
-                RawMaterialTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
                 await RunSafelyAsync(() => AddCategoryAsync(type, name));
                 if (ErrorMessage is not null)
                 {
@@ -3322,7 +3293,7 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
                 await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
                 if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
                 {
-                    TreeNameEdit = edit with { InitialText = text };
+                    _treeNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -3333,23 +3304,19 @@ public sealed class RawMaterialsViewModel : ViewModelBase, IUndoScreen, IDisposa
     /// Esc in the list's name box: the name stays as it was, and a new material's or folder's row goes, with nothing saved.
     /// The form stays on the new material, blank, as New leaves it.
     /// </summary>
-    public void CancelTreeName()
-    {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
+    public void CancelTreeName() => _treeNaming.Cancel();
 
-        TreeNameEdit = null;
-        switch (edit.Node)
+    /// <summary>What Esc does to the row named (<see cref="CancelTreeName"/>), once its box is closed.</summary>
+    private void TreeNameCancelled(object node)
+    {
+        switch (node)
         {
             case RawMaterialLeafNode { IsNew: true }:
                 EndNewMaterialRow();
                 ApplyRefresh(() => EditingName = string.Empty);
                 break;
             case RawMaterialFolderNode { IsNewFolder: true } folder:
-                RawMaterialTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
                 break;
         }
     }

@@ -120,17 +120,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// <summary>The products picked in the list, in the order they were picked, deleted ones left out.</summary>
     public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted && !l.IsNew)];
 
-    private TreeNameEdit? _treeNameEdit;
+    private readonly TreeNaming _treeNaming;
+
     /// <summary>
     /// The row of the list whose name is being typed in place, as in a file explorer, or null: a product or category being
     /// renamed (Rename, F2), or a new product or folder being named (New Product, New Folder). The list draws a box on it,
     /// which gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
     /// </summary>
-    public TreeNameEdit? TreeNameEdit
-    {
-        get => _treeNameEdit;
-        private set => this.RaiseAndSetIfChanged(ref _treeNameEdit, value);
-    }
+    public TreeNameEdit? TreeNameEdit => _treeNaming.Edit;
 
     private string? _moveNotice;
     /// <summary>
@@ -882,6 +879,8 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         ILogger logger)
         : base(logger)
     {
+        _treeNaming = new TreeNaming(
+            _treeSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         _versionRepository = versionRepository;
         _productRepository = productRepository;
         _usageRepository = usageRepository;
@@ -2284,29 +2283,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         SearchText = string.Empty;
         NewProduct(stage, categoryId, isComposite);
         var row = ProductTree.BeginNewProduct(NewProductStage, _newProductCategoryId, IsEditingComposite);
-        SelectedTreeNode = row;
-        TreeNameEdit = new TreeNameEdit(row, row.Product.Name);
+        _treeNaming.Start(row, row.Product.Name);
     }
 
     /// <summary>
     /// Takes the new product's row out of the list (<see cref="NewProductInList"/>), and the rows picked, and stops the
     /// naming in it. The form is left as it is.
     /// </summary>
-    private void EndNewProductRow()
-    {
-        if (ProductTree.PendingProduct is not { } row)
-        {
-            return;
-        }
-
-        if (ReferenceEquals(TreeNameEdit?.Node, row))
-        {
-            TreeNameEdit = null;
-        }
-
-        ProductTree.EndNewProduct();
-        _treeSelection.Quietly(() => SelectedTreeNodes.Remove(row));
-    }
+    private void EndNewProductRow() => _treeNaming.EndNewRow(ProductTree.PendingProduct, ProductTree.EndNewProduct);
 
     /// <summary>
     /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
@@ -4760,8 +4744,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         CancelTreeName();
-        SelectedTreeNode = leaf;
-        TreeNameEdit = new TreeNameEdit(leaf, leaf.Product.Name);
+        _treeNaming.Start(leaf, leaf.Product.Name);
     }
 
     /// <summary>
@@ -4776,8 +4759,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
         }
 
         CancelTreeName();
-        SelectedTreeNode = folder;
-        TreeNameEdit = new TreeNameEdit(folder, category.Name, CategoryHint);
+        _treeNaming.Start(folder, category.Name, CategoryHint);
     }
 
     /// <summary>
@@ -4801,9 +4783,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     {
         CancelTreeName();
         SearchText = string.Empty;
-        var row = ProductTree.BeginNewFolder(stage);
-        SelectedTreeNode = row;
-        TreeNameEdit = new TreeNameEdit(row, text, CategoryHint);
+        _treeNaming.Start(ProductTree.BeginNewFolder(stage), text, CategoryHint);
     }
 
     /// <summary>What the name box on a category's folder says when pointed at: the prompts used to say it.</summary>
@@ -4816,22 +4796,14 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// opened. An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name refused shows why, and
     /// the box comes back with it, to be put right. A second call for the same box, as Enter's box is left, does nothing.
     /// </summary>
-    public async Task CommitTreeNameAsync(string text)
+    public Task CommitTreeNameAsync(string text) => _treeNaming.CommitAsync(text);
+
+    /// <summary>Whether a row of the list is a new product's or a new folder's, still to be named.</summary>
+    private static bool IsNewRow(object node) => node is ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true };
+
+    /// <summary>What a name typed into the list's box does (<see cref="CommitTreeNameAsync"/>), once it's taken for one.</summary>
+    private async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
-
-        var name = text.Trim();
-        if (name.Length == 0 || (edit.Node is not (ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true })
-            && string.Equals(name, edit.InitialText, StringComparison.Ordinal)))
-        {
-            CancelTreeName();
-            return;
-        }
-
-        TreeNameEdit = null;
         switch (edit.Node)
         {
             case ProductLeafNode { IsNew: true, Product.IsComposite: true } row:
@@ -4842,7 +4814,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await SaveNewProductAsync(name);
                 if (ProductTree.PendingProduct == row)
                 {
-                    TreeNameEdit = edit with { InitialText = text };
+                    _treeNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -4851,14 +4823,13 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await RunSafelyAsync(() => RenameProductToAsync(leaf, name));
                 if (ErrorMessage is not null && ProductTree.Find(leaf.Product.Id) is { } stillListed)
                 {
-                    TreeNameEdit = edit with { Node = stillListed, InitialText = text };
+                    _treeNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
 
                 break;
 
             case ProductFolderNode { IsNewFolder: true } folder:
-                ProductTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, ProductTree.EndNewFolder);
                 ProductCategory? category = null;
                 await RunSafelyAsync(async () =>
                 {
@@ -4880,7 +4851,7 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
                 await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
                 if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
                 {
-                    TreeNameEdit = edit with { InitialText = text };
+                    _treeNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -4891,23 +4862,19 @@ public sealed class ProductsViewModel : ViewModelBase, IUndoScreen, IDisposable,
     /// Esc in the list's name box: the name stays as it was, and a new product's or folder's row goes, with nothing saved.
     /// The form stays on the new product, blank, as New leaves it.
     /// </summary>
-    public void CancelTreeName()
-    {
-        if (TreeNameEdit is not { } edit)
-        {
-            return;
-        }
+    public void CancelTreeName() => _treeNaming.Cancel();
 
-        TreeNameEdit = null;
-        switch (edit.Node)
+    /// <summary>What Esc does to the row named (<see cref="CancelTreeName"/>), once its box is closed.</summary>
+    private void TreeNameCancelled(object node)
+    {
+        switch (node)
         {
             case ProductLeafNode { IsNew: true }:
                 EndNewProductRow();
                 ApplyRefresh(() => EditingName = string.Empty);
                 break;
             case ProductFolderNode { IsNewFolder: true } folder:
-                ProductTree.EndNewFolder();
-                _treeSelection.Quietly(() => SelectedTreeNodes.Remove(folder));
+                _treeNaming.EndNewRow(folder, ProductTree.EndNewFolder);
                 break;
         }
     }
