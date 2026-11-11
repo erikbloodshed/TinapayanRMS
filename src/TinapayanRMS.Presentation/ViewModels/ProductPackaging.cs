@@ -78,9 +78,15 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         set
         {
             this.RaiseAndSetIfChanged(ref _bulkQuantity, value);
-            RaiseBulkCostChanged();
+            RaiseCostsChanged();
         }
     }
+
+    /// <summary>
+    /// What the packaging per piece costs one sellable unit, its lines alone: the figure beside its heading. The bulk
+    /// packaging's share is in its own caption (BulkCostText); the product's packaging cost holds both.
+    /// </summary>
+    public decimal LinesCost => LineEdits.Sum(l => l.CostPerUnit);
 
     /// <summary>What one bulk pack's lines cost together, at the screen's cost basis.</summary>
     public decimal BulkPackCost => BulkEdits.Sum(l => l.CostPerUnit);
@@ -88,14 +94,19 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// <summary>What the bulk packaging costs one sellable unit: the pack's cost shared out among the products it holds.</summary>
     public decimal BulkCostPerUnit => ProductRules.CalculateBulkPackagingCost(BulkPackCost, BulkQuantity);
 
-    /// <summary>The Bulk Packaging table's caption: "Pack cost 42.58 ÷ 6 products = 7.10 per unit".</summary>
-    public string BulkCostText => BulkQuantity is >= 1
-        ? $"Pack cost {BulkPackCost:N2} ÷ {BulkQuantity} {(BulkQuantity == 1 ? "product" : "products")} = {BulkCostPerUnit:N2} per unit"
+    /// <summary>
+    /// The Bulk Packaging table's caption: "Pack cost 42.58 ÷ 6 products = 7.10 per unit", or, while it has no lines, what
+    /// to add (a quantity alone saves nothing).
+    /// </summary>
+    public string BulkCostText =>
+        BulkEdits.Count == 0 ? "No bulk packaging. Add what one bulk pack takes, such as a box several products share."
+        : BulkQuantity is >= 1 ? $"Pack cost {BulkPackCost:N2} ÷ {BulkQuantity} {(BulkQuantity == 1 ? "product" : "products")} = {BulkCostPerUnit:N2} per unit"
         : $"Pack cost {BulkPackCost:N2}. Enter how many products one pack holds.";
 
-    /// <summary>The bulk figures again, after a line or the quantity changed.</summary>
-    public void RaiseBulkCostChanged()
+    /// <summary>The tab's cost figures again, after a line or the quantity changed: the packaging per piece's and the bulk packaging's.</summary>
+    public void RaiseCostsChanged()
     {
+        this.RaisePropertyChanged(nameof(LinesCost));
         this.RaisePropertyChanged(nameof(BulkPackCost));
         this.RaisePropertyChanged(nameof(BulkCostPerUnit));
         this.RaisePropertyChanged(nameof(BulkCostText));
@@ -105,8 +116,8 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     public IEnumerable<PackagingLineRow> AllLineEdits => LineEdits.Concat(BulkEdits);
 
     /// <summary>
-    /// What the per-piece packaging links as the form stands, saved or not (the Add Sub-Assembly form's Link sets it,
-    /// the Packaging tab's Make a Copy and Delete Sub-Assembly clear it), or null while the product owns its lines.
+    /// What the per-piece packaging links as the form stands, saved or not (the Packaging tab's Link sets it, and its Make a
+    /// Copy and Remove Link clear it), or null while the product owns its lines.
     /// </summary>
     public PackagingLinkTarget? LinkTarget { get; private set; }
 
@@ -212,9 +223,9 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     public bool IsPackagingLinkedToProduct => IsPackagingLinked && !IsPackagingLinkedToSet;
 
     /// <summary>
-    /// What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner. A load, Delete
-    /// Sub-Assembly, Make a Copy and an add all come through here, so a Move to Sub-Assemblies waiting for Save ends here
-    /// too; an undo puts it back afterwards (the screen's RestoreSnapshot).
+    /// What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner. A load, Link,
+    /// Copy, Make a Copy and Remove Link all come through here, so a Move to Sub-Assemblies waiting for Save ends here too;
+    /// an undo puts it back afterwards (the screen's RestoreSnapshot).
     /// </summary>
     public void ShowLink(PackagingLinkTarget? target)
     {
@@ -252,7 +263,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         SelectedBulkEdit = null;
         BulkEdits.Clear();
         BulkEdits.AddRange(rows);
-        RaiseBulkCostChanged();
+        RaiseCostsChanged();
     }
 
     /// <summary>Shows <paramref name="lines"/> as saved, and makes them what Save compares against.</summary>

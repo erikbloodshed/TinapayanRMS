@@ -16,8 +16,8 @@ public sealed partial class ProductsViewModel
     /// <summary>The recipe's tabs follow its sections as they're added, taken out and moved.</summary>
     private void WireRecipeTabLists()
     {
-        // The Packaging tab is always there, last, for the bulk packaging; the packaging for each piece, like a recipe
-        // section, comes in through Add Sub-Assembly.
+        // The Packaging tab is always there, last: the packaging per piece is typed, linked and copied on the tab itself,
+        // and the bulk packaging typed there, never through Add Sub-Assembly, which is for recipe sections.
         RecipeTabs.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasRecipeSections));
         RecipeTabs.Add(PackagingTab);
 

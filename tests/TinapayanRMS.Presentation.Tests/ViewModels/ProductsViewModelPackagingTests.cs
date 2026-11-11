@@ -356,6 +356,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
         viewModel.HasRecipeSections.Should().BeFalse();
+        viewModel.Packaging.BulkCostText.Should().Be("No bulk packaging. Add what one bulk pack takes, such as a box several products share.");
 
         viewModel.EditingName = "Pandesal";
         viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = cartonId, QtyPerUnit = 1m });
@@ -386,6 +387,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 4m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
         viewModel.Packaging.BulkEdits.Single().QtyPerUnit.Should().Be(1m);
         viewModel.Packaging.BulkCostText.Should().Be("Pack cost 12.00 ÷ 6 products = 2.00 per unit");
+        viewModel.Packaging.LinesCost.Should().Be(2m, "the Packaging per Piece heading's figure is its lines alone: the bulk share has its own caption");
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
 

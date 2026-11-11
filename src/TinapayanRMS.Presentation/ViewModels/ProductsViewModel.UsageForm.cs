@@ -639,7 +639,7 @@ public sealed partial class ProductsViewModel
     private void PackagingLinesEdited()
     {
         PackagingLineRow.Resolve(Packaging.AllLineEdits, PackagingMaterials.ToDictionary(m => m.Id));
-        Packaging.RaiseBulkCostChanged();
+        Packaging.RaiseCostsChanged();
         RecomputeCosts();
     }
 

@@ -530,6 +530,23 @@ public class FieldTests
         picked.Should().BeEmpty();
     }
 
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task A_picker_takes_the_cursor_and_opens_its_list_as_it_shows_only_when_it_opens_on_show(bool openOnShow)
+    {
+        await using var context = AppServices.NewContext();
+
+        // The Packaging tab's Link and Copy picker shows in answer to the button: once the combo box is made, its script
+        // set up, it's given the cursor and its list. Any other picker waits to be clicked.
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Gift Box Set", "Cream Loaf"])
+            .Add(f => f.OpenOnShow, openOnShow));
+
+        context.JSInterop.Invocations.Any(i => i.Identifier == "sfBlazor.DropDownList.focusIn").Should().Be(openOnShow);
+        field.FindAll("li.e-list-item").Select(li => li.TextContent.Trim()).Should().Equal(openOnShow ? ["Gift Box Set", "Cream Loaf"] : []);
+    }
+
     // The combo box's event arguments, as it makes them: their setters are Syncfusion's own.
     private static FilteringEventArgs Typed(string text)
     {

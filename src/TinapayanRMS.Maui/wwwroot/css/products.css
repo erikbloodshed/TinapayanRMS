@@ -98,11 +98,16 @@
     margin: 0;
 }
 
+/* The line under the tabs is drawn in the strip's own last pixel row (its bottom padding), which the tab showing covers
+   by reaching a pixel further down (margin-bottom: -1px), so it opens onto its form. It was the strip's border: but the
+   strip scrolls sideways when the tabs don't fit, so the pixel reaching over its border counted as more to scroll, and
+   the strip had a scroll bar beside the tabs for it. */
 .recipe-tabs {
     display: flex;
     gap: 2px;
     overflow-x: auto;
-    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 1px;
+    box-shadow: inset 0 -1px 0 var(--card-border);
     flex: none;
 }
 

@@ -4,8 +4,10 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A choice in the Link and Copy picker: a recipe sub-assembly, "Chocolate Glaze — Sub-Assemblies (Glaze)", or
-/// packaging: a packaging set, "Gift Box Set — Sub-Assemblies (Packaging)", or another product's, "Packaging — Cream Loaf".
+/// A choice in a picker of what to link or copy. In the section form's (Add Sub-Assembly's Link and Copy, and a linked
+/// section's change of link), a recipe sub-assembly, "Chocolate Glaze — Sub-Assemblies (Glaze)" (DisplayName). In the
+/// Packaging tab's Link and Copy, packaging: a packaging set, "Gift Box Set — packaging set", or another product's,
+/// "Cream Loaf — product" (PackagingSourceName).
 /// </summary>
 public sealed class LinkableSubAssemblyOption
 {
@@ -30,8 +32,6 @@ public sealed class LinkableSubAssemblyOption
 
     /// <summary>What the product's packaging would link or copy, or null for a recipe.</summary>
     public PackagingLinkTarget? PackagingTarget { get; }
-
-    public bool IsPackaging => PackagingTarget is not null;
 
     /// <summary>A sub-assembly's id, or another product's id negated: one key for the picker's merge.</summary>
     public int Key => SubAssembly?.Id ?? PackagingTarget!.Key;

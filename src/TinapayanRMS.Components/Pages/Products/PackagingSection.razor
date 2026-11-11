@@ -1,10 +1,11 @@
 @* A product's packaging (the WPF PackagingSectionView), on a tab every product has, with both its tables always there.
    First the packaging per piece: where it's linked from, as a tag, or a link that opens the packaging set on
-   Sub-Assemblies; what the packaging costs per sellable unit; Link and Copy, which open a picker of the packaging sets
-   (and, to copy, the other products) in their place; and Move to Sub-Assemblies for lines of its own. Its table is typed
-   straight into unless it's linked, with Make a Copy and Remove Link under a linked one. Then its bulk packaging: what
-   one bulk pack takes (a box several units share, its tape), and in a box of its own how many products the pack holds,
-   which share out its cost. *@
+   Sub-Assemblies; what its lines cost one sellable unit; Link and Copy, which open a picker of the packaging sets (and,
+   to copy, the other products) in their place, ready to type into; and Move to Sub-Assemblies for lines of its own. Its
+   table is typed straight into unless it's linked, with Make a Copy and Remove Link under a linked one, and while it has
+   no lines a caption says what to add (a table's own empty text shows only without an add row). Then its bulk packaging:
+   what one bulk pack takes (a box several units share, its tape), and in a box of its own how many products the pack
+   holds, which share out its cost. *@
 <div class="section-view">
     <div class="section-heading">
         <div class="usage-badges">
@@ -27,6 +28,7 @@
             {
                 <PickField ID="packaging-source" TItem="LinkableSubAssemblyOption" Items="ViewModel.Packaging.SourceOptions" TextField="PackagingSourceName"
                            @bind-Value="ViewModel.Packaging.PickedSource" Placeholder="@ViewModel.Packaging.SourcePlaceholder" CssClass="packaging-source"
+                           OpenOnShow="true" PopupWidth="420px"
                            Tooltip="@(ViewModel.Packaging.SourceMode == PackagingSourceMode.Copy
                                ? "Its lines become this product's own, in place of the ones here, to change as you like."
                                : "Its lines show here, read-only, in place of the ones here, and follow every change made to the set.")" />
@@ -34,7 +36,7 @@
             }
         </div>
         <div class="lines-footer-right">
-            <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.Costing.Costs.OwnPackaging.ToString("N2")</span>
+            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@ViewModel.CostUnitCaption · @ViewModel.Packaging.LinesCost.ToString("N2")</span>
             @if (!ViewModel.Packaging.IsPickingSource)
             {
                 <CommandButton Command="ViewModel.StartLinkingPackagingCommand" Icon="AppIcon.Link" Label="Link"
@@ -51,8 +53,7 @@
     </div>
 
     <PackagingLinesGrid @ref="_lines" Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
-                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis"
-                        EmptyText="No packaging per piece. Add what one piece takes, such as its bag and label, or Link a packaging set." />
+                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis" />
 
     <div class="lines-footer">
         @if (ViewModel.Packaging.IsPackagingLinked)
@@ -67,7 +68,14 @@
         }
         else
         {
-            <span></span>
+            if (ViewModel.Packaging.LineEdits.Count == 0)
+            {
+                <p class="caption">No packaging per piece. Add what one piece takes, such as its bag and label, or Link a packaging set.</p>
+            }
+            else
+            {
+                <span></span>
+            }
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
@@ -86,8 +94,7 @@
             </div>
         </div>
         <PackagingLinesGrid @ref="_bulk" Items="ViewModel.Packaging.BulkEdits" NewItem="ViewModel.Packaging.NewBulkEdit" Materials="ViewModel.PackagingMaterials"
-                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.CostBasis"
-                            EmptyText="No bulk packaging. Add what one bulk pack takes, such as a box several products share." />
+                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.CostBasis" />
         <div class="lines-footer">
             <p class="caption">@ViewModel.Packaging.BulkCostText</p>
             <div class="button-row">

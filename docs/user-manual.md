@@ -727,12 +727,14 @@ A linked section has a badge saying where it's from. Click the badge to open the
 
 The **Packaging** tab is on every product, with two tables, both always there: **Packaging per Piece** and **Bulk Packaging**.
 
-**Packaging per Piece** is what one sellable unit takes, such as its bag and label. Type it straight into the table. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**. **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
+**Packaging per Piece** is what one sellable unit takes, such as its bag and label. Type it straight into the table. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**. **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out. While the table is empty, a line under it says what to add.
+
+Beside the heading, **Per piece** (or the unit the product is sold in) shows what these lines cost one sellable unit. The bulk packaging's share isn't in it: that's under the Bulk Packaging table. The Costing tab's **Packaging** holds both.
 
 To use packaging that already exists, use the buttons at the top right of the tab:
 
-- **Link** opens a picker of the **packaging sets** on the Sub-Assemblies screen. Pick one, and its lines show in the table in place of the ones there. They can't be changed here: they follow every change made to the set. If there's no packaging set yet, the screen says so.
-- **Copy** opens a picker of the packaging sets and every other product. Pick one, and its lines come in as this product's own, in place of the ones there, to change as you like.
+- **Link** opens a picker of the **packaging sets** on the Sub-Assemblies screen, with its list open and the cursor in it, so you can start typing a name straight away. Pick one, and its lines show in the table in place of the ones there. They can't be changed here: they follow every change made to the set. If there's no packaging set yet, the screen says so.
+- **Copy** opens a picker of the packaging sets and every other product, ready to type into in the same way. Pick one, and its lines come in as this product's own, in place of the ones there, to change as you like.
 - The **✕** beside the picker closes it without changing anything. A product with no packaging per piece can't be picked: the screen says so, and you can pick another.
 - Under linked lines, **Make a Copy** turns them into this product's own lines so you can change them, and **Remove Link** takes the link and its lines out, leaving no packaging per piece.
 - **Undo** puts back what the table held before a Link, a Copy or a Remove Link.
@@ -741,7 +743,7 @@ To use packaging that already exists, use the buttons at the top right of the ta
 
 - **Products per pack**, beside its heading, is how many products one bulk pack holds: a whole number, 1 or more.
 - Its table lists what one pack takes: **Material**, **Qty**, **Unit**, **Unit Cost** and **Cost per Pack**. Type each quantity for the whole pack, such as 1 box and 30 cm of tape. The quantities stay as you type them.
-- Under the table, the caption shows the sum: the pack's cost, divided by the products it holds, is what each product carries, as in "Pack cost 12.60 ÷ 6 products = 2.10 per unit". That share joins the **Packaging** figure on the Costing tab and the cost caption at the top of the Packaging tab.
+- Under the table, the caption shows the sum: the pack's cost, divided by the products it holds, is what each product carries, as in "Pack cost 12.60 ÷ 6 products = 2.10 per unit". That share joins the **Packaging** figure on the Costing tab. While the table is empty, the caption says what to add instead.
 - **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
 - Save refuses bulk lines with no **Products per pack**. Take every line out to have no bulk packaging.
 - A material can be both one of the packaging lines and one of the bulk lines, such as tape on each product's bag and on the box.

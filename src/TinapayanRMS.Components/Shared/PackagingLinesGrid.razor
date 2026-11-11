@@ -5,7 +5,7 @@
    material (picked from a list showing its category, base unit and cost per unit), how many, in any of the material's
    own units (its base unit or an alternative one), that unit's cost, and the line's cost. Dragged into order. *@
 <LineGrid @ref="_grid" TRow="PackagingLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
-          Reorderable="!ReadOnly" ReadOnly="ReadOnly" EmptyText="@EmptyText" Footer="Footer">
+          Reorderable="!ReadOnly" ReadOnly="ReadOnly" Footer="Footer">
     <Header>
         <th>Material</th>
         <th class="col-number col-qty">Qty</th>
@@ -69,8 +69,6 @@
 
     /// <summary>Which of a material's costs its picker lists: buffered, or the true cost while Products shows unbuffered costs.</summary>
     [Parameter] public CostBasis Basis { get; set; }
-
-    [Parameter] public string? EmptyText { get; set; }
 
     [Parameter] public RenderFragment? Footer { get; set; }
 

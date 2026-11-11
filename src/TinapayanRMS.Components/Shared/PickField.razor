@@ -14,12 +14,13 @@
    list filters on every key (DebounceDelay 0): Syncfusion's default held each filter back 300 ms after the key, so the
    list trailed the typing. The lists are in memory, and a filter takes the window a few milliseconds. Only a pick made
    with the cursor in the box is passed on: the combo box also hands back values of its own as it settles on a list it
-   was given (OnValueChanged). *@
+   was given (OnValueChanged). A picker that shows in answer to a button (OpenOnShow) takes the cursor and opens its list
+   as it shows, so the next key filters it. *@
 <PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
             AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
             Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
     <ComboBoxFieldSettings Text="Text" Value="Index" />
-    <ComboBoxEvents TValue="int?" TItem="Choice" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
+    <ComboBoxEvents TValue="int?" TItem="Choice" Created="OnCreated" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
     @if (ItemTemplate is not null)
     {
         <ComboBoxTemplates TItem="Choice">
@@ -82,6 +83,13 @@
 
     [Parameter] public string PopupWidth { get; set; } = "100%";
 
+    /// <summary>
+    /// Whether the picker takes the cursor and opens its list as it shows: one that appears in answer to a button (the
+    /// Packaging tab's Link and Copy), where nothing else is to be done but pick. Without it, the user had to click the
+    /// box first, and with the Vim keys on, what they typed straight away went to the keys instead.
+    /// </summary>
+    [Parameter] public bool OpenOnShow { get; set; }
+
     /// <summary>What's being typed, as it's typed: for a screen that settles typed text itself.</summary>
     [Parameter] public EventCallback<string> OnTyped { get; set; }
 
@@ -126,6 +134,17 @@
         TextOf?.Invoke(item)
         ?? (TextField is null ? item?.ToString() : item?.GetType().GetProperty(TextField)?.GetValue(item)?.ToString())
         ?? "";
+
+    // The combo box says it's made once its first drawing has set up its script (sfBlazor's initialize), which its
+    // FocusAsync and ShowPopupAsync call into: from then on it can be given the cursor and its list.
+    private async Task OnCreated(object args)
+    {
+        if (OpenOnShow && _box is not null)
+        {
+            await _box.FocusAsync();
+            await _box.ShowPopupAsync();
+        }
+    }
 
     private async Task OnFocus(object args)
     {
