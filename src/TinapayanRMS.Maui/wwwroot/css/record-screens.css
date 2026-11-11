@@ -744,8 +744,9 @@
     flex: none;
 }
 
-/* Purchase Cost Setup: Cost From beside Remove, under the brand table; and the target buffer under the buffer, while
-   prices have moved it away. */
+/* Purchase Cost Setup: Basis beside Remove, under the brand table; and the target buffer under the buffer, while
+   prices have moved it away. Basis keeps one width, enough for a brand's name, as the card widens or narrows: the
+   picker sets its own width in its style attribute (100%), which would stretch it across the row. */
 .cost-from-row {
     display: flex;
     align-items: center;
@@ -753,7 +754,8 @@
 }
 
 .cost-from-row .cost-from-picker {
-    width: 280px;
+    width: 240px !important;
+    flex: none;
 }
 
 .cost-from-row .remove-line {

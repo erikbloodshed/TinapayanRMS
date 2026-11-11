@@ -6,27 +6,45 @@
    each item's place in the list rather than the item, since it reads an enum's first value as no value at all. Within
    an undo screen the pick is one undo step. A picker on a screen that adds what's typed (the Category pickers) passes
    OnTyped and OnLeave, and the screen settles the text itself. As the WPF pickers highlighted the best match for what's
-   typed (PickerMatchHighlight), the first match fills in as it's typed (Autofill), so Enter or Tab picks it. The list
-   filters on every key (DebounceDelay 0): Syncfusion's default held each filter back 300 ms after the key, so the list
-   and the fill-in trailed the typing, and a late fill-in could put back text just rubbed out. The lists are in memory,
-   and a filter takes the window a few milliseconds. Only a pick made with the cursor in the box is passed on: the combo
-   box also hands back values of its own as it settles on a list it was given (OnValueChanged). *@
-<SfComboBox ID="@ID" TValue="int?" TItem="Choice" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
-            AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="true" Placeholder="@Placeholder"
+   typed (PickerMatchHighlight), the list is sorted best match first (each item's Rank, RecordNameMatch.Rank, set as
+   it's typed, before the combo box filters), and the best match is highlighted for Enter or Tab to pick, the box
+   keeping only what's typed: the combo box's own fill-in (Autofill) wrote the rest of a name into the box under the
+   cursor, and found only names starting with what was typed. The combo box is the app's own (PickComboBox), which
+   sorts by the rank and highlights the best match: Syncfusion's marks the item it held, where that's still listed. The
+   list filters on every key (DebounceDelay 0): Syncfusion's default held each filter back 300 ms after the key, so the
+   list trailed the typing. The lists are in memory, and a filter takes the window a few milliseconds. Only a pick made
+   with the cursor in the box is passed on: the combo box also hands back values of its own as it settles on a list it
+   was given (OnValueChanged). *@
+<PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
+            AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
             Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
     <ComboBoxFieldSettings Text="Text" Value="Index" />
-    <ComboBoxEvents TValue="int?" TItem="Choice" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" />
+    <ComboBoxEvents TValue="int?" TItem="Choice" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
     @if (ItemTemplate is not null)
     {
         <ComboBoxTemplates TItem="Choice">
             <ItemTemplate Context="choice">@ItemTemplate(choice.Item)</ItemTemplate>
         </ComboBoxTemplates>
     }
-</SfComboBox>
+</PickComboBox>
 
 @code {
-    /// <summary>An item as the combo box holds it: its place in the list, and the text it's found and shown by.</summary>
-    public sealed record Choice(int Index, string Text, TItem Item);
+    /// <summary>
+    /// An item as the combo box holds it: its place in the list, the text it's found and shown by, and how well that
+    /// matches what's typed, which the list is sorted by. The match isn't part of what it is: the combo box may hold it
+    /// by its hash while it changes.
+    /// </summary>
+    public sealed record Choice(int Index, string Text, TItem Item)
+    {
+        public int Rank { get; set; }
+
+        public bool Equals(Choice? other) =>
+            other is not null && Index == other.Index && Text == other.Text && EqualityComparer<TItem>.Default.Equals(Item, other.Item);
+
+        public override int GetHashCode() => HashCode.Combine(Index, Text, Item);
+    }
+
+    private PickComboBox<TItem>? _box;
 
     private List<Choice> _choices = [];
 
@@ -88,6 +106,13 @@
 
     private int? ShownIndex => _hasCursor ? (_typed is null ? null : IndexOf(_typed.Item)) : SelectedIndex;
 
+    // What Enter or Tab takes while the box has the cursor: the best match for what's typed, or the item the arrow keys
+    // moved to. None once it's been picked, or with nothing typed.
+    private Choice? _highlighted;
+
+    // Whether the highlighted item was taken for what's typed, since the box took the cursor or was last typed into.
+    private bool _highlightTaken;
+
     protected override void OnParametersSet()
     {
         var items = Items.ToList();
@@ -105,26 +130,78 @@
     private async Task OnFocus(object args)
     {
         _typed = SelectedIndex is { } i ? _choices[i] : null;
+        _highlighted = null;
+        _highlightTaken = false;
+        foreach (var choice in _choices)
+        {
+            choice.Rank = 0;
+        }
+        if (_box is not null)
+        {
+            _box.BestMatch = null;
+            _box.LeftWithTypedText = false;
+        }
+
         _hasCursor = true;
         Recorder?.BeginUndoStep();
         await OnArrive.InvokeAsync();
     }
 
+    // Tab, or a click elsewhere, picks the highlighted item, unless Escape put the item's name back. The combo box picks
+    // only an item named exactly what's typed as it's left, and on a new line, with nothing picked before, it says
+    // nothing at all.
     private async Task OnBlur(object args)
     {
+        if (_highlighted is not null && _box?.LeftWithTypedText == true)
+        {
+            await PassOnAsync(_highlighted);
+        }
+
         _hasCursor = false;
         Recorder?.EndUndoStep();
         await OnLeave.InvokeAsync();
     }
 
-    private async Task OnFiltering(FilteringEventArgs args) => await OnTyped.InvokeAsync(args.Text ?? "");
+    // Ranked before the combo box filters, as it then sorts what it lists by the rank and highlights the first. With
+    // nothing typed it lists everything as given, so every rank is the same.
+    private async Task OnFiltering(FilteringEventArgs args)
+    {
+        var text = args.Text ?? "";
+        _highlighted = null;
+        _highlightTaken = false;
+        foreach (var choice in _choices)
+        {
+            choice.Rank = RecordNameMatch.Rank(choice.Text, text) ?? int.MaxValue;
+            if (choice.Rank != int.MaxValue && (_highlighted is null || choice.Rank < _highlighted.Rank))
+            {
+                _highlighted = choice;
+            }
+        }
+
+        if (_box is not null)
+        {
+            _box.BestMatch = _highlighted;
+        }
+
+        await OnTyped.InvokeAsync(text);
+    }
+
+    // An item the arrow keys moved to, or clicked: what Enter or Tab takes now.
+    private void OnSelect(SelectEventArgs<Choice> args)
+    {
+        if (_hasCursor && args.ItemData is not null)
+        {
+            _highlighted = args.ItemData;
+        }
+    }
 
     // Text that matched nothing, where a pick is needed, leaves the pick as it was, and the box shows it again once it's
-    // left.
+    // left. Typed text naming no item exactly, settled by leaving or by Enter, is the highlighted item: the combo box
+    // answers it with no pick. Only then: after Escape it also hands back no pick, and the line keeps its item.
     private async Task OnValueChanged(int? index)
     {
         // A pick comes from the box while it has the cursor: a hand picks with the cursor in it, and the combo box passes on
-        // a pick typed or filled in, on Tab or a click elsewhere, before it says the box was left. Without the cursor, a
+        // a pick typed or highlighted, on Tab or a click elsewhere, before it says the box was left. Without the cursor, a
         // value is the combo box settling on a list it was given, handing back the place it was given with it a drawing
         // before: a Raw Materials pick shows the base unit in the Buffered Cost "Per" list until the material's details
         // put its purchase unit there, and the combo box's late answer put the base unit back under a form already
@@ -135,14 +212,31 @@
             return;
         }
 
-        _typed = index is { } i && i >= 0 && i < _choices.Count ? _choices[i] : null;
-        if (_typed is not null)
+        if (index is { } i && i >= 0 && i < _choices.Count)
         {
-            await ValueChanged.InvokeAsync(_typed.Item);
+            await PassOnAsync(_choices[i]);
         }
-        else if (AllowEmpty)
+        else if (_box?.LeftWithTypedText == true && _highlighted is not null)
         {
-            await ValueChanged.InvokeAsync(default);
+            await PassOnAsync(_highlighted);
+            _highlightTaken = true;
         }
+        // The combo box, still showing what was typed, answers no pick again once the highlighted item is taken: a
+        // Category, which can be left empty, was emptied.
+        else if (!_highlightTaken)
+        {
+            _typed = null;
+            if (AllowEmpty)
+            {
+                await ValueChanged.InvokeAsync(default);
+            }
+        }
+    }
+
+    private async Task PassOnAsync(Choice picked)
+    {
+        _typed = picked;
+        _highlighted = null;
+        await ValueChanged.InvokeAsync(picked.Item);
     }
 }

@@ -32,7 +32,7 @@ public sealed partial class ProductsViewModel
             // stays the tab showing through the reload.
             if (UsageForm.IsUsageFormOpen && !IsUsageFormUntouched())
             {
-                SelectRecipeTab(ApplyForm());
+                SelectRecipeTab(TabFor(ApplyUsageForm()));
             }
 
             var product = new Product

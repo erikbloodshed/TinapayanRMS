@@ -612,6 +612,30 @@ input.e-input {
     padding-bottom: 0;
 }
 
+/* A picker's list (PickField). The theme marked the item Enter or Tab takes in #f5f5f5 on its #fafafa, which couldn't be
+   seen: it's a strong Sky tint with a deep Sky bar and bold ink, the item the box holds a pale one, and the one under the
+   mouse paler still. Each rule names the theme's own classes with it, to outweigh the theme's. */
+.e-dropdownbase .e-list-item.e-hover {
+    background: var(--color-sf-primary-lighter);
+    color: var(--heading-foreground);
+}
+
+.e-dropdownbase .e-list-item.e-active,
+.e-dropdownbase .e-list-item.e-active.e-hover {
+    background: var(--accent-soft);
+    color: var(--accent-foreground);
+}
+
+.e-dropdownbase .e-list-item.e-item-focus,
+.e-dropdownbase .e-list-item.e-item-focus.e-hover,
+.e-dropdownbase .e-list-item.e-item-focus.e-active,
+.e-dropdownbase .e-list-item.e-item-focus.e-active.e-hover {
+    background: #b5e0f3;
+    box-shadow: inset 3px 0 0 var(--color-sf-primary-bg-color-selected);
+    color: var(--color-sf-primary-text-color);
+    font-weight: 600;
+}
+
 /* A grid's heading row, as tall as its rows (RowHeight). */
 .e-grid .e-gridheader .e-headercell,
 .e-grid .e-gridheader .e-detailheadercell {

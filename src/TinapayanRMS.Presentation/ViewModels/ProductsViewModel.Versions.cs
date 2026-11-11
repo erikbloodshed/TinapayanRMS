@@ -237,7 +237,6 @@ public sealed partial class ProductsViewModel
                         : product.IsComposite ? new RecipeTabChoice.Components()
                         : new RecipeTabChoice.Packaging(),
                     HasAddSubAssemblyTab = false,
-                    HasPackaging = link is not null || packagingLines.Count > 0 || bulkLines.Count > 0,
                     PackagingLink = link,
                     IsPackagingMoving = false,
                     Lines = packagingLines,
@@ -249,7 +248,6 @@ public sealed partial class ProductsViewModel
                     EditingUsageIndex = null,
                     FormLines = [],
                     FormAddIns = [],
-                    FormPackagingLines = [],
                 },
                 null);
 

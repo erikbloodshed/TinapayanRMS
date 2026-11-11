@@ -60,7 +60,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
     }
 
     [Test]
-    public Task A_new_composite_opens_on_its_Products_table_with_no_Quantity_Required_and_adds_only_product_owned_sections_and_packaging() => UiThread.RunAsync(async () =>
+    public Task A_new_composite_opens_on_its_Products_table_with_no_Quantity_Required_and_adds_only_product_owned_sections() => UiThread.RunAsync(async () =>
     {
         await AddTwoProductsAsync();
         await AddRoleAsync("Topping", sortOrder: 3, isProductOwned: true);
@@ -73,29 +73,28 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.HeaderTitle.Should().Be("New composite product");
         viewModel.CostUnitCaption.Should().Be("Per unit");
         viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit");
-        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab);
+        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab, viewModel.PackagingTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.IsComponentsShowing.Should().BeTrue();
         viewModel.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Ensaymada");
         (await CanSave(viewModel)).Should().BeFalse("nothing is typed into it yet");
 
-        // Add Sub-Assembly opens the add form after the Products tab, offering the product-owned roles and packaging:
-        // never Dough, and never the products' Dough sections to link or copy.
+        // Add Sub-Assembly opens the add form after the Products tab, offering the product-owned roles: never Dough, never
+        // the products' Dough sections to link or copy, and never packaging, which is the Packaging tab's.
         await viewModel.AddUsageCommand.Execute(UsageFormMode.New);
-        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab, viewModel.AddSubAssemblyTab);
+        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab, viewModel.AddSubAssemblyTab, viewModel.PackagingTab);
         viewModel.AddSubAssemblyTab.Header.Should().Be("New Sub-Assembly");
-        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Topping", "Packaging");
+        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Topping");
         viewModel.UsageForm.EditingUsageRole!.Name.Should().Be("Topping");
-        viewModel.UsageForm.IsFormPackaging.Should().BeFalse();
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging, "the products' sections are all Dough");
+        viewModel.UsageForm.LinkableSubAssemblies.Should().BeEmpty("the products' sections are all Dough");
         await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => !o.IsPackaging);
+        viewModel.UsageForm.LinkableSubAssemblies.Should().BeEmpty();
 
         // Back to a product of sub-assemblies: New takes the Products tab away.
         await viewModel.NewCommand.Execute();
         viewModel.IsEditingComposite.Should().BeFalse();
-        viewModel.RecipeTabs.Should().BeEmpty();
+        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
         viewModel.HeaderTitle.Should().Be("New product");
         viewModel.AddSubAssemblyTab.Header.Should().Be("New Sub-Assembly");
     });
@@ -172,7 +171,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             () => $"sections={viewModel.UsageEdits.Count} lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.RecipeTabs.Should().HaveCount(2);
+        viewModel.RecipeTabs.Should().HaveCount(3);
         viewModel.RecipeTabs[0].Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.RecipeTabs[1].Should().BeOfType<SubAssemblyRecipeTab>().Which.Header.Should().Be("Topping");
         viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(
@@ -193,7 +192,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await viewModel.RemoveUsageCommand.Execute();
 
         viewModel.UsageEdits.Should().BeEmpty();
-        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab);
+        viewModel.RecipeTabs.Should().Equal(viewModel.ComponentsTab, viewModel.PackagingTab);
         viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.ComponentsTab);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
         viewModel.Costing.Costs.PartsTitle.Should().Be("Products (ingredients)");

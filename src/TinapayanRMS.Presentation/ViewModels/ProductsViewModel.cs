@@ -177,14 +177,14 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// <summary>
     /// The Recipe Structure's tabs: a composite's ComponentsTab first, then a sub-assembly's for each of UsageEdits, in
     /// the same order (MirrorUsageTabs, SectionTabOffset), then AddSubAssemblyTab while a sub-assembly is being added,
-    /// then PackagingTab while the product has packaging (HasPackaging). A new product has none, and a new composite
-    /// only its Products. Only this screen changes them: the tab strip can't drag them into another order
-    /// (RecipeStructureCard).
+    /// then PackagingTab, always last and always there, so bulk packaging can be typed into with no packaging for each piece.
+    /// A new product has only Packaging, and a new composite its Products and Packaging. Only this screen changes them: the
+    /// tab strip can't drag them into another order (RecipeStructureCard).
     /// </summary>
     public ObservableCollection<RecipeTab> RecipeTabs { get; } = [];
 
-    /// <summary>The Recipe Structure has a tab to show; with none, the card says how to start.</summary>
-    public bool HasRecipeTabs => RecipeTabs.Count > 0;
+    /// <summary>The recipe has a tab besides Packaging (a section's, New Sub-Assembly's, or a composite's Products); with none, the card says how to start.</summary>
+    public bool HasRecipeSections => RecipeTabs.Any(t => t is not PackagingRecipeTab);
 
     /// <summary>The New Sub-Assembly tab, in RecipeTabs only while Add Sub-Assembly's form is open in it.</summary>
     public AddSubAssemblyRecipeTab AddSubAssemblyTab { get; } = new();
@@ -309,8 +309,8 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
 
-    /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the form's picker.</summary>
-    private IReadOnlyList<SubAssembly> _packagingSets = [];
+    /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the Packaging tab's Link and Copy.</summary>
+    private List<SubAssembly> _packagingSets = [];
 
 
     private string _searchText = string.Empty;
@@ -541,21 +541,13 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// <summary>A saved product: links and clones need one, so the tab only shows then.</summary>
     public bool ShowLinks => _showLinks.Value;
 
-    private bool _hasPackaging;
-    /// <summary>
-    /// The product has packaging, its own lines or a link, so the Recipe Structure has its Packaging tab. A new product
-    /// has none until Add Sub-Assembly adds it in the Packaging role; Delete Sub-Assembly on the tab takes it out.
-    /// </summary>
-    public bool HasPackaging
-    {
-        get => _hasPackaging;
-        private set => this.RaiseAndSetIfChanged(ref _hasPackaging, value);
-    }
-
     /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
     public ProductCosting Costing { get; } = new();
 
-    /// <summary>The Recipe Structure's Packaging tab: the packaging lines, or what they link, and a Move to Sub-Assemblies.</summary>
+    /// <summary>
+    /// The Recipe Structure's Packaging tab, which every product has: the packaging lines for each piece, typed in or what
+    /// they link, Link and Copy, Move to Sub-Assemblies, and the bulk packaging.
+    /// </summary>
     public ProductPackaging Packaging { get; }
 
     /// <summary>A composite's Products table: its lines, the add row, the product cell's options, and what each product brings.</summary>
@@ -815,11 +807,20 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// <summary>Removes the line picked in the Packaging tab's Bulk Packaging table, as one undo step.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveBulkLineCommand { get; private set; }
 
-    /// <summary>The add form's Remove Line under its packaging table.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveFormPackagingLineCommand { get; private set; }
-
     /// <summary>Make a Copy on a linked Packaging tab: the lines it shows become the product's own, and the link goes with Save.</summary>
     public ReactiveCommand<RxVoid, RxVoid> CopyPackagingCommand { get; private set; }
+
+    /// <summary>Link on the Packaging tab: a picker of the packaging sets, the one picked linked in place of the packaging per piece.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartLinkingPackagingCommand { get; private set; }
+
+    /// <summary>Copy on the Packaging tab: a picker of the packaging sets and the other products, the one picked's lines copied in as this product's own.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartCopyingPackagingCommand { get; private set; }
+
+    /// <summary>Closes the Packaging tab's Link or Copy picker with nothing picked.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CancelPickingPackagingCommand { get; private set; }
+
+    /// <summary>Remove Link on a linked Packaging tab: the link and the lines it shows go, leaving no packaging per piece.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemovePackagingLinkCommand { get; private set; }
 
     /// <summary>
     /// Move to Sub-Assemblies on the Packaging tab, while its lines are the product's own: Save puts them on the
@@ -884,7 +885,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository, unitOfWork);
         Packaging = new ProductPackaging(FindPackagingMaterial, () => CostBasis);
-        UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), FindPackagingMaterial, () => CostBasis);
+        UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), () => CostBasis);
         ComponentsTable = new ProductComponents(
             _savedProducts,
             id => Products.FirstOrDefault(p => p.Id == id),

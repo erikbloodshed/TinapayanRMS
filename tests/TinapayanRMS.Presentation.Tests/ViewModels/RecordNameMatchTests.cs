@@ -28,4 +28,30 @@ public class RecordNameMatchTests
     {
         RecordNameMatch.Best(Names, name => name, typed).Should().BeNull();
     }
+
+    [Test]
+    public void A_name_with_a_word_starting_with_the_text_comes_before_one_only_holding_it()
+    {
+        RecordNameMatch.Best(["Unsalted Butter", "Sea Salt"], name => name, "salt").Should().Be("Sea Salt");
+    }
+
+    [Test]
+    [Arguments("Salt", 0)]
+    [Arguments("Salted Egg", 1)]
+    [Arguments("Sea Salt", 2)]
+    [Arguments("Unsalted Salt", 2)]
+    [Arguments("Unsalted Butter", 3)]
+    public void A_pickers_list_is_sorted_by_how_well_each_name_matches(string name, int rank)
+    {
+        RecordNameMatch.Rank(name, " SALT ").Should().Be(rank);
+    }
+
+    [Test]
+    [Arguments("Flour", "salt")]
+    [Arguments("Salt", "")]
+    [Arguments("Salt", "   ")]
+    public void A_name_not_holding_the_text_or_nothing_typed_has_no_rank(string name, string typed)
+    {
+        RecordNameMatch.Rank(name, typed).Should().BeNull();
+    }
 }

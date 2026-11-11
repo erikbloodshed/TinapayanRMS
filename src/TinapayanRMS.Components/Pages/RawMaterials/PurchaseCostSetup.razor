@@ -1,5 +1,5 @@
 @* A purchased material's prices (the WPF PurchaseCostSetupCard): one line per brand, each in a purchase unit it's bought
-   in, with what it comes to per base unit (Unit Price); Cost From, the brand it's costed at (the dearest unless one is picked); then the Cost Buffer % and the fixed
+   in, with what it comes to per base unit (Unit Price); Basis, the brand it's costed at (the dearest unless one is picked); then the Cost Buffer % and the fixed
    Buffered Cost, which follow each other as either is typed, in a unit picked to show it in. While prices have moved the
    buffer off the target last typed, the target shows, with Re-apply Target to type it again. *@
 <div class="tab-card">
@@ -29,9 +29,9 @@
         </Row>
     </LineGrid>
     <div class="cost-from-row form-extra">
-        <label class="form-label" for="rm-cost-from">Cost From</label>
+        <label class="form-label" for="rm-cost-from">Basis</label>
         <PickField ID="rm-cost-from" TItem="CostFromOption" Items="ViewModel.CostFromOptions" TextOf="o => o.Label"
-                   Value="ViewModel.CostFrom" ValueChanged="o => ViewModel.CostFrom = o" CssClass="cost-from-picker"
+                   Value="ViewModel.CostFrom" ValueChanged="o => ViewModel.CostFrom = o" CssClass="cost-from-picker" PopupWidth="340px"
                    Tooltip="The brand the material is costed at. Dearest brand costs it at the most it's bought for; pick a brand to cost it at that brand's price (its dearest unit, if it's priced in more than one). Save keeps it." />
         <CommandButton Command="ViewModel.RemoveBrandPriceCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
     </div>
@@ -40,7 +40,7 @@
         <div class="field-stack">
             <label class="field-label" for="rm-buffer-percent">Cost Buffer %</label>
             <NumberField ID="rm-buffer-percent" TValue="decimal?" @bind-Value="ViewModel.TypedCostBufferPercent" Min="0" Max="100"
-                         Tooltip="The cushion on top of the brand it's costed at (Cost From), for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
+                         Tooltip="The cushion on top of the brand it's costed at (Basis), for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-buffered-cost">Buffered Cost</label>
@@ -58,7 +58,7 @@
         <div class="target-buffer-row">
             <span>@ViewModel.TargetBufferText</span>
             <CommandButton Command="ViewModel.ReapplyTargetBufferCommand" Icon="AppIcon.Apply" Label="Re-apply Target"
-                           Tooltip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Cost From) with it on top. Save keeps it." />
+                           Tooltip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Basis) with it on top. Save keeps it." />
         </div>
     }
     <p class="caption">@ViewModel.PurchaseBufferedCostText</p>

@@ -1,11 +1,14 @@
-@* A product's packaging (the WPF PackagingSectionView): where it's linked from, as a tag, or a link that opens the
-   packaging set on Sub-Assemblies; what it costs per sellable unit; its lines, typed into unless they're linked; and
-   Move to Sub-Assemblies for its own, or Make a Copy for a linked one. Under them, its bulk packaging: what one bulk pack
-   takes (a box several units share, its tape), and in a box of its own how many products the pack holds, which share
-   out its cost. *@
+@* A product's packaging (the WPF PackagingSectionView), on a tab every product has, with both its tables always there.
+   First the packaging per piece: where it's linked from, as a tag, or a link that opens the packaging set on
+   Sub-Assemblies; what the packaging costs per sellable unit; Link and Copy, which open a picker of the packaging sets
+   (and, to copy, the other products) in their place; and Move to Sub-Assemblies for lines of its own. Its table is typed
+   straight into unless it's linked, with Make a Copy and Remove Link under a linked one. Then its bulk packaging: what
+   one bulk pack takes (a box several units share, its tape), and in a box of its own how many products the pack holds,
+   which share out its cost. *@
 <div class="section-view">
     <div class="section-heading">
         <div class="usage-badges">
+            <span class="group-heading">Packaging per Piece</span>
             @if (ViewModel.Packaging.IsPackagingLinkedToProduct)
             {
                 <span class="badge badge-warning">@ViewModel.Packaging.PackagingLinkedToText</span>
@@ -20,10 +23,26 @@
             {
                 <span class="badge badge-warning" title="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own.">Moves to Sub-Assemblies on Save</span>
             }
+            @if (ViewModel.Packaging.IsPickingSource)
+            {
+                <PickField ID="packaging-source" TItem="LinkableSubAssemblyOption" Items="ViewModel.Packaging.SourceOptions" TextField="PackagingSourceName"
+                           @bind-Value="ViewModel.Packaging.PickedSource" Placeholder="@ViewModel.Packaging.SourcePlaceholder" CssClass="packaging-source"
+                           Tooltip="@(ViewModel.Packaging.SourceMode == PackagingSourceMode.Copy
+                               ? "Its lines become this product's own, in place of the ones here, to change as you like."
+                               : "Its lines show here, read-only, in place of the ones here, and follow every change made to the set.")" />
+                <CommandButton Command="ViewModel.CancelPickingPackagingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
+            }
         </div>
         <div class="lines-footer-right">
             <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.Costing.Costs.OwnPackaging.ToString("N2")</span>
-            @if (ViewModel.Packaging.CanMovePackaging)
+            @if (!ViewModel.Packaging.IsPickingSource)
+            {
+                <CommandButton Command="ViewModel.StartLinkingPackagingCommand" Icon="AppIcon.Link" Label="Link"
+                               Tooltip="Use a packaging set from the Sub-Assemblies screen instead of the lines here. Its lines show read-only, and follow every change made to the set." />
+                <CommandButton Command="ViewModel.StartCopyingPackagingCommand" Icon="AppIcon.Copy" Label="Copy"
+                               Tooltip="Copy the lines of a packaging set, or of another product's packaging, in place of the ones here. They're this product's own, to change as you like." />
+            }
+            @if (ViewModel.Packaging.CanMovePackaging && ViewModel.Packaging.LineEdits.Count > 0)
             {
                 <CommandButton Command="ViewModel.MovePackagingToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
                                Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
@@ -31,20 +50,29 @@
         </div>
     </div>
 
-    <PackagingLinesGrid Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
-                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis" />
+    <PackagingLinesGrid @ref="_lines" Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
+                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis"
+                        EmptyText="No packaging per piece. Add what one piece takes, such as its bag and label, or Link a packaging set." />
 
     <div class="lines-footer">
         @if (ViewModel.Packaging.IsPackagingLinked)
         {
             <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
-            <CommandButton Command="ViewModel.CopyPackagingCommand" Icon="AppIcon.Copy" Label="Make a Copy"
-                           Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
+            <div class="button-row">
+                <CommandButton Command="ViewModel.CopyPackagingCommand" Icon="AppIcon.Copy" Label="Make a Copy"
+                               Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
+                <CommandButton Command="ViewModel.RemovePackagingLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
+                               Tooltip="Take the link out, and its lines with it, leaving no packaging per piece. The packaging set stays on the Sub-Assemblies screen." />
+            </div>
         }
         else
         {
             <span></span>
-            <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+            <div class="button-row">
+                <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
+                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+            </div>
         }
     </div>
 
@@ -74,5 +102,6 @@
 @code {
     [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
 
+    private PackagingLinesGrid? _lines;
     private PackagingLinesGrid? _bulk;
 }

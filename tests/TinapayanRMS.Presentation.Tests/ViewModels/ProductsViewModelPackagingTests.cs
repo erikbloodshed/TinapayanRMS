@@ -16,10 +16,10 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
 /// <summary>
-/// The product's packaging on the Products screen, on real repositories: it comes in through Add Sub-Assembly like a
-/// recipe section — the Packaging role for a new one, or packaging picked to link or copy (a packaging set, or another
-/// product's) — and gets a Packaging tab only then. Make a Copy on a linked tab makes it the product's own; Delete
-/// Sub-Assembly takes it out. Save writes the link and the lines together.
+/// The product's packaging on the Products screen, on real repositories: the Packaging tab, which every product has,
+/// with its table of packaging per piece, typed straight into, linked to a packaging set or copied from one or another
+/// product (Link and Copy), and its bulk packaging. Make a Copy on a linked tab makes it the product's own, and Remove
+/// Link takes it out. Add Sub-Assembly never offers packaging. Save writes the link and the lines together.
 /// </summary>
 [NotInParallel(DatabaseCollection.B)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
@@ -52,77 +52,50 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     });
 
     [Test]
-    public Task A_new_packaging_is_added_in_the_Packaging_role_and_saved_as_the_products_own_lines() => UiThread.RunAsync(async () =>
+    public Task Packaging_per_piece_is_typed_straight_into_the_Packaging_tab_and_saved_as_the_products_own_lines() => UiThread.RunAsync(async () =>
     {
         await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.EditingName = "Ensaymada";
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab, "a new product has only the Packaging tab");
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue("its table is there to type into from the start");
 
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough", "Packaging");
-        viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.Single(r => r.IsPackaging);
-        viewModel.UsageForm.IsFormPackaging.Should().BeTrue();
-        viewModel.UsageForm.IsFormEditingPackaging.Should().BeTrue();
-        viewModel.UsageForm.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
-        viewModel.UsageForm.UsageFormCostPerPieceText.Should().Be("30.0000");
-
-        // The form has no Apply of its own: Save puts it in the recipe and shows its tab, as leaving the tab would.
-        await viewModel.SaveCommand.Execute();
-
-        viewModel.ErrorMessage.Should().BeNull();
-        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
-        viewModel.HasPackaging.Should().BeTrue();
-        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
-        viewModel.Costing.Costs.Packaging.Should().Be(30m);
-
-        // One packaging to a product: the role isn't offered again. Nothing is typed into this form, so Save drops it.
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
-        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
-
+        viewModel.Packaging.LineEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
+        await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 30m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         var line = await dbContext.PackagingLines.SingleAsync(Cancellation);
-        (line.PackagingMaterialId, line.QtyPerUnit).Should().Be((boxId, 1m));
+        (line.PackagingMaterialId, line.QtyPerUnit, line.IsBulk).Should().Be((boxId, 1m, false));
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
     });
 
     [Test]
-    public Task The_form_shows_under_a_sub_assemblys_tab_or_New_Sub_Assemblys_and_the_packaging_under_its_own() => UiThread.RunAsync(async () =>
+    public Task Add_Sub_Assembly_never_offers_packaging_which_the_Packaging_tab_takes() => UiThread.RunAsync(async () =>
     {
-        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
-        await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
-        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 6, isPackaging: true);
+        await AddRoleAsync("Dough", sortOrder: 1);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
-        await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var otherId = await AddProductAsync("Cream Loaf");
+        await new PackagingLineRepository(CreateDbContextFactory())
+            .SetLinesAsync(otherId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
         var viewModel = await CreateLoadedViewModelAsync();
-        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, false), "no product is picked, so there are no tabs");
 
-        viewModel.SelectedProduct = viewModel.Products.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRecipeTab is SubAssemblyRecipeTab, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
-        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
-
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
-        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
-
-        viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.Single(r => r.IsPackaging);
-        viewModel.UsageForm.FormPackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
-        await viewModel.SaveCommand.Execute();
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
-        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((false, true));
-
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
-        (viewModel.IsUsageFormShowing, viewModel.IsPackagingShowing).Should().Be((true, false));
+        foreach (var mode in new[] { UsageFormMode.New, UsageFormMode.Link, UsageFormMode.Copy })
+        {
+            await viewModel.AddUsageCommand.Execute(mode);
+            viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
+            viewModel.UsageForm.LinkableSubAssemblies.Should().BeEmpty("neither the packaging set nor Cream Loaf's packaging is a recipe section");
+        }
     });
 
     [Test]
-    public Task Linking_a_packaging_set_shows_its_lines_read_only_and_Save_writes_the_link() => UiThread.RunAsync(async () =>
+    public Task Link_on_the_Packaging_tab_shows_a_sets_lines_read_only_and_Save_writes_the_link() => UiThread.RunAsync(async () =>
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
@@ -130,27 +103,28 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
             new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m), (ribbonId, null, 30m)], Cancellation);
         var productId = await AddProductAsync("Ensaymada");
+        await AddProductAsync("Cream Loaf");
         var viewModel = await CreateLoadedViewModelAsync();
-        viewModel.SelectedProduct = viewModel.Products.Single();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel, () => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
-        viewModel.RecipeTabs.Should().BeEmpty();
+        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
 
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal("Gift Box Set — Sub-Assemblies (Packaging)");
-        viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.UsageForm.FormPackagingLines.Count == 2, () => $"lines={viewModel.UsageForm.FormPackagingLines.Count}");
-        viewModel.UsageForm.IsFormPackaging.Should().BeTrue();
-        viewModel.UsageForm.IsFormEditingPackaging.Should().BeFalse("a link's lines are kept where it's from");
-
-        await viewModel.SaveCommand.Execute();
+        // Link offers only the Sub-Assemblies screen's packaging sets, never another product's packaging.
+        await viewModel.StartLinkingPackagingCommand.Execute();
+        viewModel.Packaging.IsPickingSource.Should().BeTrue();
+        viewModel.Packaging.SourceOptions.Select(o => o.PackagingSourceName).Should().Equal("Gift Box Set — packaging set");
+        await PickAsync(viewModel, "Gift Box Set — packaging set");
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
+        viewModel.Packaging.IsPickingSource.Should().BeFalse();
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
         viewModel.Packaging.IsPackagingEditable.Should().BeFalse();
         viewModel.Packaging.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
         viewModel.Costing.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
 
+        await viewModel.SaveCommand.Execute();
+
+        viewModel.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var link = await dbContext.PackagingLinks.SingleAsync(Cancellation);
@@ -160,35 +134,83 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         await Settle.UntilAsync(viewModel, () => viewModel.Packaging.LineEdits.Count == 2, () => $"lines={viewModel.Packaging.LineEdits.Count}");
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue("the reload shows the saved link");
-        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
+
+        // The set linked now isn't offered again.
+        await viewModel.StartLinkingPackagingCommand.Execute();
+        viewModel.Packaging.IsPickingSource.Should().BeFalse();
+        viewModel.ErrorMessage.Should().Be("This product links the only packaging set there is.");
     });
 
     [Test]
-    public Task Copying_another_products_packaging_makes_it_this_products_own() => UiThread.RunAsync(async () =>
+    public Task Copy_on_the_Packaging_tab_puts_another_products_lines_in_place_of_its_own_as_one_undo_step() => UiThread.RunAsync(async () =>
     {
-        await AddRoleAsync("Packaging", isPackaging: true);
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var bagId = await AddPackagingAsync("Bag", 1m);
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
         var sourceId = await AddProductAsync("Cream Loaf");
         await new PackagingLineRepository(CreateDbContextFactory())
             .SetLinesAsync(sourceId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 2m)], Cancellation);
-        var viewModel = await CreateLoadedViewModelAsync();
-        viewModel.EditingName = "Cream Loaf Mini";
+        var viewModel = await OpenWithOwnPackagingAsync(bagId);
 
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.UsageForm.EditingUsageSource = viewModel.UsageForm.LinkableSubAssemblies.Single(o => o.DisplayName == "Packaging — Cream Loaf");
-        await Settle.UntilAsync(viewModel, () => viewModel.UsageForm.FormPackagingLines.Count == 1, () => $"lines={viewModel.UsageForm.FormPackagingLines.Count}");
-        viewModel.UsageForm.EditingUsageRole!.IsPackaging.Should().BeTrue("a copy of packaging takes the Packaging role");
-        viewModel.UsageForm.IsFormEditingPackaging.Should().BeTrue();
-        viewModel.UsageForm.FormPackagingLines.Single().QtyPerUnit = 3m;
+        // Copy offers the packaging sets, then every other product, never this one.
+        await viewModel.StartCopyingPackagingCommand.Execute();
+        viewModel.Packaging.SourceOptions.Select(o => o.PackagingSourceName).Should().Equal("Gift Box Set — packaging set", "Cream Loaf — product");
+        await PickAsync(viewModel, "Cream Loaf — product");
 
+        viewModel.ErrorMessage.Should().BeNull();
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue("a copy is this product's own to type into");
+        viewModel.Packaging.LineEdits.Should().ContainSingle().Which.PackagingMaterialId.Should().Be(boxId);
+        viewModel.Costing.Costs.Packaging.Should().Be(60m);
+
+        // One step: undo puts the bag back.
+        viewModel.TryUndo().Should().BeTrue();
+        viewModel.Packaging.LineEdits.Should().ContainSingle().Which.PackagingMaterialId.Should().Be(bagId);
+        viewModel.TryRedo().Should().BeTrue();
+
+        viewModel.Packaging.LineEdits.Single().QtyPerUnit = 3m;
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
-        var copyId = await dbContext.Products.Where(p => p.Name == "Cream Loaf Mini").Select(p => p.Id).SingleAsync(Cancellation);
-        (await dbContext.PackagingLines.SingleAsync(l => l.ProductId == copyId, Cancellation)).QtyPerUnit.Should().Be(3m);
+        var productId = await dbContext.Products.Where(p => p.Name == "Ensaymada").Select(p => p.Id).SingleAsync(Cancellation);
+        (await dbContext.PackagingLines.SingleAsync(l => l.ProductId == productId, Cancellation)).QtyPerUnit.Should().Be(3m);
         (await dbContext.PackagingLines.SingleAsync(l => l.ProductId == sourceId, Cancellation)).QtyPerUnit.Should().Be(2m, "the source is untouched");
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
+    });
+
+    [Test]
+    public Task Picking_packaging_with_no_lines_is_refused_and_the_picker_stays_open() => UiThread.RunAsync(async () =>
+    {
+        await AddRoleAsync("Packaging", isPackaging: true);
+        var bagId = await AddPackagingAsync("Bag", 1m);
+        await AddProductAsync("Plain Roll");
+        var viewModel = await OpenWithOwnPackagingAsync(bagId);
+
+        await viewModel.StartCopyingPackagingCommand.Execute();
+        viewModel.Packaging.PickedSource = viewModel.Packaging.SourceOptions.Single(o => o.PackagingSourceName == "Plain Roll — product");
+        await Settle.UntilAsync(viewModel, () => viewModel.ErrorMessage is not null, () => $"error={viewModel.ErrorMessage}");
+
+        viewModel.ErrorMessage.Should().Be("Plain Roll has no packaging for each piece to copy. Pick another.");
+        viewModel.Packaging.IsPickingSource.Should().BeTrue();
+        viewModel.Packaging.LineEdits.Should().ContainSingle().Which.PackagingMaterialId.Should().Be(bagId, "nothing changed");
+
+        await viewModel.CancelPickingPackagingCommand.Execute();
+        viewModel.Packaging.IsPickingSource.Should().BeFalse();
+        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("opening and closing the picker changes nothing");
+    });
+
+    [Test]
+    public Task Link_with_no_packaging_set_says_how_to_make_one() => UiThread.RunAsync(async () =>
+    {
+        var viewModel = await CreateLoadedViewModelAsync();
+
+        await viewModel.StartLinkingPackagingCommand.Execute();
+
+        viewModel.Packaging.IsPickingSource.Should().BeFalse();
+        viewModel.ErrorMessage.Should().StartWith("There's no packaging set to link yet.");
     });
 
     [Test]
@@ -277,10 +299,6 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.TryRedo().Should().BeTrue();
         viewModel.Packaging.IsPackagingMoving.Should().BeTrue();
         (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
-
-        // Taking the packaging out takes the move with it.
-        await viewModel.RemoveUsageCommand.Execute();
-        viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
     });
 
     [Test]
@@ -300,71 +318,56 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     });
 
     [Test]
-    public Task Delete_Sub_Assembly_on_the_Packaging_tab_takes_out_the_lines_or_the_link() => UiThread.RunAsync(async () =>
+    public Task Remove_Link_takes_out_the_link_and_its_lines_and_keeps_the_bulk_packaging() => UiThread.RunAsync(async () =>
     {
-        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
-        var boxId = await AddPackagingAsync("Gift Box", 30m);
-        var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
-        var ownId = await AddProductAsync("Cream Loaf");
-        await new PackagingLineRepository(CreateDbContextFactory())
-            .SetLinesAsync(ownId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
-        var linkedId = await AddProductAsync("Ensaymada");
-        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(linkedId, setId, Cancellation);
-        var viewModel = await CreateLoadedViewModelAsync();
+        var (_, boxId) = await AddWrapperSetAndBoxAsync();
+        var productId = await ProductIdAsync("Ensaymada");
+        await SaveBulkAsync(productId, boxId, productsPerPack: 6);
+        var viewModel = await OpenLinkedAsync();
+        viewModel.Costing.Costs.Packaging.Should().Be(4m, "a ₱2 wrapper a piece, and a ₱12 box shared by 6");
+        (await viewModel.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
+        (await viewModel.RemovePackagingLinkCommand.CanExecute.FirstAsync()).Should().BeTrue();
 
-        foreach (var productId in new[] { ownId, linkedId })
-        {
-            viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
-            await Settle.UntilAsync(viewModel, () => viewModel.SelectedRecipeTab is PackagingRecipeTab, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
-            (await viewModel.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        await viewModel.RemovePackagingLinkCommand.Execute();
 
-            await viewModel.RemoveUsageCommand.Execute();
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
+        viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
+        viewModel.Packaging.IsPackagingEditable.Should().BeTrue();
+        viewModel.Packaging.LineEdits.Should().BeEmpty();
+        viewModel.Packaging.BulkEdits.Should().ContainSingle();
+        viewModel.Costing.Costs.Packaging.Should().Be(2m);
+        (await viewModel.RemovePackagingLinkCommand.CanExecute.FirstAsync()).Should().BeFalse();
 
-            viewModel.RecipeTabs.Should().BeEmpty();
-            viewModel.SelectedRecipeTab.Should().BeNull();
-            viewModel.HasPackaging.Should().BeFalse();
-            viewModel.Costing.Costs.Packaging.Should().Be(0m);
+        await viewModel.SaveCommand.Execute();
 
-            await viewModel.SaveCommand.Execute();
-            viewModel.ErrorMessage.Should().BeNull();
-        }
-
+        viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
-        (await dbContext.PackagingLines.CountAsync(Cancellation)).Should().Be(0);
         (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
+        (await dbContext.PackagingLines.Select(l => new { l.PackagingMaterialId, l.IsBulk }).ToListAsync(Cancellation))
+            .Should().BeEquivalentTo([new { PackagingMaterialId = boxId, IsBulk = true }]);
     });
 
     [Test]
-    public Task Packaging_is_offered_to_link_or_copy_only_while_the_product_has_none() => UiThread.RunAsync(async () =>
+    public Task A_new_product_opens_on_the_Packaging_tab_and_can_save_bulk_packaging_alone() => UiThread.RunAsync(async () =>
     {
-        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
-        var boxId = await AddPackagingAsync("Gift Box", 30m);
-        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
-            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
-        var ownId = await AddProductAsync("Cream Loaf");
-        await new PackagingLineRepository(CreateDbContextFactory())
-            .SetLinesAsync(ownId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
-        await AddProductAsync("Ensaymada");
+        var cartonId = await AddPackagingAsync("Carton", 12m);
         var viewModel = await CreateLoadedViewModelAsync();
+        await viewModel.NewCommand.Execute();
+        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
+        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
+        viewModel.HasRecipeSections.Should().BeFalse();
 
-        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ensaymada");
-        await Settle.UntilAsync(viewModel, () => viewModel.SelectedProduct?.Name == "Ensaymada", () => $"selected={viewModel.SelectedProduct?.Name}");
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
-            ["Gift Box Set — Sub-Assemblies (Packaging)"],
-            "linking offers only the Sub-Assemblies screen's, never another product's packaging");
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Copy);
-        viewModel.UsageForm.LinkableSubAssemblies.Select(o => o.DisplayName).Should().Equal(
-            ["Gift Box Set — Sub-Assemblies (Packaging)", "Packaging — Cream Loaf"],
-            "another product's packaging can still be copied, and a product never offers its own");
+        viewModel.EditingName = "Pandesal";
+        viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = cartonId, QtyPerUnit = 1m });
+        viewModel.Packaging.BulkQuantity = 12;
+        await viewModel.SaveCommand.Execute();
 
-        // Picking another product closes the form with nothing applied, which is what abandons this add now.
-        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == ownId);
-        await Settle.UntilAsync(viewModel, () => viewModel.HasPackaging, () => $"has packaging={viewModel.HasPackaging}");
-        await viewModel.AddUsageCommand.Execute(UsageFormMode.Link);
-        viewModel.UsageForm.LinkableSubAssemblies.Should().NotContain(o => o.IsPackaging);
-        viewModel.UsageForm.FormRoleOptions.Should().NotContain(r => r.IsPackaging);
+        viewModel.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var product = await dbContext.Products.SingleAsync(Cancellation);
+        (product.Name, product.BulkPackagingQuantity).Should().Be(("Pandesal", (int?)12));
+        var line = await dbContext.PackagingLines.SingleAsync(Cancellation);
+        (line.PackagingMaterialId, line.IsBulk).Should().Be((cartonId, true));
     });
 
     [Test]
@@ -487,6 +490,39 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     }
 
     private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
+
+    /// <summary>Picks <paramref name="name"/> in the Packaging tab's open Link or Copy picker, and waits for its lines to go in.</summary>
+    private static async Task PickAsync(ProductsViewModel viewModel, string name)
+    {
+        viewModel.Packaging.PickedSource = viewModel.Packaging.SourceOptions.Single(o => o.PackagingSourceName == name);
+        await Settle.UntilAsync(viewModel,
+            () => !viewModel.Packaging.IsPickingSource || viewModel.ErrorMessage is not null,
+            () => $"picking={viewModel.Packaging.IsPickingSource}, error={viewModel.ErrorMessage}");
+    }
+
+    private async Task<int> ProductIdAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.Products.Where(p => p.Name == name).Select(p => p.Id).SingleAsync(Cancellation);
+    }
+
+    /// <summary>Gives the product bulk packaging: one <paramref name="materialId"/> a pack, shared by <paramref name="productsPerPack"/>.</summary>
+    private async Task SaveBulkAsync(int productId, int materialId, int productsPerPack)
+    {
+        await using var dbContext = CreateDbContext();
+        var (qtyPerUnit, unitsPerPackagingUnit) = ProductRules.ReconcileReciprocal(PackagingLineAuthoredField.QtyPerUnit, 1m);
+        dbContext.PackagingLines.Add(new PackagingLine
+        {
+            ProductId = productId,
+            PackagingMaterialId = materialId,
+            QtyPerUnit = qtyPerUnit,
+            UnitsPerPackagingUnit = unitsPerPackagingUnit,
+            AuthoredField = PackagingLineAuthoredField.QtyPerUnit,
+            IsBulk = true,
+        });
+        (await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation)).BulkPackagingQuantity = productsPerPack;
+        await dbContext.SaveChangesAsync(Cancellation);
+    }
 
     /// <summary>A packaging material with <paramref name="baseUnit"/> as its base unit, costing <paramref name="cost"/> a base unit, buffered the same.</summary>
     private async Task<int> AddPackagingAsync(string name, decimal cost, string baseUnit = "pc")

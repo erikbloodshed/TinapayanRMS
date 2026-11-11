@@ -104,12 +104,12 @@
                             <div class="button-row">
                                 <SfCheckBox Label="Only below target" @bind-Checked="ViewModel!.OnlyBelowTarget" />
                                 <CommandButton Command="ViewModel!.ReapplyTargetBuffersCommand" Icon="AppIcon.Apply" Label="Re-apply Target Buffer"
-                                               Tooltip="Puts the target buffer back on top of the brand each one is costed at (its Cost From brand, else the dearest) for the materials picked, or for every one shown below target. Asks first." />
+                                               Tooltip="Puts the target buffer back on top of the brand each one is costed at (its Basis brand, else the dearest) for the materials picked, or for every one shown below target. Asks first." />
                                 <CommandButton Command="ViewModel!.ExportCostBuffersCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
                             </div>
                         </div>
-                        <p class="caption">Every purchased material's buffered cost against the brand it's costed at now (its Cost From brand, else the dearest). Brand prices don't move the buffered cost, so a rise wears the buffer down; Target % is the buffer last typed for it. Pick materials (Ctrl or Shift for several), or none for all shown, and Re-apply Target Buffer puts it back on top. Double-click one to open it.</p>
+                        <p class="caption">Every purchased material's buffered cost against the brand it's costed at now (its Basis brand, else the dearest). Brand prices don't move the buffered cost, so a rise wears the buffer down; Target % is the buffer last typed for it. Pick materials (Ctrl or Shift for several), or none for all shown, and Re-apply Target Buffer puts it back on top. Double-click one to open it.</p>
                         <SelfDrawn>
                             <SfGrid @ref="_costBuffers" ID="report-cost-buffers" TValue="CostBufferRow" DataSource="ViewModel!.CostBuffers" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
                                     AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" AllowResizing="true">

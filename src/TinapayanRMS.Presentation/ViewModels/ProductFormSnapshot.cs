@@ -73,7 +73,6 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
     public required bool HasAddSubAssemblyTab { get; init; }
 
     // Packaging
-    public required bool HasPackaging { get; init; }
     public required PackagingLinkTarget? PackagingLink { get; init; }
 
     /// <summary>Move to Sub-Assemblies was pressed on the Packaging tab: Save makes its lines a packaging set, and links it.</summary>
@@ -105,7 +104,6 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
     public required int? UsageSourceKey { get; init; }
     public required IReadOnlyList<IngredientLineState> FormLines { get; init; }
     public required IReadOnlyList<IngredientLineState> FormAddIns { get; init; }
-    public required IReadOnlyList<PackagingLineState> FormPackagingLines { get; init; }
     public required decimal FormFormulaBase { get; init; }
     public required UsageAuthoredField UsageAuthoredField { get; init; }
     public required decimal UsageWeightPerPiece { get; init; }
@@ -129,7 +127,6 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
         && Costing == other.Costing
         && SectionsShowSame(Usages, other.Usages)
         && HasAddSubAssemblyTab == other.HasAddSubAssemblyTab
-        && HasPackaging == other.HasPackaging
         && Equals(PackagingLink, other.PackagingLink)
         && IsPackagingMoving == other.IsPackagingMoving
         && Lines.SequenceEqual(other.Lines)
@@ -148,7 +145,6 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
         && UsageSourceKey == other.UsageSourceKey
         && FormLines.SequenceEqual(other.FormLines)
         && FormAddIns.SequenceEqual(other.FormAddIns)
-        && FormPackagingLines.SequenceEqual(other.FormPackagingLines)
         && FormFormulaBase == other.FormFormulaBase
         && UsageAuthoredField == other.UsageAuthoredField
         && UsageWeightPerPiece == other.UsageWeightPerPiece
@@ -185,7 +181,6 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
         UsageSourceKey = form.UsageSourceKey,
         FormLines = form.FormLines,
         FormAddIns = form.FormAddIns,
-        FormPackagingLines = form.FormPackagingLines,
         FormFormulaBase = form.FormFormulaBase,
         UsageAuthoredField = form.UsageAuthoredField,
         UsageWeightPerPiece = form.UsageWeightPerPiece,

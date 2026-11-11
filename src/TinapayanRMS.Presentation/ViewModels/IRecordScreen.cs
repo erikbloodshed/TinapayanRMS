@@ -30,11 +30,12 @@ public interface IRevertScreen
 }
 
 /// <summary>
-/// The record a typed name means: the one named exactly that, else one whose name starts with it, else one whose name
-/// holds it, ignoring case; among equals, the first by name.
+/// What a typed name means, ignoring case: the record named exactly that, else one whose name starts with it, else one
+/// with a word in its name starting with it ("salt" finds Sea Salt before Unsalted Butter), else one whose name holds it.
 /// </summary>
 public static class RecordNameMatch
 {
+    /// <summary>The one record the text names best; among equals, the first by name. None when nothing's typed.</summary>
     public static T? Best<T>(IEnumerable<T> records, Func<T, string?> nameOf, string text)
         where T : class
     {
@@ -50,10 +51,7 @@ public static class RecordNameMatch
         foreach (var record in records)
         {
             var name = nameOf(record) ?? string.Empty;
-            var rank = name.Equals(wanted, StringComparison.OrdinalIgnoreCase) ? 0
-                : name.StartsWith(wanted, StringComparison.OrdinalIgnoreCase) ? 1
-                : name.Contains(wanted, StringComparison.OrdinalIgnoreCase) ? 2
-                : -1;
+            var rank = RankOf(name, wanted);
             if (rank < 0)
             {
                 continue;
@@ -68,5 +66,45 @@ public static class RecordNameMatch
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// How well a name matches typed text, lower being better (a picker's list is sorted by it): 0 the exact name,
+    /// 1 starting with it, 2 a word starting with it, 3 holding it; none when it doesn't hold it, or nothing's typed.
+    /// </summary>
+    public static int? Rank(string? name, string text)
+    {
+        var wanted = text.Trim();
+        return wanted.Length == 0 || RankOf(name ?? string.Empty, wanted) is not (>= 0 and var rank) ? null : rank;
+    }
+
+    private static int RankOf(string name, string wanted)
+    {
+        if (name.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (name.StartsWith(wanted, StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        // It can be found inside a word before it's found at one's start ("Unsalted Salt"), so each place is checked.
+        var at = name.IndexOf(wanted, StringComparison.OrdinalIgnoreCase);
+        if (at < 0)
+        {
+            return -1;
+        }
+
+        for (; at >= 0; at = name.IndexOf(wanted, at + 1, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!char.IsLetterOrDigit(name[at - 1]))
+            {
+                return 2;
+            }
+        }
+
+        return 3;
     }
 }

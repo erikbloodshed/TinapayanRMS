@@ -205,7 +205,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
-            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.UsageForm.FormLines.Count == 1 && viewModel.HasPackaging)),
+            () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.UsageForm.FormLines.Count == 1 && viewModel.Packaging.LineEdits.Count > 0)),
             () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }

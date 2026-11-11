@@ -235,7 +235,7 @@ public sealed partial class ProductsViewModel
             row.CostBasis = CostBasis;
         }
 
-        foreach (var row in UsageForm.FormPackagingLines.Concat(Packaging.AllLineEdits))
+        foreach (var row in Packaging.AllLineEdits)
         {
             row.CostBasis = CostBasis;
         }
@@ -348,7 +348,7 @@ public sealed partial class ProductsViewModel
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
         [.. UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), CostBasis))],
-        HasPackaging
+        Packaging.LineEdits.Count > 0 || Packaging.BulkEdits.Count > 0
             ? PrintedPackaging.From(
                 Packaging.LineEdits.Select(l => l.ToPriced()),
                 Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null,

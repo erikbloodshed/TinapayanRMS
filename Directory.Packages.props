@@ -12,7 +12,7 @@
     <!-- MAUI's packages are the installed workload's (`dotnet workload list`, maui-windows): move them with it. -->
     <MauiPackagesVersion>11.0.0</MauiPackagesVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.1.43</SyncfusionVersion>
+    <SyncfusionVersion>35.1.46</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.89" />

@@ -217,7 +217,7 @@ public sealed partial class RawMaterialsViewModel
         RawMaterialRules.FindCostBrandPrice([.. priced.Select(r => (r.Brand, r.Price!.Value, r.Quantity))], EditingPreferredBrand);
 
     /// <summary>
-    /// The Cost From picker's choices as the grid now is: the dearest brand, each named brand once, and the preferred brand
+    /// The Basis picker's choices as the grid now is: the dearest brand, each named brand once, and the preferred brand
     /// still, saying so, when its prices have gone.
     /// </summary>
     private void RebuildCostFromOptions()
@@ -286,7 +286,7 @@ public sealed partial class RawMaterialsViewModel
         var cost = priced[dearest].CostPerBaseUnit!.Value;
         var unit = BufferedCostUnit?.Abbreviation ?? BaseUnitAbbreviation;
 
-        // What the cost comes from, as the texts name it: the brand picked in Cost From while it has a price, else the dearest.
+        // What the cost comes from, as the texts name it: the brand picked in Basis while it has a price, else the dearest.
         var isPreferred = RawMaterialRules.IsBrandPriced(priced.Select(r => r.Brand), EditingPreferredBrand);
         var source = isPreferred ? RawMaterialRules.NormalizeBrand(priced[dearest].Brand)! : "the dearest brand";
         DearestPurchaseCost = cost;
@@ -313,7 +313,7 @@ public sealed partial class RawMaterialsViewModel
         }
 
         PurchaseCostSourceText = isPreferred
-            ? $"From {source}, the brand picked in Cost From."
+            ? $"From {source}, the brand picked in Basis."
             : priced.Count > 1
                 ? $"From {RawMaterialRules.NormalizeBrand(priced[dearest].Brand) ?? "the unnamed brand"}, the dearest of {priced.Count} brands."
                 : string.Empty;

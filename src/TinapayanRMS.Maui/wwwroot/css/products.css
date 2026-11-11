@@ -242,8 +242,22 @@
     color: var(--muted-foreground);
 }
 
-.add-ins-heading .group-heading {
+.add-ins-heading .group-heading,
+.section-heading .group-heading {
     margin: 0;
+    white-space: nowrap;
+}
+
+/* The Packaging tab's Link and Copy picker: up to wide enough for a set's or a product's name, narrower beside a link's
+   badge. A flex basis, since Syncfusion sets the picker's own width inline. */
+.section-heading .usage-badges {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.usage-badges .packaging-source {
+    flex: 0 1 420px;
+    min-width: 220px;
 }
 
 .bulk-packaging {

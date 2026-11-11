@@ -175,7 +175,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **One Save saves the whole record**, including everything on its tabs. Until you press **Save**, nothing you type is stored.
 - **Undo** (**Ctrl+Z**) and **Redo** (**Ctrl+Y**) step back and forth through the changes you've made since opening the record.
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
-- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly or Packaging) can be typed into. Typing narrows the list to the names that contain what you typed, and fills in the first name that starts with it. **Enter** or **Tab** picks that name, so "marg" and Enter picks Margarine. **Down** and **Up** move to the other names. **Backspace** takes off the filled-in part first, then a letter at a time, and you can empty the picker to see the whole list. If what you typed matches nothing, or you leave the picker empty where a name is needed (a recipe line's ingredient), it shows what it had again once you leave it. **Esc** closes the list and puts back what it had. Clicking or tabbing into a picker selects its text, so what you type replaces it.
+- **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly) can be typed into. Typing narrows the list to the names that contain what you typed, closest first: the name itself, then names starting with it, then names with a word starting with it, then the rest, so "salt" lists Sea Salt before Unsalted Butter. The closest is highlighted in blue, with a bar down its left side, and the box keeps just what you typed. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine, and so does clicking somewhere else. **Down** and **Up** move through the list: the first press puts the highlighted name in the box, and each one after moves to the next. The name the picker already holds, if it's in the list, is a paler blue. **Backspace** takes off a letter at a time, and you can empty the picker to see the whole list. If what you typed matches nothing, or you leave the picker empty where a name is needed (a recipe line's ingredient), it shows what it had again once you leave it. **Esc** closes the list, and the picker keeps what it had. Clicking or tabbing into a picker selects its text, so what you type replaces it.
 - **New** starts a blank record. **Delete** asks before deleting anything.
 - **Changes you haven't saved are never left behind without asking.** When a product, sub-assembly or raw material, new or saved, has changes you haven't saved and you go somewhere else, a message asks **Save the changes to …?** It asks when you go to another screen (from the tabs, the menu or Find, or by closing the tab showing), pick another item in the list, press **New**, click a **Dependents** tile or another link, go **Back** or **Forward**, use **Clone** or **Create Variant**, or close the window. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
@@ -415,7 +415,7 @@ Dragging materials onto another category moves them straight away. A material ca
 At the top are the material's name and **New**, **Save**, **Undo**, **Redo** and **Delete**, then these figures:
 
 - **Base Unit**: *gram (g)* for an ingredient.
-- **Current Cost per …**: the true cost, as last saved. For a purchased material it's the price of the brand in **Cost From** (the dearest brand unless you pick one), per the unit it's shown in.
+- **Current Cost per …**: the true cost, as last saved. For a purchased material it's the price of the brand in **Basis** (the dearest brand unless you pick one), per the unit it's shown in.
 - **Buffered Cost per …**: the cost with the buffer on top. This is the figure recipes use.
 - **Total Weight** and **Total Cost**, for a made ingredient only: what its batch yields after weight loss, and what that batch costs.
 - **Last Updated**: when the material was last saved, and when its cost last changed.
@@ -451,12 +451,12 @@ Enter one row per brand you buy:
 
 The material's **current cost** comes from the **dearest** brand: its price divided by the base units in its purchase unit. For example, a 25 kg bag at 1,250.00 costs 1,250 ÷ 25,000 = 0.05 per gram.
 
-<a id="cost-from"></a>**Cost From**, under the brand table beside **Remove**, picks another brand to cost the material at instead: say you nearly always buy the cheaper Queen flour, and only buy Sampaguita when Queen runs out. Pick **Queen** and the material is costed at Queen's price; leave it on **Dearest brand**, as it starts, to cost it at the most you pay. If the brand is priced in more than one unit, its dearest per base unit is used. If you remove every price of the brand you picked, the dearest brand is used until you price it again or pick another (the picker says *no price: the dearest is used*). The cost buffer, the texts under it, **Re-apply Target**, Price History, and every recipe and product that uses the material all follow the brand it's costed at once you Save.
+<a id="basis"></a>**Basis**, under the brand table beside **Remove**, picks another brand to cost the material at instead: say you nearly always buy the cheaper Queen flour, and only buy Sampaguita when Queen runs out. Pick **Queen** and the material is costed at Queen's price; leave it on **Dearest brand**, as it starts, to cost it at the most you pay. If the brand is priced in more than one unit, its dearest per base unit is used. If you remove every price of the brand you picked, the dearest brand is used until you price it again or pick another (the picker says *no price: the dearest is used*). The cost buffer, the texts under it, **Re-apply Target**, Price History, and every recipe and product that uses the material all follow the brand it's costed at once you Save.
 
 <a id="cost-buffer"></a>**Cost buffer.** Under the brand table are **Cost Buffer %**, **Buffered Cost** and **Per**:
 
 - A new material's **Cost Buffer %** starts at the default in Settings → Costing Defaults, 10% unless you change it there. Set it to 0 for no buffer.
-- Typing the **Cost Buffer %** works out the **Buffered Cost** as the brand it's costed at (see Cost From) plus that percentage.
+- Typing the **Cost Buffer %** works out the **Buffered Cost** as the brand it's costed at (see Basis) plus that percentage.
 - Typing the **Buffered Cost** works out the percentage.
 - **Per** chooses the unit the buffered cost is shown and typed in, such as per gram or per bag. It's always stored per base unit, so choosing another unit there isn't a change to save: **Save** doesn't light up for it, though **Undo** takes it back. A material opens on the unit of the brand it's costed at.
 
@@ -673,20 +673,22 @@ Deleting a product asks first, then moves it to the **Deleted** folder at the bo
 
 ### Recipe tab: Recipe Structure
 
-The recipe has a tab for every section: each sub-assembly, named by its role, then **Packaging** when the product has packaging. A new product's recipe is empty.
+The recipe has a tab for every section: each sub-assembly, named by its role, then **Packaging**, which every product has. A new product's recipe has only the Packaging tab, and opens on it.
 
 - **Add Sub-Assembly** opens a menu with three choices:
   - **New sub-assembly**: type its lines in here.
-  - **Link an existing one**: use a sub-assembly from the Sub-Assemblies screen, a packaging set, or another product's packaging. It follows every change made to it where it's kept.
+  - **Link an existing one**: use a sub-assembly from the Sub-Assemblies screen. It follows every change made to it where it's kept.
   - **Copy an existing one**: start from an existing sub-assembly's lines and role, including another product's own. The copy is a new sub-assembly.
-- **Delete Sub-Assembly** takes the section showing out of the recipe when you Save. A linked sub-assembly stays on the Sub-Assemblies screen.
+- **Delete Sub-Assembly** takes the section showing out of the recipe when you Save. A linked sub-assembly stays on the Sub-Assemblies screen. It isn't offered on the Packaging tab.
+
+Add Sub-Assembly is only for recipe sections. Packaging is added on the Packaging tab.
 
 #### A section's form
 
 Each section's tab shows its form:
 
 - **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*, here and wherever the saved product shows: Reports, printouts and the Price Simulator.
-- **Existing Sub-Assembly or Packaging** picker, when you're linking or copying.
+- **Existing Sub-Assembly** picker, when you're linking or copying.
 - **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
 - **Batch parameters**:
   - **Weight/piece (g)** and **Yield (pcs)**: type either one
@@ -723,14 +725,19 @@ A linked section has a badge saying where it's from. Click the badge to open the
 
 #### Packaging
 
-To add packaging, use **Add Sub-Assembly** and pick the **Packaging** role:
+The **Packaging** tab is on every product, with two tables, both always there: **Packaging per Piece** and **Bulk Packaging**.
 
-- With **New sub-assembly**, type how much of each material one sellable unit takes. The lines go on the **Packaging** tab.
-- With **Link an existing one**, pick a **packaging set** or another product's packaging. The Packaging tab then shows the linked lines, and **Make a Copy** turns them into this product's own lines so you can change them.
+**Packaging per Piece** is what one sellable unit takes, such as its bag and label. Type it straight into the table. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**. **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
 
-The Packaging tab's table is typed into. Its columns are **Material**, **Qty**, **Unit** (the base unit or one of the material's alternative units), **Unit Cost** and **Cost per Unit**.
+To use packaging that already exists, use the buttons at the top right of the tab:
 
-**Bulk Packaging**, under the packaging lines, is for packaging several products share, such as a box that holds 6 and the tape that closes it. It's on every product's Packaging tab, whether its packaging is its own lines or linked.
+- **Link** opens a picker of the **packaging sets** on the Sub-Assemblies screen. Pick one, and its lines show in the table in place of the ones there. They can't be changed here: they follow every change made to the set. If there's no packaging set yet, the screen says so.
+- **Copy** opens a picker of the packaging sets and every other product. Pick one, and its lines come in as this product's own, in place of the ones there, to change as you like.
+- The **✕** beside the picker closes it without changing anything. A product with no packaging per piece can't be picked: the screen says so, and you can pick another.
+- Under linked lines, **Make a Copy** turns them into this product's own lines so you can change them, and **Remove Link** takes the link and its lines out, leaving no packaging per piece.
+- **Undo** puts back what the table held before a Link, a Copy or a Remove Link.
+
+**Bulk Packaging**, under the packaging per piece, is for packaging several products share, such as a box that holds 6 and the tape that closes it. It doesn't need any packaging per piece.
 
 - **Products per pack**, beside its heading, is how many products one bulk pack holds: a whole number, 1 or more.
 - Its table lists what one pack takes: **Material**, **Qty**, **Unit**, **Unit Cost** and **Cost per Pack**. Type each quantity for the whole pack, such as 1 box and 30 cm of tape. The quantities stay as you type them.
@@ -738,10 +745,9 @@ The Packaging tab's table is typed into. Its columns are **Material**, **Qty**, 
 - **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
 - Save refuses bulk lines with no **Products per pack**. Take every line out to have no bulk packaging.
 - A material can be both one of the packaging lines and one of the bulk lines, such as tape on each product's bag and on the box.
-- Bulk packaging is this product's own. Linking a packaging set, **Make a Copy** and **Move to Sub-Assemblies** leave it as it is, and the packaging set never has it. **Clone** copies it; **Create Variant** doesn't, since a variant starts with no packaging.
-- **Delete Sub-Assembly** on the Packaging tab takes the bulk packaging out too.
+- Bulk packaging is this product's own. **Link**, **Copy**, **Make a Copy**, **Remove Link** and **Move to Sub-Assemblies** leave it as it is, and the packaging set never has it. **Clone** copies it; **Create Variant** doesn't, since a variant starts with no packaging.
 
-**Move to Sub-Assemblies**, at the top right of the Packaging tab while the packaging is this product's own lines, works as it does for the product's own sections. Save puts the lines on the Sub-Assemblies screen as a packaging set named after the product, such as *Ensaymada Packaging*, and this product links it there. The cost doesn't change. Until you save, a **Moves to Sub-Assemblies on Save** badge shows and you can still change the lines; Undo or Revert keeps them the product's own. Afterwards other products can link the set too, its lines are changed on the Sub-Assemblies screen, and **Make a Copy** makes them this product's own again.
+**Move to Sub-Assemblies**, at the top right of the Packaging tab while the packaging per piece is this product's own lines, works as it does for the product's own sections. Save puts the lines on the Sub-Assemblies screen as a packaging set named after the product, such as *Ensaymada Packaging*, and this product links it there. The cost doesn't change. Until you save, a **Moves to Sub-Assemblies on Save** badge shows and you can still change the lines; Undo or Revert keeps them the product's own. Afterwards other products can link the set too, its lines are changed on the Sub-Assemblies screen, and **Make a Copy** makes them this product's own again.
 
 Packaging quantities are for one sellable unit. They aren't multiplied by Quantity Required. If you change Quantity Required, check the packaging yourself.
 
@@ -761,7 +767,7 @@ Each product goes on one line. Drag lines into order, and use **Remove Line** to
 
 **Include each product's packaging**, on the same row as Remove Line, is off for a new composite. Tick it when the products go into the composite already in their own packaging, such as an Ensaymada in its bag. The **Packaging Cost** column then appears, and each line's **Cost** adds its packaging in. On the Costing tab, that packaging goes into the composite's **Packaging** row, not into its products' recipe cost, so Labor, Overhead and Admin aren't taken of it. The products listed under **Products (ingredients)** there still show their recipe cost only. The Packaging tab still shows only the composite's own packaging. Ticking or unticking the box is one step for **Undo**, and **Save** keeps it. A printed composite's Products table has the Packaging Cost column too while the box is ticked.
 
-**Add Sub-Assembly** works as it does for any product, but a composite is offered only the **product-owned** roles and **Packaging**. A section's piece size is for one whole composite: a Topping with a **Weight/piece** of 100 g puts 100 g on each box. **Delete Sub-Assembly** takes the section showing out, or the packaging on the Packaging tab.
+**Add Sub-Assembly** works as it does for any product, but a composite is offered only the **product-owned** roles. Its packaging is on its Packaging tab, as any product's is. A section's piece size is for one whole composite: a Topping with a **Weight/piece** of 100 g puts 100 g on each box. **Delete Sub-Assembly** takes the section showing out.
 
 Save needs at least **two different products** in a composite.
 
@@ -940,7 +946,7 @@ Double-click a material to open it on the **Raw Materials** screen.
 
 ### Cost Buffers
 
-Every purchased material with a price, and how its fixed **buffered cost** stands against the brand it's costed at now (its [Cost From](#cost-from) brand, or the dearest). Prices rising don't move the buffered cost, so they wear the buffer down: this tab finds the materials where that has happened.
+Every purchased material with a price, and how its fixed **buffered cost** stands against the brand it's costed at now (its [Basis](#basis) brand, or the dearest). Prices rising don't move the buffered cost, so they wear the buffer down: this tab finds the materials where that has happened.
 
 - **Raw Material**, **Type**, **Category** and **Per**: the base unit the costs are per, such as *g*.
 - **Brand Cost** and **Buffered Cost**: the true cost (the price of the brand it's costed at) and the buffered cost, per base unit.
@@ -1003,7 +1009,7 @@ The **Price Simulator** shows what raw material price changes would do to every 
 The top table holds the changes to try, one row per raw material:
 
 - **Raw Material**: pick a purchased ingredient or packaging material. Type to search the list.
-- **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from the brand it's costed at on **Cost Setup** (its Cost From brand, or the dearest), which is the price its cost comes from. A material with no price yet shows its base unit and no price.
+- **Per** and **Current Price**: the unit it's bought in and what one costs now. These come from the brand it's costed at on **Cost Setup** (its Basis brand, or the dearest), which is the price its cost comes from. A material with no price yet shows its base unit and no price.
 - **New Price** or **Change %**: type either one, and the other is worked out. For example, a sack of flour at 1,250 up **10**% shows a new price of 1,375. A material with no price yet needs its new price typed.
 
 **Remove Line** takes the picked row away, and **Clear All** takes them all away, so every figure is today's again.
@@ -1092,7 +1098,7 @@ This happens as soon as you save. A product you had open on the Products screen 
 
 ### Raw materials
 
-- **Purchased**: cost per base unit = the price of the brand in Cost From (the dearest brand unless one is picked) ÷ the base units in its purchase unit. The buffered cost is a fixed amount. It's set from the Cost Buffer % on the first price, or whenever you type the percentage again.
+- **Purchased**: cost per base unit = the price of the brand in Basis (the dearest brand unless one is picked) ÷ the base units in its purchase unit. The buffered cost is a fixed amount. It's set from the Cost Buffer % on the first price, or whenever you type the percentage again.
 - **Made**: final weight = the grams of its sub-assembly's lines and its add-ins × (1 − Weight Loss %). Cost per gram = their total cost ÷ final weight. The buffered cost uses their buffered costs.
 - **Linked**: cost per gram = linked-to ingredient's cost per gram × Cost Share % ÷ Weight Share %.
 
@@ -1265,7 +1271,7 @@ Right-click the category's folder in the Products list and choose **Print Folder
 1. In the Products header, press the arrow beside **New** and choose **New composite product**. Or right-click a folder in the list and choose **New Composite Product Here**.
 2. Type its name into the *New composite product* row the list shows, and press **Enter**. It's saved once you press **Save** in step 6.
 3. On the **Products** tab, add a line for each product: pick the product, then type how many go in under **Qty**.
-4. Use **Add Sub-Assembly** with the **Packaging** role for the box, and for anything wrapping the pieces inside it. The products' own packaging isn't included. If the pieces go in already in their own packaging, tick **Include each product's packaging** under the Products table instead of listing it again.
+4. On the **Packaging** tab, type the box into **Packaging per Piece**, with anything wrapping the pieces inside it, or **Link** a packaging set that has them. The products' own packaging isn't included. If the pieces go in already in their own packaging, tick **Include each product's packaging** under the Products table instead of listing it again.
 5. For a topping or filling over the whole composite, use **Add Sub-Assembly** in that role. Its **Weight/piece** is what one whole composite takes.
 6. Check the **Costing** tab, then press **Save**. A composite needs at least two different products.
 
@@ -1273,18 +1279,18 @@ Right-click the category's folder in the Products list and choose **Print Folder
 
 1. On **Sub-Assemblies**, right-click the **Packaging** folder, choose **New Packaging Set Here**, type its name and press **Enter**. List the box and the bags one pack takes, then Save.
 2. Make the pack product. For example, use **Create Variant** of the single and set **Quantity Required** to 8.
-3. In its recipe, use **Add Sub-Assembly → Link an existing one** with the **Packaging** role, and pick the set. Save.
+3. On its **Packaging** tab, press **Link** and pick the set. Save.
 
 Or type the packaging straight into the pack product's Packaging tab, then press **Move to Sub-Assemblies** and Save. The set is made from those lines and linked for you.
 
 ### Add a box several products share
 
-For products packed in their own wrapper (their own lines or a linked packaging set) and then several to a box:
+For products packed several to a box, whether or not each is in its own wrapper first:
 
-1. Open the product on its **Packaging** tab. Under its packaging lines is **Bulk Packaging**.
+1. Open the product on its **Packaging** tab, which every product has. Under **Packaging per Piece** is **Bulk Packaging**.
 2. In **Products per pack**, type how many products one box holds, such as 6.
 3. In the Bulk Packaging table, add what one box takes: the box itself (Qty 1), and anything else for the whole box, such as its tape.
-4. Check the caption under the table, then Save. Each product now carries a sixth of the box's cost, on top of its own packaging.
+4. Check the caption under the table, then Save. Each product now carries a sixth of the box's cost, on top of any packaging of its own.
 
 ### Install or update TinapayanRMS
 

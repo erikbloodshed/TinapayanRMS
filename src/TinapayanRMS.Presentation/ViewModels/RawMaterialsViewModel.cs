@@ -462,10 +462,10 @@ public sealed partial class RawMaterialsViewModel : RecordFormViewModel<RawMater
         }
     }
 
-    /// <summary>The Cost From picker's choices: the dearest brand, then each brand in the grid (RebuildCostFromOptions).</summary>
+    /// <summary>The Basis picker's choices: the dearest brand, then each brand in the grid (RebuildCostFromOptions).</summary>
     public ObservableCollection<CostFromOption> CostFromOptions { get; } = [new(null)];
 
-    /// <summary>The Cost From picker's pick, <see cref="EditingPreferredBrand"/> as one of its choices.</summary>
+    /// <summary>The Basis picker's pick, <see cref="EditingPreferredBrand"/> as one of its choices.</summary>
     public CostFromOption? CostFrom
     {
         get => CostFromOptions.FirstOrDefault(o => string.Equals(o.Brand, EditingPreferredBrand, StringComparison.OrdinalIgnoreCase)) ?? CostFromOptions[0];

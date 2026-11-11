@@ -174,7 +174,6 @@ public sealed partial class ProductsViewModel
                 UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
                     ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null));
                 UsageForm.ShowSource(UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey));
-                PackagingLineRow.Resolve(UsageForm.FormPackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
 
                 UsageForm.Recompute();
                 RecomputeCosts();
@@ -582,7 +581,6 @@ public sealed partial class ProductsViewModel
         // The history is this product's form; another product's steps would put back a recipe that isn't its.
         History.Clear();
 
-        var previousTab = SelectedRecipeTab;
         _detailProductId = null;
 
         _arrangingRecipeTabs = true;
@@ -601,10 +599,6 @@ public sealed partial class ProductsViewModel
         }
 
         Packaging.Clear();
-        if (!keepRecipeTabs)
-        {
-            SetHasPackaging(false);
-        }
 
         // A composite's lines, and what its products were read to bring, are that composite's.
         ComponentsTable.Clear();
@@ -615,9 +609,10 @@ public sealed partial class ProductsViewModel
 
         // A picked product's sub-assemblies are on their way, and pick the tab when they arrive.
         _isRecipeClearedForAnother = SelectedProduct is not null;
+        // A blank form opens on its first tab, a composite's on its Products, whatever showed before.
         if (SelectedProduct is null)
         {
-            ReselectRecipeTab(previousTab, previousUsage: null, previousIds: []);
+            ReselectRecipeTab(previous: null, previousUsage: null, previousIds: []);
         }
     }
 
@@ -673,7 +668,6 @@ public sealed partial class ProductsViewModel
         Packaging.LoadLink(detail.PackagingLink);
         Packaging.LoadLines(detail.Lines);
         Packaging.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
-        SetHasPackaging(detail.PackagingLink is not null || detail.Lines.Count > 0 || detail.BulkLines.Count > 0);
         ReplaceUsages(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         Costing.Load(detail.Costing);
         RefreshLinkableOptions();

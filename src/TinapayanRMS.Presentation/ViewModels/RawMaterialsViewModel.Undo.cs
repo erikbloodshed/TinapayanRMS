@@ -136,7 +136,7 @@ public sealed partial class RawMaterialsViewModel
 
         // The Cost Buffer % box shows TypedCostBufferPercent, raised as the buffer changes: an undo that leaves the buffer
         // as it was doesn't, and without this the box would keep the percent from before the undo (undoing a
-        // Cost From pick, say).
+        // Basis pick, say).
         this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
         RecomputeBomTotals();
     }

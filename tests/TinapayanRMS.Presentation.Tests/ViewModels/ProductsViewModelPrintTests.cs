@@ -36,7 +36,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             ],
             []));
         await AddPackagingLineAsync(productId);
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && vm.HasPackaging);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
 
         var printout = await PrintAsync(viewModel);
 

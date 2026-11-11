@@ -39,4 +39,7 @@ public sealed class LinkableSubAssemblyOption
     public string DisplayName => SubAssembly is null
         ? $"Packaging — {PackagingTarget!.Name}"
         : $"{SubAssembly.Name} — {SubAssembly.OwnerProduct?.Name ?? PricedSection.StandaloneSourceName} ({SubAssembly.Role?.Name})";
+
+    /// <summary>What the Packaging tab's Link and Copy picker shows for packaging: "Gift Box Set — packaging set", "Cream Loaf — product".</summary>
+    public string PackagingSourceName => SubAssembly is null ? $"{PackagingTarget!.Name} — product" : $"{SubAssembly.Name} — packaging set";
 }

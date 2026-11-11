@@ -766,7 +766,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             await AddPackagingLineAsync(productId);
         }
 
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && vm.HasPackaging == withPackaging);
+        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && (vm.Packaging.LineEdits.Count > 0) == withPackaging);
         return (viewModel, productId);
     }
 

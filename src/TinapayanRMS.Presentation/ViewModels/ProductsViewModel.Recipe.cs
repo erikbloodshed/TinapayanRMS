@@ -16,8 +16,13 @@ public sealed partial class ProductsViewModel
     /// <summary>The recipe's tabs follow its sections as they're added, taken out and moved.</summary>
     private void WireRecipeTabLists()
     {
-        // A new product starts with no tabs at all: packaging, like a recipe section, comes in through Add Sub-Assembly.
-        RecipeTabs.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasRecipeTabs));
+        // The Packaging tab is always there, last, for the bulk packaging; the packaging for each piece, like a recipe
+        // section, comes in through Add Sub-Assembly.
+        RecipeTabs.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasRecipeSections));
+        RecipeTabs.Add(PackagingTab);
+
+        // The blank form shows it from the start, so its tables are there to type into before anything else happens.
+        SelectedRecipeTab = PackagingTab;
         UsageEdits.CollectionChanged += (_, e) =>
         {
             MirrorUsageTabs(e);
@@ -59,7 +64,8 @@ public sealed partial class ProductsViewModel
         nameof(AddUsageCommand), nameof(EditUsageCommand), nameof(MakeCopyCommand), nameof(UnlinkCommand),
         nameof(MoveToSubAssembliesCommand), nameof(MoveToInHouseCommand), nameof(RemoveUsageCommand),
         nameof(CopyPackagingCommand), nameof(MovePackagingToSubAssembliesCommand), nameof(RemoveLineCommand),
-        nameof(RemoveBulkLineCommand))]
+        nameof(RemoveBulkLineCommand), nameof(StartLinkingPackagingCommand), nameof(StartCopyingPackagingCommand),
+        nameof(CancelPickingPackagingCommand), nameof(RemovePackagingLinkCommand))]
     private void WireRecipeCommands()
     {
         RemoveComponentCommand = ReactiveCommand.Create(
@@ -80,7 +86,7 @@ public sealed partial class ProductsViewModel
         });
 
         // Add Sub-Assembly opens a New Sub-Assembly tab, after the sub-assemblies' and before Packaging's, with a fresh
-        // add form in it, which also adds the packaging (the Packaging role, or a packaging source to link or copy). The form
+        // add form in it, for a recipe section: packaging is typed, linked or copied on the Packaging tab itself. The form
         // showing is applied first, as leaving its tab would apply it; one a rule refuses keeps its tab, with the
         // message, and nothing opens. The tab goes again once another shows (RecipeTabShown).
         //
@@ -158,17 +164,11 @@ public sealed partial class ProductsViewModel
         MoveToInHouseCommand = ReactiveCommand.CreateFromTask<ProductUsageEdit>(usage => RunSafelyAsync(() => MoveToInHouseAsync(usage)));
 
         // Delete Sub-Assembly takes out the one whose tab is showing. Nothing to confirm: it only leaves the recipe,
-        // with Save, and the sub-assembly stays on the Sub-Assemblies screen. On the Packaging tab it takes out the
-        // packaging: its lines, or its link, go with Save.
+        // with Save, and the sub-assembly stays on the Sub-Assemblies screen. The Packaging tab isn't a sub-assembly: its
+        // lines are taken out with Remove Line, and a link with Remove Link.
         RemoveUsageCommand = ReactiveCommand.CreateFromTask(
             () => RunSafelyAsync(() =>
             {
-                if (SelectedRecipeTab is PackagingRecipeTab)
-                {
-                    AsUndoStep(RemovePackaging);
-                    return Task.CompletedTask;
-                }
-
                 var usage = ((SubAssemblyRecipeTab)SelectedRecipeTab!).Usage;
                 AsUndoStep(() =>
                 {
@@ -182,7 +182,7 @@ public sealed partial class ProductsViewModel
                     // Products, else Packaging.
                     var index = UsageEdits.IndexOf(usage);
                     var neighbour = index + 1 < UsageEdits.Count ? UsageEdits[index + 1] : index > 0 ? UsageEdits[index - 1] : null;
-                    SelectRecipeTab(neighbour is null ? ComponentsTabIfShown ?? PackagingTabIfShown : TabFor(neighbour));
+                    SelectRecipeTab(neighbour is null ? ComponentsTabIfShown ?? PackagingTab : TabFor(neighbour));
 
                     UsageEdits.Remove(usage);
                     RefreshLinkableOptions();
@@ -191,16 +191,32 @@ public sealed partial class ProductsViewModel
 
                 return Task.CompletedTask;
             }),
-            this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab or PackagingRecipeTab));
+            this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab));
 
         // The linked packaging's lines, as they show, become the product's own; Save drops the link and writes them.
         CopyPackagingCommand = ReactiveCommand.Create(
+            () => AsUndoStep(() => Packaging.ShowLink(null)),
+            Packaging.WhenAnyValue(p => p.IsPackagingLinked));
+
+        // The link and the lines it shows go, leaving none for each piece; Save drops the link. The bulk packaging stays.
+        RemovePackagingLinkCommand = ReactiveCommand.Create(
             () => AsUndoStep(() =>
             {
+                Packaging.SelectedLineEdit = null;
+                Packaging.LineEdits.Clear();
                 Packaging.ShowLink(null);
-                RefreshLinkableOptions();
+                RecomputeCosts();
             }),
             Packaging.WhenAnyValue(p => p.IsPackagingLinked));
+
+        // Link and Copy open the Packaging tab's picker; picking in it does the rest (ApplyPackagingSourceAsync). Opening
+        // or closing it changes nothing Save writes, so neither is an undo step.
+        StartLinkingPackagingCommand = ReactiveCommand.Create(StartLinkingPackaging);
+        StartCopyingPackagingCommand = ReactiveCommand.Create(StartCopyingPackaging);
+        CancelPickingPackagingCommand = ReactiveCommand.Create(Packaging.EndPickingSource);
+        LoadLatest(
+            Packaging.WhenAnyValue(p => p.PickedSource).Where(source => source is not null && Packaging.IsPickingSource).Select(source => source!),
+            ApplyPackagingSourceAsync);
 
         // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links.
         // They're typed straight into the tab rather than through a form, so they're checked now instead: a line half
@@ -299,51 +315,77 @@ public sealed partial class ProductsViewModel
     /// <summary>What the Products table's product cell offers, for the product showing (a new one can hold any).</summary>
     private void RefreshComponentOptions() => ComponentsTable.RefreshOptions(_detailProductId ?? 0, Products);
 
-    /// <summary>The Packaging tab comes and goes with the packaging, always last, after the add form's tab.</summary>
-    private void SetHasPackaging(bool hasPackaging)
+    /// <summary>
+    /// Link on the Packaging tab: the picker offers the Sub-Assemblies screen's packaging sets, less the one linked now.
+    /// With none, it says how to make one. Another product's packaging is only copied, never linked.
+    /// </summary>
+    private void StartLinkingPackaging()
     {
-        HasPackaging = hasPackaging;
-        if (hasPackaging == RecipeTabs.Contains(PackagingTab))
+        var linkedKey = Packaging.LinkTarget?.Key;
+        List<LinkableSubAssemblyOption> options = [.. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)).Where(o => o.Key != linkedKey)];
+        if (options.Count == 0)
+        {
+            ErrorMessage = _packagingSets.Count == 0
+                ? "There's no packaging set to link yet. Make one on the Sub-Assemblies screen, or type the lines here and press Move to Sub-Assemblies."
+                : "This product links the only packaging set there is.";
+            return;
+        }
+
+        ErrorMessage = null;
+        Packaging.StartPickingSource(PackagingSourceMode.Link, options);
+    }
+
+    /// <summary>Copy on the Packaging tab: the picker offers the packaging sets, then every other product's packaging.</summary>
+    private void StartCopyingPackaging()
+    {
+        ErrorMessage = null;
+        Packaging.StartPickingSource(
+            PackagingSourceMode.Copy,
+            [
+                .. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
+                .. Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
+            ]);
+    }
+
+    /// <summary>
+    /// The packaging picked on the Packaging tab, once its lines are in: a set's lines, or another product's packaging as
+    /// it shows (through any link of its own). Linked, they show read-only and follow the set; copied, they're this
+    /// product's own to type into. Either takes the place of the packaging per piece there was, as one undo step, and Save
+    /// writes it; the bulk packaging stays. Packaging with no lines is refused, and the picker stays open for another.
+    /// </summary>
+    private async Task ApplyPackagingSourceAsync(LinkableSubAssemblyOption source, CancellationToken cancellationToken)
+    {
+        var target = source.PackagingTarget!;
+        IReadOnlyList<PackagingLineRow> rows = target switch
+        {
+            PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
+                .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
+            PackagingLinkTarget.OtherProduct(var productId, _) =>
+                [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
+        };
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The picker moved on while the lines loaded (cancelled, another pick, or another product): they're stale.
+        if (!ReferenceEquals(Packaging.PickedSource, source))
         {
             return;
         }
 
-        _arrangingRecipeTabs = true;
-        try
+        var linking = Packaging.SourceMode == PackagingSourceMode.Link;
+        if (rows.Count == 0)
         {
-            if (hasPackaging)
-            {
-                RecipeTabs.Add(PackagingTab);
-            }
-            else
-            {
-                RecipeTabs.Remove(PackagingTab);
-            }
+            ErrorMessage = $"{target.Name} has no packaging for each piece to {(linking ? "link" : "copy")}. Pick another.";
+            return;
         }
-        finally
+
+        ErrorMessage = null;
+        AsUndoStep(() =>
         {
-            _arrangingRecipeTabs = false;
-        }
-    }
-
-    /// <summary>The Packaging tab while the product has packaging, else null: the tab to fall back on after the sub-assemblies'.</summary>
-    private RecipeTab? PackagingTabIfShown => HasPackaging ? PackagingTab : null;
-
-    /// <summary>
-    /// Delete Sub-Assembly on the Packaging tab: the packaging leaves the recipe, lines or link, and its tab goes. The
-    /// last sub-assembly's tab shows instead, if there is one. Save writes it; the packs keep their own lines.
-    /// </summary>
-    private void RemovePackaging()
-    {
-        SelectRecipeTab(RecipeTabs.OfType<SubAssemblyRecipeTab>().LastOrDefault() ?? ComponentsTabIfShown);
-        Packaging.SelectedLineEdit = null;
-        Packaging.LineEdits.Clear();
-        Packaging.ShowBulkLines([]);
-        Packaging.BulkQuantity = null;
-        Packaging.ShowLink(null);
-        SetHasPackaging(false);
-        RefreshLinkableOptions();
-        RecomputeCosts();
+            Packaging.EndPickingSource();
+            Packaging.ShowLines(rows);
+            Packaging.ShowLink(linking ? target : null);
+            RecomputeCosts();
+        });
     }
 
     /// <summary>The saved usages as sections, in recipe order; they're also what Save compares the recipe against.</summary>
@@ -599,7 +641,7 @@ public sealed partial class ProductsViewModel
     {
         RecipeTab? tab = previous switch
         {
-            PackagingRecipeTab => PackagingTabIfShown,
+            PackagingRecipeTab => PackagingTab,
             ComponentsRecipeTab => ComponentsTabIfShown,
             _ => null,
         };
@@ -616,23 +658,23 @@ public sealed partial class ProductsViewModel
                     .FirstOrDefault();
         }
 
-        // A product with neither has no tab to show: the card says how to start. A composite always has its Products.
-        SelectRecipeTab(tab ?? ComponentsTabIfShown ?? RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault() ?? PackagingTabIfShown);
+        // A product with neither shows Packaging, which is always there, and the card says how to start. A composite
+        // always has its Products.
+        SelectRecipeTab(tab ?? ComponentsTabIfShown ?? RecipeTabs.OfType<SubAssemblyRecipeTab>().FirstOrDefault<RecipeTab>() ?? PackagingTab);
     }
 
     /// <summary>
     /// The sub-assemblies the form can link or copy. Linking offers only the Sub-Assemblies screen's (standalone) ones the
-    /// recipe doesn't already link, never anything a product keeps; copying offers every other one, and other products'
-    /// packaging. A pick that's no longer offered is cleared. The roles the form offers follow the recipe too
-    /// (RefreshFormRoleOptions).
+    /// recipe doesn't already link, never anything a product keeps; copying offers every other one. Never packaging,
+    /// which the Packaging tab links and copies itself. A pick that's no longer offered is cleared. The roles the form
+    /// offers follow the recipe too (RefreshFormRoleOptions).
     /// </summary>
     private void RefreshLinkableOptions()
     {
         var linking = UsageForm.EditingUsageMode == UsageFormMode.Link;
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
 
-        // Packaging comes after the recipes, while the product has none: the packaging sets, then (to copy only) every
-        // other product's packaging. A composite's own sections are only in product-owned roles, so it's offered those.
+        // A composite's own sections are only in product-owned roles, so it's offered those.
         UsageForm.LinkableSubAssemblies.MergeFrom(
             [
                 .. _linkable
@@ -640,8 +682,6 @@ public sealed partial class ProductsViewModel
                         ? s.OwnerProductId is null && !usedIds.Contains(s.Id)
                         : s.OwnerProductId is null || s.OwnerProductId != _detailProductId))
                     .Select(s => new LinkableSubAssemblyOption(s)),
-                .. HasPackaging ? [] : _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
-                .. HasPackaging || linking ? [] : Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
             ],
             o => o.Key);
 
@@ -661,11 +701,10 @@ public sealed partial class ProductsViewModel
     private void RefreshFormRoleOptions()
     {
         var pickedRoleId = UsageForm.EditingUsageRole?.Id;
-        // The Packaging role adds the product's packaging, which isn't a recipe section: offered only to add, and only
-        // while there's none. A section already in the recipe can't turn into packaging. A composite's sections are only
-        // in product-owned roles (CompositeProductRules.EnsureSectionRoles).
+        // Never the Packaging role: packaging isn't a recipe section, and the Packaging tab takes it. A composite's
+        // sections are only in product-owned roles (CompositeProductRules.EnsureSectionRoles).
         UsageForm.FormRoleOptions.MergeFrom(
-            [.. Roles.Where(r => r.IsPackaging ? UsageForm.IsAddingUsage && !HasPackaging : !IsEditingComposite || r.IsProductOwned)],
+            [.. Roles.Where(r => !r.IsPackaging && (!IsEditingComposite || r.IsProductOwned))],
             r => r.Id);
         UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId));
     }

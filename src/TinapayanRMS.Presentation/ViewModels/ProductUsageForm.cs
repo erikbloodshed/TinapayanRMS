@@ -16,55 +16,23 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
 /// </summary>
 /// <param name="findIngredient">An ingredient as the screen last loaded it, for a row that prices itself.</param>
-/// <param name="findPackagingMaterial">A packaging material as the screen last loaded it.</param>
 /// <param name="costBasis">The screen's cost basis, buffered or not, which a new row is priced at.</param>
 public sealed class ProductUsageForm(
-    Func<int, RawMaterial?> findIngredient, Func<int, RawMaterial?> findPackagingMaterial, Func<CostBasis> costBasis) : ReactiveObject, IDisposable
+    Func<int, RawMaterial?> findIngredient, Func<CostBasis> costBasis) : ReactiveObject, IDisposable
 {
     /// <summary>
     /// The roles the form offers: every recipe role, as a recipe can have several sub-assemblies in one, told apart by
-    /// their names; and the Packaging role while there's no packaging.
+    /// their names. Never the Packaging role: the Packaging tab takes the product's packaging.
     /// </summary>
     public ObservableCollection<SubAssemblyRole> FormRoleOptions { get; } = [];
 
     /// <summary>
-    /// The add form's packaging lines, when it adds packaging (IsFormPackaging): how much of each material one piece
-    /// takes. Typed into for a new or copied packaging; read-only for a link, whose lines are kept where it's from.
-    /// </summary>
-    public ObservableCollection<PackagingLineRow> FormPackagingLines { get; } = [];
-
-    /// <summary>The line the form's packaging table's add row edits, priced as its material is picked.</summary>
-    public Func<PackagingLineRow> NewFormPackagingLine => () => new PackagingLineRow(findPackagingMaterial) { CostBasis = costBasis() };
-
-    private PackagingLineRow? _selectedFormPackagingLine;
-    public PackagingLineRow? SelectedFormPackagingLine
-    {
-        get => _selectedFormPackagingLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormPackagingLine, value);
-    }
-
-    /// <summary>
-    /// The add form adds the product's packaging rather than a recipe section: the Packaging role is picked for a new one,
-    /// or a packaging source for a link or a copy. It then shows the packaging table in place of the ingredients, add-ins
-    /// and piece size, and Apply fills the Packaging tab.
-    /// </summary>
-    public bool IsFormPackaging => IsAddingUsage && EditingUsageMode switch
-    {
-        UsageFormMode.Link => EditingUsageSource?.IsPackaging == true,
-        UsageFormMode.Copy => EditingUsageSource is { } source ? source.IsPackaging : EditingUsageRole?.IsPackaging == true,
-        _ => EditingUsageRole?.IsPackaging == true,
-    };
-
-    /// <summary>The form's packaging table can be typed into: a new or copied packaging, not a link.</summary>
-    public bool IsFormEditingPackaging => IsFormPackaging && EditingUsageMode != UsageFormMode.Link;
-
-    /// <summary>
     /// The add form makes a new sub-assembly that Save keeps on the Sub-Assemblies screen, linked: its role isn't
-    /// product-owned (SubAssemblyRole.IsProductOwned), where it would stay the product's own, and it isn't packaging.
+    /// product-owned (SubAssemblyRole.IsProductOwned), where it would stay the product's own.
     /// The form's "Moves to Sub-Assemblies on Save" badge shows then, in the place of a title.
     /// </summary>
     public bool IsFormNewMovingToSubAssemblies =>
-        IsAddingUsage && EditingUsageMode == UsageFormMode.New && EditingUsageRole is { IsPackaging: false, IsProductOwned: false };
+        IsAddingUsage && EditingUsageMode == UsageFormMode.New && EditingUsageRole is { IsProductOwned: false };
 
     /// <summary>
     /// Other products' sub-assemblies the form can link or copy. Linking leaves out the ones the recipe
@@ -490,14 +458,6 @@ public sealed class ProductUsageForm(
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
     internal void Recompute()
     {
-        // Packaging is one set of lines per piece, with no batch to share out.
-        if (IsFormPackaging)
-        {
-            var packagingCost = FormPackagingLines.Sum(l => l.CostPerUnit);
-            UsageFormCostPerPieceText = FormPackagingLines.Any(l => l.PackagingMaterial is not null) ? $"{packagingCost:N4}" : "—";
-            return;
-        }
-
         var batch = Batch();
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
         UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
@@ -580,13 +540,8 @@ public sealed class ProductUsageForm(
         this.RaisePropertyChanged(nameof(EditingUsageYield));
     }
 
-    /// <summary>Whether the form adds packaging has followed its mode, role or source: what shows of it follows.</summary>
-    internal void RaisePackagingChanged()
-    {
-        this.RaisePropertyChanged(nameof(IsFormPackaging));
-        this.RaisePropertyChanged(nameof(IsFormEditingPackaging));
-        this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
-    }
+    /// <summary>The form's mode, role or source changed: whether Save moves a new one to the Sub-Assemblies screen follows.</summary>
+    internal void RaiseKindChanged() => this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
 
     /// <summary>The form's lines or add-ins changed: what its tables and the add-ins badge show follows.</summary>
     internal void RaiseLinesChanged()

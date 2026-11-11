@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using AwesomeAssertions;
 using Syncfusion.Blazor.DropDowns;
 using TinapayanRMS.Presentation.ViewModels;
@@ -337,7 +338,7 @@ public class FieldTests
             .Add(f => f.Items, ["Flour", "Salt", "Water"])
             .Add(f => f.Value, "Salt")
             .Add(f => f.ValueChanged, picked.Add));
-        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+        var box = field.FindComponent<PickComboBox<string>>();
         var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
         box.Instance.Value.Should().Be(1);
 
@@ -362,6 +363,130 @@ public class FieldTests
     }
 
     [Test]
+    public async Task A_picker_lists_the_best_match_first_and_leaving_it_picks_that_without_the_rest_written_into_the_box()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Unsalted Butter", "Flour", "Sea Salt"])
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<PickComboBox<string>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+        box.Instance.Autofill.Should().BeFalse("the rest of a name written into the box under the cursor was in the way");
+
+        // A new line: nothing picked yet, so the combo box, which takes only an exact name as it's left, says nothing.
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("salt")));
+
+        // The combo box lists what holds the text, sorted by its rank.
+        box.Instance.DataSource.Where(c => c.Text.Contains("salt", StringComparison.OrdinalIgnoreCase)).OrderBy(c => c.Rank)
+            .Select(c => c.Text).Should().Equal("Sea Salt", "Unsalted Butter");
+        picked.Should().BeEmpty("nothing changes as letters are typed");
+
+        // Left with the text typed: the combo box says so (CustomValueAsync), then that it was left.
+        box.Instance.LeftWithTypedText = true;
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        picked.Should().Equal("Sea Salt");
+    }
+
+    [Test]
+    public async Task A_picker_that_can_be_left_empty_keeps_the_highlighted_item_the_combo_box_then_answers_no_pick_to()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Margarine", "Refrigerated Margarine", "Water"])
+            .Add(f => f.Value, "Water")
+            .Add(f => f.AllowEmpty, true)
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<PickComboBox<string>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("marg")));
+
+        // Tab: no item is named "marg", so the highlighted one is taken; the combo box, still showing "marg", answers no
+        // pick again before it says it was left.
+        box.Instance.LeftWithTypedText = true;
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        picked.Should().Equal(["Margarine"], "a Category was emptied by the second answer");
+    }
+
+    [Test]
+    public async Task Escape_then_leaving_keeps_the_pick()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["All Purpose Cream", "All Purpose Flour"])
+            .Add(f => f.Value, "All Purpose Flour")
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<PickComboBox<string>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("purpose")));
+        box.Instance.BestMatch!.Text.Should().Be("All Purpose Cream");
+
+        // Escape: the combo box answers with no pick of its own accord, then, left, settles no typed text.
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        picked.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Enter_or_tab_on_text_naming_no_item_exactly_picks_the_item_the_arrow_keys_moved_to()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Bread Flour", "Cake Flour", "Salt"])
+            .Add(f => f.Value, "Cake Flour")
+            .Add(f => f.ValueChanged, picked.Add));
+        var box = field.FindComponent<PickComboBox<string>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("flour")));
+        var bread = box.Instance.DataSource.First(c => c.Text == "Bread Flour");
+        await field.InvokeAsync(() => events.Instance.OnValueSelect.InvokeAsync(Selected(bread)));
+
+        // Tab: the combo box settles the typed text (CustomValueAsync), finds no item named "flour", and answers with no
+        // pick.
+        box.Instance.LeftWithTypedText = true;
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(null));
+
+        picked.Should().Equal("Bread Flour");
+
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+        picked.Should().Equal(["Bread Flour"], "it's picked once");
+    }
+
+    [Test]
+    public async Task A_picker_rubbed_out_and_left_picks_nothing()
+    {
+        await using var context = AppServices.NewContext();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Flour", "Salt"])
+            .Add(f => f.Value, "Salt")
+            .Add(f => f.ValueChanged, picked.Add));
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("fl")));
+        await field.InvokeAsync(() => events.Instance.Filtering.InvokeAsync(Typed("")));
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        picked.Should().BeEmpty("the line keeps its pick");
+    }
+
+    [Test]
     public async Task A_value_the_combo_box_hands_back_without_the_cursor_is_no_pick()
     {
         await using var context = AppServices.NewContext();
@@ -370,7 +495,7 @@ public class FieldTests
             .Add(f => f.Items, ["gram", "bag"])
             .Add(f => f.Value, "bag")
             .Add(f => f.ValueChanged, picked.Add));
-        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+        var box = field.FindComponent<PickComboBox<string>>();
 
         // Another record picked: its list comes with the base unit showing, then its own unit, as a Raw Materials pick's
         // Buffered Cost "Per" does as the details arrive.
@@ -393,7 +518,7 @@ public class FieldTests
             .Add(f => f.Items, ["Bread", "Pastry"])
             .Add(f => f.Value, "Pastry")
             .Add(f => f.ValueChanged, picked.Add));
-        var box = field.FindComponent<SfComboBox<int?, PickField<string>.Choice>>();
+        var box = field.FindComponent<PickComboBox<string>>();
         var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
 
         await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
@@ -403,5 +528,30 @@ public class FieldTests
 
         box.Instance.Value.Should().Be(2, "the box still shows Pastry, not Cake, which took its old place");
         picked.Should().BeEmpty();
+    }
+
+    // The combo box's event arguments, as it makes them: their setters are Syncfusion's own.
+    private static FilteringEventArgs Typed(string text)
+    {
+        var args = new FilteringEventArgs();
+        SetText(args, text);
+        return args;
+    }
+
+    private static SelectEventArgs<PickField<string>.Choice> Selected(PickField<string>.Choice choice)
+    {
+        var args = new SelectEventArgs<PickField<string>.Choice>();
+        SelectArgs<PickField<string>.Choice>.SetItemData(args, choice);
+        return args;
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "set_Text")]
+    private static extern void SetText(FilteringEventArgs args, string text);
+
+    // An accessor on a generic type is reached through a generic class of its own.
+    private static class SelectArgs<T>
+    {
+        [UnsafeAccessor(UnsafeAccessorKind.Method, Name = "set_ItemData")]
+        public static extern void SetItemData(SelectEventArgs<T> args, T item);
     }
 }

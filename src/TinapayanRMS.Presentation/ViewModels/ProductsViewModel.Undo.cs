@@ -28,7 +28,6 @@ public sealed partial class ProductsViewModel
         WatchForSave(ComponentsTable.ComponentEdits);
         WatchForSave(UsageForm.FormLines);
         WatchForSave(UsageForm.FormAddIns);
-        WatchForSave(UsageForm.FormPackagingLines);
         ((INotifyPropertyChanged)RecipeTabs).PropertyChanged += (_, _) => RebaseSettledForm();
     }
 
@@ -80,7 +79,6 @@ public sealed partial class ProductsViewModel
         Usages = [.. UsageEdits],
         SelectedTab = CaptureTabChoice(),
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
-        HasPackaging = HasPackaging,
         PackagingLink = Packaging.LinkTarget,
         IsPackagingMoving = Packaging.IsPackagingMoving,
         Lines = [.. Packaging.LineEdits.Select(CaptureLine)],
@@ -99,7 +97,6 @@ public sealed partial class ProductsViewModel
         UsageSourceKey = UsageForm.EditingUsageSource?.Key,
         FormLines = [.. UsageForm.FormLines.Select(CaptureIngredientLine)],
         FormAddIns = [.. UsageForm.FormAddIns.Select(CaptureIngredientLine)],
-        FormPackagingLines = [.. UsageForm.FormPackagingLines.Select(CaptureLine)],
         FormFormulaBase = UsageForm.FormFormulaBase,
         UsageAuthoredField = UsageForm.AuthoredField,
         UsageWeightPerPiece = UsageForm.EditingUsageWeightPerPiece,
@@ -139,7 +136,6 @@ public sealed partial class ProductsViewModel
             CloseUsageForm();
             UsageForm.SelectedFormLine = null;
             UsageForm.SelectedFormAddIn = null;
-            UsageForm.SelectedFormPackagingLine = null;
             Packaging.SelectedLineEdit = null;
             Packaging.SelectedBulkEdit = null;
             ComponentsTable.SelectedComponentEdit = null;
@@ -176,8 +172,6 @@ public sealed partial class ProductsViewModel
 
             Packaging.BulkQuantity = snapshot.BulkQuantity;
 
-            SetHasPackaging(snapshot.HasPackaging);
-
             // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
             // read now, and prices the line when it arrives).
             ComponentsTable.Restore(snapshot.Components);
@@ -203,7 +197,7 @@ public sealed partial class ProductsViewModel
                 {
                     RecipeTabChoice.Usage(var index) => RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
                     RecipeTabChoice.AddSubAssembly => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
-                    RecipeTabChoice.Packaging => PackagingTabIfShown,
+                    RecipeTabChoice.Packaging => PackagingTab,
                     RecipeTabChoice.Components => ComponentsTabIfShown,
                     null => null,
                 };
@@ -241,12 +235,6 @@ public sealed partial class ProductsViewModel
             UsageForm.FormFormulaBase = snapshot.FormFormulaBase;
             RestoreIngredientLines(UsageForm.FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
             RestoreIngredientLines(UsageForm.FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
-            UsageForm.FormPackagingLines.Clear();
-            foreach (var line in snapshot.FormPackagingLines)
-            {
-                UsageForm.FormPackagingLines.Add(RestoreLine(line));
-            }
-
             UsageForm.RestorePieceSize(snapshot.UsageAuthoredField, snapshot.UsageWeightPerPiece, snapshot.UsageYield);
 
             UsageForm.EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
@@ -259,7 +247,7 @@ public sealed partial class ProductsViewModel
         //    changed, bring everything into line" entry point: it raises what the form's tables show, works the
         //    derived piece-size figure out again, and runs the single ApplyFormulaBase pass that gives every row
         //    back its BaseWeight and BatchWeight.
-        UsageForm.RaisePackagingChanged();
+        UsageForm.RaiseKindChanged();
         FormLinesChanged();
         RecomputeCosts();
 

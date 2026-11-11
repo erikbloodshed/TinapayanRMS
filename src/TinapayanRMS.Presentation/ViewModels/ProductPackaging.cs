@@ -9,13 +9,20 @@ using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
+/// <summary>How the Packaging tab's picker takes the packaging picked: as a link, or as a copy of its lines.</summary>
+public enum PackagingSourceMode
+{
+    Link,
+    Copy,
+}
+
 /// <summary>
-/// The Products screen's Packaging tab, in its Recipe Structure (PackagingSectionView, through ProductsViewModel.Packaging):
-/// the per-piece packaging lines, typed straight into its table, or what they link (another product's
-/// packaging, or a set on the Sub-Assemblies screen), its bulk packaging (a box several units share, with how many it
-/// holds), a Move to Sub-Assemblies waiting for Save, and what was last loaded,
-/// which Save compares against. The screen keeps whether the product has packaging at all (HasPackaging, the tab), the
-/// undo history these are part of, and the commands that change them as undo steps.
+/// The Products screen's Packaging tab, always the Recipe Structure's last (PackagingSection, through
+/// ProductsViewModel.Packaging): the per-piece packaging lines, typed straight into its table, or what they link (a set
+/// on the Sub-Assemblies screen, or another product's packaging), the picker its Link and Copy open, its bulk packaging
+/// (a box several units share, with how many it holds), a Move to Sub-Assemblies waiting for Save, and what was last
+/// loaded, which Save compares against. The screen keeps the undo history these are part of, and the commands that
+/// change them as undo steps.
 /// </summary>
 /// <param name="findPackagingMaterial">A packaging material as the screen last loaded it, for a row that prices itself.</param>
 /// <param name="costBasis">The screen's cost basis, buffered or not, which a new row is priced at.</param>
@@ -137,6 +144,58 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// <summary>The packaging is the product's own lines, not on their way already: the Packaging tab offers Move to Sub-Assemblies.</summary>
     public bool CanMovePackaging => IsPackagingEditable && !IsPackagingMoving;
 
+    private PackagingSourceMode? _sourceMode;
+    /// <summary>
+    /// Link or Copy was pressed on the Packaging tab: a picker of what to link or copy (SourceOptions) stands in for the
+    /// two buttons until one is picked (PickedSource) or the pick is cancelled. Null while nothing is being picked.
+    /// </summary>
+    public PackagingSourceMode? SourceMode
+    {
+        get => _sourceMode;
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref _sourceMode, value);
+            this.RaisePropertyChanged(nameof(IsPickingSource));
+            this.RaisePropertyChanged(nameof(SourcePlaceholder));
+        }
+    }
+
+    public bool IsPickingSource => SourceMode is not null;
+
+    /// <summary>The picker's prompt, by what it's for.</summary>
+    public string SourcePlaceholder => SourceMode == PackagingSourceMode.Copy ? "Copy the packaging of…" : "Link a packaging set…";
+
+    /// <summary>
+    /// What the picker offers: to link, the Sub-Assemblies screen's packaging sets; to copy, those and every other
+    /// product's packaging.
+    /// </summary>
+    public ObservableCollection<LinkableSubAssemblyOption> SourceOptions { get; } = [];
+
+    private LinkableSubAssemblyOption? _pickedSource;
+    /// <summary>The packaging picked to link or copy: its lines load, and then fill the table (the screen's ApplyPackagingSourceAsync).</summary>
+    public LinkableSubAssemblyOption? PickedSource
+    {
+        get => _pickedSource;
+        set => this.RaiseAndSetIfChanged(ref _pickedSource, value);
+    }
+
+    /// <summary>Opens the picker for <paramref name="mode"/>, offering <paramref name="options"/>, nothing picked yet.</summary>
+    public void StartPickingSource(PackagingSourceMode mode, IEnumerable<LinkableSubAssemblyOption> options)
+    {
+        PickedSource = null;
+        SourceOptions.Clear();
+        SourceOptions.AddRange(options);
+        SourceMode = mode;
+    }
+
+    /// <summary>Closes the picker, picked or not.</summary>
+    public void EndPickingSource()
+    {
+        SourceMode = null;
+        PickedSource = null;
+        SourceOptions.Clear();
+    }
+
     private string _packagingLinkedToText = string.Empty;
     /// <summary>"Linked to Cream Loaf" or "Linked to Gift Box Set (Sub-Assemblies)", or empty while the product has its own packaging.</summary>
     public string PackagingLinkedToText
@@ -218,6 +277,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// <summary>No packaging, lines or link, no bulk packaging, and none saved: a new product's, or the details cleared for another's.</summary>
     public void Clear()
     {
+        EndPickingSource();
         LineEdits.Clear();
         LoadLink(null);
         _savedLines = [];

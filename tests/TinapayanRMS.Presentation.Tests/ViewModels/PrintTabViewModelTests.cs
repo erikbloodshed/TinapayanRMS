@@ -130,7 +130,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             []));
         await AddBoxAsync(productId);
         await SetCostingAsync(productId);
-        var products = await OpenProductsAsync("Ube Roll", vm => vm.UsageEdits.Count == 2 && vm.HasPackaging);
+        var products = await OpenProductsAsync("Ube Roll", vm => vm.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
 
         var screen = products.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
@@ -147,7 +147,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
         await AddBoxAsync(productId, unbufferedCost: 25m);
         await SetCostingAsync(productId);
-        var products = await OpenProductsAsync("Ensaymada", vm => vm.UsageEdits.Count == 1 && vm.HasPackaging);
+        var products = await OpenProductsAsync("Ensaymada", vm => vm.UsageEdits.Count == 1 && vm.Packaging.LineEdits.Count > 0);
         await products.ToggleCostBasisCommand.Execute();
         var tab = CreatePrintTab(products);
 
@@ -181,7 +181,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             Cancellation);
         await AddBoxAsync(boxId);
         await SetCostingAsync(boxId);
-        var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.HasPackaging);
+        var products = await OpenProductsAsync("Pasalubong Box", vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
 
         var screen = products.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
