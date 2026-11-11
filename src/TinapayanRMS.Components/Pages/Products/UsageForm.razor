@@ -104,7 +104,7 @@
                 <div id="usage-lines">
                     <IngredientLinesGrid @ref="_lines" Items="ViewModel.UsageForm.FormLines" NewItem="@(ViewModel.UsageForm.IsFormLinesEditable ? ViewModel.UsageForm.NewFormLine : null)" Ingredients="ViewModel.Ingredients"
                                          @bind-SelectedItem="ViewModel.UsageForm.SelectedFormLine" PercentHeader="@ViewModel.UsageForm.UsageFormPercentHeader"
-                                         ReadOnly="!ViewModel.UsageForm.IsFormLinesEditable" Basis="ViewModel.CostBasis" />
+                                         ReadOnly="!ViewModel.UsageForm.IsFormLinesEditable" />
                 </div>
                 <div class="lines-footer">
                     <p class="caption">@ViewModel.UsageForm.UsageFormBaseCaption</p>
@@ -128,7 +128,7 @@
                     </div>
                     <IngredientLinesGrid @ref="_addIns" Items="ViewModel.UsageForm.FormAddIns" NewItem="ViewModel.UsageForm.NewFormAddIn" Ingredients="ViewModel.Ingredients"
                                          @bind-SelectedItem="ViewModel.UsageForm.SelectedFormAddIn" PercentHeader="@ViewModel.UsageForm.UsageFormPercentHeader"
-                                         ShowBase="false" Basis="ViewModel.CostBasis" />
+                                         ShowBase="false" />
                     <div class="lines-footer">
                         <p class="caption">@ViewModel.UsageForm.UsageFormAddInsCaption</p>
                         <div class="button-row">

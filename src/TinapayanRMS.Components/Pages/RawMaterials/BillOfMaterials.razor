@@ -53,16 +53,9 @@
         </Header>
         <Row Context="row">
             <td>
-                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" PopupWidth="420px"
-                           Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id">
-                    <ItemTemplate Context="material">
-                        <span class="pick-columns">
-                            <span>@material.Name</span>
-                            <span class="muted">@material.Category?.Name</span>
-                            <span class="muted number">@material.BufferedCostPerBaseUnit.ToString("N4")</span>
-                        </span>
-                    </ItemTemplate>
-                </PickField>
+                @* Names alone, as a recipe line's picker lists them (IngredientLinesGrid). *@
+                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" PopupWidth="320px"
+                           Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id" />
             </td>
             <td><NumberField TValue="decimal?" Value="row.Grams" ValueChanged="v => row.Grams = v" Format="#,0.0###" Min="0" CssClass="cell-field" /></td>
             <td class="cell-number">@row.CostPerGram.ToString("N4")</td>
