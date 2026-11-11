@@ -612,28 +612,23 @@ input.e-input {
     padding-bottom: 0;
 }
 
-/* A picker's list (PickField). The theme marked the item Enter or Tab takes in #f5f5f5 on its #fafafa, which couldn't be
-   seen: it's a strong Sky tint with a deep Sky bar and bold ink, the item the box holds a pale one, and the one under the
-   mouse paler still. Each rule names the theme's own classes with it, to outweigh the theme's. */
-.e-dropdownbase .e-list-item.e-hover {
-    background: var(--color-sf-primary-lighter);
-    color: var(--heading-foreground);
+/* A picker's list (PickField). Every highlight in it looks the same: the pale Sky the screens' lists and tables mark
+   their selected row with, in the list's own ink and weight (the theme's, #f5f5f5 on the list's white, couldn't be
+   seen). The item Enter takes also has a deep Sky bar down its left side: the theme marks it e-item-focus (the first
+   item as the list opens on an empty box, the best match for what's typed) or e-active (the item the box holds as it
+   opens, the one Down or Up moved to), one item at a time. The item under the mouse (e-hover), which a click takes,
+   has the tint alone. Each rule names the theme's own classes with it, to outweigh the theme's. */
+.e-dropdownbase .e-list-item.e-hover,
+.e-dropdownbase .e-list-item.e-active,
+.e-dropdownbase .e-list-item.e-active.e-hover,
+.e-dropdownbase .e-list-item.e-item-focus {
+    background: var(--accent-soft);
+    color: var(--color-sf-content-text-color);
 }
 
 .e-dropdownbase .e-list-item.e-active,
-.e-dropdownbase .e-list-item.e-active.e-hover {
-    background: var(--accent-soft);
-    color: var(--accent-foreground);
-}
-
-.e-dropdownbase .e-list-item.e-item-focus,
-.e-dropdownbase .e-list-item.e-item-focus.e-hover,
-.e-dropdownbase .e-list-item.e-item-focus.e-active,
-.e-dropdownbase .e-list-item.e-item-focus.e-active.e-hover {
-    background: #b5e0f3;
+.e-dropdownbase .e-list-item.e-item-focus {
     box-shadow: inset 3px 0 0 var(--color-sf-primary-bg-color-selected);
-    color: var(--color-sf-primary-text-color);
-    font-weight: 600;
 }
 
 /* A grid's heading row, as tall as its rows (RowHeight). */
