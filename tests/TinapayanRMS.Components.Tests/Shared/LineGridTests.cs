@@ -3,6 +3,7 @@ using System.ComponentModel;
 using AwesomeAssertions;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -39,6 +40,22 @@ public class LineGridTests
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Cost)));
             }
         }
+    }
+
+    /// <summary>A screen's form as the table sees it: the undo steps it opens and closes, and how the lines stood in each.</summary>
+    private sealed class Form(ObservableCollection<Line> lines) : IUndoRecorder
+    {
+        public int FormVersion => 0;
+
+        public bool IsEditPending { get; set; }
+
+        public List<string?[]> Begun { get; } = [];
+
+        public int Ended { get; private set; }
+
+        public void BeginUndoStep() => Begun.Add([.. lines.Select(line => line.Name)]);
+
+        public void EndUndoStep() => Ended++;
     }
 
     private readonly ObservableCollection<Line> _lines = [new() { Name = "Flour" }, new() { Name = "Water" }];
@@ -175,6 +192,64 @@ public class LineGridTests
         picked = null;
         grid.Find("tr.add-row").Click();
         picked.Should().BeNull("Remove takes lines only");
+    }
+
+    [Test]
+    public async Task A_line_dropped_on_another_takes_its_place_as_one_undo_step_and_is_picked()
+    {
+        await using var context = AppServices.NewContext();
+        _lines.Add(new() { Name = "Salt" });
+        var form = new Form(_lines);
+        Line? picked = null;
+        var grid = Render(context, parameters => parameters
+            .Add(g => g.Reorderable, true)
+            .Add(g => g.SelectedItemChanged, line => picked = line)
+            .AddCascadingValue<IUndoRecorder>(form));
+        var flour = _lines[0];
+
+        // Flour, the first line, dropped on Salt, the third: the page's watch says so by the places it drew them at.
+        await grid.InvokeAsync(() => grid.Instance.MoveLine(0, 2));
+
+        _lines.Select(line => line.Name).Should().Equal("Water", "Salt", "Flour");
+        form.Begun.Should().ContainSingle().Which.Should().Equal("Flour", "Water", "Salt");
+        form.Ended.Should().Be(1);
+        picked.Should().BeSameAs(flour);
+        grid.FindAll("td.name").Select(cell => cell.TextContent).Should().Equal("Water", "Salt", "Flour", "");
+    }
+
+    [Test]
+    [Arguments(0, 0)]
+    [Arguments(0, 2)]
+    [Arguments(-1, 1)]
+    [Arguments(1, 5)]
+    public async Task A_drop_on_the_line_itself_or_where_no_line_is_moves_nothing(int from, int to)
+    {
+        await using var context = AppServices.NewContext();
+        var form = new Form(_lines);
+        var grid = Render(context, parameters => parameters.Add(g => g.Reorderable, true).AddCascadingValue<IUndoRecorder>(form));
+
+        // Two lines: the third place is the add row's.
+        await grid.InvokeAsync(() => grid.Instance.MoveLine(from, to));
+
+        _lines.Select(line => line.Name).Should().Equal("Flour", "Water");
+        form.Begun.Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task Only_the_lines_of_a_table_kept_in_order_are_dragged()
+    {
+        await using var context = AppServices.NewContext();
+
+        var ordered = Render(context, parameters => parameters.Add(g => g.Reorderable, true));
+        var unordered = Render(context);
+
+        ordered.FindAll("tbody td.row-header").Select(cell => cell.GetAttribute("data-drag")).Should().Equal("true", "true", null);
+        ordered.FindAll("[draggable]").Should().BeEmpty("the browser's own drag never drops in the window: the page's watch drags by the pointer");
+        unordered.FindAll("td.row-header[data-drag]").Should().BeEmpty();
+        context.JSInterop.Invocations.Count(i => i.Identifier == "tinapayan.watchLineDrag").Should().Be(2);
+
+        await unordered.InvokeAsync(() => unordered.Instance.MoveLine(0, 1));
+        _lines.Select(line => line.Name).Should().Equal("Flour", "Water");
     }
 
     [Test]

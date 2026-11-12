@@ -120,6 +120,178 @@ window.tinapayan = {
         }
     },
 
+    // Dragging a table's lines into order by their row headers (LineGrid): by the pointer, not the browser's own drag and
+    // drop, which the Windows web view never hands a drop back to the page from (WinUI's WebView2 starts the drag, and
+    // the page sees no dragover or drop, so a real mouse moved nothing). A press on a row header marked data-drag, moved
+    // a few pixels, drags its line; the line under the pointer shows where it would go (a bar above it when the line
+    // goes up, below when it goes down, the line dragged faded), and the release there tells the table
+    // (MoveLine(from, to), by the lines' places as drawn). Anywhere beside the table, a release on the line itself,
+    // Escape or a lost pointer moves nothing. Near the top or bottom of the pane that scrolls, the pane scrolls.
+    // Returns an object whose dispose() lets go of the table.
+    watchLineDrag(table, dotNet) {
+        if (!table) {
+            return { dispose() { } };
+        }
+        const threshold = 4;
+        const edge = 32;
+        let drag = null;
+
+        const lines = () => [...table.tBodies[0].rows].filter(row => row.querySelector(":scope > td.row-header[data-drag]"));
+        const scroller = () => {
+            for (let at = table.parentElement; at && at !== document.body; at = at.parentElement) {
+                const overflow = getComputedStyle(at).overflowY;
+                if ((overflow === "auto" || overflow === "scroll") && at.scrollHeight > at.clientHeight) {
+                    return at;
+                }
+            }
+            return null;
+        };
+        const unmark = () => table.querySelectorAll("tr.drop-above, tr.drop-below, tr.dragging-line")
+            .forEach(row => row.classList.remove("drop-above", "drop-below", "dragging-line"));
+
+        // The line the pointer is over, held to the first and last lines above and below them; none beside the table.
+        const targetAt = (x, y) => {
+            const box = table.getBoundingClientRect();
+            if (x < box.left || x > box.right) {
+                return null;
+            }
+            const rows = lines();
+            if (rows.length === 0) {
+                return null;
+            }
+            if (y < rows[0].getBoundingClientRect().top) {
+                return rows[0];
+            }
+            return rows.find(row => y < row.getBoundingClientRect().bottom) ?? rows[rows.length - 1];
+        };
+
+        const mark = () => {
+            unmark();
+            drag.source.classList.add("dragging-line");
+            const rows = lines();
+            const from = rows.indexOf(drag.source);
+            const target = targetAt(drag.x, drag.y);
+            const to = target ? rows.indexOf(target) : -1;
+            drag.to = to >= 0 && from >= 0 && to !== from ? to : -1;
+            drag.from = from;
+            if (drag.to >= 0) {
+                target.classList.add(drag.to < from ? "drop-above" : "drop-below");
+            }
+        };
+
+        const scroll = () => {
+            drag.frame = 0;
+            const pane = drag.pane;
+            if (!pane) {
+                return;
+            }
+            const box = pane.getBoundingClientRect();
+            const step = drag.y < box.top + edge ? -Math.ceil((box.top + edge - drag.y) / 4)
+                : drag.y > box.bottom - edge ? Math.ceil((drag.y - box.bottom + edge) / 4) : 0;
+            if (step !== 0) {
+                const before = pane.scrollTop;
+                pane.scrollTop += step;
+                if (pane.scrollTop !== before) {
+                    mark();
+                    drag.frame = requestAnimationFrame(scroll);
+                }
+            }
+        };
+
+        const end = drop => {
+            if (!drag) {
+                return;
+            }
+            const { header, pointerId, moving, from, to, frame } = drag;
+            drag = null;
+            cancelAnimationFrame(frame);
+            unmark();
+            table.classList.remove("dragging-lines");
+            document.removeEventListener("keydown", onKey, true);
+            if (header.hasPointerCapture(pointerId)) {
+                header.releasePointerCapture(pointerId);
+            }
+            if (drop && moving && from >= 0 && to >= 0) {
+                dotNet.invokeMethodAsync("MoveLine", from, to).catch(() => { });
+            }
+        };
+
+        const onKey = e => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                end(false);
+            }
+        };
+
+        const onDown = e => {
+            const header = e.button === 0 && !drag ? e.target.closest("td.row-header[data-drag]") : null;
+            if (!header || !table.tBodies[0].contains(header)) {
+                return;
+            }
+            drag = {
+                header, source: header.parentElement, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY,
+                x: e.clientX, y: e.clientY, moving: false, from: -1, to: -1, frame: 0, pane: null
+            };
+            header.setPointerCapture(e.pointerId);
+        };
+
+        const onMove = e => {
+            if (!drag || e.pointerId !== drag.pointerId) {
+                return;
+            }
+            drag.x = e.clientX;
+            drag.y = e.clientY;
+            if (!drag.moving) {
+                if (Math.abs(drag.x - drag.startX) < threshold && Math.abs(drag.y - drag.startY) < threshold) {
+                    return;
+                }
+                drag.moving = true;
+                drag.pane = scroller();
+                table.classList.add("dragging-lines");
+                document.addEventListener("keydown", onKey, true);
+            }
+            e.preventDefault();
+            mark();
+            if (!drag.frame) {
+                drag.frame = requestAnimationFrame(scroll);
+            }
+        };
+
+        const onUp = e => {
+            if (drag && e.pointerId === drag.pointerId) {
+                drag.x = e.clientX;
+                drag.y = e.clientY;
+                if (drag.moving) {
+                    mark();
+                }
+                end(true);
+            }
+        };
+
+        const onCancel = e => {
+            if (drag && e.pointerId === drag.pointerId) {
+                end(false);
+            }
+        };
+
+        table.addEventListener("pointerdown", onDown);
+        table.addEventListener("pointermove", onMove);
+        table.addEventListener("pointerup", onUp);
+        table.addEventListener("pointercancel", onCancel);
+        table.addEventListener("lostpointercapture", onCancel);
+        return {
+            dispose() {
+                end(false);
+                table.removeEventListener("pointerdown", onDown);
+                table.removeEventListener("pointermove", onMove);
+                table.removeEventListener("pointerup", onUp);
+                table.removeEventListener("pointercancel", onCancel);
+                table.removeEventListener("lostpointercapture", onCancel);
+            }
+        };
+    },
+
     // A picker shown by a look-alike until it has the cursor (PickField's Deferred), its combo box now made beside it,
     // unseen: the cursor goes to the combo box, the Vim keys' mode staying as it was (a move the keys made stays a move);
     // a press on the look-alike's arrow is a click into the picker, which starts typing, as a click on the combo box's own

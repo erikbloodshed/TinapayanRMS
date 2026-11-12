@@ -1,6 +1,6 @@
 @typeparam TRow where TRow : class
 @using System.Collections.ObjectModel
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 @* A table of lines typed straight into, as the WPF screens' editable SfDataGrids were (Purchase Cost Setup, Alternative
@@ -8,9 +8,10 @@
    showing the line picked (the one Remove takes). Under the lines, the add row (GridAddNewRow): a draft made by the
    ViewModel's factory, which joins the lines the moment anything is typed into it, and a new draft takes its place. A
    draft left untouched is never added. Where the order matters, a line is dragged by its row header to its new place
-   (GridRowReordering). Insert Line, or the Insert key while the table has the cursor, puts a blank line in above the one
+   (GridRowReordering), as one undo step: with the pointer, by app.js's watchLineDrag, since the Windows web view never
+   hands the page the browser's own drag and drop. Insert Line, or the Insert key while the table has the cursor, puts a blank line in above the one
    picked, or at the bottom with none (GridRowInserting), and its first cell takes the cursor. *@
-<table id="@_id" class="line-grid @CssClass @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
+<table @ref="_table" id="@_id" class="line-grid @CssClass @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
     <thead>
         <tr>
             <th class="row-header"></th>
@@ -24,10 +25,9 @@
         {
             var isDraft = ReferenceEquals(row, _draft);
             var events = EventsOf(row);
-            <tr @key="row" class="@(isDraft ? "add-row" : "") @(ReferenceEquals(row, SelectedItem) ? "selected" : "") @(ReferenceEquals(row, _dropTarget) ? "drop-target" : "")"
-                @onfocusin="events.Select" @onclick="events.Select"
-                @ondragover="events.DragOver" @ondragover:preventDefault="true" @ondrop="events.Drop" @ondrop:preventDefault="true">
-                <td class="row-header" draggable="@(Reorderable && !isDraft ? "true" : "false")" @ondragstart="events.DragStart" @ondragend="OnDragEnd"
+            <tr @key="row" class="@(isDraft ? "add-row" : "") @(ReferenceEquals(row, SelectedItem) ? "selected" : "")"
+                @onfocusin="events.Select" @onclick="events.Select">
+                <td class="row-header" data-drag="@(Reorderable && !isDraft ? "true" : null)"
                     title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
                     @if (isDraft)
                     {
@@ -63,9 +63,13 @@
 
 @code {
     private readonly string _id = "line-grid-" + Guid.NewGuid().ToString("N")[..8];
+    private ElementReference _table;
     private TRow? _draft;
-    private TRow? _dragging;
-    private TRow? _dropTarget;
+    private Drops? _drops;
+    private DotNetObjectReference<Drops>? _dropsReference;
+
+    /// <summary>The page's watch on the row headers' drags (app.js's watchLineDrag), let go with the table.</summary>
+    private IJSObjectReference? _dragWatch;
 
     /// <summary>The line just inserted, whose first cell takes the cursor once it's drawn.</summary>
     private int? _focusRow;
@@ -75,13 +79,14 @@
     // recreating delegates for many repeated elements). A line that's gone loses its own after the next drawing.
     private readonly Dictionary<object, RowEvents> _rowEvents = new(ReferenceEqualityComparer.Instance);
 
-    private sealed record RowEvents(Func<Task> Select, Action DragOver, Func<Task> Drop, Action DragStart);
+    // A drag is the page's own (watchLineDrag), so a row's one handler is its pick.
+    private sealed record RowEvents(Func<Task> Select);
 
     private RowEvents EventsOf(TRow row)
     {
         if (!_rowEvents.TryGetValue(row, out var events))
         {
-            events = new RowEvents(() => SelectAsync(row), () => OnDragOver(row), () => OnDropAsync(row), () => _dragging = row);
+            events = new RowEvents(() => SelectAsync(row));
             _rowEvents[row] = events;
         }
 
@@ -222,28 +227,31 @@
         }
     }
 
-    private void OnDragOver(TRow row) => _dropTarget = _dragging is not null && !ReferenceEquals(row, _dragging) ? row : null;
-
-    private void OnDragEnd()
+    /// <summary>
+    /// A line dragged by its row header and dropped on another (app.js's watchLineDrag): it takes that line's place, the
+    /// lines between moving up or down one, as one undo step, and it's the line picked. The places are the lines' as the
+    /// page last drew them; a drop on the line itself, or on a place there's no line at, moves nothing.
+    /// </summary>
+    public async Task MoveLine(int from, int to)
     {
-        _dragging = null;
-        _dropTarget = null;
-    }
-
-    private Task OnDropAsync(TRow target)
-    {
-        if (_dragging is { } dragging && Reorderable)
+        if (!Reorderable || from == to || from < 0 || to < 0 || from >= Items.Count || to >= Items.Count)
         {
-            var from = Items.IndexOf(dragging);
-            var to = Items.IndexOf(target);
-            if (from >= 0 && to >= 0 && from != to)
-            {
-                Items.Move(from, to);
-            }
+            return;
         }
 
-        OnDragEnd();
-        return Task.CompletedTask;
+        var line = Items[from];
+        Recorder?.BeginUndoStep();
+        try
+        {
+            Items.Move(from, to);
+        }
+        finally
+        {
+            Recorder?.EndUndoStep();
+        }
+
+        await SelectAsync(line);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -289,6 +297,13 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         ForgetGoneRows();
+        if (firstRender)
+        {
+            _drops = new Drops(MoveLine);
+            _dropsReference = DotNetObjectReference.Create(_drops);
+            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchLineDrag", _table, _dropsReference);
+        }
+
         if (_focusRow is { } row)
         {
             _focusRow = null;
@@ -296,9 +311,39 @@
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Unwatch();
         _rowEvents.Clear();
+        if (_dragWatch is not null)
+        {
+            try
+            {
+                await _dragWatch.InvokeVoidAsync("dispose");
+                await _dragWatch.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page has gone: nothing left to let go of.
+            }
+        }
+
+        _drops?.LetGo();
+        _dropsReference?.Dispose();
+    }
+
+    /// <summary>
+    /// What the page's drag watch calls with a drop: a go-between that lets go of the table as the table goes, so nothing
+    /// that kept the reference handed to the page (a disposed one still holds what it wraps) keeps the table, and a drop
+    /// arriving after the table has gone moves nothing.
+    /// </summary>
+    public sealed class Drops(Func<int, int, Task> move)
+    {
+        private Func<int, int, Task>? _move = move;
+
+        [JSInvokable]
+        public Task MoveLine(int from, int to) => _move?.Invoke(from, to) ?? Task.CompletedTask;
+
+        internal void LetGo() => _move = null;
     }
 }
