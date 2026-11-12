@@ -52,7 +52,7 @@ public sealed partial class ProductsViewModel
         {
             // A new composite named in the list keeps its row until it's saved: put back blank, it has none.
             EndNewProductRow();
-            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, _newProductCategoryId, IsEditingComposite);
+            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, NewProductFolderId, IsEditingComposite);
             return;
         }
 

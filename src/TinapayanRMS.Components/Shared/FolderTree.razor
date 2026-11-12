@@ -8,13 +8,15 @@
    Children), whether each folder is open (IsExpanded, kept through a refresh and between visits), and the rows picked
    (SelectedTreeNodes, which this changes as rows are clicked: alone, or with Ctrl or Shift). Clicking a folder opens or
    closes it. Rows that can be dragged are dragged onto a folder (or a row in one) to move them there, which the screen
-   saves at once. A right-click opens the menu for the row, or for the list in its empty space; F2 and Del do what the
-   row's menu shows beside them, Enter opens or closes a folder, and the arrows move through the rows. Where the screen
-   says (RenamesOnSecondClick), a slow second click on the row picked does what F2 does, as in File Explorer.
-   A row picked from elsewhere (a Save, Back) has its folders opened and is scrolled into view. *@
+   saves at once: with the pointer, by app.js's watchTreeDrag, which scrolls the list as the pointer nears its top or
+   bottom, since the Windows web view doesn't hand the browser's own drag and drop back to the page. A right-click opens
+   the menu for the row, or for the list in its empty space; F2, Del, Ctrl+X and Ctrl+V do what the row's menu shows
+   beside them, Esc what the screen gives it (Products: forgets what was cut), Enter opens or closes a folder, and the
+   arrows move through the rows. Where the screen says (RenamesOnSecondClick), a slow second click on the row picked does
+   what F2 does, as in File Explorer. A row picked from elsewhere (a Save, Back) has its folders opened and is scrolled
+   into view. *@
 <div @ref="_element" class="folder-tree" tabindex="0" role="tree" aria-multiselectable="true"
-     @onkeydown="OnKeyDown" @onfocusout="CancelSecondClick" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true"
-     @ondragover="OnListDragOver" @ondragover:preventDefault="true" @ondrop="OnListDrop" @ondrop:preventDefault="true">
+     @onkeydown="OnKeyDown" @onfocusout="CancelSecondClick" @oncontextmenu="OnListContextMenu" @oncontextmenu:preventDefault="true">
     @{
         _visible.Clear();
         _redraws?.Drawn();
@@ -41,9 +43,13 @@
     // The rename a slow second click on a row is waiting to make.
     private CancellationTokenSource? _secondClick;
 
-    // Dragging: the rows being dragged, and the row they're over.
+    // Dragging: the rows being dragged, and the row they're over; the page's watch on the drags (app.js's watchTreeDrag),
+    // and what it calls, let go with the tree.
     private IReadOnlyList<TNode> _dragging = [];
     private TNode? _dropTarget;
+    private Drags? _drags;
+    private DotNetObjectReference<Drags>? _dragsReference;
+    private IJSObjectReference? _dragWatch;
 
     // The folders' and rows' changes this tree listens to, so it redraws when a folder opens, a title changes or a
     // folder's rows change; added as rows appear, removed with the tree.
@@ -54,14 +60,9 @@
     // drawing, each would be a new handler the page swaps in, for every row of the list, each time anything on the screen
     // changes (ASP.NET Core's rendering guidance: avoid recreating delegates for many repeated elements).
     private readonly Dictionary<object, RowEvents> _rowEvents = new(ReferenceEqualityComparer.Instance);
-    private EventCallback<DragEventArgs>? _dragEnd;
 
-    private sealed record RowEvents(
-        EventCallback<MouseEventArgs> Click,
-        EventCallback<MouseEventArgs> ContextMenu,
-        EventCallback<DragEventArgs> DragStart,
-        EventCallback<DragEventArgs> DragOver,
-        EventCallback<DragEventArgs> Drop);
+    // A drag is the page's own (watchTreeDrag), so a row's handlers are its click and its menu.
+    private sealed record RowEvents(EventCallback<MouseEventArgs> Click, EventCallback<MouseEventArgs> ContextMenu);
 
     private RowEvents EventsOf(TNode node)
     {
@@ -69,10 +70,7 @@
         {
             events = new RowEvents(
                 EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowClick(node, e)),
-                EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)),
-                EventCallback.Factory.Create<DragEventArgs>(this, () => OnDragStart(node)),
-                EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDragOver(node)),
-                EventCallback.Factory.Create<DragEventArgs>(this, () => OnRowDrop(node)));
+                EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)));
             _rowEvents[node] = events;
         }
 
@@ -107,8 +105,8 @@
     [Parameter] public Func<TNode, bool>? CanDrag { get; set; }
 
     /// <summary>
-    /// Whether a row's name is being typed in place (a TreeNameBox in its RowTemplate): it isn't dragged, since a row
-    /// that can be keeps the mouse from selecting the text in it, and a click, F2 or Del on it does nothing.
+    /// Whether a row's name is being typed in place (a TreeNameBox in its RowTemplate): it isn't dragged, so the mouse
+    /// selects the text in it, and a click, F2, Del, Ctrl+X or Ctrl+V on it does nothing.
     /// </summary>
     [Parameter] public Func<TNode, bool>? IsEditing { get; set; }
 
@@ -156,6 +154,7 @@
             + (isSelected ? " selected" : "")
             + (isEditing ? " editing" : "")
             + (ReferenceEquals(node, _dropTarget) ? " drop-target" : "")
+            + (_dragging.Contains(node) ? " dragging" : "")
             + (RowClass?.Invoke(node) is { } extra ? " " + extra : "");
 
         var seq = 0;
@@ -171,7 +170,13 @@
         }
 
         builder.AddAttribute(seq++, "style", $"padding-left:{8 + depth * 18}px");
-        builder.AddAttribute(seq++, "draggable", draggable ? "true" : "false");
+        // What the page's watch drags (watchTreeDrag). Never the browser's own drag, which the web view keeps.
+        builder.AddAttribute(seq++, "draggable", "false");
+        if (draggable)
+        {
+            builder.AddAttribute(seq++, "data-drag", "true");
+        }
+
         var events = EventsOf(node);
         builder.AddAttribute(seq++, "onclick", events.Click);
         builder.AddAttribute(seq++, "oncontextmenu", events.ContextMenu);
@@ -180,18 +185,6 @@
         // The row's own, because the list's is never reached: stopping the event here stops it before the list's
         // preventDefault, and the browser's menu opened over this one.
         builder.AddEventPreventDefaultAttribute(seq++, "oncontextmenu", true);
-        if (draggable)
-        {
-            builder.AddAttribute(seq++, "ondragstart", events.DragStart);
-            builder.AddAttribute(seq++, "ondragend", _dragEnd ??= EventCallback.Factory.Create<DragEventArgs>(this, OnDragEnd));
-        }
-
-        builder.AddAttribute(seq++, "ondragover", events.DragOver);
-        builder.AddEventStopPropagationAttribute(seq++, "ondragover", true);
-        builder.AddEventPreventDefaultAttribute(seq++, "ondragover", true);
-        builder.AddAttribute(seq++, "ondrop", events.Drop);
-        builder.AddEventStopPropagationAttribute(seq++, "ondrop", true);
-        builder.AddEventPreventDefaultAttribute(seq++, "ondrop", true);
 
         builder.OpenElement(seq++, "span");
         builder.AddAttribute(seq++, "class", isFolder && children!.Count > 0 ? (isOpen ? OpenExpander : ClosedExpander) : "tree-expander glyph");
@@ -231,6 +224,9 @@
         if (firstRender)
         {
             await JS.InvokeVoidAsync("tinapayan.preventKeys", _element, new[] { "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", " " });
+            _drags = new Drags(this);
+            _dragsReference = DotNetObjectReference.Create(_drags);
+            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTreeDrag", _element, _dragsReference);
         }
 
         var first = Selected.Count > 0 ? Selected[0] : null;
@@ -420,12 +416,26 @@
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         CancelSecondClick();
+        var current = Selected.Count > 0 ? Selected[0] as TNode : null;
+        var isEditing = current is not null && IsEditing?.Invoke(current) == true;
+
+        // Cut and paste, as in a file explorer: what the menu of the row picked shows beside Ctrl+X and Ctrl+V. Not in the
+        // name box, whose own cut and paste they are.
+        if (e.CtrlKey && !e.AltKey && !e.ShiftKey && !e.MetaKey && e.Key.ToUpperInvariant() is "X" or "V")
+        {
+            if (!isEditing)
+            {
+                RunShortcut("Ctrl+" + e.Key.ToUpperInvariant());
+            }
+
+            return;
+        }
+
         if (e.CtrlKey || e.AltKey || e.MetaKey)
         {
             return;
         }
 
-        var current = Selected.Count > 0 ? Selected[0] as TNode : null;
         switch (e.Key)
         {
             case "ArrowDown" or "ArrowUp" or "Home" or "End":
@@ -460,12 +470,11 @@
             case "Enter" or " " when current is not null && ChildrenOf(current) is not null:
                 SetExpanded(current, !IsExpanded(current));
                 break;
-            case "F2" or "Delete" when current is null || IsEditing?.Invoke(current) != true:
-                if (Shortcut?.Invoke(e.Key == "F2" ? "F2" : "Del") is { Command: { } command } item && command.CanExecute(item.Parameter))
-                {
-                    command.Execute(item.Parameter);
-                }
-
+            case "F2" or "Delete" when !isEditing:
+                RunShortcut(e.Key == "F2" ? "F2" : "Del");
+                break;
+            case "Escape" when !isEditing:
+                RunShortcut("Esc");
                 break;
             case "ContextMenu" when current is not null && MenuFor is not null && _menu is not null:
                 await _menu.OpenAsync(MenuFor(current), 200, 200);
@@ -473,10 +482,32 @@
         }
     }
 
-    private void OnDragStart(TNode node)
+    /// <summary>Runs what the row picked's menu shows beside <paramref name="gesture"/> (TreeShortcut), if it can run.</summary>
+    private void RunShortcut(string gesture)
+    {
+        if (Shortcut?.Invoke(gesture) is { Command: { } command } item && command.CanExecute(item.Parameter))
+        {
+            command.Execute(item.Parameter);
+        }
+    }
+
+    /// <summary>The row drawn with this element's id, or null for none (the list's empty space, or a row gone since).</summary>
+    private TNode? RowOf(string? elementId) =>
+        elementId is null ? null : _visible.FirstOrDefault(n => ElementId(n) == elementId);
+
+    /// <summary>
+    /// A drag begun on the row with this element's id (watchTreeDrag): a row that's picked drags every row picked that can
+    /// be dragged; any other is picked alone and drags alone. Returns how many rows it drags, which the page's ghost of
+    /// them shows; none when that row can't be dragged.
+    /// </summary>
+    internal int StartDrag(string elementId)
     {
         CancelSecondClick();
-        // Dragging a row that's picked drags every row picked that can be dragged; any other drags alone.
+        if (RowOf(elementId) is not { } node || CanDrag?.Invoke(node) != true)
+        {
+            return 0;
+        }
+
         if (!Selected.Contains(node))
         {
             _pickedHere = true;
@@ -484,38 +515,86 @@
         }
 
         _dragging = [.. Selected.OfType<TNode>().Where(n => CanDrag?.Invoke(n) == true)];
+        StateHasChanged();
+        return _dragging.Count;
     }
 
-    private void OnDragEnd()
+    /// <summary>
+    /// The rows dragged are over this row (null: the list's empty space): it's marked when they can drop there. Returns
+    /// whether they can, which the page's ghost says ("Move to Cakes").
+    /// </summary>
+    internal bool DragOver(string? elementId)
     {
-        _dragging = [];
-        _dropTarget = null;
-    }
-
-    private void OnRowDragOver(TNode node)
-    {
-        var target = _dragging.Count > 0 && CanDrop?.Invoke(_dragging, node) == true ? node : null;
+        var over = RowOf(elementId);
+        var target = over is not null && _dragging.Count > 0 && CanDrop?.Invoke(_dragging, over) == true ? over : null;
         if (!ReferenceEquals(target, _dropTarget))
         {
             _dropTarget = target;
+            StateHasChanged();
         }
+
+        return target is not null;
     }
 
-    private void OnListDragOver() => _dropTarget = null;
-
-    private async Task OnRowDrop(TNode node) => await DropAsync(node);
-
-    private async Task OnListDrop() => await DropAsync(null);
-
-    private async Task DropAsync(TNode? target)
+    /// <summary>The rows dragged let go on this row, or on the list's empty space (null): they move, if they can.</summary>
+    internal async Task DropAsync(string? elementId)
     {
         var dragging = _dragging;
-        _dragging = [];
-        _dropTarget = null;
+        var target = RowOf(elementId);
+        EndDrag();
         if (dragging.Count > 0 && OnDrop is not null && CanDrop?.Invoke(dragging, target) == true)
         {
             await OnDrop(dragging, target);
         }
+    }
+
+    /// <summary>The drag ends with nothing dropped: let go beside the list, Escape, or the pointer lost.</summary>
+    internal void EndDrag()
+    {
+        if (_dragging.Count > 0 || _dropTarget is not null)
+        {
+            _dragging = [];
+            _dropTarget = null;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// What the page's drag watch calls: a go-between that lets go of the tree as the tree goes, so nothing that kept the
+    /// reference handed to the page keeps the tree, and a drop arriving after the tree has gone moves nothing.
+    /// </summary>
+    public sealed class Drags(FolderTree<TNode> tree)
+    {
+        private FolderTree<TNode>? _tree = tree;
+
+        /// <summary>How many rows the drag takes: none when it can't start there.</summary>
+        [JSInvokable]
+        public Task<int> Start(string elementId) => Ask(t => t.StartDrag(elementId));
+
+        /// <summary>Whether the rows dragged can drop on that row.</summary>
+        [JSInvokable]
+        public Task<bool> Over(string? elementId) => Ask(t => t.DragOver(elementId));
+
+        [JSInvokable]
+        public Task Drop(string? elementId) => _tree is { } tree ? tree.InvokeAsync(() => tree.DropAsync(elementId)) : Task.CompletedTask;
+
+        [JSInvokable]
+        public Task Cancel() => Run(t => t.EndDrag());
+
+        private Task Run(Action<FolderTree<TNode>> action) => _tree is { } tree ? tree.InvokeAsync(() => action(tree)) : Task.CompletedTask;
+
+        private async Task<T> Ask<T>(Func<FolderTree<TNode>, T> question)
+        {
+            var answer = default(T)!;
+            if (_tree is { } tree)
+            {
+                await tree.InvokeAsync(() => answer = question(tree));
+            }
+
+            return answer;
+        }
+
+        internal void LetGo() => _tree = null;
     }
 
     private void Watch(TNode node)
@@ -541,7 +620,7 @@
 
     private RedrawGate Redraws => _redraws ??= new RedrawGate(InvokeAsync, StateHasChanged);
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         CancelSecondClick();
         foreach (var unwatch in _watched.Values)
@@ -551,6 +630,20 @@
 
         _watched.Clear();
         _rowEvents.Clear();
-        return ValueTask.CompletedTask;
+        if (_dragWatch is not null)
+        {
+            try
+            {
+                await _dragWatch.InvokeVoidAsync("dispose");
+                await _dragWatch.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page has gone: nothing left to let go of.
+            }
+        }
+
+        _drags?.LetGo();
+        _dragsReference?.Dispose();
     }
 }

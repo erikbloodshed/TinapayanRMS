@@ -322,13 +322,16 @@ public class FolderTreeTests
 
         var row = tree.FindAll(".tree-row")[2];
         row.ClassList.Should().Contain("editing");
-        row.GetAttribute("draggable").Should().Be("false", "a row that can be dragged keeps the mouse from selecting its text");
-        tree.FindAll(".tree-row")[1].GetAttribute("draggable").Should().Be("true");
+        row.HasAttribute("data-drag").Should().BeFalse("a row that can be dragged keeps the mouse from selecting its text");
+        tree.FindAll(".tree-row")[1].GetAttribute("data-drag").Should().Be("true");
+        tree.FindAll(".tree-row").Should().OnlyContain(r => r.GetAttribute("draggable") == "false", "the page's watch drags, not the browser");
 
         var input = tree.Find(".tree-row.editing input");
         await input.KeyDownAsync(Key.Down);
         await input.KeyDownAsync(Key.Home);
         await input.KeyDownAsync(new KeyboardEventArgs { Key = "F2" });
+        await input.KeyDownAsync(new KeyboardEventArgs { Key = "v", CtrlKey = true });
+        await input.KeyDownAsync(new KeyboardEventArgs { Key = "x", CtrlKey = true });
         _selected.Should().BeEmpty("the keys are the box's");
         shortcuts.Should().Be(0);
 
@@ -337,7 +340,104 @@ public class FolderTreeTests
 
         _selected.Add(pandesal);
         await tree.Find(".folder-tree").KeyDownAsync(new KeyboardEventArgs { Key = "F2" });
-        shortcuts.Should().Be(0, "F2 on the row being named renames nothing more");
+        await tree.Find(".folder-tree").KeyDownAsync(new KeyboardEventArgs { Key = "v", CtrlKey = true });
+        shortcuts.Should().Be(0, "F2 on the row being named renames nothing more, and Ctrl+V pastes into the box alone");
+    }
+
+    [Test]
+    public async Task Ctrl_X_Ctrl_V_and_Esc_do_what_the_screen_gives_them()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var asked = new List<string>();
+        var tree = context.Render<FolderTree<Node>>(parameters => parameters
+            .Add(t => t.Roots, [_breads, _cakes])
+            .Add(t => t.ChildrenOf, node => node.Children)
+            .Add(t => t.IsExpanded, node => node.IsExpanded)
+            .Add(t => t.SetExpanded, (node, open) => node.IsExpanded = open)
+            .Add(t => t.Selected, _selected)
+            .Add(t => t.KeyOf, node => node.Name)
+            .Add(t => t.Shortcut, gesture =>
+            {
+                asked.Add(gesture);
+                return null;
+            })
+            .Add(t => t.RowTemplate, node => $"<span class=\"title\">{node.Name}</span>"));
+        _selected.Add(_breads.Children![1]);
+        var list = tree.Find(".folder-tree");
+
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "x", CtrlKey = true });
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "V", CtrlKey = true });
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "Escape" });
+        await list.KeyDownAsync(new KeyboardEventArgs { Key = "v", CtrlKey = true, ShiftKey = true });
+
+        asked.Should().Equal("Ctrl+X", "Ctrl+V", "Esc");
+    }
+
+    [Test]
+    public async Task A_drag_from_the_page_marks_what_it_drags_and_where_it_can_drop_and_drops_there()
+    {
+        await using var context = AppServices.NewContext();
+        _breads.IsExpanded = true;
+        var asado = _breads.Children![0];
+        var pandesal = _breads.Children![1];
+        List<(IReadOnlyList<Node> Dragged, Node? Target)> drops = [];
+        var tree = context.Render<FolderTree<Node>>(parameters => parameters
+            .Add(t => t.Roots, [_breads, _cakes])
+            .Add(t => t.ChildrenOf, node => node.Children)
+            .Add(t => t.IsExpanded, node => node.IsExpanded)
+            .Add(t => t.SetExpanded, (node, open) => node.IsExpanded = open)
+            .Add(t => t.Selected, _selected)
+            .Add(t => t.KeyOf, node => node.Name.TrimEnd('/'))
+            .Add(t => t.CanDrag, node => node.Children is null)
+            .Add(t => t.CanDrop, (_, target) => target == _cakes)
+            .Add(t => t.OnDrop, (dragged, target) =>
+            {
+                drops.Add((dragged, target));
+                return Task.CompletedTask;
+            })
+            .Add(t => t.RowTemplate, node => $"<span class=\"title\">{node.Name}</span>"));
+        var drags = new FolderTree<Node>.Drags(tree.Instance);
+        string ClassOf(string id) => tree.Find("#" + id).GetAttribute("class")!;
+
+        // Asado Roll picked with Pandesal, then Pandesal dragged: both go.
+        _selected.AddRange([asado, pandesal]);
+        (await drags.Start("tree-Pandesal")).Should().Be(2, "the page's ghost shows how many go");
+        ClassOf("tree-Pandesal").Should().Contain("dragging");
+        ClassOf("tree-Asado-Roll").Should().Contain("dragging");
+
+        (await drags.Over("tree-Breads")).Should().BeFalse();
+        ClassOf("tree-Breads").Should().NotContain("drop-target", "nothing can drop there");
+        (await drags.Over("tree-Cakes")).Should().BeTrue("the page's ghost says where they'd go");
+        ClassOf("tree-Cakes").Should().Contain("drop-target");
+        await drags.Over(null);
+        ClassOf("tree-Cakes").Should().NotContain("drop-target", "the list's empty space is no row to mark");
+
+        await drags.Drop("tree-Cakes");
+
+        drops.Should().ContainSingle();
+        drops[0].Dragged.Should().Equal(asado, pandesal);
+        drops[0].Target.Should().BeSameAs(_cakes);
+        tree.FindAll(".tree-row.dragging, .tree-row.drop-target").Should().BeEmpty();
+
+        // A row outside the rows picked is picked alone and dragged alone; let go beside the list, it drops nothing.
+        _selected.Clear();
+        _selected.Add(pandesal);
+        await drags.Start("tree-Asado-Roll");
+        _selected.Should().Equal(asado);
+        await drags.Over("tree-Cakes");
+        await drags.Cancel();
+        await drags.Drop("tree-Cakes");
+
+        drops.Should().ContainSingle("a drag ended drops nothing more");
+        tree.FindAll(".tree-row.dragging, .tree-row.drop-target").Should().BeEmpty();
+
+        // A folder can't be dragged here, and a row gone since drops nothing.
+        (await drags.Start("tree-Breads")).Should().Be(0, "nothing follows the pointer from a row that can't be dragged");
+        await drags.Drop("tree-Cakes");
+        await drags.Start("tree-Gone");
+        await drags.Drop("tree-Cakes");
+        drops.Should().ContainSingle();
     }
 
     /// <summary>What F2 runs, counted.</summary>

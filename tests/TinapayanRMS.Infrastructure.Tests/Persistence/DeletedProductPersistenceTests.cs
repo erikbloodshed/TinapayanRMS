@@ -61,7 +61,8 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         var cakes = new ProductCategory { Name = "Cakes" };
         await new ProductCategoryRepository(CreateDbContextFactory()).AddAsync(cakes, Cancellation);
         var productId = await AddProductAsync("Mamon");
-        await CreateRepository().MoveAsync([new ProductMove(productId, ProductStage.Production, cakes.Id)], Cancellation);
+        await CreateRepository().MoveAsync([new ProductMove(productId, ProductStage.Production, null)], Cancellation);
+        await CreateRepository().UpdateAsync(new Product { Id = productId, Name = "Mamon", CategoryId = cakes.Id }, Cancellation);
         await CreateRepository().DeleteAsync(productId, Cancellation);
         await new ProductCategoryRepository(CreateDbContextFactory()).DeleteAsync(cakes.Id, Cancellation);
 

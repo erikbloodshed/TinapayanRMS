@@ -27,38 +27,40 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     public void Each_choice_reads_as_its_label()
     {
         // What a screen reader says for the dropdown's choice. A record case's own ToString would say "Folder { Label = … }".
-        PrintScope[] scopes = [new PrintScope.ThisProduct(), new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.Production)), new PrintScope.AllProducts()];
+        PrintScope[] scopes = [new PrintScope.ThisProduct(), PrintScope.Folder.Of(ProductFolderNode.ForStage(ProductStage.Production)), new PrintScope.AllProducts()];
 
         scopes.Select(s => s.ToString()).Should().Equal(scopes.Select(s => s.Label));
         scopes.Select(s => s.Label).Should().NotContain(label => label.Contains('{'));
     }
 
     [Test]
-    public Task A_category_folder_prints_its_products_in_the_lists_order_under_its_title() => UiThread.RunAsync(async () =>
+    public Task A_folder_prints_its_products_and_those_of_the_folders_in_it_in_the_lists_order_under_its_path() => UiThread.RunAsync(async () =>
     {
         var (breads, _) = await AddCatalogueAsync();
-        var tab = CreatePrintTab(await OpenProductsAsync());
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
 
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.Execute();
 
-        tab.PrintSet!.Title.Should().Be("Breads · Production");
+        tab.PrintSet!.Title.Should().Be("Production › Breads");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco");
         tab.PrintSet.Products.Should().OnlyContain(p => p.SaveNote == null, "a set prints as saved");
         tab.Note.Should().BeNull();
     });
 
     [Test]
-    public Task Uncategorized_and_a_stage_hold_what_the_list_files_under_them() => UiThread.RunAsync(async () =>
+    public Task A_stage_holds_every_product_in_it_whatever_its_folder() => UiThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
-        var tab = CreatePrintTab(await OpenProductsAsync());
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
 
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.Uncategorized(ProductStage.Production)));
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.StageFolder(ProductStage.Production)));
         await tab.LoadCommand.Execute();
-        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Loaf");
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf");
 
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForStage(ProductStage.Innovation)));
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.StageFolder(ProductStage.Innovation)));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Title.Should().Be("Innovation");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
@@ -82,13 +84,45 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     public Task A_folder_asked_for_is_offered_beside_This_product_and_All_products_in_place_of_the_last() => UiThread.RunAsync(async () =>
     {
         var (breads, cakes) = await AddCatalogueAsync();
-        var tab = CreatePrintTab(await OpenProductsAsync());
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
 
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, breads)));
-        tab.Pick(new PrintScope.Folder(ProductFolderNode.ForCategory(ProductStage.Production, cakes)));
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
 
-        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Cakes · Production", "All products");
-        tab.SelectedScope.Label.Should().Be("Cakes · Production");
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Production › Cakes", "All products");
+        tab.SelectedScope.Label.Should().Be("Production › Cakes");
+
+        // The same folder asked for again is the same choice, left as it is.
+        var chosen = tab.SelectedScope;
+        var changes = 0;
+        tab.PropertyChanged += (_, e) => changes += e.PropertyName == nameof(PrintTabViewModel.SelectedScope) ? 1 : 0;
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
+        tab.SelectedScope.Should().BeSameAs(chosen);
+        tab.Scopes.Should().HaveCount(3);
+        changes.Should().Be(0);
+    });
+
+    [Test]
+    public Task A_folder_prints_a_folder_made_in_it_after_it_was_picked() => UiThread.RunAsync(async () =>
+    {
+        var (breads, _) = await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+
+        var holiday = new ProductFolder { Name = "Holiday", Stage = ProductStage.Production, ParentId = breads.Id };
+        await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(holiday, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Add(new Product { Name = "Bibingka", Stage = ProductStage.Production, FolderId = holiday.Id });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await products.LoadCommand.Execute();
+        await tab.LoadCommand.Execute();
+
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Bibingka", "Cheese Roll", "Pan de Coco");
     });
 
     [Test]
@@ -196,18 +230,29 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     /// Two categories and five products: Production's Breads (Pan de Coco, Cheese Roll), Cakes (Mocha Roll) and Uncategorized
     /// (Loaf), and Innovation's Breads (Test Bread). Named out of order, so the list's order is the test's.
     /// </summary>
-    private async Task<(ProductCategory Breads, ProductCategory Cakes)> AddCatalogueAsync()
+    /// <summary>
+    /// Production › Breads (Pan de Coco) › Rolls (Cheese Roll), Production › Cakes (Mocha Roll), Loaf at the top of
+    /// Production, and Innovation › Breads (Test Bread). The categories say something else, as they may.
+    /// </summary>
+    private async Task<(ProductFolder Breads, ProductFolder Cakes)> AddCatalogueAsync()
     {
         await using var dbContext = CreateDbContext();
-        var cakes = new ProductCategory { Name = "Cakes" };
-        var breads = new ProductCategory { Name = "Breads" };
-        dbContext.ProductCategories.AddRange(cakes, breads);
+        var category = new ProductCategory { Name = "Baked" };
+        var breads = new ProductFolder { Name = "Breads", Stage = ProductStage.Production };
+        var cakes = new ProductFolder { Name = "Cakes", Stage = ProductStage.Production };
+        var newBreads = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
+        dbContext.ProductCategories.Add(category);
+        dbContext.ProductFolders.AddRange(breads, cakes, newBreads);
+        await dbContext.SaveChangesAsync(Cancellation);
+        var rolls = new ProductFolder { Name = "Rolls", Stage = ProductStage.Production, ParentId = breads.Id };
+        dbContext.ProductFolders.Add(rolls);
+        await dbContext.SaveChangesAsync(Cancellation);
         dbContext.Products.AddRange(
-            new Product { Name = "Pan de Coco", Stage = ProductStage.Production, Category = breads },
-            new Product { Name = "Test Bread", Stage = ProductStage.Innovation, Category = breads },
-            new Product { Name = "Mocha Roll", Stage = ProductStage.Production, Category = cakes },
+            new Product { Name = "Pan de Coco", Stage = ProductStage.Production, FolderId = breads.Id, Category = category },
+            new Product { Name = "Test Bread", Stage = ProductStage.Innovation, FolderId = newBreads.Id, Category = category },
+            new Product { Name = "Mocha Roll", Stage = ProductStage.Production, FolderId = cakes.Id },
             new Product { Name = "Loaf", Stage = ProductStage.Production },
-            new Product { Name = "Cheese Roll", Stage = ProductStage.Production, Category = breads });
+            new Product { Name = "Cheese Roll", Stage = ProductStage.Production, FolderId = rolls.Id, Category = category });
         await dbContext.SaveChangesAsync(Cancellation);
         return (breads, cakes);
     }
@@ -301,6 +346,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             new RawMaterialRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductFolderRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),

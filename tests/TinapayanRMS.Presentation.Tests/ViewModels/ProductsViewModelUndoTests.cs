@@ -824,6 +824,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             new RawMaterialRepository(factory),
             new RawMaterialCategoryRepository(factory),
             new ProductCategoryRepository(factory),
+            new ProductFolderRepository(factory),
             new ProductVersionRepository(factory),
             new ProductValidator(),
             new CostingParametersValidator(),

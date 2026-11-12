@@ -143,24 +143,60 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         }
 
         // Checked rather than left to the foreign key, whose refusal would read as a duplicate name: a move undone after
-        // the category it came from was deleted.
-        var categoryIds = moves.Select(m => m.CategoryId).OfType<int>().Distinct().ToList();
-        if (categoryIds.Count > 0
-            && await dbContext.ProductCategories.CountAsync(c => categoryIds.Contains(c.Id), cancellationToken) < categoryIds.Count)
+        // the folder it came from was deleted.
+        var folderIds = moves.Select(m => m.FolderId).OfType<int>().Distinct().ToList();
+        var folders = await dbContext.ProductFolders.AsNoTracking().Where(f => folderIds.Contains(f.Id)).ToDictionaryAsync(f => f.Id, cancellationToken);
+        if (folderIds.Any(id => !folders.ContainsKey(id)))
         {
-            throw new BusinessRuleException("The category to move it to no longer exists.");
+            throw new BusinessRuleException(ProductFolderRules.MissingFolderMessage);
         }
 
         var now = dbContext.LocalNow();
         foreach (var move in moves)
         {
+            if (move.FolderId is { } folderId)
+            {
+                ProductFolderRepository.EnsureSameStage(folders[folderId].Stage, move.Stage);
+            }
+
             var product = products[move.ProductId];
             product.Stage = move.Stage;
-            product.CategoryId = move.CategoryId;
+            product.FolderId = move.FolderId;
             product.UpdatedAt = now;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
+        var ids = productIds.Distinct().ToList();
+        var products = await dbContext.Products.Where(p => ids.Contains(p.Id)).OrderBy(p => p.Id).ToListAsync(cancellationToken);
+        if (ids.Where(id => products.All(p => p.Id != id)).ToList() is [var missingId, ..])
+        {
+            throw new BusinessRuleException($"Product {missingId} does not exist.");
+        }
+
+        // Each product goes to the folder at its own folder's path in the other stage, made if it isn't there.
+        var folders = await dbContext.ProductFolders.AsNoTracking().ToListAsync(cancellationToken);
+        List<int> made = [];
+        List<ProductMove> moves = [];
+        var now = dbContext.LocalNow();
+        foreach (var product in products.Where(p => p.Stage != stage))
+        {
+            var folderId = await ProductFolderRepository.EnsurePathAsync(
+                dbContext, stage, ProductFolderRules.PathOf(folders, product.FolderId), made, cancellationToken);
+            product.Stage = stage;
+            product.FolderId = folderId;
+            product.UpdatedAt = now;
+            moves.Add(new ProductMove(product.Id, stage, folderId));
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new StageMove(moves, made);
     }
 
     public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
@@ -206,8 +242,8 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
 
         // A copy of the form's fields: the caller's entity is never attached, and never given an id by
-        // a save that then rolls back. The stage is only a new product's: a saved one's changes by moving it. So is
-        // whether it's a composite, which a saved one keeps (UpdateAsync refuses another).
+        // a save that then rolls back. The stage and folder are only a new product's: a saved one's change by moving it.
+        // So is whether it's a composite, which a saved one keeps (UpdateAsync refuses another).
         var fields = new Product
         {
             Id = product.Id,
@@ -217,6 +253,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             QuantityRequired = product.QuantityRequired,
             CurrentPrice = product.CurrentPrice,
             Stage = product.Stage,
+            FolderId = product.FolderId,
             IsComposite = product.IsComposite,
             IncludesComponentPackaging = product.IncludesComponentPackaging,
         };
@@ -382,11 +419,22 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
 
     /// <summary>
     /// Adds <paramref name="product"/>, stamped as saved now, and saves it: the product gets its id. Returns it, tracked.
-    /// A composite is one sellable unit.
+    /// A composite is one sellable unit. Filed in a folder, it's in that folder's stage; a folder deleted meanwhile files it
+    /// at the top of its stage.
     /// </summary>
     internal static async Task<Product> AddAsync(TinapayanRMSDbContext dbContext, Product product, CancellationToken cancellationToken)
     {
         product.Name = ProductRules.StoredName(product.Name);
+        if (product.FolderId is { } folderId)
+        {
+            var folderStage = await dbContext.ProductFolders
+                .Where(f => f.Id == folderId)
+                .Select(f => (ProductStage?)f.Stage)
+                .FirstOrDefaultAsync(cancellationToken);
+            product.FolderId = folderStage is null ? null : folderId;
+            product.Stage = folderStage ?? product.Stage;
+        }
+
         CompositeProductRules.EnsureOneUnit(product.IsComposite, product.QuantityRequired);
         CompositeProductRules.EnsureComponentPackagingOnComposite(product.IsComposite, product.IncludesComponentPackaging);
         await EnsureNameNotHeldByDeletedAsync(dbContext, 0, product.Name, cancellationToken);

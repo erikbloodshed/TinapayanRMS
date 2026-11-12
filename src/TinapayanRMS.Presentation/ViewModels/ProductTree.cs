@@ -20,7 +20,7 @@ public closed class ProductTreeNode : ReactiveObject
 
     public abstract bool IsFolder { get; }
 
-    /// <summary>One of the two top-level folders, Production and Innovation, which hold the category folders.</summary>
+    /// <summary>One of the two top-level folders, Production and Innovation, which hold the user's folders.</summary>
     public abstract bool IsStage { get; }
 
     /// <summary>A row at the top of the list, shown in bold: a stage's folder, or the Deleted folder.</summary>
@@ -42,17 +42,17 @@ public closed class ProductTreeNode : ReactiveObject
 }
 
 /// <summary>
-/// A folder of the Products list: a stage's (Production, Innovation), or a product category's inside
-/// one, or the stage's Uncategorized; or the Deleted folder after the stages, holding the deleted products. The tree finds its rows in <see cref="Children"/> through a HierarchyPropertyDescriptor
-/// for this type alone (ProductListCard). A product has no children at all: the tree gives an expander to every row whose
-/// children are an observable collection, even an empty one.
+/// A folder of the Products list: a stage's (Production, Innovation), or one of the user's (ProductFolder) inside a stage
+/// or inside another of theirs, as deep as wanted; or the Deleted folder after the stages, holding the deleted products.
+/// The list finds its rows in <see cref="Children"/>: its folders first, by name, then its products, by name. A product has
+/// no children at all.
 /// </summary>
 public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTreeNode>
 {
-    private ProductFolderNode(ProductStage stage, int? categoryId, bool isStage, string title, bool isDeletedFolder = false, bool isNewFolder = false)
+    private ProductFolderNode(ProductStage stage, int? folderId, bool isStage, string title, bool isDeletedFolder = false, bool isNewFolder = false)
     {
-        Stage = stage;
-        CategoryId = categoryId;
+        _stage = stage;
+        FolderId = folderId;
         IsStage = isStage;
         IsDeletedFolder = isDeletedFolder;
         IsNewFolder = isNewFolder;
@@ -61,35 +61,51 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
     }
 
     /// <summary>
-    /// The row New Folder adds to a stage while its name is typed into it (ProductTree.BeginNewFolder): no category yet,
-    /// until the name typed saves one, and none at all if it's cancelled.
+    /// The row New Folder adds inside <paramref name="parent"/> (a stage's folder or one of the user's) while its name is
+    /// typed into it (ProductTree.BeginNewFolder): no folder yet, until the name typed saves one, and none at all if it's
+    /// cancelled.
     /// </summary>
-    public static ProductFolderNode NewFolder(ProductStage stage) => new(stage, null, isStage: false, NewFolderTitle, isNewFolder: true);
+    public static ProductFolderNode NewFolder(ProductFolderNode parent) =>
+        new(parent.Stage, null, isStage: false, NewFolderTitle, isNewFolder: true) { ParentFolder = parent };
 
     public const string NewFolderTitle = "New folder";
 
-    /// <summary>The row New Folder adds, named in the list before it's a category: nothing is dropped on it, and it has no menu.</summary>
+    /// <summary>The row New Folder adds, named in the list before it's a folder: nothing is dropped on it, and it has no menu.</summary>
     public bool IsNewFolder { get; }
 
     /// <summary>A stage's folder.</summary>
     public static ProductFolderNode ForStage(ProductStage stage) => new(stage, null, isStage: true, ProductRules.StageTitle(stage));
 
-    public static ProductFolderNode ForCategory(ProductStage stage, ProductCategory category) => new(stage, category.Id, isStage: false, category.Name);
-
-    public static ProductFolderNode Uncategorized(ProductStage stage) => new(stage, null, isStage: false, ProductRules.UncategorizedTitle);
+    /// <summary>One of the user's folders.</summary>
+    public static ProductFolderNode ForFolder(ProductFolder folder) => new(folder.Stage, folder.Id, isStage: false, folder.Name);
 
     /// <summary>
-    /// The Deleted folder, holding the deleted products by name, whatever their stage and category, until each is restored
+    /// The Deleted folder, holding the deleted products by name, whatever their stage and folder, until each is restored
     /// or deleted permanently. Closed the first time the list shows, as every other folder is open. Its Stage means nothing.
     /// </summary>
     public static ProductFolderNode Deleted() => new(default, null, isStage: false, DeletedTitle, isDeletedFolder: true);
 
     public const string DeletedTitle = "Deleted";
 
-    public ProductStage Stage { get; }
+    private ProductStage _stage;
+    /// <summary>The stage it's in: a folder moved to the other stage keeps its row, in its new place.</summary>
+    public ProductStage Stage
+    {
+        get => _stage;
+        internal set => this.RaiseAndSetIfChanged(ref _stage, value);
+    }
 
-    /// <summary>The category a category folder holds, or null for a stage's folder and for Uncategorized.</summary>
-    public int? CategoryId { get; }
+    /// <summary>The user's folder (ProductFolder) it shows, or null for a stage's folder, Deleted, and a new folder's row.</summary>
+    public int? FolderId { get; }
+
+    /// <summary>One of the user's folders: it can be renamed, moved and deleted, as a stage's and Deleted can't.</summary>
+    public bool IsUserFolder => FolderId is not null;
+
+    /// <summary>The folder it's in: its stage's, or another of the user's; null for a stage and for Deleted.</summary>
+    public ProductFolderNode? ParentFolder { get; internal set; }
+
+    /// <summary>The user's folder it's in, or null at the top of its stage: where a folder made in it, or moved beside it, goes.</summary>
+    public int? ParentFolderId => ParentFolder?.FolderId;
 
     public override bool IsStage { get; }
 
@@ -98,24 +114,21 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
 
     public override bool IsTopLevel => IsStage || IsDeletedFolder;
 
-    /// <summary>A category's folder, which can be renamed or deleted (the category with it), as a stage's and Uncategorized can't.</summary>
-    public bool IsCategory => CategoryId is not null;
-
     /// <summary>
     /// What names the folder from one run to the next, for remembering whether it was left closed: "Production",
-    /// "Production/Uncategorized", "Production/12" for category 12, and the same under "Innovation"; "Deleted"
-    /// for the Deleted folder.
+    /// "Innovation", "Folder/12" for the user's folder 12, and "Deleted".
     /// </summary>
     public string Key =>
         IsDeletedFolder ? DeletedTitle
         : IsStage ? Stage.ToString()
-        : IsNewFolder ? $"{Stage}/New"
-        : $"{Stage}/{CategoryId?.ToString(CultureInfo.InvariantCulture) ?? ProductRules.UncategorizedTitle}";
+        : IsNewFolder ? "Folder/New"
+        : $"Folder/{FolderId?.ToString(CultureInfo.InvariantCulture)}";
 
     /// <summary>
-    /// A folder's <see cref="Key"/> as kept before Innovation was renamed on 2026-11-09 ("ResearchAndDevelopment",
-    /// "ResearchAndDevelopment/12"), as its key now ("Innovation", "Innovation/12"); any other key as it is. Read as kept,
-    /// Innovation's folders left closed opened again (FolderMemory.Read).
+    /// A folder's <see cref="Key"/> as kept before Innovation was renamed on 2026-11-09 ("ResearchAndDevelopment"), as its
+    /// key now ("Innovation"); any other key as it is. Read as kept, Innovation left closed would open again
+    /// (FolderMemory.Read). The category folders' keys kept before folders were the user's own ("Production/12") match no
+    /// folder now, and are forgotten.
     /// </summary>
     public static string CurrentFolderKey(string key)
     {
@@ -125,11 +138,31 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
             : key;
     }
 
-    /// <summary>The products the folder shows: none for a stage's folder, whose rows are folders.</summary>
+    /// <summary>The products it shows itself, not those in the folders in it.</summary>
     public IEnumerable<ProductLeafNode> Products => Children.OfType<ProductLeafNode>();
 
+    /// <summary>The folders it shows.</summary>
+    public IEnumerable<ProductFolderNode> Folders => Children.OfType<ProductFolderNode>();
+
+    /// <summary>The products it shows, and those every folder in it shows, however deep.</summary>
+    public IEnumerable<ProductLeafNode> AllProducts => Products.Concat(Folders.SelectMany(f => f.AllProducts));
+
+    /// <summary>Whether it's <paramref name="folder"/> or inside it, however deep.</summary>
+    public bool IsInside(ProductFolderNode folder)
+    {
+        for (var at = this; at is not null; at = at.ParentFolder)
+        {
+            if (ReferenceEquals(at, folder))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private int _productCount;
-    /// <summary>The products it shows (a stage's: in all its folders), or while a search filters the list, the matches.</summary>
+    /// <summary>The products it holds, in the folders in it too, or while the list is filtered, the matches.</summary>
     public override int ProductCount => _productCount;
 
     internal void ShowCount(int count)
@@ -144,7 +177,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
     private string _title;
     public override string Title => _title;
 
-    /// <summary>A category renamed in Settings keeps its folder, under its new name.</summary>
+    /// <summary>A folder renamed keeps its row, under its new name.</summary>
     internal void Rename(string title)
     {
         if (_title != title)
@@ -166,8 +199,8 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
 
     private bool _isExpanded;
     /// <summary>
-    /// The folder is open. The tree reads and writes it (its HierarchyPropertyDescriptor's IsExpandedPropertyName), and
-    /// it's kept here, so a folder stays as it was left through a refresh, or while a search hides it.
+    /// The folder is open. The list reads and writes it, and it's kept here, so a folder stays as it was left through a
+    /// refresh, or while a search hides it.
     /// </summary>
     public bool IsExpanded
     {
@@ -227,24 +260,35 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
     public bool IsNew => Product.Id == 0;
 }
 
+/// <summary>What dropping rows of the Products list on another does (ProductTree.DropFor).</summary>
+public closed record TreeDrop
+{
+    /// <summary>Products dragged: each one's move, those already there left out.</summary>
+    public sealed record Products(IReadOnlyList<ProductMove> Moves) : TreeDrop;
+
+    /// <summary>One folder dragged, with all it holds.</summary>
+    public sealed record Folder(ProductFolderMove Move) : TreeDrop;
+}
+
 /// <summary>
-/// The Products list as a tree: a folder for each stage, Production then Innovation, holding a folder
-/// for every product category (by name) and then Uncategorized, each holding its products (by name); then the Deleted
-/// folder, holding the deleted products (by name). Refresh merges rather than rebuilds: every folder and product keeps its
-/// node, which the tree's selection and open folders are tied to.
+/// The Products list as a tree, as a file explorer shows folders: a folder for each stage, Production then Innovation,
+/// holding the user's folders (ProductFolder), as deep as they go, and the products filed at the top of the stage; each of
+/// those folders its own folders first, by name, then its products, by name. Then the Deleted folder, holding the deleted
+/// products (by name). Refresh merges rather than rebuilds: every folder and product keeps its node, which the tree's
+/// selection and open folders are tied to, through a rename, a move or a move to the other stage.
 /// </summary>
 public sealed class ProductTree : IDisposable
 {
     private readonly TreeLeaves<Product, ProductLeafNode> _leaves = new(p => p.Id, p => new ProductLeafNode(p), (leaf, p) => leaf.Product = p);
 
-    /// <summary>Every folder each stage has, shown or not: one per category, and its Uncategorized.</summary>
-    private readonly Dictionary<ProductFolderNode, StageFolders> _foldersByRoot = [];
+    /// <summary>The user's folders, shown or not, by id.</summary>
+    private readonly Dictionary<int, ProductFolderNode> _folders = [];
 
     /// <summary>Which folders start open, and every one opened or closed since.</summary>
     private readonly FolderMemory _memory;
 
     /// <summary>
-    /// A Refresh with something in it has made the category folders, so <see cref="ClosedFolderKeys"/> reads the folders. The
+    /// A Refresh with something in it has made the folders, so <see cref="ClosedFolderKeys"/> reads the folders. The
     /// screen refreshes its tree, empty, as it's made, which doesn't count: disposed before a load, it would keep the stages alone.
     /// </summary>
     private bool _isFilled;
@@ -257,11 +301,6 @@ public sealed class ProductTree : IDisposable
     {
         _memory = memory ?? new FolderMemory();
         Stages = [_memory.Track(ProductFolderNode.ForStage(ProductStage.Production)), _memory.Track(ProductFolderNode.ForStage(ProductStage.Innovation))];
-        foreach (var root in Stages)
-        {
-            _foldersByRoot[root] = new StageFolders(_memory.Track(ProductFolderNode.Uncategorized(root.Stage)));
-        }
-
         DeletedFolder = _memory.Track(ProductFolderNode.Deleted(), startsOpen: false);
         Roots = [.. Stages, DeletedFolder];
     }
@@ -278,65 +317,81 @@ public sealed class ProductTree : IDisposable
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
     public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
 
-    /// <summary>The product's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
+    /// <summary>The product's row, or null while it isn't listed (a filter hides it, or it isn't loaded).</summary>
     public ProductLeafNode? Find(int productId) => _leaves.Find(productId);
 
     /// <summary>The stage's folder.</summary>
     public ProductFolderNode StageFolder(ProductStage stage) => Stages.Single(r => r.Stage == stage);
 
-    /// <summary>The category's folder in <paramref name="stage"/>, shown or not; null for one it has no folder for yet.</summary>
-    public ProductFolderNode? CategoryFolder(ProductStage stage, int categoryId) =>
-        _foldersByRoot[StageFolder(stage)].ByCategory.GetValueOrDefault(categoryId);
+    /// <summary>The user's folder's row, shown or not; null for one the list hasn't been given.</summary>
+    public ProductFolderNode? Folder(int folderId) => _folders.GetValueOrDefault(folderId);
 
     /// <summary>
-    /// Every folder closed now, stages and Deleted included, by <see cref="ProductFolderNode.Key"/>: what to start with
-    /// next time. Before the first Refresh, which makes the category folders, the ones it was given.
+    /// The row a product of <paramref name="stage"/> filed in <paramref name="folderId"/> shows in: that folder's, or the
+    /// stage's for none, or one the list hasn't been given.
     /// </summary>
-    public IReadOnlyList<string> ClosedFolderKeys() =>
-        _memory.ClosedKeys(Roots.Concat(_foldersByRoot.Values.SelectMany(f => f.All)), _isFilled);
+    public ProductFolderNode FolderOf(ProductStage stage, int? folderId) =>
+        folderId is { } id && _folders.TryGetValue(id, out var folder) ? folder : StageFolder(stage);
 
-    /// <summary>
-    /// Opens every folder in <paramref name="stage"/>, and the stage itself; in both stages, and the Deleted folder, when
-    /// it's null.
-    /// </summary>
-    public void ExpandAll(ProductFolderNode? stage)
+    /// <summary>Where a folder of the list is, as the notices name it: "Production › Breads › Holiday", or "Production" for a stage.</summary>
+    public static string PathTitle(ProductFolderNode folder)
     {
-        foreach (var root in StagesOf(stage))
+        List<string> names = [];
+        ProductFolderNode? at = folder;
+        for (; at is { IsStage: false, IsDeletedFolder: false }; at = at.ParentFolder)
         {
-            root.IsExpanded = true;
-            foreach (var folder in _foldersByRoot[root].All)
-            {
-                folder.IsExpanded = true;
-            }
+            names.Add(at.Title);
         }
 
-        if (stage is null)
+        names.Reverse();
+        return ProductFolderRules.PathTitle(at?.Stage ?? folder.Stage, names);
+    }
+
+    /// <summary>
+    /// Every folder closed now, stages, the user's folders and Deleted, by <see cref="ProductFolderNode.Key"/>: what to start
+    /// with next time. Before the first Refresh, which makes the folders, the ones it was given.
+    /// </summary>
+    public IReadOnlyList<string> ClosedFolderKeys() => _memory.ClosedKeys(Roots.Concat(_folders.Values), _isFilled);
+
+    /// <summary>
+    /// Opens <paramref name="from"/> and every folder in it, however deep: a stage's or one of the user's; both stages and the
+    /// Deleted folder when it's null.
+    /// </summary>
+    public void ExpandAll(ProductFolderNode? from)
+    {
+        foreach (var folder in FoldersFrom(from).Concat(from is null ? Stages : [from]))
+        {
+            folder.IsExpanded = true;
+        }
+
+        if (from is null)
         {
             DeletedFolder.IsExpanded = true;
         }
     }
 
     /// <summary>
-    /// Closes every folder in <paramref name="stage"/>, or in both stages, and the Deleted folder, when it's null. The
-    /// stages stay open, so their category folders show, closed.
+    /// Closes every folder in <paramref name="from"/>, however deep, or in both stages, and the Deleted folder, when it's
+    /// null. <paramref name="from"/> stays open, and so do the stages, so the folders in them show, closed.
     /// </summary>
-    public void CollapseAll(ProductFolderNode? stage)
+    public void CollapseAll(ProductFolderNode? from)
     {
-        foreach (var root in StagesOf(stage))
+        foreach (var folder in FoldersFrom(from))
         {
-            foreach (var folder in _foldersByRoot[root].All)
-            {
-                folder.IsExpanded = false;
-            }
+            folder.IsExpanded = false;
         }
 
-        if (stage is null)
+        if (from is null)
         {
             DeletedFolder.IsExpanded = false;
         }
     }
 
-    private IEnumerable<ProductFolderNode> StagesOf(ProductFolderNode? stage) => stage is null ? Stages : [StageFolder(stage.Stage)];
+    /// <summary>The user's folders inside <paramref name="from"/> (a stage's or one of theirs), shown or not; all of them for null.</summary>
+    private IEnumerable<ProductFolderNode> FoldersFrom(ProductFolderNode? from) =>
+        from is null || from.IsDeletedFolder
+            ? (from is null ? _folders.Values : [])
+            : _folders.Values.Where(f => !ReferenceEquals(f, from) && f.IsInside(from));
 
     /// <summary>The row New Folder added, while its name is being typed; null otherwise.</summary>
     public ProductFolderNode? PendingFolder { get; private set; }
@@ -345,18 +400,19 @@ public sealed class ProductTree : IDisposable
     public ProductLeafNode? PendingProduct { get; private set; }
 
     /// <summary>
-    /// Adds a "New folder" row to <paramref name="stage"/>, after its categories and before Uncategorized, for its name to
-    /// be typed into; the stage opens to show it. A refresh keeps it there until <see cref="EndNewFolder"/>. Any earlier
-    /// one goes first: there's one at a time.
+    /// Adds a "New folder" row inside the user's folder <paramref name="parentFolderId"/>, or at the top of
+    /// <paramref name="stage"/> for none, after the folders there and before the products, for its name to be typed into;
+    /// the folders it's in open to show it. A refresh keeps it there until <see cref="EndNewFolder"/>. Any earlier one goes
+    /// first: there's one at a time.
     /// </summary>
-    public ProductFolderNode BeginNewFolder(ProductStage stage)
+    public ProductFolderNode BeginNewFolder(ProductStage stage, int? parentFolderId)
     {
         EndNewFolder();
-        var folder = PendingFolder = ProductFolderNode.NewFolder(stage);
-        var root = StageFolder(stage);
-        var at = root.Children.IndexOf(_foldersByRoot[root].Uncategorized);
-        root.Children.Insert(at < 0 ? root.Children.Count : at, folder);
-        root.IsExpanded = true;
+        var parent = FolderOf(stage, parentFolderId);
+        var folder = PendingFolder = ProductFolderNode.NewFolder(parent);
+        var at = parent.Children.TakeWhile(row => row is ProductFolderNode).Count();
+        parent.Children.Insert(at, folder);
+        OpenDownTo(parent);
         return folder;
     }
 
@@ -366,30 +422,28 @@ public sealed class ProductTree : IDisposable
         if (PendingFolder is { } folder)
         {
             PendingFolder = null;
-            StageFolder(folder.Stage).Children.Remove(folder);
+            folder.ParentFolder?.Children.Remove(folder);
         }
     }
 
     /// <summary>
-    /// Adds a "New product" row to the folder of <paramref name="stage"/> and <paramref name="categoryId"/> (Uncategorized
-    /// for none, or one with no folder), last, for its name to be typed into; its folders open to show it. A refresh keeps
-    /// it there, uncounted, until <see cref="EndNewProduct"/>. Any earlier one goes first: there's one at a time.
+    /// Adds a "New product" row to the user's folder <paramref name="folderId"/>, or the top of <paramref name="stage"/> for
+    /// none (or one the list hasn't been given), last, for its name to be typed into; the folders it's in open to show it.
+    /// A refresh keeps it there, uncounted, until <see cref="EndNewProduct"/>. Any earlier one goes first: there's one at a time.
     /// </summary>
-    public ProductLeafNode BeginNewProduct(ProductStage stage, int? categoryId, bool isComposite)
+    public ProductLeafNode BeginNewProduct(ProductStage stage, int? folderId, bool isComposite)
     {
         EndNewProduct();
-        var root = StageFolder(stage);
-        var folder = FolderOf(root, categoryId);
+        var folder = FolderOf(stage, folderId);
         var row = PendingProduct = new ProductLeafNode(new Product
         {
             Name = isComposite ? NewCompositeProductTitle : NewProductTitle,
-            Stage = stage,
-            CategoryId = folder.CategoryId,
+            Stage = folder.Stage,
+            FolderId = folder.FolderId,
             IsComposite = isComposite,
         });
         folder.Children.Add(row);
-        root.IsExpanded = true;
-        folder.IsExpanded = true;
+        OpenDownTo(folder);
         return row;
     }
 
@@ -403,42 +457,43 @@ public sealed class ProductTree : IDisposable
         if (PendingProduct is { } row)
         {
             PendingProduct = null;
-            foreach (var folder in _foldersByRoot.Values.SelectMany(f => f.All))
+            foreach (var folder in Stages.Concat(_folders.Values))
             {
                 folder.Children.Remove(row);
             }
         }
     }
 
-    /// <summary>The folder in <paramref name="root"/> for <paramref name="categoryId"/>: its category's, or Uncategorized for none, or one with no folder.</summary>
-    private ProductFolderNode FolderOf(ProductFolderNode root, int? categoryId)
+    /// <summary>Opens <paramref name="folder"/> and every folder it's in, so what's in it shows.</summary>
+    public static void OpenDownTo(ProductFolderNode folder)
     {
-        var folders = _foldersByRoot[root];
-        return categoryId is { } id && folders.ByCategory.TryGetValue(id, out var folder) ? folder : folders.Uncategorized;
+        for (var at = folder; at is not null; at = at.ParentFolder)
+        {
+            at.IsExpanded = true;
+        }
     }
 
     public void Dispose() => _memory.Dispose();
 
     /// <summary>
-    /// Where dropping <paramref name="product"/> on <paramref name="target"/> files it: a category folder or Uncategorized
-    /// sets its stage and category, a stage's folder its stage alone, and another product the folder that one is in.
+    /// Where dropping <paramref name="product"/> on <paramref name="target"/> files it: a stage's folder at the top of that
+    /// stage, one of the user's folders in that folder (and its stage), and another product in the folder that one is in.
     /// Null when that's where it is already, or there's nothing to drop on. A deleted product goes nowhere, and nothing goes
     /// into the Deleted folder by a move: Delete and Restore do that.
     /// </summary>
     public static ProductMove? MoveTo(ProductTreeNode? target, Product product)
     {
-        (ProductStage Stage, int? CategoryId)? place = product.IsDeleted || product.Id == 0 ? null : target switch
+        (ProductStage Stage, int? FolderId)? place = product.IsDeleted || product.Id == 0 ? null : target switch
         {
             ProductFolderNode { IsDeletedFolder: true } or ProductLeafNode { IsDeleted: true } => null,
             ProductFolderNode { IsNewFolder: true } or ProductLeafNode { IsNew: true } => null,
-            ProductFolderNode { IsStage: true } stage => (stage.Stage, product.CategoryId),
-            ProductFolderNode folder => (folder.Stage, folder.CategoryId),
-            ProductLeafNode leaf => (leaf.Product.Stage, leaf.Product.CategoryId),
+            ProductFolderNode folder => (folder.Stage, folder.FolderId),
+            ProductLeafNode leaf => (leaf.Product.Stage, leaf.Product.FolderId),
             null => null,
         };
 
-        return place is { } to && (to.Stage != product.Stage || to.CategoryId != product.CategoryId)
-            ? new ProductMove(product.Id, to.Stage, to.CategoryId)
+        return place is { } to && (to.Stage != product.Stage || to.FolderId != product.FolderId)
+            ? new ProductMove(product.Id, to.Stage, to.FolderId)
             : null;
     }
 
@@ -450,103 +505,116 @@ public sealed class ProductTree : IDisposable
         [.. products.Select(p => MoveTo(target, p)).OfType<ProductMove>()];
 
     /// <summary>
-    /// Filing each of <paramref name="products"/> under <paramref name="stage"/> and, unless <paramref name="keepCategory"/>,
-    /// <paramref name="categoryId"/>, leaving out any that are there already: the list's Move To and Promote.
+    /// Filing each of <paramref name="products"/> in the user's folder <paramref name="folderId"/>, or at the top of
+    /// <paramref name="stage"/> for none, leaving out any that are there already: the list's Move to.
     /// </summary>
-    public static IReadOnlyList<ProductMove> MovesTo(ProductStage stage, int? categoryId, bool keepCategory, IEnumerable<Product> products) =>
+    public static IReadOnlyList<ProductMove> MovesTo(ProductStage stage, int? folderId, IEnumerable<Product> products) =>
         [.. from product in products
-            let toCategory = keepCategory ? product.CategoryId : categoryId
-            where product.Stage != stage || product.CategoryId != toCategory
-            select new ProductMove(product.Id, stage, toCategory)];
+            where product.Stage != stage || product.FolderId != folderId
+            select new ProductMove(product.Id, stage, folderId)];
 
     /// <summary>
-    /// <paramref name="products"/> in the order the list shows them, folders opened: Production's, then
-    /// Innovation's; in each, a category's at a time by the category's name, then the uncategorized; in each folder,
-    /// by name. The order a set of products prints in.
+    /// Where dropping the user's <paramref name="folder"/> on <paramref name="target"/> puts it: in a stage's folder, at
+    /// the top of that stage; in another of the user's folders, inside it; on a product, beside it, in the folder it's in.
+    /// Null for itself or a folder inside it, where it is already, the Deleted folder or a row being named.
     /// </summary>
-    public static IReadOnlyList<Product> InListOrder(IEnumerable<Product> products) =>
-    [
-        .. products
-            .OrderBy(p => p.Stage == ProductStage.Production ? 0 : 1)
-            .ThenBy(p => p.CategoryId is null ? 1 : 0)
-            .ThenBy(p => p.Category?.Name ?? string.Empty, StringComparer.CurrentCulture)
-            .ThenBy(p => p.CategoryId)
-            .ThenBy(p => p.Name, StringComparer.CurrentCulture),
-    ];
-
-    /// <summary>
-    /// Brings the tree in line with <paramref name="products"/> (in the order the list shows them),
-    /// <paramref name="categories"/> and the <paramref name="deleted"/> products (in that order too; none when it's null).
-    /// Every category has a folder in each stage, so an empty one can still be dropped on; while a search filters the list
-    /// (<paramref name="isFiltered"/>), only the folders holding a match show, open, and the Deleted folder opens on its own.
-    /// </summary>
-    public void Refresh(IReadOnlyList<ProductCategory> categories, IReadOnlyList<Product> products, bool isFiltered, IReadOnlyList<Product>? deleted = null)
+    public static ProductFolderMove? FolderMoveTo(ProductTreeNode? target, ProductFolderNode folder)
     {
-        deleted ??= [];
-        // A product's category is read with it, so one added since the categories were loaded still gets its folder.
-        var allCategories = categories
-            .Concat(products.Select(p => p.Category).OfType<ProductCategory>())
-            .DistinctBy(c => c.Id)
-            .OrderBy(c => c.Name, StringComparer.CurrentCulture)
-            .ToList();
-        var categoryIds = allCategories.Select(c => c.Id).ToHashSet();
-
-        _leaves.Merge(products.Concat(deleted));
-
-        // Each stage's folders as they should show, and each folder's products.
-        var layout = Stages.ToDictionary(root => root, root =>
+        if (folder.FolderId is not { } folderId)
         {
-            var folders = _foldersByRoot[root];
-            var inStage = products.Where(p => p.Stage == root.Stage).ToList();
-            var wanted = new List<(ProductFolderNode Folder, List<ProductTreeNode> Rows)>();
-            foreach (var category in allCategories)
-            {
-                if (folders.ByCategory.TryGetValue(category.Id, out var folder))
-                {
-                    folder.Rename(category.Name);
-                }
-                else
-                {
-                    folder = folders.ByCategory[category.Id] = _memory.Track(ProductFolderNode.ForCategory(root.Stage, category));
-                }
-
-                wanted.Add((folder, RowsOf(inStage.Where(p => p.CategoryId == category.Id))));
-            }
-
-            wanted.Add((folders.Uncategorized, RowsOf(inStage.Where(p => p.CategoryId is not { } id || !categoryIds.Contains(id)))));
-
-            // A deleted category's folder goes for good.
-            foreach (var id in folders.ByCategory.Keys.Where(id => !categoryIds.Contains(id)).ToList())
-            {
-                folders.ByCategory.Remove(id);
-            }
-
-            // The rows being named stay where they were added: a new folder before Uncategorized, a new product last in
-            // its folder.
-            if (PendingFolder is { } newFolder && newFolder.Stage == root.Stage)
-            {
-                wanted.Insert(wanted.Count - 1, (newFolder, []));
-            }
-
-            if (PendingProduct is { } newProduct && newProduct.Product.Stage == root.Stage)
-            {
-                var into = FolderOf(root, newProduct.Product.CategoryId);
-                wanted.Single(w => w.Folder == into).Rows.Add(newProduct);
-            }
-
-            return wanted;
-        });
-
-        // Everything leaving the tree goes before anything arrives, so a product moving from one folder to another, or to
-        // and from Deleted, is never in both at once.
-        var deletedRows = RowsOf(deleted);
-        TreeRows.RemoveMissing(DeletedFolder.Children, deletedRows);
-        foreach (var (root, wanted) in layout)
-        {
-            TreeRows.RemoveLeaving(root.Children, wanted, isFiltered);
+            return null;
         }
 
-        // Deleted holds its products straight, whatever their stage and category. It opens on a search's matches, as the
+        (ProductStage Stage, int? ParentId)? place = target switch
+        {
+            ProductFolderNode { IsDeletedFolder: true } or ProductLeafNode { IsDeleted: true } => null,
+            ProductFolderNode { IsNewFolder: true } or ProductLeafNode { IsNew: true } => null,
+            ProductFolderNode { IsStage: true } stage => (stage.Stage, null),
+            ProductFolderNode into when !into.IsInside(folder) => (into.Stage, into.FolderId),
+            ProductLeafNode leaf when leaf.Product.FolderId is not { } id || !Holds(folder, id) => (leaf.Product.Stage, leaf.Product.FolderId),
+            ProductFolderNode or ProductLeafNode or null => null,
+        };
+
+        return place is { } to && (to.Stage != folder.Stage || to.ParentId != folder.ParentFolderId)
+            ? new ProductFolderMove(folderId, to.Stage, to.ParentId)
+            : null;
+
+        // A folder dropped on a product inside it would go inside itself. A product shows only with every folder it's in,
+        // so the folders the dragged one shows are enough to look in.
+        static bool Holds(ProductFolderNode dragged, int id) => dragged.FolderId == id || dragged.Folders.Any(f => Holds(f, id));
+    }
+
+    /// <summary>
+    /// What dropping <paramref name="dragged"/> on <paramref name="target"/> (or the list's empty space, null) does:
+    /// products move into the folder (<see cref="MovesTo(ProductTreeNode?, IEnumerable{Product})"/>), and one folder of
+    /// the user's moves with all it holds (<see cref="FolderMoveTo"/>). Null when nothing would move, or what's dragged is
+    /// neither: products and folders together, or several folders.
+    /// </summary>
+    public static TreeDrop? DropFor(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target) => dragged switch
+    {
+        [ProductFolderNode folder] => FolderMoveTo(target, folder) is { } move ? new TreeDrop.Folder(move) : null,
+        { Count: > 0 } when dragged.All(n => n is ProductLeafNode) =>
+            MovesTo(target, dragged.Cast<ProductLeafNode>().Select(l => l.Product)) is { Count: > 0 } moves ? new TreeDrop.Products(moves) : null,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Brings the tree in line with the user's <paramref name="folders"/>, the <paramref name="products"/> it shows and the
+    /// <paramref name="deleted"/> products (none when it's null). Every folder shows, so an empty one can still be dropped
+    /// on; while the list is filtered (<paramref name="isFiltered"/>: a search, or a category picked), only the folders
+    /// holding a match, however deep, show, open, and the Deleted folder opens on its own.
+    /// </summary>
+    public void Refresh(IReadOnlyList<ProductFolder> folders, IReadOnlyList<Product> products, bool isFiltered, IReadOnlyList<Product>? deleted = null)
+    {
+        deleted ??= [];
+        _leaves.Merge(products.Concat(deleted));
+        MergeFolders(folders);
+
+        // Each product's row goes in its folder, or the top of its stage for none, or a folder the list hasn't been given.
+        var productsIn = products
+            .Select(p => (Row: _leaves[p.Id], In: FolderOf(p.Stage, p.FolderId)))
+            .ToLookup(p => p.In, p => p.Row);
+
+        // How many products each folder holds, the folders in it included: whether it shows while the list is filtered.
+        Dictionary<ProductFolderNode, int> counts = [];
+        foreach (var stage in Stages)
+        {
+            Count(stage);
+        }
+
+        // Each folder's rows as they should show: its folders, then the new folder's row, then its products, then the new
+        // product's row; the rows being named stay where they were added.
+        Dictionary<ProductFolderNode, List<ProductTreeNode>> wanted = [];
+        foreach (var container in Stages.Concat(_folders.Values))
+        {
+            List<ProductTreeNode> rows =
+            [
+                .. SubfoldersOf(container).Where(f => !isFiltered || counts[f] > 0).OrderBy(f => f.Title, StringComparer.CurrentCulture).ThenBy(f => f.FolderId),
+            ];
+            if (PendingFolder is { } newFolder && ReferenceEquals(newFolder.ParentFolder, container))
+            {
+                rows.Add(newFolder);
+            }
+
+            rows.AddRange(productsIn[container].OrderBy(l => l.Product.Name, StringComparer.CurrentCulture).ThenBy(l => l.Product.Id));
+            if (PendingProduct is { } newProduct && ReferenceEquals(FolderOf(newProduct.Product.Stage, newProduct.Product.FolderId), container))
+            {
+                rows.Add(newProduct);
+            }
+
+            wanted[container] = rows;
+        }
+
+        // Everything leaving a folder goes before anything arrives, so a product or folder moving from one to another, or
+        // to and from Deleted, is never in two at once.
+        var deletedRows = _leaves.RowsOf(deleted).ToList();
+        TreeRows.RemoveMissing(DeletedFolder.Children, deletedRows);
+        foreach (var (container, rows) in wanted)
+        {
+            TreeRows.RemoveMissing(container.Children, rows);
+        }
+
+        // Deleted holds its products straight, whatever their stage and folder. It opens on a filter's matches, as the
         // stages' folders do, and the tree is told again when it gets its first rows open (ITreeFolder.AnnounceExpanded).
         var deletedWasEmpty = DeletedFolder.Children.Count == 0;
         TreeRows.Arrange(DeletedFolder.Children, deletedRows);
@@ -561,34 +629,119 @@ public sealed class ProductTree : IDisposable
             DeletedFolder.AnnounceExpanded();
         }
 
-        // The screen's load makes every folder empty and fills it after, since the categories come in before the products.
-        foreach (var (root, wanted) in layout)
+        // Each stage, from the top down. An open folder just shown, or just given its first rows, is announced once
+        // everything is in place, each before the folders in it: the screen showing at startup binds its tree before the
+        // first load has filled it, and the tree holds an empty folder closed however it's set.
+        List<ProductFolderNode> toAnnounce = [];
+        foreach (var stage in Stages)
         {
-            TreeRows.LayTopFolder(root, wanted, isFiltered);
+            Lay(stage, isAdded: false);
         }
 
-        // A new product isn't one yet: its folder and stage count only the saved ones.
-        if (PendingProduct is { } pending
-            && Stages.Single(r => r.Stage == pending.Product.Stage) is var pendingRoot
-            && FolderOf(pendingRoot, pending.Product.CategoryId) is var pendingFolder
-            && pendingFolder.Children.Contains(pending))
+        foreach (var folder in toAnnounce)
         {
-            pendingFolder.ShowCount(pendingFolder.ProductCount - 1);
-            pendingRoot.ShowCount(pendingRoot.ProductCount - 1);
+            folder.AnnounceExpanded();
         }
 
-        _isFilled |= allCategories.Count > 0 || products.Count > 0 || deleted.Count > 0;
+        _isFilled |= folders.Count > 0 || products.Count > 0 || deleted.Count > 0;
 
-        List<ProductTreeNode> RowsOf(IEnumerable<Product> inFolder) => [.. _leaves.RowsOf(inFolder)];
+        int Count(ProductFolderNode container)
+        {
+            var count = productsIn[container].Count() + SubfoldersOf(container).Sum(Count);
+            counts[container] = count;
+            return count;
+        }
+
+        void Lay(ProductFolderNode container, bool isAdded)
+        {
+            var wasEmpty = container.Children.Count == 0;
+            var added = TreeRows.Arrange(container.Children, wanted[container]).ToHashSet();
+            container.ShowCount(counts[container]);
+            if (isFiltered)
+            {
+                container.IsExpanded = true;
+            }
+
+            if (container.IsExpanded && ((wasEmpty && container.Children.Count > 0) || isAdded))
+            {
+                toAnnounce.Add(container);
+            }
+
+            foreach (var folder in container.Folders.Where(f => !f.IsNewFolder))
+            {
+                Lay(folder, added.Contains(folder));
+            }
+        }
     }
 
-    private sealed class StageFolders(ProductFolderNode uncategorized)
+    /// <summary>The user's folders whose rows go in <paramref name="container"/>, shown or not.</summary>
+    private IEnumerable<ProductFolderNode> SubfoldersOf(ProductFolderNode container) =>
+        _folders.Values.Where(f => ReferenceEquals(f.ParentFolder, container));
+
+    /// <summary>
+    /// Gives each of the user's folders its row, made once and kept, renamed, re-staged and put in its parent as it is now;
+    /// a folder gone loses its row. A folder whose parent the list hasn't been given, or one in a loop of parents left by an
+    /// edit outside the app, shows at the top of its stage.
+    /// </summary>
+    private void MergeFolders(IReadOnlyList<ProductFolder> folders)
     {
-        public Dictionary<int, ProductFolderNode> ByCategory { get; } = [];
+        var byId = folders.ToDictionary(f => f.Id);
+        foreach (var gone in _folders.Keys.Where(id => !byId.ContainsKey(id)).ToList())
+        {
+            var node = _folders[gone];
+            _folders.Remove(gone);
+            node.ParentFolder?.Children.Remove(node);
+            node.Children.Clear();
+            node.ParentFolder = null;
+        }
 
-        public ProductFolderNode Uncategorized { get; } = uncategorized;
+        foreach (var folder in folders)
+        {
+            if (_folders.TryGetValue(folder.Id, out var node))
+            {
+                node.Rename(folder.Name);
+            }
+            else
+            {
+                _folders[folder.Id] = _memory.Track(ProductFolderNode.ForFolder(folder));
+            }
+        }
 
-        /// <summary>Every folder in the stage: each category's, then Uncategorized.</summary>
-        public IEnumerable<ProductFolderNode> All => ByCategory.Values.Append(Uncategorized);
+        foreach (var folder in folders)
+        {
+            var node = _folders[folder.Id];
+            var parent = folder.ParentId is { } parentId && byId.ContainsKey(parentId) && !IsInLoop(folder.Id)
+                ? _folders[parentId]
+                : null;
+
+            // A folder is in its parent's stage; one at the top in its own.
+            node.Stage = parent is null ? folder.Stage : TopOf(folder.Id).Stage;
+            node.ParentFolder = parent ?? StageFolder(node.Stage);
+        }
+
+        bool IsInLoop(int id)
+        {
+            HashSet<int> seen = [];
+            for (int? at = id; at is { } current && byId.TryGetValue(current, out var f); at = f.ParentId)
+            {
+                if (!seen.Add(current))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        ProductFolder TopOf(int id)
+        {
+            var at = byId[id];
+            while (at.ParentId is { } parentId && byId.TryGetValue(parentId, out var parent))
+            {
+                at = parent;
+            }
+
+            return at;
+        }
     }
 }

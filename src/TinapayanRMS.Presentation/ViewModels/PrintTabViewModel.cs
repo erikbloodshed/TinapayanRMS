@@ -13,25 +13,31 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// What the Print tab prints: the product the Products screen has open, a folder of the Products list (a stage, or a
-/// category or Uncategorized in one), or every product.
+/// What the Print tab prints: the product the Products screen has open, a folder of the Products list (a stage, or one of
+/// the user's folders, with the folders in it), or every product.
 /// </summary>
-/// <param name="Label">What the tab's Print choice reads: "This product", "Breads · Production", "All products".</param>
+/// <param name="Label">What the tab's Print choice reads: "This product", "Production › Breads", "All products".</param>
 public closed record PrintScope(string Label)
 {
     /// <summary>A set's title over its contents, and in the job's name; null for This product.</summary>
     public virtual string? Title => null;
 
     /// <summary>
-    /// <paramref name="product"/> is in the set: any product for All products; for a folder, its stage's, and in a
-    /// category's folder that category's, in Uncategorized a product with none.
+    /// Which products are in the set, with the list's <paramref name="folders"/> as they are now: any product for All
+    /// products; for a stage's folder, every product in that stage; for one of the user's folders, every product in it and
+    /// in the folders in it, however deep, a folder made since it was picked included.
     /// </summary>
-    public bool Holds(Product product) => this switch
+    public Func<Product, bool> Holds(IEnumerable<ProductFolder> folders) => this switch
     {
-        ThisProduct => false,
-        Folder folder => product.Stage == folder.Stage && (folder.IsStage || product.CategoryId == folder.CategoryId),
-        AllProducts => true,
+        ThisProduct => _ => false,
+        Folder { IsStage: true } stage => product => product.Stage == stage.Stage,
+        Folder { FolderId: { } id } folder => InFolders(folder.Stage, ProductFolderRules.SubtreeIds(folders, id)),
+        Folder => _ => false,
+        AllProducts => _ => true,
     };
+
+    private static Func<Product, bool> InFolders(ProductStage stage, IReadOnlySet<int> folderIds) =>
+        product => product.Stage == stage && product.FolderId is { } folderId && folderIds.Contains(folderId);
 
     /// <summary>
     /// Its label, which a screen reader reads for the dropdown's choice. Sealed, so each case keeps it rather than
@@ -42,13 +48,16 @@ public closed record PrintScope(string Label)
     /// <summary>The product the Products screen has open, unsaved edits included.</summary>
     public sealed record ThisProduct() : PrintScope("This product");
 
-    /// <summary>A folder of the list: "Production" for a stage's, "Breads · Production" for a category's, or "Uncategorized · Production".</summary>
-    public sealed record Folder(string Label, ProductStage Stage, int? CategoryId, bool IsStage) : PrintScope(Label)
+    /// <summary>
+    /// A folder of the list: "Production" for a stage's, "Production › Breads › Holiday" for one of the user's
+    /// (<paramref name="FolderId"/>; null for a stage), which prints with every folder in it (Holds). By its id, so the same
+    /// folder picked again is the same choice.
+    /// </summary>
+    public sealed record Folder(string Label, ProductStage Stage, int? FolderId, bool IsStage) : PrintScope(Label)
     {
-        public Folder(ProductFolderNode folder)
-            : this(folder.IsStage ? folder.Title : $"{folder.Title} · {ProductRules.StageTitle(folder.Stage)}", folder.Stage, folder.CategoryId, folder.IsStage)
-        {
-        }
+        /// <summary>The folder <paramref name="folder"/> shows.</summary>
+        public static Folder Of(ProductFolderNode folder) =>
+            new(ProductTree.PathTitle(folder), folder.Stage, folder.FolderId, folder.IsStage);
 
         public override string? Title => Label;
     }
@@ -227,7 +236,8 @@ public sealed class PrintTabViewModel : ViewModelBase
     private async Task PrepareSetAsync(PrintScope scope, CancellationToken cancellationToken)
     {
         Progress = "Preparing…";
-        var products = ProductTree.InListOrder((await _productRepository.GetAllAsync(cancellationToken)).Where(scope.Holds));
+        var products = ProductFolderRules.InListOrder(
+            (await _productRepository.GetAllAsync(cancellationToken)).Where(scope.Holds(_products.Folders)), _products.Folders);
         var printedAt = DateTime.Now;
 
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the

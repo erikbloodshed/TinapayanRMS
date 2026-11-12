@@ -46,6 +46,7 @@ public sealed partial class ProductsViewModel
 
                 // Only a new product's is written: a saved one's changes by moving it in the list.
                 Stage = NewProductStage,
+                FolderId = NewProductFolderId,
 
                 // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
                 IsComposite = IsEditingComposite,

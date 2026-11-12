@@ -58,6 +58,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     private readonly IValidator<Product> _productValidator;
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
+    private readonly IProductFolderRepository _folderRepository;
     private readonly IValidator<ProductCategory> _categoryValidator;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private ReadOnlyObservableCollection<Product> _products;
@@ -68,7 +69,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// <summary>Every product in use (none of the deleted), for the packaging link and clone pickers.</summary>
     public ReadOnlyObservableCollection<Product> Products => _products;
 
-    /// <summary>The products the list shows: those whose name matches SearchText.</summary>
+    /// <summary>The products the list shows: those whose name matches SearchText, in the category CategoryFilter picks.</summary>
     public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
 
     /// <summary>
@@ -77,7 +78,13 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// </summary>
     public IReadOnlyList<Product> DeletedProducts { get; private set; } = [];
 
-    /// <summary>The Products list (ProductListCard): VisibleProducts filed in a folder for their stage, then their category.</summary>
+    /// <summary>
+    /// The Products list's folders (ProductFolder), in both stages, as last read: the user's own, holding products and other
+    /// folders, apart from the categories.
+    /// </summary>
+    public IReadOnlyList<ProductFolder> Folders { get; private set; } = [];
+
+    /// <summary>The Products list (ProductListCard): VisibleProducts filed in their stage, in the user's folders.</summary>
     public ProductTree ProductTree { get; }
 
     /// <summary>The view state key the closed folders of the Products list are kept under (IViewStateStore).</summary>
@@ -136,13 +143,13 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         private set => this.RaiseAndSetIfChanged(ref _moveNotice, value);
     }
 
-    /// <summary>Where the products the last move took were before it: what Undo on the notice puts back.</summary>
-    private IReadOnlyList<ProductMove> _moveUndo = [];
+    /// <summary>Where what the last move took was before it: what Undo on the notice puts back. Null with nothing to undo.</summary>
+    private MoveUndo? _moveUndo;
 
     private ProductStage _newProductStage = CostingDefaults.DefaultNewProductStage;
     /// <summary>
     /// The stage Save files a new product in: the one Settings → Costing Defaults gives a new product after New
-    /// (Production unless it says otherwise), or the stage of the folder New Product Here was picked on.
+    /// (Production unless it says otherwise), or the stage of the folder New Product Here was picked on (NewProductFolderId).
     /// Revert keeps it. The header says so (NewProductTag).
     /// </summary>
     public ProductStage NewProductStage
@@ -151,8 +158,16 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         private set => this.RaiseAndSetIfChanged(ref _newProductStage, value);
     }
 
-    /// <summary>The category New Product Here started the product in, which Revert puts back; null after New.</summary>
-    private int? _newProductCategoryId;
+    private int? _newProductFolderId;
+    /// <summary>
+    /// The user's folder New Product Here started the product in, which Save files it in and Revert keeps; null after New,
+    /// and for a stage's folder: the top of the stage.
+    /// </summary>
+    public int? NewProductFolderId
+    {
+        get => _newProductFolderId;
+        private set => this.RaiseAndSetIfChanged(ref _newProductFolderId, value);
+    }
 
     /// <summary>
     /// Whether the new product showing goes in Settings' stage rather than a folder's: started by New, not New Product
@@ -319,6 +334,23 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         get => _searchText;
         set => this.RaiseAndSetIfChanged(ref _searchText, value);
     }
+
+    private ProductCategoryFilter _categoryFilter = new ProductCategoryFilter.All();
+    /// <summary>
+    /// The list's category filter: every product, or only a category's (or the uncategorized ones), each in its folder,
+    /// with only the folders holding one showing, as a search shows its matches. With the search, both have to match.
+    /// </summary>
+    public ProductCategoryFilter CategoryFilter
+    {
+        get => _categoryFilter;
+        set => this.RaiseAndSetIfChanged(ref _categoryFilter, value ?? new ProductCategoryFilter.All());
+    }
+
+    /// <summary>The category filter's choices: All categories, each category by name, then Uncategorized.</summary>
+    public ObservableCollection<ProductCategoryFilter> CategoryFilters { get; } = [new ProductCategoryFilter.All(), new ProductCategoryFilter.Uncategorized()];
+
+    /// <summary>Whether the list shows only some products: a search typed, or a category picked.</summary>
+    private bool IsListFiltered => SearchText.Trim().Length > 0 || CategoryFilter is not ProductCategoryFilter.All;
 
     private Product? _selectedProduct;
 
@@ -676,12 +708,49 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; private set; }
 
     /// <summary>
-    /// Products moved to other folders of the Products list (ProductListCard), by a drag, Move To, or Promote: files each
-    /// under its folder's stage and category straight away, with no Save, and says so on the list's notice bar with an
-    /// Undo (MoveNotice). On the product the form shows, the Category picker follows, and the form's undo steps take the
-    /// new category as given, so no undo brings the old one back for a Save to write.
+    /// Products moved to other folders of the Products list (ProductListCard), by a drag or Move to: files each in its
+    /// folder and stage straight away, with no Save, and says so on the list's notice bar with an Undo (MoveNotice). Its
+    /// category stays as it is. The form's Save never writes a saved product's stage or folder, so whatever is typed into
+    /// the form stays as it is.
     /// </summary>
     public ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> MoveProductsCommand { get; private set; }
+
+    /// <summary>
+    /// Promote to Production, Send Back to Innovation, and a folder's Promote All: files the products in the other stage,
+    /// each in the folder at the same path as its own there, made if it isn't (IProductRepository.MoveToStageAsync), with
+    /// the notice bar's Undo, which takes away again the folders it made while they're still empty.
+    /// </summary>
+    public ReactiveCommand<StageMoveRequest, RxVoid> MoveToStageCommand { get; private set; }
+
+    /// <summary>
+    /// A folder of the user's dragged, or moved by its Move to: puts it, with all it holds, in another folder or at the top
+    /// of a stage, straight away (IProductFolderRepository.MoveAsync), with the notice bar's Undo. Moved to the other stage,
+    /// the folders and products in it go too.
+    /// </summary>
+    public ReactiveCommand<ProductFolderMove, RxVoid> MoveFolderCommand { get; private set; }
+
+    private IReadOnlyList<ProductTreeNode> _cutNodes = [];
+    /// <summary>
+    /// The rows Cut (Ctrl+X) took, as in a file explorer: products, or one folder of the user's, faded in the list until
+    /// Paste (Ctrl+V) moves them, Esc forgets them, or another Cut takes their place. Nothing is saved until the paste.
+    /// </summary>
+    public IReadOnlyList<ProductTreeNode> CutNodes
+    {
+        get => _cutNodes;
+        private set => this.RaiseAndSetIfChanged(ref _cutNodes, value);
+    }
+
+    /// <summary>Cut on the list: the products picked (or the one the menu was opened on), or one folder, wait to be pasted.</summary>
+    public ReactiveCommand<IReadOnlyList<ProductTreeNode>, RxVoid> CutCommand { get; private set; }
+
+    /// <summary>
+    /// Paste on the list: what was cut moves into the folder it was asked on (a stage's, one of the user's, or the folder of
+    /// the product it was asked on), as a drop there does, with the notice bar's Undo.
+    /// </summary>
+    public ReactiveCommand<ProductTreeNode, RxVoid> PasteCommand { get; private set; }
+
+    /// <summary>Esc on the list: what was cut is forgotten, and stays where it is.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ClearCutCommand { get; private set; }
 
     /// <summary>
     /// Sets the costing of the products picked in the list (or the one its menu was opened on) to Settings' costing
@@ -733,22 +802,25 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     public ReactiveCommand<ProductLeafNode, RxVoid> DeletePermanentlyCommand { get; private set; }
 
     /// <summary>
-    /// New Folder on the list: adds a "New folder" row to a stage for its name to be typed into (TreeNameEdit), and the
-    /// name typed adds a category, a folder in both stages. Its parameter is the folder it was asked on; from the list's
-    /// empty space, the stage of the row picked, or Production.
+    /// New Folder on the list: adds a "New folder" row inside the folder it was asked on (a stage's or one of the user's)
+    /// for its name to be typed into (TreeNameEdit), and the name typed adds the folder there. From the list's empty space
+    /// or its toolbar, it goes in the folder picked, or the folder of the product picked, or at the top of Production.
     /// </summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewCategoryCommand { get; private set; }
+    public ReactiveCommand<ProductFolderNode?, RxVoid> NewFolderCommand { get; private set; }
 
-    /// <summary>Rename Category on a category's folder: its name becomes a box to type into, in place, and the name typed renames the category, and so its folder in both stages.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> RenameCategoryCommand { get; private set; }
+    /// <summary>Rename on one of the user's folders: its name becomes a box to type into, in place, and the name typed renames it.</summary>
+    public ReactiveCommand<ProductFolderNode, RxVoid> RenameFolderCommand { get; private set; }
 
-    /// <summary>Delete Category on a category's folder: asks first, then deletes it, leaving its products uncategorized.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> DeleteCategoryCommand { get; private set; }
+    /// <summary>
+    /// Delete on one of the user's folders: asks first, then deletes it, and nothing in it: its products and folders go up
+    /// into the folder it was in.
+    /// </summary>
+    public ReactiveCommand<ProductFolderNode, RxVoid> DeleteFolderCommand { get; private set; }
 
-    /// <summary>Expand All: opens every folder in the stage given, or in both.</summary>
+    /// <summary>Expand All: opens every folder in the folder given (a stage's or one of the user's), or in both stages.</summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> ExpandAllCommand { get; private set; }
 
-    /// <summary>Collapse All: closes every folder in the stage given, or in both, leaving the stages open.</summary>
+    /// <summary>Collapse All: closes every folder in the folder given, or in both stages, leaving the one given and the stages open.</summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> CollapseAllCommand { get; private set; }
 
     /// <summary>
@@ -860,6 +932,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         IRawMaterialRepository rawMaterialRepository,
         IRawMaterialCategoryRepository rawMaterialCategoryRepository,
         IProductCategoryRepository categoryRepository,
+        IProductFolderRepository folderRepository,
         IProductVersionRepository versionRepository,
         IValidator<Product> productValidator,
         IValidator<CostingParameters> costingParametersValidator,
@@ -921,6 +994,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
+        _folderRepository = folderRepository;
         _categoryValidator = categoryValidator;
 
         // The list's folders open as they were left last time, a folder new since included, and the ones closed are written

@@ -23,10 +23,10 @@ public partial class ProductEntityType
             "TinapayanRMS.Domain.Entities.Product",
             typeof(Product),
             baseEntityType,
-            propertyCount: 12,
+            propertyCount: 13,
             navigationCount: 1,
-            foreignKeyCount: 1,
-            unnamedIndexCount: 2,
+            foreignKeyCount: 2,
+            unnamedIndexCount: 3,
             keyCount: 1);
 
         var id = runtimeEntityType.AddProperty(
@@ -88,6 +88,15 @@ public partial class ProductEntityType
             maxLength: 500);
         description.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         description.AddAnnotation("Relational:ColumnName", "description");
+
+        var folderId = runtimeEntityType.AddProperty(
+            "FolderId",
+            typeof(int?),
+            propertyInfo: typeof(Product).GetProperty("FolderId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(Product).GetField("<FolderId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true);
+        folderId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        folderId.AddAnnotation("Relational:ColumnName", "folder_id");
 
         var includesComponentPackaging = runtimeEntityType.AddProperty(
             "IncludesComponentPackaging",
@@ -160,9 +169,13 @@ public partial class ProductEntityType
         index.AddAnnotation("Relational:Name", "ix_products_category_id");
 
         var index0 = runtimeEntityType.AddIndex(
+            new[] { folderId });
+        index0.AddAnnotation("Relational:Name", "ix_products_folder_id");
+
+        var index1 = runtimeEntityType.AddIndex(
             new[] { name },
             unique: true);
-        index0.AddAnnotation("Relational:Name", "ix_products_name");
+        index1.AddAnnotation("Relational:Name", "ix_products_name");
 
         return runtimeEntityType;
     }
@@ -182,6 +195,17 @@ public partial class ProductEntityType
             fieldInfo: typeof(Product).GetField("<Category>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
         runtimeForeignKey.AddAnnotation("Relational:Name", "fk_products_product_categories_category_id");
+        return runtimeForeignKey;
+    }
+
+    public static RuntimeForeignKey CreateForeignKey2(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
+    {
+        var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("FolderId") },
+            principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),
+            principalEntityType,
+            deleteBehavior: DeleteBehavior.SetNull);
+
+        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_products_product_folders_folder_id");
         return runtimeForeignKey;
     }
 

@@ -65,10 +65,16 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
-        // Not the source's stage: a clone is a new product, so it starts in Innovation.
+        // Not the source's stage: a clone is a new product, so it starts in Innovation, in the folder at the source's
+        // folder's path there (Production › Breads's clone in Innovation › Breads), made if it isn't there.
+        var folders = await dbContext.ProductFolders.AsNoTracking().ToListAsync(cancellationToken);
+        var folderId = await ProductFolderRepository.EnsurePathAsync(
+            dbContext, ProductStage.Innovation, ProductFolderRules.PathOf(folders, source.FolderId), [], cancellationToken);
         var newProduct = new Product
         {
             Name = newProductName,
+            Stage = ProductStage.Innovation,
+            FolderId = folderId,
             Description = source.Description,
             CategoryId = source.CategoryId,
             QuantityRequired = source.QuantityRequired,

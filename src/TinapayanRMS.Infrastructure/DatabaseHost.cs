@@ -53,6 +53,7 @@ public static class DatabaseHost
         services.AddSingleton<ISubAssemblyRepository, SubAssemblyRepository>();
         services.AddSingleton<ISubAssemblyLineRepository, SubAssemblyLineRepository>();
         services.AddSingleton<IProductRepository, ProductRepository>();
+        services.AddSingleton<IProductFolderRepository, ProductFolderRepository>();
         services.AddSingleton<IProductSubAssemblyUsageRepository, ProductSubAssemblyUsageRepository>();
         services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
         services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();

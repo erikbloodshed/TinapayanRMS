@@ -292,6 +292,253 @@ window.tinapayan = {
         };
     },
 
+    // Dragging a list's rows onto a folder (FolderTree): by the pointer, as a table's lines are (watchLineDrag), not the
+    // browser's own drag and drop, which the Windows web view doesn't hand back to the page, and under which the list
+    // never scrolled. A press on a row marked data-drag, moved a few pixels, drags it with the rows picked (the tree says
+    // which: Start); the row under the pointer is told to the tree as it changes (Over, its element's id, or null over the
+    // list's empty space), and the release there drops on it (Drop). Near the top or bottom of the list, it scrolls, so a
+    // folder far below can be reached; the row under the pointer is told again as it scrolls past. A release beside the
+    // list, Escape or a lost pointer drops nothing (Cancel). The click a release makes on the row is swallowed, so a drop
+    // doesn't pick or open it too. While it drags, a see-through copy of the row follows the pointer, as File Explorer's
+    // does: its icon and name, how many rows go with it when there are several, and "Move to Cakes" under it while it's over
+    // a row they can drop on. Returns an object whose dispose() lets go of the list.
+    watchTreeDrag(tree, dotNet) {
+        if (!tree) {
+            return { dispose() { } };
+        }
+        const threshold = 4;
+        const edge = 32;
+        let drag = null;
+
+        const scroller = () => {
+            for (let at = tree; at && at !== document.body; at = at.parentElement) {
+                const overflow = getComputedStyle(at).overflowY;
+                if ((overflow === "auto" || overflow === "scroll") && at.scrollHeight > at.clientHeight) {
+                    return at;
+                }
+            }
+            return null;
+        };
+
+        const isInside = (x, y) => {
+            const box = tree.getBoundingClientRect();
+            return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+        };
+
+        // The row under the pointer, by its element's id; null over the list's empty space or beside the list.
+        const rowAt = (x, y) => {
+            if (!isInside(x, y)) {
+                return null;
+            }
+            const row = document.elementFromPoint(x, y)?.closest(".tree-row");
+            return row && tree.contains(row) ? row.id : null;
+        };
+
+        // The see-through copy of the row pressed that follows the pointer: made as the drag starts, gone as it ends.
+        const makeGhost = row => {
+            const ghost = document.createElement("div");
+            ghost.className = "tree-drag-ghost";
+            ghost.setAttribute("aria-hidden", "true");
+            const item = document.createElement("div");
+            item.className = "tree-drag-ghost-item";
+            const glyph = row.querySelector(".tree-glyph");
+            if (glyph) {
+                item.appendChild(glyph.cloneNode(true));
+            }
+            const title = document.createElement("span");
+            title.className = "tree-drag-ghost-title";
+            title.textContent = (row.querySelector(".tree-title") ?? row).textContent.trim();
+            item.appendChild(title);
+            const count = document.createElement("span");
+            count.className = "tree-drag-ghost-count";
+            count.hidden = true;
+            item.appendChild(count);
+            const caption = document.createElement("div");
+            caption.className = "tree-drag-ghost-caption";
+            caption.hidden = true;
+            ghost.append(item, caption);
+            document.body.appendChild(ghost);
+            return { element: ghost, count, caption };
+        };
+
+        const placeGhost = () => {
+            if (drag?.ghost) {
+                drag.ghost.element.style.transform = `translate(${drag.x + 14}px, ${drag.y + 16}px)`;
+            }
+        };
+
+        const titleOf = id => {
+            const row = id ? document.getElementById(id) : null;
+            return (row?.querySelector(".tree-title") ?? row)?.textContent.trim() ?? "";
+        };
+
+        const tell = () => {
+            const over = rowAt(drag.x, drag.y);
+            if (over !== drag.over) {
+                drag.over = over;
+                const asked = drag;
+                asked.ghost.caption.hidden = true;
+                dotNet.invokeMethodAsync("Over", over)
+                    .then(can => {
+                        // Only for the row it's still over: an answer for one left since says nothing.
+                        if (drag === asked && asked.over === over && can && over) {
+                            asked.ghost.caption.textContent = "→ Move to " + titleOf(over);
+                            asked.ghost.caption.hidden = false;
+                        }
+                    })
+                    .catch(() => { });
+            }
+        };
+
+        const scroll = () => {
+            drag.frame = 0;
+            const pane = drag.pane;
+            if (!pane) {
+                return;
+            }
+            const box = pane.getBoundingClientRect();
+            const step = drag.y < box.top + edge ? -Math.ceil((box.top + edge - drag.y) / 4)
+                : drag.y > box.bottom - edge ? Math.ceil((drag.y - box.bottom + edge) / 4) : 0;
+            if (step !== 0) {
+                const before = pane.scrollTop;
+                pane.scrollTop += step;
+                if (pane.scrollTop !== before) {
+                    tell();
+                    drag.frame = requestAnimationFrame(scroll);
+                }
+            }
+        };
+
+        // The click the release makes, on the row the drag started from: swallowed before the page's own handlers see it.
+        const swallowClick = () => {
+            const swallow = e => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.removeEventListener("click", swallow, true);
+            };
+            window.addEventListener("click", swallow, true);
+            setTimeout(() => window.removeEventListener("click", swallow, true), 400);
+        };
+
+        const end = drop => {
+            if (!drag) {
+                return;
+            }
+            const { pointerId, moving, frame, x, y, ghost } = drag;
+            drag = null;
+            cancelAnimationFrame(frame);
+            ghost?.element.remove();
+            tree.classList.remove("dragging-rows");
+            document.removeEventListener("keydown", onKey, true);
+            if (tree.hasPointerCapture(pointerId)) {
+                tree.releasePointerCapture(pointerId);
+            }
+            if (!moving) {
+                return;
+            }
+            swallowClick();
+            if (drop && isInside(x, y)) {
+                dotNet.invokeMethodAsync("Drop", rowAt(x, y)).catch(() => { });
+            } else {
+                dotNet.invokeMethodAsync("Cancel").catch(() => { });
+            }
+        };
+
+        const onKey = e => {
+            if (e.key === "Escape") {
+                e.preventDefault();
+                e.stopPropagation();
+                end(false);
+            }
+        };
+
+        const onDown = e => {
+            if (drag?.moving) {
+                return;
+            }
+            // A press that never moved, and was let go beside the list, left its drag behind: a new press starts afresh.
+            drag = null;
+            const row = e.button === 0 && !e.target.closest("input, textarea, select") ? e.target.closest(".tree-row[data-drag]") : null;
+            if (!row || !tree.contains(row)) {
+                return;
+            }
+            drag = {
+                row, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY,
+                moving: false, over: undefined, frame: 0, pane: null, ghost: null
+            };
+        };
+
+        const onMove = e => {
+            if (!drag || e.pointerId !== drag.pointerId) {
+                return;
+            }
+            drag.x = e.clientX;
+            drag.y = e.clientY;
+            if (!drag.moving) {
+                if (Math.abs(drag.x - drag.startX) < threshold && Math.abs(drag.y - drag.startY) < threshold) {
+                    return;
+                }
+                drag.moving = true;
+                drag.pane = scroller();
+                drag.ghost = makeGhost(drag.row);
+                tree.setPointerCapture(drag.pointerId);
+                tree.classList.add("dragging-rows");
+                document.addEventListener("keydown", onKey, true);
+                const started = drag;
+                dotNet.invokeMethodAsync("Start", drag.row.id)
+                    .then(count => {
+                        if (drag !== started) {
+                            return;
+                        }
+                        // A row that can't be dragged drags nothing: no copy of it follows the pointer.
+                        if (!count) {
+                            started.ghost.element.remove();
+                        } else if (count > 1) {
+                            started.ghost.count.textContent = String(count);
+                            started.ghost.count.hidden = false;
+                        }
+                    })
+                    .catch(() => { });
+            }
+            e.preventDefault();
+            placeGhost();
+            tell();
+            if (!drag.frame) {
+                drag.frame = requestAnimationFrame(scroll);
+            }
+        };
+
+        const onUp = e => {
+            if (drag && e.pointerId === drag.pointerId) {
+                drag.x = e.clientX;
+                drag.y = e.clientY;
+                end(true);
+            }
+        };
+
+        const onCancel = e => {
+            if (drag && e.pointerId === drag.pointerId) {
+                end(false);
+            }
+        };
+
+        tree.addEventListener("pointerdown", onDown);
+        tree.addEventListener("pointermove", onMove);
+        tree.addEventListener("pointerup", onUp);
+        tree.addEventListener("pointercancel", onCancel);
+        tree.addEventListener("lostpointercapture", onCancel);
+        return {
+            dispose() {
+                end(false);
+                tree.removeEventListener("pointerdown", onDown);
+                tree.removeEventListener("pointermove", onMove);
+                tree.removeEventListener("pointerup", onUp);
+                tree.removeEventListener("pointercancel", onCancel);
+                tree.removeEventListener("lostpointercapture", onCancel);
+            }
+        };
+    },
+
     // A picker shown by a look-alike until it has the cursor (PickField's Deferred), its combo box now made beside it,
     // unseen: the cursor goes to the combo box, the Vim keys' mode staying as it was (a move the keys made stays a move);
     // a press on the look-alike's arrow is a click into the picker, which starts typing, as a click on the combo box's own

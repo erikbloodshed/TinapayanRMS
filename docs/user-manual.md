@@ -166,9 +166,9 @@ The column heading changes to show which one you're looking at. Only the grams a
 The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of folders, like File Explorer:
 
 - **Search** at the top of the list narrows it to matching names and opens the folders that hold them.
-- **Drag** one or more items onto a folder to move them there. A notice under the list says what moved, with an **Undo** button.
+- **Drag** one or more items onto a folder to move them there. To reach a folder further down (or up), hold the item near the bottom (or top) edge of the list: it scrolls, faster the nearer the edge. While you drag, a see-through copy of the item follows the pointer, with a number on its corner when you drag several, and **→ Move to …** under it when it's over a folder it can go in, which is outlined too. Let go beside the list, or press **Esc**, to move nothing. A notice under the list says what moved, with an **Undo** button.
 - **Right-click** an item, a folder or the empty space for a menu of what you can do there. Some menu items have keyboard shortcuts: **F2** renames and **Del** deletes.
-- Folders you leave open or closed are the same the next time you use the app. A folder that's new since, such as a category or role you've just added, starts open, so whatever you save into it shows. The first time, every folder starts open, apart from the **Deleted** folder on Products.
+- Folders you leave open or closed are the same the next time you use the app. A folder that's new since, such as a category, role or product folder you've just added, starts open, so whatever you save into it shows. The first time, every folder starts open, apart from the **Deleted** folder on Products.
 
 ### Editing and saving
 
@@ -312,7 +312,7 @@ A made ingredient saved in an ingredient category before Made categories existed
 
 ### Product Categories
 
-Each category has a **Name**, and can have its own **Wastage %** (0 to 100), which its products are priced with in place of the shop's (see [Wastage](#wastage)). Leave it blank, as it starts, and its products use the shop's Wastage % from Costing Defaults. The list shows each category's Wastage %, blank for those using the shop's. Changing it reprices the category's products, saved ones included. Products don't need a category, and those without one are listed under **Uncategorized**. Deleting a category leaves its products uncategorized.
+Each category has a **Name**, and can have its own **Wastage %** (0 to 100), which its products are priced with in place of the shop's (see [Wastage](#wastage)). Leave it blank, as it starts, and its products use the shop's Wastage % from Costing Defaults. The list shows each category's Wastage %, blank for those using the shop's. Changing it reprices the category's products, saved ones included. Products don't need a category, and the **category filter** on the Products list finds those without one under **Uncategorized**. A category isn't a folder of the Products list: the list's folders are your own (see [The list](#the-list-2) under Products). Deleting a category leaves its products uncategorized, in whatever folder they're in.
 
 ### Roles
 
@@ -330,7 +330,7 @@ A role can't be deleted while any sub-assembly uses it.
 
 ### Costing Defaults
 
-**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation.
+**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
 
 Under it are the four percentages a **new** product's costing starts with:
 
@@ -607,34 +607,46 @@ The Products screen has the product list on the left. On the right are the selec
 
 ### The list
 
-The top-level folders are **Production** and **Innovation**. Each has a folder for every product category, plus **Uncategorized**. Drag products between folders to change their stage or category.
+The top-level folders are **Production** and **Innovation**. Inside them you make your own folders, as in File Explorer, and put products in them however suits you: by kind, by season, by who makes them. A folder can hold other folders, as deep as you like, and products can also sit loose at the top of a stage. In each folder, its folders come first, then its products, each by name. Each folder shows how many products it holds, counting the folders inside it.
 
-Below them is the **Deleted** folder 🗑, where deleted products wait, by name, until you restore them or delete them permanently. Clicking a deleted product doesn't open it. It can't be dragged, and nothing can be dropped on the folder.
+**A folder isn't a category.** A product's category is set on its form, and it still sets the product's Wastage % and prints on its page, whichever folder the product is in. To find a category's products, pick the category in the **category filter**, the box on a row of its own under the buttons below the search box. The list then shows only that category's products (or, with **Uncategorized**, those without one), in their folders, and only the folders that hold one. **All categories** shows everything again. The filter and the search work together: with both, a product has to match both.
+
+When the app was first updated to have its own folders, it made a folder in each stage for each category that had products there, and put those products in it, so the list looked as it did. From then on you can rename, move or delete those folders like any other: changing a folder changes no product's category.
+
+**Drag** products onto a folder, or onto a product in it, to move them there. Dropped on **Production** or **Innovation** itself, they go loose at the top of that stage. Moving into the other stage changes the product's stage. You can also drag **one folder** at a time onto another folder or a stage: it moves with everything in it, and moved into the other stage, every product in it changes stage too. A folder can't be dropped inside itself or a folder of its own, and a drop that would leave things where they are does nothing. A notice under the list says what moved, with **Undo**.
+
+**Cut and paste** move them too, as in File Explorer, without dragging: pick one or more products (Ctrl+click or Shift+click for several), or one folder, and press **Ctrl+X** (or right-click → **Cut**). They fade, and nothing moves yet. Then right-click the folder they should go in, or Production or Innovation, or a product in that folder, and choose **Paste**, or pick it and press **Ctrl+V**. They move there straight away, as a drag would, with the same notice and **Undo**. **Esc** in the list forgets what was cut, which stays where it is. Paste is greyed where nothing would move, such as the folder they're in already, or a folder inside the one cut.
+
+Below them is the **Deleted** folder 🗑, where deleted products wait, by name, until you restore them or delete them permanently. Clicking a deleted product doesn't open it. It can't be dragged, and nothing can be dropped on the folder. A deleted product keeps its folder, and goes back to it when you restore it.
 
 Right-click menus:
 
 - **A product**:
-  - **Promote to Production** or **Send Back to Innovation**
-  - **Move to** (any stage and category)
+  - **Promote to Production** or **Send Back to Innovation**: puts the product in the other stage, in the folder with the same path there (Innovation › Breads › Holiday goes to Production › Breads › Holiday). Any of those folders that isn't there yet is made. **Undo** on the notice moves the product back, and takes away any folder the move made, if nothing else has gone in it since.
+  - **Move to**: any stage, then the top of the stage or any folder in it. A folder that holds others opens a further menu, starting with the folder itself. The place the product is in already is greyed.
+  - **Cut** (Ctrl+X) and **Paste** (Ctrl+V): see Cut and paste above. Paste on a product moves what was cut into that product's folder.
   - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
   - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
   - **Delete** (Del)
 
   With several products picked, the menu offers to promote or move them all, or to apply the costing defaults to them all.
-- **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Folder**, **Print Stage**, **Expand All** and **Collapse All**.
-- **A category's folder**: **New Product Here**, **New Composite Product Here**, **Promote All to Production**, **Print Folder**, **New Folder**, **Rename Category** (F2) and **Delete Category** (Del).
+- **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Folder**, **Paste** (Ctrl+V; to the top of the stage), **Print Stage**, **Expand All** and **Collapse All**.
+- **One of your folders**: **New Product Here**, **New Composite Product Here**, **New Folder** (a folder inside it), **Promote All to Production** (in Innovation, for everything in it and its folders; with a search or filter on, what it shows), **Move to** (any stage, then the top of the stage or any folder but itself and those inside it), **Cut** (Ctrl+X) and **Paste** (Ctrl+V), **Print Folder** (its products and those of every folder inside it), **Rename** (F2), **Delete** (Del), **Expand All** and **Collapse All**.
+  - **Delete** deletes the folder, never the products in it. It asks first, saying how many products and folders it holds: they all move up into the folder it was in, or to the top of the stage. If a folder inside it has the same name as one already there, the delete is refused, and the message says which: rename one of them first.
 - **The empty space**: **New Product**, **New Composite Product**, **New Folder**, **Print All Products**, **Expand All** and **Collapse All**. These are also buttons under the search box. Each button shows only its icon; point at it to see its name.
 - **A product in the Deleted folder**: **Restore** and **Delete Permanently** (Del).
 
 **Names are typed straight into the list**, as in File Explorer:
 
-- **Rename** (or F2, or clicking the product you've already picked once more, slowly: a double-click doesn't rename) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename Category** does the same for a category's folder, and renames it in both Production and Innovation.
-- **New Folder** adds a *New folder* row, its name selected, to the stage you right-clicked (from the button under the search box, the stage of the row you've picked). Type the category's name and press **Enter**: the category is saved, and gets a folder in both Production and Innovation. **Esc**, an empty name, or clicking away before you've typed one, adds nothing. A name that's already a category picks that category's folder.
-- **New Product Here**, **New Composite Product Here** and **New** in the header add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc**, or clicking away before you've typed a name (on the form, or on another product), adds nothing, so no product called *New product* is saved by accident. Clicking the form leaves it on the new product, for you to fill in, name and **Save**. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it, under Uncategorized.
+- **Rename** (or F2, or clicking the product you've already picked once more, slowly: a double-click doesn't rename) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename** on a folder (or F2 with the folder picked) does the same for the folder.
+- **New Folder** adds a *New folder* row, its name selected, inside the folder or stage you right-clicked. From the button under the search box, it goes inside the folder you've picked, or the folder of the product you've picked, or at the top of Production. Type its name and press **Enter**: the folder is saved there and picked. **Esc**, an empty name, or clicking away before you've typed one, adds nothing. Two folders side by side can't have the same name, whatever the capitals; the same name in another folder is fine.
+- **New Product Here**, **New Composite Product Here** and **New** in the header add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc**, or clicking away before you've typed a name (on the form, or on another product), adds nothing, so no product called *New product* is saved by accident. Clicking the form leaves it on the new product, for you to fill in, name and **Save**. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it, at the top of the stage. A product started from a folder has no category until you pick one on its form. New, New Folder and their "Here" forms clear the search and the category filter first, so the new row shows.
 - **A composite product can't be saved until it holds two products**, so its name goes into the form instead. Its row keeps the name until you press **Save**.
 
 If the name is already taken, a message says so and the box stays open with what you typed, to change it.
+
+**Clone…** and **Create Variant…** put the new product in Innovation, in the folder with the same path as the source's (made if it isn't there).
 
 A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new mark the next time the Products tab opens.
 
@@ -663,9 +675,9 @@ Below the header are the fields you fill in:
 
 A **Priced below cost** badge in the header means prices have risen past the buffered cost of a purchased material in the recipe or packaging. Every cost here is at buffered costs, so the product is priced under what that material costs. Point at the badge to see which materials. Re-apply their target buffers on Raw Materials, or in Reports' **Cost Buffers**, to carry their new prices in. A composite product's own products aren't checked here; each shows its badge when you open it.
 
-Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanBMS's copy leaves it out.
+Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage, folder and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanBMS's copy leaves it out.
 
-- **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its category was deleted in the meantime, it comes back in **Uncategorized**.
+- **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its folder was deleted in the meantime, it comes back where that folder's products went. If its category was deleted, it comes back uncategorized.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
 - A deleted product **still holds everything it uses**, so it can come back whole. A sub-assembly it links, an ingredient in its recipe, or a product it holds or whose packaging it links can't be deleted until you delete the deleted product permanently. **Dependents** tiles and refusal messages name it with "(deleted)" after its name. Clicking its tile picks it in the Deleted folder.
 - A deleted product keeps its name, so no other product can take that name until it's deleted permanently.
@@ -1223,7 +1235,7 @@ Open the **Deleted** folder at the bottom of the Products list, right-click the 
 
 ### Move a product into production
 
-Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. Right-click a category folder and choose **Promote All to Production** to promote every product in that folder.
+Right-click it in the Products list and choose **Promote to Production**, or drag it into a Production folder. It goes in the folder with the same path in Production, made if it isn't there. Right-click an Innovation folder and choose **Promote All to Production** to promote every product in that folder and the folders in it.
 
 ### Plan a day's baking
 
@@ -1263,9 +1275,9 @@ If the data restored wasn't the one you wanted, the **Before restore** backup ho
 2. Sort, filter and choose the columns as you want them in the file.
 3. Press **Export to Excel**, choose a folder and a name, and press **Save**.
 
-### Print the recipes of a whole category
+### Print the recipes of a whole folder
 
-Right-click the category's folder in the Products list and choose **Print Folder**. Untick **Costing** for kitchen copies.
+Right-click the folder in the Products list and choose **Print Folder**: it prints the folder's products and those of every folder in it. Untick **Costing** for kitchen copies.
 
 ### Make a composite product, such as a gift box of several products
 

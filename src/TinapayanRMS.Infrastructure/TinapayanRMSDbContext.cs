@@ -83,6 +83,8 @@ public sealed class TinapayanRMSDbContext : DbContext
 
     public DbSet<Product> Products => Set<Product>();
 
+    public DbSet<ProductFolder> ProductFolders => Set<ProductFolder>();
+
     public DbSet<ProductComponent> ProductComponents => Set<ProductComponent>();
 
     public DbSet<ProductSubAssemblyUsage> ProductSubAssemblyUsages => Set<ProductSubAssemblyUsage>();

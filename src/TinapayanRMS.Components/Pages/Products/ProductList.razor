@@ -1,8 +1,11 @@
-@* Products' list (the WPF ProductListCard): a search box; the list's commands as icons; the products in a folder for
-   their stage (Production, Innovation), then their category, each with an image saying what it is; the
-   deleted ones in a Deleted folder at the end; and what the last move did, with Undo. Dragging products onto a folder
-   moves them there, saved at once; a deleted product only comes back by Restore, from its menu. A name is typed in
-   place, as in a file explorer (TreeNameEdit): a product or category renamed, or a new product or folder named. *@
+@* Products' list (the WPF ProductListCard): a search box; the list's commands as icons, and the category filter; the
+   products in a folder for their stage (Production, Innovation), then in the user's own folders, as deep as they go, as
+   in a file explorer; the deleted ones in a Deleted folder at the end; and what the last move did, with Undo. A folder
+   isn't a category: the filter finds a category's products wherever they're filed. Dragging products, or one folder,
+   onto a folder moves them there, saved at once, the list scrolling as the pointer nears its top or bottom; so do Cut
+   (Ctrl+X) and Paste (Ctrl+V) on a folder, the rows cut faded till then. A deleted product only comes back by Restore,
+   from its menu. A name is
+   typed in place (TreeNameEdit): a product or folder renamed, or a new product or folder named. *@
 <section class="card list-card tree-card">
     <div class="list-heading">
         <h2 class="section-header">Products</h2>
@@ -15,10 +18,20 @@
     <div class="list-toolbar">
         <ActionButton Icon="AppIcon.Add" Tooltip="New Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewProductInCommand, null)" />
         <ActionButton Icon="AppIcon.Composite" Tooltip="New Composite Product" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCompositeProductInCommand, null)" />
-        <ActionButton Icon="AppIcon.NewFolder" Tooltip="New Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewCategoryCommand, null)" />
+        <ActionButton Icon="AppIcon.NewFolder" Tooltip="New Folder" Flat="true" OnClick="() => Commands.Run(ViewModel.NewFolderCommand, null)" />
         <CommandButton Command="ViewModel.PrintAllCommand" Icon="AppIcon.Print" Tooltip="Print All Products" Flat="true" />
         <ActionButton Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" OnClick="() => Commands.Run(ViewModel.ExpandAllCommand, null)" />
         <ActionButton Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" OnClick="() => Commands.Run(ViewModel.CollapseAllCommand, null)" />
+    </div>
+
+    @* A row of its own, so "All categories" and a long category's name show whole. Not one of the form's boxes either:
+       picking a category changes nothing to save. *@
+    <div class="list-filter-row">
+        <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
+            <PickField ID="product-category-filter" TItem="ProductCategoryFilter" Items="ViewModel.CategoryFilters" TextField="Label"
+                       @bind-Value="ViewModel.CategoryFilter" CssClass="list-filter"
+                       Tooltip="Show only one category's products, in their folders" />
+        </CascadingValue>
     </div>
 
     <FolderTree TNode="ProductTreeNode"
@@ -29,10 +42,10 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="RowClass"
-                CanDrag="n => n is ProductLeafNode { IsDeleted: false, IsNew: false }"
+                CanDrag="CanDrag"
                 IsEditing="IsEditing"
                 RenamesOnSecondClick="n => n is ProductLeafNode { IsDeleted: false, IsNew: false }"
-                CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
+                CanDrop="(dragged, target) => ProductTree.DropFor(dragged, target) is not null"
                 OnDrop="DropAsync"
                 MenuFor="ViewModel.TreeMenuFor"
                 Shortcut="ViewModel.TreeShortcut">
@@ -75,26 +88,31 @@
         _ => node.Title,
     };
 
-    private static string? RowClass(ProductTreeNode node) => node switch
+    private string? RowClass(ProductTreeNode node)
     {
-        { IsTopLevel: true } => "top-level",
-        ProductLeafNode { IsDeleted: true } => "deleted",
-        _ => null,
-    };
+        var kind = node switch
+        {
+            { IsTopLevel: true } => "top-level",
+            ProductLeafNode { IsDeleted: true } => "deleted",
+            _ => null,
+        };
+
+        // Cut (Ctrl+X) and waiting to be pasted: faded, as in File Explorer.
+        return ViewModel.CutNodes.Contains(node) ? (kind is null ? "cut" : kind + " cut") : kind;
+    }
 
     private bool IsEditing(ProductTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
-    private static IReadOnlyList<ProductMove> MovesFor(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target) =>
-        dragged.All(n => n is ProductLeafNode)
-            ? ProductTree.MovesTo(target, dragged.Cast<ProductLeafNode>().Select(l => l.Product))
-            : [];
+    // A row the drag starts on is dragged with the rows picked, as a file explorer does: those it allows (products, or one
+    // folder of the user's alone) are what's dropped.
+    private static bool CanDrag(ProductTreeNode node) =>
+        node is ProductLeafNode { IsDeleted: false, IsNew: false } or ProductFolderNode { IsUserFolder: true };
 
     private async Task DropAsync(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target)
     {
-        var moves = MovesFor(dragged, target);
-        if (moves.Count > 0)
+        if (ProductTree.DropFor(dragged, target) is { } drop)
         {
-            await Commands.Run(ViewModel.MoveProductsCommand, moves);
+            await ViewModel.DropAsync(drop);
         }
     }
 }

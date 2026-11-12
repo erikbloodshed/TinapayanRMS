@@ -21,8 +21,8 @@ public sealed partial class ProductsViewModel
                 product is null && string.IsNullOrWhiteSpace(name) ? (isComposite ? "New composite product" : "New product") : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
 
-        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, (product, stage) =>
-                product is null ? $"Goes in {ProductRules.StageTitle(stage)}" : null)
+        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, x => x.NewProductFolderId, (product, stage, folderId) =>
+                product is null ? $"Goes in {ProductFolderRules.PathTitle(Folders, stage, folderId)}" : null)
             .ToProperty(this, x => x.NewProductTag);
     }
 
@@ -78,6 +78,7 @@ public sealed partial class ProductsViewModel
             // Each has its own context (AddDbContextFactory), and none touches ViewModel state.
             var rolesRead = Task.Run(() => subAssemblyRoleRepository.GetAllAsync(CancellationToken.None));
             var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
+            var foldersRead = Task.Run(() => _folderRepository.GetAllAsync(CancellationToken.None));
             var rawMaterialsRead = Task.Run(() => rawMaterialRepository.GetAllAsync(CancellationToken.None));
             var productsRead = Task.Run(() => _productRepository.GetAllAsync(CancellationToken.None));
             var deletedRead = Task.Run(() => _productRepository.GetDeletedAsync(CancellationToken.None));
@@ -92,11 +93,12 @@ public sealed partial class ProductsViewModel
             var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
             var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
             await Task.WhenAll(
-                rolesRead, categoriesRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
+                rolesRead, categoriesRead, foldersRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
                 linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
 
             var roles = await rolesRead;
             var categories = await categoriesRead;
+            var folders = await foldersRead;
             var rawMaterials = await rawMaterialsRead;
             var products = await productsRead;
             var deleted = await deletedRead;
@@ -139,9 +141,11 @@ public sealed partial class ProductsViewModel
                 EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
                 Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
                 PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
-                // The Deleted folder first, so the tree, refreshed as the products merge, files a product deleted or
-                // restored since in its new place in one go. The tree is refreshed again for a change to Deleted alone.
+                // The Deleted folder and the folders first, so the tree, refreshed as the products merge, files a product
+                // deleted, restored or moved since in its new place in one go. The tree is refreshed again for a change to
+                // those alone.
                 DeletedProducts = deleted;
+                Folders = folders;
                 _productCache.MergeFrom(products);
                 RefreshProductTree();
                 _markupChecks.OnNext(products);
@@ -221,7 +225,7 @@ public sealed partial class ProductsViewModel
         NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProductInList()));
         NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => NewProductInList(isComposite: true)));
         NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewProductInList(
-            folder?.Stage, folder?.CategoryId, isComposite: true)));
+            folder?.Stage, folder?.FolderId, isComposite: true)));
 
         DeleteCommand = ReactiveCommand.CreateFromTask(
             () => DeleteProductAsync(SelectedProduct!),
@@ -480,7 +484,7 @@ public sealed partial class ProductsViewModel
         {
             if (ProductTree.Find(productId) is null)
             {
-                SearchText = string.Empty;
+                ClearListFilters();
             }
 
             ProductTree.DeletedFolder.IsExpanded = true;
@@ -495,7 +499,7 @@ public sealed partial class ProductsViewModel
 
         if (!VisibleProducts.Contains(product))
         {
-            SearchText = string.Empty;
+            ClearListFilters();
         }
 
         SelectedProduct = product;
@@ -507,24 +511,24 @@ public sealed partial class ProductsViewModel
     /// for it to start a product from, no longer is: it would load over the new form, and a name typed into it since
     /// would then be saved as that product's.
     /// </summary>
-    private void NewProduct(ProductStage? stage = null, int? categoryId = null, bool isComposite = false)
+    private void NewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
         _productToOpen = null;
         _subAssemblyToStartFrom = null;
-        StartNewProduct(stage, categoryId, isComposite);
+        StartNewProduct(stage, folderId, isComposite);
     }
 
     /// <summary>
     /// New and New Product Here: <see cref="NewProduct"/>, and the new product's row in the list, in the folder Save would
     /// file it in, picked, with its name ready to be typed, as a new file in a file explorer. The name typed saves it
-    /// (<see cref="CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
+    /// (<see cref="CommitTreeNameAsync"/>). The search and the category filter are cleared first, so the row shows.
     /// </summary>
-    private void NewProductInList(ProductStage? stage = null, int? categoryId = null, bool isComposite = false)
+    private void NewProductInList(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
         CancelTreeName();
-        SearchText = string.Empty;
-        NewProduct(stage, categoryId, isComposite);
-        var row = ProductTree.BeginNewProduct(NewProductStage, _newProductCategoryId, IsEditingComposite);
+        ClearListFilters();
+        NewProduct(stage, folderId, isComposite);
+        var row = ProductTree.BeginNewProduct(NewProductStage, NewProductFolderId, IsEditingComposite);
         _treeNaming.Start(row, row.Product.Name);
     }
 
@@ -536,21 +540,21 @@ public sealed partial class ProductsViewModel
 
     /// <summary>
     /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
-    /// in <paramref name="stage"/>, or Settings' stage for a new product when it's null, and <paramref name="categoryId"/>,
-    /// which its Category picker starts on. <paramref name="isComposite"/> makes it a composite, which opens on its empty
-    /// Products table.
+    /// in <paramref name="stage"/>, or Settings' stage for a new product when it's null, in the user's folder
+    /// <paramref name="folderId"/>, or at the top of the stage for none; it has no category until one is picked.
+    /// <paramref name="isComposite"/> makes it a composite, which opens on its empty Products table.
     /// </summary>
-    private void StartNewProduct(ProductStage? stage = null, int? categoryId = null, bool isComposite = false)
+    private void StartNewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
         _newProductInDefaultStage = stage is null;
         NewProductStage = stage ?? _defaultNewProductStage;
-        _newProductCategoryId = categoryId;
+        NewProductFolderId = stage is null ? null : folderId;
         SelectedProduct = null;
         FormVersion++;
         _editingId = 0;
         EditingName = string.Empty;
         EditingDescription = string.Empty;
-        EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
+        EditingCategory = null;
         EditingQuantityRequired = 1;
         EditingIncludesComponentPackaging = false;
         EditingCurrentPrice = null;

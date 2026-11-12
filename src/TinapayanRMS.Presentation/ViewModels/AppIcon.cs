@@ -79,4 +79,8 @@ public enum AppIcon
     Download,
     Upload,
     Menu,
+
+    // The Products list's Cut and Paste, which move products and folders as a drag does.
+    Cut,
+    Paste,
 }

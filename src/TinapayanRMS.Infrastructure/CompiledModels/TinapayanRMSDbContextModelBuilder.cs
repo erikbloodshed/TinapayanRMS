@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("c9c7981e-803d-4a28-a98d-f7c51e5bbe7e"), entityTypeCount: 24)
+        : base(skipDetectChanges: false, modelId: new Guid("93ab4857-9bfb-44df-a525-2dc7868e5385"), entityTypeCount: 25)
     {
     }
 
@@ -28,6 +28,7 @@ public partial class TinapayanRMSDbContextModel
         var product = ProductEntityType.Create(this);
         var productCategory = ProductCategoryEntityType.Create(this);
         var productComponent = ProductComponentEntityType.Create(this);
+        var productFolder = ProductFolderEntityType.Create(this);
         var productSubAssemblyUsage = ProductSubAssemblyUsageEntityType.Create(this);
         var productVersion = ProductVersionEntityType.Create(this);
         var rawMaterial = RawMaterialEntityType.Create(this);
@@ -55,8 +56,10 @@ public partial class TinapayanRMSDbContextModel
         PriceScenarioLineEntityType.CreateForeignKey1(priceScenarioLine, priceScenario);
         PriceScenarioLineEntityType.CreateForeignKey2(priceScenarioLine, rawMaterial);
         ProductEntityType.CreateForeignKey1(product, productCategory);
+        ProductEntityType.CreateForeignKey2(product, productFolder);
         ProductComponentEntityType.CreateForeignKey1(productComponent, product);
         ProductComponentEntityType.CreateForeignKey2(productComponent, product);
+        ProductFolderEntityType.CreateForeignKey1(productFolder, productFolder);
         ProductSubAssemblyUsageEntityType.CreateForeignKey1(productSubAssemblyUsage, product);
         ProductSubAssemblyUsageEntityType.CreateForeignKey2(productSubAssemblyUsage, subAssembly);
         ProductVersionEntityType.CreateForeignKey1(productVersion, product);
@@ -90,6 +93,7 @@ public partial class TinapayanRMSDbContextModel
         ProductEntityType.CreateAnnotations(product);
         ProductCategoryEntityType.CreateAnnotations(productCategory);
         ProductComponentEntityType.CreateAnnotations(productComponent);
+        ProductFolderEntityType.CreateAnnotations(productFolder);
         ProductSubAssemblyUsageEntityType.CreateAnnotations(productSubAssemblyUsage);
         ProductVersionEntityType.CreateAnnotations(productVersion);
         RawMaterialEntityType.CreateAnnotations(rawMaterial);

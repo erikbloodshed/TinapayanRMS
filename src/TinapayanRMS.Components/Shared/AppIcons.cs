@@ -63,6 +63,8 @@ public static class AppIcons
         AppIcon.Download => IconName.Download,
         AppIcon.Upload => IconName.Upload,
         AppIcon.Menu => IconName.Menu,
+        AppIcon.Cut => IconName.Cut,
+        AppIcon.Paste => IconName.Paste,
         _ => throw new ArgumentOutOfRangeException(nameof(icon), icon, null),
     };
 

@@ -141,10 +141,16 @@ public sealed record BulkPackagingDraft(
     int? Quantity);
 
 /// <summary>
-/// A product filed under another folder of the Products list: the stage and category it goes in from now on.
-/// <paramref name="CategoryId"/> null leaves it uncategorized.
+/// A product filed under another folder of the Products list: the stage and the folder (ProductFolder) it goes in from now
+/// on. <paramref name="FolderId"/> null files it at the top of the stage. Its category stays as it is.
 /// </summary>
-public sealed record ProductMove(int ProductId, ProductStage Stage, int? CategoryId);
+public sealed record ProductMove(int ProductId, ProductStage Stage, int? FolderId);
+
+/// <summary>
+/// What a Promote or a Send Back did (IProductRepository.MoveToStageAsync): each product's move, and the folders made for
+/// them in the other stage, which an Undo takes away again if they're still empty.
+/// </summary>
+public sealed record StageMove(IReadOnlyList<ProductMove> Moves, IReadOnlyList<int> MadeFolderIds);
 
 public interface IProductRepository
 {
@@ -193,16 +199,25 @@ public interface IProductRepository
     Task AddAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Changes the name, description, category, quantity required and current price, and stamps UpdatedAt. The stage stays
-    /// as it is; whether it's a composite can't change (a different IsComposite is refused).
+    /// Changes the name, description, category, quantity required and current price, and stamps UpdatedAt. The stage and
+    /// folder stay as they are; whether it's a composite can't change (a different IsComposite is refused).
     /// </summary>
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Files each product under another folder of the Products list, all in one save: sets its stage and category,
-    /// nothing else, and stamps UpdatedAt. Refused, with nothing moved, if a product or a category doesn't exist.
+    /// Files each product under another folder of the Products list, all in one save: sets its stage and folder,
+    /// nothing else, and stamps UpdatedAt. Refused, with nothing moved, if a product or a folder doesn't exist, or a
+    /// folder is in the other stage.
     /// </summary>
     Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Promote and Send Back: files each product in <paramref name="stage"/>, in the folder at the same path as its own
+    /// (Innovation › Breads › Holiday to Production › Breads › Holiday), making the folders that aren't there yet; one at
+    /// the top of its stage goes to the top of the other. A product in <paramref name="stage"/> already is left out. All in
+    /// one save, stamping UpdatedAt.
+    /// </summary>
+    Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, CancellationToken cancellationToken);
 
     /// <summary>
     /// Renames the product and nothing else, stamping UpdatedAt; its own sub-assemblies, named after it, take the new
@@ -218,8 +233,9 @@ public interface IProductRepository
     /// </summary>
     /// <param name="product">
     /// Only its Id, Name, Description, CategoryId, QuantityRequired, CurrentPrice and IsComposite are read, and a new one's
-    /// Stage; it's never given an id. A new product goes in the stage it holds (Innovation unless it's set),
-    /// and a saved one keeps its stage. Whether it's a composite is a new one's to say; a saved one's can't change.
+    /// Stage and FolderId; it's never given an id. A new product goes in the stage and folder it holds (Innovation unless
+    /// it's set; the folder's stage when they differ, and the top of the stage when the folder is gone), and a saved one
+    /// keeps its stage and folder. Whether it's a composite is a new one's to say; a saved one's can't change.
     /// </param>
     /// <param name="recipe">
     /// The product's complete recipe of sub-assemblies, or null to leave it as it is. One of its own it no longer lists is

@@ -59,8 +59,18 @@
 
 .list-toolbar {
     display: flex;
+    align-items: center;
     gap: 4px;
     margin-bottom: 8px;
+}
+
+/* Products' category filter, on a row of its own under the toolbar, as wide as the list. */
+.list-filter-row {
+    margin-bottom: 8px;
+}
+
+.list-filter-row .list-filter {
+    width: 100%;
 }
 
 .drop-down-items {
@@ -118,6 +128,87 @@
 .tree-row.drop-target {
     outline: 2px solid var(--color-sf-primary);
     outline-offset: -2px;
+}
+
+/* A row that can be dragged (app.js's watchTreeDrag) isn't text to select: a press moved on it drags it. */
+.tree-row[data-drag] {
+    user-select: none;
+}
+
+.folder-tree.dragging-rows,
+.folder-tree.dragging-rows .tree-row {
+    cursor: grabbing;
+}
+
+/* What follows the pointer while a list's rows are dragged (app.js's watchTreeDrag), as File Explorer's does: a
+   see-through copy of the row pressed, how many go with it, and where they'd go. It never takes the pointer. */
+.tree-drag-ghost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 10000;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.tree-drag-ghost-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 280px;
+    padding: 4px 10px;
+    background: var(--color-sf-primary-light);
+    border: 1px solid var(--color-sf-primary);
+    border-radius: 4px;
+    color: var(--heading-foreground);
+    font-size: 13px;
+    opacity: 0.75;
+    box-shadow: 0 2px 6px rgba(76, 79, 105, 0.25);
+    white-space: nowrap;
+}
+
+.tree-drag-ghost-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* How many rows go with it, on its corner, as File Explorer's count. */
+.tree-drag-ghost-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    background: var(--color-sf-primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+}
+
+.tree-drag-ghost-caption {
+    padding: 2px 8px;
+    background: var(--card-background);
+    border: 1px solid var(--card-border);
+    border-radius: 3px;
+    color: var(--accent-foreground);
+    font-size: 12px;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(76, 79, 105, 0.2);
+}
+
+/* The rows being dragged, and the rows cut (Products' Cut, Ctrl+X) until they're pasted, faded as in File Explorer. */
+.tree-row.dragging > *,
+.tree-row.cut > * {
+    opacity: 0.5;
 }
 
 .tree-row.top-level .tree-title {

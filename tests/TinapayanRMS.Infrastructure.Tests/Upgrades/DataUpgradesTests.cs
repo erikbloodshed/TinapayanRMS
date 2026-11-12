@@ -24,7 +24,7 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
 
         await dbContext.Database.MigrateAsync(Cancellation);
 
-        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers", "2026-11-09 innovation stage"]);
+        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers", "2026-11-09 innovation stage", "2026-11-12 product folders"]);
     }
 
     [Test]
@@ -131,6 +131,56 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         await using (var dbContext = CreateDbContext())
         {
             (await dbContext.Products.CountAsync(p => p.Stage == ProductStage.Innovation, Cancellation)).Should().Be(1, "EF's queries find it by its new name");
+        }
+    }
+
+    [Test]
+    public async Task The_product_folders_upgrade_files_the_products_in_a_folder_per_category_with_products_in_each_stage()
+    {
+        await using (var dbContext = CreateDbContext())
+        {
+            // As saved before folders were the user's own: each category a folder in each stage.
+            var breads = new ProductCategory { Name = "Breads" };
+            var cakes = new ProductCategory { Name = "Cakes" };
+            var empty = new ProductCategory { Name = "Pastries" };
+            dbContext.ProductCategories.AddRange(breads, cakes, empty);
+            var deletedAt = new DateTime(2026, 11, 1, 9, 0, 0);
+            dbContext.Products.AddRange(
+                new Product { Name = "Pandesal", Stage = ProductStage.Production, Category = breads },
+                new Product { Name = "Ensaymada", Stage = ProductStage.Production, Category = breads },
+                new Product { Name = "Test Bun", Stage = ProductStage.Innovation, Category = breads },
+                new Product { Name = "Mamon", Stage = ProductStage.Production, Category = cakes },
+                new Product { Name = "Loaf", Stage = ProductStage.Production },
+                new Product { Name = "Old Bread", Stage = ProductStage.Production, Category = breads, DeletedAt = deletedAt },
+                new Product { Name = "Old Cake", Stage = ProductStage.Innovation, Category = cakes, DeletedAt = deletedAt });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await using (var dbContext = CreateDbContext())
+        {
+            await DataUpgrades.RunAsync(dbContext, Cancellation);
+        }
+
+        await using (var dbContext = CreateDbContext())
+        {
+            var folders = await dbContext.ProductFolders.OrderBy(f => f.Stage).ThenBy(f => f.Name).ToListAsync(Cancellation);
+            folders.Select(f => (f.Stage, f.Name)).Should().Equal(
+                [(ProductStage.Innovation, "Breads"), (ProductStage.Production, "Breads"), (ProductStage.Production, "Cakes")],
+                "a folder for each category with a product in that stage: none for Pastries, none in Innovation for a deleted cake alone");
+            folders.Should().OnlyContain(f => f.ParentId == null);
+
+            var products = await dbContext.Products.ToListAsync(Cancellation);
+            string? FolderOf(string name) =>
+                folders.FirstOrDefault(f => f.Id == products.Single(p => p.Name == name).FolderId) is { } folder ? $"{folder.Stage}/{folder.Name}" : null;
+
+            FolderOf("Pandesal").Should().Be("Production/Breads");
+            FolderOf("Ensaymada").Should().Be("Production/Breads");
+            FolderOf("Test Bun").Should().Be("Innovation/Breads");
+            FolderOf("Mamon").Should().Be("Production/Cakes");
+            FolderOf("Loaf").Should().BeNull("an uncategorized product stays at the top of its stage");
+            FolderOf("Old Bread").Should().Be("Production/Breads", "a deleted one goes in its category's folder when there's one, for its restore");
+            FolderOf("Old Cake").Should().BeNull();
+            (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain("2026-11-12 product folders");
         }
     }
 

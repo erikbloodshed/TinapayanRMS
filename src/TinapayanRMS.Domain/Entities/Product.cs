@@ -11,7 +11,10 @@ public sealed class Product
     /// <summary>A short description shown under the product's name, e.g. "Soft bread with a creamy filling". Optional.</summary>
     public string? Description { get; set; }
 
-    /// <summary>What the Products list groups it under (Breads, Cakes, …). Optional: null for an uncategorized product.</summary>
+    /// <summary>
+    /// What kind of product it is (Breads, Cakes, …): the Products list's category filter, the Wastage % its category may
+    /// set, and the category on a printout. Optional: null for an uncategorized product. It isn't a folder (FolderId).
+    /// </summary>
     public int? CategoryId { get; set; }
 
     public ProductCategory? Category { get; set; }
@@ -22,6 +25,12 @@ public sealed class Product
     /// dragging it to another folder in the list moves it (IProductRepository.MoveAsync).
     /// </summary>
     public ProductStage Stage { get; set; }
+
+    /// <summary>
+    /// The Products list's folder it's filed in (ProductFolder), in its stage; null for one loose at the top of its stage.
+    /// Only a move changes a saved product's (IProductRepository.MoveAsync), as only a move changes its stage.
+    /// </summary>
+    public int? FolderId { get; set; }
 
     /// <summary>
     /// Made of other products (<see cref="ProductComponent"/>, at least two different ones) and its own packaging, and

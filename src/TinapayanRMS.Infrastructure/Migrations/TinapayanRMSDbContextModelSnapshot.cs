@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261110083212_BulkPackaging";
+    public override string LastMigrationId => "20261112122740_ProductFolders";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -406,6 +406,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnName("description")
                     .UseCollation("case_insensitive");
 
+                b.Property<int?>("FolderId")
+                    .HasColumnType("integer")
+                    .HasColumnName("folder_id");
+
                 b.Property<bool>("IncludesComponentPackaging")
                     .HasColumnType("boolean")
                     .HasColumnName("includes_component_packaging");
@@ -444,6 +448,9 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 b.HasIndex("CategoryId")
                     .HasDatabaseName("ix_products_category_id");
+
+                b.HasIndex("FolderId")
+                    .HasDatabaseName("ix_products_folder_id");
 
                 b.HasIndex("Name")
                     .IsUnique()
@@ -535,6 +542,50 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                         t.HasCheckConstraint("CK_ProductComponents_NotItself", "product_id <> component_product_id");
 
                         t.HasCheckConstraint("CK_ProductComponents_Quantity", "quantity > 0");
+                    });
+            });
+
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductFolder", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer")
+                    .HasColumnName("id");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<string>("Name")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("name")
+                    .UseCollation("case_insensitive");
+
+                b.Property<int?>("ParentId")
+                    .HasColumnType("integer")
+                    .HasColumnName("parent_id");
+
+                b.Property<string>("Stage")
+                    .IsRequired()
+                    .HasMaxLength(30)
+                    .HasColumnType("character varying(30)")
+                    .HasColumnName("stage");
+
+                b.HasKey("Id")
+                    .HasName("pk_product_folders");
+
+                b.HasIndex("ParentId")
+                    .HasDatabaseName("ix_product_folders_parent_id");
+
+                var index = b.HasIndex("Stage", "ParentId", "Name")
+                    .IsUnique()
+                    .HasDatabaseName("ix_product_folders_stage_parent_id_name");
+
+                NpgsqlIndexBuilderExtensions.AreNullsDistinct(index, false);
+
+                b.ToTable("product_folders", t =>
+                    {
+                        t.HasCheckConstraint("CK_ProductFolders_NotOwnParent", "parent_id IS NULL OR parent_id <> id");
                     });
             });
 
@@ -1369,6 +1420,12 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .OnDelete(DeleteBehavior.SetNull)
                     .HasConstraintName("fk_products_product_categories_category_id");
 
+                b.HasOne("TinapayanRMS.Domain.Entities.ProductFolder", null)
+                    .WithMany()
+                    .HasForeignKey("FolderId")
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("fk_products_product_folders_folder_id");
+
                 b.Navigation("Category");
             });
 
@@ -1391,6 +1448,15 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.Navigation("ComponentProduct");
 
                 b.Navigation("Product");
+            });
+
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductFolder", b =>
+            {
+                b.HasOne("TinapayanRMS.Domain.Entities.ProductFolder", null)
+                    .WithMany()
+                    .HasForeignKey("ParentId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("fk_product_folders_product_folders_parent_id");
             });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>

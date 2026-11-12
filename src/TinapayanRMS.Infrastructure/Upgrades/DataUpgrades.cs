@@ -23,6 +23,7 @@ internal static class DataUpgrades
         ("2026-11-05 section names", MigrationId<_20261105040552_StoreSectionNames>(), SectionNamesUpgrade.RunAsync),
         ("2026-11-05 target buffers", MigrationId<RawMaterialTargetCostBuffer>(), TargetBuffersUpgrade.RunAsync),
         ("2026-11-09 innovation stage", MigrationId<InitialCreate>(), InnovationStageUpgrade.RunAsync),
+        ("2026-11-12 product folders", MigrationId<_20261112122740_ProductFolders>(), ProductFoldersUpgrade.RunAsync),
     ];
 
     /// <summary>The migration that made data_upgrades, which no upgrade can be recorded without.</summary>

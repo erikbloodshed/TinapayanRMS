@@ -49,5 +49,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .WithMany()
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // A folder deleted outside the app leaves its products at the top of their stage. The app moves them up into the
+        // folder it was in first (ProductFolderRepository.DeleteAsync).
+        builder.HasOne<ProductFolder>()
+            .WithMany()
+            .HasForeignKey(p => p.FolderId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
