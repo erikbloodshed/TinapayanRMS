@@ -224,6 +224,18 @@
     width: 28%;
 }
 
+/* Each price's markup percentage, in a narrow column of its own with no heading, lighter than the amounts, as the
+   Costing tab has it; the current price's keeps its amber or red. */
+.print-price-comparison .print-percent {
+    width: 1%;
+    padding-left: 3px;
+    white-space: nowrap;
+}
+
+.print-price-comparison .print-percent:not(.print-warning, .print-error) {
+    color: #5c5f77;
+}
+
 /* The suggested price rounded up, under the price row, in line with the rows above it. */
 .print-price-comparison .print-part-row td {
     padding-left: 6px;

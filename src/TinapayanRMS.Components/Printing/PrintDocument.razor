@@ -104,6 +104,9 @@
 
     private static string MarkupText(decimal? markup) => markup is { } value ? value.ToString("N2", CultureInfo.CurrentCulture) + "%" : "—";
 
+    // A markup's percentage in the price comparison, in its own column after the amount, as the Costing tab shows it.
+    private static string MarkupShare(decimal? markup) => markup is { } value ? "(" + value.ToString("N1", CultureInfo.CurrentCulture) + "%)" : "";
+
     private static string Change(decimal now, decimal simulated) =>
         simulated == now ? "—" : (simulated - now).ToString("+#,0.00;-#,0.00", CultureInfo.CurrentCulture);
 
@@ -438,36 +441,39 @@
             <tr>
                 <th>Component</th>
                 <th class="n">Suggested Price</th>
+                <th class="print-percent"></th>
                 <th class="n">Current Price</th>
+                <th class="print-percent"></th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>Markup %</td>
-                <td class="n">@MarkupText(costs.MarginPercent)</td>
-                <td class="n @markupClass">@MarkupText(costs.CurrentMarkupPercent)</td>
-            </tr>
-            <tr>
                 <td>Markup</td>
                 <td class="n">@Money(costs.Markup)</td>
+                <td class="n print-percent">@MarkupShare(costs.MarginPercent)</td>
                 <td class="n @markupClass">@(costs.CurrentMarkup is { } markup ? Money(markup) : "—")</td>
+                <td class="n print-percent @markupClass">@MarkupShare(costs.CurrentMarkupPercent)</td>
             </tr>
             <tr>
                 <td>VAT (@costs.VatPercent.ToString("0.##", CultureInfo.CurrentCulture)%)</td>
                 <td class="n">@Money(costs.Vat)</td>
+                <td class="print-percent"></td>
                 <td class="n">@(costs.CurrentVat is { } vat ? Money(vat) : "—")</td>
+                <td class="print-percent"></td>
             </tr>
             <tr class="print-band print-total">
                 <td>Selling price</td>
                 <td class="n">@Money(costs.SellingPrice)</td>
+                <td class="print-percent"></td>
                 <td class="n">@(costs.CurrentPrice is { } price ? Money(price) : "—")</td>
+                <td class="print-percent"></td>
             </tr>
             @if (costs.HasPriceRounding)
             {
                 <tr class="print-part-row">
                     <td>@costs.PriceRoundingLabel</td>
                     <td class="n">@Money(costs.RoundedSellingPrice)</td>
-                    <td></td>
+                    <td colspan="3"></td>
                 </tr>
             }
         </tbody>

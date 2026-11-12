@@ -803,14 +803,13 @@ Each column shows, for its price:
 
 | Row | Suggested Price | Current Price |
 |---|---|---|
-| **Markup %** | The Markup Metric | What the store price earns on the base cost, once VAT is taken out |
-| **Markup** | The markup in pesos, over the base cost | What the store price leaves over the base cost, once VAT is taken out |
+| **Markup** | The markup in pesos over the base cost, with the Markup Metric beside it, such as *30.00 (30.0%)* | What the store price leaves over the base cost once VAT is taken out, with what that earns on the base cost beside it, such as *20.00 (20.0%)* |
 | **VAT** | The VAT added on top | The VAT inside the store price |
 | **Selling price** | The suggested price | The store price |
 
 For example, with a base cost of ₱100.00, a Markup Metric of 30% and 12% VAT, the suggested price is ₱145.60: ₱30.00 of markup and ₱15.60 of VAT. A store price of ₱134.40 is ₱120.00 before VAT, so it earns ₱20.00 (20%) and holds ₱14.40 of VAT.
 
-The store price's Markup % and Markup turn **amber** when it earns less than the Markup Metric, and **red** when it doesn't cover the base cost, as the header's Markup % does. With no Current Price entered, its column shows dashes. When Settings sets a [price rounding](#costing-defaults), a last row shows the suggested price rounded up, such as *Rounded up to the next 0.25*.
+The percentages sit in a narrow column of their own after each price, in lighter text, so the amounts line up down the table. The store price's Markup turns **amber** when it earns less than the Markup Metric, and **red** when it doesn't cover the base cost, as the header's Markup % does. With no Current Price entered, its column shows dashes. When Settings sets a [price rounding](#costing-defaults), a last row shows the suggested price rounded up, such as *Rounded up to the next 0.25*.
 
 Everything updates as you type, before you save. See [How costs are worked out](#12-how-costs-are-worked-out).
 
@@ -885,7 +884,7 @@ Press **Print** in the Products header to open the **Print** tab. It shows the p
 - **Print** (the picker at the top left) chooses **This product**, the folder last asked for, or **All products**.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
-- The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup %, Markup, VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup % and Markup print amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
+- The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup (the amount, then its percentage in brackets, lighter), VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup prints amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
 - **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
 To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**.

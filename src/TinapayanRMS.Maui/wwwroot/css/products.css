@@ -369,19 +369,40 @@
     gap: 16px;
 }
 
-/* Its two price columns share the width, their long headings wrapping. */
+/* Each price column has a narrow column after it, with no heading, for the markup's percentage, so the amounts stay in
+   line down the column. The table is only about 500px wide on the shop's laptop, so the columns take the width their
+   figures need, the headings and the row labels kept on one line. */
 .price-comparison th.number {
-    width: 32%;
-    white-space: normal;
+    white-space: nowrap;
     vertical-align: bottom;
 }
 
-/* The suggested price rounded up to a price you'd charge, under the price itself. */
+.price-comparison td:first-child {
+    white-space: nowrap;
+}
+
+.price-comparison .percent {
+    width: 1%;
+    padding-left: 4px;
+    white-space: nowrap;
+}
+
+/* Lighter than the amounts, as the breakdown's % of Price; the store price's keeps its amber or red. */
+.price-comparison .percent:not(.figure-warning, .figure-error) {
+    color: var(--muted-foreground);
+}
+
+/* The suggested price rounded up to a price you'd charge, under the price itself. Its label may wrap, so it doesn't
+   hold the first column wide enough to wrap the price headings. */
 .cost-summary .rounded-row td {
     color: var(--muted-foreground);
     font-size: 13px;
     padding-top: 4px;
     white-space: nowrap;
+}
+
+.price-comparison .rounded-row td:first-child {
+    white-space: normal;
 }
 
 /* The store price's markup when it earns less than the Markup Metric, though it covers the base cost. */

@@ -2,7 +2,8 @@
    amount it comes to, either of which can be typed, with its share of the price under it; on the right the Costing
    Summary, from the parts and their wastage through labor, overhead and administrative to the base cost, each with its
    share of the price; under it, the suggested selling price beside the current store price, each as its markup, VAT and
-   price, the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
+   price (the markup one row, each price's amount with its percentage in a column of its own beside it, with no
+   heading, so the amounts stay in line), the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
 <div class="costing">
     <h2 class="panel-header">Costing Summary</h2>
     <div class="costing-columns">
@@ -94,36 +95,39 @@
                     <tr>
                         <th>Component</th>
                         <th class="number" title="@($"{ViewModel.SuggestedSellingPriceLabel}: what the costing works out, the base cost with the Markup Metric on it, then VAT")">Suggested Price</th>
+                        <th class="percent"></th>
                         <th class="number" title="@CurrentPriceTooltip">Current Price</th>
+                        <th class="percent"></th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Markup %</td>
-                        <td class="number">@Costs.MarginPercent.ToString("N2")%</td>
-                        <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"{percent:N2}%" : "—")</td>
-                    </tr>
-                    <tr>
                         <td>Markup</td>
                         <td class="number">@Costs.Markup.ToString("N2")</td>
+                        <td class="number percent">(@Costs.MarginPercent.ToString("N1")%)</td>
                         <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
+                        <td class="number percent @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"({percent:N1}%)" : "")</td>
                     </tr>
                     <tr>
                         <td>VAT (@Costs.VatPercent.ToString("0.##")%)</td>
                         <td class="number">@Costs.Vat.ToString("N2")</td>
+                        <td class="percent"></td>
                         <td class="number">@(Costs.CurrentVat?.ToString("N2") ?? "—")</td>
+                        <td class="percent"></td>
                     </tr>
                     <tr class="total-row">
                         <td>Selling price</td>
                         <td class="number">@Costs.SellingPrice.ToString("N2")</td>
+                        <td class="percent"></td>
                         <td class="number">@(Costs.CurrentPrice?.ToString("N2") ?? "—")</td>
+                        <td class="percent"></td>
                     </tr>
                     @if (Costs.HasPriceRounding)
                     {
                         <tr class="rounded-row">
                             <td>@Costs.PriceRoundingLabel</td>
                             <td class="number">@Costs.RoundedSellingPrice.ToString("N2")</td>
-                            <td></td>
+                            <td colspan="3"></td>
                         </tr>
                     }
                 </tbody>

@@ -25,13 +25,13 @@ public class PrintDocumentCostingTests
         breakdown.Should().EndWith("Subtotal (base cost) | 100.00 | 68.7%");
         breakdown.Should().NotContain(row => row.StartsWith("Markup", StringComparison.Ordinal) || row.StartsWith("VAT", StringComparison.Ordinal));
         Rows(document, ".print-price-comparison").Should().Equal(
-            "Component | Suggested Price | Current Price",
-            "Markup % | 30.00% | 20.00%",
-            "Markup | 30.00 | 20.00",
-            "VAT (12%) | 15.60 | 14.40",
-            "Selling price | 145.60 | 134.40",
+            "Component | Suggested Price |  | Current Price | ",
+            "Markup | 30.00 | (30.0%) | 20.00 | (20.0%)",
+            "VAT (12%) | 15.60 |  | 14.40 | ",
+            "Selling price | 145.60 |  | 134.40 | ",
             "Rounded up to the next 0.25 | 145.75 | ");
-        document.FindAll(".print-price-comparison .print-warning").Should().HaveCount(2, "the current price earns less than the 30% markup");
+        document.FindAll(".print-price-comparison .print-warning").Select(cell => cell.TextContent).Should().Equal(
+            ["20.00", "(20.0%)"], "the current price earns less than the 30% markup");
     }
 
     [Test]
@@ -41,11 +41,10 @@ public class PrintDocumentCostingTests
 
         var document = Render(context, Printout(currentPrice: null));
 
-        Rows(document, ".print-price-comparison").Skip(1).Take(4).Should().Equal(
-            "Markup % | 30.00% | —",
-            "Markup | 30.00 | —",
-            "VAT (12%) | 15.60 | —",
-            "Selling price | 145.60 | —");
+        Rows(document, ".print-price-comparison").Skip(1).Take(3).Should().Equal(
+            "Markup | 30.00 | (30.0%) | — | ",
+            "VAT (12%) | 15.60 |  | — | ",
+            "Selling price | 145.60 |  | — | ");
         document.FindAll(".print-warning, .print-error").Should().BeEmpty();
     }
 
