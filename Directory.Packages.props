@@ -66,13 +66,13 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
-    <!-- At the Microsoft.Testing.Platform version TUnit brings (2.5.2 with TUnit 1.83.0): move them together. It does
+    <!-- At the Microsoft.Testing.Platform version TUnit brings (2.5.2 with TUnit 1.83.8): move them together. It does
          nothing unless TESTINGPLATFORM_HOTRELOAD_ENABLED is 1, which only scripts/Watch-Tests.ps1 sets. -->
     <PackageVersion Include="Microsoft.Testing.Extensions.HotReload" Version="2.5.2" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <!-- TUnit.Engine runs the tests, TUnit.Core has their attributes (all the shared fixtures library needs): the TUnit
          package would add its own assertions beside AwesomeAssertions. Move both together. -->
-    <PackageVersion Include="TUnit.Core" Version="1.83.0" />
-    <PackageVersion Include="TUnit.Engine" Version="1.83.0" />
+    <PackageVersion Include="TUnit.Core" Version="1.83.8" />
+    <PackageVersion Include="TUnit.Engine" Version="1.83.8" />
   </ItemGroup>
 </Project>
