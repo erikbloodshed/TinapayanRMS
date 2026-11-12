@@ -27,7 +27,7 @@
             }
             else
             {
-                <PickField TItem="RawMaterial" Items="Ingredients" TextField="Name" CssClass="cell-field" PopupWidth="320px"
+                <PickField TItem="RawMaterial" Items="Ingredients" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="320px"
                            Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id" />
             }
         </td>

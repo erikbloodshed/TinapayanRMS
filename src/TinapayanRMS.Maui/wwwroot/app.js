@@ -1,7 +1,8 @@
 // Small browser helpers the Blazor components call through JS interop (window.tinapayan).
 
-// A number box's text, and a picker's, is selected as it takes the cursor, so what's typed replaces it, as the WPF
-// DoubleTextBoxes and ComboBoxAdvs did: without it a picker's typing is added to the name it holds, and matches nothing.
+// A number box's text, and a picker's (or its look-alike's, PickField's Deferred), is selected as it takes the cursor, so
+// what's typed replaces it, as the WPF DoubleTextBoxes and ComboBoxAdvs did: without it a picker's typing is added to the
+// name it holds, and matches nothing.
 // Done here, in the browser, so it's in place before the first key: the server can't be asked in time. A click puts the
 // caret where it lands after focus arrives, so when the cursor came in by that click, the selection is made again once
 // the click is over. Only then: a box the cursor came into by Tab (or the Vim keys) is clicked in to put the caret
@@ -16,7 +17,7 @@ document.addEventListener("pointerup", () => { pressedOn = null; }, true);
 document.addEventListener("pointercancel", () => { pressedOn = null; }, true);
 document.addEventListener("focusin", e => {
     const input = e.target;
-    if (input instanceof HTMLInputElement && !input.readOnly && (input.closest(".number-field") || input.classList.contains("e-combobox"))) {
+    if (input instanceof HTMLInputElement && !input.readOnly && (input.closest(".number-field, .deferred-pick") || input.classList.contains("e-combobox"))) {
         input.select();
         if (pressedOn instanceof Node && input.contains(pressedOn)) {
             input.addEventListener("mouseup", () => input.select(), { once: true });
@@ -117,6 +118,44 @@ window.tinapayan = {
                 field.select();
             }
         }
+    },
+
+    // A picker shown by a look-alike until it has the cursor (PickField's Deferred), its combo box now made beside it,
+    // unseen: the cursor goes to the combo box, the Vim keys' mode staying as it was (a move the keys made stays a move);
+    // a press on the look-alike's arrow is a click into the picker, which starts typing, as a click on the combo box's own
+    // arrow did. What was typed into the look-alike meanwhile goes with it, and the combo box filters on it as it would on
+    // a key (its input, then the key's keyup); else the combo box's text is selected, as any picker's is when it takes the
+    // cursor. True if the combo box has the cursor: not when the cursor went on elsewhere first, unless the arrow was
+    // pressed.
+    handOverPick(cell, pressed) {
+        const from = cell?.querySelector(".deferred-pick input");
+        const to = cell?.querySelector("input.e-combobox");
+        if (!to) {
+            return false;
+        }
+        if (document.activeElement === to) {
+            return true;
+        }
+        if (!from || (!pressed && document.activeElement !== from)) {
+            return false;
+        }
+
+        const typed = from.value !== from.dataset.text ? from.value : null;
+        if (window.tinapayanVim && !pressed) {
+            window.tinapayanVim.focusKeepingMode(to);
+        } else {
+            to.focus();
+        }
+        if (typed !== null) {
+            to.value = typed;
+            to.setSelectionRange(typed.length, typed.length);
+            const last = typed.slice(-1);
+            const key = last || "Backspace";
+            const code = !last ? "Backspace" : /[a-z]/i.test(last) ? "Key" + last.toUpperCase() : /\d/.test(last) ? "Digit" + last : last === " " ? "Space" : "";
+            to.dispatchEvent(new Event("input", { bubbles: true }));
+            to.dispatchEvent(new KeyboardEvent("keyup", { key, code, bubbles: true }));
+        }
+        return true;
     },
 
     // Keeps the keys a component handles itself (a tree's arrows, say) from also scrolling the page.

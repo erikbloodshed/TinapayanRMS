@@ -19,7 +19,7 @@
         </Header>
         <Row Context="row">
             <td>
-                <PickField TItem="Product" Items="ViewModel.ComponentsTable.ComponentProductOptions" TextField="Name" CssClass="cell-field" PopupWidth="420px"
+                <PickField TItem="Product" Items="ViewModel.ComponentsTable.ComponentProductOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
                            Value="row.Product" ValueChanged="p => row.ComponentProductId = p?.Id">
                     <ItemTemplate Context="product"><span class="pick-columns"><span>@product.Name</span><span class="muted">@product.Category?.Name</span></span></ItemTemplate>
                 </PickField>

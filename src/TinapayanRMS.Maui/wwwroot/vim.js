@@ -955,6 +955,12 @@ window.tinapayanVim = (() => {
             };
         },
 
+        // Puts the cursor in a control that takes the place of the one that has it, the mode staying as it was: a picker's
+        // combo box, made once its look-alike had the cursor (PickField's Deferred). A move the keys made stays a move.
+        focusKeepingMode(element) {
+            focusQuietly(element);
+        },
+
         disable() {
             if (on) {
                 document.removeEventListener("keydown", onKeyDown, true);

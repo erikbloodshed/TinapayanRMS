@@ -23,11 +23,11 @@ public class FieldTests
 
         public bool IsEditPending { get; set; }
 
+        public int Begun { get; private set; }
+
         public int Ended { get; private set; }
 
-        public void BeginUndoStep()
-        {
-        }
+        public void BeginUndoStep() => Begun++;
 
         public void EndUndoStep() => Ended++;
     }
@@ -545,6 +545,113 @@ public class FieldTests
 
         context.JSInterop.Invocations.Any(i => i.Identifier == "sfBlazor.DropDownList.focusIn").Should().Be(openOnShow);
         field.FindAll("li.e-list-item").Select(li => li.TextContent.Trim()).Should().Equal(openOnShow ? ["Gift Box Set", "Cream Loaf"] : []);
+    }
+
+    [Test]
+    public async Task A_deferred_picker_is_its_look_alike_until_it_has_the_cursor_and_the_combo_box_only_while_it_has()
+    {
+        await using var context = AppServices.NewContext();
+        context.JSInterop.Setup<bool>("tinapayan.handOverPick", _ => true).SetResult(true);
+        var form = new Form();
+        List<string?> picked = [];
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .AddCascadingValue<IUndoRecorder>(form)
+            .Add(f => f.Items, ["Flour", "Salt", "Water"])
+            .Add(f => f.Value, "Salt")
+            .Add(f => f.Deferred, true)
+            .Add(f => f.ValueChanged, picked.Add));
+
+        // A recipe line as it's drawn: the item's name in the look-alike, and no combo box setting up its list.
+        field.FindComponents<PickComboBox<string>>().Should().BeEmpty();
+        field.Find(".deferred-pick input").GetAttribute("value").Should().Be("Salt");
+
+        // The look-alike takes the cursor: the combo box is made, and once it's set up, the cursor is handed to it.
+        field.Find(".deferred-pick input").Focus();
+        field.WaitForAssertion(() => field.FindAll(".deferred-pick").Should().BeEmpty());
+        var handOver = context.JSInterop.Invocations.Single(i => i.Identifier == "tinapayan.handOverPick");
+        handOver.Arguments[1].Should().Be(false, "the arrow wasn't pressed");
+        form.Begun.Should().Be(0, "the look-alike's cursor is no visit to the picker yet");
+
+        // The combo box, given the cursor, is the picker as ever: a pick passes on.
+        var box = field.FindComponent<PickComboBox<string>>();
+        var events = field.FindComponent<ComboBoxEvents<int?, PickField<string>.Choice>>();
+        box.Instance.Value.Should().Be(1);
+        await field.InvokeAsync(() => events.Instance.Focus.InvokeAsync(new object()));
+        await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(2));
+        picked.Should().Equal("Water");
+        form.Begun.Should().Be(1);
+
+        // Left: the look-alike takes its place again, with the line's pick.
+        field.Render(parameters => parameters.Add(f => f.Value, "Water"));
+        await field.InvokeAsync(() => events.Instance.Blur.InvokeAsync(new object()));
+
+        field.FindComponents<PickComboBox<string>>().Should().BeEmpty();
+        field.Find(".deferred-pick input").GetAttribute("value").Should().Be("Water");
+        form.Ended.Should().Be(1);
+    }
+
+    [Test]
+    public async Task A_deferred_pickers_arrow_opens_its_list_once_the_combo_box_has_the_cursor()
+    {
+        await using var context = AppServices.NewContext();
+        context.JSInterop.Setup<bool>("tinapayan.handOverPick", _ => true).SetResult(true);
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Flour", "Salt", "Water"])
+            .Add(f => f.Value, "Salt")
+            .Add(f => f.Deferred, true));
+
+        field.Find(".deferred-pick .e-ddl-icon").MouseDown();
+
+        field.WaitForAssertion(() => field.FindAll("li.e-list-item").Select(li => li.TextContent.Trim()).Should().Equal("Flour", "Salt", "Water"));
+        context.JSInterop.Invocations.Single(i => i.Identifier == "tinapayan.handOverPick").Arguments[1].Should().Be(true);
+    }
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task A_list_a_picker_opens_itself_closes_on_escape(bool deferred)
+    {
+        await using var context = AppServices.NewContext();
+        context.JSInterop.Setup<bool>("tinapayan.handOverPick", _ => true).SetResult(true);
+
+        // A deferred picker's arrow, or a picker that opens on show (the Packaging tab's Link and Copy): the combo box
+        // opened by the picker, not by a press on its own arrow.
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Flour", "Salt", "Water"])
+            .Add(f => f.Deferred, deferred)
+            .Add(f => f.OpenOnShow, !deferred));
+        if (deferred)
+        {
+            field.Find(".deferred-pick .e-ddl-icon").MouseDown();
+        }
+
+        field.WaitForAssertion(() => field.FindAll("li.e-list-item").Should().HaveCount(3));
+
+        // Escape, as the combo box's script hands it on, closes it, as it does a list opened by a press on the combo box's
+        // own arrow: Syncfusion closes only a list it has marked open.
+        var box = field.FindComponent<PickComboBox<string>>();
+        await field.InvokeAsync(() => box.Instance.KeyActionHandler(new KeyActions { Action = "escape", Key = "Escape", Type = "keydown", Events = new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" } }));
+
+        field.WaitForAssertion(() => field.FindAll(".e-popup-open li.e-list-item").Should().BeEmpty());
+    }
+
+    [Test]
+    public async Task A_deferred_picker_whose_cursor_went_on_before_its_combo_box_was_set_up_stays_its_look_alike()
+    {
+        await using var context = AppServices.NewContext();
+
+        // Tab, Tab: the look-alike had the cursor and lost it before the combo box was ready to take it.
+        context.JSInterop.Setup<bool>("tinapayan.handOverPick", _ => true).SetResult(false);
+        var field = context.Render<PickField<string>>(parameters => parameters
+            .Add(f => f.Items, ["Flour", "Salt", "Water"])
+            .Add(f => f.Value, "Salt")
+            .Add(f => f.Deferred, true));
+
+        field.Find(".deferred-pick input").Focus();
+
+        field.WaitForAssertion(() => context.JSInterop.Invocations.Any(i => i.Identifier == "tinapayan.handOverPick").Should().BeTrue());
+        field.WaitForAssertion(() => field.FindComponents<PickComboBox<string>>().Should().BeEmpty());
+        field.Find(".deferred-pick input").GetAttribute("value").Should().Be("Salt");
     }
 
     // The combo box's event arguments, as it makes them: their setters are Syncfusion's own.

@@ -1,4 +1,5 @@
 @typeparam TItem
+@inject IJSRuntime JS
 
 @* A picker bound to a ViewModel's choice, as the WPF screens' ComboBoxAdvs were: every picker filters as it's typed
    into, and picks only what it lists. The choice is
@@ -15,21 +16,47 @@
    list trailed the typing. The lists are in memory, and a filter takes the window a few milliseconds. Only a pick made
    with the cursor in the box is passed on: the combo box also hands back values of its own as it settles on a list it
    was given (OnValueChanged). A picker that shows in answer to a button (OpenOnShow) takes the cursor and opens its list
-   as it shows, so the next key filters it. *@
-<PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
-            AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
-            Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
-    <ComboBoxFieldSettings Text="Text" Value="Index" />
-    <ComboBoxEvents TValue="int?" TItem="Choice" Created="OnCreated" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
-    @if (ItemTemplate is not null)
-    {
-        <ComboBoxTemplates TItem="Choice">
-            <ItemTemplate Context="choice">@ItemTemplate(choice.Item)</ItemTemplate>
-        </ComboBoxTemplates>
-    }
-</PickComboBox>
+   as it shows, so the next key filters it. A picker on every line of a table (Deferred) is the combo box only while it
+   has the cursor: until then, a look-alike of it, a box with the item's name and the arrow, takes its place. *@
+@if (Deferred)
+{
+    @* The look-alike keeps its place, and the cursor, while the combo box is made beside it, unseen (handing-over); once
+       the combo box is set up, the cursor is handed to it (OnCreated), and the look-alike goes. *@
+    <span @ref="_cell" class="deferred-pick-cell @(_handingOver ? "handing-over" : null)">
+        @if (_live)
+        {
+            @ComboBox
+        }
+        @if (!_live || _handingOver)
+        {
+            <span class="e-ddl e-input-group e-control-container e-control-wrapper e-valid-input field @CssClass deferred-pick" style="width: 100%;" title="@Tooltip">
+                <input class="e-input" type="text" value="@NameShown" data-text="@NameShown" placeholder="@Placeholder" disabled="@Disabled"
+                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="combobox" aria-expanded="false" @onfocus="GoLive" />
+                <span class="e-input-group-icon e-ddl-icon e-icons" @onmousedown="GoLiveAndOpen" @onmousedown:preventDefault="true"></span>
+            </span>
+        }
+    </span>
+}
+else
+{
+    @ComboBox
+}
 
 @code {
+    private RenderFragment ComboBox =>
+        @<PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
+                     AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
+                     Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
+            <ComboBoxFieldSettings Text="Text" Value="Index" />
+            <ComboBoxEvents TValue="int?" TItem="Choice" Created="OnCreated" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
+            @if (ItemTemplate is not null)
+            {
+                <ComboBoxTemplates TItem="Choice">
+                    <ItemTemplate Context="choice">@ItemTemplate(choice.Item)</ItemTemplate>
+                </ComboBoxTemplates>
+            }
+        </PickComboBox>;
+
     /// <summary>
     /// An item as the combo box holds it: its place in the list, the text it's found and shown by, and how well that
     /// matches what's typed, which the list is sorted by. The match isn't part of what it is: the combo box may hold it
@@ -90,6 +117,15 @@
     /// </summary>
     [Parameter] public bool OpenOnShow { get; set; }
 
+    /// <summary>
+    /// Whether the picker is the combo box only while it has the cursor, and until then a look-alike of it: a box with the
+    /// item's name and the arrow, which takes the cursor (a click, Tab, Insert Line, the Vim keys) and its arrow's press as
+    /// the combo box would, and hands them over, with anything typed meanwhile, once the combo box is made. For a picker on
+    /// every line of a table (LineGrid): each combo box sets up its whole list as it's drawn, which made them the largest
+    /// part of opening a screen or picking a record.
+    /// </summary>
+    [Parameter] public bool Deferred { get; set; }
+
     /// <summary>What's being typed, as it's typed: for a screen that settles typed text itself.</summary>
     [Parameter] public EventCallback<string> OnTyped { get; set; }
 
@@ -121,7 +157,25 @@
     // Whether the highlighted item was taken for what's typed, since the box took the cursor or was last typed into.
     private bool _highlightTaken;
 
+    // Deferred: whether the combo box is drawn, and whether its look-alike still has the cursor while it's made; and
+    // whether the look-alike's arrow was pressed, for the list to open once the combo box has the cursor.
+    private bool _live;
+    private bool _handingOver;
+    private bool _openWhenLive;
+    private ElementReference _cell;
+
+    private string NameShown => Value is { } item ? Text(item) : "";
+
+    // A look-alike's list waits until it goes live: only the combo box reads it.
     protected override void OnParametersSet()
+    {
+        if (!Deferred || _live)
+        {
+            UpdateChoices();
+        }
+    }
+
+    private void UpdateChoices()
     {
         var items = Items.ToList();
         if (items.Count != _choices.Count || !items.Select((item, i) => EqualityComparer<TItem>.Default.Equals(item, _choices[i].Item) && Text(item) == _choices[i].Text).All(same => same))
@@ -136,14 +190,64 @@
         ?? "";
 
     // The combo box says it's made once its first drawing has set up its script (sfBlazor's initialize), which its
-    // FocusAsync and ShowPopupAsync call into: from then on it can be given the cursor and its list.
+    // FocusAsync and ShowPopupAsync call into: from then on it can be given the cursor and its list. A deferred picker's
+    // look-alike hands it the cursor then, in the browser (tinapayan.handOverPick), with what was typed into it meanwhile,
+    // unless the cursor went on elsewhere first: then the look-alike stays.
     private async Task OnCreated(object args)
     {
-        if (OpenOnShow && _box is not null)
+        if (_box is null)
+        {
+            return;
+        }
+
+        if (_handingOver)
+        {
+            var pressed = _openWhenLive;
+            _openWhenLive = false;
+            bool taken;
+            try
+            {
+                taken = await JS.InvokeAsync<bool>("tinapayan.handOverPick", _cell, pressed);
+            }
+            catch (JSException)
+            {
+                taken = false;
+            }
+
+            _handingOver = false;
+            if (!taken && !_hasCursor)
+            {
+                _live = false;
+            }
+            else if (pressed && _live)
+            {
+                await _box.ShowPopupAsync();
+            }
+        }
+        else if (OpenOnShow)
         {
             await _box.FocusAsync();
             await _box.ShowPopupAsync();
         }
+    }
+
+    // Deferred: the look-alike took the cursor. The combo box is made beside it, unseen, and takes the cursor once it's
+    // set up (OnCreated).
+    private void GoLive()
+    {
+        if (!_live && !Disabled)
+        {
+            UpdateChoices();
+            _live = true;
+            _handingOver = true;
+        }
+    }
+
+    // Its arrow pressed: the same, and the list opens once the combo box has the cursor.
+    private void GoLiveAndOpen()
+    {
+        _openWhenLive = !Disabled;
+        GoLive();
     }
 
     private async Task OnFocus(object args)
@@ -179,6 +283,13 @@
         _hasCursor = false;
         Recorder?.EndUndoStep();
         await OnLeave.InvokeAsync();
+
+        // Deferred: the look-alike takes the combo box's place again. What the combo box still does after saying it was
+        // left (a float label's size, in its script) finds nothing there to do.
+        if (Deferred)
+        {
+            _live = false;
+        }
     }
 
     // Ranked before the combo box filters, as it then sorts what it lists by the rank and highlights the first. With

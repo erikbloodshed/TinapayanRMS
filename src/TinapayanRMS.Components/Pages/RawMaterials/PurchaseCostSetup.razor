@@ -17,7 +17,7 @@
         <Row Context="row">
             <td><TextField Value="@row.Brand" ValueChanged="v => row.Brand = v" CssClass="cell-field" /></td>
             <td>
-                <PickField TItem="PurchaseUnitChoice" Items="ViewModel.PurchaseUnitOptions" TextField="Name" CssClass="cell-field" PopupWidth="260px"
+                <PickField TItem="PurchaseUnitChoice" Items="ViewModel.PurchaseUnitOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="260px"
                            Value="ViewModel.PurchaseUnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)" ValueChanged="o => row.UnitKey = o?.Key">
                     <ItemTemplate Context="option"><span class="pick-columns"><span>@option.Name</span><span class="muted">@option.Abbreviation</span></span></ItemTemplate>
                 </PickField>

@@ -631,6 +631,21 @@ input.e-input {
     box-shadow: inset 3px 0 0 var(--color-sf-primary-bg-color-selected);
 }
 
+/* A picker shown by a look-alike until it has the cursor (PickField's Deferred): the look-alike wears the combo box's own
+   classes, so it's drawn the same. While the combo box is made, the look-alike keeps its place and the cursor, and the
+   combo box waits over it unseen, taking no clicks, until the cursor is handed to it. */
+.deferred-pick-cell {
+    display: block;
+    position: relative;
+}
+
+.deferred-pick-cell.handing-over > .e-input-group:not(.deferred-pick) {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
 /* A grid's heading row, as tall as its rows (RowHeight). */
 .e-grid .e-gridheader .e-headercell,
 .e-grid .e-gridheader .e-detailheadercell {

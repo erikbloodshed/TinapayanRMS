@@ -12,7 +12,7 @@
             </Header>
             <Row Context="row">
                 <td>
-                    <PickField TItem="UnitOfMeasure" Items="ViewModel.UnitsOfMeasure" TextField="Name" CssClass="cell-field" PopupWidth="260px"
+                    <PickField TItem="UnitOfMeasure" Items="ViewModel.UnitsOfMeasure" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="260px"
                                Value="ViewModel.UnitsOfMeasure.FirstOrDefault(u => u.Id == row.UnitOfMeasureId)" ValueChanged="u => row.UnitOfMeasureId = u?.Id">
                         <ItemTemplate Context="unit"><span class="pick-columns"><span>@unit.Name</span><span class="muted">@unit.Abbreviation</span></span></ItemTemplate>
                     </PickField>

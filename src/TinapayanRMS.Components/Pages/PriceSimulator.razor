@@ -70,7 +70,7 @@
                     </Header>
                     <Row Context="row">
                         <td>
-                            <PickField TItem="RawMaterial" Items="ViewModel!.Materials" TextField="Name" CssClass="cell-field" PopupWidth="420px"
+                            <PickField TItem="RawMaterial" Items="ViewModel!.Materials" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
                                        Value="row.Material" ValueChanged="m => row.MaterialId = m?.Id">
                                 <ItemTemplate Context="material"><span class="pick-columns"><span>@material.Name</span><span class="muted">@material.Category?.Name</span></span></ItemTemplate>
                             </PickField>

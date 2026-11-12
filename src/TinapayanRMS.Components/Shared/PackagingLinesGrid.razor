@@ -21,7 +21,7 @@
             }
             else
             {
-                <PickField TItem="RawMaterial" Items="Materials" TextField="Name" CssClass="cell-field" PopupWidth="460px"
+                <PickField TItem="RawMaterial" Items="Materials" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="460px"
                            Value="row.PackagingMaterial" ValueChanged="m => row.PackagingMaterialId = m?.Id">
                     <ItemTemplate Context="material">
                         <span class="pick-columns pick-columns-4">
@@ -42,7 +42,7 @@
             }
             else
             {
-                <PickField TItem="PackagingUnitChoice" Items="row.UnitOptions" TextField="Abbreviation" CssClass="cell-field"
+                <PickField TItem="PackagingUnitChoice" Items="row.UnitOptions" TextField="Abbreviation" CssClass="cell-field" Deferred="true"
                            Value="row.UnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)" ValueChanged="o => { if (o is not null) row.UnitKey = o.Key; }" />
             }
         </td>

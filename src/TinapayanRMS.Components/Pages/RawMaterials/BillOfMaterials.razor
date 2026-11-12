@@ -54,7 +54,7 @@
         <Row Context="row">
             <td>
                 @* Names alone, as a recipe line's picker lists them (IngredientLinesGrid). *@
-                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" PopupWidth="320px"
+                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="320px"
                            Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id" />
             </td>
             <td><NumberField TValue="decimal?" Value="row.Grams" ValueChanged="v => row.Grams = v" Format="#,0.0###" Min="0" CssClass="cell-field" /></td>
