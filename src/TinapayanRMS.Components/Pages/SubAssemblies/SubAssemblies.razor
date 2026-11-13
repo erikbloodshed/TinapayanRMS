@@ -1,6 +1,6 @@
 @page "/sub-assemblies"
 @page "/sub-assemblies/{Id:int}"
-@inherits ScreenBase<SubAssembliesViewModel>
+@inherits RecordScreenBase<SubAssembliesViewModel>
 @inject Prompts Prompts
 
 <PageTitle>@(ViewModel!.SelectedRow?.Name ?? "Sub-Assemblies") · TinapayanRMS</PageTitle>
@@ -136,12 +136,6 @@
 </CascadingValue>
 
 @code {
-    /// <summary>The sub-assembly in the address, opened as picking it in the list would.</summary>
-    [Parameter] public int? Id { get; set; }
-
-    /// <summary>The address last acted on: its sub-assembly is opened once, not each time the screen is given it again.</summary>
-    private int? _addressOpened;
-
     private IngredientLinesGrid? _lines;
 
     protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
@@ -154,40 +148,15 @@
         // Make In-House Ingredient: the made ingredient's name and the Made category it goes in.
         AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
-
-        // The sub-assembly in the address is the load's to open, at its end: the list is fresh only then. New clicked
-        // meanwhile is the later word.
-        _addressOpened = Id;
-        if (Id is { } id && viewModel.SelectedRow?.Id != id)
-        {
-            viewModel.OpenSubAssemblyOnLoad(id);
-        }
     }
 
-    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
-    // called for too, once the load is back: New clicked before then would have the sub-assembly load over it.
-    protected override void OnParametersSet()
-    {
-        if (Id == _addressOpened)
-        {
-            return;
-        }
+    protected override string AddressRoot => "sub-assemblies";
 
-        _addressOpened = Id;
-        if (Id is { } id && ViewModel!.SelectedRow?.Id != id)
-        {
-            ViewModel.OpenSubAssembly(id);
-        }
-    }
+    protected override int? ShownId => ViewModel!.SelectedRow?.Id;
 
-    // The sub-assembly picked goes into the address, so Back returns to the one before.
-    protected override void OnViewModelChanged(string? propertyName)
-    {
-        if (propertyName == nameof(SubAssembliesViewModel.SelectedRow) && ViewModel!.SelectedRow is { Id: > 0 } row && row.Id != Id)
-        {
-            _ = InvokeAsync(() => MoveAddressTo($"sub-assemblies/{row.Id}"));
-        }
-    }
+    protected override string ShownProperty => nameof(SubAssembliesViewModel.SelectedRow);
 
-    protected override bool IsOwnAddress(string path) => path.StartsWith("sub-assemblies", StringComparison.OrdinalIgnoreCase);
+    protected override void Open(int id) => ViewModel!.OpenSubAssembly(id);
+
+    protected override void OpenOnLoad(int id) => ViewModel!.OpenSubAssemblyOnLoad(id);
 }

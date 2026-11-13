@@ -1,6 +1,6 @@
 @page "/products"
 @page "/products/{Id:int}"
-@inherits ScreenBase<ProductsViewModel>
+@inherits RecordScreenBase<ProductsViewModel>
 @inject Prompts Prompts
 
 <PageTitle>@(ViewModel!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
@@ -58,12 +58,6 @@
 </CascadingValue>
 
 @code {
-    /// <summary>The product in the address, opened as picking it in the list would.</summary>
-    [Parameter] public int? Id { get; set; }
-
-    /// <summary>The address last acted on: its product is opened once, not each time the screen is given it again.</summary>
-    private int? _addressOpened;
-
     protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
@@ -82,42 +76,17 @@
         // Move to In-House: the made ingredient's name and the Made category it goes in.
         AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
-
-        // The product in the address is the load's to open, at its end: the list is fresh only then. New clicked
-        // meanwhile is the later word.
-        _addressOpened = Id;
-        if (Id is { } id && viewModel.SelectedProduct?.Id != id)
-        {
-            viewModel.OpenProductOnLoad(id);
-        }
     }
 
-    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
-    // called for too, once the load is back: New clicked before then would have the product load over it.
-    protected override void OnParametersSet()
-    {
-        if (Id == _addressOpened)
-        {
-            return;
-        }
+    protected override string AddressRoot => "products";
 
-        _addressOpened = Id;
-        if (Id is { } id && ViewModel!.SelectedProduct?.Id != id)
-        {
-            ViewModel.OpenProduct(id);
-        }
-    }
+    protected override int? ShownId => ViewModel!.SelectedProduct?.Id;
 
-    // The product picked goes into the address, so Back returns to the one before.
-    protected override void OnViewModelChanged(string? propertyName)
-    {
-        if (propertyName == nameof(ProductsViewModel.SelectedProduct) && ViewModel!.SelectedProduct is { Id: > 0 } product && product.Id != Id)
-        {
-            _ = InvokeAsync(() => MoveAddressTo($"products/{product.Id}"));
-        }
-    }
+    protected override string ShownProperty => nameof(ProductsViewModel.SelectedProduct);
 
-    protected override bool IsOwnAddress(string path) => path.StartsWith("products", StringComparison.OrdinalIgnoreCase);
+    protected override void Open(int id) => ViewModel!.OpenProduct(id);
+
+    protected override void OpenOnLoad(int id) => ViewModel!.OpenProductOnLoad(id);
 
     // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
     protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);

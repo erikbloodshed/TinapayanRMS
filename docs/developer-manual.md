@@ -893,7 +893,7 @@ A component that redraws on a ViewModel's events asks its own `RedrawGate` (`Req
 
 A large screen is split into components in a folder named after it (`Pages/RawMaterials/`, `Pages/Products/`). A part takes the screen's ViewModel as a `ViewModel` parameter and has no state the ViewModel should own. The screen's page decides when each part shows. Keep a part's `@code` to view-only work, such as focus.
 
-**A record screen has an address per record.** Its page takes an optional `Id` (`@page "/products/{Id:int}"`), opens that record, and puts the record the user picks into the address in `OnViewModelChanged`. That gives the web view's Back and Forward something to step through, and lets one screen open a record on another by navigating.
+**A record screen has an address per record.** Its page inherits [RecordScreenBase&lt;TViewModel&gt;](../src/TinapayanRMS.Components/Shared/RecordScreenBase.cs), which takes an optional `Id` (`@page "/products/{Id:int}"`), opens that record, and puts the record the user picks into the address in `OnViewModelChanged`. The page names its address and record: `AddressRoot` ("products"), `ShownId`, `ShownProperty`, `Open` and `OpenOnLoad`; `IsOwnAddress` follows from `AddressRoot`. That gives the web view's Back and Forward something to step through, and lets one screen open a record on another by navigating.
 
 **The page acts on an address once, when it arrives** (`_addressOpened`), and not each time it's handed the same one:
 

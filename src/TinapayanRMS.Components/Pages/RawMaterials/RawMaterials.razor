@@ -1,6 +1,6 @@
 @page "/raw-materials"
 @page "/raw-materials/{Id:int}"
-@inherits ScreenBase<RawMaterialsViewModel>
+@inherits RecordScreenBase<RawMaterialsViewModel>
 @inject Prompts Prompts
 @inject IJSRuntime JS
 
@@ -68,12 +68,6 @@
 </CascadingValue>
 
 @code {
-    /// <summary>The material in the address, opened as picking it in the list would.</summary>
-    [Parameter] public int? Id { get; set; }
-
-    /// <summary>The address last acted on: its material is opened once, not each time the screen is given it again.</summary>
-    private int? _addressOpened;
-
     protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
@@ -88,43 +82,17 @@
         // Copy fills the form with a name to change: the cursor goes to Name. New names the material in the list instead,
         // where its row's box has the cursor.
         AddSubscription(viewModel.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
-
-        // The material in the address is the load's to open, at its end: the list is fresh only then. New clicked
-        // meanwhile is the later word.
-        _addressOpened = Id;
-        if (Id is { } id && viewModel.SelectedRawMaterial?.Id != id)
-        {
-            viewModel.OpenRawMaterialOnLoad(id);
-        }
     }
 
-    // An address that changed: Back, Forward, or another screen's link. Not the one the screen opened on, which this is
-    // called for too, once the load is back: New clicked before then would have the material load over it.
-    protected override void OnParametersSet()
-    {
-        if (Id == _addressOpened)
-        {
-            return;
-        }
+    protected override string AddressRoot => "raw-materials";
 
-        _addressOpened = Id;
-        if (Id is { } id && ViewModel!.SelectedRawMaterial?.Id != id)
-        {
-            ViewModel.OpenRawMaterial(id);
-        }
-    }
+    protected override int? ShownId => ViewModel!.SelectedRawMaterial?.Id;
 
-    // The material picked goes into the address, so Back returns to the one before.
-    protected override void OnViewModelChanged(string? propertyName)
-    {
-        if (propertyName == nameof(RawMaterialsViewModel.SelectedRawMaterial)
-            && ViewModel!.SelectedRawMaterial is { Id: > 0 } material && material.Id != Id)
-        {
-            _ = InvokeAsync(() => MoveAddressTo($"raw-materials/{material.Id}"));
-        }
-    }
+    protected override string ShownProperty => nameof(RawMaterialsViewModel.SelectedRawMaterial);
 
-    protected override bool IsOwnAddress(string path) => path.StartsWith("raw-materials", StringComparison.OrdinalIgnoreCase);
+    protected override void Open(int id) => ViewModel!.OpenRawMaterial(id);
+
+    protected override void OpenOnLoad(int id) => ViewModel!.OpenRawMaterialOnLoad(id);
 
     private async Task FocusNameAsync()
     {
