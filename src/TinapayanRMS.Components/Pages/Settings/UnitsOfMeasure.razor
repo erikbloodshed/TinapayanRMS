@@ -20,10 +20,10 @@
     <section class="card form-card">
         <h2 class="section-header">@ViewModel!.FormTitle</h2>
         <FormRow Label="Name" For="unit-name">
-            <SfTextBox ID="unit-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="unit-name" @bind-Value="ViewModel!.EditingName" />
         </FormRow>
         <FormRow Label="Abbreviation" For="unit-abbreviation">
-            <SfTextBox ID="unit-abbreviation" @bind-Value="ViewModel!.EditingAbbreviation" />
+            <TextField ID="unit-abbreviation" @bind-Value="ViewModel!.EditingAbbreviation" />
         </FormRow>
         <div class="button-row">
             <CommandButton Command="ViewModel!.NewCommand" Icon="AppIcon.Add" Label="New" />

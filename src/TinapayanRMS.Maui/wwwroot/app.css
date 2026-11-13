@@ -672,10 +672,6 @@ input.e-input {
     to { transform: rotate(360deg); }
 }
 
-.number-box input {
-    text-align: right;
-}
-
 /* A grid that fills its card: its heading stays put and its rows scroll under it. Syncfusion sizes the rows' scroller
    from the Height it's given, which a percentage of a flex item doesn't settle, so the grid is laid out as a column. */
 .list-card .e-grid,

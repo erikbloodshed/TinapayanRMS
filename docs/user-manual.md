@@ -192,7 +192,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - Pickers inside tables, such as the ingredient or material pickers, suggest names as you type.
 - To change a line's ingredient, material or product, type over it. The line keeps what it had until you pick another, so its cost and the totals don't change while you type. Text that names nothing in the list leaves the line as it was.
 - **Drag a row** by its left edge (the narrow cell before the first column) to change the order of recipe lines, add-ins, packaging lines and a composite product's products. While you drag, the line fades and a blue bar shows where it will go: above the line under the pointer when you drag up, below it when you drag down. Let go there, and the lines in between move up or down one to make room. Dragging near the top or bottom of the table scrolls it. Press **Esc**, or let go beside the table, to leave the order as it was. A move is one step for **Undo**, and the order is saved with the rest.
-- **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell takes the cursor, ready to type. With no line selected, the new line goes in at the bottom. You can also press **Insert** while the cursor is in the table. It's on the ingredient tables: a sub-assembly's lines on the Sub-Assemblies screen, a product section's lines and add-ins (the add-ins button is **Insert Add-In**), and a made ingredient's add-ins. A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
+- **Insert Line** puts a blank line in above the selected one, so you don't have to add it at the bottom and drag it up. The new line's Ingredient cell takes the cursor, ready to type. With no line selected, the new line goes in at the bottom. You can also press **Insert** while the cursor is in the table. It's on the ingredient and packaging tables: a sub-assembly's or packaging set's lines on the Sub-Assemblies screen, a product's packaging, a product section's lines and add-ins (the add-ins button is **Insert Add-In**), and a made ingredient's add-ins. A line you leave blank does no harm, because Save leaves it out. **Undo** or **Remove Line** takes it away.
 - **Remove Line** removes the selected line.
 - Figures shown in grey are worked out by the app, so they can't be typed into.
 
@@ -330,7 +330,7 @@ A role can't be deleted while any sub-assembly uses it.
 
 ### Costing Defaults
 
-**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
+**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. Like **Type** on Material Categories, it's a picker you can type into to narrow its list, as on the screens. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
 
 Under it are the four percentages a **new** product's costing starts with:
 

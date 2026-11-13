@@ -78,7 +78,7 @@
                                     <h2 class="section-header">Lines</h2>
                                     @if (ViewModel!.IsPackaging)
                                     {
-                                        <PackagingLinesGrid Items="ViewModel!.PackagingLines" NewItem="ViewModel!.NewPackagingLine" Materials="ViewModel!.PackagingMaterials"
+                                        <PackagingLinesGrid @ref="_packagingLines" Items="ViewModel!.PackagingLines" NewItem="ViewModel!.NewPackagingLine" Materials="ViewModel!.PackagingMaterials"
                                                             @bind-SelectedItem="ViewModel!.SelectedPackagingLine" CostHeader="Cost per Set" />
                                     }
                                     else
@@ -93,11 +93,8 @@
                                                 : ViewModel!.FormulaBaseCaption)
                                         </p>
                                         <div class="button-row">
-                                            @if (!ViewModel!.IsPackaging)
-                                            {
-                                                <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
-                                                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                                            }
+                                            <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="InsertLineAsync"
+                                                          Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
                                             <CommandButton Command="ViewModel!.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                                         </div>
                                     </div>
@@ -137,6 +134,11 @@
 
 @code {
     private IngredientLinesGrid? _lines;
+    private PackagingLinesGrid? _packagingLines;
+
+    // Insert Line in the table showing: a recipe's lines, or a packaging set's.
+    private Task InsertLineAsync() =>
+        (ViewModel!.IsPackaging ? _packagingLines?.InsertLineAsync() : _lines?.InsertLineAsync()) ?? Task.CompletedTask;
 
     protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
 

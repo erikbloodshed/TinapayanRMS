@@ -21,11 +21,11 @@
     <section class="card form-card">
         <h2 class="section-header">@ViewModel!.FormTitle</h2>
         <FormRow Label="Name" For="category-name">
-            <SfTextBox ID="category-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="category-name" @bind-Value="ViewModel!.EditingName" />
         </FormRow>
         <FormRow Label="Type" For="category-type">
-            <SfDropDownList ID="category-type" TValue="RawMaterialCategoryType" TItem="RawMaterialCategoryType" DataSource="ViewModel!.Types" @bind-Value="ViewModel!.EditingType"
-                            title="Ingredient: purchased and linked ingredients. Made: made ingredients, and only them. Packaging: packaging materials." />
+            <PickField ID="category-type" TItem="RawMaterialCategoryType" Items="ViewModel!.Types" @bind-Value="ViewModel!.EditingType"
+                       Tooltip="Ingredient: purchased and linked ingredients. Made: made ingredients, and only them. Packaging: packaging materials." />
         </FormRow>
         <p class="caption form-extra">Every material goes in a category of its own type: a made ingredient only in a Made one, and a Made one takes nothing else. A category's type can change only when everything in it fits the new one.</p>
         <div class="button-row">

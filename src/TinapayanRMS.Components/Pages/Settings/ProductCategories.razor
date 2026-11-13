@@ -20,7 +20,7 @@
     <section class="card form-card">
         <h2 class="section-header">@ViewModel!.FormTitle</h2>
         <FormRow Label="Name" For="product-category-name">
-            <SfTextBox ID="product-category-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="product-category-name" @bind-Value="ViewModel!.EditingName" />
         </FormRow>
         <FormRow Label="Wastage %" For="product-category-wastage">
             <NumberField ID="product-category-wastage" TValue="decimal?" @bind-Value="ViewModel!.EditingWastagePercent" Format="N2" Min="0" Max="100" Placeholder="Shop-wide"

@@ -20,10 +20,8 @@ const components = [
     "sfdropdownbutton",
     "sfdropdownlist",
     "sfgrid",
-    "sfnumerictextbox",
     "sfsidebar",
     "sftab",
-    "sftextbox",
     "sftoast",
 ];
 

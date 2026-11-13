@@ -27,7 +27,7 @@
     <section class="card form-card">
         <h2 class="section-header">@ViewModel!.FormTitle</h2>
         <FormRow Label="Name" For="role-name">
-            <SfTextBox ID="role-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="role-name" @bind-Value="ViewModel!.EditingName" />
         </FormRow>
         <FormRow Label="">
             <SfCheckBox Label="Product-owned" @bind-Checked="ViewModel!.EditingIsProductOwned" Disabled="!ViewModel!.CanEditProductOwned"
