@@ -157,16 +157,41 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
 
     public bool HasUnsavedChanges => History.IsDirty;
 
+    /// <summary>The form's last Save (<see cref="RunSaveAsync"/>), done or still running.</summary>
+    private Task _saving = Task.CompletedTask;
+
+    /// <summary>
+    /// Runs the form's Save, the body of the screen's SaveCommand, as <see cref="ViewModelBase.RunSafelyAsync(Func{Task})"/>
+    /// does, and keeps it while it runs. The form holds unsaved changes until its Save is done, so the question about them
+    /// waits for it (<see cref="ResolveUnsavedChangesAsync"/>): asked meanwhile (Save, then a tab or the window's Close
+    /// before it was back), its Yes started a second Save of the same form beside the first, since SaveCommand.Execute()
+    /// runs whatever CanExecute says. Kept here rather than read from the command's IsExecuting, which ReactiveUI sets on
+    /// its output scheduler, and so not always by the time Execute() returns.
+    /// </summary>
+    protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(save);
+
     /// <inheritdoc/>
-    public Task<bool> ResolveUnsavedChangesAsync(bool revert) => AskAboutUnsavedChangesAsync(
-        History.IsDirty,
-        UnsavedChangesName,
-        async () =>
+    /// <remarks>
+    /// Waits for a Save still running first, only while the form is dirty: a Save clears the form's history before it
+    /// reloads, so nothing a Save runs on its way can wait for that Save itself.
+    /// </remarks>
+    public async Task<bool> ResolveUnsavedChangesAsync(bool revert)
+    {
+        if (History.IsDirty)
         {
-            await SaveFormAsync();
-            return !History.IsDirty;
-        },
-        revert ? RevertToSavedAsync : null);
+            await _saving;
+        }
+
+        return await AskAboutUnsavedChangesAsync(
+            History.IsDirty,
+            UnsavedChangesName,
+            async () =>
+            {
+                await SaveFormAsync();
+                return !History.IsDirty;
+            },
+            revert ? RevertToSavedAsync : null);
+    }
 
     /// <summary>
     /// A record picked in the list, by <paramref name="id"/>: shown at once (<paramref name="pick"/>), or, while the form holds

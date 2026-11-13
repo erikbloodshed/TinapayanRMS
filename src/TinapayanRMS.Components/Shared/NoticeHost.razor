@@ -1,6 +1,8 @@
+@using TinapayanRMS.Infrastructure.Services
 @implements IDisposable
 @inject Notices Notices
 @inject AppStatus Status
+@inject Serilog.ILogger Logger
 
 @* Two toasts in the bottom-right corner: an error stays until it's closed or cleared, a success fades after 4 seconds
    (held while the mouse is over it, then gone a second after it leaves). *@
@@ -15,7 +17,17 @@
     private SfToast? _errorToast;
     private SfToast? _successToast;
 
-    protected override void OnInitialized() => Notices.Changed += OnNoticeChanged;
+    // How many messages each toast has been given. Each one hides what's showing before it shows itself, and both are
+    // calls to the page, so two that come within one of them finish in either order: only the latest shows, or an error
+    // cleared just after it was raised would still come up.
+    private int _errors;
+    private int _successes;
+
+    protected override void OnInitialized()
+    {
+        Notices.Changed += OnNoticeChanged;
+        UnhandledFailures.Reported += OnUnhandledFailure;
+    }
 
     // A tab that just reloaded because of a restore says what was restored.
     protected override void OnAfterRender(bool firstRender)
@@ -26,9 +38,20 @@
         }
     }
 
-    private void OnNoticeChanged(NoticeKind kind, string? message) => InvokeAsync(async () =>
+    // A command or worked-out property that failed with nothing on the screen to catch it (UnhandledFailures), already
+    // logged: shown as RunSafelyAsync shows a failure, so the click that hit it doesn't just do nothing.
+    private void OnUnhandledFailure(Exception exception) => OnNoticeChanged(NoticeKind.Error, Failure.Of(exception).Text);
+
+    private void OnNoticeChanged(NoticeKind kind, string? message)
     {
-        var toast = kind == NoticeKind.Error ? _errorToast : _successToast;
+        var error = kind == NoticeKind.Error;
+        var number = error ? Interlocked.Increment(ref _errors) : Interlocked.Increment(ref _successes);
+        InvokeAsync(() => ShowAsync(error, message, number)).Forget(Logger);
+    }
+
+    private async Task ShowAsync(bool error, string? message, int number)
+    {
+        var toast = error ? _errorToast : _successToast;
         if (toast is null)
         {
             return;
@@ -36,21 +59,27 @@
 
         // A new message replaces the one showing, and no message takes it away.
         await toast.HideAsync("All");
-        if (!string.IsNullOrEmpty(message))
+        var latest = error ? Volatile.Read(ref _errors) : Volatile.Read(ref _successes);
+        if (string.IsNullOrEmpty(message) || number != latest)
         {
-            // The colour class goes on each toast: the component's own CssClass doesn't reach it.
-            var error = kind == NoticeKind.Error;
-            await toast.ShowAsync(new ToastModel
-            {
-                Content = message,
-                CssClass = error ? "e-toast-danger" : "e-toast-success",
-                Width = "380px",
-                ShowCloseButton = true,
-                Timeout = error ? 0 : 4000,
-                ExtendedTimeout = error ? 0 : 1000,
-            });
+            return;
         }
-    });
 
-    public void Dispose() => Notices.Changed -= OnNoticeChanged;
+        // The colour class goes on each toast: the component's own CssClass doesn't reach it.
+        await toast.ShowAsync(new ToastModel
+        {
+            Content = message,
+            CssClass = error ? "e-toast-danger" : "e-toast-success",
+            Width = "380px",
+            ShowCloseButton = true,
+            Timeout = error ? 0 : 4000,
+            ExtendedTimeout = error ? 0 : 1000,
+        });
+    }
+
+    public void Dispose()
+    {
+        Notices.Changed -= OnNoticeChanged;
+        UnhandledFailures.Reported -= OnUnhandledFailure;
+    }
 }

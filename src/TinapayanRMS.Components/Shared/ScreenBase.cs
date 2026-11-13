@@ -59,6 +59,8 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
 
     [Inject] private UnsavedChangesGuard ClosingGuard { get; set; } = null!;
 
+    [Inject] private Serilog.ILogger Logger { get; set; } = null!;
+
     /// <summary>The command that loads the screen, run each time it's opened; null for a screen with nothing to load.</summary>
     protected abstract ReactiveCommand<RxVoid, RxVoid>? LoadCommand { get; }
 
@@ -95,7 +97,7 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
         {
             _subscriptions.Add(ClosingGuard.Watch(form));
             _subscriptions.Add(Navigator.RegisterLocationChangingHandler(OnLocationChangingAsync));
-            _subscriptions.Add(new Unsubscriber(() => _ = SetLeaveWarningAsync(false)));
+            _subscriptions.Add(new Unsubscriber(() => SetLeaveWarningAsync(false).Forget(Logger)));
         }
     }
 

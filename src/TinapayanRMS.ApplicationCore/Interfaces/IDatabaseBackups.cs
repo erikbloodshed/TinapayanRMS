@@ -49,6 +49,13 @@ public interface IDatabaseBackups
 
     /// <summary>Deletes a backup file: one copied in to restore and then refused or not used.</summary>
     void Delete(DatabaseBackup backup);
+
+    /// <summary>
+    /// Puts the database back under its own name when a restore was cut short as it swapped the restored copy in, between
+    /// renaming the database aside and renaming the copy in its place: the app ended there (a power cut, the process
+    /// killed), and no database has the app's name. True when it put one back; false, doing nothing, otherwise.
+    /// </summary>
+    Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>What made a backup: Back Up Now, the day's automatic one, the safety copy a restore takes first, or a file brought in to restore.</summary>

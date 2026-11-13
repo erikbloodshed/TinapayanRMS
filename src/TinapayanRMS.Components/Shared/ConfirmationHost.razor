@@ -1,5 +1,6 @@
 @implements IDisposable
 @inject Confirmations Confirmations
+@inject Serilog.ILogger Logger
 
 @* "Confirm" rather than "Confirm Delete": the same question comes before anything that can't be undone, and the message
    says which. Closing it any other way (Esc, the close button) answers No. Asked about unsaved changes, it has Cancel
@@ -28,7 +29,7 @@
 @code {
     protected override void OnInitialized() => Confirmations.Changed += OnChanged;
 
-    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private void OnChanged() => InvokeAsync(StateHasChanged).Forget(Logger);
 
     public void Dispose() => Confirmations.Changed -= OnChanged;
 }

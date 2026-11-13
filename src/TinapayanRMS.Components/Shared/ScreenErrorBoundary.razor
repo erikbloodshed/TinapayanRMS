@@ -1,0 +1,41 @@
+@inherits ErrorBoundaryBase
+@implements IDisposable
+@inject Serilog.ILogger Logger
+@inject NavigationManager Navigation
+
+@* The screen on show, kept apart from the rest of the window. An exception a screen didn't catch (in drawing it, in one
+   of its events, in a component's call to the page) used to bring up Blazor's error bar, whose only way on was to load
+   the page again, which builds every screen's ViewModel afresh and loses the form's unsaved changes. Now the screen
+   alone gives way to this panel, the title bar, the tabs and the other screens still working. The ViewModel stays (it's
+   the page's), so opening the screen again, here or by going to it, shows it as it was, unsaved changes and all. The log
+   has what happened. *@
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="screen-error" role="alert">
+        <Icon Of="AppIcon.Warning" CssClass="screen-error-glyph" />
+        <div class="screen-error-text">
+            <p class="screen-error-title">This screen ran into a problem it didn't expect, and the details went to the log.</p>
+            <p>What it holds is kept, unsaved changes included. Open it again to go on.</p>
+            <ActionButton Label="Open It Again" Primary="true" OnClick="Recover" />
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Logger.Error(exception, "A screen failed, and gave way to its error panel");
+        return Task.CompletedTask;
+    }
+
+    // Another address shows another screen, or this one afresh: whatever failed was the last one's.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(Recover).Forget(Logger);
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

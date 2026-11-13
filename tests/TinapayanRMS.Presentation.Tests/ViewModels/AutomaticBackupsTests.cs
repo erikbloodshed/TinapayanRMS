@@ -253,5 +253,7 @@ public sealed class AutomaticBackupsTests : IDisposable
         public Task<RestoredBackup> RestoreAsync(DatabaseBackup backup, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public void Delete(DatabaseBackup backup) => throw new NotSupportedException();
+
+        public Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

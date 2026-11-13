@@ -90,6 +90,8 @@ public static class ServiceRegistration
             message => provider.GetRequiredService<AppStatus>().AnnounceRestore(message),
             provider.GetRequiredService<Serilog.ILogger>(),
             provider.GetRequiredService<AutomaticBackups>()));
+        // A backup or restore running there keeps the window open (UnsavedChangesGuard): closing ends the process.
+        services.AddScoped<IBusyWork>(provider => provider.GetRequiredService<DatabaseBackupsViewModel>());
         // Started by the MAUI app once it's built, as a web host starts its hosted services.
         services.AddHostedService<StartupTasks>();
 

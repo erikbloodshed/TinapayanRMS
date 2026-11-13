@@ -8,6 +8,7 @@
 @code {
     private DotNetObjectReference<UndoKeys>? _self;
     private IJSObjectReference? _registration;
+    private bool _disposed;
 
     [Parameter, EditorRequired] public IUndoScreen Screen { get; set; } = null!;
 
@@ -22,7 +23,9 @@
         if (firstRender)
         {
             _self = DotNetObjectReference.Create(this);
-            _registration = await JS.InvokeAsync<IJSObjectReference>("tinapayan.registerUndoKeys", _self);
+
+            // The keys are the document's: a screen left before they were registered stops them at once.
+            _registration = await JS.InvokeAsync<IJSObjectReference>("tinapayan.registerUndoKeys", _self).KeepUnlessGoneAsync(() => _disposed);
         }
     }
 
@@ -45,6 +48,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         await _registration.StopAsync();
         _self?.Dispose();
     }

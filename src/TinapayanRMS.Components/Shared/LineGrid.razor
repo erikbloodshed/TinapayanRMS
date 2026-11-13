@@ -61,6 +61,7 @@
 
     /// <summary>The page's watch on the row headers' drags (app.js's watchLineDrag), let go with the table.</summary>
     private IJSObjectReference? _dragWatch;
+    private bool _disposed;
 
     /// <summary>The line just inserted, whose first cell takes the cursor once it's drawn.</summary>
     private int? _focusRow;
@@ -288,7 +289,7 @@
         {
             _drops = new Drops(MoveLine);
             _dropsReference = DotNetObjectReference.Create(_drops);
-            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchLineDrag", _table, _dropsReference);
+            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchLineDrag", _table, _dropsReference).KeepUnlessGoneAsync(() => _disposed);
         }
 
         if (_focusRow is { } row)
@@ -300,6 +301,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         Unwatch();
         _rowEvents.Clear();
         await _dragWatch.StopAsync();

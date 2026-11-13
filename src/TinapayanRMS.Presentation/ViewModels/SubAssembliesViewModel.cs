@@ -585,7 +585,7 @@ public sealed class SubAssembliesViewModel : ListFormViewModel<SubAssemblyFormSn
             },
             this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null && row.SubAssembly.Role?.IsPackaging != true));
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(async () =>
         {
             var name = EditingName.Trim();
             var validation = _subAssemblyValidator.Validate(new SubAssembly { Name = name, RoleId = EditingRole?.Id ?? 0 });

@@ -57,6 +57,7 @@
     private bool _open;
     private DotNetObjectReference<FindHost>? _self;
     private IJSObjectReference? _key;
+    private bool _disposed;
 
     protected override void OnInitialized() => Find.PropertyChanged += OnFindChanged;
 
@@ -65,7 +66,7 @@
         if (firstRender)
         {
             _self = DotNetObjectReference.Create(this);
-            _key = await JS.InvokeAsync<IJSObjectReference>("tinapayan.registerFindKey", _self);
+            _key = await JS.InvokeAsync<IJSObjectReference>("tinapayan.registerFindKey", _self).KeepUnlessGoneAsync(() => _disposed);
         }
     }
 
@@ -132,6 +133,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         Find.PropertyChanged -= OnFindChanged;
         await _key.StopAsync();
         _self?.Dispose();

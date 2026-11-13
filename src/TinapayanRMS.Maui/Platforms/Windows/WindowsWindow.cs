@@ -46,6 +46,7 @@ public static partial class WindowsWindow
         IPlatformApplication.Current?.Services.GetRequiredService<AppWindowChrome>().Attach(window);
 
         var mayClose = false;
+        var deciding = false;
         appWindow.Closing += async (_, args) =>
         {
             if (mayClose)
@@ -53,12 +54,26 @@ public static partial class WindowsWindow
                 return;
             }
 
-            // Held open while the form is asked about; closed again once it may be.
+            // Held open while the form is asked about, or a Save it's running finishes; closed again once it may be. Close
+            // clicked again meanwhile waits on the first.
             args.Cancel = true;
-            if (await FormMayBeLeftAsync())
+            if (deciding)
             {
-                mayClose = true;
-                window.Close();
+                return;
+            }
+
+            deciding = true;
+            try
+            {
+                if (await FormMayBeLeftAsync())
+                {
+                    mayClose = true;
+                    window.Close();
+                }
+            }
+            finally
+            {
+                deciding = false;
             }
         };
     }
@@ -92,7 +107,8 @@ public static partial class WindowsWindow
         appWindow.MoveAndResize(new RectInt32(work.X + (work.Width - width) / 2, work.Y + (work.Height - height) / 2, width, height));
     }
 
-    // The question is the screen's own dialog, in the web view, so it's asked on the web view's dispatcher.
+    // The question is the screen's own dialog, in the web view, so it's asked on the web view's dispatcher. A backup or
+    // restore running in Settings → Database keeps the window open (UnsavedChangesGuard): it ends the process as it closes.
     private static async Task<bool> FormMayBeLeftAsync()
     {
         try

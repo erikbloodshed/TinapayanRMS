@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject Prompts Prompts
 @inject IJSRuntime JS
+@inject Serilog.ILogger Logger
 
 @* The name prompt: a heading, a line saying more, and one box that starts with the text it's given, selected so typing
    replaces it, with a picker under it when there's a choice to make too (a made ingredient's Made category). OK (or
@@ -54,7 +55,7 @@
         }
 
         StateHasChanged();
-    });
+    }).Forget(Logger);
 
     private async Task OnOpened() => await JS.InvokeVoidAsync("tinapayan.focus", "prompt-text");
 

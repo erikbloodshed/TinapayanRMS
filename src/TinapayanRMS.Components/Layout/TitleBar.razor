@@ -55,6 +55,7 @@
     private ElementReference _bar;
     private DotNetObjectReference<TitleBar>? _self;
     private IJSObjectReference? _watch;
+    private bool _disposed;
     private bool _maximized;
     private bool _canGoBack;
     private bool _canGoForward;
@@ -74,7 +75,7 @@
         if (firstRender)
         {
             _self = DotNetObjectReference.Create(this);
-            _watch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTitleBar", _bar, _self);
+            _watch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTitleBar", _bar, _self).KeepUnlessGoneAsync(() => _disposed);
         }
     }
 
@@ -104,6 +105,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         Window.StateChanged -= OnWindowStateChanged;
         Shell.PropertyChanged -= OnShellChanged;
         await _watch.StopAsync();

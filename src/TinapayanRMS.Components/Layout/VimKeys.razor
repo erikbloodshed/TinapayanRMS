@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject VimKeysState State
+@inject Serilog.ILogger Logger
 
 @* The Vim keys' place in the header, and their way back to the server. The keys themselves are read in the browser
    (wwwroot/vim.js), where the keyboard and the cursor are: it's handed the key table and the command list as the keys
@@ -23,7 +24,7 @@
         }
     }
 
-    private void OnChanged() => InvokeAsync(ApplyAsync);
+    private void OnChanged() => InvokeAsync(ApplyAsync).Forget(Logger);
 
     private async Task ApplyAsync()
     {

@@ -148,7 +148,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens at a time: opening it again brings the window that's open to the front.
+- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens on the PC at a time: opening it again brings the window that's open to the front. If it's open in another Windows sign-in on the PC, or the old TinapayanRMS is open, it says so and doesn't open (see [Troubleshooting](#14-troubleshooting-and-questions)).
 - **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
@@ -159,7 +159,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 - **Back and Forward** (the arrows at the top right, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, Settings' tabs included, like a web browser. If the cursor was in a box when another record opens, the cursor leaves the box, so that you don't type over the record that just opened. Click the box again to type in it.
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
 - Changes made on one screen show up on another the next time you open it.
-- **Closing the window** closes the app. What you've saved is kept. If a product, sub-assembly or raw material has changes you **haven't** saved, the app asks whether to save them first, as it does when you go to another screen (see [Editing and saving](#editing-and-saving)).
+- **Closing the window** closes the app. What you've saved is kept. If a product, sub-assembly or raw material has changes you **haven't** saved, the app asks whether to save them first, as it does when you go to another screen (see [Editing and saving](#editing-and-saving)). While a save is still on its way, the window waits for it rather than ask. While **Settings → Database** is backing up, copying or restoring, the window doesn't close, and a red notice says why: close it once that's done (a restore restarts the app by itself).
 
 ### Lists as folder trees
 
@@ -183,7 +183,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
   - **Cancel** keeps them, and you stay where you were.
   - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Leaving Print for any other screen asks about the product's changes, as leaving Products would. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
-- If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
+- If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, the screen gives way to a panel saying **This screen ran into a problem it didn't expect**: press **Open It Again**, and the screen comes back as it was, changes you haven't saved included. The other screens keep working meanwhile. Only rarely, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
 
 ### Working in tables
 
@@ -377,7 +377,7 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
   - A backup is checked and brought up to date before it takes the data's place. If it's refused, or anything goes wrong part-way, the data stays as it was.
 - **Restore from File…** restores a backup file from elsewhere, such as a USB stick or another computer. Pick the file, and it's copied into the folder and restored as above.
 
-A backup or a restore can take a little while. The tab says what it's doing until it's done.
+A backup or a restore can take a little while. The tab says what it's doing until it's done, and the window can't be closed meanwhile. If the computer goes off in the middle of a restore, the app puts the data back as it was before the restore the next time it starts.
 
 Backups are *.backup* files. The *.bak* files the app made before 21 October 2026, when it kept its data in SQL Server, aren't listed and can't be restored. Everything they held was carried over into the app's data on that day.
 
@@ -1426,11 +1426,23 @@ A figure has more digits than the app keeps, for example a price typed with too 
 **A number box doesn't take what I typed.**
 A number box takes numbers under a billion (999,999,999.9999 at most). If you type more digits than that, for example by holding a key down, the box keeps the last number it could take and shows it when you leave the box. Check the figure and type it again.
 
+**A screen says "This screen ran into a problem it didn't expect".**
+Something happened on that screen that the app didn't expect. It's in the log file, which helps whoever looks after the app. Press **Open It Again**: the screen comes back as it was, with any changes you hadn't saved. Going to another screen and back does the same.
+
 **A bar at the bottom of the window says something went wrong, and that the page needs reloading.**
-Something happened that the app didn't expect. It's in the log file, which helps whoever looks after the app. Press **Reload**. What you had saved is safe; what you hadn't saved is lost.
+Something happened outside the screens that the app didn't expect. It's in the log file. Press **Reload**. What you had saved is safe; what you hadn't saved is lost.
 
 **Opening the app brings up the window that's already open, not a new one.**
-Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another Windows user on the same PC, another PC using the same database, or another version of the app on this PC, so take care not to work on the same thing in two of them at the same time.
+Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another PC using the same database, so take care not to work on the same thing on two PCs at the same time.
+
+**Opening the app says it's open in another Windows sign-in on this PC.**
+Someone else signed in to Windows on this PC has TinapayanRMS open. Only one copy can be open on the PC, for the same reason as above. Sign in as them and close it there, or ask them to, then open it again.
+
+**Opening the app says the old TinapayanRMS is open.**
+The earlier version of the app (the one installed before this one) is open on this PC. The two can't share the data, so close the old one, then open TinapayanRMS again.
+
+**Opening the app says TinapayanRMS couldn't start.**
+Something stopped it before its window opened. The message says what, and where the log file is: show both to whoever looks after the app.
 
 **Opening the app does nothing.**
 The copy that's open has stopped responding, or is busy with something long. Give it a moment. If its window doesn't come back, end **TinapayanRMS.Maui** in Task Manager, then open the app again. Anything it hadn't saved is lost.
@@ -1451,7 +1463,7 @@ Purchased materials are costed at their **buffered cost**, which stays fixed unt
 Packaging quantities are per sellable unit and aren't rescaled. Update the Packaging tab by hand, or link a packaging set made for that pack size.
 
 **A message asks "Save the changes to …?" when I click somewhere else.**
-The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving). Closing the window asks the same. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
+The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving). Closing the window asks the same. Right after **Save**, it doesn't ask: the app waits for the save to go through first. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
 
 **The window shows a notice about a Syncfusion licence.**
 The app needs a licence key for its screen components, set on the computer by whoever installed it. Ask them to check it.

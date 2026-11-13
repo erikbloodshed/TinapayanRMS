@@ -419,6 +419,62 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
         new FileInfo(backup.Path).Length.Should().Be(backup.SizeBytes);
     }
 
+    // The app ended as a restore put its restored copy in place, between renaming the database aside and renaming the
+    // copy into its place: nothing has the database's name, and every screen would fail to load.
+    [Test]
+    public async Task A_restore_cut_short_between_its_renames_is_put_back_at_the_next_start()
+    {
+        await AddCategoryAsync("Breads");
+        var replaced = _database.Name + DatabaseBackups.ReplacedSuffix;
+        try
+        {
+            NpgsqlConnection.ClearAllPools();
+            await MaintenanceAsync($"ALTER DATABASE \"{_database.Name}\" WITH ALLOW_CONNECTIONS false");
+            await MaintenanceAsync($"ALTER DATABASE \"{_database.Name}\" RENAME TO \"{replaced}\"");
+
+            (await _backups.RecoverInterruptedRestoreAsync(Cancellation)).Should().BeTrue();
+
+            (await CategoryNamesAsync()).Should().Equal("Breads");
+        }
+        finally
+        {
+            await MaintenanceAsync($"DROP DATABASE IF EXISTS \"{replaced}\"");
+        }
+    }
+
+    // A restore that swapped its copy in but was cut short before it dropped the one it replaced: the database is there,
+    // and nothing of the one set aside is the app's to touch (the next restore drops it first).
+    [Test]
+    public async Task Nothing_is_put_back_while_the_database_is_there()
+    {
+        await AddCategoryAsync("Breads");
+        var replaced = _database.Name + DatabaseBackups.ReplacedSuffix;
+        try
+        {
+            await MaintenanceAsync($"CREATE DATABASE \"{replaced}\" TEMPLATE template0");
+
+            (await _backups.RecoverInterruptedRestoreAsync(Cancellation)).Should().BeFalse();
+
+            (await CategoryNamesAsync()).Should().Equal("Breads");
+        }
+        finally
+        {
+            await MaintenanceAsync($"DROP DATABASE IF EXISTS \"{replaced}\"");
+        }
+
+        (await _backups.RecoverInterruptedRestoreAsync(Cancellation)).Should().BeFalse("with none set aside there's nothing to put back");
+    }
+
+    /// <summary>A statement on the server's maintenance database, unpooled, as the app's own run there.</summary>
+    private async Task MaintenanceAsync(string sql)
+    {
+        var settings = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Database = "postgres", Pooling = false, CommandTimeout = 600 };
+        await using var connection = new NpgsqlConnection(settings.ConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync(Cancellation);
+    }
+
     private async Task AddCategoryAsync(string name)
     {
         await using var dbContext = _database.CreateDbContext();

@@ -25,6 +25,9 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// <summary>The maintenance database every PostgreSQL server has, which the statements that create, rename and drop a database run in.</summary>
     private const string MaintenanceDatabase = "postgres";
 
+    /// <summary>What a restore renames the database to while the restored copy takes its name, before it's dropped.</summary>
+    public const string ReplacedSuffix = "_replaced";
+
     /// <summary>How long a restore waits for the database's other connections to close once they've been told to.</summary>
     private static readonly TimeSpan DisconnectTimeout = TimeSpan.FromSeconds(30);
 
@@ -137,6 +140,47 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     }
 
     public void Delete(DatabaseBackup backup) => File.Delete(backup.Path);
+
+    /// <summary>
+    /// <see cref="SwapInAsync"/> renames the database aside (<see cref="ReplacedSuffix"/>), closed to connections, before it
+    /// renames the restored copy in its place: cut short between the two (the app ended, a power cut), nothing has the
+    /// database's name and every screen fails to load. This renames the one set aside back and opens it again, as it was
+    /// before the restore began; the restored copy is left to the next restore, which drops it first. Nothing is done when
+    /// the database is there, or there's none set aside.
+    /// </summary>
+    public async Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken)
+    {
+        var target = await TargetAsync(cancellationToken);
+        var replaced = target.Database + ReplacedSuffix;
+        await _turn.WaitAsync(cancellationToken);
+        try
+        {
+            await using var connection = await OpenMaintenanceAsync(target, cancellationToken);
+            await using var command = new NpgsqlCommand("SELECT datname FROM pg_database WHERE datname = ANY(@names)", connection);
+            command.Parameters.AddWithValue("names", new[] { target.Database, replaced });
+            var present = new HashSet<string>(StringComparer.Ordinal);
+            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+            {
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    present.Add(reader.GetString(0));
+                }
+            }
+
+            if (present.Contains(target.Database) || !present.Contains(replaced))
+            {
+                return false;
+            }
+
+            await ExecuteAsync(connection, $"ALTER DATABASE {Quote(replaced)} RENAME TO {Quote(target.Database)}", cancellationToken);
+            await ExecuteAsync(connection, $"ALTER DATABASE {Quote(target.Database)} WITH ALLOW_CONNECTIONS true", cancellationToken);
+            return true;
+        }
+        finally
+        {
+            _turn.Release();
+        }
+    }
 
     public void Dispose() => _turn.Dispose();
 
@@ -297,7 +341,7 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     /// </summary>
     private static async Task SwapInAsync(Target target, string scratchDatabase, CancellationToken cancellationToken)
     {
-        var replaced = target.Database + "_replaced";
+        var replaced = target.Database + ReplacedSuffix;
         await DropDatabaseAsync(target, replaced, cancellationToken);
         NpgsqlConnection.ClearAllPools();
         await using var connection = await OpenMaintenanceAsync(target, cancellationToken);

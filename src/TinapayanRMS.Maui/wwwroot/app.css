@@ -496,6 +496,35 @@ html, body {
     font-size: 16px;
 }
 
+/* A screen that failed, in its place (ScreenErrorBoundary): a card with a warning sign, as the banners have, and the way
+   back to the screen. */
+
+.screen-error {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    max-width: 640px;
+    margin: 24px;
+    padding: 16px 20px;
+    background: var(--card-background);
+    border: 1px solid #df8e1d;
+    border-radius: 6px;
+    color: var(--heading-foreground);
+}
+
+.screen-error .glyph.screen-error-glyph {
+    color: #df8e1d;
+    font-size: 20px;
+}
+
+.screen-error-text p {
+    margin: 0 0 8px;
+}
+
+.screen-error-title {
+    font-weight: 600;
+}
+
 /* Cards of their own width that wrap in a narrow window (Costing Defaults). */
 
 .card-wrap {

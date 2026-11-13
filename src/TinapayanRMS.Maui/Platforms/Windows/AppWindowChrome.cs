@@ -32,6 +32,9 @@ public sealed partial class AppWindowChrome : IAppWindow
     private static readonly MethodInfo? SetMauiTitleBarVisibility = typeof(NavigationRootManager).GetMethod(
         "SetTitleBarVisibility", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(bool)]);
 
+    /// <summary>Set once MAUI's switch is missing or has failed: it isn't tried again.</summary>
+    private static bool _titleBarRowFailed;
+
     private Microsoft.UI.Xaml.Window? _window;
     private bool _wasMaximized;
     private (DeviceRect TitleBar, IReadOnlyList<DeviceRect> Buttons)? _titleBar;
@@ -118,7 +121,7 @@ public sealed partial class AppWindowChrome : IAppWindow
     private static void HideMauisTitleBarRow()
     {
         var manager = MainPage.Current?.Window?.Handler?.MauiContext?.Services.GetService(typeof(NavigationRootManager));
-        if (manager is null)
+        if (manager is null || _titleBarRowFailed)
         {
             return;
         }
@@ -126,10 +129,22 @@ public sealed partial class AppWindowChrome : IAppWindow
         if (SetMauiTitleBarVisibility is null)
         {
             Log.Warning("MAUI's NavigationRootManager.SetTitleBarVisibility(bool) wasn't found, so its title bar's row shows above the page's");
+            _titleBarRowFailed = true;
             return;
         }
 
-        SetMauiTitleBarVisibility.Invoke(manager, [false]);
+        // MAUI's internals, found by name: an update that keeps the name but changes what it does mustn't take the window
+        // down. This runs in the window's message hook, on every show, maximize and restore, where an exception would end
+        // the app; so a failure is logged once, and the row is left showing from then on.
+        try
+        {
+            SetMauiTitleBarVisibility.Invoke(manager, [false]);
+        }
+        catch (Exception ex)
+        {
+            _titleBarRowFailed = true;
+            Log.Warning(ex, "MAUI's NavigationRootManager.SetTitleBarVisibility(bool) failed, so its title bar's row shows above the page's");
+        }
     }
 
     /// <summary>

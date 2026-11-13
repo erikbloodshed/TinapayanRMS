@@ -50,6 +50,7 @@
     private Drags? _drags;
     private DotNetObjectReference<Drags>? _dragsReference;
     private IJSObjectReference? _dragWatch;
+    private bool _disposed;
 
     // The folders' and rows' changes this tree listens to, so it redraws when a folder opens, a title changes or a
     // folder's rows change; added as rows appear, removed with the tree.
@@ -223,7 +224,7 @@
             await JS.InvokeVoidAsync("tinapayan.preventKeys", _element, new[] { "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", " " });
             _drags = new Drags(this);
             _dragsReference = DotNetObjectReference.Create(_drags);
-            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTreeDrag", _element, _dragsReference);
+            _dragWatch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTreeDrag", _element, _dragsReference).KeepUnlessGoneAsync(() => _disposed);
         }
 
         var first = Selected.Count > 0 ? Selected[0] : null;
@@ -611,6 +612,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         CancelSecondClick();
         foreach (var unwatch in _watched.Values)
         {

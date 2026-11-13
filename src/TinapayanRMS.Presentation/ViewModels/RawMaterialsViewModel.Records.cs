@@ -215,7 +215,7 @@ public sealed partial class RawMaterialsViewModel
 
         OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(async () =>
         {
             // The picked material's details haven't replaced the previous one's yet: saving now would write that material's
             // brand prices or BOM under this one. The moment passes in a fraction of a second.

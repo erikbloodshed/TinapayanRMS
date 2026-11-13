@@ -32,10 +32,13 @@ public sealed class DatabaseBackupRow(DatabaseBackup backup)
 /// shows the folder in File Explorer; Back Up Now takes one; Copy to… puts one elsewhere, such as a USB stick; Restore and Restore from File…
 /// put one back over the database, after a confirmation, and restart the app, whose screens all hold what was there before.
 /// </summary>
-public sealed class DatabaseBackupsViewModel : ViewModelBase
+public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
 {
     private readonly IDatabaseBackups _backups;
     private readonly Action<string> _restartApp;
+
+    /// <summary>Set while a restore runs: closing then would cut it short, and the app restarts by itself once it's done.</summary>
+    private bool _restoring;
 
     public ObservableCollection<DatabaseBackupRow> Backups { get; } = [];
 
@@ -62,6 +65,11 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
         get => _busyText;
         private set => this.RaiseAndSetIfChanged(ref _busyText, value);
     }
+
+    /// <inheritdoc/>
+    public string? KeepsWindowOpen => BusyText is null ? null
+        : _restoring ? "A restore is running, and closing now would cut it short. TinapayanRMS restarts by itself once it's done."
+        : $"Settings → Database is still at work ({BusyText.TrimEnd('…')}). Close TinapayanRMS once it's done.";
 
     /// <summary>Input: the backup's file name, to suggest. Output: where to copy it, or null when cancelled. The View shows a Save dialog.</summary>
     public Interaction<string, string?> ChooseCopyDestination { get; } = new();
@@ -221,11 +229,19 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase
             return false;
         }
 
-        var restored = await WhileBusyAsync(
-            "Restoring… TinapayanRMS restarts when it's done.",
-            () => Task.Run(() => _backups.RestoreAsync(backup, CancellationToken.None)));
-        _restartApp(RestoredText(header, restored));
-        return true;
+        _restoring = true;
+        try
+        {
+            var restored = await WhileBusyAsync(
+                "Restoring… TinapayanRMS restarts when it's done.",
+                () => Task.Run(() => _backups.RestoreAsync(backup, CancellationToken.None)));
+            _restartApp(RestoredText(header, restored));
+            return true;
+        }
+        finally
+        {
+            _restoring = false;
+        }
     }
 
     public static string ConfirmRestoreText(BackupHeader header) =>

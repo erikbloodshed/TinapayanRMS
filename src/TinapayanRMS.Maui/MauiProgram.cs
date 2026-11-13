@@ -57,6 +57,11 @@ public static class MauiProgram
                 formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
 
+        // An exception that ends the process, and a task that failed with nothing awaiting it, are logged from here on: MAUI
+        // logs neither. The window's own thread is hooked by the WinUI app (Platforms/Windows/App), ReactiveUI's by its
+        // bootstrapper.
+        UnhandledFailures.Watch();
+
         // Which garbage collector this copy runs on: Satori's in a build with -p:UseSatoriGC=true (the Maui project's
         // experiment), which lists its settings under its own name, or .NET's own.
         Log.Information(
@@ -75,10 +80,11 @@ public static class MauiProgram
 
             // appsettings.json, built into the app (the WPF app's file), then environment variables
             // (ConnectionStrings__Default) over it.
+            // The configuration reads the stream as it's added, so it can go straight after.
             using (var settings = typeof(MauiProgram).Assembly.GetManifestResourceStream("appsettings.json")
                 ?? throw new InvalidOperationException("The app's appsettings.json isn't built into it."))
+            using (var copy = new MemoryStream())
             {
-                var copy = new MemoryStream();
                 settings.CopyTo(copy);
                 copy.Position = 0;
                 builder.Configuration.AddJsonStream(copy);
@@ -111,6 +117,11 @@ public static class MauiProgram
         {
             Log.Fatal(ex, "The app stopped because of an error at startup");
             Log.CloseAndFlush();
+
+            // A MAUI app that throws as it starts just disappears: say why, and where the details are.
+            StartupMessage.ShowError(
+                $"TinapayanRMS couldn't start: {Failure.FirstLine(ex.Message)}{Environment.NewLine}{Environment.NewLine}"
+                + $"The details are in its log, in {Path.Combine(DataFolder, "logs")}.");
             throw;
         }
     }

@@ -1,15 +1,18 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using TinapayanRMS.Components;
 
 namespace TinapayanRMS.Maui.WinUI;
 
 /// <summary>
-/// One copy of the app for the Windows user: starting it again (the Desktop icon twice) brings the window already open
-/// to the front, rather than a second copy that would run its own hourly backups and write the same view-state files.
-/// Each copy on the disk is its own app, so one run from source doesn't stop the installed copy, nor the other way round.
-/// The WPF app (on main, or installed) keeps to one copy of its own the same way: the two apps can be open at once.
+/// One copy of the app on the PC. Starting it again in the same Windows sign-in (the Desktop icon twice) brings the window
+/// already open to the front, rather than a second copy that would run its own hourly backups and write the same view-state
+/// files. Each copy on the disk is its own app within a sign-in, so one run from source doesn't stop the installed copy,
+/// nor the other way round. Across sign-ins, and against the WPF app, it's one copy for the whole PC (OneCopyPerPc): a
+/// start refused that way says why and ends.
 /// </summary>
 public static partial class SingleInstance
 {
@@ -18,7 +21,10 @@ public static partial class SingleInstance
     // Held for the life of the process: Windows releases it as the process ends.
     private static Mutex? _claim;
 
-    /// <summary>Whether this is the only copy; false when the window of the one already running was brought forward.</summary>
+    /// <summary>
+    /// Whether this copy may run: false when the window of the one already running in this sign-in was brought forward,
+    /// or when another sign-in has the app open, or the WPF app is open, which a message box has said.
+    /// </summary>
     public static bool Claim()
     {
         var folder = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
@@ -26,27 +32,73 @@ public static partial class SingleInstance
         if (!first)
         {
             ShowFirst();
+            return false;
         }
 
-        return first;
+        using var me = Process.GetCurrentProcess();
+        if (OneCopyPerPc.RefusalFor(RunningCopies(me.ProcessName), me.Id, me.SessionId) is { } refusal)
+        {
+            StartupMessage.ShowInformation(refusal);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// This app's processes and the WPF app's, in every Windows session: the session comes from the system's list of
+    /// processes, so no administrator is needed to read another user's. One that ends while it's read is left out.
+    /// </summary>
+    private static List<OneCopyPerPc.RunningCopy> RunningCopies(string appProcessName)
+    {
+        var running = new List<OneCopyPerPc.RunningCopy>();
+        foreach (var (name, isWpfApp) in (ReadOnlySpan<(string, bool)>)[(appProcessName, false), (OneCopyPerPc.WpfProcessName, true)])
+        {
+            foreach (var process in Process.GetProcessesByName(name))
+            {
+                using (process)
+                {
+                    try
+                    {
+                        running.Add(new OneCopyPerPc.RunningCopy(process.Id, process.SessionId, isWpfApp));
+                    }
+                    catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+                    {
+                        // It ended while it was being read.
+                    }
+                }
+            }
+        }
+
+        return running;
     }
 
     private static void ShowFirst()
     {
         using var me = Process.GetCurrentProcess();
-        var running = Process.GetProcessesByName(me.ProcessName)
-            .FirstOrDefault(p => p.Id != me.Id && p.MainWindowHandle != 0 && p.MainModule?.FileName == me.MainModule?.FileName);
-        if (running is null)
+        var processes = Process.GetProcessesByName(me.ProcessName);
+        try
         {
-            return;
-        }
+            var running = processes.FirstOrDefault(p => p.Id != me.Id && p.MainWindowHandle != 0 && p.MainModule?.FileName == me.MainModule?.FileName);
+            if (running is null)
+            {
+                return;
+            }
 
-        if (IsIconic(running.MainWindowHandle))
+            if (IsIconic(running.MainWindowHandle))
+            {
+                ShowWindow(running.MainWindowHandle, ShowRestore);
+            }
+
+            SetForegroundWindow(running.MainWindowHandle);
+        }
+        finally
         {
-            ShowWindow(running.MainWindowHandle, ShowRestore);
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
         }
-
-        SetForegroundWindow(running.MainWindowHandle);
     }
 
     [LibraryImport("user32.dll")]

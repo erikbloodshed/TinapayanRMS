@@ -85,7 +85,7 @@ window.tinapayan = {
             if (shortcut && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
                 e.preventDefault();
                 e.stopPropagation();
-                dotNet.invokeMethodAsync("OpenFromKeyAsync");
+                dotNet.invokeMethodAsync("OpenFromKeyAsync").catch(error => console.error("Find didn't open.", error));
             }
         };
         document.addEventListener("keydown", handler, true);
@@ -617,7 +617,10 @@ window.tinapayan = {
             if (active && active !== document.body) {
                 active.blur();
             }
-            setTimeout(() => dotNet.invokeMethodAsync("Undo", redo).then(restore), 0);
+            // The cursor goes back whatever the step did: a step that failed left it in no field at all.
+            setTimeout(() => dotNet.invokeMethodAsync("Undo", redo)
+                .catch(error => console.error("Undo didn't go through.", error))
+                .finally(restore), 0);
         };
         document.addEventListener("keydown", handler);
         return { dispose: () => document.removeEventListener("keydown", handler) };
@@ -657,7 +660,8 @@ window.tinapayan = {
             const told = JSON.stringify([titleBar, buttons]);
             if (told !== sent) {
                 sent = told;
-                dotNet.invokeMethodAsync("SetTitleBar", titleBar, buttons);
+                dotNet.invokeMethodAsync("SetTitleBar", titleBar, buttons)
+                    .catch(error => console.error("The window wasn't told where its title bar is.", error));
             }
         };
         const queue = () => {
@@ -682,7 +686,8 @@ window.tinapayan = {
         queue();
 
         const history = () => dotNet.invokeMethodAsync(
-            "HistoryChanged", window.navigation?.canGoBack ?? true, window.navigation?.canGoForward ?? true);
+            "HistoryChanged", window.navigation?.canGoBack ?? true, window.navigation?.canGoForward ?? true)
+            .catch(error => console.error("Back and Forward weren't updated.", error));
         window.navigation?.addEventListener("currententrychange", history);
         history();
 

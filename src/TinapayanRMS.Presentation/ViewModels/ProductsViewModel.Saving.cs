@@ -113,7 +113,7 @@ public sealed partial class ProductsViewModel
                 SuccessMessage = message;
             }
         };
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(_saveForm), History.WhenAnyValue(h => h.IsDirty));
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(_saveForm), History.WhenAnyValue(h => h.IsDirty));
 
         // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
         RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
