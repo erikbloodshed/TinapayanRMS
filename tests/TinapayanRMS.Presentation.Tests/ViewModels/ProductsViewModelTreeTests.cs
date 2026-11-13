@@ -228,6 +228,11 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await viewModel.UndoMoveCommand.Execute();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
 
+        // ReactiveUI marks the Undo finished on its scheduler, after Execute has returned, and a paste before then is
+        // refused as a move still running: no hand is that quick, but a loaded test run is (it failed so on GitHub's
+        // runner). The moves are offered again once it's marked.
+        await Settle.UntilOfferedAsync(viewModel.MoveFolderCommand.CanExecute, "Move");
+
         // A folder is cut with all it holds, alone; Esc forgets a cut.
         var breads = tree.Folder(breadsId)!;
         await RunAsync(viewModel.TreeMenuFor(breads).Single(i => i.Header == "Cut"));
