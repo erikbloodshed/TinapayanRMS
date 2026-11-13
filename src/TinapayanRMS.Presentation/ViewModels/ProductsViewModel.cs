@@ -21,7 +21,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, ICategoryPickerScreen, IRecordScreen, IRevertScreen, IListTreeScreen
+public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -463,11 +463,8 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
     }
 
-    /// <summary>The category the picker held when it took the cursor, for a cancelled prompt to put back (BeginCategoryEdit).</summary>
-    private ProductCategory? _categoryBeforeEdit;
-
-    /// <summary>Set while CommitCategoryTextAsync runs: its prompt takes the cursor from the picker, which would settle it again.</summary>
-    private bool _isCommittingCategory;
+    /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
+    private readonly CategoryPicker<ProductCategory> _categoryPicker;
 
     private ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
@@ -912,6 +909,10 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         ILogger logger)
         : base(logger)
     {
+        _categoryPicker = new CategoryPicker<ProductCategory>(
+            () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
+            () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
+            SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
         _versionRepository = versionRepository;
         _productRepository = productRepository;
         _usageRepository = usageRepository;

@@ -976,86 +976,12 @@ public sealed partial class ProductsViewModel
         });
     }
 
-    public void BeginCategoryEdit()
-    {
-        if (!_isCommittingCategory)
-        {
-            _categoryBeforeEdit = EditingCategory;
-        }
-    }
+    /// <summary>The Category picker took the cursor (CategoryPicker.Begin).</summary>
+    public void BeginCategoryEdit() => _categoryPicker.Begin();
 
     /// <summary>
-    /// ICategoryPickerScreen, as on Raw Materials: a name that isn't a category yet is offered as a new one, saved and
-    /// picked, so a product can go in a new category without a trip to Settings. Save saves the product's choice. A
-    /// cancelled prompt puts back the category the picker had; a name that turns out to be listed is picked instead.
+    /// What's typed into the Category picker, settled as it's left (CategoryPicker.CommitAsync), as on Raw Materials: a
+    /// name that isn't a category yet is offered as a new one. Save saves the product's choice.
     /// </summary>
-    public async Task CommitCategoryTextAsync()
-    {
-        var typed = CategorySearchText.Trim();
-        if (_isCommittingCategory || typed.Length == 0 || IsNamed(EditingCategory, typed))
-        {
-            return;
-        }
-
-        _isCommittingCategory = true;
-        try
-        {
-            if (Categories.FirstOrDefault(c => IsNamed(c, typed)) is { } listed)
-            {
-                AsUndoStep(() => EditingCategory = listed);
-                return;
-            }
-
-            var name = (await PromptForNewCategory.Handle(typed))?.Trim();
-            if (string.IsNullOrEmpty(name))
-            {
-                AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
-            }
-            else if (Categories.FirstOrDefault(c => IsNamed(c, name)) is { } named)
-            {
-                AsUndoStep(() => EditingCategory = named);
-            }
-            else
-            {
-                await AddCategoryAsync(name);
-            }
-
-            // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
-            CategorySearchText = EditingCategory?.Name ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
-            ShowFailure(ex);
-        }
-        finally
-        {
-            _isCommittingCategory = false;
-        }
-
-        static bool IsNamed(ProductCategory? category, string name) =>
-            string.Equals(category?.Name, name, StringComparison.OrdinalIgnoreCase);
-    }
-
-    /// <summary>Saves a category and picks it. A refused name puts back the category the picker had.</summary>
-    private async Task AddCategoryAsync(string name)
-    {
-        var added = false;
-        await RunSafelyAsync(async () =>
-        {
-            if (await SaveNewCategoryAsync(name) is not { } category)
-            {
-                return;
-            }
-
-            AsUndoStep(() => EditingCategory = category);
-            SuccessMessage = $"{category.Name} was added.";
-            added = true;
-        });
-
-        if (!added)
-        {
-            AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
-        }
-    }
+    public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
 }

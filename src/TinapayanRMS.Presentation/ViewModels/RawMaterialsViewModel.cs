@@ -21,7 +21,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
 /// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
-public sealed partial class RawMaterialsViewModel : ListFormViewModel<RawMaterialFormSnapshot>, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IListTreeScreen
+public sealed partial class RawMaterialsViewModel : ListFormViewModel<RawMaterialFormSnapshot>, IDisposable, IBrandPriceRowHost, IRecordScreen, IListTreeScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -311,11 +311,8 @@ public sealed partial class RawMaterialsViewModel : ListFormViewModel<RawMateria
         set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
     }
 
-    /// <summary>The category the picker held when it took the cursor, for a cancelled prompt to put back (BeginCategoryEdit).</summary>
-    private RawMaterialCategory? _categoryBeforeEdit;
-
-    /// <summary>Set while CommitCategoryTextAsync runs: its prompt takes the cursor from the picker, which would settle it again.</summary>
-    private bool _isCommittingCategory;
+    /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
+    private readonly CategoryPicker<RawMaterialCategory> _categoryPicker;
 
     private RawMaterialSource _editingSource = RawMaterialSource.Purchased;
     public RawMaterialSource EditingSource
@@ -963,6 +960,10 @@ public sealed partial class RawMaterialsViewModel : ListFormViewModel<RawMateria
         MaterialCostShares? costShares = null)
         : base(logger)
     {
+        _categoryPicker = new CategoryPicker<RawMaterialCategory>(
+            () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => CategoryOptions, c => c.Name,
+            () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
+            SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
         _costShares = costShares;
         _rawMaterialRepository = rawMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;

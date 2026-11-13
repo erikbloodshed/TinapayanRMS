@@ -123,98 +123,33 @@ public sealed partial class RawMaterialsViewModel
         CollapseAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.CollapseAll);
     }
 
-    public void BeginCategoryEdit()
-    {
-        if (!_isCommittingCategory)
-        {
-            _categoryBeforeEdit = EditingCategory;
-        }
-    }
+    /// <summary>The Category picker took the cursor (CategoryPicker.Begin).</summary>
+    public void BeginCategoryEdit() => _categoryPicker.Begin();
 
     /// <summary>
-    /// ICategoryPickerScreen: a name that isn't one of the material type's categories is offered as a new one, saved
-    /// for that type and picked, so filing a material under a new category doesn't mean a trip to Settings and back.
-    /// A cancelled prompt puts back the category the picker had; a name that turns out to be listed is picked instead.
+    /// What's typed into the Category picker, settled as it's left (CategoryPicker.CommitAsync): a name that isn't one of
+    /// the material type's categories is offered as a new one of that type.
     /// </summary>
-    public async Task CommitCategoryTextAsync()
-    {
-        var typed = CategorySearchText.Trim();
-        if (_isCommittingCategory || typed.Length == 0 || IsNamed(EditingCategory, typed))
-        {
-            return;
-        }
-
-        _isCommittingCategory = true;
-        try
-        {
-            if (CategoryOptions.FirstOrDefault(c => IsNamed(c, typed)) is { } listed)
-            {
-                AsUndoStep(() => EditingCategory = listed);
-                return;
-            }
-
-            var name = (await PromptForNewCategory.Handle(typed))?.Trim();
-            if (string.IsNullOrEmpty(name))
-            {
-                AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
-            }
-            else if (CategoryOptions.FirstOrDefault(c => IsNamed(c, name)) is { } named)
-            {
-                AsUndoStep(() => EditingCategory = named);
-            }
-            else
-            {
-                await AddCategoryAsync(name);
-            }
-
-            // The picker shows the category it now holds rather than what was typed: the new one, or the one put back.
-            CategorySearchText = EditingCategory?.Name ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            // Nothing awaits this: it's the picker's, from the keyboard or the focus leaving.
-            ShowFailure(ex);
-        }
-        finally
-        {
-            _isCommittingCategory = false;
-        }
-
-        static bool IsNamed(RawMaterialCategory? category, string name) =>
-            string.Equals(category?.Name, name, StringComparison.OrdinalIgnoreCase);
-    }
+    public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
 
     /// <summary>
     /// Saves a category of the material's own type, the only kind the picker offers it (a Made one for a made ingredient),
-    /// and picks it. A refused name puts back the category the picker had.
+    /// and reads it back with the screen's load; null, with the reason showing, if its name is refused.
     /// </summary>
-    private async Task AddCategoryAsync(string name)
+    private async Task<RawMaterialCategory?> SaveNewCategoryAsync(string name)
     {
-        var added = false;
-        await RunSafelyAsync(async () =>
+        var category = new RawMaterialCategory { Name = name, Type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource) };
+        var validation = _categoryValidator.Validate(category);
+        if (!validation.IsValid)
         {
-            var category = new RawMaterialCategory { Name = name, Type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource) };
-
-
-            var validation = _categoryValidator.Validate(category);
-            if (!validation.IsValid)
-            {
-                ErrorMessage = validation.ToString(" ");
-                return;
-            }
-
-            // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
-            await _categoryRepository.AddAsync(category, CancellationToken.None);
-            await LoadCommand.Execute();
-            AsUndoStep(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == category.Id));
-            SuccessMessage = $"{category.Name} was added.";
-            added = true;
-        });
-
-        if (!added)
-        {
-            AsUndoStep(() => EditingCategory = _categoryBeforeEdit);
+            ErrorMessage = validation.ToString(" ");
+            return null;
         }
+
+        // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
+        await _categoryRepository.AddAsync(category, CancellationToken.None);
+        await LoadCommand.Execute();
+        return Categories.FirstOrDefault(c => c.Id == category.Id);
     }
 
     private void RefreshTree()
