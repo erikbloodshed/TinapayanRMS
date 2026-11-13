@@ -1,4 +1,5 @@
 using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
@@ -56,15 +57,34 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         IListTreeScreen screen = viewModel;
         var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
 
-        screen.CanDrag([breadFlour]).Should().BeTrue();
-        screen.CanDrag([TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")]).Should().BeFalse("a folder isn't dragged");
+        screen.CanDrag(breadFlour).Should().BeTrue();
+        screen.CanDrag(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Should().BeFalse("a folder isn't dragged");
         screen.CanDrop([breadFlour], TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes")).Should().BeFalse("a material's type is fixed");
         screen.CanDrop([breadFlour], viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
 
-        (await screen.Drop([breadFlour], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods"))).Should().BeSameAs(breadFlour);
+        (await screen.DropAsync([breadFlour], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods"))).Should().BeSameAs(breadFlour);
 
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
         viewModel.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+    });
+
+    [Test]
+    public Task A_drop_made_while_a_move_is_still_saving_does_nothing() => UiThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var caneSugarId = await AddIngredientAsync("Cane Sugar", flourId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+
+        var firstMove = viewModel.MoveMaterialsCommand.Execute([new RawMaterialMove(breadFlourId, dryGoodsId)]).ToTask();
+        (await screen.DropAsync([viewModel.RawMaterialTree.Find(caneSugarId)!], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods")))
+            .Should().BeNull("a move is still saving");
+        await firstMove;
+
+        (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
+        (await CategoryOfAsync(caneSugarId)).Should().Be(flourId, "the drop made meanwhile did nothing");
     });
 
     [Test]

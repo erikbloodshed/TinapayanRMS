@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
+using System.Windows.Input;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -341,16 +342,20 @@ public sealed partial class RawMaterialsViewModel
     IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or RawMaterialTreeNode ? TreeMenuFor(node as RawMaterialTreeNode) : [];
 
     /// <summary>Only materials can be dragged, one or several: the folders are fixed.</summary>
-    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is RawMaterialLeafNode { IsNew: false });
+    bool IListTreeScreen.CanDrag(object node) => node is RawMaterialLeafNode { IsNew: false };
 
     bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
 
-    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target)
+    async Task<object?> IListTreeScreen.DropAsync(IEnumerable<object> nodes, object? target)
     {
         var moves = DropMoves(nodes, target);
-        return moves.Count == 0
-            ? Observable.Return<object?>(null)
-            : MoveMaterialsCommand.Execute(moves).Select(_ => (object?)RawMaterialTree.Find(moves[0].RawMaterialId));
+        if (moves.Count == 0 || !((ICommand)MoveMaterialsCommand).CanExecute(moves))
+        {
+            return null;
+        }
+
+        await MoveMaterialsCommand.Execute(moves);
+        return RawMaterialTree.Find(moves[0].RawMaterialId);
     }
 
     /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (RawMaterialTree.MovesTo): none unless every one is a record.</summary>

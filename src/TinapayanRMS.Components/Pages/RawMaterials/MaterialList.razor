@@ -35,11 +35,11 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="@(n => n.IsTypeFolder ? "top-level" : null)"
-                CanDrag="n => n is RawMaterialLeafNode { IsNew: false }"
+                CanDrag="n => Screen.CanDrag(n)"
                 IsEditing="IsEditing"
                 RenamesOnSecondClick="n => n is RawMaterialLeafNode { IsNew: false }"
-                CanDrop="(dragged, target) => MovesFor(dragged, target).Count > 0"
-                OnDrop="DropAsync"
+                CanDrop="(dragged, target) => Screen.CanDrop(dragged, target)"
+                OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="ViewModel.TreeMenuFor"
                 Shortcut="ViewModel.TreeShortcut">
         <RowTemplate Context="node">
@@ -79,18 +79,6 @@
 
     private bool IsEditing(RawMaterialTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
-    private static IReadOnlyList<RawMaterialMove> MovesFor(IReadOnlyList<RawMaterialTreeNode> dragged, RawMaterialTreeNode? target) =>
-        dragged.All(n => n is RawMaterialLeafNode)
-            ? RawMaterialTree.MovesTo(target, dragged.Cast<RawMaterialLeafNode>().Select(l => l.RawMaterial))
-            : [];
-
-    private async Task DropAsync(IReadOnlyList<RawMaterialTreeNode> dragged, RawMaterialTreeNode? target)
-    {
-        var moves = MovesFor(dragged, target);
-        if (moves.Count > 0)
-        {
-            await Commands.Run(ViewModel.MoveMaterialsCommand, moves);
-        }
-    }
-
+    // What can be dragged and dropped where is the screen's to say (IListTreeScreen), as its tests check it.
+    private IListTreeScreen Screen => ViewModel;
 }

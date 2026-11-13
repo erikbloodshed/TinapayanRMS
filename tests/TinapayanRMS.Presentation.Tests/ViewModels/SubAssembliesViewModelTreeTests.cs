@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
@@ -76,15 +77,34 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         var halaya = viewModel.SubAssemblyTree.Find(halayaId)!;
         var filling = viewModel.SubAssemblyTree.Folder(fillingRoleId)!;
 
-        screen.CanDrag([halaya]).Should().BeTrue();
-        screen.CanDrag([filling]).Should().BeFalse("a folder isn't dragged");
+        screen.CanDrag(halaya).Should().BeTrue();
+        screen.CanDrag(filling).Should().BeFalse("a folder isn't dragged");
         screen.CanDrop([halaya], viewModel.SubAssemblyTree.Folder(doughRoleId)).Should().BeFalse("it's there already");
 
-        (await screen.Drop([halaya], filling)).Should().BeSameAs(halaya);
+        (await screen.DropAsync([halaya], filling)).Should().BeSameAs(halaya);
 
         (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
         filling.SubAssemblies.Should().ContainSingle();
         viewModel.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
+    });
+
+    [Test]
+    public Task A_drop_made_while_a_move_is_still_saving_does_nothing() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
+        var yemaId = await AddRecipeAsync("Yema", doughRoleId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+
+        var firstMove = viewModel.MoveSubAssembliesCommand.Execute([new SubAssemblyMove(halayaId, fillingRoleId)]).ToTask();
+        (await screen.DropAsync([viewModel.SubAssemblyTree.Find(yemaId)!], viewModel.SubAssemblyTree.Folder(fillingRoleId)))
+            .Should().BeNull("a move is still saving");
+        await firstMove;
+
+        (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
+        (await RoleOfAsync(yemaId)).Should().Be(doughRoleId, "the drop made meanwhile did nothing");
     });
 
     [Test]

@@ -42,11 +42,11 @@
                 Selected="ViewModel.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="RowClass"
-                CanDrag="CanDrag"
+                CanDrag="n => Screen.CanDrag(n)"
                 IsEditing="IsEditing"
                 RenamesOnSecondClick="n => n is ProductLeafNode { IsDeleted: false, IsNew: false }"
-                CanDrop="(dragged, target) => ProductTree.DropFor(dragged, target) is not null"
-                OnDrop="DropAsync"
+                CanDrop="(dragged, target) => Screen.CanDrop(dragged, target)"
+                OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="ViewModel.TreeMenuFor"
                 Shortcut="ViewModel.TreeShortcut">
         <RowTemplate Context="node">
@@ -103,16 +103,6 @@
 
     private bool IsEditing(ProductTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
 
-    // A row the drag starts on is dragged with the rows picked, as a file explorer does: those it allows (products, or one
-    // folder of the user's alone) are what's dropped.
-    private static bool CanDrag(ProductTreeNode node) =>
-        node is ProductLeafNode { IsDeleted: false, IsNew: false } or ProductFolderNode { IsUserFolder: true };
-
-    private async Task DropAsync(IReadOnlyList<ProductTreeNode> dragged, ProductTreeNode? target)
-    {
-        if (ProductTree.DropFor(dragged, target) is { } drop)
-        {
-            await ViewModel.DropAsync(drop);
-        }
-    }
+    // What can be dragged and dropped where is the screen's to say (IListTreeScreen), as its tests check it.
+    private IListTreeScreen Screen => ViewModel;
 }

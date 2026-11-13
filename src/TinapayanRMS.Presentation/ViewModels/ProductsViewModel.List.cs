@@ -426,16 +426,27 @@ public sealed partial class ProductsViewModel
         var dragging => dragging.All(node => node is ProductLeafNode { IsDeleted: false, IsNew: false }),
     };
 
-    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(n => n is ProductTreeNode) && CanDrag(nodes.Cast<ProductTreeNode>());
+    // A row a drag starts on is dragged with the rows picked, as a file explorer does: those it allows (products, or one
+    // folder of the user's alone) are what's dropped, and DropFor refuses a folder with products.
+    bool IListTreeScreen.CanDrag(object node) => node is ProductTreeNode row && CanDrag([row]);
 
     bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropFor(nodes, target) is not null;
 
-    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target) => DropFor(nodes, target) switch
+    async Task<object?> IListTreeScreen.DropAsync(IEnumerable<object> nodes, object? target)
     {
-        TreeDrop.Products(var moves) => MoveProductsCommand.Execute(moves).Select(_ => (object?)ProductTree.Find(moves[0].ProductId)),
-        TreeDrop.Folder(var move) => MoveFolderCommand.Execute(move).Select(_ => (object?)ProductTree.Folder(move.FolderId)),
-        null => Observable.Return<object?>(null),
-    };
+        // Paste runs the same drop, so the guard is DropAsync's, the one place for it.
+        if (DropFor(nodes, target) is not { } drop || !await DropAsync(drop))
+        {
+            return null;
+        }
+
+        return drop switch
+        {
+            TreeDrop.Products(var moves) => ProductTree.Find(moves[0].ProductId),
+            TreeDrop.Folder(var move) => ProductTree.Folder(move.FolderId),
+            _ => null,
+        };
+    }
 
     /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (ProductTree.DropFor).</summary>
     private static TreeDrop? DropFor(IEnumerable<object> nodes, object? target) =>
@@ -443,16 +454,15 @@ public sealed partial class ProductsViewModel
             ? ProductTree.DropFor([.. dragging.Cast<ProductTreeNode>()], target as ProductTreeNode)
             : null;
 
-    /// <summary>Runs what dropping rows of the list does (ProductList's drop): the products' moves, or the folder's.</summary>
-    /// <remarks>
-    /// A drop made while an earlier move is still saving does nothing, as a click on a busy button does: run together, the
-    /// second would be judged against the list as it was, and each would take the other's Undo.
-    /// </remarks>
-    public async Task DropAsync(TreeDrop drop)
+    /// <summary>
+    /// Runs what dropping rows of the list does, or a paste: the products' moves, or the folder's. False, having done
+    /// nothing, while an earlier move is still saving (IListTreeScreen.DropAsync says why).
+    /// </summary>
+    private async Task<bool> DropAsync(TreeDrop drop)
     {
         if (IsMoving)
         {
-            return;
+            return false;
         }
 
         switch (drop)
@@ -464,6 +474,8 @@ public sealed partial class ProductsViewModel
                 await MoveFolderCommand.Execute(move);
                 break;
         }
+
+        return true;
     }
 
     /// <summary>

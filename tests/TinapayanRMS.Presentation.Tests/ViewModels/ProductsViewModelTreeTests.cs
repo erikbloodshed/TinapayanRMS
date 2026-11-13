@@ -75,24 +75,24 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var cakes = viewModel.ProductTree.Folder(cakesId)!;
         var production = viewModel.ProductTree.StageFolder(ProductStage.Production);
 
-        screen.CanDrag([mamon]).Should().BeTrue();
-        screen.CanDrag([cakes]).Should().BeTrue("one folder is dragged with all it holds");
-        screen.CanDrag([mamon, cakes]).Should().BeFalse("not a folder and products together");
-        screen.CanDrag([production]).Should().BeFalse("a stage is fixed");
+        screen.CanDrag(mamon).Should().BeTrue();
+        screen.CanDrag(cakes).Should().BeTrue("one folder is dragged with all it holds");
+        screen.CanDrop([mamon, cakes], production).Should().BeFalse("not a folder and products together");
+        screen.CanDrag(production).Should().BeFalse("a stage is fixed");
         screen.CanDrop([mamon], breads).Should().BeFalse("it's there already");
         screen.CanDrop([mamon], viewModel.ProductTree.DeletedFolder).Should().BeFalse("nothing is dropped into Deleted");
         screen.CanDrop([mamon], cakes).Should().BeTrue();
 
-        (await screen.Drop([mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
+        (await screen.DropAsync([mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
 
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
         cakes.Products.Should().ContainSingle();
         viewModel.MoveNotice.Should().Be("Moved Mamon to Innovation › Cakes");
-        (await screen.Drop([mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
+        (await screen.DropAsync([mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
 
         // A folder dropped in the other stage takes what it holds there.
         screen.CanDrop([cakes], cakes).Should().BeFalse("a folder doesn't go inside itself");
-        (await screen.Drop([cakes], production)).Should().BeSameAs(cakes);
+        (await screen.DropAsync([cakes], production)).Should().BeSameAs(cakes);
 
         viewModel.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, cakesId), "a product goes with its folder");
@@ -105,6 +105,25 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
         viewModel.ProductTree.StageFolder(ProductStage.Innovation).Folders.Should().Contain(cakes, "Undo puts the folder back with it");
+    });
+
+    [Test]
+    public Task A_drop_made_while_a_move_is_still_saving_does_nothing() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddFolderAsync("Breads");
+        var cakesId = await AddFolderAsync("Cakes");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await LoadedViewModelAsync();
+        IListTreeScreen screen = viewModel;
+
+        // Breads to Production: it saves, then reads the list again. A drop meanwhile would be judged against the list as
+        // it was, and the two would take each other's Undo.
+        var folderMove = viewModel.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
+        (await screen.DropAsync([viewModel.ProductTree.Find(mamonId)!], viewModel.ProductTree.Folder(cakesId))).Should().BeNull("a move is still saving");
+        await folderMove;
+
+        viewModel.ErrorMessage.Should().BeNull();
+        (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, breadsId), "the drop did nothing: Mamon went with its folder alone");
     });
 
     [Test]

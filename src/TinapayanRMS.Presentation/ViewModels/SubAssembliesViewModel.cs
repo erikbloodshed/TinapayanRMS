@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Windows.Input;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -1204,16 +1205,20 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     IReadOnlyList<TreeMenuItem> IListTreeScreen.TreeMenuFor(object? node) => node is null or SubAssemblyTreeNode ? TreeMenuFor(node as SubAssemblyTreeNode) : [];
 
     /// <summary>Only sub-assemblies can be dragged, one or several: the folders are the roles, in their own order.</summary>
-    bool IListTreeScreen.CanDrag(IEnumerable<object> nodes) => nodes.All(node => node is SubAssemblyLeafNode { IsNew: false });
+    bool IListTreeScreen.CanDrag(object node) => node is SubAssemblyLeafNode { IsNew: false };
 
     bool IListTreeScreen.CanDrop(IEnumerable<object> nodes, object? target) => DropMoves(nodes, target).Count > 0;
 
-    IObservable<object?> IListTreeScreen.Drop(IEnumerable<object> nodes, object? target)
+    async Task<object?> IListTreeScreen.DropAsync(IEnumerable<object> nodes, object? target)
     {
         var moves = DropMoves(nodes, target);
-        return moves.Count == 0
-            ? Observable.Return<object?>(null)
-            : MoveSubAssembliesCommand.Execute(moves).Select(_ => (object?)SubAssemblyTree.Find(moves[0].SubAssemblyId));
+        if (moves.Count == 0 || !((ICommand)MoveSubAssembliesCommand).CanExecute(moves))
+        {
+            return null;
+        }
+
+        await MoveSubAssembliesCommand.Execute(moves);
+        return SubAssemblyTree.Find(moves[0].SubAssemblyId);
     }
 
     /// <summary>What dropping <paramref name="nodes"/> on <paramref name="target"/> would do (SubAssemblyTree.MovesTo): none unless every one is a record.</summary>
