@@ -1,4 +1,6 @@
 using System.Reactive.Linq;
+using System.Reactive.Threading.Tasks;
+using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
@@ -344,6 +346,60 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "Expand All"));
         viewModel.Folders.Select(f => viewModel.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => f.IsExpanded);
+    });
+
+    [Test]
+    public Task While_a_move_saves_no_other_move_nor_its_Undo_can_start_from_a_menu() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddFolderAsync("Breads");
+        var cakesId = await AddFolderAsync("Cakes");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var viewModel = await LoadedViewModelAsync();
+        await viewModel.MoveProductsCommand.Execute([new ProductMove(mamonId, ProductStage.Innovation, cakesId)]);
+        viewModel.MoveNotice.Should().NotBeNull("there's a move to undo");
+        static bool CanRun(ICommand command) => command.CanExecute(null);
+
+        // Breads to Production: it saves, then reads the list again. Meanwhile a menu's Promote, Send Back or Move to, a
+        // folder's own move, and the notice's Undo are all off, as each would be judged against the list as it was.
+        var folderMove = viewModel.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
+        CanRun(viewModel.MoveToStageCommand).Should().BeFalse();
+        CanRun(viewModel.MoveProductsCommand).Should().BeFalse();
+        CanRun(viewModel.MoveFolderCommand).Should().BeFalse();
+        CanRun(viewModel.UndoMoveCommand).Should().BeFalse();
+
+        await folderMove;
+        viewModel.ErrorMessage.Should().BeNull();
+
+        // ReactiveCommand says a command has ended just after its task has: the moves are free again then.
+        await Settle.UntilAsync(viewModel, () => CanRun(viewModel.MoveToStageCommand), () => "a move still running");
+        CanRun(viewModel.MoveToStageCommand).Should().BeTrue();
+        CanRun(viewModel.MoveProductsCommand).Should().BeTrue();
+        CanRun(viewModel.MoveFolderCommand).Should().BeTrue();
+        CanRun(viewModel.UndoMoveCommand).Should().BeTrue("the folder's move has a notice to undo");
+    });
+
+    [Test]
+    public Task A_new_products_place_follows_its_folder_renamed_and_moved_to_the_other_stage_before_its_Save() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddFolderAsync("Breads");
+        var viewModel = await LoadedViewModelAsync();
+        await RunAsync(viewModel.TreeMenuFor(viewModel.ProductTree.Folder(breadsId)!).Single(i => i.Header == "New Product Here"));
+        viewModel.CancelTreeName();
+        viewModel.NewProductTag.Should().Be("Goes in Innovation › Breads");
+
+        // Renamed and sent to Production, from another computer, then read again here.
+        var folders = new ProductFolderRepository(CreateDbContextFactory());
+        await folders.RenameAsync(breadsId, "Bread Rolls", Cancellation);
+        await folders.MoveAsync(new ProductFolderMove(breadsId, ProductStage.Production, null), Cancellation);
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.NewProductTag.Should().Be("Goes in Production › Bread Rolls", "the header says where Save will file it now");
+        viewModel.NewProductStage.Should().Be(ProductStage.Production);
+        TypeName(viewModel, "Pan de Coco");
+        await viewModel.SaveCommand.Execute();
+        viewModel.ErrorMessage.Should().BeNull();
+        var saved = await ProductNamedAsync("Pan de Coco");
+        (saved.Stage, saved.FolderId).Should().Be((ProductStage.Production, breadsId));
     });
 
     [Test]
@@ -1060,7 +1116,6 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
     private static IEnumerable<string> TitlesIn(ProductFolderNode folder) => folder.Children.Select(c => c.Title);
 
-    /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Test]
     public Task A_product_whose_current_price_earns_less_than_its_target_markup_is_flagged_in_the_list() => UiThread.RunAsync(async () =>
     {
@@ -1236,6 +1291,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         return await dbContext.Products.Where(p => p.Id == productId).Select(p => p.Name).SingleAsync(Cancellation);
     }
 
+    /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)

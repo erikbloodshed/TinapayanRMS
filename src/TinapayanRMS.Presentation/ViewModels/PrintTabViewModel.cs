@@ -23,21 +23,23 @@ public closed record PrintScope(string Label)
     public virtual string? Title => null;
 
     /// <summary>
-    /// Which products are in the set, with the list's <paramref name="folders"/> as they are now: any product for All
+    /// Which products are in the set, with the <paramref name="folders"/> as they're saved now: any product for All
     /// products; for a stage's folder, every product in that stage; for one of the user's folders, every product in it and
-    /// in the folders in it, however deep, a folder made since it was picked included.
+    /// in the folders in it, however deep, a folder made in it since it was picked included, wherever it's gone since.
     /// </summary>
     public Func<Product, bool> Holds(IEnumerable<ProductFolder> folders) => this switch
     {
         ThisProduct => _ => false,
         Folder { IsStage: true } stage => product => product.Stage == stage.Stage,
-        Folder { FolderId: { } id } folder => InFolders(folder.Stage, ProductFolderRules.SubtreeIds(folders, id)),
+        Folder { FolderId: { } id } => InFolders(ProductFolderRules.SubtreeIds(folders, id)),
         Folder => _ => false,
         AllProducts => _ => true,
     };
 
-    private static Func<Product, bool> InFolders(ProductStage stage, IReadOnlySet<int> folderIds) =>
-        product => product.Stage == stage && product.FolderId is { } folderId && folderIds.Contains(folderId);
+    // By the folders alone: a product is always in its folder's stage, so a folder moved to the other stage since it was
+    // picked has its products with it there, where the stage it was picked in would find none.
+    private static Func<Product, bool> InFolders(IReadOnlySet<int> folderIds) =>
+        product => product.FolderId is { } folderId && folderIds.Contains(folderId);
 
     /// <summary>
     /// Its label, which a screen reader reads for the dropdown's choice. Sealed, so each case keeps it rather than
@@ -59,6 +61,15 @@ public closed record PrintScope(string Label)
         public static Folder Of(ProductFolderNode folder) =>
             new(ProductTree.PathTitle(folder), folder.Stage, folder.FolderId, folder.IsStage);
 
+        /// <summary>
+        /// The same folder, named and staged as <paramref name="folders"/> have it now: "Production › Breads" once Breads
+        /// has gone to Production. Itself for a stage's folder, or one that's gone.
+        /// </summary>
+        public Folder AsNow(IReadOnlyList<ProductFolder> folders) =>
+            FolderId is { } id && folders.FirstOrDefault(f => f.Id == id) is { } now
+                ? this with { Label = ProductFolderRules.PathTitle(folders, now.Stage, id), Stage = now.Stage }
+                : this;
+
         public override string? Title => Label;
     }
 
@@ -79,6 +90,7 @@ public sealed class PrintTabViewModel : ViewModelBase
 {
     private readonly ProductsViewModel _products;
     private readonly IProductRepository _productRepository;
+    private readonly IProductFolderRepository _folderRepository;
     private readonly SavedProductReader _savedProducts;
 
     // The preparation running; a newer one cancels it.
@@ -87,11 +99,17 @@ public sealed class PrintTabViewModel : ViewModelBase
     // Set while a Print request picks the choice, so the choice alone doesn't prepare the pages: showing the tab does.
     private bool _isPicking;
 
-    public PrintTabViewModel(ProductsViewModel products, IProductRepository productRepository, SavedProductReader savedProducts, ILogger logger)
+    public PrintTabViewModel(
+        ProductsViewModel products,
+        IProductRepository productRepository,
+        IProductFolderRepository folderRepository,
+        SavedProductReader savedProducts,
+        ILogger logger)
         : base(logger)
     {
         _products = products;
         _productRepository = productRepository;
+        _folderRepository = folderRepository;
         _savedProducts = savedProducts;
 
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(PrepareAsync));
@@ -173,6 +191,36 @@ public sealed class PrintTabViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// <paramref name="scope"/>, and the choice showing it, named as the folder is now (PrintScope.Folder.AsNow): renamed
+    /// or moved since it was picked, the choice and the pages' title say where it is, not where it was.
+    /// </summary>
+    private PrintScope NamedAsNow(PrintScope scope, IReadOnlyList<ProductFolder> folders)
+    {
+        if (scope is not PrintScope.Folder picked || picked.AsNow(folders) is var now && now == picked)
+        {
+            return scope;
+        }
+
+        if (Scopes.IndexOf(picked) is var index and >= 0)
+        {
+            Scopes[index] = now;
+        }
+
+        // Picked as it already is, so it prepares nothing again.
+        _isPicking = true;
+        try
+        {
+            SelectedScope = now;
+        }
+        finally
+        {
+            _isPicking = false;
+        }
+
+        return now;
+    }
+
     private async Task PrepareAsync()
     {
         var preparing = new CancellationTokenSource();
@@ -236,8 +284,15 @@ public sealed class PrintTabViewModel : ViewModelBase
     private async Task PrepareSetAsync(PrintScope scope, CancellationToken cancellationToken)
     {
         Progress = "Preparing…";
-        var products = ProductFolderRules.InListOrder(
-            (await _productRepository.GetAllAsync(cancellationToken)).Where(scope.Holds(_products.Folders)), _products.Folders);
+
+        // The products and their folders as they're saved now, read together, not the folders as the Products screen last
+        // read them: products another computer filed in a folder it made in the one picked are in the set, in their place.
+        var productsRead = _productRepository.GetAllAsync(cancellationToken);
+        var foldersRead = _folderRepository.GetAllAsync(cancellationToken);
+        await Task.WhenAll(productsRead, foldersRead);
+        var folders = await foldersRead;
+        scope = NamedAsNow(scope, folders);
+        var products = ProductFolderRules.InListOrder((await productsRead).Where(scope.Holds(folders)), folders);
         var printedAt = DateTime.Now;
 
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the

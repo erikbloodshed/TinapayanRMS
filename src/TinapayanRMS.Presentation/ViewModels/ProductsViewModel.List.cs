@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Windows.Input;
 using DynamicData;
 using DynamicData.Binding;
@@ -85,17 +86,26 @@ public sealed partial class ProductsViewModel
         nameof(PasteCommand), nameof(ClearCutCommand))]
     private void WireListCommands()
     {
-        // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).
+        // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor). The moves and their
+        // Undo run one at a time, whichever kind (_noMoveRunning).
         MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
-            moves => RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)));
-        MoveToStageCommand = ReactiveCommand.CreateFromTask<StageMoveRequest>(request => RunSafelyAsync(() => MoveToStageAsync(request)));
-        MoveFolderCommand = ReactiveCommand.CreateFromTask<ProductFolderMove>(move => RunSafelyAsync(() => MoveFolderAsync(move, isUndo: false)));
+            moves => RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)), _noMoveRunning);
+        MoveToStageCommand = ReactiveCommand.CreateFromTask<StageMoveRequest>(request => RunSafelyAsync(() => MoveToStageAsync(request)), _noMoveRunning);
+        MoveFolderCommand = ReactiveCommand.CreateFromTask<ProductFolderMove>(move => RunSafelyAsync(() => MoveFolderAsync(move, isUndo: false)), _noMoveRunning);
         CutCommand = ReactiveCommand.Create<IReadOnlyList<ProductTreeNode>>(nodes => CutNodes = CanDrag(nodes) && nodes.Count > 0 ? [.. nodes] : []);
         PasteCommand = ReactiveCommand.CreateFromTask<ProductTreeNode>(PasteAsync);
         ClearCutCommand = ReactiveCommand.Create(() => { CutNodes = []; });
         ApplyCostingDefaultsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<Product>>(ApplyCostingDefaultsAsync);
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(UndoMoveAsync), hasMoveNotice);
+        UndoMoveCommand = ReactiveCommand.CreateFromTask(
+            () => RunSafelyAsync(UndoMoveAsync), Observable.CombineLatest(hasMoveNotice, _noMoveRunning, (hasNotice, free) => hasNotice && free));
+        Observable.CombineLatest(
+                MoveProductsCommand.IsExecuting,
+                MoveToStageCommand.IsExecuting,
+                MoveFolderCommand.IsExecuting,
+                UndoMoveCommand.IsExecuting,
+                (products, toStage, folder, undo) => !(products || toStage || folder || undo))
+            .Subscribe(_noMoveRunning);
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
         NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(
             () => NewProductInList(folder?.Stage, folder?.FolderId)));
@@ -456,10 +466,16 @@ public sealed partial class ProductsViewModel
         }
     }
 
-    /// <summary>A move of the list's is still saving or reading the list again.</summary>
-    private bool IsMoving =>
-        !((ICommand)MoveProductsCommand).CanExecute(null) || !((ICommand)MoveFolderCommand).CanExecute(null)
-        || !((ICommand)MoveToStageCommand).CanExecute(null);
+    /// <summary>
+    /// False while a move of the list's, of products or a folder or to the other stage, or its Undo, is still saving or
+    /// reading the list again, and every one of them is off till it's done, from a menu, a key, a drop or a paste: each reads
+    /// the list as it stands and takes the notice's Undo, so a second started meanwhile would be judged against the list as
+    /// it was, and the two would take each other's Undo. Each command alone was off only while it ran itself.
+    /// </summary>
+    private readonly BehaviorSubject<bool> _noMoveRunning = new(true);
+
+    /// <summary>A move of the list's, or its Undo, is still saving or reading the list again.</summary>
+    private bool IsMoving => !_noMoveRunning.Value;
 
     private List<TreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
     {

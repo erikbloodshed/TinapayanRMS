@@ -78,11 +78,26 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
     /// </summary>
     public IReadOnlyList<Product> DeletedProducts { get; private set; } = [];
 
+    private IReadOnlyList<ProductFolder> _folders = [];
     /// <summary>
     /// The Products list's folders (ProductFolder), in both stages, as last read: the user's own, holding products and other
-    /// folders, apart from the categories.
+    /// folders, apart from the categories. A new product started in one of them goes to its stage with it, should it have
+    /// moved to the other since (NewProductStage), as Save would file it there; the header names its place as it is now
+    /// (NewProductTag).
     /// </summary>
-    public IReadOnlyList<ProductFolder> Folders { get; private set; } = [];
+    public IReadOnlyList<ProductFolder> Folders
+    {
+        get => _folders;
+        private set
+        {
+            if (NewProductFolderId is { } folderId && value.FirstOrDefault(f => f.Id == folderId) is { } folder)
+            {
+                NewProductStage = folder.Stage;
+            }
+
+            this.RaiseAndSetIfChanged(ref _folders, value);
+        }
+    }
 
     /// <summary>The Products list (ProductListCard): VisibleProducts filed in their stage, in the user's folders.</summary>
     public ProductTree ProductTree { get; }
@@ -1038,6 +1053,7 @@ public sealed partial class ProductsViewModel : RecordFormViewModel<ProductFormS
         _printRequests.Dispose();
         _versionReads.Dispose();
         _markupChecks.Dispose();
+        _noMoveRunning.Dispose();
         _picks.Dispose();
         UsageForm.Dispose();
     }

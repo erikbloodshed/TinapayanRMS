@@ -109,4 +109,26 @@ public class ProductFolderRulesTests
         ProductFolderRules.InListOrder(products, Folders).Select(p => p.Name).Should().Equal(
             "Fruitcake", "Bibingka", "Ensaymada", "Pandesal", "Mamon", "Apple Pie", "Test Bun", "Loose Bun", "Lost");
     }
+
+    [Test]
+    public void InListOrder_lists_the_products_of_folders_whose_parents_come_round_in_a_loop_at_the_top_of_their_stage()
+    {
+        // A and B each other's parent, left by an edit outside the app, and C in A: the list shows all three at the top of
+        // Production, as their parents never reach it (ProductTree).
+        ProductFolder[] folders =
+        [
+            new() { Id = 1, Name = "A", Stage = ProductStage.Production, ParentId = 2 },
+            new() { Id = 2, Name = "B", Stage = ProductStage.Production, ParentId = 1 },
+            new() { Id = 3, Name = "C", Stage = ProductStage.Production, ParentId = 1 },
+            new() { Id = 4, Name = "Breads", Stage = ProductStage.Production },
+        ];
+        Product Of(int id, string name, int? folderId) => new() { Id = id, Name = name, Stage = ProductStage.Production, FolderId = folderId };
+        Product[] products = [Of(1, "In A", 1), Of(2, "In B", 2), Of(3, "In C", 3), Of(4, "In Breads", 4), Of(5, "Loose", null)];
+
+        ProductFolderRules.IsInLoop(folders.ToDictionary(f => f.Id), 1).Should().BeTrue();
+        ProductFolderRules.IsInLoop(folders.ToDictionary(f => f.Id), 3).Should().BeTrue("going up from C comes round A and B");
+        ProductFolderRules.IsInLoop(folders.ToDictionary(f => f.Id), 4).Should().BeFalse();
+        ProductFolderRules.InListOrder(products, folders).Select(p => p.Name).Should().Equal(
+            ["In A", "In B", "In Breads", "In C", "Loose"], "every product is listed once, each looped folder at the top by name");
+    }
 }

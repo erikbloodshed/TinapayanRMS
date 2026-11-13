@@ -710,27 +710,13 @@ public sealed class ProductTree : IDisposable
         foreach (var folder in folders)
         {
             var node = _folders[folder.Id];
-            var parent = folder.ParentId is { } parentId && byId.ContainsKey(parentId) && !IsInLoop(folder.Id)
+            var parent = folder.ParentId is { } parentId && byId.ContainsKey(parentId) && !ProductFolderRules.IsInLoop(byId, folder.Id)
                 ? _folders[parentId]
                 : null;
 
             // A folder is in its parent's stage; one at the top in its own.
             node.Stage = parent is null ? folder.Stage : TopOf(folder.Id).Stage;
             node.ParentFolder = parent ?? StageFolder(node.Stage);
-        }
-
-        bool IsInLoop(int id)
-        {
-            HashSet<int> seen = [];
-            for (int? at = id; at is { } current && byId.TryGetValue(current, out var f); at = f.ParentId)
-            {
-                if (!seen.Add(current))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         ProductFolder TopOf(int id)

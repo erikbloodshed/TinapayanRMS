@@ -55,6 +55,25 @@ public static class ProductFolderRules
         return ids;
     }
 
+    /// <summary>
+    /// Whether going up from <paramref name="folderId"/>, parent by parent, comes round to a folder again: a loop of
+    /// parents only an edit outside the app can leave, as the database refuses only a folder that's its own parent. The
+    /// list shows such a folder at the top of its stage (ProductTree), and a printout lists it there (<see cref="InListOrder"/>).
+    /// </summary>
+    public static bool IsInLoop(IReadOnlyDictionary<int, ProductFolder> byId, int folderId)
+    {
+        HashSet<int> seen = [];
+        for (int? at = folderId; at is { } current && byId.TryGetValue(current, out var folder); at = folder.ParentId)
+        {
+            if (!seen.Add(current))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Whether <paramref name="folderId"/> is <paramref name="ancestorId"/> or inside it, however deep.</summary>
     public static bool IsInside(IEnumerable<ProductFolder> folders, int folderId, int ancestorId)
     {
@@ -103,17 +122,17 @@ public static class ProductFolderRules
     /// <paramref name="products"/> in the order the list shows them with every folder open: Production's, then
     /// Innovation's; in each folder, and at the top of each stage, its folders first, each with all it holds, then its own
     /// products; folders and products by name. A product whose folder isn't among <paramref name="folders"/> is at the top
-    /// of its stage. The order a set of products prints in.
+    /// of its stage, and a folder whose parents come round in a loop is at the top of its stage, as the list shows it
+    /// (<see cref="IsInLoop"/>), so every product given is listed once. The order a set of products prints in.
     /// </summary>
     public static IReadOnlyList<Product> InListOrder(IEnumerable<Product> products, IEnumerable<ProductFolder> folders)
     {
         var folderList = folders.ToList();
         var byId = folderList.ToDictionary(f => f.Id);
         var productsIn = products.ToLookup(p => p.FolderId is { } id && byId.ContainsKey(id) ? (int?)id : null);
-        var subfolders = folderList
-            .Where(f => f.ParentId is { } parentId && byId.ContainsKey(parentId))
-            .ToLookup(f => f.ParentId!.Value);
-        var topFolders = folderList.Where(f => f.ParentId is not { } parentId || !byId.ContainsKey(parentId)).ToList();
+        bool IsTop(ProductFolder folder) => folder.ParentId is not { } parentId || !byId.ContainsKey(parentId) || IsInLoop(byId, folder.Id);
+        var subfolders = folderList.Where(f => !IsTop(f)).ToLookup(f => f.ParentId!.Value);
+        var topFolders = folderList.Where(IsTop).ToList();
 
         List<Product> ordered = [];
         HashSet<int> seen = [];

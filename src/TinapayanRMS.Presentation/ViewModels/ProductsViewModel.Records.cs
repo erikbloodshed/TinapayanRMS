@@ -21,8 +21,9 @@ public sealed partial class ProductsViewModel
                 product is null && string.IsNullOrWhiteSpace(name) ? (isComposite ? "New composite product" : "New product") : name)
             .ToProperty(this, x => x.HeaderTitle, "New product");
 
-        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, x => x.NewProductFolderId, (product, stage, folderId) =>
-                product is null ? $"Goes in {ProductFolderRules.PathTitle(Folders, stage, folderId)}" : null)
+        // Its folder's path as it is now: renamed or moved since New Product Here, it says so (Folders).
+        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, x => x.NewProductFolderId, x => x.Folders, (product, stage, folderId, folders) =>
+                product is null ? $"Goes in {ProductFolderRules.PathTitle(folders, stage, folderId)}" : null)
             .ToProperty(this, x => x.NewProductTag);
     }
 

@@ -126,6 +126,50 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     });
 
     [Test]
+    public Task A_folder_prints_what_another_computer_filed_in_a_folder_it_made_in_it_before_Products_reads_it_again() => UiThread.RunAsync(async () =>
+    {
+        var (breads, _) = await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+
+        // Made and filed in from another computer: this one's Products list hasn't read it.
+        var holiday = new ProductFolder { Name = "Holiday", Stage = ProductStage.Production, ParentId = breads.Id };
+        await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(holiday, Cancellation);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Add(new Product { Name = "Bibingka", Stage = ProductStage.Production, FolderId = holiday.Id });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+        await tab.LoadCommand.Execute();
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Bibingka", "Cheese Roll", "Pan de Coco"], "Bibingka is in Breads › Holiday");
+
+        tab.Pick(new PrintScope.AllProducts());
+        await tab.LoadCommand.Execute();
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(
+            ["Bibingka", "Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf", "Test Bread"], "in its folder's place, not loose at the top of Production");
+    });
+
+    [Test]
+    public Task A_folder_moved_to_the_other_stage_since_it_was_picked_prints_its_products_under_its_new_path() => UiThread.RunAsync(async () =>
+    {
+        var (_, cakes) = await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
+
+        // Its products go with it (ProductFolderRepository.MoveAsync).
+        await new ProductFolderRepository(CreateDbContextFactory()).MoveAsync(new ProductFolderMove(cakes.Id, ProductStage.Innovation, null), Cancellation);
+        await tab.LoadCommand.Execute();
+
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Mocha Roll"], "it went to Innovation with it");
+        tab.PrintSet.Title.Should().Be("Innovation › Cakes");
+        tab.SelectedScope.Label.Should().Be("Innovation › Cakes", "the choice says where it is now");
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Innovation › Cakes", "All products");
+    });
+
+    [Test]
     public Task A_set_prints_the_open_product_as_saved_and_says_so_while_This_product_has_its_edits() => UiThread.RunAsync(async () =>
     {
         await AddCatalogueAsync();
@@ -291,7 +335,8 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     private PrintTabViewModel CreatePrintTab(ProductsViewModel products)
     {
         var factory = CreateDbContextFactory();
-        return new PrintTabViewModel(products, new ProductRepository(factory), CreateReader(), new LoggerConfiguration().CreateLogger());
+        return new PrintTabViewModel(
+            products, new ProductRepository(factory), new ProductFolderRepository(factory), CreateReader(), new LoggerConfiguration().CreateLogger());
     }
 
     private SavedProductReader CreateReader()
