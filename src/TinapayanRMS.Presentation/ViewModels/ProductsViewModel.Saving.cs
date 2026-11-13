@@ -56,7 +56,7 @@ public sealed partial class ProductsViewModel
             var validation = _productValidator.Validate(product);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
@@ -64,7 +64,7 @@ public sealed partial class ProductsViewModel
             var costingValidation = _costingParametersValidator.Validate(costing);
             if (!costingValidation.IsValid)
             {
-                ErrorMessage = string.Join(" ", costingValidation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = costingValidation.ToString(" ");
                 return;
             }
 

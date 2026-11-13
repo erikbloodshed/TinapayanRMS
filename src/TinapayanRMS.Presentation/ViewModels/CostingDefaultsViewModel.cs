@@ -143,7 +143,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             });
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 

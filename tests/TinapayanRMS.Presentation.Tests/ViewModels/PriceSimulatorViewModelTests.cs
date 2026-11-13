@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
@@ -84,6 +85,31 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         }
 
         viewModel.Materials.Select(m => m.Name).Should().Equal("Egg", "Flour");
+    });
+
+    [Test]
+    public Task A_change_typed_and_the_filter_ticked_each_reach_the_products_table_in_one_change() => UiThread.RunAsync(async () =>
+    {
+        var bakery = await AddBakeryAsync();
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
+
+        // Its grid draws every row again for each change it hears of: a row at a time, a change held the window over a second.
+        List<NotifyCollectionChangedAction> heard = [];
+        viewModel.Products.CollectionChanged += (_, e) => heard.Add(e.Action);
+
+        // The row's material picked prices nothing yet, so the table is left as it was; the percent typed changes it once.
+        var change = viewModel.NewChange();
+        viewModel.Changes.Add(change);
+        change.MaterialId = bakery.EggId;
+        change.ChangePercent = 10m;
+        await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.MeringueId)?.IsAffected == true, () => viewModel.ErrorMessage ?? "not yet");
+        heard.Should().Equal(NotifyCollectionChangedAction.Reset);
+
+        viewModel.OnlyAffected = true;
+        heard.Should().Equal(NotifyCollectionChangedAction.Reset, NotifyCollectionChangedAction.Reset);
+        viewModel.Products.Select(r => r.ProductName).Should().BeEquivalentTo(["Meringue", "Party Box"]);
     });
 
     [Test]

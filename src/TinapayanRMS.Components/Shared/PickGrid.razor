@@ -4,7 +4,7 @@
    with a ViewModel's Selected… property both ways. A pick in the grid sets it; the ViewModel clearing it (New, Save,
    Delete) clears the grid's highlight, and the ViewModel pointing it at a record (after a load, or a refresh) highlights
    that row. Columns must include the item's key with IsPrimaryKey, so a refresh keeps the right row picked. *@
-<SfGrid @ref="_grid" TValue="TItem" DataSource="DataSource" GridLines="GridLine.Both" Height="@Height" Width="100%" RowHeight="24" EnableHover="true">
+<SfGrid @ref="_grid" TValue="TItem" DataSource="DataSource" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24" EnableHover="true">
     <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Single" EnableToggle="false" />
     <GridEvents TValue="TItem" RowSelected="OnRowSelected" DataBound="OnDataBound" />
     <GridColumns>
@@ -26,8 +26,6 @@
     [Parameter] public EventCallback<TItem?> SelectedItemChanged { get; set; }
 
     [Parameter, EditorRequired] public RenderFragment Columns { get; set; } = null!;
-
-    [Parameter] public string Height { get; set; } = "100%";
 
     protected override void OnParametersSet()
     {

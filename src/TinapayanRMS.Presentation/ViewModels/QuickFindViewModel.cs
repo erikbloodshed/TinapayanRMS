@@ -114,9 +114,12 @@ public sealed class QuickFindViewModel : ViewModelBase
 
     private async Task LoadAsync()
     {
-        var rawMaterials = await _rawMaterials.GetAllAsync(CancellationToken.None);
-        var subAssemblies = await _subAssemblies.GetStandaloneAsync(CancellationToken.None);
-        var products = await _products.GetAllAsync(CancellationToken.None);
+        // Read together, off the UI thread, as the screens read their lists.
+        var rawMaterialsRead = Task.Run(() => _rawMaterials.GetAllAsync(CancellationToken.None));
+        var subAssembliesRead = Task.Run(() => _subAssemblies.GetStandaloneAsync(CancellationToken.None));
+        var productsRead = Task.Run(() => _products.GetAllAsync(CancellationToken.None));
+        await Task.WhenAll(rawMaterialsRead, subAssembliesRead, productsRead);
+        var (rawMaterials, subAssemblies, products) = (await rawMaterialsRead, await subAssembliesRead, await productsRead);
         _records =
         [
             .. rawMaterials.Select(m => new QuickFindResult(

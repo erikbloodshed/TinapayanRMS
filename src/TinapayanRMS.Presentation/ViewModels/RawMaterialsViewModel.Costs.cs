@@ -351,7 +351,7 @@ public sealed partial class RawMaterialsViewModel
             var validation = _brandPriceValidator.Validate(new RawMaterialBrandPrice { Brand = brand, Price = row.Price ?? 0m });
             if (!validation.IsValid)
             {
-                throw new BusinessRuleException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+                throw new BusinessRuleException(validation.ToString(" "));
             }
 
             prices.Add((brand, key == PurchaseUnitChoice.BaseUnitKey ? null : key, row.Price!.Value));

@@ -64,6 +64,67 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
     }
 
     [Test]
+    public async Task ApplyCosting_to_several_versions_each_changed_one_with_a_baseline_only_when_it_had_none()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [new RecipeLine(flourId, 400m)]);
+        var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [new RecipeLine(flourId, 300m)]);
+        var (spanishBreadId, _) = await AddProductWithSubAssemblyAsync("Spanish Bread", doughRoleId, [new RecipeLine(flourId, 200m)]);
+        var costings = new CostingParametersRepository(CreateDbContextFactory());
+        await costings.SetAsync(ensaymadaId, 35m, 25m, 15m, 60m, Cancellation);
+        await costings.SetAsync(spanishBreadId, 10m, 5m, 5m, 40m, Cancellation);
+        await costings.SetAsync(cheeseRollId, 20m, 10m, 5m, 50m, Cancellation);
+        var products = new ProductRepository(CreateDbContextFactory());
+        var cheeseRoll = (await products.GetByIdAsync(cheeseRollId, Cancellation))!;
+        cheeseRoll.CurrentPrice = 9m;
+        await CreateSaves().SaveProductAsync(cheeseRoll, null, null, null, null, null, false, DateTime.Now, Cancellation);
+        var ensaymadaSavedAt = (await products.GetByIdAsync(ensaymadaId, Cancellation))!.UpdatedAt;
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+        var appliedAt = DateTime.Now;
+
+        // Given out of the list's order, and Pandesal twice: the names come back in the order given, each once.
+        var changed = await CreateSaves().ApplyCostingAsync([cheeseRollId, ensaymadaId, pandesalId, spanishBreadId, pandesalId], defaults, appliedAt, Cancellation);
+
+        changed.Should().Equal(["Cheese Roll", "Pandesal", "Spanish Bread"], "Ensaymada had the defaults already");
+        foreach (var id in new[] { pandesalId, cheeseRollId, spanishBreadId })
+        {
+            var costing = (await costings.GetForProductAsync(id, Cancellation))!;
+            (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent).Should().Be((35m, 25m, 15m, 60m));
+            (await products.GetByIdAsync(id, Cancellation))!.UpdatedAt.Should().BeOnOrAfter(appliedAt.AddSeconds(-1), "it's stamped as saved");
+        }
+
+        (await products.GetByIdAsync(ensaymadaId, Cancellation))!.UpdatedAt.Should().Be(ensaymadaSavedAt, "nothing about it changed");
+        var versions = new ProductVersionRepository(CreateDbContextFactory());
+        (await versions.GetForProductAsync(ensaymadaId, Cancellation)).Should().BeEmpty();
+        (await versions.GetForProductAsync(cheeseRollId, Cancellation)).Select(v => v.Note)
+            .Should().Equal([VersionedSaves.CostingDefaultsNote, null, ProductVersionRules.BaselineNote], "it had versions, so no baseline goes in again");
+        var spanishBread = await versions.GetForProductAsync(spanishBreadId, Cancellation);
+        spanishBread.Select(v => v.Note).Should().Equal(VersionedSaves.CostingDefaultsNote, ProductVersionRules.BaselineNote);
+        spanishBread.Select(v => ProductVersionContent.FromJson(v.Content).Costing!.LaborPercent).Should().Equal([35m, 10m], "its baseline is how it stood before");
+        spanishBread[0].SavedAt.Should().BeCloseTo(appliedAt, TimeSpan.FromMilliseconds(1), "PostgreSQL keeps microseconds");
+        (await versions.GetForProductAsync(pandesalId, Cancellation)).Select(v => v.Note)
+            .Should().Equal(VersionedSaves.CostingDefaultsNote, ProductVersionRules.BaselineNote);
+    }
+
+    [Test]
+    public async Task ApplyCosting_whose_versions_are_refused_changes_no_costing()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var costings = new CostingParametersRepository(CreateDbContextFactory());
+        await costings.SetAsync(pandesalId, 10m, 5m, 5m, 40m, Cancellation);
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+
+        var apply = () => CreateSaves(refuseVersions: true).ApplyCostingAsync([pandesalId], defaults, DateTime.Now, Cancellation);
+
+        await apply.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
+        (await costings.GetForProductAsync(pandesalId, Cancellation))!.LaborPercent.Should().Be(10m);
+    }
+
+    [Test]
     public async Task SaveProduct_whose_version_is_refused_saves_nothing()
     {
         var doughRoleId = await AddRoleAsync("Dough");

@@ -133,19 +133,7 @@
     public async ValueTask DisposeAsync()
     {
         Find.PropertyChanged -= OnFindChanged;
-        try
-        {
-            if (_key is not null)
-            {
-                await _key.InvokeVoidAsync("dispose");
-                await _key.DisposeAsync();
-            }
-        }
-        catch (JSDisconnectedException)
-        {
-            // The tab has gone.
-        }
-
+        await _key.StopAsync();
         _self?.Dispose();
     }
 }

@@ -188,8 +188,6 @@ public sealed partial class ProductsViewModel
                     RefreshLinkableOptions();
                     RecomputeCosts();
                 });
-
-                return Task.CompletedTask;
             }),
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab));
 

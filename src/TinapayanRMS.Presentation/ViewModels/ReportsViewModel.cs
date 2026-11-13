@@ -333,66 +333,72 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
 
         LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
         {
-            // Off the UI thread, as Products and Raw Materials read their details, and both summaries at once.
-            var productCostsRead = Task.Run(ReadProductCostsAsync);
-            var costDriversRead = Task.Run(ReadCostDriversAsync);
-            var rawMaterialPricesRead = Task.Run(ReadRawMaterialPricesAsync);
-            var (productCosts, _) = await productCostsRead;
-            var (rawMaterialPrices, costBuffers) = await rawMaterialPricesRead;
+            // Off the UI thread, as Products and Raw Materials read their details.
+            var read = await Task.Run(ReadAsync);
 
             // Each table in one change (TableRows), so its grid draws it once.
-            ProductCosts.ReplaceWith(productCosts);
-            RawMaterialPrices.ReplaceWith(rawMaterialPrices);
-            _allCostBuffers = costBuffers;
+            ProductCosts.ReplaceWith(read.ProductCosts);
+            RawMaterialPrices.ReplaceWith(read.RawMaterialPrices);
+            _allCostBuffers = read.CostBuffers;
             ShowCostBuffers();
-            CostDrivers.ReplaceWith(await costDriversRead);
+            CostDrivers.ReplaceWith(read.CostDrivers);
+            _priced = read.Priced;
             _marginErosionWanted.OnNext(RxVoid.Default);
         }));
     }
 
     /// <summary>
-    /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the
-    /// screen and Print read through too). All of them are read together, in the same dozen or so queries however many
-    /// products there are. The rows stay in the list's order, by name.
+    /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the screen
+    /// and Print read through too), and every material with its price history, all read side by side, then worked into
+    /// every table but Margin Erosion. The products are read once for the Product Cost Summary, Cost Drivers and Margin
+    /// Erosion together, in the same dozen or so queries however many there are: each read them for itself, three times a
+    /// visit, before 2026-11-13.
     /// </summary>
-    private async Task<(List<ProductCostRow> Rows, IReadOnlyList<SavedProduct> Saved)> ReadProductCostsAsync()
+    private async Task<Read> ReadAsync()
     {
-        var products = await _productRepository.GetAllAsync(CancellationToken.None);
-        var saved = await _savedProducts.ReadAllAsync(products, CostBasis.Buffered, CancellationToken.None);
-        return ([.. saved.Select(s => new ProductCostRow(s.Product, s.Costs))], saved);
+        var productsRead = ReadProductsAsync();
+        var materialsRead = _rawMaterialRepository.GetAllAsync(CancellationToken.None);
+        var historyRead = _priceHistoryRepository.GetAllAsync(CancellationToken.None);
+        var bomLinesRead = _bomLineRepository?.GetAllAsync(CancellationToken.None);
+        await Task.WhenAll(productsRead, materialsRead, historyRead, bomLinesRead ?? Task.CompletedTask);
+
+        var (products, details) = await productsRead;
+        var materials = await materialsRead;
+        var history = (await historyRead).ToLookup(h => h.RawMaterialId);
+
+        // The products in the list's order, by name; the purchased materials, ingredients and packaging alike, by name: a
+        // made or linked ingredient has no price history. Cost Buffers takes those with a price and a buffered cost.
+        IReadOnlyList<SavedProduct> priced = [.. products.Select(p => SavedProductReader.Build(p, details[p.Id], CostBasis.Buffered))];
+        List<RawMaterial> purchased = [.. materials.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
+        return new Read(
+            priced,
+            [.. priced.Select(s => new ProductCostRow(s.Product, s.Costs))],
+            [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
+            [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))],
+            bomLinesRead is null ? [] : CostDriverAnalysis.Analyse(products, details, materials.ToDictionary(m => m.Id), [.. await bomLinesRead]));
+
+        async Task<(IReadOnlyList<Product> Products, IReadOnlyDictionary<int, ProductDetail> Details)> ReadProductsAsync()
+        {
+            var products = await _productRepository.GetAllAsync(CancellationToken.None);
+            return (products, await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None));
+        }
     }
+
+    /// <summary>What a visit reads, priced and worked into its tables.</summary>
+    private sealed record Read(
+        IReadOnlyList<SavedProduct> Priced,
+        List<ProductCostRow> ProductCosts,
+        List<RawMaterialPriceSummaryRow> RawMaterialPrices,
+        List<CostBufferRow> CostBuffers,
+        IReadOnlyList<CostDriverRow> CostDrivers);
+
+    /// <summary>Every product as the last visit read and priced it: what Margin Erosion compares, whatever day it compares with.</summary>
+    private IReadOnlyList<SavedProduct> _priced = [];
 
     /// <summary>
-    /// The purchased materials, ingredients and packaging alike, by name: a made or linked ingredient has no price history;
-    /// and those with a price and a buffered cost, for Cost Buffers.
+    /// Margin Erosion: every product as saved today, as the visit read it, against its latest version by the end of
+    /// <see cref="MarginErosionSince"/>. A new day to compare with reads only the versions.
     /// </summary>
-    private async Task<(List<RawMaterialPriceSummaryRow> Prices, List<CostBufferRow> Buffers)> ReadRawMaterialPricesAsync()
-    {
-        var materials = await _rawMaterialRepository.GetAllAsync(CancellationToken.None);
-        var history = (await _priceHistoryRepository.GetAllAsync(CancellationToken.None)).ToLookup(h => h.RawMaterialId);
-        List<RawMaterial> purchased = [.. materials.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
-
-        return (
-            [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
-            [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))]);
-    }
-
-    /// <summary>Cost Drivers, off the UI thread: every product and material as saved, priced as Reports prices them (CostDriverAnalysis).</summary>
-    private async Task<IReadOnlyList<CostDriverRow>> ReadCostDriversAsync()
-    {
-        if (_bomLineRepository is null)
-        {
-            return [];
-        }
-
-        var products = await _productRepository.GetAllAsync(CancellationToken.None);
-        var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
-        var materials = (await _rawMaterialRepository.GetAllAsync(CancellationToken.None)).ToDictionary(m => m.Id);
-        var bomLines = await _bomLineRepository.GetAllAsync(CancellationToken.None);
-        return CostDriverAnalysis.Analyse(products, details, materials, [.. bomLines]);
-    }
-
-    /// <summary>Margin Erosion: every product as saved today against its latest version by the end of <see cref="MarginErosionSince"/>.</summary>
     private async Task LoadMarginErosionAsync(CancellationToken cancellationToken)
     {
         if (_versionRepository is null)
@@ -400,14 +406,13 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var priced = _priced;
         var asOf = MarginErosionSince.AddDays(1).AddTicks(-1);
         var rows = await Task.Run(
             async () =>
             {
-                var products = await _productRepository.GetAllAsync(cancellationToken);
-                var saved = await _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken);
                 var versions = (await _versionRepository.GetLatestAsOfAsync(asOf, cancellationToken)).ToDictionary(v => v.ProductId);
-                return MarginErosionAnalysis.Analyse(saved, versions);
+                return MarginErosionAnalysis.Analyse(priced, versions);
             },
             cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();

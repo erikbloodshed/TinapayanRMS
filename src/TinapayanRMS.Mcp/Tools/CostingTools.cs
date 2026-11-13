@@ -88,21 +88,16 @@ public sealed class CostingTools(
                 throw new McpException($"{repeated.First().Material.Name} is changed more than once. Give it one change.");
             }
 
-            List<(int MaterialId, decimal Cost, decimal BufferedCost)> newCosts = [.. rows.Select(r => (r.Material.Id, r.Cost, r.BufferedCost))];
-
-            // As PriceSimulatorViewModel.RecalculateAsync works them out.
+            // As the Price Simulator screen works them out, with the same code.
             var basis = BasisOf(unbuffered);
-            var repriced = IngredientCostRules.Reprice(materials, bomLines, newCosts.ToDictionary(c => c.MaterialId, c => (c.Cost, c.BufferedCost)));
-            var pricedDetails = SavedProductReader.PricedAt(details, repriced);
+            var simulated = PriceChangeSimulation.Run(
+                products, details, materials, bomLines, rows.ToDictionary(r => r.Material.Id, r => (r.Cost, r.BufferedCost)), basis, cancellationToken);
             List<PriceSimulatorProductRow> productRows =
             [
-                .. products.Select(p => new PriceSimulatorProductRow(
-                    p,
-                    SavedProductReader.Build(p, details[p.Id], basis).Costs,
-                    SavedProductReader.Build(p, pricedDetails[p.Id], basis, repriced).Costs)),
+                .. products.Select(p => new PriceSimulatorProductRow(p, SavedProductReader.Build(p, details[p.Id], basis).Costs, simulated.Products[p.Id].Costs)),
             ];
 
-            var reachedBy = IngredientCostRules.ReachedBy(materials.Values, bomLines, [.. rows.Select(r => r.Material.Id)]);
+            var reachedBy = simulated.ReachedBy;
             List<PriceChangeTried> tried =
             [
                 .. rows.Select(r => new PriceChangeTried(

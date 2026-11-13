@@ -106,19 +106,7 @@
     {
         Window.StateChanged -= OnWindowStateChanged;
         Shell.PropertyChanged -= OnShellChanged;
-        try
-        {
-            if (_watch is not null)
-            {
-                await _watch.InvokeVoidAsync("dispose");
-                await _watch.DisposeAsync();
-            }
-        }
-        catch (JSDisconnectedException)
-        {
-            // The page has gone.
-        }
-
+        await _watch.StopAsync();
         _self?.Dispose();
     }
 }

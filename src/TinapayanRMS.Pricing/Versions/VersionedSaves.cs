@@ -41,27 +41,40 @@ public sealed class VersionedSaves(
         IReadOnlyList<int> productIds, CostingParameters costing, DateTime savedAt, CancellationToken cancellationToken) =>
         unitOfWork.RunAsync<IReadOnlyList<string>>(async () =>
         {
+            // The products are read and written together, in the same few commands however many there are: one at a time,
+            // it took some 30 a product, over 2,400 for the shop's 84, and 1.6 s (2026-11-13).
             var wanted = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
-            List<string> changed = [];
-            foreach (var productId in productIds)
-            {
-                var current = await costingParametersRepository.GetForProductAsync(productId, cancellationToken);
-                if ((current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarginPercent ?? 0m) == wanted
-                    || await productRepository.GetByIdAsync(productId, cancellationToken) is not { } product)
-                {
-                    continue;
-                }
+            List<int> given = [.. productIds.Distinct()];
+            var costings = (await costingParametersRepository.GetForProductsAsync(given, cancellationToken)).ToDictionary(c => c.ProductId);
+            bool TakesThemAlready(int productId) =>
+                costings.GetValueOrDefault(productId) is var current
+                && (current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarginPercent ?? 0m) == wanted;
 
-                await RecordVersionBeforeHistoryAsync(productId, savedAt, cancellationToken);
-                await costingParametersRepository.SetAsync(
-                    productId, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, cancellationToken);
-                var detail = await savedProducts.ReadDetailAsync(productId, cancellationToken);
-                await versionRepository.AddAsync(productId, ProductVersionSnapshot.From(product, detail), savedAt, CostingDefaultsNote, cancellationToken);
-                await productRepository.UpdateAsync(product, cancellationToken);
-                changed.Add(product.Name);
+            var productsById = (await productRepository.GetByIdsAsync([.. given.Where(id => !TakesThemAlready(id))], cancellationToken)).ToDictionary(p => p.Id);
+            List<Product> changing = [.. given.Where(productsById.ContainsKey).Select(id => productsById[id])];
+            if (changing.Count == 0)
+            {
+                return [];
             }
 
-            return changed;
+            List<int> changingIds = [.. changing.Select(p => p.Id)];
+            var before = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
+            await costingParametersRepository.SetForProductsAsync(
+                changingIds, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, cancellationToken);
+            var after = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
+
+            // One with no versions yet gets how it stood before first, dated when it was last saved, as a Save's would be
+            // (RecordVersionBeforeHistoryAsync).
+            await versionRepository.AddRangeAsync(
+                [
+                    .. changing.Select(product => new ProductVersionDraft(product.Id, ProductVersionSnapshot.From(product, after[product.Id]), savedAt, CostingDefaultsNote)
+                    {
+                        Baseline = new(product.Id, ProductVersionSnapshot.From(product, before[product.Id]), product.UpdatedAt ?? savedAt, ProductVersionRules.BaselineNote),
+                    }),
+                ],
+                cancellationToken);
+            await productRepository.StampSavedAsync(changingIds, cancellationToken);
+            return [.. changing.Select(p => p.Name)];
         }, cancellationToken);
 
     /// <summary>

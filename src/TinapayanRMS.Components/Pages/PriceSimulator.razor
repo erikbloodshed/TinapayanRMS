@@ -104,31 +104,35 @@
             </div>
         </div>
         <p class="caption">Every product for one sellable unit, now and with the price changes, at buffered costs; Unbuffered shows them at the materials' true costs instead, and Print Report and Export to Excel follow. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns; Price to Keep Markup is the price that earns today's markup with the changes. Double-click a product to open it.</p>
-        <SfGrid @ref="_products" TValue="PriceSimulatorProductRow" DataSource="ViewModel!.Products" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
-                AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true">
-            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
-            <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
-            <GridTextWrapSettings WrapMode="WrapMode.Header" />
-            <GridEvents TValue="PriceSimulatorProductRow" RowSelected="SyncSelectionAsync" RowDeselected="SyncSelectionAsync"
-                        OnRecordDoubleClick="OpenProductAsync" DataBound="RememberShownAsync" />
-            <GridColumns>
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductId)" IsPrimaryKey="true" Visible="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductName)" HeaderText="Product" Width="220" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.Category)" HeaderText="Category" MinWidth="120" Width="130" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialCost)" HeaderText="Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedRawMaterialCost)" HeaderText="Simulated Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.BaseCost)" HeaderText="Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedBaseCost)" HeaderText="Simulated Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.ChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.SuggestedPrice)" HeaderText="Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedSuggestedPrice)" HeaderText="Simulated Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.CurrentPrice)" HeaderText="Current Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedMarkupPercent)" HeaderText="Simulated Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-                <GridColumn Field="@nameof(PriceSimulatorProductRow.PriceToKeepMarkup)" HeaderText="Price to Keep Markup" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
-            </GridColumns>
-        </SfGrid>
+        @* In a SelfDrawn, as Reports' grids are: it draws itself as its rows change, which they do in one change
+           (TableRows), so the page drawing again for a change typed or a button's state doesn't draw it again. *@
+        <SelfDrawn>
+            <SfGrid @ref="_products" TValue="PriceSimulatorProductRow" DataSource="ViewModel!.Products" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+                    AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true">
+                <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
+                <GridTextWrapSettings WrapMode="WrapMode.Header" />
+                <GridEvents TValue="PriceSimulatorProductRow" RowSelected="SyncSelectionAsync" RowDeselected="SyncSelectionAsync"
+                            OnRecordDoubleClick="OpenProductAsync" DataBound="RememberShownAsync" />
+                <GridColumns>
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductId)" IsPrimaryKey="true" Visible="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.ProductName)" HeaderText="Product" Width="220" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.Category)" HeaderText="Category" MinWidth="120" Width="130" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialCost)" HeaderText="Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedRawMaterialCost)" HeaderText="Simulated Raw Material Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.RawMaterialChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.BaseCost)" HeaderText="Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedBaseCost)" HeaderText="Simulated Base Cost" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.ChangePercent)" HeaderText="Change %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.SuggestedPrice)" HeaderText="Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedSuggestedPrice)" HeaderText="Simulated Suggested Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.CurrentPrice)" HeaderText="Current Price" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.SimulatedMarkupPercent)" HeaderText="Simulated Markup %" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                    <GridColumn Field="@nameof(PriceSimulatorProductRow.PriceToKeepMarkup)" HeaderText="Price to Keep Markup" Format="N2" TextAlign="TextAlign.Right" AllowFiltering="false" />
+                </GridColumns>
+            </SfGrid>
+        </SelfDrawn>
     </section>
 </div>
 

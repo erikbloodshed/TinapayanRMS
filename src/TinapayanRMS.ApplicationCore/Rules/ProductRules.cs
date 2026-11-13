@@ -39,8 +39,6 @@ public static class ProductRules
         }
     }
 
-
-
     /// <summary>
     /// A product's whole set of usages: an empty set is valid (PLAN.md doesn't require a product to
     /// have a usage at all times), and so is a piece size of 0 — a section can go into the recipe before

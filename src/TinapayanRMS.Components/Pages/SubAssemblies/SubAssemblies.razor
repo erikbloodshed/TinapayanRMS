@@ -1,7 +1,6 @@
 @page "/sub-assemblies"
 @page "/sub-assemblies/{Id:int}"
 @inherits ScreenBase<SubAssembliesViewModel>
-@inject NavigationManager Navigation
 @inject Prompts Prompts
 
 <PageTitle>@(ViewModel!.SelectedRow?.Name ?? "Sub-Assemblies") · TinapayanRMS</PageTitle>

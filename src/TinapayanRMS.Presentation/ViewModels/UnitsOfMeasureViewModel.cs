@@ -109,7 +109,7 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
             var validation = _unitOfMeasureValidator.Validate(unit);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 

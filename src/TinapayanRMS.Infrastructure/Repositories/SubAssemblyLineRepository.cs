@@ -55,20 +55,7 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
         SubAssemblyRules.EnsureValidLines(lines);
 
         var ingredientIds = lines.Select(l => l.IngredientId).ToList();
-        var ingredients = await dbContext.RawMaterials
-            .Where(m => ingredientIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.Name, m.Type })
-            .ToDictionaryAsync(m => m.Id, cancellationToken);
-
-        foreach (var line in lines)
-        {
-            if (!ingredients.TryGetValue(line.IngredientId, out var ingredient))
-            {
-                throw new BusinessRuleException($"Ingredient {line.IngredientId} does not exist.");
-            }
-
-            RawMaterialRules.EnsureUsableInRecipes(ingredient.Type, ingredient.Name);
-        }
+        await LineChecks.UsableIngredientNamesAsync(dbContext, ingredientIds, cancellationToken);
 
         await dbContext.SubAssemblyLines
             .Where(l => l.SubAssemblyId == subAssembly.Id)

@@ -52,7 +52,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// reaches: what the report prints, so it always matches the table, even while a refused change waits to be put right.
     /// </summary>
     private IReadOnlyDictionary<int, SavedProduct> _now = new Dictionary<int, SavedProduct>();
-    private Dictionary<int, SavedProduct> _simulated = [];
+    private IReadOnlyDictionary<int, SavedProduct> _simulated = new Dictionary<int, SavedProduct>();
     private IReadOnlyList<(PrintedPriceChange Change, IReadOnlySet<int> Reaches)> _tried = [];
 
     private CostBasis _costBasis;
@@ -102,8 +102,11 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         private set => this.RaiseAndSetIfChanged(ref _materials, value);
     }
 
-    /// <summary>The products, all of them or only those a change reaches.</summary>
-    public ObservableCollection<PriceSimulatorProductRow> Products { get; } = [];
+    /// <summary>
+    /// The products, all of them or only those a change reaches, replaced all together (TableRows): its grid draws every row
+    /// again for each change to the list, so filled a row at a time it held the window over a second for each change typed.
+    /// </summary>
+    public TableRows<PriceSimulatorProductRow> Products { get; } = [];
 
     /// <summary>The Products table's picked rows (its SelectedItems), Ctrl or Shift held for several: what Print Report's Selected products prints.</summary>
     public ObservableCollection<object> SelectedProducts { get; } = [];
@@ -315,19 +318,11 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         var (rows, simulatedById, reaches) = await Task.Run(
             () =>
             {
-                var repriced = IngredientCostRules.Reprice(data.Materials, data.BomLines, newCosts.ToDictionary(c => c.MaterialId, c => (c.Cost, c.BufferedCost)));
-                var details = SavedProductReader.PricedAt(data.Details, repriced);
-                Dictionary<int, SavedProduct> simulatedById = [];
-                foreach (var product in data.Products)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    simulatedById[product.Id] = SavedProductReader.Build(product, details[product.Id], basis, repriced);
-                }
-
-                IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, now[p.Id].Costs, simulatedById[p.Id].Costs))];
-                var reachedBy = IngredientCostRules.ReachedBy(data.Materials.Values, data.BomLines, [.. newCosts.Select(c => c.MaterialId)]);
-                List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => reachedBy[c.MaterialId])];
-                return (rows, simulatedById, reaches);
+                var simulated = PriceChangeSimulation.Run(
+                    data.Products, data.Details, data.Materials, data.BomLines, newCosts.ToDictionary(c => c.MaterialId, c => (c.Cost, c.BufferedCost)), basis, cancellationToken);
+                IReadOnlyList<PriceSimulatorProductRow> rows = [.. data.Products.Select(p => new PriceSimulatorProductRow(p, now[p.Id].Costs, simulated.Products[p.Id].Costs))];
+                List<IReadOnlySet<int>> reaches = [.. newCosts.Select(c => simulated.ReachedBy[c.MaterialId])];
+                return (rows, simulated.Products, reaches);
             },
             cancellationToken);
 
@@ -484,17 +479,13 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Shows the rows the Only affected filter leaves. They're new rows each time, so the picked products are picked again
-    /// by id: a change typed or the filter ticked doesn't lose them.
+    /// Shows the rows the Only affected filter leaves, in one change. They're new rows each time, so the picked products are
+    /// picked again by id: a change typed or the filter ticked doesn't lose them.
     /// </summary>
     private void ShowRows()
     {
         HashSet<int> picked = [.. SelectedProducts.OfType<PriceSimulatorProductRow>().Select(r => r.ProductId)];
-        Products.Clear();
-        foreach (var row in _allRows.Where(row => !OnlyAffected || row.IsAffected))
-        {
-            Products.Add(row);
-        }
+        Products.ReplaceWith(_allRows.Where(row => !OnlyAffected || row.IsAffected));
 
         SelectedProducts.Clear();
         foreach (var row in Products.Where(r => picked.Contains(r.ProductId)))

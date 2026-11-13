@@ -110,31 +110,7 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
         var stored = await StageStandaloneAsync(dbContext, subAssembly, isPackaging: true, cancellationToken);
 
         SubAssemblyRules.EnsureValidPackagingLines(lines);
-        var materialIds = lines.Select(l => l.PackagingMaterialId).ToList();
-        var materials = await dbContext.RawMaterials
-            .Where(m => materialIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.Name, m.Type })
-            .ToDictionaryAsync(m => m.Id, cancellationToken);
-        foreach (var line in lines)
-        {
-            var material = materials.GetValueOrDefault(line.PackagingMaterialId)
-                ?? throw new BusinessRuleException($"Packaging material {line.PackagingMaterialId} does not exist.");
-            RawMaterialRules.EnsureUsableAsPackaging(material.Type, material.Name);
-        }
-
-        // A line's unit is one of its own material's alternative units; an empty one means that material's base unit.
-        var unitIds = lines.Where(l => l.UnitId is not null).Select(l => l.UnitId!.Value).Distinct().ToList();
-        var materialIdByUnitId = await dbContext.RawMaterialUnits
-            .Where(u => unitIds.Contains(u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.RawMaterialId, cancellationToken);
-        foreach (var line in lines)
-        {
-            if (line.UnitId is { } unitId
-                && (!materialIdByUnitId.TryGetValue(unitId, out var unitMaterialId) || unitMaterialId != line.PackagingMaterialId))
-            {
-                throw new BusinessRuleException("A packaging set line's unit must be one of that material's own units.");
-            }
-        }
+        await LineChecks.EnsureUsablePackagingAsync(dbContext, [.. lines.Select(l => (l.PackagingMaterialId, l.UnitId))], "packaging set line", cancellationToken);
 
         // Saved here so a new one has its id for its lines. A set is costed on read, so its stored totals stay 0.
         await dbContext.SaveChangesAsync(cancellationToken);

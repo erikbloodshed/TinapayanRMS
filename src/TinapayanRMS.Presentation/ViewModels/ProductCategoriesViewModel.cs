@@ -108,7 +108,7 @@ public sealed class ProductCategoriesViewModel : ViewModelBase, IDisposable
             var validation = _categoryValidator.Validate(category);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 

@@ -855,10 +855,7 @@ public sealed partial class ProductsViewModel
     /// </summary>
     private void NameNewComposite(ProductLeafNode row, string name)
     {
-        var recorder = (IUndoRecorder)this;
-        recorder.BeginUndoStep();
-        EditingName = name;
-        recorder.EndUndoStep();
+        AsUndoStep(() => EditingName = name);
         row.Product = new Product
         {
             Name = name,
@@ -956,7 +953,7 @@ public sealed partial class ProductsViewModel
         var validation = _categoryValidator.Validate(category);
         if (!validation.IsValid)
         {
-            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            ErrorMessage = validation.ToString(" ");
             return null;
         }
 

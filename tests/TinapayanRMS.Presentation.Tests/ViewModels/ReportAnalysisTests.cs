@@ -1,3 +1,4 @@
+using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -86,6 +87,72 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         (await new ProductVersionRepository(CreateDbContextFactory()).GetLatestAsOfAsync(monthAgo.AddDays(-1), Cancellation))
             .Should().BeEmpty("there was no version before it");
     });
+
+    [Test]
+    public Task A_visit_reads_the_products_once_for_every_table_and_a_new_day_reads_only_the_versions() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(flourId, 1000m)], weightPerPiece: 10m);
+        await SetStageAsync([pandesalId], ProductStage.Production);
+        await using (var dbContext = CreateDbContext())
+        {
+            dbContext.Products.Single(p => p.Id == pandesalId).CurrentPrice = 1m;
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        // A version a month ago, at flour 0.05; flour has since gone up to 0.06.
+        var products = new ProductRepository(CreateDbContextFactory());
+        var monthAgo = DateTime.Today.AddDays(-30);
+        await new ProductVersionRepository(CreateDbContextFactory()).AddAsync(
+            pandesalId, ProductVersionSnapshot.From((await products.GetByIdAsync(pandesalId, Cancellation))!, await SavedProducts().ReadDetailAsync(pandesalId, Cancellation)), monthAgo, null, Cancellation);
+        await SetFlourCostAsync(flourId, 0.06m);
+        var viewModel = CreateReports();
+        viewModel.MarginErosionSince = monthAgo;
+
+        await viewModel.LoadCommand.Execute();
+        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
+
+        var costs = viewModel.ProductCosts.Should().ContainSingle().Subject;
+        viewModel.CostDrivers.Select(r => r.Name).Should().Equal("Flour");
+        viewModel.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost, "both tables price the products the visit read");
+
+        // Flour changes after the visit. Another day compares the products as the visit read them, beside the other tables,
+        // until the next visit reads them again.
+        await SetFlourCostAsync(flourId, 0.07m);
+        viewModel.MarginErosionSince = monthAgo.AddDays(-1);
+        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 0, () => $"{viewModel.MarginErosion.Count} eroded");
+        viewModel.MarginErosionSince = monthAgo.AddDays(1);
+        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
+        viewModel.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost);
+
+        await viewModel.LoadCommand.Execute();
+        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1 && viewModel.MarginErosion[0].BaseCostNow > costs.BaseCost, () => "not read again");
+        viewModel.MarginErosion[0].BaseCostNow.Should().Be(viewModel.ProductCosts.Single().BaseCost);
+    });
+
+    private async Task SetFlourCostAsync(int flourId, decimal costPerGram)
+    {
+        await using var dbContext = CreateDbContext();
+        var flour = dbContext.RawMaterials.Single(m => m.Id == flourId);
+        flour.CostPerBaseUnit = costPerGram;
+        flour.BufferedCostPerBaseUnit = costPerGram;
+        await dbContext.SaveChangesAsync(Cancellation);
+    }
+
+    private ReportsViewModel CreateReports()
+    {
+        ReactiveUIBootstrapper.EnsureInitialized();
+        var factory = CreateDbContextFactory();
+        return new ReportsViewModel(
+            new RawMaterialPriceHistoryRepository(factory),
+            new RawMaterialRepository(factory),
+            new ProductRepository(factory),
+            SavedProducts(),
+            new Serilog.LoggerConfiguration().CreateLogger(),
+            new ProductVersionRepository(factory),
+            new IngredientBomLineRepository(factory));
+    }
 
     private async Task<IReadOnlyList<CostDriverRow>> AnalyseCostDriversAsync()
     {

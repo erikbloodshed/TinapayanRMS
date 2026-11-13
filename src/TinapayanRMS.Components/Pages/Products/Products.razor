@@ -1,7 +1,6 @@
 @page "/products"
 @page "/products/{Id:int}"
 @inherits ScreenBase<ProductsViewModel>
-@inject NavigationManager Navigation
 @inject Prompts Prompts
 
 <PageTitle>@(ViewModel!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>

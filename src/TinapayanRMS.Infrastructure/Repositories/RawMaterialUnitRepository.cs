@@ -154,7 +154,6 @@ public sealed class RawMaterialUnitRepository(IDbContextFactory<TinapayanRMSDbCo
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>A material can have each unit of measure only once; the unique index would otherwise report it as a duplicate name.</summary>
     /// <summary>
     /// The multiplier <paramref name="unit"/> is saved with: a standard unit's fixed one when it and the material's base
     /// unit are of the same kind (StandardUnitRules: a kilogram of an ingredient is 1,000 g, whatever was sent), else
@@ -176,6 +175,7 @@ public sealed class RawMaterialUnitRepository(IDbContextFactory<TinapayanRMSDbCo
             : unit.BaseUnitsPerUnit;
     }
 
+    /// <summary>A material can have each unit of measure only once; the unique index would otherwise report it as a duplicate name.</summary>
     private static async Task EnsureNotAlreadyAddedAsync(
         TinapayanRMSDbContext dbContext, int rawMaterialId, int unitOfMeasureId, int excludeId, CancellationToken cancellationToken)
     {

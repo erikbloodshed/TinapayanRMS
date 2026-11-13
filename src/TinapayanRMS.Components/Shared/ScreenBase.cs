@@ -122,15 +122,6 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     /// <summary>The page's toasts, for a failure the screen meets outside its ViewModel.</summary>
     protected Notices ScreenNotices => Notices;
 
-    /// <summary>Runs <paramref name="command"/> from a click. Its ViewModel catches what it throws (RunSafelyAsync).</summary>
-    protected static async Task Run(ReactiveCommand<RxVoid, RxVoid> command)
-    {
-        if (((ICommand)command).CanExecute(null))
-        {
-            await command.Execute();
-        }
-    }
-
     /// <summary>Whether <paramref name="command"/> can run now, for a button's Disabled.</summary>
     protected static bool CanRun(ICommand command) => command.CanExecute(null);
 

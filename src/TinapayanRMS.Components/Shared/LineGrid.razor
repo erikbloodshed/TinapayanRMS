@@ -11,7 +11,7 @@
    (GridRowReordering), as one undo step: with the pointer, by app.js's watchLineDrag, since the Windows web view never
    hands the page the browser's own drag and drop. Insert Line, or the Insert key while the table has the cursor, puts a blank line in above the one
    picked, or at the bottom with none (GridRowInserting), and its first cell takes the cursor. *@
-<table @ref="_table" id="@_id" class="line-grid @CssClass @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
+<table @ref="_table" id="@_id" class="line-grid @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
     <thead>
         <tr>
             <th class="row-header"></th>
@@ -50,15 +50,6 @@
             <tr class="empty-row"><td colspan="99">@EmptyText</td></tr>
         }
     </tbody>
-    @if (Footer is not null)
-    {
-        <tfoot>
-            <tr>
-                <td class="row-header"></td>
-                @Footer
-            </tr>
-        </tfoot>
-    }
 </table>
 
 @code {
@@ -131,15 +122,11 @@
 
     [Parameter, EditorRequired] public RenderFragment<TRow> Row { get; set; } = null!;
 
-    [Parameter] public RenderFragment? Footer { get; set; }
-
     [Parameter] public bool Reorderable { get; set; }
 
     [Parameter] public bool ReadOnly { get; set; }
 
     [Parameter] public string? EmptyText { get; set; }
-
-    [Parameter] public string? CssClass { get; set; }
 
     /// <summary>
     /// Whether the Insert key puts a line in above the one picked, as the ingredient tables' Insert Line does. Insert Line
@@ -315,19 +302,7 @@
     {
         Unwatch();
         _rowEvents.Clear();
-        if (_dragWatch is not null)
-        {
-            try
-            {
-                await _dragWatch.InvokeVoidAsync("dispose");
-                await _dragWatch.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // The page has gone: nothing left to let go of.
-            }
-        }
-
+        await _dragWatch.StopAsync();
         _drops?.LetGo();
         _dropsReference?.Dispose();
     }

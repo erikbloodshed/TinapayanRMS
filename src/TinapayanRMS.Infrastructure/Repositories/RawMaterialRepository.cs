@@ -306,18 +306,19 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
             if (brandPrices is not null)
             {
-                var rows = new List<RawMaterialBrandPrice>();
-                foreach (var (brand, unitOfMeasureId, price) in brandPrices)
-                {
-                    rows.Add(new RawMaterialBrandPrice
-                    {
-                        Brand = brand,
-                        UnitId = await FindUnitIdAsync(dbContext, id, unitOfMeasureId, cancellationToken),
-                        Price = price,
-                    });
-                }
+                // Each price's unit is named by its unit of measure, since a unit added in this Save had no id: the
+                // material's units are read once for all of them, now that they're saved.
+                var unitIds = brandPrices.Any(p => p.UnitOfMeasureId is not null)
+                    ? await dbContext.RawMaterialUnits.Where(u => u.RawMaterialId == id).ToDictionaryAsync(u => u.UnitOfMeasureId, u => u.Id, cancellationToken)
+                    : [];
+                List<RawMaterialBrandPrice> rows =
+                [
+                    .. brandPrices.Select(p => new RawMaterialBrandPrice { Brand = p.Brand, UnitId = UnitIdOf(unitIds, p.UnitOfMeasureId), Price = p.Price }),
+                ];
 
-                var saved = await dbContext.RawMaterials.FirstAsync(m => m.Id == id, cancellationToken);
+                // Tracked already, by the add or update above: Find reads it again only if it isn't.
+                var saved = await dbContext.RawMaterials.FindAsync([id], cancellationToken)
+                    ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
 
                 // No buffered cost sent: it's worked out from the new prices, not the old ones UpdateAsync had.
                 if (fields.Source == RawMaterialSource.Purchased && material.BufferedCostPerBaseUnit == 0m)
@@ -455,20 +456,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     {
         var made = await MadeIngredientRecipeAsync(dbContext, ingredientId, cancellationToken);
 
-        var addInIds = addIns.Select(a => a.IngredientId).Distinct().ToList();
-        var addInMaterials = await dbContext.RawMaterials
-            .Where(m => addInIds.Contains(m.Id))
-            .Select(m => new { m.Id, m.Name, m.Type })
-            .ToDictionaryAsync(m => m.Id, cancellationToken);
-        foreach (var addIn in addIns)
-        {
-            var material = addInMaterials.GetValueOrDefault(addIn.IngredientId)
-                ?? throw new BusinessRuleException($"Ingredient {addIn.IngredientId} does not exist.");
-            RawMaterialRules.EnsureUsableInRecipes(material.Type, material.Name);
-        }
-
+        var names = await LineChecks.UsableIngredientNamesAsync(dbContext, [.. addIns.Select(a => a.IngredientId)], cancellationToken);
         IngredientBomRules.EnsureValidAddIns(
-            [.. addIns.Select(a => (a.IngredientId, a.Grams, addInMaterials[a.IngredientId].Name))], made.SubAssemblyName, made.LineIngredientIds);
+            [.. addIns.Select(a => (a.IngredientId, a.Grams, names[a.IngredientId]))], made.SubAssemblyName, made.LineIngredientIds);
 
         await dbContext.IngredientAddInLines.Where(l => l.IngredientId == ingredientId).ExecuteDeleteAsync(cancellationToken);
         dbContext.IngredientAddInLines.AddRange(addIns.Select((a, index) => new IngredientAddInLine
@@ -718,18 +708,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// unit. A new price names its unit by unit of measure because a unit added in the same save had no
     /// id yet; a material has each unit of measure at most once.
     /// </summary>
-    private static async Task<int?> FindUnitIdAsync(
-        TinapayanRMSDbContext dbContext, int rawMaterialId, int? unitOfMeasureId, CancellationToken cancellationToken)
-    {
-        if (unitOfMeasureId is null)
-        {
-            return null;
-        }
-
-        return await dbContext.RawMaterialUnits
-            .Where(u => u.RawMaterialId == rawMaterialId && u.UnitOfMeasureId == unitOfMeasureId)
-            .Select(u => (int?)u.Id)
-            .SingleOrDefaultAsync(cancellationToken)
-            ?? throw new BusinessRuleException("A price's unit must be one of that material's own units.");
-    }
+    /// <summary>The material's own unit a price is in, by unit of measure; null for a price per base unit.</summary>
+    private static int? UnitIdOf(Dictionary<int, int> unitIdsByUnitOfMeasure, int? unitOfMeasureId) =>
+        unitOfMeasureId is not { } unitOfMeasure ? null
+        : unitIdsByUnitOfMeasure.TryGetValue(unitOfMeasure, out var unitId) ? unitId
+        : throw new BusinessRuleException("A price's unit must be one of that material's own units.");
 }

@@ -138,17 +138,17 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         return newProduct.Id;
     }
 
-    /// <summary>
-    /// The new product's recipe, at the source's piece sizes: its own copy of each of the source's own
-    /// sub-assemblies (lines, role, and its section name there, named after the new product by SetRecipeAsync), and a
-    /// link to every one the source links, with the source's add-ins on it as the new product's own.
-    /// </summary>
     /// <summary>Saved packaging lines as SetLinesAsync takes them: each as it was typed.</summary>
     private static List<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> AsTyped(
         IEnumerable<PackagingLine> lines) =>
         [.. lines.Select(l => (l.PackagingMaterialId, l.UnitId, l.AuthoredField,
             l.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? l.QtyPerUnit : l.UnitsPerPackagingUnit))];
 
+    /// <summary>
+    /// The new product's recipe, at the source's piece sizes: its own copy of each of the source's own
+    /// sub-assemblies (lines, role, and its section name there, named after the new product by SetRecipeAsync), and a
+    /// link to every one the source links, with the source's add-ins on it as the new product's own.
+    /// </summary>
     private static RecipeDraft DerivedRecipe(
         List<ProductSubAssemblyUsage> usages,
         ILookup<int, SubAssemblyLine> ownLines,

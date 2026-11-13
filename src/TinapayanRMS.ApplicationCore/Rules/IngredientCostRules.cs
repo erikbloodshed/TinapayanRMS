@@ -113,10 +113,8 @@ public static class IngredientCostRules
             copies[id] = copy;
         }
 
-        var dependencies = Dependencies(materials.Values, bomLines);
-        var affected = IngredientCostGraph.GetDependents(newCosts.Keys, IngredientCostGraph.DependentsOf(dependencies));
         var linesByIngredientId = bomLines.ToLookup(l => l.IngredientId);
-        foreach (var id in IngredientCostGraph.InDependencyOrder(affected, dependencies))
+        foreach (var id in IngredientCostGraph.GetDependentsInOrder(newCosts.Keys, Dependencies(materials.Values, bomLines)))
         {
             var copy = materials[id].ShallowCopy();
             (copy.CostPerBaseUnit, copy.BufferedCostPerBaseUnit, copy.CostBufferPercent) =

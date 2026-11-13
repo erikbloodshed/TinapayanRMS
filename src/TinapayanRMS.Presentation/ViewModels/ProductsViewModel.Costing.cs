@@ -89,7 +89,7 @@ public sealed partial class ProductsViewModel
             {
                 if (!AreDetailsReady)
                 {
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 // On the History tab it prints the version picked there (PreparePrintout), so the form isn't applied: its
@@ -99,7 +99,7 @@ public sealed partial class ProductsViewModel
                     if (VersionHistory.SelectedRow is null)
                     {
                         ErrorMessage = "Pick a version in the History tab's table to print it.";
-                        return Task.CompletedTask;
+                        return;
                     }
                 }
                 else
@@ -108,7 +108,6 @@ public sealed partial class ProductsViewModel
                 }
 
                 _printRequests.OnNext(new PrintScope.ThisProduct());
-                return Task.CompletedTask;
             }));
 
         ToggleCostBasisCommand = ReactiveCommand.Create(ToggleCostBasis);

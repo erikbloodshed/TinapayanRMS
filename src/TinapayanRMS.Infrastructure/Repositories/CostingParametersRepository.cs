@@ -46,17 +46,48 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
         CostingRules.EnsureValidParameters(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
 
         var existing = await dbContext.CostingParameters.FirstOrDefaultAsync(c => c.ProductId == costing.ProductId, cancellationToken);
-        if (existing is null)
+        CopyFields(costing, existing ?? dbContext.CostingParameters.Add(new CostingParameters { ProductId = costing.ProductId }).Entity);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SetForProductsAsync(
+        IReadOnlyCollection<int> productIds,
+        decimal laborPercent,
+        decimal overheadPercent,
+        decimal administrativePercent,
+        decimal marginPercent,
+        CancellationToken cancellationToken)
+    {
+        CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, marginPercent);
+        if (productIds.Count == 0)
         {
-            existing = new CostingParameters { ProductId = costing.ProductId };
-            dbContext.CostingParameters.Add(existing);
+            return;
         }
 
-        existing.LaborPercent = costing.LaborPercent;
-        existing.OverheadPercent = costing.OverheadPercent;
-        existing.AdministrativePercent = costing.AdministrativePercent;
-        existing.MarginPercent = costing.MarginPercent;
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        List<int> ids = [.. productIds.Distinct()];
+        var existing = await dbContext.CostingParameters.Where(c => ids.Contains(c.ProductId)).ToDictionaryAsync(c => c.ProductId, cancellationToken);
+        var costing = new CostingParameters
+        {
+            LaborPercent = laborPercent,
+            OverheadPercent = overheadPercent,
+            AdministrativePercent = administrativePercent,
+            MarginPercent = marginPercent,
+        };
+        foreach (var productId in ids)
+        {
+            CopyFields(costing, existing.GetValueOrDefault(productId) ?? dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId }).Entity);
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>The four percentages from <paramref name="costing"/> onto a product's stored row.</summary>
+    private static void CopyFields(CostingParameters costing, CostingParameters row)
+    {
+        row.LaborPercent = costing.LaborPercent;
+        row.OverheadPercent = costing.OverheadPercent;
+        row.AdministrativePercent = costing.AdministrativePercent;
+        row.MarginPercent = costing.MarginPercent;
     }
 }

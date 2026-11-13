@@ -135,7 +135,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             var validation = _roleValidator.Validate(role);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 

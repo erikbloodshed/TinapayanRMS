@@ -58,18 +58,11 @@
                 </table>
             }
         </section>
-
-        @foreach (var product in Set.Products)
-        {
-            <article class="print-sheet print-product">@ProductPart(product)</article>
-        }
     }
-    else
+
+    @foreach (var product in Set.Products)
     {
-        @foreach (var product in Set.Products)
-        {
-            <article class="print-sheet print-product">@ProductPart(product)</article>
-        }
+        <article class="print-sheet print-product">@ProductPart(product)</article>
     }
 </div>
 

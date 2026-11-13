@@ -644,13 +644,21 @@ window.tinapayan = {
                 height: Math.round(r.height * scale),
             };
         };
+        // Sent only when something moved: the window keeps what it was told last, and sets it again itself after a change
+        // of style (AppWindowChrome.AfterStyleChanged).
+        let sent = "";
         const send = () => {
             queued = false;
+            const titleBar = device(bar.getBoundingClientRect());
             const buttons = [...bar.querySelectorAll("button, a, input")]
                 .filter(e => e.getClientRects().length > 0)
                 .map(e => device(e.getBoundingClientRect()))
                 .filter(r => r.width > 0 && r.height > 0);
-            dotNet.invokeMethodAsync("SetTitleBar", device(bar.getBoundingClientRect()), buttons);
+            const told = JSON.stringify([titleBar, buttons]);
+            if (told !== sent) {
+                sent = told;
+                dotNet.invokeMethodAsync("SetTitleBar", titleBar, buttons);
+            }
         };
         const queue = () => {
             if (!queued) {

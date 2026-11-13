@@ -254,7 +254,7 @@ public sealed partial class RawMaterialsViewModel
             var validation = _rawMaterialValidator.Validate(material);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 

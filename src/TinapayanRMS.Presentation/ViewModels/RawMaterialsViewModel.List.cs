@@ -201,7 +201,7 @@ public sealed partial class RawMaterialsViewModel
             var validation = _categoryValidator.Validate(category);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
@@ -630,10 +630,7 @@ public sealed partial class RawMaterialsViewModel
     /// </summary>
     private void NameNewMaterial(RawMaterialLeafNode row, string name)
     {
-        var recorder = (IUndoRecorder)this;
-        recorder.BeginUndoStep();
-        EditingName = name;
-        recorder.EndUndoStep();
+        AsUndoStep(() => EditingName = name);
         var material = row.RawMaterial;
         row.RawMaterial = new RawMaterial { Name = name, Type = material.Type, Source = material.Source, CategoryId = material.CategoryId };
     }
@@ -668,7 +665,7 @@ public sealed partial class RawMaterialsViewModel
             var validation = _categoryValidator.Validate(added);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
@@ -698,7 +695,7 @@ public sealed partial class RawMaterialsViewModel
         var validation = _categoryValidator.Validate(renamed);
         if (!validation.IsValid)
         {
-            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            ErrorMessage = validation.ToString(" ");
             return;
         }
 

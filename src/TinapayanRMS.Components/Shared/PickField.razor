@@ -46,7 +46,7 @@ else
     private RenderFragment ComboBox =>
         @<PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
                      AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
-                     Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="ShowClearButton" title="@Tooltip" PopupWidth="@PopupWidth">
+                     Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="false" title="@Tooltip" PopupWidth="@PopupWidth">
             <ComboBoxFieldSettings Text="Text" Value="Index" />
             <ComboBoxEvents TValue="int?" TItem="Choice" Created="OnCreated" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
             @if (ItemTemplate is not null)
@@ -99,8 +99,6 @@ else
     /// text that matches nothing puts the pick back rather than clearing it.
     /// </summary>
     [Parameter] public bool AllowEmpty { get; set; }
-
-    [Parameter] public bool ShowClearButton { get; set; }
 
     [Parameter] public string? Placeholder { get; set; }
 
@@ -336,8 +334,8 @@ else
         // before: a Raw Materials pick shows the base unit in the Buffered Cost "Per" list until the material's details
         // put its purchase unit there, and the combo box's late answer put the base unit back under a form already
         // settled, which then had changes to save. It's no pick: left out, the box is drawn again (as after any of its
-        // events) with the ViewModel's pick. Only the clear button, which no picker shows, empties the box without it.
-        if (!_hasCursor && !(index is null && ShowClearButton))
+        // events) with the ViewModel's pick.
+        if (!_hasCursor)
         {
             return;
         }

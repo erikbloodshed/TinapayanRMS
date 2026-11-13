@@ -198,7 +198,7 @@ public sealed partial class RawMaterialsViewModel
             var validation = _unitValidator.Validate(unit);
             if (!validation.IsValid)
             {
-                throw new BusinessRuleException(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage)));
+                throw new BusinessRuleException(validation.ToString(" "));
             }
 
             RawMaterialRules.EnsureNotTheBaseUnit(EditingType == RawMaterialType.Packaging ? EditingBaseUnit?.Id : null, unit.UnitOfMeasureId);

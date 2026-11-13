@@ -198,6 +198,13 @@ public abstract class ViewModelBase : ReactiveObject
         }
     });
 
+    /// <summary>The same for an action that's done when it returns.</summary>
+    protected Task RunSafelyAsync(Action action) => RunSafelyAsync(() =>
+    {
+        action();
+        return Task.CompletedTask;
+    });
+
     /// <summary>
     /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync"/>'s
     /// actions are, rather than reaching ReactiveUI, and the next load tries again (showing the tab again). Unlike an

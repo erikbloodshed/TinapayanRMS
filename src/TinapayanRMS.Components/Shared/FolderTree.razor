@@ -135,9 +135,6 @@
     /// </summary>
     [Parameter] public Func<CancellationToken, Task> SecondClickWait { get; set; } = cancellation => Task.Delay(500, cancellation);
 
-    /// <summary>Changes the tree's rows can't be watched for on their own; the screen passes something that changes with them.</summary>
-    [Parameter] public object? Version { get; set; }
-
     private string ElementId(TNode node) => "tree-" + KeyOf(node).Replace('/', '-').Replace(' ', '-');
 
     private RenderFragment RenderNode(TNode node, int depth) => builder =>
@@ -329,15 +326,6 @@
         }
     }
 
-    /// <summary>Does what F2 does on the row picked: renames it, where the screen gives F2 that.</summary>
-    private void Rename()
-    {
-        if (Shortcut?.Invoke("F2") is { Command: { } command } item && command.CanExecute(item.Parameter))
-        {
-            command.Execute(item.Parameter);
-        }
-    }
-
     /// <summary>
     /// Renames <paramref name="node"/> as F2 would, once <see cref="SecondClickWait"/> is over, if nothing called it off
     /// meanwhile and the row is still the one picked. Another click, a key, a drag or a menu in the tree calls it off, and
@@ -357,8 +345,9 @@
                     return;
                 }
 
+                // What F2 does on the row picked: renames it, where the screen gives F2 that.
                 CancelSecondClick();
-                Rename();
+                RunShortcut("F2");
             });
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
@@ -630,19 +619,7 @@
 
         _watched.Clear();
         _rowEvents.Clear();
-        if (_dragWatch is not null)
-        {
-            try
-            {
-                await _dragWatch.InvokeVoidAsync("dispose");
-                await _dragWatch.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // The page has gone: nothing left to let go of.
-            }
-        }
-
+        await _dragWatch.StopAsync();
         _drags?.LetGo();
         _dragsReference?.Dispose();
     }

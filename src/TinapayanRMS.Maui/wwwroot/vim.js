@@ -86,7 +86,10 @@ window.tinapayanVim = (() => {
         mode = next;
         pending = "";
         const label = document.getElementById("vim-mode");
-        if (label) {
+
+        // Written only when it changes, as it's set again on every move into a field: the title bar watches what's in it
+        // (app.js's watchTitleBar), and each change in it tells the window where its caption is again.
+        if (label && (label.hidden !== !on || label.textContent !== mode || label.classList.contains("vim-insert") !== (mode === "INSERT"))) {
             label.hidden = !on;
             label.textContent = mode;
             label.classList.toggle("vim-insert", mode === "INSERT");

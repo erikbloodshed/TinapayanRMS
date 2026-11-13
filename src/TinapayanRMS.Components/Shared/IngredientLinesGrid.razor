@@ -7,7 +7,7 @@
    The lines are dragged into order, and the add row has no tick until it's a line. Insert Line (InsertLineAsync) puts a
    blank line in above the one picked, as one undo step. *@
 <LineGrid @ref="_grid" TRow="IngredientLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
-          Reorderable="!ReadOnly" ReadOnly="ReadOnly" InsertKey="true" EmptyText="@EmptyText" Footer="Footer">
+          Reorderable="!ReadOnly" ReadOnly="ReadOnly" InsertKey="true">
     <Header>
         <th>Ingredient</th>
         <th class="col-number col-grams">Grams</th>
@@ -65,10 +65,6 @@
 
     /// <summary>Whether the lines have a Base tick; a linked recipe's add-ins don't.</summary>
     [Parameter] public bool ShowBase { get; set; } = true;
-
-    [Parameter] public string? EmptyText { get; set; }
-
-    [Parameter] public RenderFragment? Footer { get; set; }
 
     [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
 

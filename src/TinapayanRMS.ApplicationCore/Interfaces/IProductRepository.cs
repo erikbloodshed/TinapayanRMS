@@ -205,6 +205,12 @@ public interface IProductRepository
     Task UpdateAsync(Product product, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Stamps the products as saved now (UpdatedAt) and changes nothing else, in one command however many there are: what
+    /// a change to something they're priced from that isn't theirs leaves them (the Products list's Apply Costing Defaults).
+    /// </summary>
+    Task StampSavedAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Files each product under another folder of the Products list, all in one save: sets its stage and folder,
     /// nothing else, and stamps UpdatedAt. Refused, with nothing moved, if a product or a folder doesn't exist, or a
     /// folder is in the other stage.

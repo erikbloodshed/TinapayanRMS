@@ -45,19 +45,7 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (_registration is not null)
-        {
-            try
-            {
-                await _registration.InvokeVoidAsync("dispose");
-                await _registration.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // The tab closed: nothing left to unregister.
-            }
-        }
-
+        await _registration.StopAsync();
         _self?.Dispose();
     }
 }

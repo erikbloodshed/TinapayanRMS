@@ -638,7 +638,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
             var validation = _subAssemblyValidator.Validate(new SubAssembly { Name = name, RoleId = EditingRole?.Id ?? 0 });
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
@@ -1508,10 +1508,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     /// </summary>
     private void NameNewSubAssembly(SubAssemblyLeafNode row, string name)
     {
-        var recorder = (IUndoRecorder)this;
-        recorder.BeginUndoStep();
-        EditingName = name;
-        recorder.EndUndoStep();
+        AsUndoStep(() => EditingName = name);
         var subAssembly = row.SubAssembly;
         row.Row = new StandaloneSubAssemblyRow(new SubAssembly { Name = name, RoleId = subAssembly.RoleId, Role = subAssembly.Role }, []);
     }
@@ -1546,7 +1543,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
             var validation = _roleValidator.Validate(added);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
@@ -1581,7 +1578,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         var validation = _roleValidator.Validate(renamed);
         if (!validation.IsValid)
         {
-            ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+            ErrorMessage = validation.ToString(" ");
             return;
         }
 

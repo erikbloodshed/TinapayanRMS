@@ -127,6 +127,21 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task StampSavedAsync(IReadOnlyCollection<int> ids, CancellationToken cancellationToken)
+    {
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        List<int> productIds = [.. ids];
+        var now = dbContext.LocalNow();
+        await dbContext.Products
+            .Where(p => productIds.Contains(p.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.UpdatedAt, now), cancellationToken);
+    }
+
     public async Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken)
     {
         if (moves.Count == 0)
@@ -174,20 +189,31 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var ids = productIds.Distinct().ToList();
         var products = await dbContext.Products.Where(p => ids.Contains(p.Id)).OrderBy(p => p.Id).ToListAsync(cancellationToken);
-        if (ids.Where(id => products.All(p => p.Id != id)).ToList() is [var missingId, ..])
+        HashSet<int> found = [.. products.Select(p => p.Id)];
+        if (ids.Where(id => !found.Contains(id)).ToList() is [var missingId, ..])
         {
             throw new BusinessRuleException($"Product {missingId} does not exist.");
         }
 
-        // Each product goes to the folder at its own folder's path in the other stage, made if it isn't there.
+        // Each product goes to the folder at its own folder's path in the other stage, made if it isn't there: found once a
+        // folder, however many products it holds.
         var folders = await dbContext.ProductFolders.AsNoTracking().ToListAsync(cancellationToken);
+        Dictionary<int, int?> folderInStage = [];
         List<int> made = [];
         List<ProductMove> moves = [];
         var now = dbContext.LocalNow();
         foreach (var product in products.Where(p => p.Stage != stage))
         {
-            var folderId = await ProductFolderRepository.EnsurePathAsync(
-                dbContext, stage, ProductFolderRules.PathOf(folders, product.FolderId), made, cancellationToken);
+            if (product.FolderId is not { } from || !folderInStage.TryGetValue(from, out var folderId))
+            {
+                folderId = await ProductFolderRepository.EnsurePathAsync(
+                    dbContext, stage, ProductFolderRules.PathOf(folders, product.FolderId), made, cancellationToken);
+                if (product.FolderId is { } source)
+                {
+                    folderInStage[source] = folderId;
+                }
+            }
+
             product.Stage = stage;
             product.FolderId = folderId;
             product.UpdatedAt = now;
