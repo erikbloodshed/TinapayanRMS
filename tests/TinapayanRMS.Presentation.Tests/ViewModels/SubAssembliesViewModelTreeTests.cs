@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
+using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
@@ -99,6 +100,8 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         IListTreeScreen screen = viewModel;
 
         var firstMove = viewModel.MoveSubAssembliesCommand.Execute([new SubAssemblyMove(halayaId, fillingRoleId)]).ToTask();
+        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
+        await viewModel.MoveSubAssembliesCommand.CanExecute.FirstAsync(offered => !offered);
         (await screen.DropAsync([viewModel.SubAssemblyTree.Find(yemaId)!], viewModel.SubAssemblyTree.Folder(fillingRoleId)))
             .Should().BeNull("a move is still saving");
         await firstMove;

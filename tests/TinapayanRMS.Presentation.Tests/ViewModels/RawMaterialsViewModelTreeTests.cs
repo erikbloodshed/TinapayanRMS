@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
+using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using ReactiveUI;
@@ -79,6 +80,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         IListTreeScreen screen = viewModel;
 
         var firstMove = viewModel.MoveMaterialsCommand.Execute([new RawMaterialMove(breadFlourId, dryGoodsId)]).ToTask();
+        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
+        await viewModel.MoveMaterialsCommand.CanExecute.FirstAsync(offered => !offered);
         (await screen.DropAsync([viewModel.RawMaterialTree.Find(caneSugarId)!], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods")))
             .Should().BeNull("a move is still saving");
         await firstMove;

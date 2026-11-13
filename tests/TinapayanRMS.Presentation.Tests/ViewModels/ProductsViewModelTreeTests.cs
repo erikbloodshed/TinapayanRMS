@@ -119,6 +119,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         // Breads to Production: it saves, then reads the list again. A drop meanwhile would be judged against the list as
         // it was, and the two would take each other's Undo.
         var folderMove = viewModel.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
+        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
+        await viewModel.MoveProductsCommand.CanExecute.FirstAsync(offered => !offered);
         (await screen.DropAsync([viewModel.ProductTree.Find(mamonId)!], viewModel.ProductTree.Folder(cakesId))).Should().BeNull("a move is still saving");
         await folderMove;
 
@@ -381,6 +383,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         // Breads to Production: it saves, then reads the list again. Meanwhile a menu's Promote, Send Back or Move to, a
         // folder's own move, and the notice's Undo are all off, as each would be judged against the list as it was.
         var folderMove = viewModel.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
+        await viewModel.MoveFolderCommand.CanExecute.FirstAsync(offered => !offered);
         CanRun(viewModel.MoveToStageCommand).Should().BeFalse();
         CanRun(viewModel.MoveProductsCommand).Should().BeFalse();
         CanRun(viewModel.MoveFolderCommand).Should().BeFalse();
