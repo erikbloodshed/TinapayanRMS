@@ -18,7 +18,11 @@
     press <key> [name]      press a key: Enter, Escape, Control+k
     eval <javascript>       run it in the page and print what it returns
     hit <x> <y> [<x> <y>…]  what Windows' hit test says at points of the window (2 caption, 1 client, 12 top edge)
+    smoke                   every screen and Settings page, then a record of each record screen: fails on the error
+                            bar, a screen's error panel, a red toast or a page error (the check before an install)
     close                   the title bar's Close, which asks about unsaved changes; says so if the window stays
+
+    TINAPAYANRMS_EXE, when set, is the copy to drive (a trial install, say) in place of the Debug build.
 #>
 param(
     [Parameter(Mandatory, Position = 0)][string]$Command,
@@ -29,7 +33,9 @@ $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 # TINAPAYANRMS_SATORI=1 drives the Satori GC build instead (dotnet build src/TinapayanRMS.Maui -p:UseSatoriGC=true).
 $bin = if ($env:TINAPAYANRMS_SATORI) { 'bin\Satori\Debug' } else { 'bin\Debug' }
-$exe = Join-Path $repo "src\TinapayanRMS.Maui\$bin\net11.0-windows10.0.19041.0\win-x64\TinapayanRMS.Maui.exe"
+# TINAPAYANRMS_EXE drives another copy: one the install script put in a trial folder, say, as the shop will run it.
+$exe = if ($env:TINAPAYANRMS_EXE) { (Resolve-Path -LiteralPath $env:TINAPAYANRMS_EXE).Path }
+       else { Join-Path $repo "src\TinapayanRMS.Maui\$bin\net11.0-windows10.0.19041.0\win-x64\TinapayanRMS.Maui.exe" }
 $port = 9222
 $shots = Join-Path $env:TEMP 'tinapayanrms-shots'
 $tools = Join-Path $env:LOCALAPPDATA 'TinapayanRMS\dev\playwright'
