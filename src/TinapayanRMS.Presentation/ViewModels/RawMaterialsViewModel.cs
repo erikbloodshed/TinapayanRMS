@@ -21,7 +21,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// units, brand prices and a made ingredient's sub-assembly and add-ins are all edited in memory, and Save
 /// writes them together. The sub-assembly's own lines are only shown: they're written on the Sub-Assemblies screen.
 /// </summary>
-public sealed partial class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormSnapshot>, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IListTreeScreen
+public sealed partial class RawMaterialsViewModel : ListFormViewModel<RawMaterialFormSnapshot>, IDisposable, IBrandPriceRowHost, ICategoryPickerScreen, IRecordScreen, IListTreeScreen
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -69,50 +69,8 @@ public sealed partial class RawMaterialsViewModel : RecordFormViewModel<RawMater
 
     private readonly FolderStateWriter _closedFoldersWriter;
 
-    private readonly TreeSelection _treeSelection = new();
-
-    /// <summary>
-    /// The rows picked in the Raw Materials list, bound to the tree's SelectedItems, which it shares: one row, or several
-    /// with Ctrl or Shift held. Its first is <see cref="SelectedTreeNode"/>. The tree changes it as rows are clicked, and
-    /// this screen as SelectedRawMaterial changes (SyncTreeSelection), as the Products screen does its own.
-    /// </summary>
-    public ObservableCollection<object> SelectedTreeNodes => _treeSelection.Nodes;
-
-    private object? _selectedTreeNode;
-    /// <summary>
-    /// The first row picked in the list: a material's (RawMaterialLeafNode), a folder's, or null. Picking a material's row
-    /// picks the material; picking a folder's leaves the material showing as it is, and so do more rows picked with Ctrl.
-    /// SelectedRawMaterial changed any other way (Back and Forward, a Save, New) moves the row to it. Setting it picks that
-    /// row alone, as a click does.
-    /// </summary>
-    public object? SelectedTreeNode
-    {
-        get => _selectedTreeNode;
-        set => _treeSelection.Pick(value);
-    }
-
     /// <summary>The materials picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>().Where(l => !l.IsNew)];
-
-    private readonly TreeNaming _treeNaming;
-
-    /// <summary>
-    /// The row of the list whose name is being typed in place, as in a file explorer, or null: a material or category being
-    /// renamed (Rename, F2), or a new material or folder being named (New, New Folder). The list draws a box on it, which
-    /// gives the name typed to <see cref="CommitTreeNameAsync"/>, or Esc to <see cref="CancelTreeName"/>.
-    /// </summary>
-    public TreeNameEdit? TreeNameEdit => _treeNaming.Edit;
-
-    private string? _moveNotice;
-    /// <summary>
-    /// What the last move in the list did, "Moved Flour to Ingredients › Dry Goods", on the list's notice bar with Undo
-    /// beside it (UndoMoveCommand); null once it's undone or dismissed. The bar hides itself after a few seconds.
-    /// </summary>
-    public string? MoveNotice
-    {
-        get => _moveNotice;
-        private set => this.RaiseAndSetIfChanged(ref _moveNotice, value);
-    }
 
     /// <summary>Where the materials the last move took were before it: what Undo on the notice puts back.</summary>
     private IReadOnlyList<RawMaterialMove> _moveUndo = [];
@@ -895,8 +853,6 @@ public sealed partial class RawMaterialsViewModel : RecordFormViewModel<RawMater
     /// <summary>Puts back where the last move took the materials from (the notice bar's Undo).</summary>
     public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; private set; }
 
-    public ReactiveCommand<RxVoid, RxVoid> DismissMoveNoticeCommand { get; private set; }
-
     /// <summary>
     /// The list's New … Here: a new material of the folder's type, in its category when it's a category's folder. With no
     /// folder (the list's empty space), a new ingredient, as New starts one. Like New, it adds the material's row to the list
@@ -1007,8 +963,6 @@ public sealed partial class RawMaterialsViewModel : RecordFormViewModel<RawMater
         MaterialCostShares? costShares = null)
         : base(logger)
     {
-        _treeNaming = new TreeNaming(
-            _treeSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         _costShares = costShares;
         _rawMaterialRepository = rawMaterialRepository;
         _priceHistoryRepository = priceHistoryRepository;

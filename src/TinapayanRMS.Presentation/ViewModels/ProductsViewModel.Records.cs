@@ -530,14 +530,14 @@ public sealed partial class ProductsViewModel
         ClearListFilters();
         NewProduct(stage, folderId, isComposite);
         var row = ProductTree.BeginNewProduct(NewProductStage, NewProductFolderId, IsEditingComposite);
-        _treeNaming.Start(row, row.Product.Name);
+        ListNaming.Start(row, row.Product.Name);
     }
 
     /// <summary>
     /// Takes the new product's row out of the list (<see cref="NewProductInList"/>), and the rows picked, and stops the
     /// naming in it. The form is left as it is.
     /// </summary>
-    private void EndNewProductRow() => _treeNaming.EndNewRow(ProductTree.PendingProduct, ProductTree.EndNewProduct);
+    private void EndNewProductRow() => ListNaming.EndNewRow(ProductTree.PendingProduct, ProductTree.EndNewProduct);
 
     /// <summary>
     /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it

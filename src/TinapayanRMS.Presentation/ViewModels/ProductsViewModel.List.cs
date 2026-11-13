@@ -23,8 +23,6 @@ public sealed partial class ProductsViewModel
     [MemberNotNull(nameof(_products), nameof(_categories), nameof(_visibleProducts))]
     private void WireList()
     {
-        SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
-
         var byName = SortExpressionComparer<Product>.Ascending(p => p.Name);
 
         _productCache.Connect()
@@ -78,7 +76,7 @@ public sealed partial class ProductsViewModel
     /// <summary>The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor).</summary>
     [MemberNotNull(
         nameof(MoveProductsCommand), nameof(MoveToStageCommand), nameof(MoveFolderCommand), nameof(ApplyCostingDefaultsCommand),
-        nameof(UndoMoveCommand), nameof(DismissMoveNoticeCommand), nameof(NewProductInCommand), nameof(RenameProductCommand),
+        nameof(UndoMoveCommand), nameof(NewProductInCommand), nameof(RenameProductCommand),
         nameof(CloneProductCommand), nameof(CreateVariantOfCommand), nameof(DeleteProductCommand),
         nameof(RestoreProductCommand), nameof(DeletePermanentlyCommand), nameof(NewFolderCommand),
         nameof(RenameFolderCommand), nameof(DeleteFolderCommand), nameof(ExpandAllCommand),
@@ -106,7 +104,6 @@ public sealed partial class ProductsViewModel
                 UndoMoveCommand.IsExecuting,
                 (products, toStage, folder, undo) => !(products || toStage || folder || undo))
             .Subscribe(_noMoveRunning);
-        DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
         NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => AfterUnsavedChangesAsync(
             () => NewProductInList(folder?.Stage, folder?.FolderId)));
         RenameProductCommand = ReactiveCommand.Create<ProductLeafNode>(BeginRenameProduct);
@@ -138,7 +135,7 @@ public sealed partial class ProductsViewModel
         // several picked, the first left would otherwise become SelectedTreeNode, and its product the one picked.
         var search = SearchText.Trim();
         var category = CategoryFilter;
-        _treeSelection.Quietly(() => ProductTree.Refresh(
+        ListSelection.Quietly(() => ProductTree.Refresh(
             Folders,
             VisibleProducts,
             isFiltered: IsListFiltered,
@@ -186,34 +183,15 @@ public sealed partial class ProductsViewModel
         CategoryFilter = new ProductCategoryFilter.All();
     }
 
-    /// <summary>
-    /// Puts SelectedProduct's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone, unless
-    /// it's picked already, when the rows picked with it stay. Nothing picked, or a filter hiding it, picks no row.
-    /// </summary>
-    private void SyncTreeSelection() =>
-        _treeSelection.BringFirst(SelectedProduct is { } product ? ProductTree.Find(product.Id) : ProductTree.PendingProduct);
+    protected override object? ShowingRow => SelectedProduct is { } product ? ProductTree.Find(product.Id) : ProductTree.PendingProduct;
 
-    /// <summary>
-    /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
-    /// SelectedTreeNode, and a product's row picked by the user picks the product.
-    /// </summary>
-    private void TreeSelectionChanged()
+    protected override string PickedRecordsProperty => nameof(SelectedTreeProducts);
+
+    // A product's row picks it. A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to
+    // restore. So is the new product's, which is the form's already.
+    protected override void PickRowFromList(object row)
     {
-        var first = SelectedTreeNodes.Count > 0 ? SelectedTreeNodes[0] : null;
-        this.RaisePropertyChanged(nameof(SelectedTreeProducts));
-        if (ReferenceEquals(first, _selectedTreeNode))
-        {
-            return;
-        }
-
-        _selectedTreeNode = first;
-        this.RaisePropertyChanged(nameof(SelectedTreeNode));
-
-        // The tree calls this in the middle of changing SelectedItems: picking the product leads to SyncTreeSelection,
-        // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        // A deleted product's row is picked as a folder's is, leaving the form as it is: it's there to restore.
-        // So is the new product's, which is the form's already.
-        if (!_treeSelection.IsSyncing && first is ProductLeafNode { IsDeleted: false, IsNew: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
+        if (row is ProductLeafNode { IsDeleted: false, IsNew: false } leaf && leaf.Product.Id != SelectedProduct?.Id)
         {
             PickFromList(leaf.Product.Id, () => SelectedProduct = leaf.Product, SyncTreeSelection, OpenProductAsync);
         }
@@ -307,7 +285,7 @@ public sealed partial class ProductsViewModel
             }
         });
 
-        _treeSelection.Restore(picked, IsStillListed);
+        ListSelection.Restore(picked, IsStillListed);
     }
 
     /// <summary>
@@ -330,7 +308,7 @@ public sealed partial class ProductsViewModel
             ProductTree.OpenDownTo(parent);
         }
 
-        _treeSelection.Restore(picked, IsStillListed);
+        ListSelection.Restore(picked, IsStillListed);
         _moveUndo = isUndo ? null : new MoveUndo.Folder(back);
         MoveNotice = isUndo ? null : $"Moved {folder.Name} to {ProductFolderRules.PathTitle(Folders, move.Stage, move.ParentId)}";
     }
@@ -710,7 +688,7 @@ public sealed partial class ProductsViewModel
         }
 
         CancelTreeName();
-        _treeNaming.Start(leaf, leaf.Product.Name);
+        ListNaming.Start(leaf, leaf.Product.Name);
     }
 
     /// <summary>A folder's Rename: its name becomes a box to type into, in place, and the name typed renames it.</summary>
@@ -722,7 +700,7 @@ public sealed partial class ProductsViewModel
         }
 
         CancelTreeName();
-        _treeNaming.Start(folder, folder.Title, FolderHint);
+        ListNaming.Start(folder, folder.Title, FolderHint);
     }
 
     /// <summary>
@@ -748,26 +726,21 @@ public sealed partial class ProductsViewModel
     {
         CancelTreeName();
         ClearListFilters();
-        _treeNaming.Start(ProductTree.BeginNewFolder(stage, parentId), text, FolderHint);
+        ListNaming.Start(ProductTree.BeginNewFolder(stage, parentId), text, FolderHint);
     }
 
     /// <summary>What the name box on a folder says when pointed at.</summary>
     private const string FolderHint = "A folder holds products and other folders. It isn't a category: a product's category is set on its form.";
 
-    /// <summary>
-    /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it: saves it, at once, as the
-    /// row's. A product's or a folder's is renamed; a new folder's adds the folder; a new product's is saved with the form
-    /// as it is, which is the costing defaults and nothing else, then opened. An empty name, or the name it had, is an Esc
-    /// (<see cref="CancelTreeName"/>). A name refused shows why, and the box comes back with it, to be put right. A second
-    /// call for the same box, as Enter's box is left, does nothing.
-    /// </summary>
-    public Task CommitTreeNameAsync(string text) => _treeNaming.CommitAsync(text);
-
     /// <summary>Whether a row of the list is a new product's or a new folder's, still to be named.</summary>
-    private static bool IsNewRow(object node) => node is ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true };
+    protected override bool IsNewRow(object node) => node is ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true };
 
-    /// <summary>What a name typed into the list's box does (<see cref="CommitTreeNameAsync"/>), once it's taken for one.</summary>
-    private async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
+    /// <summary>
+    /// What a name typed into the list's box does (<see cref="ListFormViewModel{TSnapshot}.CommitTreeNameAsync"/>), once
+    /// it's taken for one: it's saved, at once, as the row's. A product's or a folder's is renamed; a new folder's adds the
+    /// folder; a new product's is saved with the form as it is, which is the costing defaults and nothing else, then opened.
+    /// </summary>
+    protected override async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
         switch (edit.Node)
         {
@@ -779,7 +752,7 @@ public sealed partial class ProductsViewModel
                 await SaveNewProductAsync(name);
                 if (ProductTree.PendingProduct == row)
                 {
-                    _treeNaming.Edit = edit with { InitialText = text };
+                    ListNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -788,13 +761,13 @@ public sealed partial class ProductsViewModel
                 await RunSafelyAsync(() => RenameProductToAsync(leaf, name));
                 if (ErrorMessage is not null && ProductTree.Find(leaf.Product.Id) is { } stillListed)
                 {
-                    _treeNaming.Edit = edit with { Node = stillListed, InitialText = text };
+                    ListNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
 
                 break;
 
             case ProductFolderNode { IsNewFolder: true } folder:
-                _treeNaming.EndNewRow(folder, ProductTree.EndNewFolder);
+                ListNaming.EndNewRow(folder, ProductTree.EndNewFolder);
                 var stage = folder.Stage;
                 var parentId = folder.ParentFolderId;
                 ProductFolder? added = null;
@@ -824,7 +797,7 @@ public sealed partial class ProductsViewModel
                 });
                 if (ErrorMessage is not null && ProductTree.Folder(folderId) is { } stillThere)
                 {
-                    _treeNaming.Edit = edit with { Node = stillThere, InitialText = text };
+                    ListNaming.Edit = edit with { Node = stillThere, InitialText = text };
                 }
 
                 break;
@@ -839,13 +812,10 @@ public sealed partial class ProductsViewModel
     }
 
     /// <summary>
-    /// Esc in the list's name box: the name stays as it was, and a new product's or folder's row goes, with nothing saved.
-    /// The form stays on the new product, blank, as New leaves it.
+    /// What Esc does to the row named (<see cref="ListFormViewModel{TSnapshot}.CancelTreeName"/>), once its box is closed:
+    /// a new product's or folder's row goes, with nothing saved. The form stays on the new product, blank, as New leaves it.
     /// </summary>
-    public void CancelTreeName() => _treeNaming.Cancel();
-
-    /// <summary>What Esc does to the row named (<see cref="CancelTreeName"/>), once its box is closed.</summary>
-    private void TreeNameCancelled(object node)
+    protected override void TreeNameCancelled(object node)
     {
         switch (node)
         {
@@ -854,7 +824,7 @@ public sealed partial class ProductsViewModel
                 ApplyRefresh(() => EditingName = string.Empty);
                 break;
             case ProductFolderNode { IsNewFolder: true } folder:
-                _treeNaming.EndNewRow(folder, ProductTree.EndNewFolder);
+                ListNaming.EndNewRow(folder, ProductTree.EndNewFolder);
                 break;
         }
     }

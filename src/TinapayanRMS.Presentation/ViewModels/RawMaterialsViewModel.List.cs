@@ -24,8 +24,6 @@ public sealed partial class RawMaterialsViewModel
         nameof(_linkTargets), nameof(_addInOptions), nameof(_categoryOptions))]
     private void WireLists()
     {
-        SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
-
         var byName = SortExpressionComparer<RawMaterial>.Ascending(m => m.Name);
 
         // The list's tree follows both lists once each change has reached them: a material added, removed, renamed, moved
@@ -101,7 +99,7 @@ public sealed partial class RawMaterialsViewModel
 
     /// <summary>The list's commands, each run on the folder or material its menu was opened on (TreeMenuFor).</summary>
     [MemberNotNull(
-        nameof(MoveMaterialsCommand), nameof(UndoMoveCommand), nameof(DismissMoveNoticeCommand),
+        nameof(MoveMaterialsCommand), nameof(UndoMoveCommand),
         nameof(NewMaterialInCommand), nameof(RenameMaterialCommand), nameof(CopyMaterialCommand),
         nameof(DeleteMaterialCommand), nameof(NewCategoryCommand), nameof(RenameCategoryCommand),
         nameof(DeleteCategoryCommand), nameof(ExpandAllCommand), nameof(CollapseAllCommand))]
@@ -111,7 +109,6 @@ public sealed partial class RawMaterialsViewModel
             moves => RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
         UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
-        DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
         NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewMaterialInList(
             folder?.Type ?? RawMaterialType.Ingredient,
             folder?.CategoryId,
@@ -224,7 +221,7 @@ public sealed partial class RawMaterialsViewModel
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its material the one picked.
-        _treeSelection.Quietly(() => RawMaterialTree.Refresh(Categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0));
+        ListSelection.Quietly(() => RawMaterialTree.Refresh(Categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0));
 
         // A folder picked stays picked. Otherwise the row goes back to the material picked: one moved to another folder
         // leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
@@ -234,33 +231,14 @@ public sealed partial class RawMaterialsViewModel
         }
     }
 
-    /// <summary>
-    /// Puts SelectedRawMaterial's row first among the rows picked in the list, and so makes it SelectedTreeNode: alone,
-    /// unless it's picked already, when the rows picked with it stay. Nothing picked, or a search hiding it, picks no row.
-    /// </summary>
-    private void SyncTreeSelection() =>
-        _treeSelection.BringFirst(SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : RawMaterialTree.PendingMaterial);
+    protected override object? ShowingRow => SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : RawMaterialTree.PendingMaterial;
 
-    /// <summary>
-    /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
-    /// SelectedTreeNode, and a material's row picked by the user picks the material.
-    /// </summary>
-    private void TreeSelectionChanged()
+    protected override string PickedRecordsProperty => nameof(SelectedTreeMaterials);
+
+    // A material's row picks it; the new material's row is the form's already.
+    protected override void PickRowFromList(object row)
     {
-        var first = SelectedTreeNodes.Count > 0 ? SelectedTreeNodes[0] : null;
-        this.RaisePropertyChanged(nameof(SelectedTreeMaterials));
-        if (ReferenceEquals(first, _selectedTreeNode))
-        {
-            return;
-        }
-
-        _selectedTreeNode = first;
-        this.RaisePropertyChanged(nameof(SelectedTreeNode));
-
-        // The tree calls this in the middle of changing SelectedItems: picking the material leads to SyncTreeSelection,
-        // which then finds its row first already and leaves the collection alone, as it must mid-change.
-        // The new material's row is the form's already.
-        if (!_treeSelection.IsSyncing && first is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
+        if (row is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
         {
             PickFromList(leaf.RawMaterial.Id, () => SelectedRawMaterial = leaf.RawMaterial, SyncTreeSelection, OpenRawMaterialAsync);
         }
@@ -297,7 +275,7 @@ public sealed partial class RawMaterialsViewModel
         }
 
         // Picks again the rows the tree dropped from its selection as they moved.
-        _treeSelection.Restore(picked, r => r is not RawMaterialLeafNode leaf || RawMaterialTree.Find(leaf.RawMaterial.Id) == leaf);
+        ListSelection.Restore(picked, r => r is not RawMaterialLeafNode leaf || RawMaterialTree.Find(leaf.RawMaterial.Id) == leaf);
 
         _moveUndo = isUndo ? [] : undo;
         MoveNotice = isUndo ? null : MoveNoticeFor(moves);
@@ -482,7 +460,7 @@ public sealed partial class RawMaterialsViewModel
         }
 
         CancelTreeName();
-        _treeNaming.Start(leaf, leaf.RawMaterial.Name);
+        ListNaming.Start(leaf, leaf.RawMaterial.Name);
     }
 
     /// <summary>
@@ -497,7 +475,7 @@ public sealed partial class RawMaterialsViewModel
         }
 
         CancelTreeName();
-        _treeNaming.Start(folder, category.Name);
+        ListNaming.Start(folder, category.Name);
     }
 
     /// <summary>
@@ -511,7 +489,7 @@ public sealed partial class RawMaterialsViewModel
     {
         CancelTreeName();
         SearchText = string.Empty;
-        _treeNaming.Start(RawMaterialTree.BeginNewFolder(type), text, NewFolderHint(type));
+        ListNaming.Start(RawMaterialTree.BeginNewFolder(type), text, NewFolderHint(type));
     }
 
     /// <summary>What the name box on a new folder says when pointed at: the prompts used to say it.</summary>
@@ -541,7 +519,7 @@ public sealed partial class RawMaterialsViewModel
             Source = source,
             CategoryId = EditingCategory?.Id ?? 0,
         });
-        _treeNaming.Start(row, title);
+        ListNaming.Start(row, title);
     }
 
     /// <summary>"New ingredient", "New made ingredient" or "New packaging material": what a new material's row reads until it's named.</summary>
@@ -555,22 +533,18 @@ public sealed partial class RawMaterialsViewModel
     /// naming in it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left
     /// as it is.
     /// </summary>
-    private void EndNewMaterialRow() => _treeNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
-
-    /// <summary>
-    /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it. A material's or a
-    /// category's is renamed at once; a new folder's adds a category of its type, or picks the one of that name there
-    /// already; a new material's goes into the form, as typed there, and its row takes it: a material needs more than a
-    /// name before Save can file it. An empty name, or the name it had, is an Esc (<see cref="CancelTreeName"/>). A name
-    /// refused shows why, and the box comes back with it. A second call for the same box, as Enter's box is left, does nothing.
-    /// </summary>
-    public Task CommitTreeNameAsync(string text) => _treeNaming.CommitAsync(text);
+    private void EndNewMaterialRow() => ListNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
 
     /// <summary>Whether a row of the list is a new material's or a new folder's, still to be named.</summary>
-    private static bool IsNewRow(object node) => node is RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true };
+    protected override bool IsNewRow(object node) => node is RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true };
 
-    /// <summary>What a name typed into the list's box does (<see cref="CommitTreeNameAsync"/>), once it's taken for one.</summary>
-    private async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
+    /// <summary>
+    /// What a name typed into the list's box does (<see cref="ListFormViewModel{TSnapshot}.CommitTreeNameAsync"/>), once
+    /// it's taken for one. A material's or a category's is renamed at once; a new folder's adds a category of its type, or
+    /// picks the one of that name there already; a new material's goes into the form, as typed there, and its row takes
+    /// it: a material needs more than a name before Save can file it.
+    /// </summary>
+    protected override async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
         switch (edit.Node)
         {
@@ -582,13 +556,13 @@ public sealed partial class RawMaterialsViewModel
                 await RunSafelyAsync(() => RenameMaterialToAsync(leaf, name));
                 if (ErrorMessage is not null && RawMaterialTree.Find(leaf.RawMaterial.Id) is { } stillListed)
                 {
-                    _treeNaming.Edit = edit with { Node = stillListed, InitialText = text };
+                    ListNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
 
                 break;
 
             case RawMaterialFolderNode { IsNewFolder: true, CategoryType: { } type } folder:
-                _treeNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
+                ListNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
                 await RunSafelyAsync(() => AddCategoryAsync(type, name));
                 if (ErrorMessage is not null)
                 {
@@ -601,7 +575,7 @@ public sealed partial class RawMaterialsViewModel
                 await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
                 if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
                 {
-                    _treeNaming.Edit = edit with { InitialText = text };
+                    ListNaming.Edit = edit with { InitialText = text };
                 }
 
                 break;
@@ -609,13 +583,10 @@ public sealed partial class RawMaterialsViewModel
     }
 
     /// <summary>
-    /// Esc in the list's name box: the name stays as it was, and a new material's or folder's row goes, with nothing saved.
-    /// The form stays on the new material, blank, as New leaves it.
+    /// What Esc does to the row named (<see cref="ListFormViewModel{TSnapshot}.CancelTreeName"/>), once its box is closed:
+    /// a new material's or folder's row goes, with nothing saved. The form stays on the new material, blank, as New leaves it.
     /// </summary>
-    public void CancelTreeName() => _treeNaming.Cancel();
-
-    /// <summary>What Esc does to the row named (<see cref="CancelTreeName"/>), once its box is closed.</summary>
-    private void TreeNameCancelled(object node)
+    protected override void TreeNameCancelled(object node)
     {
         switch (node)
         {
@@ -624,7 +595,7 @@ public sealed partial class RawMaterialsViewModel
                 ApplyRefresh(() => EditingName = string.Empty);
                 break;
             case RawMaterialFolderNode { IsNewFolder: true } folder:
-                _treeNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
+                ListNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
                 break;
         }
     }
