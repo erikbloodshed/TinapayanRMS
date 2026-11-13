@@ -183,7 +183,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         // Ctrl+X with both picked: the menu of the first, which covers both.
         await RunAsync(viewModel.TreeShortcut("Ctrl+X")!);
 
-        viewModel.CutNodes.Should().Equal(tree.Find(mamonId), tree.Find(pandesalId));
+        viewModel.CutNodes.Should().Equal(tree.Find(mamonId)!, tree.Find(pandesalId)!);
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId), "nothing moves until the paste");
         viewModel.TreeMenuFor(tree.Find(ensaymadaId)).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse("they're in that folder already");
         var paste = viewModel.TreeMenuFor(cakes).Single(i => i.Header == "Paste");
