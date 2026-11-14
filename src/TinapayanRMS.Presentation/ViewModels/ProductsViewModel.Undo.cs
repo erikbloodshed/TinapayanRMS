@@ -276,15 +276,7 @@ public sealed partial class ProductsViewModel
         }
     }
 
-    // The material goes on first: it brings the units the row can be in, and a key it doesn't offer falls back
-    // to the base unit, which would drop a restored unit set the other way round.
-    private PackagingLineRow RestoreLine(PackagingLineState state) =>
-        new(FindPackagingMaterial)
-        {
-            PackagingMaterialId = state.PackagingMaterialId,
-            UnitKey = state.UnitId ?? PackagingUnitChoice.BaseUnitKey,
-            QtyPerUnit = state.QtyPerUnit,
-        };
+    private PackagingLineRow RestoreLine(PackagingLineState state) => PackagingLineRow.Restore(state, FindPackagingMaterial);
 
     /// <summary>
     /// Makes UsageEdits hold <paramref name="sections"/>, section for section and in place: each tab stays and shows its

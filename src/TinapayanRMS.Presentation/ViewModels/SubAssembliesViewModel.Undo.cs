@@ -11,7 +11,10 @@ public sealed partial class SubAssembliesViewModel
         // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
         // button still disabled under the cursor would swallow the very click that enabled it.
+        // The packaging set's own changes too: a quantity typed into one of its lines changes the set's cost, the one
+        // figure that moves while the line's cell still has the cursor.
         this.Changed.Subscribe(_ => History.RefreshDirty());
+        PackagingSet.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(Lines);
         WatchForSave(PackagingSet.Lines);
     }

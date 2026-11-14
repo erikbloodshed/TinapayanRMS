@@ -58,6 +58,20 @@ public sealed class PackagingLineRow : ObservableRow
         return new PackagingLineRow(line.PackagingMaterial!, qtyPerUnit, line.UnitId) { CostBasis = basis };
     }
 
+    /// <summary>
+    /// A line an undo step kept (<see cref="PackagingLineState"/>), as a row again, half filled in if that's how it stood:
+    /// the Products screen's packaging and a Sub-Assemblies packaging set both put theirs back through here. The material
+    /// goes on first: it brings the units the row can be in, and a key it doesn't offer falls back to the base unit, which
+    /// would drop a restored unit set the other way round.
+    /// </summary>
+    public static PackagingLineRow Restore(PackagingLineState state, Func<int, RawMaterial?> findMaterial) =>
+        new(findMaterial)
+        {
+            PackagingMaterialId = state.PackagingMaterialId,
+            UnitKey = state.UnitId ?? PackagingUnitChoice.BaseUnitKey,
+            QtyPerUnit = state.QtyPerUnit,
+        };
+
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the material's costs the row is priced at: buffered, as every screen prices packaging, unless the

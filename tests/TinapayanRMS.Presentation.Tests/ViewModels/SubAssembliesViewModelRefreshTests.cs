@@ -224,6 +224,52 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.DependentsText.Should().Contain("Add Sub-Assembly");
     });
 
+    // A quantity reaches the line as it's typed, and Save has to be offered by then: the click on it is what leaves the
+    // cell, and a Save still disabled under the cursor swallows that click (UndoHistory.IsDirty).
+    [Test]
+    public Task A_packaging_sets_quantity_being_typed_offers_Save_before_its_cell_is_left() => UiThread.RunAsync(async () =>
+    {
+        await AddRoleAsync("Glaze");
+        await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
+        var pieceId = await GetOrCreateUnitOfMeasureAsync("piece", "pc");
+        int boxId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var box = new RawMaterial
+            {
+                Type = RawMaterialType.Packaging,
+                Name = "Gift Box",
+                Category = new RawMaterialCategory { Name = "Boxes" },
+                BaseUnitId = pieceId,
+                CostPerBaseUnit = 30m,
+                BufferedCostPerBaseUnit = 33m,
+            };
+            dbContext.RawMaterials.Add(box);
+            await dbContext.SaveChangesAsync(Cancellation);
+            boxId = box.Id;
+        }
+
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.EditingRole = viewModel.Roles.Single(r => r.IsPackaging);
+        viewModel.EditingName = "Gift Box Set";
+        viewModel.PackagingSet.Lines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 2m });
+        await viewModel.SaveCommand.Execute();
+        await Settle.UntilAsync(
+            viewModel,
+            () => viewModel.PackagingSet.Lines.Count == 1 && !viewModel.History.IsDirty,
+            () => $"packaging lines={viewModel.PackagingSet.Lines.Count}, dirty={viewModel.History.IsDirty}");
+
+        // The cell takes the cursor, and a key is typed: its step is still open.
+        var recorder = (IUndoRecorder)viewModel;
+        recorder.BeginUndoStep();
+        viewModel.PackagingSet.Lines.Single().QtyPerUnit = 3m;
+
+        viewModel.PackagingSet.Cost.Should().Be(99m);
+        viewModel.History.IsDirty.Should().BeTrue("Save is offered while the quantity is still being typed");
+        recorder.EndUndoStep();
+    });
+
     [Test]
     public Task Copy_starts_a_new_one_with_the_same_role_and_lines_and_Save_adds_it_beside_the_original() => UiThread.RunAsync(async () =>
     {

@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -70,13 +69,7 @@ public sealed class SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packaging
         Lines.Clear();
         foreach (var line in lines)
         {
-            // The material goes on first: it brings the units the row can be in, so the unit sticks.
-            Lines.Add(new PackagingLineRow(FindMaterial)
-            {
-                PackagingMaterialId = line.PackagingMaterialId,
-                UnitKey = line.UnitId ?? PackagingUnitChoice.BaseUnitKey,
-                QtyPerUnit = line.QtyPerUnit,
-            });
+            Lines.Add(PackagingLineRow.Restore(line, FindMaterial));
         }
     }
 
