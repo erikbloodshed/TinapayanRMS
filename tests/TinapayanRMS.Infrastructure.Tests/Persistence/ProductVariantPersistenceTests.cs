@@ -242,7 +242,11 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         variant.QuantityRequired.Should().Be(8, "a variant sells the same way its source does until it's changed");
         variant.CurrentPrice.Should().Be(35m);
 
+        // Every percentage the costing has, not only the two named: a variant's costing is its source's.
         var costing = (await costingRepository.GetForProductAsync(variantId, Cancellation))!;
+        costing.Should().BeEquivalentTo(
+            (await costingRepository.GetForProductAsync(sourceId, Cancellation))!,
+            options => options.Excluding(c => c.Id).Excluding(c => c.ProductId).Excluding(c => c.Product));
         costing.MarginPercent.Should().Be(40m);
         costing.LaborPercent.Should().Be(5m);
     }

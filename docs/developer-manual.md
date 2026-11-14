@@ -711,7 +711,7 @@ The read helpers are in `Infrastructure/Queries`:
 
 - **[DapperReads](../src/TinapayanRMS.Infrastructure/Queries/DapperReads.cs)** borrows a DbContext's connection, so reads use the same connection string as EF Core. `QueryAsync` and `QuerySingleOrDefaultAsync` run either on the factory, in a context of their own, or on a save's context. On a context that holds a transaction, a read joins that transaction (`DapperReads.Command`). `ReadAsync` gives a read that needs several queries, such as a multi-mapped join, a context of its own.
 - **[Columns](../src/TinapayanRMS.Infrastructure/Queries/Columns.cs)** lists every entity's columns by their snake_case names, `id` first, because a multi-mapped join splits on `Id` (Dapper matches it without regard to case). Dapper maps `cost_per_base_unit` back to `CostPerBaseUnit`, since `DapperReads` turns on `MatchNamesWithUnderscores`. `Columns.Of<T>(alias)` writes the SELECT list.
-- **`RawMaterialReads` and `SubAssemblyReads`** load the shared graphs: materials with their category, base unit and units; sub-assemblies with their role and owner.
+- **`RawMaterialReads` and `SubAssemblyReads`** load the shared graphs: materials with their category, base unit and units, alone or as the material of a product's packaging line or a packaging set's (one query reads both kinds of line, `ReadLinesAsync`, so a column or join they need is added once); sub-assemblies with their role and owner.
 - **`IngredientBoms`** is the one definition of a made ingredient's bill of materials, an EF Core query over its sub-assembly's lines and its add-ins. The cascade, the cycle checks and `IngredientBomLineRepository` all read it.
 
 The rules for reads:

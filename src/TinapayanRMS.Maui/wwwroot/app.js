@@ -127,6 +127,8 @@ window.tinapayan = {
     // goes up, below when it goes down, the line dragged faded), and the release there tells the table
     // (MoveLine(from, to), by the lines' places as drawn). Anywhere beside the table, a release on the line itself,
     // Escape or a lost pointer moves nothing. Near the top or bottom of the pane that scrolls, the pane scrolls.
+    // A press whose release never reaches the table (its line redrawn from under the pointer, then let go beside the
+    // table) drags nothing afterwards: the pointer moving with no button down ends it, and so does the next press.
     // Returns an object whose dispose() lets go of the table.
     watchLineDrag(table, dotNet) {
         if (!table) {
@@ -225,7 +227,14 @@ window.tinapayan = {
         };
 
         const onDown = e => {
-            const header = e.button === 0 && !drag ? e.target.closest("td.row-header[data-drag]") : null;
+            // A drag under way keeps the pointer it holds: a second finger starts nothing.
+            if (drag?.moving && drag.header.hasPointerCapture(drag.pointerId)) {
+                return;
+            }
+            // Any other drag still here is a press whose release the table never saw: a new press starts afresh, as a
+            // list's does (watchTreeDrag).
+            end(false);
+            const header = e.button === 0 ? e.target.closest("td.row-header[data-drag]") : null;
             if (!header || !table.tBodies[0].contains(header)) {
                 return;
             }
@@ -238,6 +247,12 @@ window.tinapayan = {
 
         const onMove = e => {
             if (!drag || e.pointerId !== drag.pointerId) {
+                return;
+            }
+            // No button down: the press ended where the table never saw it, so nothing is being dragged. Without this
+            // the pointer coming back over the table dragged the line by itself.
+            if (!(e.buttons & 1)) {
+                end(false);
                 return;
             }
             drag.x = e.clientX;
@@ -298,7 +313,9 @@ window.tinapayan = {
     // which: Start); the row under the pointer is told to the tree as it changes (Over, its element's id, or null over the
     // list's empty space), and the release there drops on it (Drop). Near the top or bottom of the list, it scrolls, so a
     // folder far below can be reached; the row under the pointer is told again as it scrolls past. A release beside the
-    // list, Escape or a lost pointer drops nothing (Cancel). The click a release makes on the row is swallowed, so a drop
+    // list, Escape or a lost pointer drops nothing (Cancel). A press let go where the list never saw it (beside the list,
+    // the pointer gone before it had moved over it) drags nothing afterwards: the pointer coming back with no button down
+    // ends it, and so does the next press. The click a release makes on the row is swallowed, so a drop
     // doesn't pick or open it too. While it drags, a see-through copy of the row follows the pointer, as File Explorer's
     // does: its icon and name, how many rows go with it when there are several, and "Move to Cakes" under it while it's over
     // a row they can drop on. Returns an object whose dispose() lets go of the list.
@@ -470,6 +487,13 @@ window.tinapayan = {
 
         const onMove = e => {
             if (!drag || e.pointerId !== drag.pointerId) {
+                return;
+            }
+            // No button down: the press ended where the list never saw it, so nothing is being dragged. Without this the
+            // pointer coming back over the list started the drag by itself, and the next click in the list dropped the
+            // row there, a move saved at once.
+            if (!(e.buttons & 1)) {
+                end(false);
                 return;
             }
             drag.x = e.clientX;

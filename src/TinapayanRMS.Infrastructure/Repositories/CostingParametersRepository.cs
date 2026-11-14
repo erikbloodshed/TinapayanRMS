@@ -29,9 +29,9 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await SetAsync(
             dbContext,
+            productId,
             new CostingParameters
             {
-                ProductId = productId,
                 LaborPercent = laborPercent,
                 OverheadPercent = overheadPercent,
                 AdministrativePercent = administrativePercent,
@@ -40,13 +40,17 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
             cancellationToken);
     }
 
-    /// <summary>Adds or updates <paramref name="costing"/>'s product's one row from its fields, and saves it. The entity itself is never attached.</summary>
-    internal static async Task SetAsync(TinapayanRMSDbContext dbContext, CostingParameters costing, CancellationToken cancellationToken)
+    /// <summary>
+    /// Adds or updates <paramref name="productId"/>'s one row with <paramref name="costing"/>'s percentages, and saves it.
+    /// Whose they were isn't read: a product's Save passes the form's and a clone its source's, so a percentage added to
+    /// the entity reaches both through <see cref="CopyFields"/> alone. The entity itself is never attached.
+    /// </summary>
+    internal static async Task SetAsync(TinapayanRMSDbContext dbContext, int productId, CostingParameters costing, CancellationToken cancellationToken)
     {
         CostingRules.EnsureValidParameters(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
 
-        var existing = await dbContext.CostingParameters.FirstOrDefaultAsync(c => c.ProductId == costing.ProductId, cancellationToken);
-        CopyFields(costing, existing ?? dbContext.CostingParameters.Add(new CostingParameters { ProductId = costing.ProductId }).Entity);
+        var existing = await dbContext.CostingParameters.FirstOrDefaultAsync(c => c.ProductId == productId, cancellationToken);
+        CopyFields(costing, existing ?? dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId }).Entity);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

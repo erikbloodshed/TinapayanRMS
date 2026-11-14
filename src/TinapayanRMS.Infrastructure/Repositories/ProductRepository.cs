@@ -341,17 +341,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
 
         if (costing is not null)
         {
-            await CostingParametersRepository.SetAsync(
-                dbContext,
-                new CostingParameters
-                {
-                    ProductId = fields.Id,
-                    LaborPercent = costing.LaborPercent,
-                    OverheadPercent = costing.OverheadPercent,
-                    AdministrativePercent = costing.AdministrativePercent,
-                    MarginPercent = costing.MarginPercent,
-                },
-                cancellationToken);
+            await CostingParametersRepository.SetAsync(dbContext, fields.Id, costing, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

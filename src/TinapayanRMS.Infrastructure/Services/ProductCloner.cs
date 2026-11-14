@@ -121,17 +121,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
 
         if (costing is not null)
         {
-            await CostingParametersRepository.SetAsync(
-                dbContext,
-                new CostingParameters
-                {
-                    ProductId = newProduct.Id,
-                    LaborPercent = costing.LaborPercent,
-                    OverheadPercent = costing.OverheadPercent,
-                    AdministrativePercent = costing.AdministrativePercent,
-                    MarginPercent = costing.MarginPercent,
-                },
-                cancellationToken);
+            await CostingParametersRepository.SetAsync(dbContext, newProduct.Id, costing, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

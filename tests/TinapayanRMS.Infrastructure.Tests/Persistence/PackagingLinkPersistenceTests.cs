@@ -235,7 +235,11 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
         (await CreatePackagingLineRepository().GetForProductAsync(cloneId, Cancellation))
             .Should().ContainSingle(l => l.PackagingMaterial!.Name == "6-Piece Box", "it copies the packaging the source shows");
 
+        // Every percentage the costing has, not only the two named: a clone's costing is its source's.
         var costing = (await CreateCostingParametersRepository().GetForProductAsync(cloneId, Cancellation))!;
+        costing.Should().BeEquivalentTo(
+            (await CreateCostingParametersRepository().GetForProductAsync(sourceId, Cancellation))!,
+            options => options.Excluding(c => c.Id).Excluding(c => c.ProductId).Excluding(c => c.Product));
         costing.MarginPercent.Should().Be(40m);
         costing.AdministrativePercent.Should().Be(1.25m);
 

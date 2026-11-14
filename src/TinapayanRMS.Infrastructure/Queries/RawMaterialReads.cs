@@ -54,34 +54,20 @@ internal static class RawMaterialReads
     /// The product packaging lines <paramref name="filter"/> (a WHERE over <c>l</c>) selects, in the order
     /// the user put them in: each with its material's details, and the unit the line is entered in.
     /// </summary>
-    public static async Task<IReadOnlyList<PackagingLine>> GetPackagingLinesAsync(
-        TinapayanRMSDbContext dbContext, string filter, object? parameters, CancellationToken cancellationToken)
-    {
-        var lines = (await dbContext.Connection().QueryAsync<PackagingLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterialUnit?, UnitOfMeasure?, PackagingLine>(
-            dbContext.Command(
-                $"""
-                SELECT {Columns.Of<PackagingLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
-                FROM packaging_lines l
-                JOIN raw_materials m ON m.id = l.packaging_material_id
-                {MaterialJoins}
-                LEFT JOIN raw_material_units lu ON lu.id = l.unit_id
-                LEFT JOIN units_of_measure lum ON lum.id = lu.unit_of_measure_id
-                {filter}
-                ORDER BY l.sort_order, l.id
-                """,
-                parameters,
-                cancellationToken),
-            (line, material, category, baseUnit, unit, unitOfMeasure) =>
+    public static Task<IReadOnlyList<PackagingLine>> GetPackagingLinesAsync(
+        TinapayanRMSDbContext dbContext, string filter, object? parameters, CancellationToken cancellationToken) =>
+        ReadLinesAsync<PackagingLine>(
+            dbContext,
+            "packaging_lines",
+            filter,
+            "ORDER BY l.sort_order, l.id",
+            parameters,
+            (line, material, unit) =>
             {
-                line.PackagingMaterial = WithDetails(material, category, baseUnit);
-                line.Unit = unit is null ? null : WithUnitOfMeasure(unit, unitOfMeasure!);
-                return line;
+                line.PackagingMaterial = material;
+                line.Unit = unit;
             },
-            splitOn: "Id,Id,Id,Id,Id")).AsList();
-
-        await AttachUnitsAsync(dbContext, [.. lines.Select(l => l.PackagingMaterial!)], cancellationToken);
-        return lines;
-    }
+            cancellationToken);
 
     /// <summary>
     /// A packaging set's lines, in the order the user put them in: each with its material's details, and the unit
@@ -97,32 +83,62 @@ internal static class RawMaterialReads
         GetSetLinesAsync(
             dbContext, $"WHERE l.sub_assembly_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(subAssemblyIds) }, cancellationToken);
 
-    private static async Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
-        TinapayanRMSDbContext dbContext, string filter, object parameters, CancellationToken cancellationToken)
+    private static Task<IReadOnlyList<SubAssemblyPackagingLine>> GetSetLinesAsync(
+        TinapayanRMSDbContext dbContext, string filter, object parameters, CancellationToken cancellationToken) =>
+        ReadLinesAsync<SubAssemblyPackagingLine>(
+            dbContext,
+            "sub_assembly_packaging_lines",
+            filter,
+            "ORDER BY l.sub_assembly_id, l.sort_order, l.id",
+            parameters,
+            (line, material, unit) =>
+            {
+                line.PackagingMaterial = material;
+                line.Unit = unit;
+            },
+            cancellationToken);
+
+    /// <summary>
+    /// The lines of <paramref name="table"/> that <paramref name="filter"/> (a WHERE over <c>l</c>) selects, in
+    /// <paramref name="order"/>: a product's packaging lines and a packaging set's are two tables of one shape, a
+    /// material and the unit it's entered in, so one query reads both, and a column or join it needs is added once.
+    /// <paramref name="attach"/> gives a line its material, with the material's details, and its unit, null for the
+    /// material's base unit.
+    /// </summary>
+    private static async Task<IReadOnlyList<TLine>> ReadLinesAsync<TLine>(
+        TinapayanRMSDbContext dbContext,
+        string table,
+        string filter,
+        string order,
+        object? parameters,
+        Action<TLine, RawMaterial, RawMaterialUnit?> attach,
+        CancellationToken cancellationToken)
     {
-        var lines = (await dbContext.Connection().QueryAsync<SubAssemblyPackagingLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterialUnit?, UnitOfMeasure?, SubAssemblyPackagingLine>(
+        List<RawMaterial> materials = [];
+        var lines = (await dbContext.Connection().QueryAsync<TLine, RawMaterial, RawMaterialCategory, UnitOfMeasure?, RawMaterialUnit?, UnitOfMeasure?, TLine>(
             dbContext.Command(
                 $"""
-                SELECT {Columns.Of<SubAssemblyPackagingLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
-                FROM sub_assembly_packaging_lines l
+                SELECT {Columns.Of<TLine>("l")}, {MaterialColumns}, {Columns.Of<RawMaterialUnit>("lu")}, {Columns.Of<UnitOfMeasure>("lum")}
+                FROM {table} l
                 JOIN raw_materials m ON m.id = l.packaging_material_id
                 {MaterialJoins}
                 LEFT JOIN raw_material_units lu ON lu.id = l.unit_id
                 LEFT JOIN units_of_measure lum ON lum.id = lu.unit_of_measure_id
                 {filter}
-                ORDER BY l.sub_assembly_id, l.sort_order, l.id
+                {order}
                 """,
                 parameters,
                 cancellationToken),
             (line, material, category, baseUnit, unit, unitOfMeasure) =>
             {
-                line.PackagingMaterial = WithDetails(material, category, baseUnit);
-                line.Unit = unit is null ? null : WithUnitOfMeasure(unit, unitOfMeasure!);
+                materials.Add(WithDetails(material, category, baseUnit));
+                attach(line, material, unit is null ? null : WithUnitOfMeasure(unit, unitOfMeasure!));
                 return line;
             },
             splitOn: "Id,Id,Id,Id,Id")).AsList();
 
-        await AttachUnitsAsync(dbContext, [.. lines.Select(l => l.PackagingMaterial!)], cancellationToken);
+        // Each line's material, in the lines' order: AsList has run the mapping above for every row by now.
+        await AttachUnitsAsync(dbContext, materials, cancellationToken);
         return lines;
     }
 
