@@ -8,8 +8,8 @@
 
 <UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
 
-@* The list beside the picked material: its header, then its cards in tabs along the bottom, as the WPF screen laid them
-   out. Every tab is part of the one form Save writes. Price History only applies to a saved purchased material. Between
+@* The list beside the picked material: its header, then its cards in tabs along the bottom.
+   Every tab is part of the one form Save writes. Price History only applies to a saved purchased material. Between
    picking a material and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each material has its own
    address, so the browser's Back and Forward step between the materials opened. *@
 <CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">

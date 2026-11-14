@@ -1,7 +1,7 @@
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// What a prompt with a name box and a picker under it shows (TextPromptWindow.PromptWithChoice): its title, the box's
+/// What a prompt with a name box and a picker under it shows (the Prompts dialog): its title, the box's
 /// label and starting text, the picker's label, its choices and the one it starts on, and an optional line saying more.
 /// </summary>
 public sealed record ChoicePromptRequest(

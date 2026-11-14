@@ -74,9 +74,7 @@ public sealed class ProductRecipe : ReactiveObject
 
     /// <summary>
     /// Set while SelectRecipeTab makes its pick, so the pick is part of the undo step making it rather than a step of its
-    /// own (RecipeTabPicked), and New Sub-Assembly's tab is left for SelectRecipeTab's second RecipeTabShown to take away.
-    /// That wait was for the WPF tab strip, which heard of a pick after this screen did and picked a neighbour of its own
-    /// when the tab it still showed went; the web view's buttons only draw the tab picked, so it's harmless now.
+    /// own (RecipeTabPicked).
     /// </summary>
     private bool _selectingRecipeTab;
 
@@ -541,9 +539,8 @@ public sealed class ProductRecipe : ReactiveObject
         RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => ReferenceEquals(t.Usage, usage));
 
     /// <summary>
-    /// Shows <paramref name="tab"/>, and does what showing it does even when it was already showing. The second
-    /// RecipeTabShown comes once the tab strip has moved to the tab too, so it's the one that can take New
-    /// Sub-Assembly's tab away.
+    /// Shows <paramref name="tab"/>, and does what showing it does even when it was already showing: setting
+    /// SelectedRecipeTab to the tab it already holds raises nothing.
     /// </summary>
     private void SelectRecipeTab(RecipeTab? tab)
     {
@@ -640,8 +637,7 @@ public sealed class ProductRecipe : ReactiveObject
                 break;
         }
 
-        // Not while SelectRecipeTab's pick is still reaching the tab strip, which would still be showing it.
-        if (tab is not AddSubAssemblyRecipeTab && !_selectingRecipeTab)
+        if (tab is not AddSubAssemblyRecipeTab)
         {
             RemoveAddSubAssemblyTab();
         }

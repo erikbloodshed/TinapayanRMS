@@ -12,7 +12,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Product Categories tab: what the Products list groups products under, a list of its own
+/// Settings' Product Categories tab: what the Products list groups products under, a list of its own
 /// apart from raw material categories (CategoriesViewModel).
 /// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.

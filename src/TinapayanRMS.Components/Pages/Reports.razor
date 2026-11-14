@@ -6,7 +6,7 @@
 
 <PageTitle>Reports · TinapayanRMS</PageTitle>
 
-@* Reports (the WPF ReportsView): five tables in tabs. Each sorts by a click on a heading and filters from the funnel in
+@* Reports: five tables in tabs. Each sorts by a click on a heading and filters from the funnel in
    it; a double-click on a row opens its product or material; and Export to Excel saves the table as it's shown, in its
    order, with its filters and only the columns showing (the grid's own export, saved where Windows' Save dialog says). Product Cost
    Summary's Columns button chooses which columns show. Each table's filters, sort and columns are as they were left,
@@ -235,8 +235,8 @@
         // The page's grids are new, with nothing picked: Cost Buffers' picks went with the grid they were made in.
         ViewModel!.SelectedCostBuffers.Clear();
 
-        // Export to Excel: the table named, as it's shown, under "<title> yyyy-MM-dd.xlsx" as the WPF app suggested, where
-        // the Save dialog says. The grid makes the workbook itself, as it shows the table.
+        // Export to Excel: the table named, as it's shown, under "<title> yyyy-MM-dd.xlsx", where the Save dialog
+        // says. The grid makes the workbook itself, as it shows the table.
         AddSubscription(ViewModel!.ExportToExcel.RegisterHandler(async interaction =>
         {
             var fileName = $"{interaction.Input} {DateTime.Today:yyyy-MM-dd}.xlsx";

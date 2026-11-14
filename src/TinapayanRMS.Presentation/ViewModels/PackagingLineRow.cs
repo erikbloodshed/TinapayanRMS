@@ -24,8 +24,8 @@ public sealed class PackagingLineRow : ObservableRow
     }
 
     /// <summary>
-    /// A new row that prices itself as soon as its material is picked. The grid's add row edits one of these
-    /// (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the screen's lines, so the screen
+    /// A new row that prices itself as soon as its material is picked. The table's add row edits one of these
+    /// (LineGrid's NewItem): until it's committed it isn't in the screen's lines, so the screen
     /// can't resolve it.
     /// </summary>
     public PackagingLineRow(Func<int, RawMaterial?> findMaterial)

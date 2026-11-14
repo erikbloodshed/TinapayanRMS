@@ -15,7 +15,7 @@ namespace TinapayanRMS.Presentation.Tests.ViewModels;
 /// <summary>
 /// Undo and redo on the Sub-Assemblies screen, the same mechanism Products uses with its own snapshot, and with
 /// it whether Save has anything to write, which is measured against the same snapshots. Steps are recorded by
-/// bracketing a change with BeginUndoStep/EndUndoStep, which is what the Controls/ behaviours do.
+/// bracketing a change with BeginUndoStep/EndUndoStep, which is what the fields and line tables do.
 /// </summary>
 [NotInParallel(DatabaseCollection.C)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
@@ -261,11 +261,11 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
     });
 
-    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
     private static async Task<bool> CanSave(SubAssembliesViewModel viewModel) =>
         await viewModel.SaveCommand.CanExecute.FirstAsync();
 
-    /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
+    /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(SubAssembliesViewModel viewModel, Action change)
     {
         var recorder = (IUndoRecorder)viewModel;

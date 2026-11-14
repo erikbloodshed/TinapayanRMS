@@ -892,7 +892,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         }
     }
 
-    /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
+    /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(RawMaterialsViewModel viewModel, Action change)
     {
         var recorder = (IUndoRecorder)viewModel;

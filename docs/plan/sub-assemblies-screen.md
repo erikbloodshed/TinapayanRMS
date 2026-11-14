@@ -2,7 +2,7 @@
 
 Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen and the roles it files sub-assemblies under, as they are now. When each part came in, who asked for it and what it replaced are in the [build plan](build-plan.md)'s dated log. "The app's notes" means [maui-app.md](maui-app.md); a section named without a file (Domain Model, Application Architecture, Reactive Costing Cascade) is PLAN.md's.
 
-**The screen is the Blazor page `Components/Pages/SubAssemblies`** (since 2026-11-07, when it took the WPF view's place), over the same ViewModel. Its list is a `FolderTree`, its tables typed into `LineGrid`s, its pickers `PickField`s and its boxes `NumberField`s and `TextField`s ([maui-app.md](maui-app.md), "How it's built").
+**The screen is the Blazor page `Components/Pages/SubAssemblies`** (since 2026-11-07), over its ViewModel. Its list is a `FolderTree`, its tables typed into `LineGrid`s, its pickers `PickField`s and its boxes `NumberField`s and `TextField`s ([maui-app.md](maui-app.md), "How it's built").
 
 ## What it keeps
 
@@ -93,7 +93,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 ## Settings → Roles
 
-- **The Roles tab** (`SubAssemblyRolesView`/`SubAssemblyRolesViewModel`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, the Settings dialog).
+- **The Roles tab** (`Pages/Settings/Roles` over `SubAssemblyRolesViewModel`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, Settings).
 - **The order has no box: Move Up and Move Down** in the list card's header (`MoveUpCommand`/`MoveDownCommand`, off for the first and last row and with nothing picked) call `SubAssemblyRoleRepository.MoveAsync`, which swaps the role with its neighbour.
   - `AddAsync` numbers a new role one past the last, whatever it's given, and `UpdateAsync` leaves the order alone.
   - `MoveAsync` and `DeleteAsync` number every role 1…n again (ties by name, the order the tab lists them in), so the order never has a gap.

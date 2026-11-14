@@ -9,7 +9,7 @@ namespace TinapayanRMS.Tests.Common.Fixtures;
 
 /// <summary>
 /// A ProductVersionRecorder over real repositories, and the VersionedSaves over one, for a ViewModel under test, as
-/// CompositionRoot builds them.
+/// the app registers them (ServiceRegistration).
 /// </summary>
 public static class VersionRecorders
 {

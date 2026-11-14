@@ -16,8 +16,8 @@ public sealed record ExcelSheet(string Name, IReadOnlyList<string> Headers, IRea
 }
 
 /// <summary>
-/// A workbook of several sheets, as the WPF app's ExcelExport wrote from its grids (Syncfusion XlsIO, which the licence
-/// key covers): the Price Simulator's products and price changes.
+/// A workbook of several sheets, written with Syncfusion XlsIO (which the licence key covers): the Price Simulator's
+/// products and price changes.
 /// Each sheet has a bold heading row, numbers as numbers in the screen's decimals, and columns as wide as their text.
 /// </summary>
 public static class ExcelWorkbook

@@ -13,7 +13,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Roles tab: the sections a product's recipe is split into (Dough, Filling, …),
+/// Settings' Roles tab: the sections a product's recipe is split into (Dough, Filling, …),
 /// in their order, and which of them are product-owned (a section made in a product stays that product's own).
 /// Picking a role loads it for editing; New, or finishing a Save or Delete, clears the form, so the next Save
 /// always adds a role rather than renaming the last one touched. A new role goes last; Move Up and Move Down change

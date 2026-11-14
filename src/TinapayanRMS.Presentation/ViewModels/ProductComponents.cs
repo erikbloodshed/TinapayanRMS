@@ -22,7 +22,7 @@ public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 }
 
 /// <summary>
-/// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSectionView, through
+/// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSection, through
 /// ProductsViewModel.ComponentsTable): its lines, each a product and how many of it go in, the add row, what the product
 /// cell offers, what each product brings, read off the UI thread once per product, whether the composite takes its
 /// products' packaging too (the checkbox beside Remove Line), and Remove Line itself, each change one undo step of the

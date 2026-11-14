@@ -13,7 +13,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Categories tab: the raw material categories, each for ingredients, made ingredients or packaging.
+/// Settings' Material Categories tab: the raw material categories, each for ingredients, made ingredients or packaging.
 /// Picking a category loads it for renaming or retyping; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
 /// </summary>

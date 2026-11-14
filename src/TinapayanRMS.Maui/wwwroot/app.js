@@ -1,7 +1,7 @@
 // Small browser helpers the Blazor components call through JS interop (window.tinapayan).
 
 // A number box's text, and a picker's (or its look-alike's, PickField's Deferred), is selected as it takes the cursor, so
-// what's typed replaces it, as the WPF DoubleTextBoxes and ComboBoxAdvs did: without it a picker's typing is added to the
+// what's typed replaces it: without it a picker's typing is added to the
 // name it holds, and matches nothing.
 // Done here, in the browser, so it's in place before the first key: the server can't be asked in time. A click puts the
 // caret where it lands after focus arrives, so when the cursor came in by that click, the selection is made again once
@@ -26,7 +26,7 @@ document.addEventListener("focusin", e => {
 });
 
 window.tinapayan = {
-    // Scrolls an element into view only if it isn't already, as the WPF lists' BringIntoView did.
+    // Scrolls an element into view only if it isn't already.
     scrollIntoView(id) {
         const element = document.getElementById(id);
         if (element) {

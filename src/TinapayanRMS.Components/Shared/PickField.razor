@@ -1,14 +1,14 @@
 @typeparam TItem
 @inject IJSRuntime JS
 
-@* A picker bound to a ViewModel's choice, as the WPF screens' ComboBoxAdvs were: every picker filters as it's typed
+@* A picker bound to a ViewModel's choice: every picker filters as it's typed
    into, and picks only what it lists. The choice is
    the item itself (an entity, an enum, a unit), shown by its TextField, or as itself without one. The combo box holds
    each item's place in the list rather than the item, since it reads an enum's first value as no value at all. Within
    an undo screen the pick is one undo step. A picker on a screen that adds what's typed (the Category pickers) passes
-   OnTyped and OnLeave, and the screen settles the text itself. As the WPF pickers highlighted the best match for what's
-   typed (PickerMatchHighlight), the list is sorted best match first (each item's Rank, RecordNameMatch.Rank, set as
-   it's typed, before the combo box filters), and the best match is highlighted for Enter or Tab to pick, the box
+   OnTyped and OnLeave, and the screen settles the text itself. The list is sorted best match first for what's typed
+   (each item's Rank, RecordNameMatch.Rank, set as it's typed, before the combo box filters), and the best match is
+   highlighted for Enter or Tab to pick, the box
    keeping only what's typed: the combo box's own fill-in (Autofill) wrote the rest of a name into the box under the
    cursor, and found only names starting with what was typed. The combo box is the app's own (PickComboBox), which
    sorts by the rank and highlights the best match: Syncfusion's marks the item it held, where that's still listed. The

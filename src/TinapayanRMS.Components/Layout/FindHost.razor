@@ -5,13 +5,13 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-@* Find (the WPF QuickFindWindow): Ctrl+K from anywhere, or the header's magnifier, opens a box over the names of every
+@* Find: Ctrl+K from anywhere, or the header's magnifier, opens a box over the names of every
    raw material, standalone sub-assembly and product, read afresh each time it opens. Every word typed has to be in a
    name, in any order, ignoring capitals and accents; the best matches come first. The keyboard stays in the box: Up and
    Down (and Page Up and Page Down) move the pick, Enter opens it on its own screen, as a link from another screen opens
    one, and Esc closes Find. A double-click on a match opens it too. The last search is still there, selected, the next
    time Find opens. *@
-@* On the title bar's right, as the WPF window's Find is: a glyph button built like Back, Forward and the window's own. *@
+@* On the title bar's right: a glyph button built like Back, Forward and the window's own. *@
 <button type="button" class="titlebar-button titlebar-small-glyph" title="Find a raw material, sub-assembly or product (Ctrl+K)"
         aria-label="Find" @onclick="OpenAsync">
     <Icon Of="AppIcon.Search" />

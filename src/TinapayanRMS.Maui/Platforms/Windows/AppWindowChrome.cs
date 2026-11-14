@@ -16,8 +16,8 @@ namespace TinapayanRMS.Maui.WinUI;
 /// window has no title bar of Windows' (WindowsWindow), so the page tells it where its bar is and where the bar's buttons
 /// are, and Windows takes the gaps between the buttons as the caption through the window's non-client input
 /// (InputNonClientPointerSource): dragging it moves the window and snaps it to an edge, a double-click maximizes or
-/// restores it, and a right-click opens the system menu, done by Windows itself as on any title bar, where the WPF app's
-/// ChromelessWindow had WPF's WindowChrome do it. The buttons stay the page's, which draws and clicks them.
+/// restores it, and a right-click opens the system menu, done by Windows itself as on any title bar. The buttons stay
+/// the page's, which draws and clicks them.
 /// </summary>
 public sealed partial class AppWindowChrome : IAppWindow
 {

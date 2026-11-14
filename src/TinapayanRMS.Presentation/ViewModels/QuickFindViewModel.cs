@@ -17,7 +17,7 @@ public sealed record QuickFindResult(AppScreen Screen, int Id, string Name, stri
 /// <summary>
 /// Find (Ctrl+K): one box over the names of every raw material,
 /// standalone sub-assembly and product, whatever screen is showing, and the record picked opened on its own screen as a link
-/// from another screen opens one (MainWindow). A sub-assembly a product owns isn't one: it's opened with its product. The
+/// from another screen opens one, by its address. A sub-assembly a product owns isn't one: it's opened with its product. The
 /// records are read each time the dialog opens (<see cref="LoadCommand"/>), so a name saved since is found.
 /// </summary>
 public sealed class QuickFindViewModel : ViewModelBase

@@ -1,7 +1,7 @@
 /* The record screens (Raw Materials, Sub-Assemblies, Products): a folder tree beside the picked record's header and its
    tabs, the fields and line tables they're edited in, and the cards inside the tabs. */
 
-/* ---- Tile colours: the palette's washes, as the WPF headers' FigureTileStyle brushes. ---- */
+/* ---- Tile colours: the palette's washes. ---- */
 
 :root {
     --tile-rosewater: #ebdcdc;
@@ -308,8 +308,8 @@
     gap: 8px 12px;
 }
 
-/* The title keeps room for a name, as the WPF header's does: at a width where the buttons would leave it less (the
-   Products screen at the WPF window's 1400 wide), they go under it, still on the right. */
+/* The title keeps room for a name: at a width where the buttons would leave it less (the Products screen at the
+   window's opening 1400 wide), they go under it, still on the right. */
 .header-title-row > :first-child {
     flex: 1 1 0;
     min-width: 200px;
@@ -827,7 +827,7 @@
 }
 
 /* The tabs fill their card, and each tab's content scrolls inside it, so the strip stays put. This is all that sizes
-   them: an SfTab given a Height of its own can fail as it starts (DESIGN.md, "How it's built"). */
+   them: an SfTab given a Height of its own can fail as it starts (docs/plan/maui-app.md, "How it's built"). */
 .details-tabs.e-tab {
     display: flex;
     flex-direction: column;

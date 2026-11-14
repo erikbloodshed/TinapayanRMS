@@ -19,12 +19,6 @@ public sealed class RawMaterialUnitRow : ReactiveObject
     /// <summary>A standard unit's fixed multiplier for the screen's material as it now is, or null for one that's typed.</summary>
     private readonly Func<UnitOfMeasure, decimal?>? _standardMultiplier;
 
-    /// <summary>An empty row, for the grid to compare an add row against (controls:GridAddNewRow.DropWhenUntouched).</summary>
-    public RawMaterialUnitRow()
-        : this(new RawMaterialUnit(), string.Empty, findUnitOfMeasure: null, standardMultiplier: null)
-    {
-    }
-
     /// <param name="findUnitOfMeasure">Resolves a picked unit of measure, so a row names its unit as soon as it's picked, even in the add row.</param>
     /// <param name="standardMultiplier">A standard unit's fixed multiplier for the material (StandardUnitRules), or null to type it.</param>
     public RawMaterialUnitRow(
@@ -75,7 +69,7 @@ public sealed class RawMaterialUnitRow : ReactiveObject
     /// <summary>The fixed multiplier of the row's unit when it's a standard unit of the base unit's kind; null while it's typed.</summary>
     public decimal? StandardMultiplier => Unit.UnitOfMeasure is { } unitOfMeasure ? _standardMultiplier?.Invoke(unitOfMeasure) : null;
 
-    /// <summary>Whether the multiplier cell can be typed into (controls:GridCellEditing.AllowWhen): not for a standard unit.</summary>
+    /// <summary>Whether the multiplier cell can be typed into (AlternativeUnits makes it read-only otherwise): not for a standard unit.</summary>
     public bool CanTypeMultiplier => StandardMultiplier is null;
 
     /// <summary>

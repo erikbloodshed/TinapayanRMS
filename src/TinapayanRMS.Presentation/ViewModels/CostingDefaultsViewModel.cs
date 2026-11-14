@@ -10,7 +10,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Costing Defaults tab: the stage New files a new product in, the labor, overhead, administrative,
+/// Settings' Costing Defaults tab: the stage New files a new product in, the labor, overhead, administrative,
 /// markup and VAT percentages its costing starts with, the Cost Buffer % a new raw material starts with
 /// (RawMaterialsViewModel), and the shop-wide Wastage % every product is priced with. Saving the defaults changes no saved
 /// product or material, but the wastage reprices every product. Its second card works every stored cost out again

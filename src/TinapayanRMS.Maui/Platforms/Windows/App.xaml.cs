@@ -7,8 +7,8 @@ public partial class App : MauiWinUIApplication
 {
     public App()
     {
-        // Started again, it brings the window that's open forward instead; or another sign-in has it open, or the WPF
-        // app is open, which it has said.
+        // Started again, it brings the window that's open forward instead; or another sign-in has it open, which it has
+        // said.
         if (!SingleInstance.Claim())
         {
             Environment.Exit(0);

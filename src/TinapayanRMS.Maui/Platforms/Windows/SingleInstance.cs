@@ -11,8 +11,8 @@ namespace TinapayanRMS.Maui.WinUI;
 /// One copy of the app on the PC. Starting it again in the same Windows sign-in (the Desktop icon twice) brings the window
 /// already open to the front, rather than a second copy that would run its own hourly backups and write the same view-state
 /// files. Each copy on the disk is its own app within a sign-in, so one run from source doesn't stop the installed copy,
-/// nor the other way round. Across sign-ins, and against the WPF app, it's one copy for the whole PC (OneCopyPerPc): a
-/// start refused that way says why and ends.
+/// nor the other way round. Across sign-ins it's one copy for the whole PC (OneCopyPerPc): a start refused that way says
+/// why and ends.
 /// </summary>
 public static partial class SingleInstance
 {
@@ -23,7 +23,7 @@ public static partial class SingleInstance
 
     /// <summary>
     /// Whether this copy may run: false when the window of the one already running in this sign-in was brought forward,
-    /// or when another sign-in has the app open, or the WPF app is open, which a message box has said.
+    /// or when another sign-in has the app open, which a message box has said.
     /// </summary>
     public static bool Claim()
     {
@@ -46,26 +46,23 @@ public static partial class SingleInstance
     }
 
     /// <summary>
-    /// This app's processes and the WPF app's, in every Windows session: the session comes from the system's list of
-    /// processes, so no administrator is needed to read another user's. One that ends while it's read is left out.
+    /// This app's processes, in every Windows session: the session comes from the system's list of processes, so no
+    /// administrator is needed to read another user's. One that ends while it's read is left out.
     /// </summary>
     private static List<OneCopyPerPc.RunningCopy> RunningCopies(string appProcessName)
     {
         var running = new List<OneCopyPerPc.RunningCopy>();
-        foreach (var (name, isWpfApp) in (ReadOnlySpan<(string, bool)>)[(appProcessName, false), (OneCopyPerPc.WpfProcessName, true)])
+        foreach (var process in Process.GetProcessesByName(appProcessName))
         {
-            foreach (var process in Process.GetProcessesByName(name))
+            using (process)
             {
-                using (process)
+                try
                 {
-                    try
-                    {
-                        running.Add(new OneCopyPerPc.RunningCopy(process.Id, process.SessionId, isWpfApp));
-                    }
-                    catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
-                    {
-                        // It ended while it was being read.
-                    }
+                    running.Add(new OneCopyPerPc.RunningCopy(process.Id, process.SessionId));
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+                {
+                    // It ended while it was being read.
                 }
             }
         }

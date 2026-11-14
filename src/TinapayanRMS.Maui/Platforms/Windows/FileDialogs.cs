@@ -38,7 +38,7 @@ public sealed class FileDialogs : IFileDialogs
         return (await picker.PickSingleFolderAsync())?.Path;
     }
 
-    /// <summary>As the WPF app's Open Folder did: Explorer, which takes a quoted path as the folder to open.</summary>
+    /// <summary>File Explorer, which takes a quoted path as the folder to open.</summary>
     public void ShowFolder(string folder) =>
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{folder}\"") { UseShellExecute = true })?.Dispose();
 

@@ -28,9 +28,8 @@ public closed class RawMaterialTreeNode : ReactiveObject
 
 /// <summary>
 /// A folder of the Raw Materials list: a type's (Ingredients, Packaging), or a category's inside the type it's for, a Made
-/// category's among the ingredient ones. There's no Uncategorized, since every material has a category. The tree finds
-/// its rows in <see cref="Children"/> through a HierarchyPropertyDescriptor for this type alone (MaterialListCard), as the
-/// Products list does (ProductFolderNode).
+/// category's among the ingredient ones. There's no Uncategorized, since every material has a category. Its rows are in
+/// <see cref="Children"/>, which the tree (FolderTree) draws under it, as a Products folder's are (ProductFolderNode).
 
 /// </summary>
 public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<RawMaterialTreeNode>
@@ -127,7 +126,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
 
     private bool _isExpanded;
     /// <summary>
-    /// The folder is open. The tree reads and writes it (its HierarchyPropertyDescriptor's IsExpandedPropertyName), and
+    /// The folder is open. The tree (FolderTree) reads and writes it, and
     /// it's kept here, so a folder stays as it was left through a refresh, or while a search hides it.
     /// </summary>
     public bool IsExpanded

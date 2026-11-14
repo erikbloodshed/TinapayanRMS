@@ -1,4 +1,4 @@
-@* The picked product's header (the WPF ProductHeaderCard and ProductDetailsCard): its name, with a tag while its costs
+@* The picked product's header: its name, with a tag while its costs
    show unbuffered and one saying where a new product will be filed; New (a product, or from its arrow a composite),
    Save, Undo, Redo, Revert, Print, the Buffered/Unbuffered switch and Delete; its figures in coloured tiles; then what's
    typed in about it on one row. A composite has no Quantity Required: it's one unit of the products it holds. *@
@@ -93,7 +93,7 @@
 @code {
     [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
 
-    // The picker's text, as the WPF ComboBoxAdv's Text binding kept it; settled once the picker is left.
+    // The picker's text: the category's name as it takes the cursor, or what's typed since; settled once it's left.
     private void ArriveAtCategory()
     {
         ViewModel.CategorySearchText = ViewModel.EditingCategory?.Name ?? "";

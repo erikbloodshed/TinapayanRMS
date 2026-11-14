@@ -1,6 +1,6 @@
-@* A text box bound to a ViewModel's string, as the WPF forms' SfTextBoxExts were with UpdateSourceTrigger=PropertyChanged:
+@* A text box bound to a ViewModel's string:
    each keystroke reaches the ViewModel, so whatever follows the text follows it as it's typed. Within an undo screen
-   (a cascading IUndoRecorder) the whole edit, from taking the cursor to leaving, is one undo step (FieldUndoStep).
+   (a cascading IUndoRecorder) the whole edit, from taking the cursor to leaving, is one undo step.
    While the box has the cursor the server never writes its text back: keystrokes reach the server one by one, and a
    redraw for an earlier one would otherwise overwrite those typed since, dropping them. A change from elsewhere (an
    undo, a load) shows once it's left. When another record takes the form's place under the cursor

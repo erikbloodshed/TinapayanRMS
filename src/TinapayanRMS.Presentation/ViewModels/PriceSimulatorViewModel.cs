@@ -197,10 +197,10 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// <summary>Deletes the open scenario, after asking. The changes stay in the table.</summary>
     public ReactiveCommand<RxVoid, RxVoid> DeleteScenarioCommand { get; }
 
-    /// <summary>Input: what to ask for. Output: the name typed, or null when cancelled. The View shows a TextPromptWindow.</summary>
+    /// <summary>Input: what to ask for. Output: the name typed, or null when cancelled. The page asks it in a dialog (Prompts).</summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
-    /// <summary>Runs whenever the tab is shown (MainWindow): today's products and prices, the changes kept.</summary>
+    /// <summary>Runs whenever the screen is opened (ScreenBase): today's products and prices, the changes kept.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
     public ReactiveCommand<RxVoid, RxVoid> RemoveChangeCommand { get; }
@@ -215,7 +215,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Input: the report's sets, the one to show first first: the selected products, when any are, then all the products
-    /// shown. The View shows them in a print pane.
+    /// shown. The print preview page shows them (PrintPreviews).
     /// </summary>
     public Interaction<IReadOnlyList<PrintChoice>, RxVoid> ShowPrint { get; } = new();
 

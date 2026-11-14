@@ -315,11 +315,11 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
     });
 
-    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
     private static async Task<bool> CanSave(RawMaterialsViewModel viewModel) =>
         await viewModel.SaveCommand.CanExecute.FirstAsync();
 
-    /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
+    /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(RawMaterialsViewModel viewModel, Action change)
     {
         var recorder = (IUndoRecorder)viewModel;

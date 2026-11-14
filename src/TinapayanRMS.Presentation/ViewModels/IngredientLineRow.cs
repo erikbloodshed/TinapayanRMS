@@ -21,8 +21,8 @@ public sealed class IngredientLineRow : ReactiveObject
     }
 
     /// <summary>
-    /// A new row that prices itself as soon as its ingredient is picked. The grid's add row edits one of these
-    /// (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the screen's lines, so the screen
+    /// A new row that prices itself as soon as its ingredient is picked. The table's add row edits one of these
+    /// (LineGrid's NewItem): until it's committed it isn't in the screen's lines, so the screen
     /// can't resolve it, and its Cost would stay 0 while its grams are typed.
     /// </summary>
     /// <param name="baseWeight">The formula's base as the table has it, so a percentage can be typed into the add row too.</param>
@@ -240,7 +240,7 @@ public sealed class IngredientLineRow : ReactiveObject
                     : SubAssemblyRules.CalculateBakersPercent(grams, BaseWeight);
         set
         {
-            // The grid won't open the cell where it can't be typed (controls:GridCellEditing); this is the backstop. Checked
+            // The table's cell is read-only where it can't be typed (IngredientLinesGrid); this is the backstop. Checked
             // first, so a line whose typed baker's percentage is waiting for a base to come back doesn't lose it.
             if (!CanTypeBakersPercent)
             {

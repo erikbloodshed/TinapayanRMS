@@ -2,7 +2,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// Where the sub-assembly being added comes from, picked on Add Sub-Assembly's drop-down
-/// (RecipeStructureCard) and carried by AddUsageCommand. New is the default, which is what a
+/// (RecipeStructure) and carried by AddUsageCommand. New is the default, which is what a
 /// parameterless Execute() passes.
 /// </summary>
 public enum UsageFormMode

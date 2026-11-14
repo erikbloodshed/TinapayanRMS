@@ -7,10 +7,10 @@ using DynamicData;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// Merges freshly loaded rows into a screen's existing lists instead of replacing them, so a tab
+/// Merges freshly loaded rows into a screen's existing lists instead of replacing them, so a screen
 /// coming back into view keeps its state (PLAN.md): a row that hasn't changed keeps its object,
-/// which is what an SfDataGrid's selection and scroll position and a ComboBoxAdv's SelectedItem
-/// are tied to. Only rows whose values changed are swapped for their fresh copy.
+/// which the screen's picks (a row selected, a picker's choice) point at and a table's rows are
+/// keyed by. Only rows whose values changed are swapped for their fresh copy.
 /// </summary>
 public static class CollectionMerge
 {

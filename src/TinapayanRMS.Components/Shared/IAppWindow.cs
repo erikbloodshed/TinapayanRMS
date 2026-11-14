@@ -1,11 +1,10 @@
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// The app's window, for the title bar the page draws in place of Windows' own (Layout.TitleBar), as the WPF app's
-/// ChromelessWindow draws its title bar in the theme: the window has no caption bar of Windows', only its border, so the
-/// page's title bar holds the menu toggle and the heading on the left and Find, Back, Forward, Minimize, Maximize and
-/// Close on the right. The MAUI app implements it on its window; what the title bar asks of it is only ever asked on the
-/// window's thread.
+/// The app's window, for the title bar the page draws in place of Windows' own (Layout.TitleBar): the window has no
+/// caption bar of Windows', only its border, so the page's title bar holds the menu toggle and the heading on the left
+/// and Find, Back, Forward, Minimize, Maximize and Close on the right. The MAUI app implements it on its window; what the
+/// title bar asks of it is only ever asked on the window's thread.
 /// </summary>
 public interface IAppWindow
 {

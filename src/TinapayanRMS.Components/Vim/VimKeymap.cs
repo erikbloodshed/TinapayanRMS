@@ -69,8 +69,8 @@ public sealed record VimKeyBinding(string Keys, VimAction Action, VimContexts Wh
 /// <summary>
 /// Every Vim key the app knows, where it works and what it does there: the one table the browser reads the keys from
 /// (it's handed to <c>vim.js</c> as the keys are turned on) and the cheat sheet is drawn from, so neither can drift from
-/// the other. The WPF app's table, with what a browser changes: the screens are pages, Back and Forward
-/// are the browser's own, and Ctrl+N is the browser's (a new window), so Ctrl+J and Ctrl+K move through an open list too.
+/// the other. In the web view the screens are pages, Back and Forward are the browser's own, and Ctrl+N is the
+/// browser's (a new window), so Ctrl+J and Ctrl+K move through an open list too.
 /// </summary>
 public static class VimKeymap
 {

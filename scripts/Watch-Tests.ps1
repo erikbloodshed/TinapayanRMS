@@ -6,7 +6,7 @@
 .DESCRIPTION
     Starts the test project under dotnet watch with hot reload on (TESTINGPLATFORM_HOTRELOAD_ENABLED). A change to a
     method's body, in the tests or the code they test, is applied to the tests running, and they run again. A change
-    hot reload can't apply (a new method, type or parameter, a XAML file) makes dotnet watch rebuild and start them again
+    hot reload can't apply (a new method, type or parameter) makes dotnet watch rebuild and start them again
     (DOTNET_WATCH_RESTART_ON_RUDE_EDIT), which takes longer. Stop it with Ctrl+C.
 
     Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
@@ -32,7 +32,7 @@
     into one --treenode-filter.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 UI -Class "*ProductsViewModelRefreshTests"
+    powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -Class "*ProductsViewModelRefreshTests"
 #>
 [CmdletBinding()]
 param(

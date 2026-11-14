@@ -11,10 +11,6 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// </summary>
 public sealed class JsonViewStateStore(string filePath) : IViewStateStore
 {
-    /// <summary>%LocalAppData%\TinapayanRMS\view-state.json: the Windows user's own, on this computer.</summary>
-    public static string DefaultFilePath { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TinapayanRMS", "view-state.json");
-
     private readonly Lock _lock = new();
     private Dictionary<string, List<string>>? _values;
 

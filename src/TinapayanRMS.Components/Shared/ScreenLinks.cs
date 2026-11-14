@@ -5,7 +5,7 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// One screen opening another, as the WPF MainWindow wired them: a Dependents tile (Raw Materials, Sub-Assemblies) or a
+/// One screen opening another: a Dependents tile (Raw Materials, Sub-Assemblies) or a
 /// double-clicked row (Reports, the Price Simulator) opens its product on Products; Sub-Assemblies' New Product starts a product
 /// there that links it; a Reports row, or a made ingredient's tile on Sub-Assemblies' Dependents, opens its material on Raw
 /// Materials; a linked badge on Products, or a made ingredient's Made from badge, opens its sub-assembly on

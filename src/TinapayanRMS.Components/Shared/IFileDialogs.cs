@@ -1,9 +1,9 @@
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// The computer's own file dialogs, in place of the web app's downloads and uploads: the WPF app's Save, Open and folder
-/// dialogs, which the ViewModels' interactions were written for, and File Explorer. Each dialog answers with a path, or
-/// null when cancelled. The MAUI app gives Windows' (Platforms/Windows).
+/// The computer's own file dialogs, in place of a web app's downloads and uploads: Save, Open and folder dialogs, which
+/// the ViewModels' interactions ask for, and File Explorer. Each dialog answers with a path, or null when cancelled. The
+/// MAUI app gives Windows' (Platforms/Windows).
 /// </summary>
 public interface IFileDialogs
 {

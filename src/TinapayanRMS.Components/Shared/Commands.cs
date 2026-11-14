@@ -5,7 +5,7 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Components.Shared;
 
-/// <summary>Running a ViewModel's commands from a component, as a WPF Command binding did.</summary>
+/// <summary>Running a ViewModel's commands from a component.</summary>
 public static class Commands
 {
     public static bool CanRun(ICommand command, object? parameter = null) => command.CanExecute(parameter);

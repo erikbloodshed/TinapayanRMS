@@ -5,7 +5,7 @@ namespace TinapayanRMS.Maui.WinUI;
 /// <summary>
 /// Windows' own message box, for what has to be said before the app has a window to say it in: a start that failed
 /// (MauiProgram), which otherwise just disappeared, and a start refused because the app is open in another Windows
-/// sign-in or the WPF app is open (SingleInstance). Shown in front, and waited for.
+/// sign-in (SingleInstance). Shown in front, and waited for.
 /// </summary>
 public static partial class StartupMessage
 {

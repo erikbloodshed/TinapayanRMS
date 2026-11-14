@@ -7,7 +7,7 @@ using TinapayanRMS.Components.Tests.Fixtures;
 namespace TinapayanRMS.Components.Tests.Layout;
 
 /// <summary>
-/// The window's title bar, which the page draws in place of Windows' own, as the WPF window's ChromelessWindow draws it:
+/// The window's title bar, which the page draws in place of Windows' own:
 /// what it shows, and what it asks of the window (IAppWindow). Dragging it is Windows' own, so only where the bar and its
 /// buttons are is checked here; the window's caption itself shows only in the app.
 /// </summary>

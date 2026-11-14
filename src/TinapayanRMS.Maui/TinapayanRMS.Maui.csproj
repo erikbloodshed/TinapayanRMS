@@ -7,8 +7,7 @@
   <Sdk Name="PublishWithSatoriGC" Version="11.0.0-satori.42242472725.2" />
 
   <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2.
-       Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target,
-       and the WPF app it ran beside was dropped. -->
+       Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target. -->
   <PropertyGroup>
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <OutputType>Exe</OutputType>
@@ -21,7 +20,7 @@
     <ApplicationId>com.tinapayanfestivalbakeshoppe.tinapayanrms</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
-    <!-- The WPF app's icon, for the .exe, the taskbar and Alt+Tab: the window takes it from the .exe. -->
+    <!-- The app's icon, for the .exe, the taskbar and Alt+Tab: the window takes it from the .exe. -->
     <ApplicationIcon>Resources\AppIcon\tinapayan-rms-icon.ico</ApplicationIcon>
 
     <!-- Unpackaged, as an .exe in a folder, with the Windows App SDK in that folder too, so the PC needs nothing installed
@@ -67,7 +66,7 @@
   </ItemGroup>
 
   <!-- The Syncfusion licence key, taken from the SYNCFUSION_LICENSE_KEY environment variable when the app is built, so
-       the installed app doesn't need the variable, as the WPF app's was. MauiProgram reads it back by its key. -->
+       the installed app doesn't need the variable. MauiProgram reads it back by its key. -->
   <ItemGroup Condition="'$(SYNCFUSION_LICENSE_KEY)' != ''">
     <AssemblyMetadata Include="SyncfusionLicenseKey" Value="$(SYNCFUSION_LICENSE_KEY)" />
   </ItemGroup>

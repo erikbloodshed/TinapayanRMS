@@ -5,8 +5,8 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// A screen of records with a list and a form (Raw Materials, Sub-Assemblies, Products): what the Vim command line
-/// (<c>:w</c>, <c>:new</c>, <c>:delete</c>, <c>:e name</c>) runs. Found by walking up from the keyboard to the first
-/// DataContext that is one, as Ctrl+Z finds its screen.
+/// (<c>:w</c>, <c>:new</c>, <c>:delete</c>, <c>:e name</c>) runs, on the screen
+/// showing (VimKeysState, which each screen tells as it shows and goes).
 /// </summary>
 public interface IRecordScreen
 {

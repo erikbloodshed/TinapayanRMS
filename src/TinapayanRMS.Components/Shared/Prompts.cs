@@ -3,7 +3,7 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// A name asked for, as the WPF app's TextPromptWindow asked it: a new category's, or a record's new name from a list's
+/// A name asked for: a new category's, or a record's new name from a list's
 /// menu (a ViewModel's PromptForName or PromptForNewCategory, answered by <see cref="PromptHost"/>'s dialog); or a name and
 /// a pick from a list, as Move to In-House and Make In-House Ingredient ask a made ingredient's name and Made category
 /// (PromptForMadeIngredient). One per page the window loads. The answer is what was typed (and picked), or null when it's cancelled;

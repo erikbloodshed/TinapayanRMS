@@ -12,7 +12,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Units of Measure tab. Picking a unit loads it for editing; New, or finishing
+/// Settings' Units of Measure tab. Picking a unit loads it for editing; New, or finishing
 /// a Save or Delete, clears the form, so the next Save always adds a unit rather than changing the
 /// last one touched.
 /// </summary>

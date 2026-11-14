@@ -14,11 +14,10 @@ public sealed record ScreenTab(AppScreen Screen, string Label, bool HasPagesUnde
 }
 
 /// <summary>
-/// The screens' tabs along the top, as the WPF window's, for the window: Raw Materials, Sub-Assemblies and Products
-/// are open from the start, the others open when their screen is first shown (from the menu, a link, or Products'
-/// Print), and any can be closed but the last. Closing only takes the tab off the strip: the screen keeps what it held,
-/// and showing it again brings the tab back. Settings has a tab too, though it was a dialog there: here it's a page
-/// like the rest, with tabs of its own under the strip.
+/// The screens' tabs along the top, for the window: Raw Materials, Sub-Assemblies and Products are open from the start,
+/// the others open when their screen is first shown (from the menu, a link, or Products' Print), and any can be closed
+/// but the last. Closing only takes the tab off the strip: the screen keeps what it held, and showing it again brings
+/// the tab back. Settings has a tab too, a page like the rest, with tabs of its own under the strip.
 /// </summary>
 public sealed class ScreenTabs
 {

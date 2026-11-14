@@ -23,23 +23,21 @@ namespace TinapayanRMS.Maui;
 public static class MauiProgram
 {
     /// <summary>
-    /// The MAUI app's folder in the Windows user's app data, beside the WPF app's view-state.json: its own view state and
-    /// its log. The backups are the WPF app's, since it's the same database (DatabaseBackups.DefaultFolder).
+    /// The app's folder in the Windows user's app data: its view state and its log. The backups are in a folder every
+    /// Windows user on the PC shares (DatabaseBackups.DefaultFolder).
     /// </summary>
     public static string DataFolder { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TinapayanRMS", "Maui");
 
     /// <summary>
-    /// How the screens were left, for this Windows user. The MAUI app's own: each app reads its file once and writes it
-    /// whole, so two sharing one would write over each other's changes. It starts as a copy of the WPF app's
-    /// (<see cref="ViewStateSeed"/>).
+    /// How the screens were left, for this Windows user.
     /// </summary>
     public static string ViewStateFile { get; } = Path.Combine(DataFolder, "view-state.json");
 
     public static MauiApp CreateMauiApp()
     {
-        // Syncfusion's grid and charts report their use to Syncfusion, over HTTPS (Syncfusion.Telemetry), as the WPF
-        // controls did. Off before any Syncfusion type is touched, as the WPF app had it (2026-11-06).
+        // Syncfusion's grid and charts report their use to Syncfusion, over HTTPS (Syncfusion.Telemetry). Off before any
+        // Syncfusion type is touched, at the user's request (2026-11-06).
         Syncfusion.Telemetry.Telemetry.Disable();
 
         // Numbers shown as the number boxes read them, whatever the Windows region writes them with: before anything is drawn.
@@ -48,7 +46,7 @@ public static class MauiProgram
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
-            // EF Core logs every SQL command at Information; the WPF app's log never carried them.
+            // EF Core logs every SQL command at Information: the log keeps to what went wrong.
             .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
             .WriteTo.File(
                 Path.Combine(DataFolder, "logs", "tinapayanrms-.log"),
@@ -73,12 +71,11 @@ public static class MauiProgram
         {
             RegisterSyncfusionLicence();
             ReactiveUIBootstrapper.EnsureInitialized();
-            ViewStateSeed.StartFrom(JsonViewStateStore.DefaultFilePath, ViewStateFile);
 
             var builder = MauiApp.CreateBuilder();
             builder.UseMauiApp<App>();
 
-            // appsettings.json, built into the app (the WPF app's file), then environment variables
+            // appsettings.json, built into the app, then environment variables
             // (ConnectionStrings__Default) over it.
             // The configuration reads the stream as it's added, so it can go straight after.
             using (var settings = typeof(MauiProgram).Assembly.GetManifestResourceStream("appsettings.json")
@@ -128,7 +125,7 @@ public static class MauiProgram
 
     /// <summary>
     /// The key the build compiled in from the SYNCFUSION_LICENSE_KEY environment variable (the project's AssemblyMetadata),
-    /// so an installed app needs no variable, as the WPF app did; else the variable itself. Without either the app still
+    /// so an installed app needs no variable; else the variable itself. Without either the app still
     /// opens, and Syncfusion says in the window that it has no licence.
     /// </summary>
     private static void RegisterSyncfusionLicence()

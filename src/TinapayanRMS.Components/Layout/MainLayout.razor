@@ -7,7 +7,7 @@
 @inject ScreenLinks Links
 
 <div class="app-shell">
-    @* The window's title bar, which the page draws: the window has none of Windows' own, as the WPF window had none. *@
+    @* The window's title bar, which the page draws: the window has none of Windows' own. *@
     <TitleBar OnMenu="ToggleNavigation" />
 
     @if (Status.DatabaseWarning is { } warning)
@@ -26,14 +26,14 @@
     }
 
     <div class="app-body">
-        @* The menu floats over the screen, as the WPF app's did: summoned by the title bar's button, gone on a click away. *@
+        @* The menu floats over the screen: summoned by the title bar's button, gone on a click away. *@
         <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
             <ChildContent>
                 <NavMenu Navigated="CloseNavigation" />
             </ChildContent>
         </SfSidebar>
 
-        @* The tabs are under the menu when it's out, as the WPF app's were. *@
+        @* The tabs are under the menu when it's out. *@
         <div class="app-screen">
             <ScreenTabStrip />
 
@@ -62,8 +62,7 @@
 
     private void OnStatusChanged() => InvokeAsync(StateHasChanged).Forget(Logger);
 
-    // A restore replaced what every screen holds: load the window's page again, which builds every screen afresh, as the
-    // WPF app restarted.
+    // A restore replaced what every screen holds: load the window's page again, which builds every screen afresh.
     private void OnRestored() => InvokeAsync(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true)).Forget(Logger);
 
     private void ToggleNavigation() => _navigationOpen = !_navigationOpen;

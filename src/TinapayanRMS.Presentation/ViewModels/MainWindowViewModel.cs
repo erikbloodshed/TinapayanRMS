@@ -4,8 +4,8 @@ using ReactiveUI;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// Proves the ReactiveUI bootstrap end-to-end: a ReactiveObject property driving
-/// a WhenAnyValue-derived property, resolved through DI like every future ViewModel.
+/// The window's title, which Windows shows on the taskbar and in Alt+Tab, and the title bar's heading: the title in
+/// capitals.
 /// </summary>
 public sealed class MainWindowViewModel : ReactiveObject
 {

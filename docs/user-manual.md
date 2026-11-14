@@ -148,7 +148,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 
 ### The main window
 
-- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens on the PC at a time: opening it again brings the window that's open to the front. If it's open in another Windows sign-in on the PC, or the old TinapayanRMS is open, it says so and doesn't open (see [Troubleshooting](#14-troubleshooting-and-questions)).
+- **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens on the PC at a time: opening it again brings the window that's open to the front. If it's open in another Windows sign-in on the PC, it says so and doesn't open (see [Troubleshooting](#14-troubleshooting-and-questions)).
 - **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
@@ -1315,14 +1315,6 @@ TinapayanRMS is installed from its source folder, on the PC that holds its datab
 
 Run the same command again to update the app after the code changes. How the lists were left, your Vim keys setting, the backups and the database all stay as they are. To remove the app, run `scripts\Uninstall-TinapayanRMS.ps1` the same way.
 
-**Taking the old app off.** The older TinapayanRMS this one replaced was put on the PC by hand. Once the new one is installed and working, take the old one off so nobody opens it by mistake:
-
-1. Close the old app.
-2. Run `powershell -ExecutionPolicy Bypass -File scripts\Remove-WpfApp.ps1`. It only lists what it finds: the old app's folder, its shortcuts, and whether it's running. The install script runs it too, at the end.
-3. If the list is right, run it again with `-Remove` at the end. It deletes the old app and its shortcuts, and keeps its `logs` folder. If it says it found nothing but the old app is still on the PC, add `-Folder` and the folder it's in, such as `-Folder C:\TinapayanRMS`.
-
-It never touches the database or the backups, and it keeps the old app's record of how the lists were left, which the new app copies the first time it opens. A shortcut pinned to the taskbar has to be unpinned by hand: right-click it and choose **Unpin from taskbar**.
-
 ### Share the recipes with TinapayanBMS
 
 TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
@@ -1437,9 +1429,6 @@ Only one copy of TinapayanRMS opens at a time, because a save in one copy could 
 
 **Opening the app says it's open in another Windows sign-in on this PC.**
 Someone else signed in to Windows on this PC has TinapayanRMS open. Only one copy can be open on the PC, for the same reason as above. Sign in as them and close it there, or ask them to, then open it again.
-
-**Opening the app says the old TinapayanRMS is open.**
-The earlier version of the app (the one installed before this one) is open on this PC. The two can't share the data, so close the old one, then open TinapayanRMS again.
 
 **Opening the app says TinapayanRMS couldn't start.**
 Something stopped it before its window opened. The message says what, and where the log file is: show both to whoever looks after the app.

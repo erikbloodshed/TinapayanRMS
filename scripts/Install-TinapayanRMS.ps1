@@ -19,8 +19,6 @@
     SYNCFUSION_LICENSE_KEY user environment variable, which the build compiles into the app. The app reaches PostgreSQL
     as the signed-in Windows user, with the password in that user's %APPDATA%\postgresql\pgpass.conf.
 
-    At the end it looks for the WPF app this replaced (Remove-WpfApp.ps1) and says what it found; it doesn't remove it.
-
 .PARAMETER InstallFolder
     Where the app goes. Defaults to %LocalAppData%\Programs\TinapayanRMS.
 
@@ -45,7 +43,7 @@ $exe = Join-Path $InstallFolder 'TinapayanRMS.Maui.exe'
 $webViewFolder = 'TinapayanRMS.Maui.exe.WebView2'
 
 # A copy running from the install folder holds its files: closed as its Close button does, so a copy asking about
-# changes not saved stays open rather than losing them. The WPF app is closed too, in case it was put in this folder.
+# changes not saved stays open rather than losing them.
 function Close-InstalledCopy([string]$Name) {
     $path = Join-Path $InstallFolder "$Name.exe"
     $running = @(Get-Process -Name $Name -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $path })
@@ -92,7 +90,6 @@ if ($LASTEXITCODE -ne 0) {
 
 try {
     Close-InstalledCopy 'TinapayanRMS.Maui'
-    Close-InstalledCopy 'TinapayanRMS.UI'
 }
 catch {
     Remove-Item -LiteralPath $published -Recurse -Force -ErrorAction SilentlyContinue
@@ -134,5 +131,3 @@ if (-not $NoDesktopShortcut) {
 Write-Host ''
 Write-Host "Installed in $InstallFolder. Open TinapayanRMS from the Start menu or the Desktop, or run `"$exe`"."
 Write-Host 'If the code brought new migrations, apply them before opening it: dotnet ef database update --project src/TinapayanRMS.Infrastructure'
-Write-Host ''
-& (Join-Path $PSScriptRoot 'Remove-WpfApp.ps1')

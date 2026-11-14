@@ -16,17 +16,17 @@ using RxVoid = ReactiveUI.Primitives.RxVoid;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// What every screen does with its ViewModel, as the WPF Views and their shared controls did: shows its ErrorMessage and
+/// What every screen does with its ViewModel: shows its ErrorMessage and
 /// SuccessMessage as toasts (<see cref="Notices"/>), answers its ConfirmDelete and ConfirmUnsavedChanges with a dialog
-/// (<see cref="Confirmations"/>), runs its load each time the screen is opened (the WPF app's tab activation), and draws
+/// (<see cref="Confirmations"/>), runs its load each time the screen is opened, and draws
 /// itself again whenever the ViewModel, one of its parts (the Products screen's Costing, say), one of their lists or one
 /// of their commands changes. ReactiveInjectableComponentBase injects the ViewModel, the page's own (they're scoped),
 /// and redraws on the ViewModel's property changes; the rest are added here, since a grid's rows or a button's enabled
 /// state change without a property of the ViewModel changing. However many of them change together, the screen is drawn
 /// once for them all (<see cref="RedrawGate"/>).
 /// <para>
-/// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them, as the
-/// WPF ScreenNavigator saw to it: a move to another address (the tab strip, the menu, a link, Back and Forward) asks
+/// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them: a
+/// move to another address (the tab strip, the menu, a link, Back and Forward) asks
 /// about them first, and Cancel stays; closing the window asks the same (<see cref="UnsavedChangesGuard"/>), and
 /// reloading its page has the web view ask.
 /// </para>

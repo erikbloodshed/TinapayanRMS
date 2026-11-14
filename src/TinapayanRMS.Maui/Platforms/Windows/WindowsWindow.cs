@@ -9,13 +9,13 @@ using WinRT.Interop;
 namespace TinapayanRMS.Maui.WinUI;
 
 /// <summary>
-/// The app's window, set up as the WPF main window was: chromeless, with the page's title bar in place of Windows' own
+/// The app's window, set up chromeless, with the page's title bar in place of Windows' own
 /// (<see cref="AppWindowChrome"/>), opening at 1400×800 in the middle of the monitor the mouse is on, and asking about a
 /// form's unsaved changes before it closes (Save, Don't Save or Cancel, as moving away from the form asks).
 /// </summary>
 public static partial class WindowsWindow
 {
-    /// <summary>The WPF main window's size, in device-independent pixels.</summary>
+    /// <summary>The window's size as it opens, in device-independent pixels.</summary>
     private const double OpeningWidth = 1400;
     private const double OpeningHeight = 800;
 
@@ -24,7 +24,7 @@ public static partial class WindowsWindow
         var appWindow = window.AppWindow;
         var hwnd = WindowNative.GetWindowHandle(window);
 
-        // No title bar of Windows': the page draws the title bar, as the WPF app's ChromelessWindow drew it. The border
+        // No title bar of Windows': the page draws the title bar. The border
         // stays, so Windows still resizes the window from every edge and corner and draws its shadow. The Windows App SDK
         // does it by extending the content over a title bar it hides, Minimize, Maximize and Close included, and keeps the
         // window's caption (WS_CAPTION) for snapping and the taskbar; collapsed, that title bar is no height at all. MAUI
@@ -36,7 +36,7 @@ public static partial class WindowsWindow
 
         appWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Collapsed;
 
-        // Windows 11 rounds a window without a caption only when asked, as the WPF window found; Windows 10 has no such
+        // Windows 11 rounds a window without a caption only when asked; Windows 10 has no such
         // attribute and keeps its square corners.
         var round = DwmCornerRound;
         _ = DwmSetWindowAttribute(hwnd, DwmWindowCornerPreference, ref round, sizeof(int));
@@ -91,9 +91,9 @@ public static partial class WindowsWindow
     }
 
     /// <summary>
-    /// In the middle of the work area of the monitor the mouse is on, as the WPF window opened (CenterScreen, with
-    /// StartupCentering), and no larger than it. Moved onto that monitor first, so the window has taken its scale before
-    /// it's sized for it: sized first, a move to a monitor of another scale would scale it again.
+    /// In the middle of the work area of the monitor the mouse is on, and no larger than it. Moved onto that monitor
+    /// first, so the window has taken its scale before it's sized for it: sized first, a move to a monitor of another
+    /// scale would scale it again.
     /// </summary>
     private static void OpenCentred(AppWindow appWindow, nint hwnd)
     {

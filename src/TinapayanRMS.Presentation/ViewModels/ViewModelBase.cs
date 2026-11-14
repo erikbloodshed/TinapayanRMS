@@ -86,12 +86,12 @@ public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
     /// </summary>
     protected bool IsBusyApplying => IsRefreshing || IsRestoring;
 
-    /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The View registers a handler that shows a native MessageBox.</summary>
+    /// <summary>Input: a confirmation message to show the user. Output: true if they confirmed. The screen asks it in a dialog (ScreenBase).</summary>
     public Interaction<string, bool> ConfirmDelete { get; } = new();
 
     /// <summary>
     /// Input: the question about a form's unsaved changes, naming the record. Output: whether to save them, throw them away, or
-    /// stay. The View registers a handler that shows a native MessageBox with Yes, No and Cancel.
+    /// stay. The screen asks it in a dialog of Yes, No and Cancel (ScreenBase).
     /// </summary>
     public Interaction<string, UnsavedChangesAnswer> ConfirmUnsavedChanges { get; } = new();
 

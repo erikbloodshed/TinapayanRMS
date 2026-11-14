@@ -275,7 +275,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         await viewModel.ExportProductCostsCommand.Execute();
 
-        asked.Should().Be(ReportsViewModel.ProductCostSummaryTitle, "the View picks the grid by the title, and the file is named after it");
+        asked.Should().Be(ReportsViewModel.ProductCostSummaryTitle, "the page picks the grid by the title, and the file is named after it");
         viewModel.SuccessMessage.Should().Be(@"Saved Product Cost Summary 2026-10-03.xlsx in C:\Reports.");
         viewModel.ErrorMessage.Should().BeNull();
     });

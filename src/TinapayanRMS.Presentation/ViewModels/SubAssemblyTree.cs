@@ -22,9 +22,9 @@ public closed class SubAssemblyTreeNode : ReactiveObject
 }
 
 /// <summary>
-/// A role's folder in the Sub-Assemblies list, holding the sub-assemblies in that role. The tree finds its rows in
-/// <see cref="Children"/> through a HierarchyPropertyDescriptor for this type alone (SubAssemblyListCard), as the Raw
-/// Materials list does (RawMaterialFolderNode).
+/// A role's folder in the Sub-Assemblies list, holding the sub-assemblies in that role. Its rows are in
+/// <see cref="Children"/>, which the tree (FolderTree) draws under it, as a Raw Materials folder's are
+/// (RawMaterialFolderNode).
 /// </summary>
 public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<SubAssemblyTreeNode>
 {
@@ -93,7 +93,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
 
     private bool _isExpanded;
     /// <summary>
-    /// The folder is open. The tree reads and writes it (its HierarchyPropertyDescriptor's IsExpandedPropertyName), and
+    /// The folder is open. The tree (FolderTree) reads and writes it, and
     /// it's kept here, so a folder stays as it was left through a refresh, or while a search hides it.
     /// </summary>
     public bool IsExpanded

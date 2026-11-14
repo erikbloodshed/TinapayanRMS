@@ -483,7 +483,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.NewProductTag.Should().Be("Goes in Production");
     });
 
-    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
     private static async Task<bool> CanSave(ProductsViewModel viewModel) =>
         await viewModel.SaveCommand.CanExecute.FirstAsync();
 

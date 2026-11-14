@@ -23,8 +23,8 @@ public sealed class SubAssemblyRole
 
     /// <summary>
     /// A section in this role made in a product (new, copied, or Make a Copy) is saved as that product's own
-    /// sub-assembly (SubAssembly.OwnerProductId): edited in its recipe, and not on the Sub-Assemblies screen. Set on the
-    /// Settings dialog's Roles tab; never on the Packaging role. Only a default: in any role, a product can unlink a
+    /// sub-assembly (SubAssembly.OwnerProductId): edited in its recipe, and not on the Sub-Assemblies screen. Set on
+    /// Settings' Roles tab; never on the Packaging role. Only a default: in any role, a product can unlink a
     /// linked section into a copy of its own. It's also the roles a composite product can have sections in (Product.IsComposite),
     /// so it can't be cleared while a composite has one in it. A section added in one starts at a yield of 1, the whole
     /// batch going into one piece (ProductsViewModel.StartingPieceSize).

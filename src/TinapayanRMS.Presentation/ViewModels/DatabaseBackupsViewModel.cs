@@ -52,7 +52,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
     /// <summary>Where the backups are kept, shown so they can be found in File Explorer.</summary>
     public string Folder => _backups.Folder;
 
-    /// <summary>Input: the backups folder, to show. The View opens it in File Explorer.</summary>
+    /// <summary>Input: the backups folder, to show. The page opens it in File Explorer (IFileDialogs.ShowFolder).</summary>
     public Interaction<string, RxVoid> ShowFolder { get; } = new();
 
     /// <summary>Shows the backups folder in File Explorer, making it first if no backup has yet.</summary>
@@ -71,10 +71,10 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
         : _restoring ? "A restore is running, and closing now would cut it short. TinapayanRMS restarts by itself once it's done."
         : $"Settings → Database is still at work ({BusyText.TrimEnd('…')}). Close TinapayanRMS once it's done.";
 
-    /// <summary>Input: the backup's file name, to suggest. Output: where to copy it, or null when cancelled. The View shows a Save dialog.</summary>
+    /// <summary>Input: the backup's file name, to suggest. Output: where to copy it, or null when cancelled. The page shows the Save dialog (IFileDialogs).</summary>
     public Interaction<string, string?> ChooseCopyDestination { get; } = new();
 
-    /// <summary>Output: a backup file to restore, or null when cancelled. The View shows an Open dialog.</summary>
+    /// <summary>Output: a backup file to restore, or null when cancelled. The page shows the Open dialog (IFileDialogs).</summary>
     public Interaction<RxVoid, string?> ChooseBackupFile { get; } = new();
 
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
@@ -99,7 +99,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
     /// <summary>Why the last automatic backup wasn't taken, in amber under the backups folder; null when it was.</summary>
     public string? BackupProblemText => _automatic?.LastBackupProblem;
 
-    /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The View shows a folder dialog.</summary>
+    /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The page shows the folder dialog (IFileDialogs).</summary>
     public Interaction<RxVoid, string?> ChooseCopyFolder { get; } = new();
 
     /// <summary>Picks the second folder each automatic backup is copied to, then copies the newest automatic one there now.</summary>

@@ -22,12 +22,7 @@ public sealed record PurchaseUnitChoice(int Key, string Name, string Abbreviatio
 /// </summary>
 public sealed class BrandPriceRow : ReactiveObject
 {
-    private readonly IBrandPriceRowHost? _host;
-
-    /// <summary>An empty row, for the grid to compare an add row against (controls:GridAddNewRow.DropWhenUntouched).</summary>
-    public BrandPriceRow()
-    {
-    }
+    private readonly IBrandPriceRowHost _host;
 
     /// <summary>A row that follows the screen's units and buffer, even while it's still the grid's add row.</summary>
     public BrandPriceRow(IBrandPriceRowHost host)
@@ -65,7 +60,7 @@ public sealed class BrandPriceRow : ReactiveObject
 
             _unitKey = value;
             this.RaisePropertyChanged();
-            _host?.OnUnitPicked(this);
+            _host.OnUnitPicked(this);
             Refresh();
         }
     }
@@ -94,13 +89,13 @@ public sealed class BrandPriceRow : ReactiveObject
         {
             null => null,
             PurchaseUnitChoice.BaseUnitKey => 1m,
-            { } key => _host?.FindUnit(key) is { BaseUnitsPerUnit: > 0 } unit ? unit.BaseUnitsPerUnit : null,
+            { } key => _host.FindUnit(key) is { BaseUnitsPerUnit: > 0 } unit ? unit.BaseUnitsPerUnit : null,
         };
         set
         {
             if (CanTypeQuantity && value != Quantity)
             {
-                _host!.SetMultiplier(UnitKey!.Value, value ?? 0m);
+                _host.SetMultiplier(UnitKey!.Value, value ?? 0m);
                 this.RaisePropertyChanged();
             }
         }
@@ -111,7 +106,7 @@ public sealed class BrandPriceRow : ReactiveObject
     /// unit whose multiplier is fixed (a kilogram of an ingredient is 1,000 g).
     /// </summary>
     public bool CanTypeQuantity =>
-        UnitKey is { } key && key != PurchaseUnitChoice.BaseUnitKey && _host?.FindUnit(key) is { Id: 0 } && !_host.IsMultiplierFixed(key);
+        UnitKey is { } key && key != PurchaseUnitChoice.BaseUnitKey && _host.FindUnit(key) is { Id: 0 } && !_host.IsMultiplierFixed(key);
 
     /// <summary>
     /// How far the material's buffered cost is over this brand's price, in percent: the buffered cost for one of the row's
@@ -119,7 +114,7 @@ public sealed class BrandPriceRow : ReactiveObject
     /// material has a buffered cost (or a price for Save to work one out from), and until the row has a price and a quantity.
     /// </summary>
     public decimal? BufferPercent =>
-        _host?.BufferedCostPerBaseUnit is { } buffered && Quantity is > 0 && Price is > 0
+        _host.BufferedCostPerBaseUnit is { } buffered && Quantity is > 0 && Price is > 0
             ? RawMaterialRules.CostBufferPercentOf(Price.Value, buffered * Quantity.Value)
             : null;
 

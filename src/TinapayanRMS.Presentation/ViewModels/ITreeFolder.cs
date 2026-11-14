@@ -8,7 +8,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// </summary>
 internal interface ITreeFolder<TNode> : IListFolder
 {
-    /// <summary>Its rows, which the tree finds through a HierarchyPropertyDescriptor for the folder's type.</summary>
+    /// <summary>Its rows, which the tree (FolderTree) draws under it.</summary>
     ObservableCollection<TNode> Children { get; }
 
     /// <summary>Shows how many records it holds, after its title.</summary>

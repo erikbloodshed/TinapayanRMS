@@ -15,7 +15,7 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
 /// <summary>
-/// Coming back to the Raw Materials tab re-runs LoadCommand (MainWindow). It must pick up what other
+/// Coming back to the Raw Materials tab re-runs LoadCommand (ScreenBase). It must pick up what other
 /// tabs changed while keeping the screen as the user left it: the selected row, unsaved form
 /// edits and picker choices. Also covers the one Save that writes a material with its units, price and
 /// BOM, the usage example, the empty form a new material starts with, and how its type decides which of
@@ -1962,8 +1962,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     }
 
     /// <summary>
-    /// Types into the Category picker as ComboBoxAdv's Suggest mode does: the text lands, and a name the picker doesn't
-    /// list (exactly, whatever its case) lets go of the category it held.
+    /// Types into the Category picker: the text lands, and a name the picker doesn't list (exactly, whatever its case)
+    /// clears the category it held, as typing can (CategoryPicker.Begin).
     /// </summary>
     private static void TypeCategory(RawMaterialsViewModel viewModel, string text)
     {
@@ -2044,7 +2044,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await Settle.UntilAsync(viewModel, () => viewModel.Recipe.Lines.Count > 0, () => $"recipe lines={viewModel.Recipe.Lines.Count}");
     }
 
-    /// <summary>Renames a unit of measure's abbreviation the way the Settings dialog would, behind the screen's back.</summary>
+    /// <summary>Renames a unit of measure's abbreviation the way Settings would, behind the screen's back.</summary>
     private async Task RenameAbbreviationAsync(int unitOfMeasureId, string abbreviation)
     {
         await using var dbContext = CreateDbContext();

@@ -17,17 +17,16 @@ using TinapayanRMS.Components.Vim;
 namespace TinapayanRMS.Components;
 
 /// <summary>
-/// The MAUI app's services, as the WPF app's CompositionRoot registered them, except that the ViewModels are scoped. In
-/// Blazor Hybrid a scope is a page the window's web view loads, so a reload (after a restore) builds every screen afresh,
-/// as the WPF app restarted. The repositories and services hold nothing but the context factory, so they stay singletons.
-/// What only the window can do (its file dialogs, its title bar's buttons) the MAUI app adds: IFileDialogs and IAppWindow.
+/// The app's services. The ViewModels are scoped: in Blazor Hybrid a scope is a page the window's web view loads, so a
+/// reload (after a restore) builds every screen afresh. The repositories and services hold nothing but the context
+/// factory, so they're singletons. What only the window can do (its file dialogs, its title bar's buttons) the MAUI app
+/// adds: IFileDialogs and IAppWindow.
 /// </summary>
 public static class ServiceRegistration
 {
     /// <param name="viewStateFile">
     /// The file the screens' conveniences are kept in for the Windows user (the lists' open folders, the Vim keys, the
-    /// reports' columns, the backups' second folder): the MAUI app's own, beside the WPF app's view-state.json, since each
-    /// reads its file once and writes it whole, and two apps sharing one would write over each other's changes.
+    /// reports' columns, the backups' second folder).
     /// </param>
     public static IServiceCollection AddTinapayanRMS(this IServiceCollection services, IConfiguration configuration, string viewStateFile)
     {
@@ -35,7 +34,7 @@ public static class ServiceRegistration
         services.AddSingleton<IProductCloner, ProductCloner>();
         services.AddSingleton<ICostRecalculator, CostRecalculator>();
         // Backups:ToolsFolder, when set, is the folder holding pg_dump and pg_restore; otherwise they're looked for. The
-        // folder is the WPF app's, since it's the same database: either app lists, restores and takes the same backups.
+        // backups' own folder is one every Windows user on the PC shares (DatabaseBackups.DefaultFolder).
         services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
             provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, configuration["Backups:ToolsFolder"]));
         services.AddSingleton<SavedProductReader>();
@@ -79,11 +78,11 @@ public static class ServiceRegistration
             provider.GetRequiredService<IViewStateStore>(), provider.GetRequiredService<VimKeysState>().Set));
 
         // A restore replaces everything every screen holds, so the window starts again (AppStatus.Restored): a forced load
-        // of its page opens a new scope, which builds every ViewModel afresh, as the WPF app restarted.
+        // of its page opens a new scope, which builds every ViewModel afresh.
         services.AddSingleton<AppStatus>();
 
         // The day's automatic backup and its copy to a second folder, checked every hour (StartupTasks). The second folder
-        // and the last problems are kept in the view state, as the WPF app kept them.
+        // and the last problems are kept in the view state.
         services.AddSingleton<AutomaticBackups>();
         services.AddScoped(provider => new DatabaseBackupsViewModel(
             provider.GetRequiredService<IDatabaseBackups>(),

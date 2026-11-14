@@ -17,7 +17,7 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
 /// <summary>
-/// Coming back to the Products tab re-runs LoadCommand (MainWindow). A cost changed on another tab
+/// Coming back to the Products tab re-runs LoadCommand (ScreenBase). A cost changed on another tab
 /// must reach the selected product's recipe rows and cost summary, while the selection and the
 /// costing fields the user was typing into stay as they were. Save writes the whole form at once:
 /// the product's own sub-assemblies (made in the form), the ones it links, and the rest. The Recipe
@@ -740,7 +740,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     });
 
     /// <summary>
-    /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructureCard), and the way it carries is what the
+    /// Add Sub-Assembly is a drop-down of the three ways in (RecipeStructure), and the way it carries is what the
     /// form opens in — the form has no picker of its own any more. Another item picked while the add tab shows changes
     /// that form instead of opening a second one, and the whole add is one undo step.
     /// </summary>
@@ -2100,7 +2100,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.EditingCategory = viewModel.Categories.Single();
 
-        // As ComboBoxAdv's Suggest mode does: a name it doesn't list lets go of its pick.
+        // A name the picker doesn't list can clear its pick as it's typed (CategoryPicker.Begin).
         viewModel.BeginCategoryEdit();
         viewModel.CategorySearchText = "Cakes";
         viewModel.EditingCategory = null;

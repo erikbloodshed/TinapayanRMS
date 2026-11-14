@@ -16,9 +16,9 @@ namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
 /// <summary>
 /// Undo and redo on the Products screen. One step is one finished change, and a step is recorded by bracketing
-/// the change with BeginUndoStep/EndUndoStep — which is exactly what the Controls/ behaviours do around a cell
-/// edit, an added or deleted row, and a field typed and left, so driving the screen that way here exercises the
-/// real path without a WPF control.
+/// the change with BeginUndoStep/EndUndoStep — which is exactly what the fields and line tables (TextField,
+/// NumberField, PickField, LineGrid) do around a cell edit, an added or deleted row, and a field typed and left, so
+/// driving the screen that way here exercises the real path without a page.
 ///
 /// What these are mostly guarding is that a restore puts back state the public setters can't express, and that
 /// it leaves alone the baselines Save compares against: a change undone and a change never made have to come to
@@ -200,8 +200,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     [Test]
     public Task A_step_left_open_across_a_change_of_tab_records_nothing() => UiThread.RunAsync(async () =>
     {
-        // WPF selects a tab as it takes the cursor, before the field it takes it from hears so: the field's step
-        // is still open while the form changes over to the other tab's section, and closes after it.
+        // A field can hear it lost the cursor after the tab that took it is picked: its step is still open while the
+        // form changes over to the other tab's section, and closes after it.
         var (viewModel, _) = await OpenTwoSectionProductAsync(withPackaging: true);
         var recorder = (IUndoRecorder)viewModel;
 
@@ -682,13 +682,13 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         (await CanSave(viewModel)).Should().BeTrue("the 70 g typed into the form isn't in the recipe yet, and Save would write it");
     });
 
-    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the View binds it.</summary>
+    /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
     private static async Task<bool> CanSave(ProductsViewModel viewModel) =>
         await viewModel.SaveCommand.CanExecute.FirstAsync();
 
     // ---- seeding and driving ----
 
-    /// <summary>One finished change, as the Controls/ behaviours bracket a gesture in the app.</summary>
+    /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(ProductsViewModel viewModel, Action change)
     {
         var recorder = (IUndoRecorder)viewModel;

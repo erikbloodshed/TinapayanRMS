@@ -9,7 +9,7 @@
 
 <PageTitle>Price Simulator · TinapayanRMS</PageTitle>
 
-@* The Price Simulator (the WPF PriceSimulatorView): price changes tried without changing a real price, beside the saved
+@* The Price Simulator: price changes tried without changing a real price, beside the saved
    scenarios, above every product now and with them. A material is picked and its change typed in percent, or as its new
    price; the other is worked out. A scenario is the table's changes saved under a name, kept in the database. The
    products table sorts by its headings and filters from the funnel in Product's and Category's; rows picked (Ctrl or
@@ -165,7 +165,7 @@
             interaction.SetOutput(RxVoid.Default);
         }));
 
-        // Export to Excel: the products as shown and the price changes, a sheet each, as the WPF workbook had them.
+        // Export to Excel: the products as shown and the price changes, a sheet each.
         AddSubscription(viewModel.ExportToExcel.RegisterHandler(async interaction =>
         {
             var fileName = $"{interaction.Input} {DateTime.Today:yyyy-MM-dd}.xlsx";

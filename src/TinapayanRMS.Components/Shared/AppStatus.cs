@@ -2,9 +2,9 @@ namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
 /// What the window needs to know about the app as a whole, one for the process. The database missing updates this
-/// version of the app needs (checked at startup, shown as a banner over every screen, as the WPF app said so in a message
-/// box); automatic backups that have stopped working, with the newest one getting old (AutomaticBackups, shown the same
-/// way); and a restore, which replaces what every screen holds, so the window's page loads afresh, as the WPF app restarted.
+/// version of the app needs (checked at startup, shown as a banner over every screen); automatic backups that have
+/// stopped working, with the newest one getting old (AutomaticBackups, shown the same way); and a restore, which
+/// replaces what every screen holds, so the window's page loads afresh.
 /// </summary>
 public sealed class AppStatus
 {

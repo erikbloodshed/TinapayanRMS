@@ -5,7 +5,7 @@ namespace TinapayanRMS.Maui.Services;
 
 /// <summary>
 /// The app's hosted services (StartupTasks: the database's check and the hourly automatic backups), started and stopped
-/// as a web host does, since a MAUI app doesn't run them itself. They run while the window is open, as the WPF app's did.
+/// as a web host does, since a MAUI app doesn't run them itself. They run while the window is open.
 /// </summary>
 public static class BackgroundWork
 {

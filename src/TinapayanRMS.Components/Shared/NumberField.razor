@@ -2,9 +2,9 @@
 @using System.Globalization
 @using System.Text.RegularExpressions
 
-@* A number box bound to a ViewModel's decimal or decimal?, as the WPF forms' DoubleTextBoxes and the grids' NumericColumns
-   were: shown in its Format, selected whole on taking the cursor (so it's typed over), right-aligned, and kept between
-   Min and Max. As TextField, it's never written to while it has the cursor. Each number typed reaches the ViewModel as it's typed (UpdateSourceTrigger=PropertyChanged),
+@* A number box bound to a ViewModel's decimal or decimal?: shown in its Format, selected whole on taking the cursor (so
+   it's typed over), right-aligned, and kept between Min and Max. As TextField, it's never written to while it has the
+   cursor. Each number typed reaches the ViewModel as it's typed,
    so totals and percentages follow it; a box that LandsOnLeave passes its value only once it's left, and keeps Save
    offered from the first key typed until then (IUndoRecorder.IsEditPending), not merely for having the cursor: an undo
    puts the cursor back where it was, and the form it put back read as unsaved. An empty box is null where the value can be, and 0 where it can't.

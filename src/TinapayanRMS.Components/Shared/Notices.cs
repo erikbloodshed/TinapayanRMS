@@ -2,7 +2,7 @@ namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
 /// The open screen's ErrorMessage and SuccessMessage, for <see cref="NoticeHost"/> to show as toasts in the page's
-/// bottom-right corner, as the WPF app's ErrorToast and SuccessToast did. One per page the window loads; the screen that's open passes
+/// bottom-right corner. One per page the window loads; the screen that's open passes
 /// on its ViewModel's messages as they change (<see cref="ScreenBase{TViewModel}"/>). A null message hides its toast:
 /// RunSafelyAsync clears both before every action, so the same error twice still shows twice.
 /// </summary>

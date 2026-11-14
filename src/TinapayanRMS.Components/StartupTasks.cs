@@ -7,9 +7,9 @@ using TinapayanRMS.Components.Shared;
 namespace TinapayanRMS.Components;
 
 /// <summary>
-/// What the app does as it starts, as the WPF app's OnStartup did, once the app is built: a warning when the database
-/// lacks updates this version needs (`dotnet ef database update` applies them), and the day's automatic backup, checked as
-/// the app starts and every hour while it runs, as the WPF app checked, so an app left open for days still takes one a day.
+/// What the app does as it starts, once the app is built: a warning when the database lacks updates this version needs
+/// (`dotnet ef database update` applies them), and the day's automatic backup, checked as the app starts and every hour
+/// while it runs, so an app left open for days still takes one a day.
 /// Neither holds the app up. A backup that fails is logged, and once the newest backup is getting old the window's banner
 /// says so (AutomaticBackups.OverdueWarningAsync), until one is taken.
 /// </summary>

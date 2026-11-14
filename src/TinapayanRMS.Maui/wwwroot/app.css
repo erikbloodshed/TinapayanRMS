@@ -1,4 +1,4 @@
-/* TinapayanRMS, on Syncfusion's Fluent 2 theme recoloured with the WPF app's palette (Catppuccin Latte, Sky accent). */
+/* TinapayanRMS, on Syncfusion's Fluent 2 theme recoloured to the app's palette (Catppuccin Latte, Sky accent). */
 
 :root {
     /* Latte Sky, with its dark ink for text on it: white on Sky is only 2.8:1. */
@@ -57,8 +57,8 @@ html, body {
     height: 100vh;
 }
 
-/* The window's title bar, which the page draws (Layout/TitleBar.razor), as the WPF window's ChromelessWindow drew its
-   own (MainWindow.xaml): 32px in the card colour, the menu toggle and the heading on the left, and on the right glyph
+/* The window's title bar, which the page draws (Layout/TitleBar.razor): 32px in the card colour, the menu toggle and
+   the heading on the left, and on the right glyph
    buttons 40×32, with the theme's faint wash on hover, Close red. Windows drags the rest of the bar (IAppWindow). */
 .app-titlebar {
     display: flex;
@@ -118,7 +118,7 @@ html, body {
     outline-offset: -2px;
 }
 
-/* Find, Back and Forward, at the WPF title bar's 12px. */
+/* Find, Back and Forward, at 12px. */
 .titlebar-small-glyph .glyph {
     font-size: 12px;
 }
@@ -294,7 +294,7 @@ html, body {
     background: var(--card-border);
 }
 
-/* Cards, as the WPF CardStyle: rounded, bordered, on the page's darker background. */
+/* Cards: rounded, bordered, on the page's darker background. */
 
 .card {
     background: var(--card-background);
@@ -731,7 +731,7 @@ input.e-input {
     overflow: auto !important;
 }
 
-/* The toasts, as the WPF ErrorToast and SuccessToast were coloured: a red edge for what went wrong, green for what was done. */
+/* The toasts: a red edge for what went wrong, green for what was done. */
 .e-toast-container .e-toast {
     background: #fff;
     color: var(--heading-foreground);
@@ -759,7 +759,7 @@ input.e-input {
 
 /* ---- The Vim keys (Settings → Keyboard; wwwroot/vim.js). ---- */
 
-/* NORMAL or INSERT, on the title bar before Find, as the WPF window showed it. */
+/* NORMAL or INSERT, on the title bar before Find. */
 .vim-mode {
     margin-right: 6px;
     padding: 2px 10px;

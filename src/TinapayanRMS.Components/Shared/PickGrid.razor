@@ -1,6 +1,6 @@
 @typeparam TItem where TItem : class
 
-@* A list of records to pick one from, as the WPF screens' read-only SfDataGrids were: single row selection, kept in step
+@* A list of records to pick one from: single row selection, kept in step
    with a ViewModel's Selected… property both ways. A pick in the grid sets it; the ViewModel clearing it (New, Save,
    Delete) clears the grid's highlight, and the ViewModel pointing it at a record (after a load, or a refresh) highlights
    that row. Columns must include the item's key with IsPrimaryKey, so a refresh keeps the right row picked. *@

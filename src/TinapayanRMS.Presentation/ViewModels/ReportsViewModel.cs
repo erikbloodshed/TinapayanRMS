@@ -293,7 +293,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// <summary>The raw materials the Raw Materials Price Summary asks to open, by id, which the main window opens on Raw Materials.</summary>
     public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
-    /// <summary>Runs whenever the tab is shown (MainWindow), so both summaries are from current prices.</summary>
+    /// <summary>Runs whenever the screen is opened (ScreenBase), so both summaries are from current prices.</summary>
     public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
 
     /// <summary>The Product Cost Summary to an Excel workbook, as its grid shows it: sorted, filtered and with its shown columns.</summary>

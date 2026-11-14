@@ -3,7 +3,7 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// What the window asks before it closes, as the WPF window did. Closing a window isn't a move to another address, so
+/// What the window asks before it closes. Closing a window isn't a move to another address, so
 /// ScreenBase's own question never sees it. Two things keep it open: work that closing would cut short (<see cref="IBusyWork"/>:
 /// a backup or restore running in Settings → Database), which the window waits for, saying why; and a form's unsaved
 /// changes, asked about as leaving the form asks. ScreenBase keeps its form here while its screen is up. A form whose

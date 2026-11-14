@@ -1,13 +1,13 @@
 # The Reports screen
 
-Part of [PLAN.md](../../PLAN.md). Moved out of the Syncfusion notes (`syncfusion.md`, which described the WPF controls and went with the WPF app on 2026-11-07); what each table shows is the ViewModel's (`ReportsViewModel`) and is as it was, and how it's drawn is the Blazor page's (`Components/Pages/Reports.razor`).
+Part of [PLAN.md](../../PLAN.md). What each table shows is the ViewModel's (`ReportsViewModel`), and how it's drawn is the Blazor page's (`Components/Pages/Reports.razor`).
 
 ## The screen
 
 - **One card holding an `SfTab`**, a tab per table (Product Cost Summary, Raw Materials Price Summary, Cost Buffers, Cost Drivers and Margin Erosion), each a read-only `SfGrid` under a heading, an Export to Excel button and a caption. The tab strip is given no `Height` ([maui-app.md](maui-app.md), "How it's built").
 - **A tab's table is built the first time its tab is shown** (`LoadOn="ContentLoad.Demand"`), then kept while the page is open, with its sort, filters and picks; its layout is put back then. The record screens' tabs are all built as they open (`Init`), for their forms; built that way here, the five tables were each drawn twice a visit, with the last visit's rows and then the new ones. A table shown for the first time takes about a quarter of a second.
 - **Each table sorts by a click on a heading and filters from the funnel in it** (Excel-style filters, `GridFilterSettings Type="Excel"`, on its text columns). Its rows and heading are 24px; Product Cost Summary's headings wrap onto two lines (`AllowTextWrap`), each line 20px.
-- **Each table's filters, sort and columns are as they were left**, for the Windows user: the grid's own state (`GetPersistDataAsync`) is kept in the view state after each sort, filter or column change (`GridLayouts`, under `reports-product-costs-grid` and its like) and put back as the grid is created. The WPF app kept its own layouts under the same names without `-grid`, in another shape, so the two never read each other's.
+- **Each table's filters, sort and columns are as they were left**, for the Windows user: the grid's own state (`GetPersistDataAsync`) is kept in the view state after each sort, filter or column change (`GridLayouts`, under `reports-product-costs-grid` and its like) and put back as the grid is created.
 - **A double-click on a row opens its product or material** on its own screen (`OnRecordDoubleClick`, through `OpenProductCommand` and `OpenRawMaterialCommand`, whose requests `ScreenLinks` turns into the record's address), the screen being left asking about its unsaved changes first.
 - **Product Cost Summary's Columns** opens the grid's own column chooser (`ShowColumnChooser`): every column but Product can be hidden.
 - **Export to Excel saves the table as it's shown**: the grid's own export (`ExportToExcelAsync(asMemoryStream: true)`), so its order, filters and only the columns showing come with it, saved where Windows' Save dialog says (`IFileDialogs`, `ExcelWorkbook`). A file open in Excel is an error notice; the workbook is written to memory first, so that file is left untouched.

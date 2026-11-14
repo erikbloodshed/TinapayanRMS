@@ -3,8 +3,8 @@ using TinapayanRMS.Presentation.ViewModels;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// A question that needs an answer before something that can't be undone, as the WPF app's native message boxes asked
-/// it, answered by <see cref="ConfirmationHost"/>'s dialog: a ViewModel's ConfirmDelete, Yes or No; or its
+/// A question that needs an answer before something that can't be undone, answered by <see cref="ConfirmationHost"/>'s
+/// dialog: a ViewModel's ConfirmDelete, Yes or No; or its
 /// ConfirmUnsavedChanges, Yes, No or Cancel, before a form with unsaved changes is left. One per page the window loads. Asking again
 /// while a question is open answers the open one No, or Cancel.
 /// </summary>

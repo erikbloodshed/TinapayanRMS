@@ -1,4 +1,4 @@
-// The Vim keys (Settings → Keyboard), as the WPF app's VimKeys read them: NORMAL, where letters move and act, and
+// The Vim keys (Settings → Keyboard): NORMAL, where letters move and act, and
 // INSERT, where they type. The keys are read here, in the browser, where the keyboard and the cursor are; the key table
 // (VimKeymap) and the command list (VimCommandLine) come from the server as the keys are turned on, and the server makes
 // the labels for f and runs what's typed after a colon (the VimKeys component). Everything is done the way a hand would:
@@ -360,8 +360,8 @@ window.tinapayanVim = (() => {
         }
     }
 
-    // The next tab along the top (1) or the one before (-1), round from the last to the first, as the WPF app's gt went:
-    // a closed tab is passed over. In Settings, its own tabs: so the strip's Settings tab is passed over too, or the keys
+    // The next tab along the top (1) or the one before (-1), round from the last to the first: a closed tab is passed
+    // over. In Settings, its own tabs: so the strip's Settings tab is passed over too, or the keys
     // that went in couldn't come back out.
     function stepScreen(delta) {
         const settings = [...document.querySelectorAll(".settings-tabs a")];

@@ -25,7 +25,7 @@ public sealed class ProductComponentRow : ReactiveObject
 
     /// <summary>
     /// A row that finds its product, and the product's costs if the screen has read them, as soon as one is picked.
-    /// The grid's add row edits one of these (controls:GridAddNewRow.ItemFactory): until it's committed it isn't in the
+    /// The table's add row edits one of these (LineGrid's NewItem): until it's committed it isn't in the
     /// screen's rows, so the screen can't resolve it.
     /// </summary>
     public ProductComponentRow(Func<int, Product?> findProduct, Func<int, UnitCosts?> findCosts)

@@ -6,7 +6,7 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// What Print puts on paper for a product (Printing/ProductPrintLayout): its recipe and its costing as the Products screen
+/// What Print puts on paper for a product (PrintDocument): its recipe and its costing as the Products screen
 /// shows them, unsaved edits included, taken the moment Print was pressed. Nothing in it is the screen's, so its figures can be
 /// checked without laying out a page.
 /// </summary>

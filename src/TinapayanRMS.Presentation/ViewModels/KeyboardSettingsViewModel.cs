@@ -4,7 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Settings dialog's Keyboard tab: whether the Vim keys are on. Kept for the Windows user on this computer, with the
+/// Settings' Keyboard tab: whether the Vim keys are on. Kept for the Windows user on this computer, with the
 /// lists' open folders (IViewStateStore), not in the database: it's how one person likes to work, not the bakeshop's data.
 /// </summary>
 public sealed class KeyboardSettingsViewModel : ReactiveObject
