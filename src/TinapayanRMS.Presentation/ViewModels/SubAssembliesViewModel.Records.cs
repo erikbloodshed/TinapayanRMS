@@ -64,9 +64,9 @@ public sealed partial class SubAssembliesViewModel
                 EditingRole = Roles.FirstOrDefault(r => r.Id == roleId) ?? (_editingId == 0 && roleId is null ? Roles.FirstOrDefault() : null);
 
                 IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
-                PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
+                PackagingSet.ResolveRows();
                 RecomputeTotals();
-                SetCost = PackagingLines.Sum(l => l.CostPerUnit);
+                PackagingSet.RecomputeCost();
 
                 RepointSelection(Rows.FirstOrDefault(r => r.Id == selectedId));
                 if (_editingId > 0)
@@ -143,15 +143,13 @@ public sealed partial class SubAssembliesViewModel
             Func<CancellationToken, Task<int>> save;
             if (IsPackaging)
             {
-                var setLines = PackagingLineRow.CompleteLines(PackagingLines, "set");
-                if (setLines.Count == 0)
+                var packagingLines = PackagingSet.CurrentLines();
+                if (packagingLines.Count == 0)
                 {
                     ErrorMessage = $"Add the packaging materials that go into {name}, per set.";
                     return;
                 }
 
-                List<(int PackagingMaterialId, int? UnitId, decimal QtyPerUnit)> packagingLines =
-                    [.. setLines.Select(l => (l.PackagingMaterial.Id, l.UnitId, l.QtyPerUnit))];
                 save = cancellationToken => _subAssemblyRepository.SaveStandalonePackagingAsync(subAssembly, packagingLines, cancellationToken);
             }
             else
@@ -225,8 +223,7 @@ public sealed partial class SubAssembliesViewModel
         EditingRole = role ?? Roles.FirstOrDefault();
         SelectedLine = null;
         Lines.Clear();
-        SelectedPackagingLine = null;
-        PackagingLines.Clear();
+        PackagingSet.Clear();
         ShowDependents([], []);
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
@@ -289,7 +286,6 @@ public sealed partial class SubAssembliesViewModel
 
         History.Clear();
         var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        var packagingById = PackagingMaterials.ToDictionary(m => m.Id);
 
         // Not for the same sub-assembly loaded again, as a Save does: the boxes still hold what's its.
         if (row.Id != _editingId)
@@ -304,9 +300,7 @@ public sealed partial class SubAssembliesViewModel
         SelectedLine = null;
         Lines.Clear();
         Lines.AddRange(saved.Select(l => new IngredientLineRow(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
-        SelectedPackagingLine = null;
-        PackagingLines.Clear();
-        PackagingLines.AddRange(savedSet.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));
+        PackagingSet.Show(savedSet);
         ShowDependents(row.GetDependents(), row.GetMadeIngredients());
 
         // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the

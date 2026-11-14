@@ -85,26 +85,8 @@ public sealed partial class SubAssembliesViewModel : ListFormViewModel<SubAssemb
     /// <summary>The packaging materials, for a packaging set's lines.</summary>
     public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
 
-    /// <summary>A packaging set's lines, typed straight into the table: how much of each material one set takes.</summary>
-    public ObservableCollection<PackagingLineRow> PackagingLines { get; } = [];
-
-    /// <summary>The line the packaging table's add row edits: it prices itself as its material is picked.</summary>
-    public Func<PackagingLineRow> NewPackagingLine => () => new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id));
-
-    private PackagingLineRow? _selectedPackagingLine;
-    public PackagingLineRow? SelectedPackagingLine
-    {
-        get => _selectedPackagingLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedPackagingLine, value);
-    }
-
-    private decimal _setCost;
-    /// <summary>What one packaging set costs, at its materials' buffered costs: a linking product's packaging per piece.</summary>
-    public decimal SetCost
-    {
-        get => _setCost;
-        private set => this.RaiseAndSetIfChanged(ref _setCost, value);
-    }
+    /// <summary>A packaging set's lines and what the set costs, the packaging table's (SubAssemblyPackagingSet).</summary>
+    public SubAssemblyPackagingSet PackagingSet { get; }
 
     /// <summary>
     /// The form is a packaging set: its role is the Packaging role, so it takes packaging materials per set instead of
@@ -421,6 +403,7 @@ public sealed partial class SubAssembliesViewModel : ListFormViewModel<SubAssemb
         // nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
         SubAssemblyTree = new SubAssemblyTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey));
         _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
+        PackagingSet = new SubAssemblyPackagingSet(PackagingMaterials);
 
         // The subscriptions, in the order they were made: two following one property run in that order, and several run
         // as they're made (WhenAnyValue gives its current value), so each comes after what it reads.

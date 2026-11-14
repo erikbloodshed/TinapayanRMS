@@ -1,5 +1,4 @@
 ﻿using System.Reactive.Linq;
-using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -14,7 +13,7 @@ public sealed partial class SubAssembliesViewModel
         // button still disabled under the cursor would swallow the very click that enabled it.
         this.Changed.Subscribe(_ => History.RefreshDirty());
         WatchForSave(Lines);
-        WatchForSave(PackagingLines);
+        WatchForSave(PackagingSet.Lines);
     }
 
     protected override SubAssemblyFormSnapshot CaptureSnapshot() => new()
@@ -23,7 +22,7 @@ public sealed partial class SubAssembliesViewModel
         Name = EditingName,
         RoleId = EditingRole?.Id,
         Lines = [.. Lines.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-        PackagingLines = [.. PackagingLines.Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerUnit))],
+        PackagingLines = PackagingSet.Capture(),
         FormulaBase = _formulaBase,
     };
 
@@ -42,7 +41,7 @@ public sealed partial class SubAssembliesViewModel
         ApplyRestore(() => _updates.Batch(() =>
         {
             SelectedLine = null;
-            SelectedPackagingLine = null;
+            PackagingSet.SelectedLine = null;
 
             _editingId = snapshot.EditingId;
             EditingName = snapshot.Name;
@@ -61,25 +60,15 @@ public sealed partial class SubAssembliesViewModel
                     line.AuthoredBakersPercent));
             }
 
-            PackagingLines.Clear();
-            foreach (var line in snapshot.PackagingLines)
-            {
-                // The material goes on first: it brings the units the row can be in, so the unit sticks.
-                PackagingLines.Add(new PackagingLineRow(id => PackagingMaterials.FirstOrDefault(m => m.Id == id))
-                {
-                    PackagingMaterialId = line.PackagingMaterialId,
-                    UnitKey = line.UnitId ?? PackagingUnitChoice.BaseUnitKey,
-                    QtyPerUnit = line.QtyPerUnit,
-                });
-            }
+            PackagingSet.Restore(snapshot.PackagingLines);
         }));
 
         // Once more, in this order, from the form put back: an undo that leaves a table as it was asks for none of these.
         ResolveLines();
-        ResolvePackagingLines();
+        PackagingSet.ResolveRows();
         RecomputeFormulaBase();
         RecomputeTotals();
-        RecomputeSetCost();
+        PackagingSet.RecomputeCost();
     }
 
     protected override string UnsavedChangesName =>

@@ -209,18 +209,18 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.EditingRole = viewModel.Roles.Single(r => r.IsPackaging);
         viewModel.IsPackaging.Should().BeTrue();
         viewModel.EditingName = "Gift Box Set";
-        viewModel.PackagingLines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 2m });
-        viewModel.SetCost.Should().Be(66m, "two boxes at their buffered ₱33");
+        viewModel.PackagingSet.Lines.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 2m });
+        viewModel.PackagingSet.Cost.Should().Be(66m, "two boxes at their buffered ₱33");
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Gift Box Set was saved.");
-        await Settle.UntilAsync(viewModel, () => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PackagingSet.Lines.Count == 1, () => $"packaging lines={viewModel.PackagingSet.Lines.Count}");
         viewModel.IsPackaging.Should().BeTrue();
         viewModel.Lines.Should().BeEmpty();
-        viewModel.PackagingLines.Single().BaseUnitAbbreviation.Should().Be("pc");
-        viewModel.SetCost.Should().Be(66m);
+        viewModel.PackagingSet.Lines.Single().BaseUnitAbbreviation.Should().Be("pc");
+        viewModel.PackagingSet.Cost.Should().Be(66m);
         viewModel.DependentsText.Should().Contain("Add Sub-Assembly");
     });
 
@@ -314,14 +314,14 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.PackagingLines.Count == 1, () => $"packaging lines={viewModel.PackagingLines.Count}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PackagingSet.Lines.Count == 1, () => $"packaging lines={viewModel.PackagingSet.Lines.Count}");
 
         await viewModel.CopyCommand.Execute();
 
         viewModel.IsPackaging.Should().BeTrue();
         viewModel.EditingName.Should().Be("Gift Set Copy");
-        viewModel.PackagingLines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
-        viewModel.SetCost.Should().Be(66m);
+        viewModel.PackagingSet.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
+        viewModel.PackagingSet.Cost.Should().Be(66m);
         viewModel.DependentsText.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
 
         await viewModel.SaveCommand.Execute();

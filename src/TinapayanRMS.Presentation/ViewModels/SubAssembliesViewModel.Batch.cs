@@ -23,12 +23,12 @@ public sealed partial class SubAssembliesViewModel
             .Subscribe(_ => _updates.Run(RecomputeTotals));
 
         // A packaging set's lines price themselves as their material is picked, and the set's cost follows.
-        PackagingLines.ToObservableChangeSet()
+        PackagingSet.Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
-            .Subscribe(_ => _updates.Run(ResolvePackagingLines));
-        PackagingLines.ToObservableChangeSet()
+            .Subscribe(_ => _updates.Run(PackagingSet.ResolveRows));
+        PackagingSet.Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ => _updates.Run(RecomputeSetCost));
+            .Subscribe(_ => _updates.Run(PackagingSet.RecomputeCost));
 
         // The formula's base: what's ticked, and how much of it there is.
         Lines.ToObservableChangeSet()
@@ -52,7 +52,7 @@ public sealed partial class SubAssembliesViewModel
             {
                 if (IsPackaging)
                 {
-                    PackagingLines.Remove(SelectedPackagingLine!);
+                    PackagingSet.Lines.Remove(PackagingSet.SelectedLine!);
                 }
                 else
                 {
@@ -61,7 +61,7 @@ public sealed partial class SubAssembliesViewModel
             }),
             this.WhenAnyValue(
                 x => x.SelectedLine,
-                x => x.SelectedPackagingLine,
+                x => x.PackagingSet.SelectedLine,
                 x => x.IsPackaging,
                 (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
     }
@@ -91,12 +91,6 @@ public sealed partial class SubAssembliesViewModel
 
     /// <summary>An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.</summary>
     private void ResolveLines() => IngredientLineRow.Resolve(Lines, Ingredients.ToDictionary(m => m.Id));
-
-    /// <summary>A packaging set's lines price themselves as their material is picked.</summary>
-    private void ResolvePackagingLines() => PackagingLineRow.Resolve(PackagingLines, PackagingMaterials.ToDictionary(m => m.Id));
-
-    /// <summary>A packaging set's cost follows its lines.</summary>
-    private void RecomputeSetCost() => SetCost = PackagingLines.Sum(l => l.CostPerUnit);
 
     /// <summary>The formula's base, given to every row so each reads its own percentage, and said in the caption.</summary>
     private void RecomputeFormulaBase()

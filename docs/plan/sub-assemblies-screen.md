@@ -52,7 +52,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 - **Picking the Packaging role makes the form a packaging set** (`IsPackaging`, following `EditingRole`).
   - The ingredient table, its percentage caption, Scale and the batch figures give way to a packaging table with the Products Packaging tab's columns (Material, Qty, Unit, Unit Cost and Cost per Set) and a Set Cost figure.
-  - Its rows are the same `PackagingLineRow`s (`PackagingLines`, `NewPackagingLine`), and Save writes them with `SaveStandalonePackagingAsync`. A form loads whichever kind of lines its role says.
+  - Its rows are the same `PackagingLineRow`s, held with the Set Cost by the screen's part for them, `SubAssemblyPackagingSet` (`PackagingSet`: `Lines`, `NewLine`, `SelectedLine`, `Cost`), which shows them as saved, keeps and puts them back for an undo step, and reads them as Save writes them with `SaveStandalonePackagingAsync`; the screen keeps the Remove Line both tables share. A form loads whichever kind of lines its role says.
 - **A product whose packaging links a set takes one whole set per sellable unit.** A saved sub-assembly can't move between a recipe role and the Packaging role.
 - Tests: `PackagingSetPersistenceTests` and a `SubAssembliesViewModelRefreshTests` round trip.
 

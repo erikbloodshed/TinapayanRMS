@@ -38,7 +38,7 @@
                     {
                         <div class="figure-tile tile-flamingo">
                             <div class="figure-label">Set Cost</div>
-                            <div class="figure-value">@ViewModel!.SetCost.ToString("N4")</div>
+                            <div class="figure-value">@ViewModel!.PackagingSet.Cost.ToString("N4")</div>
                         </div>
                         <div class="figure-tile"></div>
                         <div class="figure-tile"></div>
@@ -78,8 +78,8 @@
                                     <h2 class="section-header">Lines</h2>
                                     @if (ViewModel!.IsPackaging)
                                     {
-                                        <PackagingLinesGrid @ref="_packagingLines" Items="ViewModel!.PackagingLines" NewItem="ViewModel!.NewPackagingLine" Materials="ViewModel!.PackagingMaterials"
-                                                            @bind-SelectedItem="ViewModel!.SelectedPackagingLine" CostHeader="Cost per Set" />
+                                        <PackagingLinesGrid @ref="_packagingLines" Items="ViewModel!.PackagingSet.Lines" NewItem="ViewModel!.PackagingSet.NewLine" Materials="ViewModel!.PackagingMaterials"
+                                                            @bind-SelectedItem="ViewModel!.PackagingSet.SelectedLine" CostHeader="Cost per Set" />
                                     }
                                     else
                                     {
