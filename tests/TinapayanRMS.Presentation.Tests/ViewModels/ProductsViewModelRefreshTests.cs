@@ -2210,7 +2210,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     public Task A_new_product_starts_with_the_costing_defaults_and_its_first_Save_keeps_them() => UiThread.RunAsync(async () =>
     {
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
-            new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m },
+            new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m, PriceRoundingStep = 0.25m },
             Cancellation);
         var viewModel = CreateViewModel();
 
@@ -2219,6 +2219,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         (viewModel.Costing.EditingLaborPercent, viewModel.Costing.EditingOverheadPercent, viewModel.Costing.EditingAdministrativePercent, viewModel.Costing.EditingMarginPercent)
             .Should().Be((25m, 10m, 5m, 40m), "the screen opens on a new product");
         viewModel.Costing.Costs.VatPercent.Should().Be(12m, "every product is priced with the shop's VAT");
+        viewModel.Costing.Costs.PriceRoundingStep.Should().Be(0.25m, "and its price rounded up as the shop rounds");
 
         viewModel.EditingName = "Pandesal";
         await viewModel.SaveCommand.Execute();

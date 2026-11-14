@@ -597,16 +597,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
 
-    // The shop-wide Wastage % (Settings → Costing Defaults), as of the last LoadCommand: what a product is priced with unless
-    // its category sets its own (EditingCategory.WastagePercent).
-    private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
-
-    // The shop's VAT (Settings → Costing Defaults), as of the last LoadCommand: what every product is priced with.
-    private decimal _vatPercent;
-
-    /// <summary>What the Costing tab's rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
-    private decimal _priceRoundingStep;
-
     // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
     private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
 

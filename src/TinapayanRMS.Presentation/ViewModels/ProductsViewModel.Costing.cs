@@ -189,14 +189,12 @@ public sealed partial class ProductsViewModel
     private void RefreshCostingDefaults(CostingDefaults defaults)
     {
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
-        Costing.SetDefaults(defaults);
+        var shopFiguresChanged = Costing.SetDefaults(defaults);
         _defaultNewProductStage = defaults.NewProductStage;
-        if (_wastagePercent != defaults.WastagePercent || _vatPercent != defaults.VatPercent || _priceRoundingStep != defaults.PriceRoundingStep)
+        if (shopFiguresChanged)
         {
-            // Every product is priced with it, the one open included: its Costing tab follows at once.
-            _wastagePercent = defaults.WastagePercent;
-            _vatPercent = defaults.VatPercent;
-            _priceRoundingStep = defaults.PriceRoundingStep;
+            // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing
+            // tab follows at once.
             RecomputeCosts();
         }
         if (_editingId == 0 && _newProductInDefaultStage)
@@ -266,13 +264,11 @@ public sealed partial class ProductsViewModel
             QuantityRequired = EditingQuantityRequired,
             PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
             ComponentPackaging = componentPackaging,
-            WastagePercent = EditingCategory?.WastagePercent ?? _wastagePercent,
-            VatPercent = _vatPercent,
-            PriceRoundingStep = _priceRoundingStep,
             CurrentPrice = EditingCurrentPrice,
             IsComposite = IsEditingComposite,
             HasOwnSections = IsEditingComposite && UsageEdits.Count > 0,
-        });
+        },
+        EditingCategory?.WastagePercent);
 
         List<string> belowCost =
         [

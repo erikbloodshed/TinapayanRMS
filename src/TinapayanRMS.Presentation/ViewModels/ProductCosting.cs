@@ -8,12 +8,25 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// The Products screen's Costing tab (CostingCard, through ProductsViewModel.Costing): the costing
 /// percentages as typed, each metric's amount, and the cost summary worked out from them and the recipe. The screen
 /// supplies the recipe's figures and says when (<see cref="Recompute"/>); it also keeps the undo history, which these
-/// percentages are part of. What Save compares against, the costing as loaded, and a new product's defaults are here.
+/// percentages are part of. What Save compares against, the costing as loaded, a new product's defaults, and the shop's
+/// wastage, VAT and price rounding every product is priced with are here.
 /// </summary>
 public sealed class ProductCosting : ReactiveObject
 {
     /// <summary>What a new product's costing starts with (Settings → Costing Defaults), as of the screen's last load.</summary>
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _defaults;
+
+    /// <summary>
+    /// The shop-wide Wastage % (Settings → Costing Defaults), as of the screen's last load: what a product is priced with
+    /// unless its category sets its own.
+    /// </summary>
+    private decimal _wastagePercent = CostingDefaults.DefaultWastagePercent;
+
+    /// <summary>The shop's VAT (Settings → Costing Defaults), as of the screen's last load: what every product is priced with.</summary>
+    private decimal _vatPercent;
+
+    /// <summary>What the rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
+    private decimal _priceRoundingStep;
 
     /// <summary>The costing as loaded, so Save only sends it when it changed.</summary>
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _saved;
@@ -138,17 +151,36 @@ public sealed class ProductCosting : ReactiveObject
     /// </summary>
     public void ApplyDefaults() => Percentages = _defaults;
 
-    /// <summary>Takes up the defaults as the screen's load read them, for the next new product.</summary>
-    public void SetDefaults(CostingDefaults defaults) =>
+    /// <summary>
+    /// Takes up the defaults as the screen's load read them: the percentages for the next new product, and the shop's
+    /// wastage, VAT and price rounding, which every product is priced with. True when those shop figures changed, so the
+    /// product showing is priced again.
+    /// </summary>
+    public bool SetDefaults(CostingDefaults defaults)
+    {
         _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent);
+        if (_wastagePercent == defaults.WastagePercent && _vatPercent == defaults.VatPercent && _priceRoundingStep == defaults.PriceRoundingStep)
+        {
+            return false;
+        }
+
+        _wastagePercent = defaults.WastagePercent;
+        _vatPercent = defaults.VatPercent;
+        _priceRoundingStep = defaults.PriceRoundingStep;
+        return true;
+    }
 
     /// <summary>
-    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now with the
-    /// shop's VAT and wastage, at the percentages as typed here.
+    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now, with
+    /// the shop's VAT and price rounding and <paramref name="categoryWastagePercent"/>, the product's category's own
+    /// wastage, or the shop's when it sets none, at the percentages as typed here.
     /// </summary>
-    public void Recompute(ProductCostInputs recipe) =>
+    public void Recompute(ProductCostInputs recipe, decimal? categoryWastagePercent) =>
         Costs = new ProductCostSummary(recipe with
         {
+            WastagePercent = categoryWastagePercent ?? _wastagePercent,
+            VatPercent = _vatPercent,
+            PriceRoundingStep = _priceRoundingStep,
             LaborPercent = EditingLaborPercent,
             OverheadPercent = EditingOverheadPercent,
             AdministrativePercent = EditingAdministrativePercent,
