@@ -32,21 +32,21 @@
                            Tooltip="@(ViewModel.Packaging.SourceMode == PackagingSourceMode.Copy
                                ? "Its lines become this product's own, in place of the ones here, to change as you like."
                                : "Its lines show here, read-only, in place of the ones here, and follow every change made to the set.")" />
-                <CommandButton Command="ViewModel.CancelPickingPackagingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
+                <CommandButton Command="ViewModel.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
             }
         </div>
         <div class="lines-footer-right">
             <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@ViewModel.CostUnitCaption · @ViewModel.Packaging.LinesCost.ToString("N2")</span>
             @if (!ViewModel.Packaging.IsPickingSource)
             {
-                <CommandButton Command="ViewModel.StartLinkingPackagingCommand" Icon="AppIcon.Link" Label="Link"
+                <CommandButton Command="ViewModel.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
                                Tooltip="Use a packaging set from the Sub-Assemblies screen instead of the lines here. Its lines show read-only, and follow every change made to the set." />
-                <CommandButton Command="ViewModel.StartCopyingPackagingCommand" Icon="AppIcon.Copy" Label="Copy"
+                <CommandButton Command="ViewModel.Packaging.StartCopyingCommand" Icon="AppIcon.Copy" Label="Copy"
                                Tooltip="Copy the lines of a packaging set, or of another product's packaging, in place of the ones here. They're this product's own, to change as you like." />
             }
             @if (ViewModel.Packaging.CanMovePackaging && ViewModel.Packaging.LineEdits.Count > 0)
             {
-                <CommandButton Command="ViewModel.MovePackagingToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
+                <CommandButton Command="ViewModel.Packaging.MoveToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
                                Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
             }
         </div>
@@ -60,9 +60,9 @@
         {
             <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
             <div class="button-row">
-                <CommandButton Command="ViewModel.CopyPackagingCommand" Icon="AppIcon.Copy" Label="Make a Copy"
+                <CommandButton Command="ViewModel.Packaging.MakeCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
                                Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
-                <CommandButton Command="ViewModel.RemovePackagingLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
+                <CommandButton Command="ViewModel.Packaging.RemoveLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
                                Tooltip="Take the link out, and its lines with it, leaving no packaging per piece. The packaging set stays on the Sub-Assemblies screen." />
             </div>
         }
@@ -79,7 +79,7 @@
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                <CommandButton Command="ViewModel.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                <CommandButton Command="ViewModel.Packaging.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
             </div>
         }
     </div>
@@ -100,7 +100,7 @@
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                <CommandButton Command="ViewModel.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                <CommandButton Command="ViewModel.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
             </div>
         </div>
     </div>

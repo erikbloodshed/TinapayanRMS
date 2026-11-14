@@ -13,7 +13,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// Delete-confirmation Interaction the screen answers with a dialog (ConfirmationHost). Introduced in Phase 13 once every screen needed the same things — not before, since
 /// one screen needing them wouldn't have justified a shared base class over ReactiveObject directly.
 /// </summary>
-public abstract class ViewModelBase : ReactiveObject
+public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
 {
     private readonly ILogger _logger;
 
@@ -318,4 +318,17 @@ public abstract class ViewModelBase : ReactiveObject
 
         await RunSafelyAsync(action);
     }
+
+    // What the screen's parts ask of it (IScreenPartHost): its own runners and messages, as its own actions use them.
+    BackgroundWork IScreenPartHost.Work => Work;
+
+    Task IScreenPartHost.RunSafelyAsync(Func<Task> action) => RunSafelyAsync(action);
+
+    void IScreenPartHost.LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load);
+
+    void IScreenPartHost.ShowError(string? message) => ErrorMessage = message;
+
+    void IScreenPartHost.ShowSuccess(string? message) => SuccessMessage = message;
+
+    void IScreenPartHost.ShowFailure(Exception exception, string? context) => ShowFailure(exception, context);
 }

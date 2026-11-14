@@ -41,9 +41,15 @@ public class ScreenBaseTests
         public BehaviorSubject<bool> CanSave { get; } = new(false);
 
         public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+
+        /// <summary>A part, as a tab's is, with a command of its own.</summary>
+        public TestScreenPart Part { get; } = new();
     }
 
-    /// <summary>A screen that shows its ViewModel's name, rows, table and whether Save can run, and counts its drawings.</summary>
+    /// <summary>
+    /// A screen that shows its ViewModel's name, rows, table and whether Save can run, and whether its part's command can,
+    /// and counts its drawings.
+    /// </summary>
     private sealed class LinesScreen : ScreenBase<Lines>
     {
         public int Drawings { get; private set; }
@@ -60,6 +66,9 @@ public class ScreenBaseTests
             builder.CloseElement();
             builder.OpenElement(2, "span");
             builder.AddContent(3, string.Join(",", ViewModel.Table));
+            builder.CloseElement();
+            builder.OpenElement(4, "em");
+            builder.AddContent(5, CanRun(ViewModel.Part.RemoveCommand));
             builder.CloseElement();
         }
     }
@@ -168,6 +177,19 @@ public class ScreenBaseTests
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|True"));
     }
 
+    // A part's commands are its own (the Products screen's Packaging tab's Remove Line, say), so the screen watches them
+    // as it watches its ViewModel's: a button bound to one goes on and off with nothing on the ViewModel itself changing.
+    [Test]
+    public async Task A_command_of_a_part_becoming_able_to_run_redraws_the_screen()
+    {
+        await using var context = AppServices.NewContext();
+        var (screen, viewModel) = Render(context);
+
+        await screen.InvokeAsync(() => viewModel.Part.CanRemove.OnNext(true));
+
+        screen.WaitForAssertion(() => screen.Find("em").TextContent.Should().Be("True"));
+    }
+
     [Test]
     public async Task A_change_from_another_thread_redraws_the_screen()
     {
@@ -222,6 +244,7 @@ public class ScreenBaseTests
             viewModel.Rows.Add(1);
             viewModel.Table.ReplaceWith([1]);
             viewModel.CanSave.OnNext(true);
+            viewModel.Part.CanRemove.OnNext(true);
         });
 
         left.IsCollected().Should().BeTrue("the ViewModel outlives every visit to its screen, and must hold on to none of them");

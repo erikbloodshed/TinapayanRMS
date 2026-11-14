@@ -230,7 +230,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().Contain("Cake Box");
         viewModel.Packaging.SelectedLineEdit = halfLine;
-        await viewModel.RemoveLineCommand.Execute();
+        await viewModel.Packaging.RemoveLineCommand.Execute();
 
         await viewModel.SaveCommand.Execute();
 

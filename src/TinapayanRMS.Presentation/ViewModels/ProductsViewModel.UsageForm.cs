@@ -32,11 +32,10 @@ public sealed partial class ProductsViewModel
             });
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
-        // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
+        // screen's costs, buffered or not; the add rows' factories see to a row still being typed. The Packaging tab prices
+        // its own rows.
         UsageForm.FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
         UsageForm.FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        Packaging.LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        Packaging.BulkEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
 
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         UsageForm.FormLines.ToObservableChangeSet()
@@ -638,7 +637,7 @@ public sealed partial class ProductsViewModel
     /// <summary>A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.</summary>
     private void PackagingLinesEdited()
     {
-        PackagingLineRow.Resolve(Packaging.AllLineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        Packaging.ResolveRows();
         Packaging.RaiseCostsChanged();
         RecomputeCosts();
     }

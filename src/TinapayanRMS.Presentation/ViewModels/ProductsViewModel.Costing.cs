@@ -234,11 +234,7 @@ public sealed partial class ProductsViewModel
             row.CostBasis = CostBasis;
         }
 
-        foreach (var row in Packaging.AllLineEdits)
-        {
-            row.CostBasis = CostBasis;
-        }
-
+        Packaging.Reprice();
         ComponentsTable.Reprice();
 
         RecomputeCosts();

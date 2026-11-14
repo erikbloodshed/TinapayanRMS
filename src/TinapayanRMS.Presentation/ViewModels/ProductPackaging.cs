@@ -1,11 +1,14 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using DynamicData;
+using DynamicData.Binding;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -17,17 +20,43 @@ public enum PackagingSourceMode
 }
 
 /// <summary>
+/// What the Packaging tab (<see cref="ProductPackaging"/>) asks of the Products screen, besides its runners, messages and
+/// undo steps: the screen's cost basis and packaging materials, which its rows are priced at and from, the other products,
+/// whose packaging Copy offers, and the product's costs worked out again. The screen implements it explicitly, as Raw
+/// Materials does IBrandPriceRowHost.
+/// </summary>
+public interface IProductPackagingHost : IScreenPartHost, IUndoRecorder
+{
+    /// <summary>Which of the materials' costs the screen shows, buffered or not: what a row is priced at.</summary>
+    CostBasis CostBasis { get; }
+
+    /// <summary>The packaging materials as the screen last loaded them, which a row prices itself from.</summary>
+    IReadOnlyList<RawMaterial> PackagingMaterials { get; }
+
+    /// <summary>Every product but the one showing, whose packaging Copy offers.</summary>
+    IEnumerable<Product> OtherProducts { get; }
+
+    /// <summary>The product's costs worked out again, after a change to the packaging made in one go.</summary>
+    void RecomputeCosts();
+}
+
+/// <summary>
 /// The Products screen's Packaging tab, always the Recipe Structure's last (PackagingSection, through
 /// ProductsViewModel.Packaging): the per-piece packaging lines, typed straight into its table, or what they link (a set
 /// on the Sub-Assemblies screen, or another product's packaging), the picker its Link and Copy open, its bulk packaging
 /// (a box several units share, with how many it holds), a Move to Sub-Assemblies waiting for Save, and what was last
-/// loaded, which Save compares against. The screen keeps the undo history these are part of, and the commands that
-/// change them as undo steps.
+/// loaded, which Save compares against. Its commands are its own, each change one undo step of the screen's form
+/// (<see cref="IProductPackagingHost"/>); the screen keeps the undo history, the costs these lines add to, and Save.
 /// </summary>
-/// <param name="findPackagingMaterial">A packaging material as the screen last loaded it, for a row that prices itself.</param>
-/// <param name="costBasis">The screen's cost basis, buffered or not, which a new row is priced at.</param>
-public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMaterial, Func<CostBasis> costBasis) : ReactiveObject
+public sealed class ProductPackaging : ReactiveObject
 {
+    private readonly IProductPackagingHost _host;
+    private readonly ISubAssemblyRepository _subAssemblyRepository;
+    private readonly IPackagingLineRepository _packagingLineRepository;
+
+    /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for Link and Copy.</summary>
+    private IReadOnlyList<SubAssembly> _packagingSets = [];
+
     /// <summary>The key of the link last loaded or saved, or null for none: Save writes the link only when it differs.</summary>
     private int? _savedLinkKey;
 
@@ -40,11 +69,113 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     /// <summary>How many products a bulk pack held as last loaded.</summary>
     private int? _savedBulkQuantity;
 
+    /// <param name="host">The Products screen: its cost basis and materials, its runners and messages, and its undo steps.</param>
+    public ProductPackaging(IProductPackagingHost host, ISubAssemblyRepository subAssemblyRepository, IPackagingLineRepository packagingLineRepository)
+    {
+        _host = host;
+        _subAssemblyRepository = subAssemblyRepository;
+        _packagingLineRepository = packagingLineRepository;
+
+        // Every row put in a table, however it got there (a product read, an undo, a link or copy), is priced at the
+        // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
+        LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe();
+        BulkEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe();
+
+        // The linked packaging's lines, as they show, become the product's own; Save drops the link and writes them.
+        MakeCopyCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => ShowLink(null)),
+            this.WhenAnyValue(p => p.IsPackagingLinked));
+
+        // The link and the lines it shows go, leaving none for each piece; Save drops the link. The bulk packaging stays.
+        RemoveLinkCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() =>
+            {
+                SelectedLineEdit = null;
+                LineEdits.Clear();
+                ShowLink(null);
+                host.RecomputeCosts();
+            }),
+            this.WhenAnyValue(p => p.IsPackagingLinked));
+
+        // Link and Copy open the picker; picking in it does the rest (ApplySourceAsync). Opening or closing it changes
+        // nothing Save writes, so neither is an undo step.
+        StartLinkingCommand = ReactiveCommand.Create(StartLinking);
+        StartCopyingCommand = ReactiveCommand.Create(StartCopying);
+        CancelPickingCommand = ReactiveCommand.Create(EndPickingSource);
+        host.LoadLatest(
+            this.WhenAnyValue(p => p.PickedSource).Where(source => source is not null && IsPickingSource).Select(source => source!),
+            ApplySourceAsync);
+
+        // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links.
+        // They're typed straight into the tab rather than through a form, so they're checked now instead: a line half
+        // filled in, or none at all, is refused with the message, as a recipe section's form a rule refuses is. They're
+        // still typed into until Save.
+        MoveToSubAssembliesCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() =>
+            {
+                host.ShowError(null);
+                int lineCount;
+                try
+                {
+                    lineCount = CurrentLines().Count;
+                }
+                catch (BusinessRuleException ex)
+                {
+                    host.ShowError(ex.Message);
+                    return;
+                }
+
+                if (lineCount == 0)
+                {
+                    host.ShowError("Add the packaging materials one piece takes first: a packaging set needs at least one.");
+                    return;
+                }
+
+                IsPackagingMoving = true;
+            }),
+            this.WhenAnyValue(p => p.CanMovePackaging));
+
+        RemoveLineCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => LineEdits.Remove(SelectedLineEdit!)),
+            this.WhenAnyValue(p => p.SelectedLineEdit, p => p.IsPackagingLinked, (line, linked) => line is not null && !linked));
+
+        RemoveBulkLineCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => BulkEdits.Remove(SelectedBulkEdit!)),
+            this.WhenAnyValue(p => p.SelectedBulkEdit).Select(line => line is not null));
+    }
+
+    /// <summary>Make a Copy on linked packaging: the lines it shows become the product's own, and the link goes with Save.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> MakeCopyCommand { get; }
+
+    /// <summary>Remove Link on linked packaging: the link and the lines it shows go, leaving no packaging per piece.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveLinkCommand { get; }
+
+    /// <summary>Link: a picker of the packaging sets, the one picked linked in place of the packaging per piece.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartLinkingCommand { get; }
+
+    /// <summary>Copy: a picker of the packaging sets and the other products, the one picked's lines copied in as this product's own.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartCopyingCommand { get; }
+
+    /// <summary>Closes Link's or Copy's picker with nothing picked.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CancelPickingCommand { get; }
+
+    /// <summary>
+    /// Move to Sub-Assemblies, while the lines are the product's own: Save puts them on the Sub-Assemblies screen as a
+    /// packaging set named after the product, and links it (PackagingLinkDraft.NewSet). Make a Copy the other way round.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> MoveToSubAssembliesCommand { get; }
+
+    /// <summary>Removes the line picked in the packaging per piece's table, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+
+    /// <summary>Removes the line picked in the Bulk Packaging table, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveBulkLineCommand { get; }
+
     /// <summary>The packaging lines, typed straight into the Packaging tab's table.</summary>
     public ObservableCollection<PackagingLineRow> LineEdits { get; } = [];
 
     /// <summary>The line the packaging table's add row edits: it offers its material's units and prices itself before it's committed.</summary>
-    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(findPackagingMaterial) { CostBasis = costBasis() };
+    public Func<PackagingLineRow> NewLineEdit => () => new PackagingLineRow(FindMaterial) { CostBasis = _host.CostBasis };
 
     private PackagingLineRow? _selectedLineEdit;
     public PackagingLineRow? SelectedLineEdit
@@ -61,7 +192,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     public ObservableCollection<PackagingLineRow> BulkEdits { get; } = [];
 
     /// <summary>The line the Bulk Packaging table's add row edits, as <see cref="NewLineEdit"/> is for the lines.</summary>
-    public Func<PackagingLineRow> NewBulkEdit => () => new PackagingLineRow(findPackagingMaterial) { CostBasis = costBasis() };
+    public Func<PackagingLineRow> NewBulkEdit => () => new PackagingLineRow(FindMaterial) { CostBasis = _host.CostBasis };
 
     private PackagingLineRow? _selectedBulkEdit;
     public PackagingLineRow? SelectedBulkEdit
@@ -114,6 +245,24 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
 
     /// <summary>Every row the Packaging tab shows, its lines and then its bulk lines: what the screen prices and resolves.</summary>
     public IEnumerable<PackagingLineRow> AllLineEdits => LineEdits.Concat(BulkEdits);
+
+    /// <summary>Every row pointed at its material as the screen last loaded it, at its refreshed cost and units, in place.</summary>
+    public void ResolveRows() => PackagingLineRow.Resolve(AllLineEdits, _host.PackagingMaterials.ToDictionary(m => m.Id));
+
+    /// <summary>Every row priced at the screen's cost basis again: Unbuffered or Buffered was pressed.</summary>
+    public void Reprice()
+    {
+        foreach (var row in AllLineEdits)
+        {
+            row.CostBasis = _host.CostBasis;
+        }
+    }
+
+    /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
+    private RawMaterial? FindMaterial(int id) => _host.PackagingMaterials.FirstOrDefault(m => m.Id == id);
+
+    /// <summary>The packaging sets as LoadCommand read them: what Link offers, and Copy before the other products.</summary>
+    public void TakePackagingSets(IReadOnlyList<SubAssembly> packagingSets) => _packagingSets = packagingSets;
 
     /// <summary>
     /// What the per-piece packaging links as the form stands, saved or not (the Packaging tab's Link sets it, and its Make a
@@ -183,7 +332,7 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
     public ObservableCollection<LinkableSubAssemblyOption> SourceOptions { get; } = [];
 
     private LinkableSubAssemblyOption? _pickedSource;
-    /// <summary>The packaging picked to link or copy: its lines load, and then fill the table (the screen's ApplyPackagingSourceAsync).</summary>
+    /// <summary>The packaging picked to link or copy: its lines load, and then fill the table (ApplySourceAsync).</summary>
     public LinkableSubAssemblyOption? PickedSource
     {
         get => _pickedSource;
@@ -205,6 +354,79 @@ public sealed class ProductPackaging(Func<int, RawMaterial?> findPackagingMateri
         SourceMode = null;
         PickedSource = null;
         SourceOptions.Clear();
+    }
+
+    /// <summary>
+    /// Link: the picker offers the Sub-Assemblies screen's packaging sets, less the one linked now. With none, it says how
+    /// to make one. Another product's packaging is only copied, never linked.
+    /// </summary>
+    private void StartLinking()
+    {
+        var linkedKey = LinkTarget?.Key;
+        List<LinkableSubAssemblyOption> options = [.. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)).Where(o => o.Key != linkedKey)];
+        if (options.Count == 0)
+        {
+            _host.ShowError(_packagingSets.Count == 0
+                ? "There's no packaging set to link yet. Make one on the Sub-Assemblies screen, or type the lines here and press Move to Sub-Assemblies."
+                : "This product links the only packaging set there is.");
+            return;
+        }
+
+        _host.ShowError(null);
+        StartPickingSource(PackagingSourceMode.Link, options);
+    }
+
+    /// <summary>Copy: the picker offers the packaging sets, then every other product's packaging.</summary>
+    private void StartCopying()
+    {
+        _host.ShowError(null);
+        StartPickingSource(
+            PackagingSourceMode.Copy,
+            [
+                .. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
+                .. _host.OtherProducts.Select(p => new LinkableSubAssemblyOption(p)),
+            ]);
+    }
+
+    /// <summary>
+    /// The packaging picked, once its lines are in: a set's lines, or another product's packaging as it shows (through any
+    /// link of its own). Linked, they show read-only and follow the set; copied, they're this product's own to type into.
+    /// Either takes the place of the packaging per piece there was, as one undo step, and Save writes it; the bulk packaging
+    /// stays. Packaging with no lines is refused, and the picker stays open for another.
+    /// </summary>
+    private async Task ApplySourceAsync(LinkableSubAssemblyOption source, CancellationToken cancellationToken)
+    {
+        var target = source.PackagingTarget!;
+        IReadOnlyList<PackagingLineRow> rows = target switch
+        {
+            PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
+                .Select(l => new PackagingLineRow(FindMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
+            PackagingLinkTarget.OtherProduct(var productId, _) =>
+                [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
+        };
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The picker moved on while the lines loaded (cancelled, another pick, or another product): they're stale.
+        if (!ReferenceEquals(PickedSource, source))
+        {
+            return;
+        }
+
+        var linking = SourceMode == PackagingSourceMode.Link;
+        if (rows.Count == 0)
+        {
+            _host.ShowError($"{target.Name} has no packaging for each piece to {(linking ? "link" : "copy")}. Pick another.");
+            return;
+        }
+
+        _host.ShowError(null);
+        _host.AsUndoStep(() =>
+        {
+            EndPickingSource();
+            ShowLines(rows);
+            ShowLink(linking ? target : null);
+            _host.RecomputeCosts();
+        });
     }
 
     private string _packagingLinkedToText = string.Empty;

@@ -58,14 +58,11 @@ public sealed partial class ProductsViewModel
             .Subscribe(RecipeTabPicked);
     }
 
-    /// <summary>The recipe's commands: its sections', a composite's products' and its packaging's.</summary>
+    /// <summary>The recipe's commands: its sections' and a composite's products'. The packaging's are the Packaging tab's own.</summary>
     [MemberNotNull(
         nameof(RemoveComponentCommand), nameof(OpenSubAssemblyCommand), nameof(OpenLinkedSourceCommand),
         nameof(AddUsageCommand), nameof(EditUsageCommand), nameof(MakeCopyCommand), nameof(UnlinkCommand),
-        nameof(MoveToSubAssembliesCommand), nameof(MoveToInHouseCommand), nameof(RemoveUsageCommand),
-        nameof(CopyPackagingCommand), nameof(MovePackagingToSubAssembliesCommand), nameof(RemoveLineCommand),
-        nameof(RemoveBulkLineCommand), nameof(StartLinkingPackagingCommand), nameof(StartCopyingPackagingCommand),
-        nameof(CancelPickingPackagingCommand), nameof(RemovePackagingLinkCommand))]
+        nameof(MoveToSubAssembliesCommand), nameof(MoveToInHouseCommand), nameof(RemoveUsageCommand))]
     private void WireRecipeCommands()
     {
         RemoveComponentCommand = ReactiveCommand.Create(
@@ -190,69 +187,14 @@ public sealed partial class ProductsViewModel
                 });
             }),
             this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab));
-
-        // The linked packaging's lines, as they show, become the product's own; Save drops the link and writes them.
-        CopyPackagingCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => Packaging.ShowLink(null)),
-            Packaging.WhenAnyValue(p => p.IsPackagingLinked));
-
-        // The link and the lines it shows go, leaving none for each piece; Save drops the link. The bulk packaging stays.
-        RemovePackagingLinkCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() =>
-            {
-                Packaging.SelectedLineEdit = null;
-                Packaging.LineEdits.Clear();
-                Packaging.ShowLink(null);
-                RecomputeCosts();
-            }),
-            Packaging.WhenAnyValue(p => p.IsPackagingLinked));
-
-        // Link and Copy open the Packaging tab's picker; picking in it does the rest (ApplyPackagingSourceAsync). Opening
-        // or closing it changes nothing Save writes, so neither is an undo step.
-        StartLinkingPackagingCommand = ReactiveCommand.Create(StartLinkingPackaging);
-        StartCopyingPackagingCommand = ReactiveCommand.Create(StartCopyingPackaging);
-        CancelPickingPackagingCommand = ReactiveCommand.Create(Packaging.EndPickingSource);
-        LoadLatest(
-            Packaging.WhenAnyValue(p => p.PickedSource).Where(source => source is not null && Packaging.IsPickingSource).Select(source => source!),
-            ApplyPackagingSourceAsync);
-
-        // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links.
-        // They're typed straight into the tab rather than through a form, so they're checked now instead: a line half
-        // filled in, or none at all, is refused with the message, as a recipe section's form a rule refuses is. They're
-        // still typed into until Save.
-        MovePackagingToSubAssembliesCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() =>
-            {
-                ErrorMessage = null;
-                int lineCount;
-                try
-                {
-                    lineCount = Packaging.CurrentLines().Count;
-                }
-                catch (BusinessRuleException ex)
-                {
-                    ErrorMessage = ex.Message;
-                    return;
-                }
-
-                if (lineCount == 0)
-                {
-                    ErrorMessage = "Add the packaging materials one piece takes first: a packaging set needs at least one.";
-                    return;
-                }
-
-                Packaging.IsPackagingMoving = true;
-            }),
-            Packaging.WhenAnyValue(p => p.CanMovePackaging));
-
-        RemoveLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => Packaging.LineEdits.Remove(Packaging.SelectedLineEdit!)),
-            Packaging.WhenAnyValue(p => p.SelectedLineEdit, p => p.IsPackagingLinked, (line, linked) => line is not null && !linked));
-
-        RemoveBulkLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => Packaging.BulkEdits.Remove(Packaging.SelectedBulkEdit!)),
-            Packaging.WhenAnyValue(p => p.SelectedBulkEdit).Select(line => line is not null));
     }
+
+    // What the Packaging tab asks of the screen (IProductPackagingHost); its cost basis is the screen's own CostBasis.
+    IReadOnlyList<RawMaterial> IProductPackagingHost.PackagingMaterials => PackagingMaterials;
+
+    IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
+
+    void IProductPackagingHost.RecomputeCosts() => RecomputeCosts();
 
     /// <summary>
     /// A linked section as a new one whose lines the form edits, at the same role and piece size (Make a Copy, Unlink):
@@ -312,79 +254,6 @@ public sealed partial class ProductsViewModel
 
     /// <summary>What the Products table's product cell offers, for the product showing (a new one can hold any).</summary>
     private void RefreshComponentOptions() => ComponentsTable.RefreshOptions(_detailProductId ?? 0, Products);
-
-    /// <summary>
-    /// Link on the Packaging tab: the picker offers the Sub-Assemblies screen's packaging sets, less the one linked now.
-    /// With none, it says how to make one. Another product's packaging is only copied, never linked.
-    /// </summary>
-    private void StartLinkingPackaging()
-    {
-        var linkedKey = Packaging.LinkTarget?.Key;
-        List<LinkableSubAssemblyOption> options = [.. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)).Where(o => o.Key != linkedKey)];
-        if (options.Count == 0)
-        {
-            ErrorMessage = _packagingSets.Count == 0
-                ? "There's no packaging set to link yet. Make one on the Sub-Assemblies screen, or type the lines here and press Move to Sub-Assemblies."
-                : "This product links the only packaging set there is.";
-            return;
-        }
-
-        ErrorMessage = null;
-        Packaging.StartPickingSource(PackagingSourceMode.Link, options);
-    }
-
-    /// <summary>Copy on the Packaging tab: the picker offers the packaging sets, then every other product's packaging.</summary>
-    private void StartCopyingPackaging()
-    {
-        ErrorMessage = null;
-        Packaging.StartPickingSource(
-            PackagingSourceMode.Copy,
-            [
-                .. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)),
-                .. Products.Where(p => p.Id != _detailProductId).Select(p => new LinkableSubAssemblyOption(p)),
-            ]);
-    }
-
-    /// <summary>
-    /// The packaging picked on the Packaging tab, once its lines are in: a set's lines, or another product's packaging as
-    /// it shows (through any link of its own). Linked, they show read-only and follow the set; copied, they're this
-    /// product's own to type into. Either takes the place of the packaging per piece there was, as one undo step, and Save
-    /// writes it; the bulk packaging stays. Packaging with no lines is refused, and the picker stays open for another.
-    /// </summary>
-    private async Task ApplyPackagingSourceAsync(LinkableSubAssemblyOption source, CancellationToken cancellationToken)
-    {
-        var target = source.PackagingTarget!;
-        IReadOnlyList<PackagingLineRow> rows = target switch
-        {
-            PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
-                .Select(l => new PackagingLineRow(FindPackagingMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
-            PackagingLinkTarget.OtherProduct(var productId, _) =>
-                [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
-        };
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // The picker moved on while the lines loaded (cancelled, another pick, or another product): they're stale.
-        if (!ReferenceEquals(Packaging.PickedSource, source))
-        {
-            return;
-        }
-
-        var linking = Packaging.SourceMode == PackagingSourceMode.Link;
-        if (rows.Count == 0)
-        {
-            ErrorMessage = $"{target.Name} has no packaging for each piece to {(linking ? "link" : "copy")}. Pick another.";
-            return;
-        }
-
-        ErrorMessage = null;
-        AsUndoStep(() =>
-        {
-            Packaging.EndPickingSource();
-            Packaging.ShowLines(rows);
-            Packaging.ShowLink(linking ? target : null);
-            RecomputeCosts();
-        });
-    }
 
     /// <summary>The saved usages as sections, in recipe order; they're also what Save compares the recipe against.</summary>
     private void ReplaceUsages(
@@ -786,7 +655,7 @@ public sealed partial class ProductsViewModel
         }
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
-        PackagingLineRow.Resolve(Packaging.AllLineEdits, PackagingMaterials.ToDictionary(m => m.Id));
+        Packaging.ResolveRows();
     }
 
     /// <summary>

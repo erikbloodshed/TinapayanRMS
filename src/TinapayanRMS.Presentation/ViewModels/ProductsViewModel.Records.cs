@@ -151,7 +151,7 @@ public sealed partial class ProductsViewModel
                 RefreshProductTree();
                 _markupChecks.OnNext(products);
                 _linkable = linkable;
-                _packagingSets = packagingSets;
+                Packaging.TakePackagingSets(packagingSets);
                 RefreshCostingDefaults(costingDefaults);
 
                 // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.

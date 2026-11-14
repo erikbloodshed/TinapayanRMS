@@ -21,7 +21,8 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
-public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen
+public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen,
+    IProductPackagingHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -296,10 +297,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
 
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
-
-    /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for the Packaging tab's Link and Copy.</summary>
-    private List<SubAssembly> _packagingSets = [];
-
 
     private string _searchText = string.Empty;
     public string SearchText
@@ -842,32 +839,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; private set; }
 
     public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; private set; }
-    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; private set; }
-
-    /// <summary>Removes the line picked in the Packaging tab's Bulk Packaging table, as one undo step.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveBulkLineCommand { get; private set; }
-
-    /// <summary>Make a Copy on a linked Packaging tab: the lines it shows become the product's own, and the link goes with Save.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CopyPackagingCommand { get; private set; }
-
-    /// <summary>Link on the Packaging tab: a picker of the packaging sets, the one picked linked in place of the packaging per piece.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> StartLinkingPackagingCommand { get; private set; }
-
-    /// <summary>Copy on the Packaging tab: a picker of the packaging sets and the other products, the one picked's lines copied in as this product's own.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> StartCopyingPackagingCommand { get; private set; }
-
-    /// <summary>Closes the Packaging tab's Link or Copy picker with nothing picked.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CancelPickingPackagingCommand { get; private set; }
-
-    /// <summary>Remove Link on a linked Packaging tab: the link and the lines it shows go, leaving no packaging per piece.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemovePackagingLinkCommand { get; private set; }
-
-    /// <summary>
-    /// Move to Sub-Assemblies on the Packaging tab, while its lines are the product's own: Save puts them on the
-    /// Sub-Assemblies screen as a packaging set named after the product, and links it (PackagingLinkDraft.NewSet). Make a
-    /// Copy the other way round.
-    /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> MovePackagingToSubAssembliesCommand { get; private set; }
     public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; private set; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
@@ -927,7 +898,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository, unitOfWork);
-        Packaging = new ProductPackaging(FindPackagingMaterial, () => CostBasis);
+        Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
         UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), () => CostBasis);
         ComponentsTable = new ProductComponents(
             _savedProducts,

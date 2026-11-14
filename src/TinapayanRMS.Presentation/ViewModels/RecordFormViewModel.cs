@@ -106,18 +106,7 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
     }
 
     /// <summary>Records <paramref name="change"/> as one undo step, for a command that makes its change in one go.</summary>
-    protected void AsUndoStep(Action change)
-    {
-        History.Begin();
-        try
-        {
-            change();
-        }
-        finally
-        {
-            History.End();
-        }
-    }
+    protected void AsUndoStep(Action change) => ((IUndoRecorder)this).AsUndoStep(change);
 
     /// <summary>Settles whatever step is open, then puts the form back one step. False when there was nothing to undo.</summary>
     public bool TryUndo()
