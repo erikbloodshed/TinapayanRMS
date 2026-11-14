@@ -1,34 +1,42 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSectionView, through
-/// ProductsViewModel.ComponentsTable): its lines, each a product and how many of it go in, the add row,
-/// what the product cell offers, and what each product brings, read off the UI thread once per product. The screen keeps
-/// whether the composite takes its products' packaging (a product field and an undo step), the undo history these lines
-/// are part of, and the costs they add up to.
+/// What a composite's Products table (<see cref="ProductComponents"/>) asks of the Products screen, besides its runners,
+/// messages and undo steps: the screen's cost basis, which what each product brings is priced at, and its products, which
+/// the lines hold. The screen implements it explicitly.
 /// </summary>
-/// <param name="findProduct">A product as the screen's list holds it.</param>
-/// <param name="productsById">The screen's products by id, as it holds them now.</param>
-/// <param name="includesPackaging">Whether the composite takes its products' packaging, which a new row's Cost follows.</param>
-/// <param name="showFailure">Shows a failure on the screen, for a cost read nothing awaits.</param>
-/// <param name="work">The screen's work nothing awaits, which counts the cost reads (ViewModelBase.WhenIdleAsync).</param>
-public sealed class ProductComponents(
-    SavedProductReader savedProducts,
-    Func<int, Product?> findProduct,
-    Func<IReadOnlyDictionary<int, Product>> productsById,
-    Func<CostBasis> costBasis,
-    Func<bool> includesPackaging,
-    Action<Exception, string> showFailure,
-    BackgroundWork work) : ReactiveObject
+public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 {
+    /// <summary>Which of the materials' costs the screen shows, buffered or not: what each product brings is priced at it.</summary>
+    CostBasis CostBasis { get; }
+
+    /// <summary>Every product in use, as the screen holds them now: what a line's product cell finds and offers.</summary>
+    IReadOnlyList<Product> Products { get; }
+}
+
+/// <summary>
+/// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSectionView, through
+/// ProductsViewModel.ComponentsTable): its lines, each a product and how many of it go in, the add row, what the product
+/// cell offers, what each product brings, read off the UI thread once per product, whether the composite takes its
+/// products' packaging too (the checkbox beside Remove Line), and Remove Line itself, each change one undo step of the
+/// screen's form (<see cref="IProductComponentsHost"/>). The screen keeps the undo history these lines are part of, and
+/// the costs they add up to.
+/// </summary>
+public sealed class ProductComponents : ReactiveObject
+{
+    private readonly IProductComponentsHost _host;
+    private readonly SavedProductReader _savedProducts;
+
     /// <summary>
     /// What one of each product in the table brings, by product id: its recipe and packaging costs as saved, read with the
     /// composite, when one is picked, and again with every LoadCommand. Kept for the product showing only.
@@ -42,6 +50,20 @@ public sealed class ProductComponents(
     private IReadOnlyList<ProductComponent> _links = [];
 
     private ProductComponentRow? _addingRow;
+
+    /// <param name="host">The Products screen: its cost basis and products, its runners and messages, and its undo steps.</param>
+    public ProductComponents(IProductComponentsHost host, SavedProductReader savedProducts)
+    {
+        _host = host;
+        _savedProducts = savedProducts;
+
+        RemoveLineCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
+            this.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
+    }
+
+    /// <summary>The Products table's Remove Line: takes out the line picked, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
 
     /// <summary>A composite's lines, typed straight into its Products table: each a product and how many of it go in.</summary>
     public ObservableCollection<ProductComponentRow> ComponentEdits { get; } = [];
@@ -58,6 +80,51 @@ public sealed class ProductComponents(
         get => _selectedComponentEdit;
         set => this.RaiseAndSetIfChanged(ref _selectedComponentEdit, value);
     }
+
+    private bool _includesPackaging;
+    /// <summary>
+    /// A composite's products each bring their own packaging too (Product.IncludesComponentPackaging), the checkbox beside
+    /// its Products table's Remove Line: it joins the composite's packaging, not its recipe cost.
+    /// </summary>
+    public bool IncludesPackaging
+    {
+        get => _includesPackaging;
+        set
+        {
+            // Each line's Cost, and the add row's, take the products' packaging in or leave it out: first, since the change
+            // recomputes the costs from the rows as it's raised (the screen follows it).
+            foreach (var row in _addingRow is { } adding ? ComponentEdits.Append(adding) : ComponentEdits)
+            {
+                row.IncludesPackaging = value;
+            }
+
+            this.RaiseAndSetIfChanged(ref _includesPackaging, value);
+            this.RaisePropertyChanged(nameof(IsPackagingTicked));
+            this.RaisePropertyChanged(nameof(Caption));
+        }
+    }
+
+    /// <summary>
+    /// The Include each product's packaging checkbox's side of <see cref="IncludesPackaging"/>: a tick or an untick from the
+    /// screen is one undo step, whether it came by mouse, key or UI Automation. A step around the box's focus couldn't give
+    /// that, since the box keeps the cursor from one click to the next.
+    /// </summary>
+    public bool IsPackagingTicked
+    {
+        get => IncludesPackaging;
+        set
+        {
+            if (value != IncludesPackaging)
+            {
+                _host.AsUndoStep(() => IncludesPackaging = value);
+            }
+        }
+    }
+
+    /// <summary>The Products tab's caption: what each line brings, and where the products' own packaging goes.</summary>
+    public string Caption => IncludesPackaging
+        ? "Each product brings its recipe (ingredients) cost and its own packaging for how many of it go in: Cost is both. On the Costing tab the packaging joins this product's Packaging. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly."
+        : "Each product brings its recipe (ingredients) cost for how many of it go in. Its own packaging stays out: this product's Packaging covers the box and anything wrapping the pieces. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly.";
 
     /// <summary>
     /// What the product cell offers: every product but the one showing and the composites that hold it, directly or
@@ -96,7 +163,7 @@ public sealed class ProductComponents(
         ComponentEdits.AddRange(components.Select(c => NewRowFor(c.Component.ComponentProductId, c.Component.Quantity)));
 
         // A product the list doesn't hold yet shows as it was read with the composite.
-        var products = new Dictionary<int, Product>(productsById());
+        var products = ProductsById();
         foreach (var component in components)
         {
             products.TryAdd(component.Component.ComponentProductId, component.Component.ComponentProduct!);
@@ -160,25 +227,16 @@ public sealed class ProductComponents(
     }
 
     /// <summary>The lines' products and costs at the screen's basis, as it holds them now.</summary>
-    public void ResolveRows() => ProductComponentRow.Resolve(ComponentEdits, productsById(), CostsAtBasis());
+    public void ResolveRows() => ProductComponentRow.Resolve(ComponentEdits, ProductsById(), CostsAtBasis());
 
     /// <summary>The lines, and the add row still being typed into, priced again: a cost arrived, or the basis changed.</summary>
     public void Reprice()
     {
-        var products = productsById();
+        var products = ProductsById();
         ProductComponentRow.Resolve(ComponentEdits, products, CostsAtBasis());
         if (_addingRow is { } adding)
         {
             ProductComponentRow.Resolve([adding], products, CostsAtBasis());
-        }
-    }
-
-    /// <summary>Each line's Cost, and the add row's, takes the products' packaging in or leaves it out.</summary>
-    public void SetIncludesPackaging(bool includes)
-    {
-        foreach (var row in _addingRow is { } adding ? ComponentEdits.Append(adding) : ComponentEdits)
-        {
-            row.IncludesPackaging = includes;
         }
     }
 
@@ -192,9 +250,15 @@ public sealed class ProductComponents(
         List<int> missing = [.. ProductIds.Where(id => !_costs.ContainsKey(id) && _fetching.Add(id))];
         if (missing.Count > 0)
         {
-            _ = work.RunAsync(() => FetchCostsAsync(missing));
+            _ = _host.Work.RunAsync(() => FetchCostsAsync(missing));
         }
     }
+
+    /// <summary>A product as the screen's list holds it.</summary>
+    private Product? FindProduct(int id) => _host.Products.FirstOrDefault(p => p.Id == id);
+
+    /// <summary>The screen's products by id, as it holds them now.</summary>
+    private Dictionary<int, Product> ProductsById() => _host.Products.ToDictionary(p => p.Id);
 
     /// <summary>
     /// What one of a product brings, as read; null while it hasn't been, and the read starts, so the add row prices itself
@@ -209,7 +273,7 @@ public sealed class ProductComponents(
 
         if (_fetching.Add(id))
         {
-            _ = work.RunAsync(() => FetchCostsAsync([id]));
+            _ = _host.Work.RunAsync(() => FetchCostsAsync([id]));
         }
 
         return null;
@@ -219,7 +283,7 @@ public sealed class ProductComponents(
     {
         try
         {
-            var costs = await Task.Run(() => savedProducts.ReadComponentCostsAsync(productIds, CancellationToken.None));
+            var costs = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(productIds, CancellationToken.None));
             foreach (var (productId, cost) in costs)
             {
                 _costs[productId] = cost;
@@ -229,7 +293,7 @@ public sealed class ProductComponents(
         {
             // Nothing awaits this read, so what went wrong is shown rather than lost. The line stays unpriced, and the
             // next LoadCommand reads it again.
-            showFailure(ex, "Couldn't read what a product in the Products table costs");
+            _host.ShowFailure(ex, "Couldn't read what a product in the Products table costs");
         }
         finally
         {
@@ -245,13 +309,13 @@ public sealed class ProductComponents(
     /// <summary>What each product read so far brings at the screen's costs, buffered or not.</summary>
     private Dictionary<int, ProductComponentRow.UnitCosts> CostsAtBasis() => _costs.ToDictionary(c => c.Key, c => AtBasis(c.Value));
 
-    private ProductComponentRow.UnitCosts AtBasis(ComponentCosts costs) => new(costs.RecipeAt(costBasis()), costs.PackagingAt(costBasis()));
+    private ProductComponentRow.UnitCosts AtBasis(ComponentCosts costs) => new(costs.RecipeAt(_host.CostBasis), costs.PackagingAt(_host.CostBasis));
 
     /// <summary>A row for the table, finding its product and costs, its Cost following the checkbox as it stands.</summary>
     private ProductComponentRow NewRowFor(int? productId, int? quantity) =>
-        new(findProduct, FindCosts)
+        new(FindProduct, FindCosts)
         {
-            IncludesPackaging = includesPackaging(),
+            IncludesPackaging = IncludesPackaging,
             ComponentProductId = productId,
             Quantity = quantity,
         };

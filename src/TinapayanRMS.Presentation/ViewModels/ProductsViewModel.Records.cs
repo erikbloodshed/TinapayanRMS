@@ -339,7 +339,7 @@ public sealed partial class ProductsViewModel
         EditingDescription = product.Description ?? string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
         EditingQuantityRequired = product.QuantityRequired;
-        EditingIncludesComponentPackaging = product.IncludesComponentPackaging;
+        ComponentsTable.IncludesPackaging = product.IncludesComponentPackaging;
         EditingCurrentPrice = product.CurrentPrice;
         ShowUpdatedAt(product.UpdatedAt);
         EditingCloneName = $"{product.Name} Copy";
@@ -557,7 +557,7 @@ public sealed partial class ProductsViewModel
         EditingDescription = string.Empty;
         EditingCategory = null;
         EditingQuantityRequired = 1;
-        EditingIncludesComponentPackaging = false;
+        ComponentsTable.IncludesPackaging = false;
         EditingCurrentPrice = null;
         ShowUpdatedAt(null);
         EditingCloneName = string.Empty;

@@ -313,7 +313,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         // Remove Line is a step of its own too.
         viewModel.ComponentsTable.SelectedComponentEdit = viewModel.ComponentsTable.ComponentEdits[1];
-        await viewModel.RemoveComponentCommand.Execute();
+        await viewModel.ComponentsTable.RemoveLineCommand.Execute();
         viewModel.ComponentsTable.ComponentEdits.Should().ContainSingle();
         await viewModel.UndoCommand.Execute();
         viewModel.ComponentsTable.ComponentEdits.Should().HaveCount(2);
@@ -329,15 +329,15 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == boxId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={viewModel.ComponentsTable.ComponentEdits.Count}");
 
-        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+        viewModel.ComponentsTable.IncludesPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m, "a product's own packaging stays out until the box is ticked");
         viewModel.Costing.Costs.PackagingTitle.Should().Be("Packaging");
-        viewModel.ComponentsCaption.Should().Contain("Its own packaging stays out");
+        viewModel.ComponentsTable.Caption.Should().Contain("Its own packaging stays out");
         viewModel.ComponentsTable.ComponentEdits.Select(r => (r.PackagingCost, r.Cost)).Should().Equal((1.50m, 15m), (0m, 20m));
         viewModel.ComponentsTable.ComponentsCost.Should().Be(35m);
 
         // What ticking the box does.
-        viewModel.IsComponentPackagingTicked = true;
+        viewModel.ComponentsTable.IsPackagingTicked = true;
 
         // The Products table: each line's Cost is its recipe and its packaging, and the figure above adds them up.
         viewModel.ComponentsTable.ComponentEdits.Select(r => (r.RecipeCost, r.PackagingCost, r.Cost)).Should().Equal((2.50m, 1.50m, 24m), (5m, 0m, 20m));
@@ -348,19 +348,19 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         // The costing still keeps them apart: the products' lines are their recipe, and their packaging is packaging.
         viewModel.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Ensaymada × 6", 15m), ("Cheese Roll × 4", 20m));
 
-        viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
+        viewModel.ComponentsTable.IncludesPackaging.Should().BeTrue();
         viewModel.Costing.Costs.ComponentPackaging.Should().Be(9m, "6 bags of 1.50; Cheese Roll has none");
         viewModel.Costing.Costs.Packaging.Should().Be(9m);
         viewModel.Costing.Costs.OwnPackaging.Should().Be(0m, "the Packaging tab lists the composite's own lines only");
         viewModel.Costing.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m, "the recipe cost is unchanged");
         viewModel.Costing.Costs.Material.Should().Be(44m);
-        viewModel.ComponentsCaption.Should().Contain("and its own packaging");
+        viewModel.ComponentsTable.Caption.Should().Contain("and its own packaging");
         (await CanSave(viewModel)).Should().BeTrue();
 
         await viewModel.UndoCommand.Execute();
 
-        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+        viewModel.ComponentsTable.IncludesPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m);
         viewModel.ComponentsTable.ComponentEdits.Select(r => r.Cost).Should().Equal(15m, 20m);
         viewModel.ComponentsTable.ComponentsCost.Should().Be(35m);
@@ -377,7 +377,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
             (await dbContext.Products.SingleAsync(p => p.Id == boxId, Cancellation)).IncludesComponentPackaging.Should().BeTrue();
         }
 
-        viewModel.EditingIncludesComponentPackaging.Should().BeTrue();
+        viewModel.ComponentsTable.IncludesPackaging.Should().BeTrue();
         viewModel.Costing.Costs.Packaging.Should().Be(9m);
         // The rows reloaded after Save follow the box too.
         viewModel.ComponentsTable.ComponentEdits.Select(r => r.Cost).Should().Equal(24m, 20m);
@@ -385,7 +385,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
         // A new composite starts with its products' packaging left out.
         await viewModel.NewCompositeCommand.Execute();
-        viewModel.EditingIncludesComponentPackaging.Should().BeFalse();
+        viewModel.ComponentsTable.IncludesPackaging.Should().BeFalse();
     });
 
     /// <summary>A packaging material of one piece, costing <paramref name="cost"/>, as <paramref name="productId"/>'s own packaging line.</summary>

@@ -50,7 +50,7 @@ public sealed partial class ProductsViewModel
 
                 // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
                 IsComposite = IsEditingComposite,
-                IncludesComponentPackaging = IsEditingComposite && EditingIncludesComponentPackaging,
+                IncludesComponentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging,
             };
 
             var validation = _productValidator.Validate(product);

@@ -22,7 +22,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
 public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen,
-    IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost
+    IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -205,49 +205,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>A composite's Products table shows under the Recipe Structure's tabs: on its Products tab.</summary>
     public bool IsComponentsShowing => _isComponentsShowing.Value;
 
-    private bool _editingIncludesComponentPackaging;
-    /// <summary>
-    /// A composite's products each bring their own packaging too (Product.IncludesComponentPackaging), the checkbox beside
-    /// its Products table's Remove Line: it joins the composite's packaging, not its recipe cost.
-    /// </summary>
-    public bool EditingIncludesComponentPackaging
-    {
-        get => _editingIncludesComponentPackaging;
-        set
-        {
-            // Each line's Cost, and the add row's, take the products' packaging in or leave it out: first, since the change
-            // recomputes the costs from the rows as it's raised.
-            ComponentsTable.SetIncludesPackaging(value);
-
-            this.RaiseAndSetIfChanged(ref _editingIncludesComponentPackaging, value);
-            this.RaisePropertyChanged(nameof(IsComponentPackagingTicked));
-            this.RaisePropertyChanged(nameof(ComponentsCaption));
-            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-        }
-    }
-
-    /// <summary>
-    /// The Include each product's packaging checkbox's side of <see cref="EditingIncludesComponentPackaging"/>: a tick or
-    /// an untick from the screen is one undo step, whether it came by mouse, key or UI Automation. A step around the box's
-    /// focus couldn't give that, since the box keeps the cursor from one click to the next.
-    /// </summary>
-    public bool IsComponentPackagingTicked
-    {
-        get => EditingIncludesComponentPackaging;
-        set
-        {
-            if (value != EditingIncludesComponentPackaging)
-            {
-                AsUndoStep(() => EditingIncludesComponentPackaging = value);
-            }
-        }
-    }
-
-    /// <summary>The Products tab's caption: what each line brings, and where the products' own packaging goes.</summary>
-    public string ComponentsCaption => EditingIncludesComponentPackaging
-        ? "Each product brings its recipe (ingredients) cost and its own packaging for how many of it go in: Cost is both. On the Costing tab the packaging joins this product's Packaging. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly."
-        : "Each product brings its recipe (ingredients) cost for how many of it go in. Its own packaging stays out: this product's Packaging covers the box and anything wrapping the pieces. A topping or filling over the whole goes on a tab of its own, with Add Sub-Assembly.";
-
     private RecipeTab? _selectedRecipeTab;
     /// <summary>The Recipe Structure tab showing. Showing New Sub-Assembly opens the form that adds one.</summary>
     public RecipeTab? SelectedRecipeTab
@@ -424,7 +381,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
     public string MaterialCostTooltip => (IsEditingComposite
         ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
-            + (EditingIncludesComponentPackaging ? " and theirs" : string.Empty)
+            + (ComponentsTable.IncludesPackaging ? " and theirs" : string.Empty)
         : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
         + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
 
@@ -732,9 +689,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>New Composite Product Here on a folder of the list, as New Product Here; null, from the list's empty space, is New composite product itself.</summary>
     public ReactiveCommand<ProductFolderNode?, RxVoid> NewCompositeProductInCommand { get; private set; }
 
-    /// <summary>The Products table's Remove Line: takes out the line selected.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveComponentCommand { get; private set; }
-
     /// <summary>
     /// Rename on a product of the list: its name becomes a box to type into, in place (TreeNameEdit), and the name typed is
     /// saved at once, like a move (IProductRepository.RenameAsync).
@@ -878,14 +832,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
             costingDefaultsRepository, unitOfWork);
         Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
         UsageForm = new ProductUsageForm(this);
-        ComponentsTable = new ProductComponents(
-            _savedProducts,
-            id => Products.FirstOrDefault(p => p.Id == id),
-            () => Products.ToDictionary(p => p.Id),
-            () => CostBasis,
-            () => EditingIncludesComponentPackaging,
-            (ex, text) => ShowFailure(ex, text),
-            Work);
+        ComponentsTable = new ProductComponents(this, _savedProducts);
         VersionHistory = new ProductVersionHistory(
             this, versionRepository, productRepository, _savedProducts, subAssemblyRepository, subAssemblyLineRepository, packagingLineRepository);
         _versionedSaves = new VersionedSaves(

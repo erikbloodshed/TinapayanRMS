@@ -2,7 +2,7 @@
    bringing its recipe cost and, when ticked, its own packaging's too. *@
 <div class="section-view">
     <div class="section-heading">
-        <p class="caption">@ViewModel.ComponentsCaption</p>
+        <p class="caption">@ViewModel.ComponentsTable.Caption</p>
         <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.ComponentsTable.ComponentsCost.ToString("N2")</span>
     </div>
 
@@ -11,7 +11,7 @@
             <th>Product</th>
             <th class="col-number col-qty">Qty</th>
             <th class="col-number">Recipe Cost</th>
-            @if (ViewModel.EditingIncludesComponentPackaging)
+            @if (ViewModel.ComponentsTable.IncludesPackaging)
             {
                 <th class="col-number">Packaging Cost</th>
             }
@@ -26,7 +26,7 @@
             </td>
             <td><NumberField TValue="int?" Value="row.Quantity" ValueChanged="v => row.Quantity = v" Format="N0" Min="0" CssClass="cell-field" /></td>
             <td class="cell-number">@row.RecipeCost?.ToString("N2")</td>
-            @if (ViewModel.EditingIncludesComponentPackaging)
+            @if (ViewModel.ComponentsTable.IncludesPackaging)
             {
                 <td class="cell-number">@row.PackagingCost?.ToString("N2")</td>
             }
@@ -35,9 +35,9 @@
     </LineGrid>
 
     <div class="lines-footer">
-        <SfCheckBox Label="Include each product's packaging" @bind-Checked="ViewModel.IsComponentPackagingTicked"
+        <SfCheckBox Label="Include each product's packaging" @bind-Checked="ViewModel.ComponentsTable.IsPackagingTicked"
                     title="Each product's own packaging, times how many of it go in, joins this product's Packaging on the Costing tab. Labor, overhead and administrative aren't charged on it." />
-        <CommandButton Command="ViewModel.RemoveComponentCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+        <CommandButton Command="ViewModel.ComponentsTable.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
     </div>
 </div>
 

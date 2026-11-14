@@ -58,17 +58,16 @@ public sealed partial class ProductsViewModel
             .Subscribe(RecipeTabPicked);
     }
 
-    /// <summary>The recipe's commands: its sections' and a composite's products'. The packaging's are the Packaging tab's own.</summary>
+    /// <summary>
+    /// The recipe's sections' commands. The packaging's are the Packaging tab's own, and a composite's products' the
+    /// Products table's.
+    /// </summary>
     [MemberNotNull(
-        nameof(RemoveComponentCommand), nameof(OpenSubAssemblyCommand), nameof(OpenLinkedSourceCommand),
+        nameof(OpenSubAssemblyCommand), nameof(OpenLinkedSourceCommand),
         nameof(AddUsageCommand), nameof(EditUsageCommand), nameof(MakeCopyCommand), nameof(UnlinkCommand),
         nameof(MoveToSubAssembliesCommand), nameof(MoveToInHouseCommand), nameof(RemoveUsageCommand))]
     private void WireRecipeCommands()
     {
-        RemoveComponentCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => ComponentsTable.ComponentEdits.Remove(ComponentsTable.SelectedComponentEdit!)),
-            ComponentsTable.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
-
         OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
         OpenLinkedSourceCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
         {
@@ -195,6 +194,9 @@ public sealed partial class ProductsViewModel
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
     void IProductPackagingHost.RecomputeCosts() => RecomputeCosts();
+
+    // What the composite's Products table asks of the screen (IProductComponentsHost); its cost basis is the screen's own.
+    IReadOnlyList<Product> IProductComponentsHost.Products => Products;
 
     /// <summary>
     /// A linked section as a new one whose lines the form edits, at the same role and piece size (Make a Copy, Unlink):

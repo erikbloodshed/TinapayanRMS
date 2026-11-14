@@ -72,7 +72,7 @@ public sealed partial class ProductsViewModel
         Description = EditingDescription,
         CurrentPrice = EditingCurrentPrice,
         QuantityRequired = EditingQuantityRequired,
-        IncludesComponentPackaging = EditingIncludesComponentPackaging,
+        IncludesComponentPackaging = ComponentsTable.IncludesPackaging,
         CategoryId = EditingCategory?.Id,
         CloneName = EditingCloneName,
         Costing = Costing.Percentages,
@@ -143,7 +143,7 @@ public sealed partial class ProductsViewModel
             EditingDescription = snapshot.Description;
             EditingCurrentPrice = snapshot.CurrentPrice;
             EditingQuantityRequired = snapshot.QuantityRequired;
-            EditingIncludesComponentPackaging = snapshot.IncludesComponentPackaging;
+            ComponentsTable.IncludesPackaging = snapshot.IncludesComponentPackaging;
             EditingCloneName = snapshot.CloneName;
             _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
             this.RaisePropertyChanged(nameof(EditingCategory));

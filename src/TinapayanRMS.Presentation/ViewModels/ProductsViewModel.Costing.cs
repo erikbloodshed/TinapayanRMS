@@ -60,9 +60,13 @@ public sealed partial class ProductsViewModel
         this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
             .Subscribe(_ => _updates.Run(RecomputeCosts));
 
-        // A composite's products' packaging joining its own, or leaving it.
-        this.WhenAnyValue(x => x.EditingIncludesComponentPackaging)
-            .Subscribe(_ => _updates.Run(RecomputeCosts));
+        // A composite's products' packaging joining its own, or leaving it: the header's Material Cost tooltip says so too.
+        ComponentsTable.WhenAnyValue(c => c.IncludesPackaging)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+                _updates.Run(RecomputeCosts);
+            });
 
         // The caption on every figure names what it's for, so it follows the quantity, and a composite's is always one unit.
         this.WhenAnyValue(x => x.EditingQuantityRequired, x => x.IsEditingComposite)
@@ -251,7 +255,7 @@ public sealed partial class ProductsViewModel
 
         // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
         // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
-        decimal? componentPackaging = IsEditingComposite && EditingIncludesComponentPackaging
+        decimal? componentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
         Costing.Recompute(new ProductCostInputs
