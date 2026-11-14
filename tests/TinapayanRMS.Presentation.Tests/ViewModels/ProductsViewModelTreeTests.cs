@@ -83,16 +83,16 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         screen.CanDrop([mamon], viewModel.ProductTree.DeletedFolder).Should().BeFalse("nothing is dropped into Deleted");
         screen.CanDrop([mamon], cakes).Should().BeTrue();
 
-        (await screen.DropAsync([mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
+        (await DropAsync(viewModel, [mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
 
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
         cakes.Products.Should().ContainSingle();
         viewModel.MoveNotice.Should().Be("Moved Mamon to Innovation › Cakes");
-        (await screen.DropAsync([mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
+        (await DropAsync(viewModel, [mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
 
         // A folder dropped in the other stage takes what it holds there.
         screen.CanDrop([cakes], cakes).Should().BeFalse("a folder doesn't go inside itself");
-        (await screen.DropAsync([cakes], production)).Should().BeSameAs(cakes);
+        (await DropAsync(viewModel, [cakes], production)).Should().BeSameAs(cakes);
 
         viewModel.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, cakesId), "a product goes with its folder");
@@ -227,11 +227,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         await viewModel.UndoMoveCommand.Execute();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
-
-        // ReactiveUI marks the Undo finished on its scheduler, after Execute has returned, and a paste before then is
-        // refused as a move still running: no hand is that quick, but a loaded test run is (it failed so on GitHub's
-        // runner). The moves are offered again once it's marked.
-        await Settle.UntilOfferedAsync(viewModel.MoveFolderCommand.CanExecute, "Move");
+        await MovesOfferedAgainAsync(viewModel);
 
         // A folder is cut with all it holds, alone; Esc forgets a cut.
         var breads = tree.Folder(breadsId)!;
@@ -1317,6 +1313,23 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await using var dbContext = CreateDbContext();
         return await dbContext.Products.Where(p => p.Id == productId).Select(p => p.Name).SingleAsync(Cancellation);
     }
+
+    /// <summary>Drops <paramref name="nodes"/> on <paramref name="target"/> as the list does, then waits for the moves to be offered again.</summary>
+    private static async Task<object?> DropAsync(ProductsViewModel viewModel, IEnumerable<object> nodes, object? target)
+    {
+        var shown = await ((IListTreeScreen)viewModel).DropAsync(nodes, target);
+        await MovesOfferedAgainAsync(viewModel);
+        return shown;
+    }
+
+    /// <summary>
+    /// Waits for the moves to be offered again after a move or its Undo, before a drop or a paste. ReactiveUI marks a move
+    /// finished on its scheduler, after Execute has returned, and a drop or paste before then is refused as a move still
+    /// saving. No hand is that quick, and the window's scheduler marks it at once, but a loaded test run is: on GitHub's
+    /// runner a paste after an Undo, and a drop after a drop, did nothing.
+    /// </summary>
+    private static Task MovesOfferedAgainAsync(ProductsViewModel viewModel) =>
+        Settle.UntilOfferedAsync(viewModel.MoveFolderCommand.CanExecute, "Move");
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     private static async Task RunAsync(TreeMenuItem item)
