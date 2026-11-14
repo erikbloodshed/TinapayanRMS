@@ -81,8 +81,8 @@ public sealed partial class ProductsViewModel
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
         PackagingLink = Packaging.LinkTarget,
         IsPackagingMoving = Packaging.IsPackagingMoving,
-        Lines = [.. Packaging.LineEdits.Select(CaptureLine)],
-        BulkLines = [.. Packaging.BulkEdits.Select(CaptureLine)],
+        Lines = [.. Packaging.LineEdits.Select(PackagingLineState.Of)],
+        BulkLines = [.. Packaging.BulkEdits.Select(PackagingLineState.Of)],
         BulkQuantity = Packaging.BulkQuantity,
         Components = ComponentsTable.Capture(),
         IsUsageFormOpen = UsageForm.IsUsageFormOpen,
@@ -105,9 +105,6 @@ public sealed partial class ProductsViewModel
 
     private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
         new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
-
-    private static PackagingLineState CaptureLine(PackagingLineRow row) =>
-        new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 
     private RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
     {

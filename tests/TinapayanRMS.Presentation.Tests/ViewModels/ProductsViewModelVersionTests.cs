@@ -169,7 +169,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 2);
 
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[1];
-        await viewModel.RestoreVersionCommand.Execute();
+        await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().StartWith("Version 1 is in the form.");
@@ -250,7 +250,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await OpenHistoryAsync(viewModel, rows: 2);
 
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[1];
-        await viewModel.RestoreVersionCommand.Execute();
+        await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         var dough = viewModel.UsageEdits.Single();
@@ -392,7 +392,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("the section's form shows, as it does whenever a product opens");
 
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[0];
-        await viewModel.RestoreVersionCommand.Execute();
+        await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.History.IsDirty.Should().BeFalse("closing the section's form on the way isn't a change to save");
@@ -416,7 +416,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         await OpenHistoryAsync(viewModel, rows: 3);
         viewModel.VersionHistory.SelectedRow = viewModel.VersionHistory.Rows[1];
-        await viewModel.RestoreVersionCommand.Execute();
+        await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Version 2 can't be restored: it needs Butter, which is no longer there.");
         viewModel.UsageEdits.Single().Lines.Should().ContainSingle("nothing changed");

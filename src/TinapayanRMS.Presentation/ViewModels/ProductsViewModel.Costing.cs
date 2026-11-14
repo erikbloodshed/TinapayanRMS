@@ -311,7 +311,7 @@ public sealed partial class ProductsViewModel
         if (SelectedDetailsTab == HistoryTab)
         {
             return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
-                ? VersionPrintout(row, product)
+                ? VersionHistory.PrintoutOf(row, product)
                 : default(PreparedPrintout);
         }
 
@@ -354,23 +354,4 @@ public sealed partial class ProductsViewModel
     {
         CostBasis = CostBasis,
     };
-
-    /// <summary>
-    /// A version from the History tab on paper: its sections, packaging and costing as that Save left them, priced
-    /// at its costs then, as the table's Then columns are, at the screen's cost basis. Titled with the version, dated when
-    /// it was saved, and marked in the footer as from the history; the category and stage are the product's now, which a
-    /// version doesn't keep.
-    /// </summary>
-    private ProductPrintout VersionPrintout(ProductVersionRow row, Product product)
-    {
-        var (versionProduct, detail) = ProductVersionSnapshot.ToDetail(product.Id, row.Content);
-        return SavedProductReader.Build(versionProduct, detail, CostBasis).ToPrintout(DateTime.Now) with
-        {
-            ProductName = $"{row.Content.ProductName} ({row.Title})",
-            CategoryName = product.Category?.Name ?? ProductRules.UncategorizedTitle,
-            StageTitle = ProductRules.StageTitle(product.Stage),
-            LastUpdatedText = row.SavedText,
-            SaveNote = ProductPrintout.VersionNote,
-        };
-    }
 }

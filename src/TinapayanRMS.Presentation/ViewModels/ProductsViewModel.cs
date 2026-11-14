@@ -22,7 +22,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
 public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen,
-    IProductPackagingHost
+    IProductPackagingHost, IProductVersionHistoryHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -844,14 +844,11 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
     public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; private set; }
 
-    /// <summary>The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>).</summary>
-    public ProductVersionHistory VersionHistory { get; }
-
     /// <summary>
-    /// Restore on the History tab: the picked version's recipe, packaging, costing and price into the form, as unsaved
-    /// edits in one undo step (<see cref="RestoreVersionAsync"/>).
+    /// The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>), and its Restore,
+    /// which the screen puts into the form (IProductVersionHistoryHost.ApplyVersion).
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> RestoreVersionCommand { get; private set; }
+    public ProductVersionHistory VersionHistory { get; }
 
     /// <summary>A product whose versions the History tab should read: pushed as the tab shows, and after a Save.</summary>
     private readonly Subject<int> _versionReads = new();
@@ -909,22 +906,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
             (ex, text) => ShowFailure(ex, text),
             Work);
         VersionHistory = new ProductVersionHistory(
-            versionRepository,
-            productRepository,
-            _savedProducts,
-            () =>
-            {
-                // Today's materials are the screen's own.
-                Dictionary<int, RawMaterial> materialsNow = [];
-                foreach (var material in Ingredients.Concat(PackagingMaterials))
-                {
-                    materialsNow.TryAdd(material.Id, material);
-                }
-
-                return materialsNow;
-            },
-            () => CostBasis,
-            RunSafelyAsync);
+            this, versionRepository, productRepository, _savedProducts, subAssemblyRepository, subAssemblyLineRepository, packagingLineRepository);
         _versionedSaves = new VersionedSaves(
             unitOfWork,
             productRepository,
@@ -963,7 +945,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         WireRecipeCommands();
         WireUsageFormCommands();
         WireSaveCommands();
-        WireVersionCommands();
         WireCostingCommands();
     }
 

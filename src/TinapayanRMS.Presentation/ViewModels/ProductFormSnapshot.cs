@@ -27,7 +27,11 @@ public closed record RecipeTabChoice
 public readonly record struct IngredientLineState(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent);
 
 /// <summary>One packaging line, by material id for the same reason, and by unit id for the unit it's entered in.</summary>
-public readonly record struct PackagingLineState(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit);
+public readonly record struct PackagingLineState(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit)
+{
+    /// <summary>A packaging table's row as an undo step, or a version restored, keeps it.</summary>
+    public static PackagingLineState Of(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
+}
 
 /// <summary>
 /// One line of a composite's Products table, by product id for the same reason: a refresh swaps in fresh products and
