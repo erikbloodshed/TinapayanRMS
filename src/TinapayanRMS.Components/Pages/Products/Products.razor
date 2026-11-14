@@ -84,10 +84,6 @@
 
     protected override string ShownProperty => nameof(ProductsViewModel.SelectedProduct);
 
-    protected override void Open(int id) => ViewModel!.OpenProduct(id);
-
-    protected override void OpenOnLoad(int id) => ViewModel!.OpenProductOnLoad(id);
-
     // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
     protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);
 }

@@ -657,7 +657,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         viewModel.List.SelectedTreeNode = viewModel.List.SubAssemblyTree.Find(pandesalId);
         viewModel.List.SelectedTreeNodes.Add(viewModel.List.SubAssemblyTree.Find(ensaymadaId)!);
-        viewModel.OpenSubAssembly(spanishId);
+        viewModel.OpenRecord(spanishId);
 
         viewModel.List.SelectedTreeNodes.Should().Equal(viewModel.List.SubAssemblyTree.Find(spanishId)!);
         viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.SubAssemblyTree.Find(spanishId));
@@ -895,7 +895,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     private async Task<SubAssembliesViewModel> OpenedViewModelAsync(int subAssemblyId)
     {
         var viewModel = await LoadedViewModelAsync();
-        viewModel.OpenSubAssembly(subAssemblyId);
+        viewModel.OpenRecord(subAssemblyId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedRow?.Id == subAssemblyId && viewModel.Batch.Lines.Count > 0 && !viewModel.History.IsDirty,
             () => $"lines={viewModel.Batch.Lines.Count}");

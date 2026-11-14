@@ -59,7 +59,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
 
         // As the main window's Back does before the Raw Materials screen was loaded.
-        viewModel.OpenRawMaterial(sugarId);
+        viewModel.OpenRecord(sugarId);
         viewModel.SelectedRawMaterial.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -68,11 +68,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.EditingName == "Sugar", () => $"name={viewModel.EditingName}");
 
         viewModel.List.SearchText = "Flour";
-        viewModel.OpenRawMaterial(flourId);
+        viewModel.OpenRecord(flourId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(flourId);
         viewModel.List.SearchText.Should().Be("Flour", "a search showing it is left alone");
 
-        viewModel.OpenRawMaterial(sugarId);
+        viewModel.OpenRecord(sugarId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
         viewModel.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
         viewModel.List.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
@@ -2076,7 +2076,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var sugarId = await AddIngredientAsync("Sugar");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenRawMaterial(flourId);
+        viewModel.OpenRecord(flourId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.EditingName == "Flour", () => $"name={viewModel.EditingName}");
         var flour = viewModel.FormVersion;
 
@@ -2085,7 +2085,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.FormVersion.Should().Be(flour, "typing and a reload leave the form the same material's");
 
-        viewModel.OpenRawMaterial(sugarId);
+        viewModel.OpenRecord(sugarId);
         var sugar = viewModel.FormVersion;
         sugar.Should().BeGreaterThan(flour);
 
@@ -2098,7 +2098,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         freshAgain.Should().BeGreaterThan(fresh, "a new one in a new one's place empties the boxes too");
 
         // New, then the browser's Back: the Name box had the cursor, and stayed blank over the material's name.
-        viewModel.OpenRawMaterial(flourId);
+        viewModel.OpenRecord(flourId);
         viewModel.FormVersion.Should().BeGreaterThan(freshAgain);
     });
 
@@ -2109,7 +2109,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         var viewModel = CreateViewModel();
 
         // As the page does when it opens on /raw-materials/42, before the load it then runs.
-        viewModel.OpenRawMaterialOnLoad(sugarId);
+        viewModel.OpenRecordOnLoad(sugarId);
         viewModel.SelectedRawMaterial.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -2123,7 +2123,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     {
         var sugarId = await AddIngredientAsync("Sugar");
         var viewModel = CreateViewModel();
-        viewModel.OpenRawMaterialOnLoad(sugarId);
+        viewModel.OpenRecordOnLoad(sugarId);
         var loading = viewModel.LoadCommand.Execute().ToTask(Cancellation);
 
         // The load is still reading. Sugar opened over the new form at its end, and the name typed was saved as Sugar's.

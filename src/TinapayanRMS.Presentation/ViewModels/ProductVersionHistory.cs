@@ -165,8 +165,8 @@ public sealed record RestoredVersion(
 
 /// <summary>
 /// What the History tab (<see cref="ProductVersionHistory"/>) asks of the Products screen, besides its runners and
-/// messages: the product showing and what the screen has loaded, which a version is priced and restored against, and the
-/// form, which a restored version is put into. The screen implements it explicitly.
+/// messages: the product showing, the costs it shows, its own sections as saved and the form, which a restored version is
+/// put into. The screen implements it explicitly.
 /// </summary>
 public interface IProductVersionHistoryHost : IScreenPartHost
 {
@@ -175,18 +175,6 @@ public interface IProductVersionHistoryHost : IScreenPartHost
 
     /// <summary>Which of the materials' costs the screen shows, buffered or not: what a version's figures are priced at.</summary>
     CostBasis CostBasis { get; }
-
-    /// <summary>Every product in use, as the screen last loaded them: a version's products, and another product its packaging linked.</summary>
-    IReadOnlyList<Product> Products { get; }
-
-    /// <summary>The ingredients as the screen last loaded them, at today's costs.</summary>
-    IReadOnlyList<RawMaterial> Ingredients { get; }
-
-    /// <summary>The packaging materials as the screen last loaded them, at today's costs.</summary>
-    IReadOnlyList<RawMaterial> PackagingMaterials { get; }
-
-    /// <summary>The sub-assembly roles as the screen last loaded them.</summary>
-    IReadOnlyList<SubAssemblyRole> Roles { get; }
 
     /// <summary>The sub-assemblies of the product's own sections as saved: a version's section of its own still among them keeps its sub-assembly.</summary>
     IReadOnlySet<int> OwnedSectionIds { get; }
@@ -213,6 +201,10 @@ public sealed class ProductVersionHistory : ReactiveObject
     private static readonly IReadOnlyList<VersionComparison> FixedChoices = [VersionComparison.Previous, VersionComparison.Current];
 
     private readonly IProductVersionHistoryHost _host;
+    private readonly IReadOnlyList<Product> _products;
+    private readonly IReadOnlyList<RawMaterial> _ingredients;
+    private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
+    private readonly IReadOnlyList<SubAssemblyRole> _roles;
     private readonly IProductVersionRepository _versionRepository;
     private readonly IProductRepository _productRepository;
     private readonly SavedProductReader _savedProducts;
@@ -232,9 +224,17 @@ public sealed class ProductVersionHistory : ReactiveObject
     private IReadOnlyDictionary<int, RawMaterial> _materialsNow = new Dictionary<int, RawMaterial>();
     private IReadOnlyDictionary<int, ComponentCosts> _componentCostsNow = new Dictionary<int, ComponentCosts>();
 
-    /// <param name="host">The Products screen: the product showing, what it has loaded, its runners and messages, and its form.</param>
+    /// <param name="host">The Products screen: the product showing, its runners and messages, and its form.</param>
+    /// <param name="products">Every product in use, as the screen last loaded them: a version's products, and another product its packaging linked.</param>
+    /// <param name="ingredients">The ingredients as the screen last loaded them, at today's costs.</param>
+    /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, at today's costs.</param>
+    /// <param name="roles">The sub-assembly roles as the screen last loaded them.</param>
     public ProductVersionHistory(
         IProductVersionHistoryHost host,
+        IReadOnlyList<Product> products,
+        IReadOnlyList<RawMaterial> ingredients,
+        IReadOnlyList<RawMaterial> packagingMaterials,
+        IReadOnlyList<SubAssemblyRole> roles,
         IProductVersionRepository versionRepository,
         IProductRepository productRepository,
         SavedProductReader savedProducts,
@@ -243,6 +243,10 @@ public sealed class ProductVersionHistory : ReactiveObject
         IPackagingLineRepository packagingLineRepository)
     {
         _host = host;
+        _products = products;
+        _ingredients = ingredients;
+        _packagingMaterials = packagingMaterials;
+        _roles = roles;
         _versionRepository = versionRepository;
         _productRepository = productRepository;
         _savedProducts = savedProducts;
@@ -447,7 +451,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     private Dictionary<int, RawMaterial> MaterialsNow()
     {
         Dictionary<int, RawMaterial> materialsNow = [];
-        foreach (var material in _host.Ingredients.Concat(_host.PackagingMaterials))
+        foreach (var material in _ingredients.Concat(_packagingMaterials))
         {
             materialsNow.TryAdd(material.Id, material);
         }
@@ -598,7 +602,7 @@ public sealed class ProductVersionHistory : ReactiveObject
             {
                 link = new PackagingLinkTarget.Set(setId, set.Name);
             }
-            else if (versionLink.ProductId is { } linkedProductId && _host.Products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
+            else if (versionLink.ProductId is { } linkedProductId && _products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
             {
                 link = new PackagingLinkTarget.OtherProduct(linkedProductId, linkedProduct.Name);
             }
@@ -607,14 +611,14 @@ public sealed class ProductVersionHistory : ReactiveObject
         // Everything it needs that's gone, named, before anything changes.
         var materialNames = content.Materials.ToDictionary(m => m.Id, m => m.Name);
         string MaterialName(int id) => materialNames.GetValueOrDefault(id) ?? $"Material {id}";
-        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
-        var packagingById = _host.PackagingMaterials.ToDictionary(m => m.Id);
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
+        var packagingById = _packagingMaterials.ToDictionary(m => m.Id);
         bool IsRelinked(VersionSection section) => !section.IsOwn && subAssembliesNow.ContainsKey(section.SubAssemblyId);
         List<string> missing = [];
         foreach (var section in content.Sections)
         {
             var relinked = IsRelinked(section);
-            if (!relinked && _host.Roles.All(r => r.Id != section.Role.Id))
+            if (!relinked && _roles.All(r => r.Id != section.Role.Id))
             {
                 missing.Add($"the {section.Role.Name} role");
             }
@@ -630,7 +634,7 @@ public sealed class ProductVersionHistory : ReactiveObject
             .Where(l => (link is null || l.IsBulk) && !packagingById.ContainsKey(l.MaterialId))
             .Select(l => MaterialName(l.MaterialId)));
 
-        missing.AddRange(content.Components.Where(c => _host.Products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
+        missing.AddRange(content.Components.Where(c => _products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
         if (missing.Distinct().ToList() is { Count: > 0 } gone)
         {
             throw new BusinessRuleException(
@@ -681,7 +685,7 @@ public sealed class ProductVersionHistory : ReactiveObject
                     changedSinceLinks.Add(linked.Name);
                 }
 
-                var linkedRole = _host.Roles.FirstOrDefault(r => r.Id == linked.RoleId) ?? linked.Role;
+                var linkedRole = _roles.FirstOrDefault(r => r.Id == linked.RoleId) ?? linked.Role;
                 sections.Add(new ProductUsageEdit(
                     linked.Id,
                     linkedRole,
@@ -701,7 +705,7 @@ public sealed class ProductVersionHistory : ReactiveObject
             var keepsId = section.IsOwn && ownedNow.Contains(section.SubAssemblyId);
             sections.Add(new ProductUsageEdit(
                 keepsId ? section.SubAssemblyId : 0,
-                _host.Roles.First(r => r.Id == section.Role.Id),
+                _roles.First(r => r.Id == section.Role.Id),
                 [
                     .. section.Lines.Select(l => new SectionLine(ingredientsById[l.IngredientId], l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
                     .. section.AddIns.Select(a => new SectionLine(ingredientsById[a.IngredientId], a.Grams)),

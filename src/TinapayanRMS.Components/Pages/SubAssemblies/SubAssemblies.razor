@@ -157,8 +157,4 @@
     protected override int? ShownId => ViewModel!.SelectedRow?.Id;
 
     protected override string ShownProperty => nameof(SubAssembliesViewModel.SelectedRow);
-
-    protected override void Open(int id) => ViewModel!.OpenSubAssembly(id);
-
-    protected override void OpenOnLoad(int id) => ViewModel!.OpenSubAssemblyOnLoad(id);
 }

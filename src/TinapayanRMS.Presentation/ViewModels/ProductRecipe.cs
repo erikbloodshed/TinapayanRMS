@@ -20,12 +20,6 @@ public interface IProductRecipeHost : IFormPartHost
     /// </summary>
     UndoHistory<ProductFormSnapshot> History { get; }
 
-    /// <summary>Every ingredient, as the screen last loaded them: what a section's lines point at.</summary>
-    IReadOnlyList<RawMaterial> Ingredients { get; }
-
-    /// <summary>Every sub-assembly role, as the screen last loaded them.</summary>
-    IReadOnlyList<SubAssemblyRole> Roles { get; }
-
     /// <summary>Every sub-assembly that could be linked or copied, as the screen last loaded them.</summary>
     IReadOnlyList<SubAssembly> Linkable { get; }
 
@@ -61,6 +55,8 @@ public sealed class ProductRecipe : ReactiveObject
     private readonly IProductRecipeHost _host;
     private readonly ProductUsageForm _usageForm;
     private readonly ProductComponents _components;
+    private readonly IReadOnlyList<RawMaterial> _ingredients;
+    private readonly IReadOnlyList<SubAssemblyRole> _roles;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
     private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
 
@@ -93,19 +89,25 @@ public sealed class ProductRecipe : ReactiveObject
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
 
-    /// <param name="host">The screen: its undo history, the lists it loaded, the product's name and costs.</param>
+    /// <param name="host">The screen: its undo history, what can be linked, the product's name and costs.</param>
     /// <param name="usageForm">The section form, which the recipe opens on a section's tab and applies as the tab is left.</param>
     /// <param name="components">A composite's Products table, whose lines are part of the recipe Save writes.</param>
+    /// <param name="ingredients">Every ingredient, as the screen last loaded them: what a section's lines point at.</param>
+    /// <param name="roles">Every sub-assembly role, as the screen last loaded them.</param>
     public ProductRecipe(
         IProductRecipeHost host,
         ProductUsageForm usageForm,
         ProductComponents components,
+        IReadOnlyList<RawMaterial> ingredients,
+        IReadOnlyList<SubAssemblyRole> roles,
         ISubAssemblyLineRepository subAssemblyLineRepository,
         IRawMaterialCategoryRepository rawMaterialCategoryRepository)
     {
         _host = host;
         _usageForm = usageForm;
         _components = components;
+        _ingredients = ingredients;
+        _roles = roles;
         _subAssemblyLineRepository = subAssemblyLineRepository;
         _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
 
@@ -415,7 +417,7 @@ public sealed class ProductRecipe : ReactiveObject
         // Add-ins key on the usage, not the sub-assembly: they're this product's own, so two products
         // linking the same one have different sets.
         var addInsByUsage = addIns.ToLookup(a => a.UsageId);
-        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         List<ProductUsageEdit> sections =
         [
             .. usages
@@ -725,7 +727,7 @@ public sealed class ProductRecipe : ReactiveObject
         // Never the Packaging role: packaging isn't a recipe section, and the Packaging tab takes it. A composite's
         // sections are only in product-owned roles (CompositeProductRules.EnsureSectionRoles).
         _usageForm.FormRoleOptions.MergeFrom(
-            [.. _host.Roles.Where(r => !r.IsPackaging && (!isComposite || r.IsProductOwned))],
+            [.. _roles.Where(r => !r.IsPackaging && (!isComposite || r.IsProductOwned))],
             r => r.Id);
         _usageForm.ShowRole(_usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId));
     }
@@ -738,10 +740,10 @@ public sealed class ProductRecipe : ReactiveObject
     /// </summary>
     internal void RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
     {
-        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
         var linkedLinesById = linkedLines.ToLookup(l => l.SubAssemblyId);
-        var roles = _host.Roles;
+        var roles = _roles;
         var productId = _host.DetailProductId;
 
         var changed = false;
@@ -870,10 +872,10 @@ public sealed class ProductRecipe : ReactiveObject
             return;
         }
 
-        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         IReadOnlyList<SectionLine> lines =
             [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-        var role = _host.Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
+        var role = _roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
         try
         {
             _host.ShowError(null);
@@ -918,7 +920,7 @@ public sealed class ProductRecipe : ReactiveObject
         if (source?.SubAssembly is { } subAssembly)
         {
             var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
-            var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+            var ingredientsById = _ingredients.ToDictionary(m => m.Id);
             lines = [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))];
         }
 
@@ -973,7 +975,7 @@ public sealed class ProductRecipe : ReactiveObject
         }
 
         var name = answer.Text.Trim();
-        if (_host.Ingredients.Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
+        if (_ingredients.Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
             || UsageEdits.Any(u => !ReferenceEquals(u, usage) && string.Equals(u.ToMadeIngredient?.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
             _host.ShowError(MadeIngredientPrompt.NameTakenMessage(name));
@@ -1062,7 +1064,7 @@ public sealed class ProductRecipe : ReactiveObject
             IReadOnlyList<SectionLine> sourceLines =
                 [.. _usageForm.FormLines.Where(l => l.Ingredient is not null).Select(l => new SectionLine(l.Ingredient!, l.Grams ?? 0m, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
-            var role = _host.Roles.FirstOrDefault(r => r.Id == source.RoleId) ?? source.Role;
+            var role = _roles.FirstOrDefault(r => r.Id == source.RoleId) ?? source.Role;
             usage = new ProductUsageEdit(
                 source.Id,
                 role,
@@ -1306,14 +1308,14 @@ public sealed class ProductRecipe : ReactiveObject
     /// <summary>A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.</summary>
     internal void FormLinesEdited()
     {
-        IngredientLineRow.Resolve(_usageForm.FormLines, _host.Ingredients.ToDictionary(m => m.Id));
+        IngredientLineRow.Resolve(_usageForm.FormLines, _ingredients.ToDictionary(m => m.Id));
         FormLinesChanged();
     }
 
     /// <summary>An add-in picked, typed or deleted: it's priced, and the batch it joins follows.</summary>
     internal void FormAddInsEdited()
     {
-        IngredientLineRow.Resolve(_usageForm.FormAddIns, _host.Ingredients.ToDictionary(m => m.Id));
+        IngredientLineRow.Resolve(_usageForm.FormAddIns, _ingredients.ToDictionary(m => m.Id));
         FormLinesChanged();
     }
 
@@ -1382,8 +1384,106 @@ public sealed class ProductRecipe : ReactiveObject
         }
     }
 
-    /// <summary>The tab showing, as an undo step keeps it (ProductFormSnapshot.SelectedTab).</summary>
-    internal RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
+    /// <summary>
+    /// The recipe as one undo step keeps it (ProductFormSnapshot.Recipe): its sections, the tab showing, whether New
+    /// Sub-Assembly's tab is there, and the section form, the section it edits by its place among the sections.
+    /// </summary>
+    internal RecipeSnapshot Capture() => new()
+    {
+        Usages = [.. UsageEdits],
+        SelectedTab = CaptureTabChoice(),
+        HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
+        Form = new SectionFormSnapshot
+        {
+            IsOpen = _usageForm.IsUsageFormOpen,
+            IsAdding = _usageForm.IsAddingUsage,
+            Title = _usageForm.UsageFormTitle,
+            Mode = _usageForm.EditingUsageMode,
+            IsEditingLines = _usageForm.IsFormEditingLines,
+            IsPickingSource = _usageForm.IsFormPickingSource,
+            EditingUsageIndex = _usageForm.EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
+            RoleId = _usageForm.EditingUsageRole?.Id,
+            Name = _usageForm.EditingUsageName,
+            SourceKey = _usageForm.EditingUsageSource?.Key,
+            Lines = [.. _usageForm.FormLines.Select(CaptureIngredientLine)],
+            AddIns = [.. _usageForm.FormAddIns.Select(CaptureIngredientLine)],
+            FormulaBase = _usageForm.FormFormulaBase,
+            AuthoredField = _usageForm.AuthoredField,
+            WeightPerPiece = _usageForm.EditingUsageWeightPerPiece,
+            Yield = _usageForm.EditingUsageYield,
+        },
+    };
+
+    private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
+        new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
+
+    /// <summary>
+    /// The first thing an undo does (the screen's RestoreSnapshot): the section form closes, with no row picked in its
+    /// tables. EditingUsage has to be null before the sections are replaced: the tab mirror refills the form's lines from a
+    /// section that replaces the one being edited, which would undo the restore.
+    /// </summary>
+    internal void CloseForRestore()
+    {
+        CloseUsageForm();
+        _usageForm.SelectedFormLine = null;
+        _usageForm.SelectedFormAddIn = null;
+    }
+
+    /// <summary>
+    /// Puts the recipe back as <paramref name="snapshot"/> had it, for an undo, once the screen has put back the product's
+    /// fields, the costing, the packaging and a composite's products: the sections and their tabs first
+    /// (<see cref="RestoreSections"/>), then the form itself, last. The option lists are rebuilt before the pickers are put
+    /// back, as a load does, and RefreshLinkableOptions runs inside the screen's guard (IsBusyApplying): outside it, the
+    /// source it can null would start a load that clears the very lines being restored.
+    /// </summary>
+    internal void Restore(RecipeSnapshot snapshot)
+    {
+        RestoreSections(snapshot.Usages, snapshot.HasAddSubAssemblyTab, snapshot.SelectedTab);
+
+        var form = snapshot.Form;
+        _usageForm.IsAddingUsage = form.IsAdding;
+        _usageForm.UsageFormTitle = form.Title;
+        _usageForm.RestoreMode(form.Mode);
+        _usageForm.IsFormEditingLines = form.IsEditingLines;
+        _usageForm.IsFormPickingSource = form.IsPickingSource;
+
+        RefreshLinkableOptions();
+        RefreshFormRoleOptions();
+
+        _usageForm.RestorePicks(
+            form.RoleId is { } roleId ? _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null,
+            form.SourceKey is { } sourceKey ? _usageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null,
+            form.Name);
+
+        _usageForm.FormFormulaBase = form.FormulaBase;
+        RestoreIngredientLines(_usageForm.FormLines, form.Lines, form.FormulaBase);
+        RestoreIngredientLines(_usageForm.FormAddIns, form.AddIns, form.FormulaBase);
+        _usageForm.RestorePieceSize(form.AuthoredField, form.WeightPerPiece, form.Yield);
+
+        _usageForm.EditingUsage = form.EditingUsageIndex is { } usageIndex && usageIndex < UsageEdits.Count
+            ? UsageEdits[usageIndex]
+            : null;
+        _usageForm.IsUsageFormOpen = form.IsOpen;
+    }
+
+    private void RestoreIngredientLines(
+        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineState> states, decimal baseWeight)
+    {
+        rows.Clear();
+        foreach (var state in states)
+        {
+            rows.Add(IngredientLineRow.Restore(
+                id => _ingredients.FirstOrDefault(m => m.Id == id),
+                baseWeight,
+                state.IngredientId,
+                state.Grams,
+                state.IsFormulaBase,
+                state.AuthoredBakersPercent));
+        }
+    }
+
+    /// <summary>The tab showing, as an undo step keeps it (RecipeSnapshot.SelectedTab).</summary>
+    private RecipeTabChoice? CaptureTabChoice() => SelectedRecipeTab switch
     {
         SubAssemblyRecipeTab tab => new RecipeTabChoice.Usage(RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList().IndexOf(tab)),
         AddSubAssemblyRecipeTab => new RecipeTabChoice.AddSubAssembly(),
@@ -1396,7 +1496,7 @@ public sealed class ProductRecipe : ReactiveObject
     /// An undo's sections and their tabs, put back, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
     /// it, moving the tab back would apply the form the tab is being moved off, which is the very change being undone.
     /// </summary>
-    internal void RestoreSections(IReadOnlyList<ProductUsageEdit> usages, bool hasAddSubAssemblyTab, RecipeTabChoice? tab)
+    private void RestoreSections(IReadOnlyList<ProductUsageEdit> usages, bool hasAddSubAssemblyTab, RecipeTabChoice? tab)
     {
         _arrangingRecipeTabs = true;
         try
@@ -1465,7 +1565,7 @@ public sealed class ProductRecipe : ReactiveObject
         IReadOnlyDictionary<int, RawMaterial> ingredientsById)
     {
         var subAssembly = usage.SubAssembly!;
-        var role = _host.Roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
+        var role = _roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
         return ProductUsageEdit.FromSaved(usage, lines, addIns, role, _host.EditingName, ingredientsById);
     }
 

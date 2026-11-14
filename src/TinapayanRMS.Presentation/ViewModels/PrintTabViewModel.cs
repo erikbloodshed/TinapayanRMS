@@ -298,7 +298,7 @@ public sealed class PrintTabViewModel : ViewModelBase
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the
         // same dozen or so queries however many products the set holds.
         Progress = products.Count == 1 ? "Preparing 1 product…" : $"Preparing {products.Count} products…";
-        var saved = await _savedProducts.ReadAllAsync(products, _products.CostBasis, cancellationToken);
+        var saved = await _savedProducts.ReadAllAsync(products, _products.Costing.CostBasis, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         List<ProductPrintout> printouts = [.. saved.Select(s => s.ToPrintout(printedAt))];
 

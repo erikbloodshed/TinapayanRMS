@@ -60,14 +60,14 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     public Task The_suggested_selling_price_label_follows_the_quantity_required() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
-        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Piece");
+        viewModel.Costing.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Piece");
         var changed = new List<string?>();
-        viewModel.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        viewModel.Costing.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         viewModel.EditingQuantityRequired = 8;
 
-        changed.Should().Contain(nameof(ProductsViewModel.SuggestedSellingPriceLabel));
-        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit of 8 Pieces", "the Costing Summary's price row follows the quantity");
+        changed.Should().Contain(nameof(ProductCosting.SuggestedSellingPriceLabel));
+        viewModel.Costing.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit of 8 Pieces", "the Costing Summary's price row follows the quantity");
     });
 
     [Test]

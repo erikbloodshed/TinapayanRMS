@@ -22,12 +22,19 @@ public interface IFormSnapshot<in TSnapshot>
 /// <summary>
 /// What the three record screens (Products, Raw Materials, Sub-Assemblies) share about their form: its undo and redo
 /// (<see cref="History"/>, the Undo and Redo commands, the steps the fields record through <see cref="IUndoRecorder"/>),
-/// whether it holds anything to save, and the question about unsaved changes before it's left. Each screen says how its
-/// form is captured and put back, what it's called in the question, how it saves and how it goes back to what was saved.
+/// whether it holds anything to save, the question about unsaved changes before it's left, and opening a record by its id
+/// or name (<see cref="OpenRecord"/>). Each screen says how its form is captured and put back, what it's called in the
+/// question, how it saves and how it goes back to what was saved, and how a record is found and picked in its list.
 /// </summary>
-public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScreen, IUnsavedChangesScreen, IRecordListHost
+public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScreen, IUnsavedChangesScreen, IRecordListHost, IRecordOpener
     where TSnapshot : class, IFormSnapshot<TSnapshot>
 {
+    /// <summary>
+    /// A record for LoadCommand to open at its end: one <see cref="OpenRecord"/> was asked for before the list held it, or
+    /// the one in the screen's address (<see cref="OpenRecordOnLoad"/>). New drops it (<see cref="ForgetRecordToOpen"/>).
+    /// </summary>
+    private int? _recordToOpen;
+
     protected RecordFormViewModel(ILogger logger)
         : base(logger)
     {
@@ -186,10 +193,10 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
     /// A record picked in the list, by <paramref name="id"/>: shown at once (<paramref name="pick"/>), or, while the form holds
     /// unsaved changes, once they're saved or thrown away. The list calls this in the middle of changing its selection, so
     /// the question waits for that to finish, puts the list back on the record showing (<paramref name="showListOnShowing"/>),
-    /// then opens the one picked through <paramref name="openAsync"/>, which asks. Nothing awaits it: what fails shows on the
+    /// then opens the one picked (<see cref="OpenRecordAsync"/>, which asks). Nothing awaits it: what fails shows on the
     /// form (RunSafelyAsync).
     /// </summary>
-    protected void PickFromList(int id, Action pick, Action showListOnShowing, Func<int, Task> openAsync)
+    protected void PickFromList(int id, Action pick, Action showListOnShowing)
     {
         if (!History.IsDirty)
         {
@@ -201,7 +208,7 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
         {
             await Task.Yield();
             showListOnShowing();
-            await openAsync(id);
+            await OpenRecordAsync(id);
         });
     }
 
@@ -213,6 +220,80 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
             then();
         }
     }
+
+    /// <summary>
+    /// Picks the record <paramref name="id"/> as picking its row in the list would, clearing a search or filter that hides
+    /// the row. False when the list doesn't hold it (yet).
+    /// </summary>
+    protected abstract bool TrySelectRecord(int id);
+
+    /// <summary>The id of the record <paramref name="text"/> names best among the list's (RecordNameMatch); null for none.</summary>
+    protected abstract int? FindRecordByName(string text);
+
+    /// <summary>
+    /// Whether opening the record <paramref name="id"/> replaces the one the form shows, so its unsaved changes are asked
+    /// about first: any record but the one showing.
+    /// </summary>
+    protected abstract bool ReplacesShowing(int id);
+
+    /// <summary>
+    /// Opens a record as picking it in the list would, for another screen (an address of the record's: Back, Forward, a
+    /// link). A search hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not
+    /// loaded since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// </summary>
+    public void OpenRecord(int id) => _recordToOpen = TrySelectRecord(id) ? null : id;
+
+    /// <summary>
+    /// Opens a record at the end of the next LoadCommand, for the one in the screen's address as the screen opens: its list
+    /// is fresh only then. New clicked meanwhile is the later word, and the record isn't opened over it.
+    /// </summary>
+    public void OpenRecordOnLoad(int id) => _recordToOpen = id;
+
+    /// <summary>
+    /// <see cref="OpenRecord"/>, asking first about the unsaved changes of the record showing when another is to replace it
+    /// (<see cref="ReplacesShowing"/>). False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenRecordAsync(int id)
+    {
+        if (ReplacesShowing(id) && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenRecord(id);
+        return true;
+    }
+
+    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the record the name means best.</summary>
+    public bool OpenByName(string text)
+    {
+        if (FindRecordByName(text) is not { } id)
+        {
+            return false;
+        }
+
+        _ = RunSafelyAsync(() => OpenRecordAsync(id));
+        return true;
+    }
+
+    /// <summary>
+    /// The end of a LoadCommand, outside its ApplyRefresh, whose selection changes only re-point: a record asked for before
+    /// the list held it, or the one in the address, opens now, its form loading.
+    /// </summary>
+    protected void OpenRecordAskedFor()
+    {
+        if (_recordToOpen is { } id)
+        {
+            _recordToOpen = null;
+            TrySelectRecord(id);
+        }
+    }
+
+    /// <summary>
+    /// New: a record still waiting for LoadCommand to open it no longer is. It would load over the new form, and a name typed
+    /// into it since would then be saved as that record's.
+    /// </summary>
+    protected void ForgetRecordToOpen() => _recordToOpen = null;
 
     // What any part of the screen's form, and its list, asks of it (IFormPartHost, IRecordListHost).
     bool IFormPartHost.IsRefreshing => IsRefreshing;

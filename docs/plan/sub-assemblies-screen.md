@@ -87,7 +87,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 - **Rows are `StandaloneSubAssemblyRow`s.** The products linking a sub-assembly and the made ingredients made from it are text properties (`DependentsText`, `MadeIngredientsText`), with the lists behind methods (`GetDependents`, `GetMadeIngredients`), because `CollectionMerge.HasSameValues` compares a row's scalar properties only: a changed list shows as a changed row through its text.
 - **`LoadCommand` merges** roles, ingredients, packaging materials and rows (Application Architecture's fetch-then-merge), keeps unsaved lines (`IngredientLineRow.Resolve` reprices them), and re-points the selection by id.
-  - A sub-assembly asked for before the list held it (`OpenSubAssembly`, from a linked badge on Products or a made ingredient's Recipe card on Raw Materials) is opened by the load that brings it in (`_subAssemblyToOpen`).
+  - A sub-assembly asked for before the list held it (`OpenRecord`, from a linked badge on Products or a made ingredient's Recipe card on Raw Materials) is opened by the load that brings it in (`OpenRecordAskedFor`, the record screens' base's, `RecordFormViewModel`).
   - A form load counts itself (`_formLoadVersion`), so one overtaken by another pick or New drops its lines rather than adding them twice.
 - Tests: `StandaloneSubAssemblyPersistenceTests`, `SubAssembliesViewModelRefreshTests` and a `ProductsViewModelRefreshTests` test that links one.
 

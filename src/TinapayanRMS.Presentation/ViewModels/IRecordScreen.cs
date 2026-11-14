@@ -23,6 +23,19 @@ public interface IRecordScreen
     bool OpenByName(string text);
 }
 
+/// <summary>
+/// A screen of records with an address each (products/42): what its page (RecordScreenBase) opens the record in the address
+/// through. The three record screens, through RecordFormViewModel.
+/// </summary>
+public interface IRecordOpener
+{
+    /// <summary>Opens the record now, as a pick in the list does: Back, Forward, or another screen's link.</summary>
+    void OpenRecord(int id);
+
+    /// <summary>Opens the record at the end of the load the screen's opening starts: the list is fresh only then.</summary>
+    void OpenRecordOnLoad(int id);
+}
+
 /// <summary>A screen whose form can throw away its changes since the last Save (Products): <c>:revert</c>.</summary>
 public interface IRevertScreen
 {

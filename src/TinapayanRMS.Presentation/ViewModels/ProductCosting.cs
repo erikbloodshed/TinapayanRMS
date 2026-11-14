@@ -1,18 +1,28 @@
 using ReactiveUI;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Products screen's Costing tab (CostingCard, through ProductsViewModel.Costing): the costing
-/// percentages as typed, each metric's amount, and the cost summary worked out from them and the recipe. The screen
-/// supplies the recipe's figures and says when (<see cref="Recompute"/>); it also keeps the undo history, which these
-/// percentages are part of. What Save compares against, the costing as loaded, a new product's defaults, and the shop's
-/// wastage, VAT and price rounding every product is priced with are here.
+/// The Products screen's costing and costs (through ProductsViewModel.Costing; the Costing tab and the header draw them):
+/// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
+/// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
+/// materials have risen past their buffered cost. The screen supplies the recipe's figures and says when
+/// (<see cref="Recompute"/>); it also keeps the undo history, which these percentages are part of. What Save compares
+/// against, the costing as loaded, a new product's defaults, and the shop's wastage, VAT and price rounding every product is
+/// priced with are here.
 /// </summary>
 public sealed class ProductCosting : ReactiveObject
 {
+    // What the captions name, as the last Recompute was given it: the quantity a sellable unit holds, whether it's a
+    // composite, and whether a composite takes its products' packaging too.
+    private int _quantityRequired = 1;
+    private bool _isComposite;
+    private bool _includesComponentPackaging;
+
     /// <summary>What a new product's costing starts with (Settings → Costing Defaults), as of the screen's last load.</summary>
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _defaults;
 
@@ -112,6 +122,71 @@ public sealed class ProductCosting : ReactiveObject
         }
     }
 
+    private CostBasis _costBasis;
+    /// <summary>
+    /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
+    /// button (ProductsViewModel.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
+    /// isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the
+    /// next until the app closes. Print prints at it too. Only the screen switches it, as it prices its tables' rows again.
+    /// </summary>
+    public CostBasis CostBasis
+    {
+        get => _costBasis;
+        internal set
+        {
+            this.RaiseAndSetIfChanged(ref _costBasis, value);
+            this.RaisePropertyChanged(nameof(IsUnbuffered));
+            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
+            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
+            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+        }
+    }
+
+    /// <summary>The screen shows its unbuffered costs: the header's badge says so.</summary>
+    public bool IsUnbuffered => CostBasis == CostBasis.Unbuffered;
+
+    /// <summary>
+    /// The header's switch, named for the costs a click switches to: "Unbuffered" while
+    /// the screen is buffered, "Buffered" while it isn't.
+    /// </summary>
+    public string CostBasisButtonLabel => IsUnbuffered ? "Buffered" : "Unbuffered";
+
+    /// <summary>What the header's switch does from here.</summary>
+    public string CostBasisButtonTooltip => IsUnbuffered
+        ? "Shows every cost on this screen, and prints it, at the materials' buffered costs again. Nothing is saved."
+        : "Shows every cost on this screen, and prints it, at the materials' true costs, without their cost buffers. Nothing is saved.";
+
+    private string? _belowCostText;
+    /// <summary>
+    /// The header's "Priced below cost" badge's tooltip, naming the purchased materials in the recipe and packaging that
+    /// prices have risen past their fixed buffered cost (RawMaterialRules.IsBufferedBelowCost): the product is priced at the
+    /// buffered costs, so under what those cost. Null, and no badge, while none is. A composite's products' materials aren't
+    /// in the form, so they aren't counted; each says so when it's opened.
+    /// </summary>
+    public string? BelowCostText
+    {
+        get => _belowCostText;
+        private set => this.RaiseAndSetIfChanged(ref _belowCostText, value);
+    }
+
+    /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
+    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(_quantityRequired, _isComposite);
+
+    /// <summary>The Costing Summary's price row: "Suggested Selling Price per Piece", or "… per Unit of 8 Pieces".</summary>
+    public string SuggestedSellingPriceLabel => ProductPrintout.SuggestedSellingPriceLabelFor(CostUnitCaption);
+
+    /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
+    public string MaterialCostTooltip => (_isComposite
+        ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
+            + (_includesComponentPackaging ? " and theirs" : string.Empty)
+        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
+        + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
+
+    /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
+    public string MetricBaseTooltip => _isComposite
+        ? $"Of the recipe (ingredients) cost of the products it holds and its own sub-assemblies, packaging not included. {CostUnitCaption}."
+        : $"Of the sub-assemblies (ingredients) cost, packaging not included. {CostUnitCaption}.";
+
     /// <summary>The four percentages as typed, for an undo step to keep and put back (ProductFormSnapshot.Costing).</summary>
     public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Percentages
     {
@@ -173,9 +248,19 @@ public sealed class ProductCosting : ReactiveObject
     /// <summary>
     /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now, with
     /// the shop's VAT and price rounding and <paramref name="categoryWastagePercent"/>, the product's category's own
-    /// wastage, or the shop's when it sets none, at the percentages as typed here.
+    /// wastage, or the shop's when it sets none, at the percentages as typed here; the captions follow the quantity and
+    /// kind the figures are for (in <paramref name="recipe"/>), and the below-cost warning <paramref name="materials"/>,
+    /// every material the recipe and packaging use.
     /// </summary>
-    public void Recompute(ProductCostInputs recipe, decimal? categoryWastagePercent) =>
+    public void Recompute(ProductCostInputs recipe, decimal? categoryWastagePercent, IEnumerable<RawMaterial> materials)
+    {
+        var captionsChange = recipe.QuantityRequired != _quantityRequired
+            || recipe.IsComposite != _isComposite
+            || (recipe.ComponentPackaging is not null) != _includesComponentPackaging;
+        _quantityRequired = recipe.QuantityRequired;
+        _isComposite = recipe.IsComposite;
+        _includesComponentPackaging = recipe.ComponentPackaging is not null;
+
         Costs = new ProductCostSummary(recipe with
         {
             WastagePercent = categoryWastagePercent ?? _wastagePercent,
@@ -186,4 +271,30 @@ public sealed class ProductCosting : ReactiveObject
             AdministrativePercent = EditingAdministrativePercent,
             MarginPercent = EditingMarginPercent,
         });
+
+        List<string> belowCost =
+        [
+            .. materials
+                .Where(RawMaterialRules.IsBufferedBelowCost)
+                .Select(m => m.Name)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .Order(StringComparer.CurrentCultureIgnoreCase),
+        ];
+        BelowCostText = belowCost.Count switch
+        {
+            0 => null,
+            1 => $"Prices have risen past the buffered cost of {belowCost[0]}, so this product is priced under what it costs. "
+                + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.",
+            _ => $"Prices have risen past the buffered costs of {string.Join(", ", belowCost[..^1])} and {belowCost[^1]}, so this "
+                + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
+        };
+
+        if (captionsChange)
+        {
+            this.RaisePropertyChanged(nameof(CostUnitCaption));
+            this.RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
+            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+            this.RaisePropertyChanged(nameof(MetricBaseTooltip));
+        }
+    }
 }

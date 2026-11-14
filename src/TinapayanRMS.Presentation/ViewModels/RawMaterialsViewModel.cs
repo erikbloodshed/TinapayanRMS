@@ -74,12 +74,6 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
     private int _editingId;
 
-    /// <summary>
-    /// A material for LoadCommand to open at its end: one <see cref="OpenRawMaterial"/> was asked for before the list held
-    /// it, or the one in the screen's address (<see cref="OpenRawMaterialOnLoad"/>). New drops it.
-    /// </summary>
-    private int? _rawMaterialToOpen;
-
     public RawMaterialsViewModel(
         IRawMaterialRepository rawMaterialRepository,
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
@@ -762,11 +756,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         }
 
         // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the material's form.
-        if (_rawMaterialToOpen is { } rawMaterialId)
-        {
-            _rawMaterialToOpen = null;
-            TrySelectRawMaterial(rawMaterialId);
-        }
+        OpenRecordAskedFor();
     }
 
     /// <summary>Save: the material with its units, brand prices or add-ins, all or nothing.</summary>
@@ -843,7 +833,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     private void StartNewMaterial(
         RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null, RawMaterialSource source = RawMaterialSource.Purchased)
     {
-        _rawMaterialToOpen = null;
+        ForgetRecordToOpen();
         ClearForm(type, categoryId, source);
     }
 
@@ -1176,56 +1166,13 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         return Categories.FirstOrDefault(c => c.Id == category.Id);
     }
 
-    /// <summary>
-    /// Opens a material as picking it in the list would, for another screen (the main window's Back and Forward, and a
-    /// double-clicked row of Reports' Raw Materials Price Summary). A search hiding it is cleared, so the list shows the
-    /// row picked. A list that doesn't hold it yet (the screen not loaded since, or ever) opens it at the end of the next
-    /// LoadCommand, which showing the screen runs.
-    /// </summary>
-    public void OpenRawMaterial(int rawMaterialId)
+    protected override int? FindRecordByName(string text) => RecordNameMatch.Best(RawMaterials, material => material.Name, text)?.Id;
+
+    protected override bool ReplacesShowing(int id) => id != SelectedRawMaterial?.Id;
+
+    protected override bool TrySelectRecord(int id)
     {
-        _rawMaterialToOpen = TrySelectRawMaterial(rawMaterialId) ? null : rawMaterialId;
-    }
-
-    /// <summary>
-    /// Opens a material at the end of the next LoadCommand, for the one in the screen's address as the screen opens:
-    /// its list is fresh only then. New clicked meanwhile is the later word, and the material isn't opened over it.
-    /// </summary>
-    public void OpenRawMaterialOnLoad(int rawMaterialId)
-    {
-        _rawMaterialToOpen = rawMaterialId;
-    }
-
-    /// <summary>
-    /// <see cref="OpenRawMaterial"/>, asking first about the unsaved changes of the material showing when another is to
-    /// replace it. False when the user stays on it.
-    /// </summary>
-    public async Task<bool> OpenRawMaterialAsync(int rawMaterialId)
-    {
-        if (rawMaterialId != SelectedRawMaterial?.Id && !await ResolveUnsavedChangesAsync(revert: false))
-        {
-            return false;
-        }
-
-        OpenRawMaterial(rawMaterialId);
-        return true;
-    }
-
-    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the material the name means best.</summary>
-    public bool OpenByName(string text)
-    {
-        if (RecordNameMatch.Best(RawMaterials, material => material.Name, text) is not { } material)
-        {
-            return false;
-        }
-
-        _ = RunSafelyAsync(() => OpenRawMaterialAsync(material.Id));
-        return true;
-    }
-
-    private bool TrySelectRawMaterial(int rawMaterialId)
-    {
-        if (RawMaterials.FirstOrDefault(m => m.Id == rawMaterialId) is not { } material)
+        if (RawMaterials.FirstOrDefault(m => m.Id == id) is not { } material)
         {
             return false;
         }
@@ -1437,7 +1384,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     async Task IRawMaterialsListHost.LoadAsync() => await LoadCommand.Execute();
 
     void IRawMaterialsListHost.Pick(RawMaterial material) =>
-        PickFromList(material.Id, () => SelectedRawMaterial = material, List.SyncTreeSelection, OpenRawMaterialAsync);
+        PickFromList(material.Id, () => SelectedRawMaterial = material, List.SyncTreeSelection);
 
     void IRawMaterialsListHost.StartNew(RawMaterialType type, int? categoryId, RawMaterialSource source) => StartNewMaterial(type, categoryId, source);
 

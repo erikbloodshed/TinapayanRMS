@@ -48,24 +48,21 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public const string VariantOf = "Variant of";
 
     private readonly IProductRepository _productRepository;
-    private readonly IPackagingLineRepository _packagingLineRepository;
     private readonly ICostingDefaultsRepository _costingDefaultsRepository;
-    private readonly IPackagingLinkRepository _packagingLinkRepository;
     private readonly IProductCloner _productCloner;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly ISubAssemblyRoleRepository _subAssemblyRoleRepository;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
 
-    // Reads the product opened here, as Reports and Print read theirs, from the repositories above.
+    // Reads the product opened here, as Reports and Print read theirs.
     private readonly SavedProductReader _savedProducts;
+
+    // What a LoadCommand reads, apart from its merge into the form (LoadAsync).
+    private readonly ProductsLoadReader _loadReader;
 
     // Save, Clone and Create Variant, each written with the versions it records.
     private readonly VersionedSaves _versionedSaves;
     private readonly IValidator<Product> _productValidator;
     private readonly IValidator<CostingParameters> _costingParametersValidator;
     private readonly IProductCategoryRepository _categoryRepository;
-    private readonly IProductFolderRepository _folderRepository;
     private readonly IValidator<ProductCategory> _categoryValidator;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
@@ -95,18 +92,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     private readonly Subject<int> _versionReads = new();
 
     /// <summary>
-    /// Whether the new product showing goes in Settings' stage rather than a folder's: started by New, not New Product
-    /// Here. Such a product follows the setting when it changes (RefreshCostingDefaults).
-    /// </summary>
-    private bool _newProductInDefaultStage = true;
-
-    /// <summary>
-    /// A product for LoadCommand to open at its end: one <see cref="OpenProduct"/> was asked for before the list held it,
-    /// or the one in the screen's address (<see cref="OpenProductOnLoad"/>). New drops it.
-    /// </summary>
-    private int? _productToOpen;
-
-    /// <summary>
     /// A sub-assembly <see cref="StartNewProductFrom"/> was asked to link, for LoadCommand to start the new product with
     /// once its lists are fresh. New drops it.
     /// </summary>
@@ -125,9 +110,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
     /// <summary>Every sub-assembly that could be linked or copied, as last loaded; the section form's LinkableSubAssemblies filters it.</summary>
     private IReadOnlyList<SubAssembly> _linkable = [];
-
-    // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
-    private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
 
     public ProductsViewModel(
         IProductRepository productRepository,
@@ -158,22 +140,32 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
             SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
         _productRepository = productRepository;
-        _packagingLineRepository = packagingLineRepository;
         _costingDefaultsRepository = costingDefaultsRepository;
-        _packagingLinkRepository = packagingLinkRepository;
         _productCloner = productCloner;
         _subAssemblyRepository = subAssemblyRepository;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _subAssemblyRoleRepository = subAssemblyRoleRepository;
-        _rawMaterialRepository = rawMaterialRepository;
         _savedProducts = new SavedProductReader(
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository, unitOfWork);
-        Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
-        UsageForm = new ProductUsageForm(this);
-        ComponentsTable = new ProductComponents(this, _savedProducts);
+        _loadReader = new ProductsLoadReader(
+            productRepository, subAssemblyRoleRepository, categoryRepository, folderRepository, rawMaterialRepository, subAssemblyRepository,
+            subAssemblyLineRepository, costingDefaultsRepository, packagingLinkRepository, packagingLineRepository, _savedProducts);
+
+        // The lists the form and its parts read, bound first: the parts take them, as the screen keeps them (each load
+        // merges into them rather than replacing them). The categories before the list part's own subscription to them, so
+        // the category filter's choices read them changed.
+        _productCache.Connect()
+            .SortAndBind(out _products, SortExpressionComparer<Product>.Ascending(p => p.Name))
+            .Subscribe();
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
+            .Subscribe();
+
+        Packaging = new ProductPackaging(this, PackagingMaterials, subAssemblyRepository, packagingLineRepository);
+        UsageForm = new ProductUsageForm(this, Ingredients);
+        ComponentsTable = new ProductComponents(this, Products, _savedProducts);
         VersionHistory = new ProductVersionHistory(
-            this, versionRepository, productRepository, _savedProducts, subAssemblyRepository, subAssemblyLineRepository, packagingLineRepository);
+            this, Products, Ingredients, PackagingMaterials, Roles, versionRepository, productRepository, _savedProducts, subAssemblyRepository,
+            subAssemblyLineRepository, packagingLineRepository);
         _versionedSaves = new VersionedSaves(
             unitOfWork,
             productRepository,
@@ -184,23 +176,13 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         _productValidator = productValidator;
         _costingParametersValidator = costingParametersValidator;
         _categoryRepository = categoryRepository;
-        _folderRepository = folderRepository;
         _categoryValidator = categoryValidator;
-
-        // The lists the form and its parts read, bound first: the parts below take them. The categories before the list
-        // part's own subscription to them, so the category filter's choices read them changed.
-        _productCache.Connect()
-            .SortAndBind(out _products, SortExpressionComparer<Product>.Ascending(p => p.Name))
-            .Subscribe();
-        _categoryCache.Connect()
-            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
-            .Subscribe();
 
         // The parts that hold the recipe and the list. Each subscribes to what it holds alone (the recipe's tabs and which
         // of its tables shows, the list's search and filter), as it's made; what reaches from one part to another, or to
         // the form, is subscribed below, in the order it always ran.
-        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, subAssemblyLineRepository, rawMaterialCategoryRepository);
-        List = new ProductsList(this, _productCache, _categoryCache, Categories, productRepository, folderRepository, viewStateStore);
+        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, Ingredients, Roles, subAssemblyLineRepository, rawMaterialCategoryRepository);
+        List = new ProductsList(this, _productCache, _categoryCache, Categories, NewProductPlace, productRepository, folderRepository, viewStateStore);
 
         // The subscriptions, in this order: two following one property run in the order they were made, and some count on it
         // (WireDetailsTabs). Several run as they're made, WirePicks' included, so each comes after what it reads.
@@ -336,45 +318,21 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// <summary>
     /// The Products list's folders (ProductFolder), in both stages, as last read: the user's own, holding products and other
     /// folders, apart from the categories. A new product started in one of them goes to its stage with it, should it have
-    /// moved to the other since (NewProductStage), as Save would file it there; the header names its place as it is now
-    /// (NewProductTag).
+    /// moved to the other since (NewProductPlace.FoldersRead), as Save would file it there; the header names its place as it
+    /// is now (NewProductTag).
     /// </summary>
     public IReadOnlyList<ProductFolder> Folders
     {
         get => _folders;
         private set
         {
-            if (NewProductFolderId is { } folderId && value.FirstOrDefault(f => f.Id == folderId) is { } folder)
-            {
-                NewProductStage = folder.Stage;
-            }
-
+            NewProductPlace.FoldersRead(value);
             this.RaiseAndSetIfChanged(ref _folders, value);
         }
     }
 
-    private ProductStage _newProductStage = CostingDefaults.DefaultNewProductStage;
-    /// <summary>
-    /// The stage Save files a new product in: the one Settings → Costing Defaults gives a new product after New
-    /// (Production unless it says otherwise), or the stage of the folder New Product Here was picked on (NewProductFolderId).
-    /// Revert keeps it. The header says so (NewProductTag).
-    /// </summary>
-    public ProductStage NewProductStage
-    {
-        get => _newProductStage;
-        private set => this.RaiseAndSetIfChanged(ref _newProductStage, value);
-    }
-
-    private int? _newProductFolderId;
-    /// <summary>
-    /// The user's folder New Product Here started the product in, which Save files it in and Revert keeps; null after New,
-    /// and for a stage's folder: the top of the stage.
-    /// </summary>
-    public int? NewProductFolderId
-    {
-        get => _newProductFolderId;
-        private set => this.RaiseAndSetIfChanged(ref _newProductFolderId, value);
-    }
+    /// <summary>Where Save files a new product: its stage and folder, as New, New Product Here and Settings decide them.</summary>
+    public NewProductPlace NewProductPlace { get; } = new();
 
     /// <summary>What the Category picker lists. A name that isn't one of them is added by typing it (CommitCategoryTextAsync).</summary>
     public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
@@ -465,24 +423,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         set => this.RaiseAndSetIfChanged(ref _editingQuantityRequired, value);
     }
 
-    /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
-    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(EditingQuantityRequired, IsEditingComposite);
-
-    /// <summary>The Costing Summary's price row: "Suggested Selling Price per Piece", or "… per Unit of 8 Pieces".</summary>
-    public string SuggestedSellingPriceLabel => ProductPrintout.SuggestedSellingPriceLabelFor(CostUnitCaption);
-
-    /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
-    public string MaterialCostTooltip => (IsEditingComposite
-        ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
-            + (ComponentsTable.IncludesPackaging ? " and theirs" : string.Empty)
-        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
-        + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
-
-    /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
-    public string MetricBaseTooltip => IsEditingComposite
-        ? $"Of the recipe (ingredients) cost of the products it holds and its own sub-assemblies, packaging not included. {CostUnitCaption}."
-        : $"Of the sub-assemblies (ingredients) cost, packaging not included. {CostUnitCaption}.";
-
     private decimal? _editingCurrentPrice;
     /// <summary>What the shop charges for one sellable unit now, with VAT (Product.CurrentPrice); null when not entered.</summary>
     public decimal? EditingCurrentPrice
@@ -520,52 +460,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// Production" or "Goes in Innovation". Null while a saved product is showing.
     /// </summary>
     public string? NewProductTag => _newProductTag.Value;
-
-    private CostBasis _costBasis;
-    /// <summary>
-    /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
-    /// button (<see cref="ToggleCostBasisCommand"/>) switches it to their true costs for a look without the buffer. It isn't part
-    /// of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the next until
-    /// the app closes. Print prints at it too.
-    /// </summary>
-    public CostBasis CostBasis
-    {
-        get => _costBasis;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _costBasis, value);
-            this.RaisePropertyChanged(nameof(IsUnbuffered));
-            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
-            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
-        }
-    }
-
-    /// <summary>The screen shows its unbuffered costs: the header's badge says so.</summary>
-    public bool IsUnbuffered => CostBasis == CostBasis.Unbuffered;
-
-    private string? _belowCostText;
-    /// <summary>
-    /// The header's "Priced below cost" badge's tooltip, naming the purchased materials in the recipe and packaging that
-    /// prices have risen past their fixed buffered cost (RawMaterialRules.IsBufferedBelowCost): the product is priced at the
-    /// buffered costs, so under what those cost. Null, and no badge, while none is. A composite's products' materials aren't
-    /// in the form, so they aren't counted; each says so when it's opened.
-    /// </summary>
-    public string? BelowCostText
-    {
-        get => _belowCostText;
-        private set => this.RaiseAndSetIfChanged(ref _belowCostText, value);
-    }
-
-    /// <summary>
-    /// The header's switch, named for the costs a click switches to: "Unbuffered" while
-    /// the screen is buffered, "Buffered" while it isn't.
-    /// </summary>
-    public string CostBasisButtonLabel => IsUnbuffered ? "Buffered" : "Unbuffered";
-
-    /// <summary>What the header's switch does from here.</summary>
-    public string CostBasisButtonTooltip => IsUnbuffered
-        ? "Shows every cost on this screen, and prints it, at the materials' buffered costs again. Nothing is saved."
-        : "Shows every cost on this screen, and prints it, at the materials' true costs, without their cost buffers. Nothing is saved.";
 
     /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
@@ -617,7 +511,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// </summary>
     public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
-    /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (<see cref="CostBasis"/>).</summary>
+    /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (ProductCosting.CostBasis).</summary>
     public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
 
     /// <summary>
@@ -651,9 +545,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// Output: the name to add it as, or null if it was cancelled. The page answers it with a dialog (Prompts).
     /// </summary>
     public Interaction<string, string?> PromptForNewCategory { get; } = new();
-
-    /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
-    private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
 
     /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
     private void RepointSelection(Product? fresh) => this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
@@ -693,8 +584,9 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             .ToProperty(this, x => x.HeaderTitle, "New product");
 
         // Its folder's path as it is now: renamed or moved since New Product Here, it says so (Folders).
-        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, x => x.NewProductFolderId, x => x.Folders, (product, stage, folderId, folders) =>
-                product is null ? $"Goes in {ProductFolderRules.PathTitle(folders, stage, folderId)}" : null)
+        _newProductTag = this.WhenAnyValue(
+                x => x.SelectedProduct, x => x.NewProductPlace.Stage, x => x.NewProductPlace.FolderId, x => x.Folders,
+                (product, stage, folderId, folders) => product is null ? $"Goes in {ProductFolderRules.PathTitle(folders, stage, folderId)}" : null)
             .ToProperty(this, x => x.NewProductTag);
     }
 
@@ -837,23 +729,10 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
             .Subscribe(_ => _updates.Run(RecomputeCosts));
 
-        // A composite's products' packaging joining its own, or leaving it: the header's Material Cost tooltip says so too.
+        // A composite's products' packaging joining its own, or leaving it: the header's Material Cost tooltip says so too,
+        // as the Costing part works the captions out again with the costs (ProductCosting.Recompute).
         ComponentsTable.WhenAnyValue(c => c.IncludesPackaging)
-            .Subscribe(_ =>
-            {
-                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-                _updates.Run(RecomputeCosts);
-            });
-
-        // The caption on every figure names what it's for, so it follows the quantity, and a composite's is always one unit.
-        this.WhenAnyValue(x => x.EditingQuantityRequired, x => x.IsEditingComposite)
-            .Subscribe(_ =>
-            {
-                this.RaisePropertyChanged(nameof(CostUnitCaption));
-                this.RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
-                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-                this.RaisePropertyChanged(nameof(MetricBaseTooltip));
-            });
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
     }
 
     /// <summary>Save offers itself whenever the form holds something the saved product doesn't.</summary>
@@ -891,58 +770,23 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         // quantity required), so what each brings is read again; its lines may hold unsaved edits and stay as they are.
         List<int> componentIds = [.. ComponentsTable.ProductIds];
 
-        // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
-        // several times as long as the slowest of them, and the UI thread came back after each to start the next.
-        // Each has its own context (AddDbContextFactory), and none touches ViewModel state.
-        var rolesRead = Task.Run(() => _subAssemblyRoleRepository.GetAllAsync(CancellationToken.None));
-        var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
-        var foldersRead = Task.Run(() => _folderRepository.GetAllAsync(CancellationToken.None));
-        var rawMaterialsRead = Task.Run(() => _rawMaterialRepository.GetAllAsync(CancellationToken.None));
-        var productsRead = Task.Run(() => _productRepository.GetAllAsync(CancellationToken.None));
-        var deletedRead = Task.Run(() => _productRepository.GetDeletedAsync(CancellationToken.None));
-        var linkableRead = Task.Run(() => _subAssemblyRepository.GetLinkableAsync(CancellationToken.None));
-        var standaloneRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
-        var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
-        var linkedSubAssembliesRead = Task.Run(() => _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
-        var linkedLinesRead = Task.Run(() => _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
-        var packagingLinkRead = detailProductId is { } linkProductId
-            ? Task.Run(() => _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
-            : Task.FromResult<PackagingLink?>(null);
-        var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
-        var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
-        await Task.WhenAll(
-            rolesRead, categoriesRead, foldersRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
-            linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
-
-        var roles = await rolesRead;
-        var categories = await categoriesRead;
-        var folders = await foldersRead;
-        var rawMaterials = await rawMaterialsRead;
-        var products = await productsRead;
-        var deleted = await deletedRead;
-        var linkable = await linkableRead;
-        var packagingSets = (await standaloneRead).Where(s => s.Role?.IsPackaging == true).ToList();
-        var costingDefaults = await costingDefaultsRead;
-        var linkedSubAssemblies = await linkedSubAssembliesRead;
-        var linkedLines = await linkedLinesRead;
-        var packagingLink = await packagingLinkRead;
-        var componentLinks = await componentLinksRead;
-        var componentCosts = await componentCostsRead;
+        // Everything at once, on the thread pool (ProductsLoadReader), touching no ViewModel state.
+        var load = await _loadReader.ReadAsync(detailProductId, linkedIds, componentIds);
 
         // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
         // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
         // product's own lines aren't, since they may hold unsaved edits, and nor is a link picked but not saved.
-        var savedLink = packagingLink is null ? null : PackagingLinkTarget.From(packagingLink);
+        var savedLink = load.PackagingLink is { } packagingLink ? PackagingLinkTarget.From(packagingLink) : null;
         var showsSavedLink = savedLink is not null && Packaging.ShowsSavedLink(savedLink);
         var linkedPackagingLines = showsSavedLink
-            ? await _packagingLineRepository.GetEffectiveForProductAsync(packagingLink!.ProductId, CancellationToken.None)
+            ? await _loadReader.ReadLinkedPackagingAsync(load.PackagingLink!.ProductId)
             : null;
 
         // A role made product-owned in Settings, or no longer, since the product was loaded: a section it linked is its
         // own now, or one of its own is linked now. With nothing typed into the form, the product is read again, so what
         // Save compares against is how it's saved now; with something typed, RefreshRows turns the section round
         // in place, and the next Save writes it as it shows.
-        var ownershipChanged = Recipe.UsageEdits.Any(u => linkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
+        var ownershipChanged = Recipe.UsageEdits.Any(u => load.LinkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
             && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
         var reloadDetails = ownershipChanged && !History.IsDirty && detailProductId is not null;
 
@@ -954,25 +798,25 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
         ApplyRefresh(() =>
         {
-            Roles.MergeFrom(roles, r => r.Id);
-            _categoryCache.MergeFrom(categories);
+            Roles.MergeFrom(load.Roles, r => r.Id);
+            _categoryCache.MergeFrom(load.Categories);
             EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
-            Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
-            PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
+            Ingredients.MergeFrom([.. load.RawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
+            PackagingMaterials.MergeFrom([.. load.RawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
             // The Deleted folder and the folders first, so the tree, refreshed as the products merge, files a product
             // deleted, restored or moved since in its new place in one go. The tree is refreshed again for a change to
             // those alone.
-            DeletedProducts = deleted;
-            Folders = folders;
-            _productCache.MergeFrom(products);
+            DeletedProducts = load.DeletedProducts;
+            Folders = load.Folders;
+            _productCache.MergeFrom(load.Products);
             List.RefreshTree();
-            _markupChecks.OnNext(products);
-            _linkable = linkable;
-            Packaging.TakePackagingSets(packagingSets);
-            RefreshCostingDefaults(costingDefaults);
+            _markupChecks.OnNext(load.Products);
+            _linkable = load.Linkable;
+            Packaging.TakePackagingSets(load.PackagingSets);
+            RefreshCostingDefaults(load.CostingDefaults);
 
             // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
-            ComponentsTable.TakeFresh(componentCosts, componentLinks);
+            ComponentsTable.TakeFresh(load.ComponentCosts, load.ComponentLinks);
             RefreshComponentOptions();
 
             RepointSelection(Products.FirstOrDefault(p => p.Id == selectedId));
@@ -988,7 +832,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
                 Packaging.LoadLines(linkedPackagingLines);
             }
 
-            Recipe.RefreshRows(linkedSubAssemblies, linkedLines);
+            Recipe.RefreshRows(load.LinkedSubAssemblies, load.LinkedLines);
 
             // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
             Packaging.ResolveRows();
@@ -1010,11 +854,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         }
 
         // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the product's form.
-        if (_productToOpen is { } productId)
-        {
-            _productToOpen = null;
-            TrySelectProduct(productId);
-        }
+        OpenRecordAskedFor();
 
         if (_subAssemblyToStartFrom is { } subAssemblyId)
         {
@@ -1090,7 +930,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         {
             await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
             await LoadCommand.Execute();
-            TrySelectProduct(product.Id);
+            TrySelectRecord(product.Id);
         });
     }
 
@@ -1170,49 +1010,13 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     }
 
     /// <summary>
-    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Dependents tiles). A search
-    /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
-    /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
-    /// </summary>
-    public void OpenProduct(int productId)
-    {
-        _productToOpen = TrySelectProduct(productId) ? null : productId;
-    }
-
-    /// <summary>
-    /// Opens a product at the end of the next LoadCommand, for the one in the screen's address as the screen opens: its
-    /// list is fresh only then. New clicked meanwhile is the later word, and the product isn't opened over it.
-    /// </summary>
-    public void OpenProductOnLoad(int productId)
-    {
-        _productToOpen = productId;
-    }
-
-    /// <summary>
-    /// <see cref="OpenProduct"/>, asking first about the unsaved changes of the product showing when another is to replace
-    /// it; a deleted one is only picked in the Deleted folder, and replaces nothing. False when the user stays on it.
-    /// </summary>
-    public async Task<bool> OpenProductAsync(int productId)
-    {
-        if (productId != SelectedProduct?.Id
-            && DeletedProducts.All(p => p.Id != productId)
-            && !await ResolveUnsavedChangesAsync(revert: false))
-        {
-            return false;
-        }
-
-        OpenProduct(productId);
-        return true;
-    }
-
-    /// <summary>
     /// Starts a new product that links a standalone sub-assembly, for Sub-Assemblies' New Product. It waits for the next
     /// LoadCommand, which showing the screen runs, so the sub-assembly is found as it's saved now: it may have been made or
     /// renamed there since this screen last loaded.
     /// </summary>
     public void StartNewProductFrom(int subAssemblyId)
     {
-        _productToOpen = null;
+        ForgetRecordToOpen();
         _subAssemblyToStartFrom = subAssemblyId;
     }
 
@@ -1249,34 +1053,27 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         History.RefreshDirty();
     }
 
-    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the product the name means best.</summary>
-    public bool OpenByName(string text)
-    {
-        if (RecordNameMatch.Best(Products, product => product.Name, text) is not { } product)
-        {
-            return false;
-        }
+    protected override int? FindRecordByName(string text) => RecordNameMatch.Best(Products, product => product.Name, text)?.Id;
 
-        _ = RunSafelyAsync(() => OpenProductAsync(product.Id));
-        return true;
-    }
+    /// <summary>Any product but the one showing, and not a deleted one: that's only picked in the Deleted folder, and replaces nothing.</summary>
+    protected override bool ReplacesShowing(int id) => id != SelectedProduct?.Id && DeletedProducts.All(p => p.Id != id);
 
-    private bool TrySelectProduct(int productId)
+    protected override bool TrySelectRecord(int id)
     {
         // A deleted one (a Dependents tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
-        if (DeletedProducts.Any(p => p.Id == productId))
+        if (DeletedProducts.Any(p => p.Id == id))
         {
-            if (List.ProductTree.Find(productId) is null)
+            if (List.ProductTree.Find(id) is null)
             {
                 List.ClearListFilters();
             }
 
             List.ProductTree.DeletedFolder.IsExpanded = true;
-            List.SelectedTreeNode = List.ProductTree.Find(productId);
+            List.SelectedTreeNode = List.ProductTree.Find(id);
             return true;
         }
 
-        if (Products.FirstOrDefault(p => p.Id == productId) is not { } product)
+        if (Products.FirstOrDefault(p => p.Id == id) is not { } product)
         {
             return false;
         }
@@ -1297,7 +1094,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// </summary>
     private void NewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
-        _productToOpen = null;
+        ForgetRecordToOpen();
         _subAssemblyToStartFrom = null;
         StartNewProduct(stage, folderId, isComposite);
     }
@@ -1310,9 +1107,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// </summary>
     private void StartNewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
-        _newProductInDefaultStage = stage is null;
-        NewProductStage = stage ?? _defaultNewProductStage;
-        NewProductFolderId = stage is null ? null : folderId;
+        NewProductPlace.StartNew(stage, folderId);
         SelectedProduct = null;
         FormVersion++;
         _editingId = 0;
@@ -1474,8 +1269,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             CurrentPrice = EditingCurrentPrice,
 
             // Only a new product's is written: a saved one's changes by moving it in the list.
-            Stage = NewProductStage,
-            FolderId = NewProductFolderId,
+            Stage = NewProductPlace.Stage,
+            FolderId = NewProductPlace.FolderId,
 
             // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
             IsComposite = IsEditingComposite,
@@ -1695,17 +1490,13 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     {
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
         var shopFiguresChanged = Costing.SetDefaults(defaults);
-        _defaultNewProductStage = defaults.NewProductStage;
         if (shopFiguresChanged)
         {
             // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing
             // tab follows at once.
             RecomputeCosts();
         }
-        if (_editingId == 0 && _newProductInDefaultStage)
-        {
-            NewProductStage = _defaultNewProductStage;
-        }
+        NewProductPlace.TakeDefault(defaults.NewProductStage, formIsNew: _editingId == 0);
         if (untouchedNewProduct)
         {
             Costing.ApplyDefaults();
@@ -1724,18 +1515,20 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// </summary>
     private void ToggleCostBasis()
     {
-        CostBasis = CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
-        this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+        Costing.CostBasis = Costing.CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
         UsageForm.Reprice();
         Packaging.Reprice();
         ComponentsTable.Reprice();
 
         RecomputeCosts();
         UsageForm.Recompute();
-        VersionHistory.Reprice(CostBasis);
+        VersionHistory.Reprice(Costing.CostBasis);
     }
 
-    /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
+    /// <summary>
+    /// The cost summary, its captions and the below-cost warning (ProductCosting.Recompute), from the recipe and packaging
+    /// as they are now, the product's fields and the costing.
+    /// </summary>
     private void RecomputeCosts()
     {
         // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
@@ -1754,35 +1547,20 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
         var usages = Recipe.UsageEdits;
-        Costing.Recompute(new ProductCostInputs
-        {
-            Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
-            QuantityRequired = EditingQuantityRequired,
-            PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
-            ComponentPackaging = componentPackaging,
-            CurrentPrice = EditingCurrentPrice,
-            IsComposite = IsEditingComposite,
-            HasOwnSections = IsEditingComposite && usages.Count > 0,
-        },
-        EditingCategory?.WastagePercent);
-
-        List<string> belowCost =
-        [
-            .. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())
-                .Where(RawMaterialRules.IsBufferedBelowCost)
-                .Select(m => m.Name)
-                .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                .Order(StringComparer.CurrentCultureIgnoreCase),
-        ];
-        BelowCostText = belowCost.Count switch
-        {
-            0 => null,
-            1 => $"Prices have risen past the buffered cost of {belowCost[0]}, so this product is priced under what it costs. "
-                + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.",
-            _ => $"Prices have risen past the buffered costs of {string.Join(", ", belowCost[..^1])} and {belowCost[^1]}, so this "
-                + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
-        };
+        Costing.Recompute(
+            new ProductCostInputs
+            {
+                Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(Costing.CostBasis)))],
+                QuantityRequired = EditingQuantityRequired,
+                PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
+                ComponentPackaging = componentPackaging,
+                CurrentPrice = EditingCurrentPrice,
+                IsComposite = IsEditingComposite,
+                HasOwnSections = IsEditingComposite && usages.Count > 0,
+            },
+            EditingCategory?.WastagePercent,
+            usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
+                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>()));
     }
 
     /// <summary>
@@ -1827,14 +1605,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     private ProductPrintout CurrentPrintout() => new(
         string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
         EditingCategory?.Name ?? "Uncategorized",
-        ProductRules.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
-        CostUnitCaption,
+        ProductRules.StageTitle(SelectedProduct?.Stage ?? NewProductPlace.Stage),
+        Costing.CostUnitCaption,
         LastUpdatedText,
         _detailProductId is null
             ? ProductPrintout.NotSavedNote
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
-        [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), CostBasis))],
+        [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), Costing.CostBasis))],
         Packaging.LineEdits.Count > 0 || Packaging.BulkEdits.Count > 0
             ? PrintedPackaging.From(
                 Packaging.LineEdits.Select(l => l.ToPriced()),
@@ -1844,7 +1622,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
     {
-        CostBasis = CostBasis,
+        CostBasis = Costing.CostBasis,
     };
 
     /// <summary>
@@ -1928,7 +1706,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         {
             // A new composite named in the list keeps its row until it's saved: put back blank, it has none.
             List.EndNewRow();
-            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, NewProductFolderId, IsEditingComposite);
+            StartNewProduct(NewProductPlace.ChosenStage, NewProductPlace.FolderId, IsEditingComposite);
             return;
         }
 
@@ -1940,7 +1718,10 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         await LoadProductDetailAsync(product, CancellationToken.None);
     }
 
-    /// <summary>The form as it stands: everything an undo step puts back. See ProductFormSnapshot for what's left out.</summary>
+    /// <summary>
+    /// The form as it stands: everything an undo step puts back, the product's own fields and its costing, and each part's
+    /// own share. See ProductFormSnapshot for what's left out.
+    /// </summary>
     protected override ProductFormSnapshot CaptureSnapshot() => new()
     {
         EditingId = _editingId,
@@ -1952,35 +1733,10 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         CategoryId = EditingCategory?.Id,
         CloneName = EditingCloneName,
         Costing = Costing.Percentages,
-        Usages = [.. Recipe.UsageEdits],
-        SelectedTab = Recipe.CaptureTabChoice(),
-        HasAddSubAssemblyTab = Recipe.RecipeTabs.Contains(Recipe.AddSubAssemblyTab),
-        PackagingLink = Packaging.LinkTarget,
-        IsPackagingMoving = Packaging.IsPackagingMoving,
-        Lines = [.. Packaging.LineEdits.Select(PackagingLineState.Of)],
-        BulkLines = [.. Packaging.BulkEdits.Select(PackagingLineState.Of)],
-        BulkQuantity = Packaging.BulkQuantity,
+        Recipe = Recipe.Capture(),
+        Packaging = Packaging.Capture(),
         Components = ComponentsTable.Capture(),
-        IsUsageFormOpen = UsageForm.IsUsageFormOpen,
-        IsAddingUsage = UsageForm.IsAddingUsage,
-        UsageFormTitle = UsageForm.UsageFormTitle,
-        UsageMode = UsageForm.EditingUsageMode,
-        IsFormEditingLines = UsageForm.IsFormEditingLines,
-        IsFormPickingSource = UsageForm.IsFormPickingSource,
-        EditingUsageIndex = UsageForm.EditingUsage is { } editing && Recipe.UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
-        UsageRoleId = UsageForm.EditingUsageRole?.Id,
-        UsageName = UsageForm.EditingUsageName,
-        UsageSourceKey = UsageForm.EditingUsageSource?.Key,
-        FormLines = [.. UsageForm.FormLines.Select(CaptureIngredientLine)],
-        FormAddIns = [.. UsageForm.FormAddIns.Select(CaptureIngredientLine)],
-        FormFormulaBase = UsageForm.FormFormulaBase,
-        UsageAuthoredField = UsageForm.AuthoredField,
-        UsageWeightPerPiece = UsageForm.EditingUsageWeightPerPiece,
-        UsageYield = UsageForm.EditingUsageYield,
     };
-
-    private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
-        new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
 
     /// <summary>
     /// Puts the whole form back as <paramref name="snapshot"/> had it. Order matters throughout, and is explained
@@ -1995,11 +1751,9 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
         ApplyRestore(() => _updates.Batch(() =>
         {
-            // 1. The form goes first. EditingUsage has to be null before the sections are replaced: the tab mirror
-            //    refills FormLines from a section that replaces the one being edited, which would undo this restore.
-            Recipe.CloseUsageForm();
-            UsageForm.SelectedFormLine = null;
-            UsageForm.SelectedFormAddIn = null;
+            // 1. The form goes first (ProductRecipe.CloseForRestore): its section has to be let go of before the sections
+            //    are replaced. No row stays picked in any table.
+            Recipe.CloseForRestore();
             Packaging.SelectedLineEdit = null;
             Packaging.SelectedBulkEdit = null;
             ComponentsTable.SelectedComponentEdit = null;
@@ -2018,58 +1772,16 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             // 3. Costing.
             Costing.Percentages = snapshot.Costing;
 
-            // 4. Packaging. The link as saved is deliberately left alone: it's what Save compares against. Showing the
-            //    link ends a Move to Sub-Assemblies, so the move goes back after it.
-            Packaging.ShowLink(snapshot.PackagingLink);
-            Packaging.IsPackagingMoving = snapshot.IsPackagingMoving;
-            Packaging.LineEdits.Clear();
-            foreach (var line in snapshot.Lines)
-            {
-                Packaging.LineEdits.Add(RestoreLine(line));
-            }
-
-            Packaging.BulkEdits.Clear();
-            foreach (var line in snapshot.BulkLines)
-            {
-                Packaging.BulkEdits.Add(RestoreLine(line));
-            }
-
-            Packaging.BulkQuantity = snapshot.BulkQuantity;
+            // 4. Packaging (ProductPackaging.Restore), the link as saved left alone: it's what Save compares against.
+            Packaging.Restore(snapshot.Packaging);
 
             // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
             // read now, and prices the line when it arrives).
             ComponentsTable.Restore(snapshot.Components);
 
-            // 5. The sections and their tabs, under the recipe's guard against applying the form the tab moves off
-            //    (ProductRecipe.RestoreSections).
-            Recipe.RestoreSections(snapshot.Usages, snapshot.HasAddSubAssemblyTab, snapshot.SelectedTab);
-
-            // 6. The form itself, last. The option lists are rebuilt before the pickers are put back, as a load does,
-            //    and RefreshLinkableOptions runs inside the guard: outside it, the source it can null would start a
-            //    load that clears the very lines being restored.
-            UsageForm.IsAddingUsage = snapshot.IsAddingUsage;
-            UsageForm.UsageFormTitle = snapshot.UsageFormTitle;
-            UsageForm.RestoreMode(snapshot.UsageMode);
-            UsageForm.IsFormEditingLines = snapshot.IsFormEditingLines;
-            UsageForm.IsFormPickingSource = snapshot.IsFormPickingSource;
-
-            Recipe.RefreshLinkableOptions();
-            Recipe.RefreshFormRoleOptions();
-
-            UsageForm.RestorePicks(
-                snapshot.UsageRoleId is { } roleId ? UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null,
-                snapshot.UsageSourceKey is { } sourceKey ? UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null,
-                snapshot.UsageName);
-
-            UsageForm.FormFormulaBase = snapshot.FormFormulaBase;
-            RestoreIngredientLines(UsageForm.FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
-            RestoreIngredientLines(UsageForm.FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
-            UsageForm.RestorePieceSize(snapshot.UsageAuthoredField, snapshot.UsageWeightPerPiece, snapshot.UsageYield);
-
-            UsageForm.EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < Recipe.UsageEdits.Count
-                ? Recipe.UsageEdits[usageIndex]
-                : null;
-            UsageForm.IsUsageFormOpen = snapshot.IsUsageFormOpen;
+            // 5 and 6. The sections and their tabs, under the recipe's guard against applying the form the tab moves off,
+            //    then the form itself, last, its option lists rebuilt before its pickers are put back (ProductRecipe.Restore).
+            Recipe.Restore(snapshot.Recipe);
         }));
 
         // 8. One pass over the restored form, after the batch. FormLinesChanged is the recipe's own "the lines
@@ -2092,28 +1804,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         }
     }
 
-    private void RestoreIngredientLines(
-        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineState> states, decimal baseWeight)
-    {
-        rows.Clear();
-        foreach (var state in states)
-        {
-            rows.Add(IngredientLineRow.Restore(
-                id => Ingredients.FirstOrDefault(m => m.Id == id),
-                baseWeight,
-                state.IngredientId,
-                state.Grams,
-                state.IsFormulaBase,
-                state.AuthoredBakersPercent));
-        }
-    }
-
-    private PackagingLineRow RestoreLine(PackagingLineState state) => PackagingLineRow.Restore(state, FindPackagingMaterial);
-
     // What the list asks of the screen (IProductsListHost): the lists it loaded, the product the form shows, and what the
     // list's actions do to them.
-    IReadOnlyList<Product> IProductsListHost.Products => Products;
-
     IReadOnlyList<ProductFolder> IProductsListHost.Folders
     {
         get => Folders;
@@ -2123,7 +1815,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     async Task IProductsListHost.LoadAsync() => await LoadCommand.Execute();
 
     void IProductsListHost.Pick(Product product) =>
-        PickFromList(product.Id, () => SelectedProduct = product, List.SyncTreeSelection, OpenProductAsync);
+        PickFromList(product.Id, () => SelectedProduct = product, List.SyncTreeSelection);
 
     void IProductsListHost.StartNew(ProductStage? stage, int? folderId, bool isComposite) => NewProduct(stage, folderId, isComposite);
 
@@ -2186,14 +1878,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         }
     }
 
-    void IProductsListHost.FolderDeleted(int folderId, int? parentId)
-    {
-        if (NewProductFolderId == folderId)
-        {
-            NewProductFolderId = parentId;
-        }
-    }
-
     Task IProductsListHost.CloneAsync(Product product, string name) => MakeFromAsync(product.Id, name, _productCloner.CloneAsync, ClonedFrom);
 
     Task IProductsListHost.CreateVariantAsync(Product product, string name) => MakeFromAsync(product.Id, name, _productCloner.CreateVariantAsync, VariantOf);
@@ -2208,47 +1892,39 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
     void IProductsListHost.Print(PrintScope scope) => _printRequests.OnNext(scope);
 
-    // What the recipe asks of the screen (IProductRecipeHost): the lists it loaded and the product's costs.
-    IReadOnlyList<RawMaterial> IProductRecipeHost.Ingredients => Ingredients;
-
-    IReadOnlyList<SubAssemblyRole> IProductRecipeHost.Roles => Roles;
-
+    // What the recipe asks of the screen (IProductRecipeHost): what can be linked, the product showing and its costs.
     IReadOnlyList<SubAssembly> IProductRecipeHost.Linkable => _linkable;
 
     int? IProductRecipeHost.DetailProductId => _detailProductId;
 
     void IProductRecipeHost.RecomputeCosts() => RecomputeCosts();
 
+    void IProductRecipeHost.OpenProduct(int productId) => OpenRecord(productId);
+
     void IProductRecipeHost.OpenSubAssembly(int subAssemblyId) => _subAssemblyOpenRequests.OnNext(subAssemblyId);
 
-    // What the Packaging tab asks of the screen (IProductPackagingHost); its cost basis is the screen's own CostBasis.
-    IReadOnlyList<RawMaterial> IProductPackagingHost.PackagingMaterials => PackagingMaterials;
+    // What the Packaging tab asks of the screen (IProductPackagingHost); its cost basis is the Costing part's.
+    CostBasis IProductPackagingHost.CostBasis => Costing.CostBasis;
 
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
     void IProductPackagingHost.RecomputeCosts() => RecomputeCosts();
 
-    // What the composite's Products table asks of the screen (IProductComponentsHost); its cost basis is the screen's own.
-    IReadOnlyList<Product> IProductComponentsHost.Products => Products;
+    // What the composite's Products table asks of the screen (IProductComponentsHost): its cost basis, the Costing part's.
+    CostBasis IProductComponentsHost.CostBasis => Costing.CostBasis;
 
-    // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the screen's own CostBasis.
-    IReadOnlyList<RawMaterial> IProductUsageFormHost.Ingredients => Ingredients;
+    // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the Costing part's.
+    CostBasis IProductUsageFormHost.CostBasis => Costing.CostBasis;
 
     IReadOnlyList<SubAssembly> IProductUsageFormHost.Linkable => _linkable;
 
     IEnumerable<int> IProductUsageFormHost.SectionSubAssemblyIds => Recipe.UsageEdits.Select(u => u.SubAssemblyId);
 
-    // What the History tab asks of the screen (IProductVersionHistoryHost): the product showing, the lists as last loaded,
-    // and the form a restored version goes into. Its cost basis and Packaging tab are the screen's own.
+    // What the History tab asks of the screen (IProductVersionHistoryHost): the product showing, the costs it prices at, and
+    // the form a restored version goes into. Its Packaging tab is the screen's own.
     Product? IProductVersionHistoryHost.ProductShowing => AreDetailsReady ? SelectedProduct : null;
 
-    IReadOnlyList<Product> IProductVersionHistoryHost.Products => Products;
-
-    IReadOnlyList<RawMaterial> IProductVersionHistoryHost.Ingredients => Ingredients;
-
-    IReadOnlyList<RawMaterial> IProductVersionHistoryHost.PackagingMaterials => PackagingMaterials;
-
-    IReadOnlyList<SubAssemblyRole> IProductVersionHistoryHost.Roles => Roles;
+    CostBasis IProductVersionHistoryHost.CostBasis => Costing.CostBasis;
 
     IReadOnlySet<int> IProductVersionHistoryHost.OwnedSectionIds => Recipe.SavedOwnSectionIds;
 
@@ -2263,29 +1939,32 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     {
         // The form goes, as any restore closes it: what it held comes back with Undo.
         Recipe.CloseUsageForm();
+        var now = CaptureSnapshot();
         RestoreSnapshot(
-            CaptureSnapshot() with
+            now with
             {
                 CurrentPrice = version.CurrentPrice,
                 QuantityRequired = version.QuantityRequired,
                 IncludesComponentPackaging = version.IncludesComponentPackaging,
                 Costing = version.Costing,
-                Usages = version.Sections,
-                SelectedTab = version.Sections.Count > 0 ? new RecipeTabChoice.Usage(0)
-                    : version.IsComposite ? new RecipeTabChoice.Components()
-                    : new RecipeTabChoice.Packaging(),
-                HasAddSubAssemblyTab = false,
-                PackagingLink = version.PackagingLink,
-                IsPackagingMoving = false,
-                Lines = version.PackagingLines,
-                BulkLines = version.BulkLines,
-                BulkQuantity = version.BulkQuantity,
+                Recipe = now.Recipe with
+                {
+                    Usages = version.Sections,
+                    SelectedTab = version.Sections.Count > 0 ? new RecipeTabChoice.Usage(0)
+                        : version.IsComposite ? new RecipeTabChoice.Components()
+                        : new RecipeTabChoice.Packaging(),
+                    HasAddSubAssemblyTab = false,
+                    Form = now.Recipe.Form with { IsOpen = false, IsAdding = false, EditingUsageIndex = null, Lines = [], AddIns = [] },
+                },
+                Packaging = new PackagingSnapshot
+                {
+                    Link = version.PackagingLink,
+                    IsMoving = false,
+                    Lines = version.PackagingLines,
+                    BulkLines = version.BulkLines,
+                    BulkQuantity = version.BulkQuantity,
+                },
                 Components = version.Components,
-                IsUsageFormOpen = false,
-                IsAddingUsage = false,
-                EditingUsageIndex = null,
-                FormLines = [],
-                FormAddIns = [],
             },
             null);
 

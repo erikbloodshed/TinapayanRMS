@@ -21,17 +21,13 @@ public enum PackagingSourceMode
 
 /// <summary>
 /// What the Packaging tab (<see cref="ProductPackaging"/>) asks of the Products screen, besides its runners, messages and
-/// undo steps: the screen's cost basis and packaging materials, which its rows are priced at and from, the other products,
-/// whose packaging Copy offers, and the product's costs worked out again. The screen implements it explicitly, as Raw
-/// Materials does IBrandPriceRowHost.
+/// undo steps: the screen's cost basis, which its rows are priced at, the other products, whose packaging Copy offers, and
+/// the product's costs worked out again. The screen implements it explicitly, as Raw Materials does IBrandPriceRowHost.
 /// </summary>
 public interface IProductPackagingHost : IScreenPartHost, IUndoRecorder
 {
     /// <summary>Which of the materials' costs the screen shows, buffered or not: what a row is priced at.</summary>
     CostBasis CostBasis { get; }
-
-    /// <summary>The packaging materials as the screen last loaded them, which a row prices itself from.</summary>
-    IReadOnlyList<RawMaterial> PackagingMaterials { get; }
 
     /// <summary>Every product but the one showing, whose packaging Copy offers.</summary>
     IEnumerable<Product> OtherProducts { get; }
@@ -51,6 +47,7 @@ public interface IProductPackagingHost : IScreenPartHost, IUndoRecorder
 public sealed class ProductPackaging : ReactiveObject
 {
     private readonly IProductPackagingHost _host;
+    private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly IPackagingLineRepository _packagingLineRepository;
 
@@ -69,10 +66,16 @@ public sealed class ProductPackaging : ReactiveObject
     /// <summary>How many products a bulk pack held as last loaded.</summary>
     private int? _savedBulkQuantity;
 
-    /// <param name="host">The Products screen: its cost basis and materials, its runners and messages, and its undo steps.</param>
-    public ProductPackaging(IProductPackagingHost host, ISubAssemblyRepository subAssemblyRepository, IPackagingLineRepository packagingLineRepository)
+    /// <param name="host">The Products screen: its cost basis, its runners and messages, and its undo steps.</param>
+    /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a row prices itself from.</param>
+    public ProductPackaging(
+        IProductPackagingHost host,
+        IReadOnlyList<RawMaterial> packagingMaterials,
+        ISubAssemblyRepository subAssemblyRepository,
+        IPackagingLineRepository packagingLineRepository)
     {
         _host = host;
+        _packagingMaterials = packagingMaterials;
         _subAssemblyRepository = subAssemblyRepository;
         _packagingLineRepository = packagingLineRepository;
 
@@ -247,7 +250,7 @@ public sealed class ProductPackaging : ReactiveObject
     public IEnumerable<PackagingLineRow> AllLineEdits => LineEdits.Concat(BulkEdits);
 
     /// <summary>Every row pointed at its material as the screen last loaded it, at its refreshed cost and units, in place.</summary>
-    public void ResolveRows() => PackagingLineRow.Resolve(AllLineEdits, _host.PackagingMaterials.ToDictionary(m => m.Id));
+    public void ResolveRows() => PackagingLineRow.Resolve(AllLineEdits, _packagingMaterials.ToDictionary(m => m.Id));
 
     /// <summary>Every row priced at the screen's cost basis again: Unbuffered or Buffered was pressed.</summary>
     public void Reprice()
@@ -259,7 +262,7 @@ public sealed class ProductPackaging : ReactiveObject
     }
 
     /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
-    private RawMaterial? FindMaterial(int id) => _host.PackagingMaterials.FirstOrDefault(m => m.Id == id);
+    private RawMaterial? FindMaterial(int id) => _packagingMaterials.FirstOrDefault(m => m.Id == id);
 
     /// <summary>The packaging sets as LoadCommand read them: what Link offers, and Copy before the other products.</summary>
     public void TakePackagingSets(IReadOnlyList<SubAssembly> packagingSets) => _packagingSets = packagingSets;
@@ -447,7 +450,7 @@ public sealed class ProductPackaging : ReactiveObject
     /// <summary>
     /// What the per-piece packaging links as the form stands, saved or not, and the Packaging tab's banner. A load, Link,
     /// Copy, Make a Copy and Remove Link all come through here, so a Move to Sub-Assemblies waiting for Save ends here too;
-    /// an undo puts it back afterwards (the screen's RestoreSnapshot).
+    /// an undo puts it back afterwards (<see cref="Restore"/>).
     /// </summary>
     public void ShowLink(PackagingLinkTarget? target)
     {
@@ -515,6 +518,40 @@ public sealed class ProductPackaging : ReactiveObject
         LoadLink(null);
         _savedLines = [];
         LoadBulk([], null);
+    }
+
+    /// <summary>The tab as one undo step keeps it: what it links, the move to Sub-Assemblies, its lines and its bulk packaging.</summary>
+    public PackagingSnapshot Capture() => new()
+    {
+        Link = LinkTarget,
+        IsMoving = IsPackagingMoving,
+        Lines = [.. LineEdits.Select(PackagingLineState.Of)],
+        BulkLines = [.. BulkEdits.Select(PackagingLineState.Of)],
+        BulkQuantity = BulkQuantity,
+    };
+
+    /// <summary>
+    /// Puts the tab back as <paramref name="snapshot"/> had it, for an undo (the screen's RestoreSnapshot, which has taken
+    /// the rows picked away first). The link as saved is deliberately left alone: it's what Save compares against. Showing
+    /// the link ends a Move to Sub-Assemblies, so the move goes back after it.
+    /// </summary>
+    public void Restore(PackagingSnapshot snapshot)
+    {
+        ShowLink(snapshot.Link);
+        IsPackagingMoving = snapshot.IsMoving;
+        LineEdits.Clear();
+        foreach (var line in snapshot.Lines)
+        {
+            LineEdits.Add(PackagingLineRow.Restore(line, FindMaterial));
+        }
+
+        BulkEdits.Clear();
+        foreach (var line in snapshot.BulkLines)
+        {
+            BulkEdits.Add(PackagingLineRow.Restore(line, FindMaterial));
+        }
+
+        BulkQuantity = snapshot.BulkQuantity;
     }
 
     /// <summary>The packaging lines as they're typed, those filled in; a line half filled in is refused (BusinessRuleException).</summary>

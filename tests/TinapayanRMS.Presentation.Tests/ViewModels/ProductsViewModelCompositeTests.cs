@@ -71,8 +71,8 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.IsEditingComposite.Should().BeTrue();
         viewModel.IsEditingSingle.Should().BeFalse("Quantity Required's box shows only for a product of sub-assemblies");
         viewModel.HeaderTitle.Should().Be("New composite product");
-        viewModel.CostUnitCaption.Should().Be("Per unit");
-        viewModel.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit");
+        viewModel.Costing.CostUnitCaption.Should().Be("Per unit");
+        viewModel.Costing.SuggestedSellingPriceLabel.Should().Be("Suggested Selling Price per Unit");
         viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.ComponentsTab, viewModel.Recipe.PackagingTab);
         viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.ComponentsTab);
         viewModel.Recipe.IsComponentsShowing.Should().BeTrue();
@@ -479,7 +479,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         await ((ReactiveCommand<ProductFolderNode?, RxVoid>)here.Command!).Execute((ProductFolderNode?)here.Parameter);
 
         viewModel.IsEditingComposite.Should().BeTrue();
-        viewModel.NewProductStage.Should().Be(ProductStage.Production);
+        viewModel.NewProductPlace.Stage.Should().Be(ProductStage.Production);
         viewModel.NewProductTag.Should().Be("Goes in Production");
     });
 

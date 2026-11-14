@@ -9,27 +9,27 @@
     <div class="costing-columns">
         <div class="costing-metrics">
             <div class="cost-tile cost-labor">
-                <label class="form-label" for="cost-labor" title="@ViewModel.MetricBaseTooltip">Labor Metric</label>
+                <label class="form-label" for="cost-labor" title="@ViewModel.Costing.MetricBaseTooltip">Labor Metric</label>
                 <NumberField ID="cost-labor" TValue="decimal" @bind-Value="ViewModel.Costing.EditingLaborPercent" Format="N1" Min="0" Suffix="%" />
-                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingLaborAmount" Format="N2" Min="0" Tooltip="@($"The labor cost, {ViewModel.CostUnitCaption}. Typing it sets the percentage.")" />
+                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingLaborAmount" Format="N2" Min="0" Tooltip="@($"The labor cost, {ViewModel.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@ViewModel.Costing.Costs.LaborShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-overhead">
-                <label class="form-label" for="cost-overhead" title="@ViewModel.MetricBaseTooltip">Overhead Metric</label>
+                <label class="form-label" for="cost-overhead" title="@ViewModel.Costing.MetricBaseTooltip">Overhead Metric</label>
                 <NumberField ID="cost-overhead" TValue="decimal" @bind-Value="ViewModel.Costing.EditingOverheadPercent" Format="N1" Min="0" Suffix="%" />
-                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingOverheadAmount" Format="N2" Min="0" Tooltip="@($"The overhead cost, {ViewModel.CostUnitCaption}. Typing it sets the percentage.")" />
+                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingOverheadAmount" Format="N2" Min="0" Tooltip="@($"The overhead cost, {ViewModel.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@ViewModel.Costing.Costs.OverheadShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-administrative">
-                <label class="form-label" for="cost-administrative" title="@($"Administrative: office, permits, bookkeeping. {ViewModel.MetricBaseTooltip}")">Admin Metric</label>
+                <label class="form-label" for="cost-administrative" title="@($"Administrative: office, permits, bookkeeping. {ViewModel.Costing.MetricBaseTooltip}")">Admin Metric</label>
                 <NumberField ID="cost-administrative" TValue="decimal" @bind-Value="ViewModel.Costing.EditingAdministrativePercent" Format="N1" Min="0" Suffix="%" />
-                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingAdministrativeAmount" Format="N2" Min="0" Tooltip="@($"The administrative cost, {ViewModel.CostUnitCaption}. Typing it sets the percentage.")" />
+                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingAdministrativeAmount" Format="N2" Min="0" Tooltip="@($"The administrative cost, {ViewModel.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@ViewModel.Costing.Costs.AdministrativeShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-markup">
                 <label class="form-label" for="cost-markup" title="On the base cost: materials, wastage, labor, overhead and administrative">Markup Metric</label>
                 <NumberField ID="cost-markup" TValue="decimal" @bind-Value="ViewModel.Costing.EditingMarginPercent" Format="N1" Min="0" Suffix="%" />
-                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingMarkupAmount" Format="N2" Min="0" Tooltip="@($"The markup, {ViewModel.CostUnitCaption}, before VAT. Typing it sets the percentage.")" />
+                <NumberField TValue="decimal" @bind-Value="ViewModel.Costing.EditingMarkupAmount" Format="N2" Min="0" Tooltip="@($"The markup, {ViewModel.Costing.CostUnitCaption}, before VAT. Typing it sets the percentage.")" />
                 <span class="tile-caption">@ViewModel.Costing.Costs.MarkupShare.ToString("N1")% of the price</span>
             </div>
         </div>
@@ -39,7 +39,7 @@
                 <thead>
                     <tr>
                         <th>Component</th>
-                        <th class="number">@ViewModel.CostUnitCaption</th>
+                        <th class="number">@ViewModel.Costing.CostUnitCaption</th>
                         <th class="number">% of Price</th>
                     </tr>
                 </thead>
@@ -94,7 +94,7 @@
                 <thead>
                     <tr>
                         <th>Component</th>
-                        <th class="number" title="@($"{ViewModel.SuggestedSellingPriceLabel}: what the costing works out, the base cost with the Markup Metric on it, then VAT")">Suggested Price</th>
+                        <th class="number" title="@($"{ViewModel.Costing.SuggestedSellingPriceLabel}: what the costing works out, the base cost with the Markup Metric on it, then VAT")">Suggested Price</th>
                         <th class="percent"></th>
                         <th class="number" title="@CurrentPriceTooltip">Current Price</th>
                         <th class="percent"></th>
@@ -142,8 +142,8 @@
     private ProductCostSummary Costs => ViewModel.Costing.Costs;
 
     private string CurrentPriceTooltip => Costs.CurrentPrice is null
-        ? $"No current price yet: type what the shop charges, {ViewModel.CostUnitCaption.ToLowerInvariant()} with VAT, in Current Price above to compare."
-        : $"What the shop charges now, {ViewModel.CostUnitCaption.ToLowerInvariant()} with VAT (Current Price above), and what it earns once VAT is taken out.";
+        ? $"No current price yet: type what the shop charges, {ViewModel.Costing.CostUnitCaption.ToLowerInvariant()} with VAT, in Current Price above to compare."
+        : $"What the shop charges now, {ViewModel.Costing.CostUnitCaption.ToLowerInvariant()} with VAT (Current Price above), and what it earns once VAT is taken out.";
 
     // Red when the price doesn't cover the base cost, amber when it earns less than the Markup Metric, as the header's Markup %.
     private string CurrentMarkupClass => Costs.IsCurrentPriceBelowCost ? "figure-error" : Costs.IsBelowTargetMarkup ? "figure-warning" : "";

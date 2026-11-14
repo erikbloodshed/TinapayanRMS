@@ -3,7 +3,7 @@
 <div class="section-view">
     <div class="section-heading">
         <p class="caption">@ViewModel.ComponentsTable.Caption</p>
-        <span class="caption">@ViewModel.CostUnitCaption · @ViewModel.ComponentsTable.ComponentsCost.ToString("N2")</span>
+        <span class="caption">@ViewModel.Costing.CostUnitCaption · @ViewModel.ComponentsTable.ComponentsCost.ToString("N2")</span>
     </div>
 
     <LineGrid TRow="ProductComponentRow" Items="ViewModel.ComponentsTable.ComponentEdits" NewItem="ViewModel.ComponentsTable.NewComponentRow" IsBlank="r => r.IsBlank" @bind-SelectedItem="ViewModel.ComponentsTable.SelectedComponentEdit" Reorderable="true">

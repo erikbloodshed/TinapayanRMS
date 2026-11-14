@@ -28,16 +28,16 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
-        viewModel.CostBasis.Should().Be(CostBasis.Buffered, "the screen starts on the buffered costs");
-        viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
+        viewModel.Costing.CostBasis.Should().Be(CostBasis.Buffered, "the screen starts on the buffered costs");
+        viewModel.Costing.CostBasisButtonLabel.Should().Be("Unbuffered");
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
         viewModel.UsageForm.UsageFormBatchCostText.Should().Be($"{50m:N2}");
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        viewModel.IsUnbuffered.Should().BeTrue();
-        viewModel.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
+        viewModel.Costing.IsUnbuffered.Should().BeTrue();
+        viewModel.Costing.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.00m, 25m), "50 g of 1,000 g of flour at 0.04, and a box at 25");
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.04m);
         viewModel.Packaging.LineEdits.Single().UnitCost.Should().Be(25m);
@@ -55,8 +55,8 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
 
         await viewModel.ToggleCostBasisCommand.Execute();
 
-        viewModel.IsUnbuffered.Should().BeFalse();
-        viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
+        viewModel.Costing.IsUnbuffered.Should().BeFalse();
+        viewModel.Costing.CostBasisButtonLabel.Should().Be("Unbuffered");
         (viewModel.Costing.Costs.SubAssemblies, viewModel.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
         viewModel.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.CostBasis.Should().Be(CostBasis.Buffered);
@@ -92,7 +92,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == cheeseRollId && viewModel.UsageForm.FormLines.Count == 1,
             () => $"selected={viewModel.SelectedProduct?.Id}, lines={viewModel.UsageForm.FormLines.Count}");
 
-        viewModel.IsUnbuffered.Should().BeTrue();
+        viewModel.Costing.IsUnbuffered.Should().BeTrue();
         viewModel.UsageForm.FormLines.Single().CostBasis.Should().Be(CostBasis.Unbuffered);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
     });
@@ -133,7 +133,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
-        viewModel.BelowCostText.Should().BeNull("the flour and the box are costed above what they cost");
+        viewModel.Costing.BelowCostText.Should().BeNull("the flour and the box are costed above what they cost");
 
         // The flour's price goes past its buffered cost, as a new brand price leaves it; then the box's too.
         await using (var dbContext = CreateDbContext())
@@ -141,7 +141,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             await dbContext.RawMaterials.Where(m => m.Name == "Flour").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 0.06m), Cancellation);
         }
 
-        (await OpenAsync(productId)).BelowCostText.Should().Be(
+        (await OpenAsync(productId)).Costing.BelowCostText.Should().Be(
             "Prices have risen past the buffered cost of Flour, so this product is priced under what it costs. "
             + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.");
 
@@ -150,7 +150,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
             await dbContext.RawMaterials.Where(m => m.Name == "Gift Box").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 36m), Cancellation);
         }
 
-        (await OpenAsync(productId)).BelowCostText.Should().Be(
+        (await OpenAsync(productId)).Costing.BelowCostText.Should().Be(
             "Prices have risen past the buffered costs of Flour and Gift Box, so this product is priced under what they cost. "
             + "Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.");
     });

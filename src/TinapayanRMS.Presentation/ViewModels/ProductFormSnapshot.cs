@@ -1,5 +1,5 @@
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-﻿using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -40,12 +40,14 @@ public readonly record struct PackagingLineState(int? PackagingMaterialId, int? 
 public readonly record struct ComponentLineState(int? ProductId, int? Quantity);
 
 /// <summary>
-/// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else.
-/// Deliberately absent are Save's dirty-check baselines (the screen's _savedRecipe, and what its parts keep as saved:
-/// the Packaging tab's lines, bulk lines and link, the Costing tab's percentages and defaults), which decide what Save
-/// writes rather than what the screen shows;
-/// the picked product, which an undo never changes; and everything derived (RecipeTabs, Costs), which the
-/// recompute at the end of a restore works out again.
+/// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else. The
+/// product's own fields and its costing are the screen's; the recipe, the packaging and a composite's products are each
+/// their part's own share, which that part keeps and puts back (ProductRecipe, ProductPackaging and ProductComponents'
+/// Capture and Restore), in the order the screen's RestoreSnapshot puts them back in.
+/// Deliberately absent are Save's dirty-check baselines (what the parts keep as saved: the recipe as loaded, the Packaging
+/// tab's lines, bulk lines and link, the Costing tab's percentages and defaults), which decide what Save writes rather than
+/// what the screen shows; the picked product, which an undo never changes; and everything derived (RecipeTabs, Costs),
+/// which the recompute at the end of a restore works out again.
 /// </summary>
 public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
 {
@@ -67,58 +69,20 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
 
     public required (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Costing { get; init; }
 
-    /// <summary>Held by reference: a ProductUsageEdit is never changed in place, only replaced.</summary>
-    public required IReadOnlyList<ProductUsageEdit> Usages { get; init; }
-    /// <summary>
-    /// Which tab was showing. Restored, but left out of <see cref="ShowsSameAs"/>: moving between tabs isn't a
-    /// change to take back, and the move that does change something — leaving a tab applies its form — is caught
-    /// by the section it applied.
-    /// </summary>
-    public required RecipeTabChoice? SelectedTab { get; init; }
-    public required bool HasAddSubAssemblyTab { get; init; }
+    /// <summary>The recipe: its sections, the tab showing and the section form (ProductRecipe's own share).</summary>
+    public required RecipeSnapshot Recipe { get; init; }
 
-    // Packaging
-    public required PackagingLinkTarget? PackagingLink { get; init; }
-
-    /// <summary>Move to Sub-Assemblies was pressed on the Packaging tab: Save makes its lines a packaging set, and links it.</summary>
-    public required bool IsPackagingMoving { get; init; }
-    public required IReadOnlyList<PackagingLineState> Lines { get; init; }
-
-    /// <summary>The bulk packaging's lines, each for one bulk pack.</summary>
-    public required IReadOnlyList<PackagingLineState> BulkLines { get; init; }
-
-    /// <summary>How many products one bulk pack holds, as typed; null while nothing is.</summary>
-    public required int? BulkQuantity { get; init; }
+    /// <summary>The Packaging tab: its link, its lines and its bulk packaging (ProductPackaging's own share).</summary>
+    public required PackagingSnapshot Packaging { get; init; }
 
     /// <summary>A composite's Products table; empty for a product made of sub-assemblies, which has no such table.</summary>
     public required IReadOnlyList<ComponentLineState> Components { get; init; }
 
-    // The sub-assembly form
-    public required bool IsUsageFormOpen { get; init; }
-    public required bool IsAddingUsage { get; init; }
-    public required string UsageFormTitle { get; init; }
-    public required UsageFormMode UsageMode { get; init; }
-    public required bool IsFormEditingLines { get; init; }
-    public required bool IsFormPickingSource { get; init; }
-
-    /// <summary>Which section the form is editing, as an index into <see cref="Usages"/>; null while adding.</summary>
-    public required int? EditingUsageIndex { get; init; }
-    public required int? UsageRoleId { get; init; }
-    /// <summary>Null when the section goes by its role alone, which is the usual case.</summary>
-    public required string? UsageName { get; init; }
-    public required int? UsageSourceKey { get; init; }
-    public required IReadOnlyList<IngredientLineState> FormLines { get; init; }
-    public required IReadOnlyList<IngredientLineState> FormAddIns { get; init; }
-    public required decimal FormFormulaBase { get; init; }
-    public required UsageAuthoredField UsageAuthoredField { get; init; }
-    public required decimal UsageWeightPerPiece { get; init; }
-    public required decimal UsageYield { get; init; }
-
     /// <summary>
     /// True when two snapshots would look the same to the user, so nothing is worth recording. Written out
     /// rather than left to the record's own equality because the list members compare by reference there, and
-    /// because the view-only members (the add-ins table being open) are restored but mustn't count as a change:
-    /// a refused apply opens that table to show which line the message is about, and that isn't an edit.
+    /// because the view-only members (the tab showing) are restored but mustn't count as a change. Each part's share
+    /// says for itself (RecipeSnapshot.ShowsSameAs, PackagingSnapshot.ShowsSameAs).
     /// </summary>
     public bool ShowsSameAs(ProductFormSnapshot other) =>
         EditingId == other.EditingId
@@ -130,30 +94,9 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
         && CategoryId == other.CategoryId
         && CloneName == other.CloneName
         && Costing == other.Costing
-        && SectionsShowSame(Usages, other.Usages)
-        && HasAddSubAssemblyTab == other.HasAddSubAssemblyTab
-        && Equals(PackagingLink, other.PackagingLink)
-        && IsPackagingMoving == other.IsPackagingMoving
-        && Lines.SequenceEqual(other.Lines)
-        && BulkLines.SequenceEqual(other.BulkLines)
-        && BulkQuantity == other.BulkQuantity
-        && Components.SequenceEqual(other.Components)
-        && IsUsageFormOpen == other.IsUsageFormOpen
-        && IsAddingUsage == other.IsAddingUsage
-        && UsageFormTitle == other.UsageFormTitle
-        && Equals(UsageMode, other.UsageMode)
-        && IsFormEditingLines == other.IsFormEditingLines
-        && IsFormPickingSource == other.IsFormPickingSource
-        && EditingUsageIndex == other.EditingUsageIndex
-        && UsageRoleId == other.UsageRoleId
-        && UsageName == other.UsageName
-        && UsageSourceKey == other.UsageSourceKey
-        && FormLines.SequenceEqual(other.FormLines)
-        && FormAddIns.SequenceEqual(other.FormAddIns)
-        && FormFormulaBase == other.FormFormulaBase
-        && UsageAuthoredField == other.UsageAuthoredField
-        && UsageWeightPerPiece == other.UsageWeightPerPiece
-        && UsageYield == other.UsageYield;
+        && Recipe.ShowsSameAs(other.Recipe)
+        && Packaging.ShowsSameAs(other.Packaging)
+        && Components.SequenceEqual(other.Components);
 
     /// <summary>
     /// True when two snapshots would be saved the same, which is what the Save button is enabled by. It's
@@ -170,26 +113,44 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
     /// nothing else of it: the recipe, the packaging, the costing and the product's own fields stay as they were
     /// settled, so a rebase can never hide a change a Save would write.
     /// </summary>
-    public ProductFormSnapshot WithFormOf(ProductFormSnapshot form) => this with
+    public ProductFormSnapshot WithFormOf(ProductFormSnapshot form) => this with { Recipe = Recipe.WithFormOf(form.Recipe) };
+}
+
+/// <summary>
+/// The recipe's share of an undo step (ProductRecipe.Capture): its sections, which of its tabs was showing, whether New
+/// Sub-Assembly's tab was there, and the section form.
+/// </summary>
+public sealed record RecipeSnapshot
+{
+    /// <summary>Held by reference: a ProductUsageEdit is never changed in place, only replaced.</summary>
+    public required IReadOnlyList<ProductUsageEdit> Usages { get; init; }
+
+    /// <summary>
+    /// Which tab was showing. Restored, but left out of <see cref="ShowsSameAs"/>: moving between tabs isn't a
+    /// change to take back, and the move that does change something — leaving a tab applies its form — is caught
+    /// by the section it applied.
+    /// </summary>
+    public required RecipeTabChoice? SelectedTab { get; init; }
+    public required bool HasAddSubAssemblyTab { get; init; }
+
+    /// <summary>The section form, open or not, as it was.</summary>
+    public required SectionFormSnapshot Form { get; init; }
+
+    /// <summary>The recipe looks the same: its sections by what the user put there, New Sub-Assembly's tab and the form.</summary>
+    public bool ShowsSameAs(RecipeSnapshot other) =>
+        SectionsShowSame(Usages, other.Usages)
+        && HasAddSubAssemblyTab == other.HasAddSubAssemblyTab
+        && Form.ShowsSameAs(other.Form);
+
+    /// <summary>
+    /// This one with <paramref name="form"/>'s tab showing, New Sub-Assembly's tab and section form in place of its own:
+    /// its sections stay (ProductFormSnapshot.WithFormOf).
+    /// </summary>
+    public RecipeSnapshot WithFormOf(RecipeSnapshot form) => this with
     {
         SelectedTab = form.SelectedTab,
         HasAddSubAssemblyTab = form.HasAddSubAssemblyTab,
-        IsUsageFormOpen = form.IsUsageFormOpen,
-        IsAddingUsage = form.IsAddingUsage,
-        UsageFormTitle = form.UsageFormTitle,
-        UsageMode = form.UsageMode,
-        IsFormEditingLines = form.IsFormEditingLines,
-        IsFormPickingSource = form.IsFormPickingSource,
-        EditingUsageIndex = form.EditingUsageIndex,
-        UsageRoleId = form.UsageRoleId,
-        UsageName = form.UsageName,
-        UsageSourceKey = form.UsageSourceKey,
-        FormLines = form.FormLines,
-        FormAddIns = form.FormAddIns,
-        FormFormulaBase = form.FormFormulaBase,
-        UsageAuthoredField = form.UsageAuthoredField,
-        UsageWeightPerPiece = form.UsageWeightPerPiece,
-        UsageYield = form.UsageYield,
+        Form = form.Form,
     };
 
     /// <summary>
@@ -236,4 +197,78 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
             && pair.First.Grams == pair.Second.Grams
             && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
             && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
+}
+
+/// <summary>
+/// The sub-assembly form's share of an undo step (part of the recipe's, RecipeSnapshot.Form): whether it's open, on which
+/// section or adding one and how, what's picked and named, its lines and add-ins, and the piece size.
+/// </summary>
+public sealed record SectionFormSnapshot
+{
+    public required bool IsOpen { get; init; }
+    public required bool IsAdding { get; init; }
+    public required string Title { get; init; }
+    public required UsageFormMode Mode { get; init; }
+    public required bool IsEditingLines { get; init; }
+    public required bool IsPickingSource { get; init; }
+
+    /// <summary>Which section the form is editing, as an index into the recipe's sections; null while adding.</summary>
+    public required int? EditingUsageIndex { get; init; }
+    public required int? RoleId { get; init; }
+
+    /// <summary>Null when the section goes by its role alone, which is the usual case.</summary>
+    public required string? Name { get; init; }
+    public required int? SourceKey { get; init; }
+    public required IReadOnlyList<IngredientLineState> Lines { get; init; }
+    public required IReadOnlyList<IngredientLineState> AddIns { get; init; }
+    public required decimal FormulaBase { get; init; }
+    public required UsageAuthoredField AuthoredField { get; init; }
+    public required decimal WeightPerPiece { get; init; }
+    public required decimal Yield { get; init; }
+
+    /// <summary>The form looks the same: every field, its lines and add-ins line by line.</summary>
+    public bool ShowsSameAs(SectionFormSnapshot other) =>
+        IsOpen == other.IsOpen
+        && IsAdding == other.IsAdding
+        && Title == other.Title
+        && Mode == other.Mode
+        && IsEditingLines == other.IsEditingLines
+        && IsPickingSource == other.IsPickingSource
+        && EditingUsageIndex == other.EditingUsageIndex
+        && RoleId == other.RoleId
+        && Name == other.Name
+        && SourceKey == other.SourceKey
+        && Lines.SequenceEqual(other.Lines)
+        && AddIns.SequenceEqual(other.AddIns)
+        && FormulaBase == other.FormulaBase
+        && AuthoredField == other.AuthoredField
+        && WeightPerPiece == other.WeightPerPiece
+        && Yield == other.Yield;
+}
+
+/// <summary>
+/// The Packaging tab's share of an undo step (ProductPackaging.Capture): what its packaging links, whether Move to
+/// Sub-Assemblies was pressed, its lines for each piece and its bulk packaging.
+/// </summary>
+public sealed record PackagingSnapshot
+{
+    public required PackagingLinkTarget? Link { get; init; }
+
+    /// <summary>Move to Sub-Assemblies was pressed on the Packaging tab: Save makes its lines a packaging set, and links it.</summary>
+    public required bool IsMoving { get; init; }
+    public required IReadOnlyList<PackagingLineState> Lines { get; init; }
+
+    /// <summary>The bulk packaging's lines, each for one bulk pack.</summary>
+    public required IReadOnlyList<PackagingLineState> BulkLines { get; init; }
+
+    /// <summary>How many products one bulk pack holds, as typed; null while nothing is.</summary>
+    public required int? BulkQuantity { get; init; }
+
+    /// <summary>The packaging looks the same: its link and move, its lines and bulk lines line by line, and the quantity.</summary>
+    public bool ShowsSameAs(PackagingSnapshot other) =>
+        Equals(Link, other.Link)
+        && IsMoving == other.IsMoving
+        && Lines.SequenceEqual(other.Lines)
+        && BulkLines.SequenceEqual(other.BulkLines)
+        && BulkQuantity == other.BulkQuantity;
 }

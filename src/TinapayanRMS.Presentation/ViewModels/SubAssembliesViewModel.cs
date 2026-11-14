@@ -52,12 +52,6 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     /// <summary>The sub-assembly the form shows: 0 for a new one.</summary>
     private int _editingId;
 
-    /// <summary>
-    /// A sub-assembly for LoadCommand to open at its end: one <see cref="OpenSubAssembly"/> was asked for before the list
-    /// held it, or the one in the screen's address (<see cref="OpenSubAssemblyOnLoad"/>). New drops it.
-    /// </summary>
-    private int? _subAssemblyToOpen;
-
     /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
     private int _formLoadVersion;
 
@@ -321,11 +315,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         }
 
         // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the sub-assembly's form.
-        if (_subAssemblyToOpen is { } subAssemblyId)
-        {
-            _subAssemblyToOpen = null;
-            TrySelectSubAssembly(subAssemblyId);
-        }
+        OpenRecordAskedFor();
     }
 
     /// <summary>New Product: asks Products for a new product linking the picked sub-assembly, as it's saved.</summary>
@@ -416,7 +406,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     /// </summary>
     private void StartNewSubAssembly(SubAssemblyRole? role = null)
     {
-        _subAssemblyToOpen = null;
+        ForgetRecordToOpen();
         ClearForm(role);
     }
 
@@ -517,55 +507,13 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         History.MarkClean();
     }
 
-    /// <summary>
-    /// Opens a sub-assembly as picking it in the list would, for another screen (a linked badge on Products). A search
-    /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
-    /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
-    /// </summary>
-    public void OpenSubAssembly(int subAssemblyId)
+    protected override int? FindRecordByName(string text) => RecordNameMatch.Best(List.Rows, row => row.Name, text)?.Id;
+
+    protected override bool ReplacesShowing(int id) => id != SelectedRow?.Id;
+
+    protected override bool TrySelectRecord(int id)
     {
-        _subAssemblyToOpen = TrySelectSubAssembly(subAssemblyId) ? null : subAssemblyId;
-    }
-
-    /// <summary>
-    /// Opens a sub-assembly at the end of the next LoadCommand, for the one in the screen's address as the screen opens:
-    /// its list is fresh only then. New clicked meanwhile is the later word, and the sub-assembly isn't opened over it.
-    /// </summary>
-    public void OpenSubAssemblyOnLoad(int subAssemblyId)
-    {
-        _subAssemblyToOpen = subAssemblyId;
-    }
-
-    /// <summary>
-    /// <see cref="OpenSubAssembly"/>, asking first about the unsaved changes of the sub-assembly showing when another is to
-    /// replace it. False when the user stays on it.
-    /// </summary>
-    public async Task<bool> OpenSubAssemblyAsync(int subAssemblyId)
-    {
-        if (subAssemblyId != SelectedRow?.Id && !await ResolveUnsavedChangesAsync(revert: false))
-        {
-            return false;
-        }
-
-        OpenSubAssembly(subAssemblyId);
-        return true;
-    }
-
-    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the sub-assembly the name means best.</summary>
-    public bool OpenByName(string text)
-    {
-        if (RecordNameMatch.Best(List.Rows, row => row.Name, text) is not { } row)
-        {
-            return false;
-        }
-
-        _ = RunSafelyAsync(() => OpenSubAssemblyAsync(row.Id));
-        return true;
-    }
-
-    private bool TrySelectSubAssembly(int subAssemblyId)
-    {
-        if (List.Rows.FirstOrDefault(r => r.Id == subAssemblyId) is not { } row)
+        if (List.Rows.FirstOrDefault(r => r.Id == id) is not { } row)
         {
             return false;
         }
@@ -656,7 +604,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     async Task ISubAssembliesListHost.LoadAsync() => await LoadCommand.Execute();
 
     void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
-        PickFromList(row.Id, () => SelectedRow = row, List.SyncTreeSelection, OpenSubAssemblyAsync);
+        PickFromList(row.Id, () => SelectedRow = row, List.SyncTreeSelection);
 
     void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => StartNewSubAssembly(role);
 

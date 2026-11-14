@@ -18,7 +18,7 @@ namespace TinapayanRMS.Components.Tests.Shared;
 /// </summary>
 public class RecordScreenBaseTests
 {
-    private sealed class Records : ViewModelBase
+    private sealed class Records : ViewModelBase, IRecordOpener
     {
         public Records(ILogger logger)
             : base(logger)
@@ -34,6 +34,10 @@ public class RecordScreenBaseTests
         public List<int> Opened { get; } = [];
 
         public List<int> OpenedOnLoad { get; } = [];
+
+        public void OpenRecord(int id) => Opened.Add(id);
+
+        public void OpenRecordOnLoad(int id) => OpenedOnLoad.Add(id);
     }
 
     private sealed class RecordScreen : RecordScreenBase<Records>
@@ -45,10 +49,6 @@ public class RecordScreenBaseTests
         protected override int? ShownId => ViewModel!.Shown;
 
         protected override string ShownProperty => nameof(Records.Shown);
-
-        protected override void Open(int id) => ViewModel!.Opened.Add(id);
-
-        protected override void OpenOnLoad(int id) => ViewModel!.OpenedOnLoad.Add(id);
 
         protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "records");
     }

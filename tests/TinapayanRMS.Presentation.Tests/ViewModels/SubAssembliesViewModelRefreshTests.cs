@@ -142,7 +142,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
 
         // As a linked badge on Products does before the Sub-Assemblies screen was ever shown.
-        viewModel.OpenSubAssembly(ubeId);
+        viewModel.OpenRecord(ubeId);
         viewModel.SelectedRow.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -151,11 +151,11 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
 
         viewModel.List.SearchText = "Chocolate";
-        viewModel.OpenSubAssembly(chocolateId);
+        viewModel.OpenRecord(chocolateId);
         viewModel.SelectedRow!.Id.Should().Be(chocolateId);
         viewModel.List.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
 
-        viewModel.OpenSubAssembly(ubeId);
+        viewModel.OpenRecord(ubeId);
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
         viewModel.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
         viewModel.List.VisibleRows.Should().Contain(viewModel.SelectedRow);
@@ -517,7 +517,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var ubeId = await repository.SaveStandaloneAsync(new SubAssembly { Name = "Ube Glaze", RoleId = roleId }, [(sugarId, 200m)], Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenSubAssembly(ubeId);
+        viewModel.OpenRecord(ubeId);
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
         var ube = viewModel.FormVersion;
 
@@ -527,7 +527,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.FormVersion.Should().Be(ube, "typing and a reload leave the form the same sub-assembly's");
 
         // The form follows the pick once its lines are read, and the version with it.
-        viewModel.OpenSubAssembly(chocolateId);
+        viewModel.OpenRecord(chocolateId);
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Chocolate Glaze", () => $"name={viewModel.EditingName}");
         var chocolate = viewModel.FormVersion;
         chocolate.Should().BeGreaterThan(ube);
@@ -537,7 +537,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         fresh.Should().BeGreaterThan(chocolate);
 
         // New, then the browser's Back: the Name box had the cursor, and stayed blank over the sub-assembly's name.
-        viewModel.OpenSubAssembly(ubeId);
+        viewModel.OpenRecord(ubeId);
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
         viewModel.FormVersion.Should().BeGreaterThan(fresh);
     });
@@ -552,7 +552,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
 
         // As the page does when it opens on /sub-assemblies/42, before the load it then runs.
-        viewModel.OpenSubAssemblyOnLoad(ubeId);
+        viewModel.OpenRecordOnLoad(ubeId);
         viewModel.SelectedRow.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -569,7 +569,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var ubeId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
             new SubAssembly { Name = "Ube Glaze", RoleId = roleId }, [(sugarId, 200m)], Cancellation);
         var viewModel = CreateViewModel();
-        viewModel.OpenSubAssemblyOnLoad(ubeId);
+        viewModel.OpenRecordOnLoad(ubeId);
         var loading = viewModel.LoadCommand.Execute().ToTask(Cancellation);
 
         // The load is still reading. Ube Glaze opened over the new form at its end, and the name typed was saved as its.

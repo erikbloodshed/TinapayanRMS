@@ -6,10 +6,11 @@ namespace TinapayanRMS.Components.Shared;
 /// <summary>
 /// A record screen with an address per record (products/42, raw-materials/7, sub-assemblies/3), so the browser's Back and
 /// Forward step between the records opened: the record in the address opens as picking it in the list would, and the
-/// record picked goes into the address. Products, Raw Materials and Sub-Assemblies; each names its address and record.
+/// record picked goes into the address. Products, Raw Materials and Sub-Assemblies; each names its address and record, and
+/// its ViewModel opens one (IRecordOpener).
 /// </summary>
 public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
-    where TViewModel : ViewModelBase
+    where TViewModel : ViewModelBase, IRecordOpener
 {
     /// <summary>The address last acted on: its record is opened once, not each time the screen is given it again.</summary>
     private int? _addressOpened;
@@ -26,12 +27,6 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
     /// <summary>The name of the ViewModel's property for the record shown (SelectedProduct and the like).</summary>
     protected abstract string ShownProperty { get; }
 
-    /// <summary>Opens the record now, as a pick in the list does: Back, Forward, or another screen's link.</summary>
-    protected abstract void Open(int id);
-
-    /// <summary>Opens the record at the end of the load the screen's opening starts: the list is fresh only then.</summary>
-    protected abstract void OpenOnLoad(int id);
-
     // The record in the address is the load's to open, at its end. New clicked meanwhile is the later word.
     protected override void OnInitialized()
     {
@@ -39,7 +34,7 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
         _addressOpened = Id;
         if (Id is { } id && ShownId != id)
         {
-            OpenOnLoad(id);
+            ViewModel!.OpenRecordOnLoad(id);
         }
     }
 
@@ -55,7 +50,7 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
         _addressOpened = Id;
         if (Id is { } id && ShownId != id)
         {
-            Open(id);
+            ViewModel!.OpenRecord(id);
         }
     }
 

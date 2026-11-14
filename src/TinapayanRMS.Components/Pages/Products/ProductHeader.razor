@@ -5,11 +5,11 @@
 <section class="card header-card">
     <div class="header-title-row">
         <div class="header-title-group">
-            @if (ViewModel.IsUnbuffered)
+            @if (ViewModel.Costing.IsUnbuffered)
             {
                 <span class="badge badge-warning" title="Every cost on this screen is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
             }
-            @if (ViewModel.BelowCostText is { } belowCost)
+            @if (ViewModel.Costing.BelowCostText is { } belowCost)
             {
                 <span class="badge badge-warning" title="@belowCost">Priced below cost</span>
             }
@@ -36,7 +36,7 @@
                            Tooltip="Puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited." />
             <CommandButton Command="ViewModel.PrintCommand" Icon="AppIcon.Print" Label="Print"
                            Tooltip="Opens the Print screen, which previews and prints this product's recipe and costing as this screen shows them." />
-            <CommandButton Command="ViewModel.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@ViewModel.CostBasisButtonLabel" Tooltip="@ViewModel.CostBasisButtonTooltip" />
+            <CommandButton Command="ViewModel.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@ViewModel.Costing.CostBasisButtonLabel" Tooltip="@ViewModel.Costing.CostBasisButtonTooltip" />
             <CommandButton Command="ViewModel.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </div>
@@ -44,15 +44,15 @@
     <div class="section-divider"></div>
 
     <div class="figure-tiles">
-        <div class="figure-tile tile-peach" title="@ViewModel.MaterialCostTooltip">
+        <div class="figure-tile tile-peach" title="@ViewModel.Costing.MaterialCostTooltip">
             <div class="figure-label">Material Cost</div>
             <div class="figure-value">@ViewModel.Costing.Costs.Material.ToString("N2")</div>
         </div>
-        <div class="figure-tile tile-pink" title="@($"{ViewModel.CostUnitCaption}: the material cost with labor, overhead and administrative on top, before markup and VAT")">
+        <div class="figure-tile tile-pink" title="@($"{ViewModel.Costing.CostUnitCaption}: the material cost with labor, overhead and administrative on top, before markup and VAT")">
             <div class="figure-label">Base Cost</div>
             <div class="figure-value">@ViewModel.Costing.Costs.BaseCost.ToString("N2")</div>
         </div>
-        <div class="figure-tile tile-sky" title="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now")">
+        <div class="figure-tile tile-sky" title="@($"{ViewModel.Costing.CostUnitCaption}, with VAT: what the shop charges now")">
             <div class="figure-label">Current Price</div>
             <div class="figure-value">@(ViewModel.EditingCurrentPrice?.ToString("N2") ?? "—")</div>
         </div>
@@ -84,9 +84,9 @@
                          Tooltip="How many finished pieces make one sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The recipe stays per piece; the costing multiplies by this." />
         }
 
-        <label class="form-label" for="product-price" title="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>
+        <label class="form-label" for="product-price" title="@($"{ViewModel.Costing.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>
         <NumberField ID="product-price" TValue="decimal?" @bind-Value="ViewModel.EditingCurrentPrice" Format="N2" Min="0" CssClass="field-medium"
-                     Tooltip="@($"{ViewModel.CostUnitCaption}, with VAT: what the shop charges now. The Markup % in the header shows what it earns.")" />
+                     Tooltip="@($"{ViewModel.Costing.CostUnitCaption}, with VAT: what the shop charges now. The Markup % in the header shows what it earns.")" />
     </div>
 </section>
 

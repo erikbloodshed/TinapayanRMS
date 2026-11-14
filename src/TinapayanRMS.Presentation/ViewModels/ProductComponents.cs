@@ -12,16 +12,13 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// What a composite's Products table (<see cref="ProductComponents"/>) asks of the Products screen, besides its runners,
-/// messages and undo steps: the screen's cost basis, which what each product brings is priced at, and its products, which
-/// the lines hold. The screen implements it explicitly.
+/// messages and undo steps: the screen's cost basis, which what each product brings is priced at. The screen implements it
+/// explicitly.
 /// </summary>
 public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 {
     /// <summary>Which of the materials' costs the screen shows, buffered or not: what each product brings is priced at it.</summary>
     CostBasis CostBasis { get; }
-
-    /// <summary>Every product in use, as the screen holds them now: what a line's product cell finds and offers.</summary>
-    IReadOnlyList<Product> Products { get; }
 }
 
 /// <summary>
@@ -35,6 +32,7 @@ public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 public sealed class ProductComponents : ReactiveObject
 {
     private readonly IProductComponentsHost _host;
+    private readonly IReadOnlyList<Product> _products;
     private readonly SavedProductReader _savedProducts;
 
     /// <summary>
@@ -51,10 +49,12 @@ public sealed class ProductComponents : ReactiveObject
 
     private ProductComponentRow? _addingRow;
 
-    /// <param name="host">The Products screen: its cost basis and products, its runners and messages, and its undo steps.</param>
-    public ProductComponents(IProductComponentsHost host, SavedProductReader savedProducts)
+    /// <param name="host">The Products screen: its cost basis, its runners and messages, and its undo steps.</param>
+    /// <param name="products">Every product in use, as the screen holds them now: what a line's product cell finds and offers.</param>
+    public ProductComponents(IProductComponentsHost host, IReadOnlyList<Product> products, SavedProductReader savedProducts)
     {
         _host = host;
+        _products = products;
         _savedProducts = savedProducts;
 
         RemoveLineCommand = ReactiveCommand.Create(
@@ -255,10 +255,10 @@ public sealed class ProductComponents : ReactiveObject
     }
 
     /// <summary>A product as the screen's list holds it.</summary>
-    private Product? FindProduct(int id) => _host.Products.FirstOrDefault(p => p.Id == id);
+    private Product? FindProduct(int id) => _products.FirstOrDefault(p => p.Id == id);
 
     /// <summary>The screen's products by id, as it holds them now.</summary>
-    private Dictionary<int, Product> ProductsById() => _host.Products.ToDictionary(p => p.Id);
+    private Dictionary<int, Product> ProductsById() => _products.ToDictionary(p => p.Id);
 
     /// <summary>
     /// What one of a product brings, as read; null while it hasn't been, and the read starts, so the add row prices itself

@@ -417,7 +417,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await viewModel.LoadCommand.Execute();
 
         viewModel.NewProductTag.Should().Be("Goes in Production › Bread Rolls", "the header says where Save will file it now");
-        viewModel.NewProductStage.Should().Be(ProductStage.Production);
+        viewModel.NewProductPlace.Stage.Should().Be(ProductStage.Production);
         TypeName(viewModel, "Pan de Coco");
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
@@ -938,7 +938,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await OpenedViewModelAsync(pandesalId);
         viewModel.List.ProductTree.DeletedFolder.IsExpanded.Should().BeFalse();
 
-        viewModel.OpenProduct(mamonId);
+        viewModel.OpenRecord(mamonId);
 
         viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.ProductTree.Find(mamonId));
         viewModel.List.ProductTree.DeletedFolder.IsExpanded.Should().BeTrue("the row picked shows");
@@ -988,7 +988,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         TitlesIn(tree.StageFolder(ProductStage.Production)).Should().Equal("Loose Loaf");
 
         // A product opened from elsewhere that the filter hides shows: the filter goes.
-        viewModel.OpenProduct(bibingkaId);
+        viewModel.OpenRecord(bibingkaId);
         viewModel.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
         viewModel.List.SelectedTreeNode.Should().BeSameAs(tree.Find(bibingkaId));
 
@@ -1047,7 +1047,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await OpenedViewModelAsync(mamonId);
         viewModel.List.SelectedTreeNodes.Add(viewModel.List.ProductTree.Find(pandesalId)!);
 
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
 
         viewModel.List.SelectedTreeNodes.Should().Equal(viewModel.List.ProductTree.Find(ensaymadaId)!);
         viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.ProductTree.Find(ensaymadaId));
@@ -1446,7 +1446,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     private async Task<ProductsViewModel> OpenedViewModelAsync(int productId)
     {
         var viewModel = await LoadedViewModelAsync();
-        viewModel.OpenProduct(productId);
+        viewModel.OpenRecord(productId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.SelectedProduct?.Id == productId, () => $"ready={viewModel.AreDetailsReady}");
         return viewModel;
     }

@@ -36,7 +36,7 @@
             }
         </div>
         <div class="lines-footer-right">
-            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@ViewModel.CostUnitCaption · @ViewModel.Packaging.LinesCost.ToString("N2")</span>
+            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@ViewModel.Costing.CostUnitCaption · @ViewModel.Packaging.LinesCost.ToString("N2")</span>
             @if (!ViewModel.Packaging.IsPickingSource)
             {
                 <CommandButton Command="ViewModel.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
@@ -53,7 +53,7 @@
     </div>
 
     <PackagingLinesGrid @ref="_lines" Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
-                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.CostBasis" />
+                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.Costing.CostBasis" />
 
     <div class="lines-footer">
         @if (ViewModel.Packaging.IsPackagingLinked)
@@ -94,7 +94,7 @@
             </div>
         </div>
         <PackagingLinesGrid @ref="_bulk" Items="ViewModel.Packaging.BulkEdits" NewItem="ViewModel.Packaging.NewBulkEdit" Materials="ViewModel.PackagingMaterials"
-                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.CostBasis" />
+                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.Costing.CostBasis" />
         <div class="lines-footer">
             <p class="caption">@ViewModel.Packaging.BulkCostText</p>
             <div class="button-row">

@@ -645,7 +645,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         viewModel.List.SelectedTreeNode = viewModel.List.RawMaterialTree.Find(breadFlourId);
         viewModel.List.SelectedTreeNodes.Add(viewModel.List.RawMaterialTree.Find(cakeFlourId)!);
-        viewModel.OpenRawMaterial(ryeFlourId);
+        viewModel.OpenRecord(ryeFlourId);
 
         viewModel.List.SelectedTreeNodes.Should().Equal(viewModel.List.RawMaterialTree.Find(ryeFlourId)!);
         viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.RawMaterialTree.Find(ryeFlourId));
@@ -963,7 +963,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     private async Task<RawMaterialsViewModel> OpenedViewModelAsync(int rawMaterialId)
     {
         var viewModel = await LoadedViewModelAsync();
-        viewModel.OpenRawMaterial(rawMaterialId);
+        viewModel.OpenRecord(rawMaterialId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedRawMaterial?.Id == rawMaterialId,
             () => $"ready={viewModel.AreDetailsReady}");

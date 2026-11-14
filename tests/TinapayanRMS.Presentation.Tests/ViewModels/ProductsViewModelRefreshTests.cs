@@ -1367,7 +1367,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
 
         // As a Sub-Assemblies Dependents tile does before the Products screen was ever shown.
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
         viewModel.SelectedProduct.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -1376,11 +1376,11 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingName.Should().Be("Ensaymada", "the product's form is loaded, as picking it in the list would");
 
         viewModel.List.SearchText = "Cream";
-        viewModel.OpenProduct(creamLoafId);
+        viewModel.OpenRecord(creamLoafId);
         viewModel.SelectedProduct!.Id.Should().Be(creamLoafId);
         viewModel.List.SearchText.Should().Be("Cream", "a search showing the product is left alone");
 
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
         viewModel.SelectedProduct!.Id.Should().Be(ensaymadaId);
         viewModel.List.SearchText.Should().BeEmpty("a search hiding the product is cleared, so the list shows the row picked");
         viewModel.List.VisibleProducts.Should().Contain(viewModel.SelectedProduct);
@@ -1396,7 +1396,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
             new SubAssembly { Name = "Pandesal Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenProduct(creamLoafId);
+        viewModel.OpenRecord(creamLoafId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
 
         // As Sub-Assemblies' New Product does: nothing changes until the load that showing the screen starts.
@@ -2131,7 +2131,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         viewModel.List.SelectedTreeNode = breads;
         viewModel.SelectedProduct!.Id.Should().Be(mamonId, "a folder picked leaves the product showing");
 
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
         viewModel.List.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "a product opened from elsewhere takes the row with it");
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
 
@@ -2156,7 +2156,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var mamonId = await SaveProductInAsync("Mamon", breadsId, breadsCategoryId);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenProduct(mamonId);
+        viewModel.OpenRecord(mamonId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         TypeName(viewModel, "Mamon Special");
 
@@ -2197,7 +2197,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var ensaymadaId = await SaveProductInAsync("Ensaymada", breadsId, breadsCategoryId);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenProduct(mamonId);
+        viewModel.OpenRecord(mamonId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         TypeName(viewModel, "Mamon Special");
 
@@ -2989,7 +2989,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         var ensaymada = viewModel.FormVersion;
 
@@ -2998,7 +2998,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await viewModel.LoadCommand.Execute();
         viewModel.FormVersion.Should().Be(ensaymada, "typing and a reload leave the form the same product's");
 
-        viewModel.OpenProduct(creamLoafId);
+        viewModel.OpenRecord(creamLoafId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         var creamLoaf = viewModel.FormVersion;
         creamLoaf.Should().BeGreaterThan(ensaymada);
@@ -3012,7 +3012,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         freshAgain.Should().BeGreaterThan(fresh, "a new one in a new one's place empties the boxes too");
 
         // New, then the browser's Back: the Product Name box had the cursor, and stayed blank over the product's name.
-        viewModel.OpenProduct(ensaymadaId);
+        viewModel.OpenRecord(ensaymadaId);
         viewModel.FormVersion.Should().BeGreaterThan(freshAgain);
     });
 
@@ -3023,7 +3023,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
 
         // As the page does when it opens on /products/42, before the load it then runs.
-        viewModel.OpenProductOnLoad(ensaymadaId);
+        viewModel.OpenRecordOnLoad(ensaymadaId);
         viewModel.SelectedProduct.Should().BeNull("the list is empty until the screen loads");
 
         await viewModel.LoadCommand.Execute();
@@ -3037,7 +3037,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
     {
         var ensaymadaId = await AddProductAsync("Ensaymada");
         var viewModel = CreateViewModel();
-        viewModel.OpenProductOnLoad(ensaymadaId);
+        viewModel.OpenRecordOnLoad(ensaymadaId);
         var loading = viewModel.LoadCommand.Execute().ToTask(Cancellation);
 
         // The load is still reading. Ensaymada opened over the new form at its end, and the name typed was saved as its.

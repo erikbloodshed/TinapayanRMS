@@ -90,10 +90,6 @@
 
     protected override string ShownProperty => nameof(RawMaterialsViewModel.SelectedRawMaterial);
 
-    protected override void Open(int id) => ViewModel!.OpenRawMaterial(id);
-
-    protected override void OpenOnLoad(int id) => ViewModel!.OpenRawMaterialOnLoad(id);
-
     private async Task FocusNameAsync()
     {
         await RedrawNowAsync();

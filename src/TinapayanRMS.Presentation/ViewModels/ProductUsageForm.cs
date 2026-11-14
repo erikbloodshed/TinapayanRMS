@@ -14,16 +14,13 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// What the section form (<see cref="ProductUsageForm"/>) asks of the Products screen, besides its runners, messages and
-/// undo steps: the screen's cost basis and ingredients, which its rows are priced at and from, and what a linked section
-/// could link instead. The screen implements it explicitly.
+/// undo steps: the screen's cost basis, which its rows are priced at, and what a linked section could link instead. The
+/// screen implements it explicitly.
 /// </summary>
 public interface IProductUsageFormHost : IScreenPartHost, IUndoRecorder
 {
     /// <summary>Which of the materials' costs the screen shows, buffered or not: what a row is priced at.</summary>
     CostBasis CostBasis { get; }
-
-    /// <summary>The ingredients as the screen last loaded them, which a row prices itself from.</summary>
-    IReadOnlyList<RawMaterial> Ingredients { get; }
 
     /// <summary>Every sub-assembly that could be linked or copied, as the screen last loaded them.</summary>
     IReadOnlyList<SubAssembly> Linkable { get; }
@@ -43,11 +40,14 @@ public interface IProductUsageFormHost : IScreenPartHost, IUndoRecorder
 public sealed class ProductUsageForm : ReactiveObject, IDisposable
 {
     private readonly IProductUsageFormHost _host;
+    private readonly IReadOnlyList<RawMaterial> _ingredients;
 
-    /// <param name="host">The Products screen: its cost basis and ingredients, what can be linked, its messages and its undo steps.</param>
-    public ProductUsageForm(IProductUsageFormHost host)
+    /// <param name="host">The Products screen: its cost basis, what can be linked, its messages and its undo steps.</param>
+    /// <param name="ingredients">The ingredients as the screen last loaded them, which a row prices itself from.</param>
+    public ProductUsageForm(IProductUsageFormHost host, IReadOnlyList<RawMaterial> ingredients)
     {
         _host = host;
+        _ingredients = ingredients;
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -85,7 +85,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public ReactiveCommand<RxVoid, RxVoid> RemoveAddInCommand { get; }
 
     /// <summary>An ingredient as the screen last loaded it, for a row that prices itself.</summary>
-    private RawMaterial? FindIngredient(int id) => _host.Ingredients.FirstOrDefault(m => m.Id == id);
+    private RawMaterial? FindIngredient(int id) => _ingredients.FirstOrDefault(m => m.Id == id);
 
     /// <summary>
     /// The roles the form offers: every recipe role, as a recipe can have several sub-assemblies in one, told apart by
@@ -700,7 +700,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     /// </summary>
     internal void ResolveRows()
     {
-        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         IngredientLineRow.Resolve(FormLines, ingredientsById);
         IngredientLineRow.Resolve(FormAddIns, ingredientsById);
     }

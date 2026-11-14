@@ -21,20 +21,11 @@ public interface IProductsListHost : IRecordListHost
     /// <summary>The product picked, which the form shows; null for a new one.</summary>
     Product? SelectedProduct { get; }
 
-    /// <summary>Every product in use (none of the deleted), as last loaded.</summary>
-    IReadOnlyList<Product> Products { get; }
-
     /// <summary>The products in the Deleted folder, as last loaded.</summary>
     IReadOnlyList<Product> DeletedProducts { get; }
 
     /// <summary>The user's folders, in both stages, as last read: the list reads them again after a change of its own.</summary>
     IReadOnlyList<ProductFolder> Folders { get; set; }
-
-    /// <summary>The stage Save files the new product the form holds in.</summary>
-    ProductStage NewProductStage { get; }
-
-    /// <summary>The user's folder Save files the new product the form holds in; null for the top of its stage.</summary>
-    int? NewProductFolderId { get; }
 
     /// <summary>The form is a composite product's.</summary>
     bool IsEditingComposite { get; }
@@ -62,9 +53,6 @@ public interface IProductsListHost : IRecordListHost
 
     /// <summary>The products a move took, read again, within the refresh that files them: the form's product is re-pointed at its fresh copy.</summary>
     void ShowMoved(IReadOnlyList<Product> moved);
-
-    /// <summary>A folder was deleted: a new product started in it goes in the folder it was in, <paramref name="parentId"/>.</summary>
-    void FolderDeleted(int folderId, int? parentId);
 
     /// <summary>Clones <paramref name="product"/> as saved under <paramref name="name"/>, as the Clone tab does, and opens the clone.</summary>
     Task CloneAsync(Product product, string name);
@@ -113,6 +101,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private readonly IProductsListHost _host;
     private readonly SourceCache<Product, int> _productCache;
     private readonly IReadOnlyList<ProductCategory> _categories;
+    private readonly NewProductPlace _newProductPlace;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
     private readonly IProductRepository _productRepository;
     private readonly IProductFolderRepository _folderRepository;
@@ -133,11 +122,13 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <param name="productCache">The screen's products, which the list searches, filters and moves.</param>
     /// <param name="categoryCache">The screen's categories, whose changes the category filter's choices follow.</param>
     /// <param name="categories">Every category, by name, as the screen binds them: the category filter's choices.</param>
+    /// <param name="newProductPlace">Where Save files the new product: its row starts there, and a folder deleted moves it.</param>
     public ProductsList(
         IProductsListHost host,
         SourceCache<Product, int> productCache,
         SourceCache<ProductCategory, int> categoryCache,
         IReadOnlyList<ProductCategory> categories,
+        NewProductPlace newProductPlace,
         IProductRepository productRepository,
         IProductFolderRepository folderRepository,
         IViewStateStore viewStateStore)
@@ -145,6 +136,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         _host = host;
         _productCache = productCache;
         _categories = categories;
+        _newProductPlace = newProductPlace;
         _productRepository = productRepository;
         _folderRepository = folderRepository;
 
@@ -994,7 +986,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         CancelTreeName();
         ClearListFilters();
         _host.StartNew(stage, folderId, isComposite);
-        var row = ProductTree.BeginNewProduct(_host.NewProductStage, _host.NewProductFolderId, _host.IsEditingComposite);
+        var row = ProductTree.BeginNewProduct(_newProductPlace.Stage, _newProductPlace.FolderId, _host.IsEditingComposite);
         ListNaming.Start(row, row.Product.Name);
     }
 
@@ -1147,7 +1139,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         }
 
         var parentId = folder.ParentFolderId;
-        var products = _host.Products.Count(p => p.FolderId == id);
+        var products = _productCache.Items.Count(p => p.FolderId == id);
         var folders = _host.Folders.Count(f => f.ParentId == id);
         var into = ProductFolderRules.PathTitle(_host.Folders, folder.Stage, parentId);
         var holds = (products, folders) switch
@@ -1162,7 +1154,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             async () =>
             {
                 await _folderRepository.DeleteAsync(id, CancellationToken.None);
-                _host.FolderDeleted(id, parentId);
+                _newProductPlace.FolderDeleted(id, parentId);
                 await _host.LoadAsync();
             });
 
