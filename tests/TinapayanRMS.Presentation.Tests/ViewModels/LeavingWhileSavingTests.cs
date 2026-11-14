@@ -31,7 +31,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Almond Loaf";
 
@@ -75,7 +75,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Strong Flour";
 
@@ -97,7 +97,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateSubAssembliesViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Lines.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.List.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Almond Loaf Dough";
 
@@ -107,7 +107,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", viewModel.ErrorMessage);
         waited.Should().BeTrue("it waited for the Save rather than ask while it ran");
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Rows.Should().ContainSingle().Which.Name.Should().Be("Almond Loaf Dough");
+        viewModel.List.Rows.Should().ContainSingle().Which.Name.Should().Be("Almond Loaf Dough");
     });
 
     // A Save that's refused leaves the form as it was, unsaved: the question still comes, once the Save is back.
@@ -119,7 +119,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
         await viewModel.LoadCommand.Execute();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         var answers = 0;
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context =>
         {

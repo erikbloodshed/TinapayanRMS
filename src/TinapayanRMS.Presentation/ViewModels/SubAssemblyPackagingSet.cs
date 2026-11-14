@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using DynamicData;
+using DynamicData.Binding;
 using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
 
@@ -7,13 +8,29 @@ namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
 /// A packaging set's lines on the Sub-Assemblies screen (through SubAssembliesViewModel.PackagingSet): how much of each
-/// packaging material one set takes, typed straight into its table, and what the set costs. It shows them as saved, keeps
-/// and puts them back for an undo step, prices them, and reads them as Save writes them. The screen keeps the undo
-/// history, the Remove Line its recipe's table shares, and says when the lines changed or their materials were read again.
+/// packaging material one set takes, typed straight into its table, and what the set costs, which follows them. It shows
+/// them as saved, keeps and puts them back for an undo step, prices them, and reads them as Save writes them. The screen
+/// keeps the undo history, the Remove Line its recipe's table shares, and says when their materials were read again.
 /// </summary>
-/// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a line prices itself from.</param>
-public sealed class SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packagingMaterials) : ReactiveObject
+public sealed class SubAssemblyPackagingSet : ReactiveObject
 {
+    private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
+
+    /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a line prices itself from.</param>
+    /// <param name="updates">The screen's derived updates, so an undo putting the lines back works the cost out once.</param>
+    public SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packagingMaterials, DerivedUpdates updates)
+    {
+        _packagingMaterials = packagingMaterials;
+
+        // A line prices itself as its material is picked, and the set's cost follows.
+        Lines.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .Subscribe(_ => updates.Run(ResolveRows));
+        Lines.ToObservableChangeSet()
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ => updates.Run(RecomputeCost));
+    }
+
     /// <summary>The set's lines, typed straight into the table: how much of each material one set takes.</summary>
     public ObservableCollection<PackagingLineRow> Lines { get; } = [];
 
@@ -36,10 +53,10 @@ public sealed class SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packaging
     }
 
     /// <summary>A packaging material as the screen last loaded it, for a line that prices itself.</summary>
-    private RawMaterial? FindMaterial(int id) => packagingMaterials.FirstOrDefault(m => m.Id == id);
+    private RawMaterial? FindMaterial(int id) => _packagingMaterials.FirstOrDefault(m => m.Id == id);
 
     /// <summary>The lines price themselves as their material is picked, at the materials as the screen last read them.</summary>
-    public void ResolveRows() => PackagingLineRow.Resolve(Lines, packagingMaterials.ToDictionary(m => m.Id));
+    public void ResolveRows() => PackagingLineRow.Resolve(Lines, _packagingMaterials.ToDictionary(m => m.Id));
 
     /// <summary>The set's cost follows its lines.</summary>
     public void RecomputeCost() => Cost = Lines.Sum(l => l.CostPerUnit);
@@ -54,7 +71,7 @@ public sealed class SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packaging
     /// <summary>The set's lines as saved, each finding its material as the screen last loaded it.</summary>
     public void Show(IEnumerable<SubAssemblyPackagingLine> saved)
     {
-        var packagingById = packagingMaterials.ToDictionary(m => m.Id);
+        var packagingById = _packagingMaterials.ToDictionary(m => m.Id);
         SelectedLine = null;
         Lines.Clear();
         Lines.AddRange(saved.Select(l => new PackagingLineRow(packagingById.GetValueOrDefault(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId)));

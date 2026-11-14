@@ -41,8 +41,9 @@ public readonly record struct ComponentLineState(int? ProductId, int? Quantity);
 
 /// <summary>
 /// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else.
-/// Deliberately absent are Save's dirty-check baselines (_savedRecipe, _savedLines, _savedCosting,
-/// _savedPackagingLinkKey, _costingDefaults), which decide what Save writes rather than what the screen shows;
+/// Deliberately absent are Save's dirty-check baselines (the screen's _savedRecipe, and what its parts keep as saved:
+/// the Packaging tab's lines, bulk lines and link, the Costing tab's percentages and defaults), which decide what Save
+/// writes rather than what the screen shows;
 /// the picked product, which an undo never changes; and everything derived (RecipeTabs, Costs), which the
 /// recompute at the end of a restore works out again.
 /// </summary>

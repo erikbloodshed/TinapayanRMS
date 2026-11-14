@@ -164,21 +164,21 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     public Task Undoing_a_section_applied_by_leaving_its_tab_does_not_apply_it_again() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
-        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        var dough = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        viewModel.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = dough;
         viewModel.UsageForm.EditingUsageWeightPerPiece = 75m;
 
         // Leaving the tab applies the form, which is one step.
-        viewModel.SelectedRecipeTab = filling;
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
+        viewModel.Recipe.SelectedRecipeTab = filling;
+        viewModel.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
 
         viewModel.TryUndo().Should().BeTrue();
 
         viewModel.ErrorMessage.Should().BeNull("restoring must not run the apply again");
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(50m);
-        viewModel.SelectedRecipeTab.Should().BeSameAs(filling, "the undo takes back the change, not where you navigated to");
+        viewModel.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(50m);
+        viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(filling, "the undo takes back the change, not where you navigated to");
     });
 
     [Test]
@@ -187,12 +187,12 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // Leaving a tab applies its form, which closes it, and a form closed isn't an edit: only the section it
         // applied is, and nothing was typed.
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
-        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        var dough = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        viewModel.SelectedRecipeTab = filling;
-        viewModel.SelectedRecipeTab = dough;
-        viewModel.SelectedRecipeTab = filling;
+        viewModel.Recipe.SelectedRecipeTab = filling;
+        viewModel.Recipe.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = filling;
 
         viewModel.History.CanUndo.Should().BeFalse("clicking through the sections changes nothing");
     });
@@ -205,16 +205,16 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, _) = await OpenTwoSectionProductAsync(withPackaging: true);
         var recorder = (IUndoRecorder)viewModel;
 
-        viewModel.SelectedRecipeTab = viewModel.PackagingTab;
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.PackagingTab;
         recorder.BeginUndoStep();
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         recorder.EndUndoStep();
 
         viewModel.History.CanUndo.Should().BeFalse("the form opening on the tab picked isn't an edit");
 
         // And a field still holding the cursor after the change records what's typed into it next.
         recorder.BeginUndoStep();
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
         viewModel.UsageForm.EditingUsageWeightPerPiece = 12m;
         recorder.EndUndoStep();
 
@@ -230,39 +230,39 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // Guards the bookkeeping a restore does by hand: RecipeTabShown is skipped while the tab is put back,
         // and it's the only other thing that records which tab's form is open.
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
-        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        var dough = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        viewModel.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = dough;
         viewModel.UsageForm.EditingUsageWeightPerPiece = 75m;
-        viewModel.SelectedRecipeTab = filling;
+        viewModel.Recipe.SelectedRecipeTab = filling;
         viewModel.TryUndo().Should().BeTrue();
 
         // Back to Dough's tab by hand, then type and leave: the apply must still happen, which it wouldn't if
         // the restore had left behind a stale note of which tab's form was open.
-        viewModel.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = dough;
         viewModel.UsageForm.EditingUsageWeightPerPiece = 80m;
-        viewModel.SelectedRecipeTab = filling;
+        viewModel.Recipe.SelectedRecipeTab = filling;
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(80m);
+        viewModel.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(80m);
     });
 
     [Test]
     public Task Undoing_Add_Sub_Assembly_takes_its_tab_away_and_puts_the_previous_form_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
-        var tabsBefore = viewModel.RecipeTabs.Count;
+        var tabsBefore = viewModel.Recipe.RecipeTabs.Count;
         var linesBefore = viewModel.UsageForm.FormLines.Count;
 
-        await viewModel.AddUsageCommand.Execute();
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.AddSubAssemblyTab);
+        await viewModel.Recipe.AddUsageCommand.Execute();
+        viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.AddSubAssemblyTab);
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.RecipeTabs.Should().NotContain(viewModel.AddSubAssemblyTab);
-        viewModel.RecipeTabs.Should().HaveCount(tabsBefore);
-        viewModel.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>();
+        viewModel.Recipe.RecipeTabs.Should().NotContain(viewModel.Recipe.AddSubAssemblyTab);
+        viewModel.Recipe.RecipeTabs.Should().HaveCount(tabsBefore);
+        viewModel.Recipe.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>();
         viewModel.UsageForm.FormLines.Should().HaveCount(linesBefore, "the form the add replaced is back with its lines");
     });
 
@@ -270,36 +270,36 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     public Task Undoing_a_removed_section_puts_it_back_with_its_tab() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        await viewModel.RemoveUsageCommand.Execute();
-        viewModel.UsageEdits.Should().ContainSingle();
+        await viewModel.Recipe.RemoveUsageCommand.Execute();
+        viewModel.Recipe.UsageEdits.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.UsageEdits.Should().HaveCount(2);
-        viewModel.UsageEdits.Select(u => u.RoleName).Should().Equal("Dough", "Filling");
-        viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().HaveCount(2, "the tabs follow the sections");
+        viewModel.Recipe.UsageEdits.Should().HaveCount(2);
+        viewModel.Recipe.UsageEdits.Select(u => u.RoleName).Should().Equal("Dough", "Filling");
+        viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Should().HaveCount(2, "the tabs follow the sections");
     });
 
     [Test]
     public Task The_tabs_stay_in_step_with_the_sections_across_an_undo() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
 
-        await viewModel.RemoveUsageCommand.Execute();
+        await viewModel.Recipe.RemoveUsageCommand.Execute();
         viewModel.TryUndo().Should().BeTrue();
 
-        var tabs = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList();
-        tabs.Should().HaveCount(viewModel.UsageEdits.Count);
+        var tabs = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().ToList();
+        tabs.Should().HaveCount(viewModel.Recipe.UsageEdits.Count);
         for (var i = 0; i < tabs.Count; i++)
         {
-            tabs[i].Usage.Should().BeSameAs(viewModel.UsageEdits[i], "each tab shows the section at its own index");
+            tabs[i].Usage.Should().BeSameAs(viewModel.Recipe.UsageEdits[i], "each tab shows the section at its own index");
         }
 
-        viewModel.SelectedRecipeTab.Should().NotBeNull();
-        viewModel.RecipeTabs.Should().Contain(viewModel.SelectedRecipeTab!);
+        viewModel.Recipe.SelectedRecipeTab.Should().NotBeNull();
+        viewModel.Recipe.RecipeTabs.Should().Contain(viewModel.Recipe.SelectedRecipeTab!);
     });
 
     [Test]
@@ -325,13 +325,13 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // message and whether the add-ins table is open, neither of which is an edit.
         var (viewModel, seeded) = await OpenOneSubAssemblyProductAsync();
 
-        await viewModel.AddUsageCommand.Execute();
+        await viewModel.Recipe.AddUsageCommand.Execute();
         viewModel.UsageForm.EditingUsageRole = viewModel.UsageForm.FormRoleOptions.First(r => r.Name == "Dough");
         viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId, Grams = 500m });
         viewModel.UsageForm.EditingUsageWeightPerPiece = 20m;
 
         var stepsBefore = viewModel.History.CanUndo;
-        viewModel.SelectedRecipeTab = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
+        viewModel.Recipe.SelectedRecipeTab = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
 
         viewModel.ErrorMessage.Should().StartWith("This recipe has more than one Dough without a name");
         viewModel.History.CanUndo.Should().Be(stepsBefore, "a refusal changed nothing to take back");
@@ -391,8 +391,8 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
 
         viewModel.ErrorMessage.Should().BeNull();
         await Settle.UntilAsync(viewModel,
-            () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+            () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.Recipe.UsageEdits.Count}");
         viewModel.EditingName.Should().Be("Ube Roll");
         viewModel.History.CanUndo.Should().BeFalse("what was reverted to is the new starting point");
         viewModel.History.CanRedo.Should().BeFalse();
@@ -417,7 +417,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.EditingName.Should().BeEmpty();
         viewModel.EditingCurrentPrice.Should().BeNull();
-        viewModel.UsageEdits.Should().BeEmpty();
+        viewModel.Recipe.UsageEdits.Should().BeEmpty();
         viewModel.History.CanUndo.Should().BeFalse();
 
         // And the saved product is untouched: Revert only reads.
@@ -461,16 +461,16 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         // Each tab opens its section's form over the previous one, so the form holds different values without
         // anything having been edited. What Save measures against follows the form through (RebaseSettledForm).
         var (viewModel, _) = await OpenTwoSectionProductAsync();
-        var dough = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
-        var filling = viewModel.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        var dough = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = viewModel.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        viewModel.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = dough;
         (await CanSave(viewModel)).Should().BeFalse();
 
-        viewModel.SelectedRecipeTab = filling;
+        viewModel.Recipe.SelectedRecipeTab = filling;
         (await CanSave(viewModel)).Should().BeFalse();
 
-        viewModel.SelectedRecipeTab = dough;
+        viewModel.Recipe.SelectedRecipeTab = dough;
         (await CanSave(viewModel)).Should().BeFalse("clicking through the sections writes nothing");
 
         // And the form is still live: typing in the one now showing does offer Save.
@@ -493,13 +493,13 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
         var (viewModel, _) = await OpenOneSubAssemblyProductAsync();
 
-        await viewModel.AddUsageCommand.Execute(mode);
+        await viewModel.Recipe.AddUsageCommand.Execute(mode);
         viewModel.UsageForm.EditingUsageMode.Should().Be(mode);
         (await CanSave(viewModel)).Should().BeFalse("nothing has been entered in the add form");
 
         // Another way picked on the drop-down over the untouched form only changes its way.
         var other = mode == UsageFormMode.Link ? UsageFormMode.Copy : UsageFormMode.Link;
-        await viewModel.AddUsageCommand.Execute(other);
+        await viewModel.Recipe.AddUsageCommand.Execute(other);
         viewModel.UsageForm.EditingUsageMode.Should().Be(other);
         (await CanSave(viewModel)).Should().BeFalse("the form is still empty");
 
@@ -582,20 +582,20 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     {
         var (viewModel, doughId) = await OpenLinkedDoughProductAsync();
 
-        await viewModel.UnlinkCommand.Execute(viewModel.UsageEdits.Single());
+        await viewModel.Recipe.UnlinkCommand.Execute(viewModel.Recipe.UsageEdits.Single());
 
-        viewModel.UsageEdits.Single().IsOwned.Should().BeTrue();
+        viewModel.Recipe.UsageEdits.Single().IsOwned.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        var linked = viewModel.UsageEdits.Single();
+        var linked = viewModel.Recipe.UsageEdits.Single();
         linked.IsLinked.Should().BeTrue();
         linked.SubAssemblyId.Should().Be(doughId);
         (await CanSave(viewModel)).Should().BeFalse("the recipe links the dough again, as saved, and its form shows it as it was");
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.UsageEdits.Single().IsOwned.Should().BeTrue();
+        viewModel.Recipe.UsageEdits.Single().IsOwned.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
@@ -610,18 +610,18 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
         viewModel.UsageForm.IsEditingOwnedUsage.Should().BeTrue();
 
-        await viewModel.MoveToSubAssembliesCommand.Execute(viewModel.UsageForm.EditingUsage!);
-        viewModel.UsageEdits.Single().IsReleasing.Should().BeTrue();
+        await viewModel.Recipe.MoveToSubAssembliesCommand.Execute(viewModel.UsageForm.EditingUsage!);
+        viewModel.Recipe.UsageEdits.Single().IsReleasing.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.UsageEdits.Single().IsReleasing.Should().BeFalse();
+        viewModel.Recipe.UsageEdits.Single().IsReleasing.Should().BeFalse();
         viewModel.UsageForm.IsEditingOwnedUsage.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.UsageEdits.Single().IsReleasing.Should().BeTrue();
+        viewModel.Recipe.UsageEdits.Single().IsReleasing.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
@@ -635,20 +635,20 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         await SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
         var viewModel = await OpenAsync(productId, vm => vm.UsageForm.FormLines.Count == 1);
-        viewModel.PromptForMadeIngredient.RegisterHandler(interaction => interaction.SetOutput(new ChoicePromptResult("Cheese Filling", 0)));
+        viewModel.Recipe.PromptForMadeIngredient.RegisterHandler(interaction => interaction.SetOutput(new ChoicePromptResult("Cheese Filling", 0)));
 
-        await viewModel.MoveToInHouseCommand.Execute(viewModel.UsageForm.EditingUsage!);
-        viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeTrue();
+        await viewModel.Recipe.MoveToInHouseCommand.Execute(viewModel.UsageForm.EditingUsage!);
+        viewModel.Recipe.UsageEdits.Single().IsMovingToInHouse.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
+        viewModel.Recipe.UsageEdits.Single().IsMovingToInHouse.Should().BeFalse();
         viewModel.UsageForm.CanMoveEditingUsageToInHouse.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.UsageEdits.Single().ToMadeIngredient!.Name.Should().Be("Cheese Filling");
+        viewModel.Recipe.UsageEdits.Single().ToMadeIngredient!.Name.Should().Be("Cheese Filling");
         (await CanSave(viewModel)).Should().BeTrue();
     });
 
@@ -657,12 +657,12 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
     {
         var (viewModel, _) = await OpenLinkedDoughProductAsync();
 
-        await viewModel.MakeCopyCommand.Execute(viewModel.UsageEdits.Single());
+        await viewModel.Recipe.MakeCopyCommand.Execute(viewModel.Recipe.UsageEdits.Single());
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.UsageEdits.Single().IsLinked.Should().BeTrue();
+        viewModel.Recipe.UsageEdits.Single().IsLinked.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeFalse("opening the copy's form moved what Save measures against, and the undo moves it back");
     });
 
@@ -725,7 +725,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
 
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1 && vm.UsageForm.FormLines.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 1 && vm.UsageForm.FormLines.Count == 1);
         return (viewModel, doughId);
     }
 
@@ -766,7 +766,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
             await AddPackagingLineAsync(productId);
         }
 
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && (vm.Packaging.LineEdits.Count > 0) == withPackaging);
+        var viewModel = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 2 && (vm.Packaging.LineEdits.Count > 0) == withPackaging);
         return (viewModel, productId);
     }
 
@@ -797,7 +797,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.Recipe.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return viewModel;

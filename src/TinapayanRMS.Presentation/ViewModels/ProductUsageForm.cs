@@ -557,7 +557,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
         UsageFormBaseCaption = formulaBase > 0
             ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
-            : SubAssembliesViewModel.NoBaseCaption;
+            : SubAssemblyBatch.NoBaseCaption;
 
         // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
         var recipeName = EditingUsage?.DisplayName

@@ -36,7 +36,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         viewModel.EditingName = "Flour (unsaved rename)";
         var selected = viewModel.SelectedRawMaterial;
-        var pickedUnit = viewModel.UnitRows.Single().Unit.UnitOfMeasure;
+        var pickedUnit = viewModel.Units.Rows.Single().Unit.UnitOfMeasure;
 
         await SeedUnitOfMeasureAsync("sack", "sk");
         await viewModel.LoadCommand.Execute();
@@ -46,7 +46,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.RawMaterials.Should().ContainSingle().Which.Should().BeSameAs(selected);
         viewModel.SelectedRawMaterial.Should().BeSameAs(selected);
         viewModel.UnitsOfMeasure.Should().Contain(unit => ReferenceEquals(unit, pickedUnit));
-        viewModel.UnitRows.Single().Unit.UnitOfMeasure.Should().BeSameAs(pickedUnit, "the grid's unit cell still finds the unit it shows");
+        viewModel.Units.Rows.Single().Unit.UnitOfMeasure.Should().BeSameAs(pickedUnit, "the grid's unit cell still finds the unit it shows");
         viewModel.EditingName.Should().Be("Flour (unsaved rename)");
         viewModel.UnitsOfMeasure.Select(u => u.Name).Should().Equal("bag", "sack");
     });
@@ -67,15 +67,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.EditingName == "Sugar", () => $"name={viewModel.EditingName}");
 
-        viewModel.SearchText = "Flour";
+        viewModel.List.SearchText = "Flour";
         viewModel.OpenRawMaterial(flourId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(flourId);
-        viewModel.SearchText.Should().Be("Flour", "a search showing it is left alone");
+        viewModel.List.SearchText.Should().Be("Flour", "a search showing it is left alone");
 
         viewModel.OpenRawMaterial(sugarId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(sugarId);
-        viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
-        viewModel.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
+        viewModel.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        viewModel.List.VisibleRawMaterials.Should().Contain(viewModel.SelectedRawMaterial);
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "Sugar's details never arrived");
     });
 
@@ -110,7 +110,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.SelectedRawMaterial!.Id.Should().Be(flourId);
         viewModel.SelectedRawMaterial.Units.Should().ContainSingle().Which.UnitOfMeasure!.Abbreviation.Should().Be("bg", "the row shows the renamed unit");
-        var row = viewModel.UnitRows.Should().ContainSingle().Subject;
+        var row = viewModel.Units.Rows.Should().ContainSingle().Subject;
         (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
         viewModel.EditingName.Should().Be("Flour (unsaved rename)", "re-pointing the selection must not reload the form");
     });
@@ -135,17 +135,17 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == sugarId);
 
-        await Settle.UntilAsync(viewModel, () => viewModel.BrandPriceRows.Count > 0 && viewModel.PriceHistory.Count > 0,
-            () => $"brands={viewModel.BrandPriceRows.Count}, prices={viewModel.PriceHistory.Count}");
-        viewModel.BrandPriceRows.Select(r => (r.Brand, r.Price)).Should().Equal([(null, 0.09m)], "Flour's brands never join Sugar's");
-        viewModel.PriceHistory.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
+        await Settle.UntilAsync(viewModel, () => viewModel.PurchaseCost.BrandPriceRows.Count > 0 && viewModel.PriceLog.Entries.Count > 0,
+            () => $"brands={viewModel.PurchaseCost.BrandPriceRows.Count}, prices={viewModel.PriceLog.Entries.Count}");
+        viewModel.PurchaseCost.BrandPriceRows.Select(r => (r.Brand, r.Price)).Should().Equal([(null, 0.09m)], "Flour's brands never join Sugar's");
+        viewModel.PriceLog.Entries.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
 
         // The same for the recipe a made ingredient is made from.
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Butter Icing");
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Name == "Syrup");
 
-        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
-        viewModel.RecipeLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.Recipe.Lines.Count == 1, () => $"lines={viewModel.Recipe.Lines.Count}");
+        viewModel.Recipe.Lines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
     });
 
     [Test]
@@ -168,12 +168,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // and a Save now would write Flour's brand prices under Sugar.
         viewModel.AreDetailsReady.Should().BeFalse();
         viewModel.EditingName.Should().Be("Sugar");
-        viewModel.BrandPriceRows.Select(r => r.Brand).Should().Equal("Gold Medal", "Wellington");
+        viewModel.PurchaseCost.BrandPriceRows.Select(r => r.Brand).Should().Equal("Gold Medal", "Wellington");
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.BrandPriceRows.Count}");
-        viewModel.BrandPriceRows.Single().Price.Should().Be(0.09m);
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}");
+        viewModel.PurchaseCost.BrandPriceRows.Single().Price.Should().Be(0.09m);
         viewModel.SuccessMessage.Should().BeNull("nothing was saved");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterialBrandPrices.Where(p => p.RawMaterialId == sugarId).Select(p => p.Price).ToListAsync(Cancellation))
@@ -195,11 +195,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await RenameAbbreviationAsync(bagId, "bg");
         await viewModel.LoadCommand.Execute();
 
-        var row = viewModel.UnitRows.Should().ContainSingle().Subject;
+        var row = viewModel.Units.Rows.Should().ContainSingle().Subject;
         row.Unit.Id.Should().Be(0, "the unit still isn't saved");
         (row.Abbreviation, row.BaseEquivalentText).Should().Be(("bg", "25,000 g"));
-        viewModel.BrandPriceRows.Should().ContainSingle().Which.Should().BeSameAs(brand, "the unsaved brand stays");
-        viewModel.PurchaseUnitOptions.Single(o => o.Key == brand.UnitKey).Abbreviation.Should().Be("bg", "the unit picked stays picked");
+        viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle().Which.Should().BeSameAs(brand, "the unsaved brand stays");
+        viewModel.PurchaseCost.PurchaseUnitOptions.Single(o => o.Key == brand.UnitKey).Abbreviation.Should().Be("bg", "the unit picked stays picked");
     });
 
 
@@ -224,19 +224,19 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await AddUnitAsync(viewModel, trayId, 500m);
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
-            () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1 && viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Flour was saved.", "a toast says so");
         viewModel.SelectedRawMaterial!.Name.Should().Be("Flour", "saving a new material selects it");
-        viewModel.UnitRows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(
+        viewModel.Units.Rows.Select(r => (r.UnitName, r.Unit.Id > 0)).Should().Equal(
             [("bag", true), ("pack", true), ("tray", true)], "a material can have any number of alternative units");
-        viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(viewModel.UnitRows[0].Unit.Id);
-        viewModel.PriceHistory.Single().Brand.Should().Be("Gold Medal");
-        var brand = viewModel.BrandPriceRows.Single();
+        viewModel.PriceLog.Entries.Single().Entry.UnitId.Should().Be(viewModel.Units.Rows[0].Unit.Id);
+        viewModel.PriceLog.Entries.Single().Brand.Should().Be("Gold Medal");
+        var brand = viewModel.PurchaseCost.BrandPriceRows.Single();
         (brand.Brand, brand.UnitKey, brand.Price).Should().Be(("Gold Medal", bagId, 1250m), "the form reloads what was saved");
-        viewModel.HeaderCostUnitText.Should().Be("bag", "the header's costs are in the Per unit, the dearest brand's");
-        viewModel.CurrentCostText.Should().Be("1,250.00");
+        viewModel.PurchaseCost.HeaderCostUnitText.Should().Be("bag", "the header's costs are in the Per unit, the dearest brand's");
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("1,250.00");
         viewModel.CanChangeTypeAndSource.Should().BeFalse();
     });
 
@@ -279,15 +279,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
-        viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal(
+        viewModel.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal(
             ["gram", "bag", "sack"], "a unit of measure named like the ingredient's gram isn't offered twice");
 
         // The grid's add row edits the screen's own row, which adds the unit as soon as it's picked.
-        var brand = viewModel.NewBrandPriceRow();
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
         brand.CanTypeQuantity.Should().BeFalse("there's no unit to type a quantity for");
         brand.UnitKey = sackId;
 
-        var row = viewModel.UnitRows.Should().ContainSingle().Subject;
+        var row = viewModel.Units.Rows.Should().ContainSingle().Subject;
         row.UnitName.Should().Be("sack");
         row.Unit.Id.Should().Be(0, "it isn't saved yet");
         brand.CanTypeQuantity.Should().BeTrue();
@@ -295,23 +295,23 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         brand.Quantity = 25000m;
         brand.Price = 1500m;
-        viewModel.BrandPriceRows.Add(brand);
-        viewModel.UnitRows.Single().BaseEquivalentText.Should().Be("25,000 g", "the quantity typed is the unit's multiplier");
-        viewModel.PurchaseCostText.Should().Be("0.0600");
+        viewModel.PurchaseCost.BrandPriceRows.Add(brand);
+        viewModel.Units.Rows.Single().BaseEquivalentText.Should().Be("25,000 g", "the quantity typed is the unit's multiplier");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("0.0600");
 
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
-            () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1 && viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
-        var saved = viewModel.UnitRows.Should().ContainSingle().Subject;
+        var saved = viewModel.Units.Rows.Should().ContainSingle().Subject;
         saved.Unit.Id.Should().BeGreaterThan(0);
         saved.BaseUnitsPerUnit.Should().Be(25000m);
-        viewModel.PriceHistory.Single().Entry.UnitId.Should().Be(saved.Unit.Id);
-        var reloaded = viewModel.BrandPriceRows.Single();
+        viewModel.PriceLog.Entries.Single().Entry.UnitId.Should().Be(saved.Unit.Id);
+        var reloaded = viewModel.PurchaseCost.BrandPriceRows.Single();
         (reloaded.UnitKey, reloaded.Quantity).Should().Be((sackId, 25000m));
         reloaded.CanTypeQuantity.Should().BeFalse("a saved unit's multiplier is corrected in Alternative Units");
-        viewModel.CurrentCostText.Should().Be("1,500.00", "a 25 kg sack's worth, the Per unit");
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("1,500.00", "a 25 kg sack's worth, the Per unit");
     });
 
 
@@ -324,15 +324,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         await viewModel.NewCommand.Execute();
 
-        var brand = viewModel.NewBrandPriceRow();
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
         brand.UnitKey = sackId;
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("sack");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal("sack");
 
         brand.UnitKey = bagId;
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag"], "picking another new unit replaces the one added");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal(["bag"], "picking another new unit replaces the one added");
 
         brand.UnitKey = PurchaseUnitChoice.BaseUnitKey;
-        viewModel.UnitRows.Should().BeEmpty("the unit was only there for the brand");
+        viewModel.Units.Rows.Should().BeEmpty("the unit was only there for the brand");
         brand.Quantity.Should().Be(1m);
     });
 
@@ -353,16 +353,16 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         bag.Quantity.Should().Be(25000m);
 
         var pack = AddBrandPrice(viewModel, "Wellington", "pack", 40m);
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("bag", "pack");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal("bag", "pack");
 
-        var sack = viewModel.NewBrandPriceRow();
+        var sack = viewModel.PurchaseCost.NewBrandPriceRow();
         sack.UnitKey = sackId;
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "pack", "sack"], "there's no limit on alternative units");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal(["bag", "pack", "sack"], "there's no limit on alternative units");
 
         sack.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         pack.UnitKey = sackId;
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal(["bag", "sack"], "the unit added for a brand can still be swapped for another");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal(["bag", "sack"], "the unit added for a brand can still be swapped for another");
     });
 
 
@@ -382,7 +382,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Enter how many g are in one sack (Qty per Purchase Unit).");
-        viewModel.UnitRows.Should().ContainSingle().Which.UnitName.Should().Be("sack", "the edits stay to be fixed");
+        viewModel.Units.Rows.Should().ContainSingle().Which.UnitName.Should().Be("sack", "the edits stay to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
     });
@@ -415,25 +415,25 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == flourId));
-        viewModel.Dependents.Select(p => p.Name).Should().Equal("Pandesal");
-        viewModel.DependentsText.Should().StartWith("These products use it");
+        viewModel.Dependents.Products.Select(p => p.Name).Should().Equal("Pandesal");
+        viewModel.Dependents.Text.Should().StartWith("These products use it");
 
         // A product made on the Products tab while this screen kept Flour open.
         await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m), (sugarId, 100m)]);
         await viewModel.LoadCommand.Execute();
-        viewModel.Dependents.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
+        viewModel.Dependents.Products.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
 
         var opened = new List<int>();
-        using (viewModel.ProductOpenRequests.Subscribe(opened.Add))
+        using (viewModel.Dependents.ProductOpenRequests.Subscribe(opened.Add))
         {
-            await viewModel.OpenProductCommand.Execute(pandesalId);
+            await viewModel.Dependents.OpenProductCommand.Execute(pandesalId);
         }
 
         opened.Should().Equal(pandesalId);
 
         await viewModel.NewCommand.Execute();
-        viewModel.Dependents.Should().BeEmpty("a new material isn't used by anything");
-        viewModel.DependentsText.Should().Be("No product uses it yet.");
+        viewModel.Dependents.Products.Should().BeEmpty("a new material isn't used by anything");
+        viewModel.Dependents.Text.Should().Be("No product uses it yet.");
     });
 
     [Test]
@@ -456,8 +456,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SuccessMessage.Should().BeNull("nothing was saved");
         viewModel.SelectedRawMaterial.Should().BeNull();
         viewModel.CanChangeTypeAndSource.Should().BeTrue("the material still isn't saved");
-        viewModel.UnitRows.Should().ContainSingle().Which.UnitName.Should().Be("bag");
-        viewModel.BrandPriceRows.Should().ContainSingle().Which.Price.Should().Be(1250m);
+        viewModel.Units.Rows.Should().ContainSingle().Which.UnitName.Should().Be("bag");
+        viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle().Which.Price.Should().Be(1250m);
 
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.CountAsync(Cancellation)).Should().Be(1);
@@ -554,16 +554,16 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, null, "pack", 60m);
-        viewModel.PurchaseCostText.Should().Be("0.0600", "the cost per gram is worked out as the price is typed");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("0.0600", "the cost per gram is worked out as the price is typed");
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 1,
-            () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1 && viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.PriceHistory.Single().UnitName.Should().Be("pack");
-        viewModel.PriceHistory.Single().CostPerBaseUnit.Should().Be(0.06m);
+        viewModel.PriceLog.Entries.Single().UnitName.Should().Be("pack");
+        viewModel.PriceLog.Entries.Single().CostPerBaseUnit.Should().Be(0.06m);
         viewModel.SelectedRawMaterial!.CostPerBaseUnit.Should().Be(0.06m);
-        (viewModel.BrandPriceRows.Single().UnitKey, viewModel.BrandPriceRows.Single().Price).Should().Be((packId, 60m));
+        (viewModel.PurchaseCost.BrandPriceRows.Single().UnitKey, viewModel.PurchaseCost.BrandPriceRows.Single().Price).Should().Be((packId, 60m));
     });
 
     [Test]
@@ -578,16 +578,16 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, "Gold Medal", "bag", 900m); // ₱0.036/g
         AddBrandPrice(viewModel, "Wellington", "pack", 40m); // ₱0.04/g
-        viewModel.PurchaseCostText.Should().Be("0.0400");
-        viewModel.PurchaseCostSourceText.Should().Be("From Wellington, the dearest of 2 brands.");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("0.0400");
+        viewModel.PurchaseCost.PurchaseCostSourceText.Should().Be("From Wellington, the dearest of 2 brands.");
 
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1 && viewModel.BrandPriceRows.Count == 2,
-            () => $"price rows={viewModel.PriceHistory.Count}, brands={viewModel.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1 && viewModel.PurchaseCost.BrandPriceRows.Count == 2,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostPerBaseUnit.Should().Be(0.04m);
-        (viewModel.PriceHistory.Single().Brand, viewModel.PriceHistory.Single().UnitName).Should().Be(("Wellington", "pack"));
+        (viewModel.PriceLog.Entries.Single().Brand, viewModel.PriceLog.Entries.Single().UnitName).Should().Be(("Wellington", "pack"));
     });
 
     [Test]
@@ -599,14 +599,14 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
 
         var brand = AddBrandPrice(viewModel, "Gold Medal", "sack", 1500m);
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("sack");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal("sack");
 
-        viewModel.SelectedBrandPriceRow = brand;
-        await viewModel.RemoveBrandPriceCommand.Execute();
+        viewModel.PurchaseCost.SelectedBrandPriceRow = brand;
+        await viewModel.PurchaseCost.RemoveBrandPriceCommand.Execute();
 
-        viewModel.BrandPriceRows.Should().BeEmpty();
-        viewModel.UnitRows.Should().BeEmpty("the unit was only there for the brand");
-        viewModel.PurchaseCostText.Should().Be("—");
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        viewModel.Units.Rows.Should().BeEmpty("the unit was only there for the brand");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("—");
     });
 
     [Test]
@@ -645,15 +645,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingWeightLossPercent = 20m;
         viewModel.ShowPurchaseSetup.Should().BeFalse("a made ingredient is made from a sub-assembly instead of priced");
         await PickRecipeAsync(viewModel, "Syrup Base");
-        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
+        viewModel.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1,
-            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.Recipe.AddIns.Count == 1,
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.Recipe.AddIns.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.SubAssemblyId.Should().Be(recipeId);
-        viewModel.HeaderCostUnitText.Should().Be("g", "a made ingredient has no Purchase Cost Setup, so its header stays per gram");
-        viewModel.CurrentCostText.Should().MatchRegex(@"^\d+\.\d{4}$");
+        viewModel.PurchaseCost.HeaderCostUnitText.Should().Be("g", "a made ingredient has no Purchase Cost Setup, so its header stays per gram");
+        viewModel.PurchaseCost.CurrentCostText.Should().MatchRegex(@"^\d+\.\d{4}$");
         var addInId = await AddInIdAsync();
 
         viewModel.EditingName = "Syrup";
@@ -696,13 +696,13 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SubAssemblyOptions.Select(s => s.Name).Should().Equal(["Syrup Base"], "a packaging set isn't a recipe");
+        viewModel.Recipe.SubAssemblyOptions.Select(s => s.Name).Should().Equal(["Syrup Base"], "a packaging set isn't a recipe");
 
         var opened = new List<int>();
-        using var subscription = viewModel.SubAssemblyOpenRequests.Subscribe(opened.Add);
+        using var subscription = viewModel.Recipe.SubAssemblyOpenRequests.Subscribe(opened.Add);
         viewModel.EditingSource = RawMaterialSource.Made;
         await PickRecipeAsync(viewModel, "Syrup Base");
-        await viewModel.OpenSubAssemblyCommand.Execute();
+        await viewModel.Recipe.OpenSubAssemblyCommand.Execute();
 
         opened.Should().Equal(recipeId);
     });
@@ -719,27 +719,27 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         viewModel.EditingSource = RawMaterialSource.Made;
-        viewModel.IsPickingSubAssembly.Should().BeTrue("nothing is picked yet");
+        viewModel.Recipe.IsPickingSubAssembly.Should().BeTrue("nothing is picked yet");
         await PickRecipeAsync(viewModel, "Syrup Base");
-        (viewModel.IsPickingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true), "a pick settles it");
-        viewModel.SubAssemblyBadgeText.Should().Be("Syrup Base, from Sub-Assemblies");
+        (viewModel.Recipe.IsPickingSubAssembly, viewModel.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true), "a pick settles it");
+        viewModel.Recipe.SubAssemblyBadgeText.Should().Be("Syrup Base, from Sub-Assemblies");
 
-        await viewModel.StartChangingSubAssemblyCommand.Execute();
-        (viewModel.IsPickingSubAssembly, viewModel.IsChangingSubAssembly).Should().Be((true, true));
-        await viewModel.CancelChangingSubAssemblyCommand.Execute();
-        viewModel.IsShowingSubAssemblyBadge.Should().BeTrue();
-        viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base", "Cancel keeps it as it was");
+        await viewModel.Recipe.StartChangingSubAssemblyCommand.Execute();
+        (viewModel.Recipe.IsPickingSubAssembly, viewModel.Recipe.IsChangingSubAssembly).Should().Be((true, true));
+        await viewModel.Recipe.CancelChangingSubAssemblyCommand.Execute();
+        viewModel.Recipe.IsShowingSubAssemblyBadge.Should().BeTrue();
+        viewModel.Recipe.SubAssembly!.Name.Should().Be("Syrup Base", "Cancel keeps it as it was");
 
-        await viewModel.StartChangingSubAssemblyCommand.Execute();
-        viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base");
-        (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true), "another pick settles it again");
+        await viewModel.Recipe.StartChangingSubAssemblyCommand.Execute();
+        viewModel.Recipe.SubAssembly = viewModel.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base");
+        (viewModel.Recipe.IsChangingSubAssembly, viewModel.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true), "another pick settles it again");
 
         // A saved one opens with its badge, even after Edit was left open on the form before.
-        await viewModel.StartChangingSubAssemblyCommand.Execute();
+        await viewModel.Recipe.StartChangingSubAssemblyCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
-        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
-        (viewModel.IsChangingSubAssembly, viewModel.IsShowingSubAssemblyBadge).Should().Be((false, true));
-        viewModel.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.Recipe.Lines.Count == 1, () => $"lines={viewModel.Recipe.Lines.Count}");
+        (viewModel.Recipe.IsChangingSubAssembly, viewModel.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true));
+        viewModel.Recipe.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
     });
 
     [Test]
@@ -782,14 +782,14 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         PickCategory(viewModel);
         viewModel.EditingWeightLossPercent = 20m;
         await PickRecipeAsync(viewModel, "Syrup Base");
-        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
+        viewModel.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single(m => m.Name == "Vanilla").Id, Grams = 10m });
         await viewModel.SaveCommand.Execute();
         await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial?.Name == "Simple Syrup",
             () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, error={viewModel.ErrorMessage ?? "none"}");
 
         // Only reachable by editing the database directly — the picker already leaves the material itself out of
         // AddInOptions — but this pins the guard that catches it anyway, added straight to AddInEdits.
-        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.SelectedRawMaterial!.Id, Grams = 50m });
+        viewModel.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = viewModel.SelectedRawMaterial!.Id, Grams = 50m });
         viewModel.EditingWeightLossPercent = 25m; // an unrelated edit, which goes with it
 
         await viewModel.SaveCommand.Execute();
@@ -840,37 +840,37 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingSource = RawMaterialSource.Made;
         PickCategory(viewModel);
         viewModel.EditingWeightLossPercent.Should().Be(3m);
-        viewModel.BomTotalWeight.Should().Be(0m, "no sub-assembly picked yet");
-        viewModel.BomTotalCost.Should().Be(0m);
+        viewModel.Recipe.BomTotalWeight.Should().Be(0m, "no sub-assembly picked yet");
+        viewModel.Recipe.BomTotalCost.Should().Be(0m);
 
         await PickRecipeAsync(viewModel, "Syrup Base");
 
-        viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% lost while making it");
-        viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
-        viewModel.BufferedCostText.Should().Be("0.1134", "₱110 over the 970 g it yields, as the recipe stands");
+        viewModel.Recipe.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% lost while making it");
+        viewModel.Recipe.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.1134", "₱110 over the 970 g it yields, as the recipe stands");
 
         // An add-in goes on top of the recipe.
-        viewModel.AddInEdits.Add(new IngredientLineRow(id => viewModel.Ingredients.FirstOrDefault(m => m.Id == id)) { IngredientId = vanillaId, Grams = 100m });
-        viewModel.BomTotalWeight.Should().Be(1067m, "1,100 g less 3%");
-        viewModel.BomTotalCost.Should().Be(220m, "and ₱110 of vanilla");
+        viewModel.Recipe.AddIns.Add(new IngredientLineRow(id => viewModel.Ingredients.FirstOrDefault(m => m.Id == id)) { IngredientId = vanillaId, Grams = 100m });
+        viewModel.Recipe.BomTotalWeight.Should().Be(1067m, "1,100 g less 3%");
+        viewModel.Recipe.BomTotalCost.Should().Be(220m, "and ₱110 of vanilla");
 
         // The weight loss moves the yield, not the cost.
         viewModel.EditingWeightLossPercent = 20m;
-        viewModel.BomTotalWeight.Should().Be(880m);
-        viewModel.BomTotalCost.Should().Be(220m);
-        viewModel.BufferedCostText.Should().Be("0.2500");
+        viewModel.Recipe.BomTotalWeight.Should().Be(880m);
+        viewModel.Recipe.BomTotalCost.Should().Be(220m);
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.2500");
 
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
-            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.AddInEdits.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.SelectedRawMaterial is not null && viewModel.Recipe.AddIns.Count == 1 && viewModel.Recipe.Lines.Count == 1,
+            () => $"selected={viewModel.SelectedRawMaterial?.Name ?? "none"}, lines={viewModel.Recipe.AddIns.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.BomTotalWeight.Should().Be(880m);
-        viewModel.BomTotalCost.Should().Be(220m);
-        (viewModel.BomTotalCost / viewModel.BomTotalWeight).Should().Be(viewModel.SelectedRawMaterial!.BufferedCostPerBaseUnit,
+        viewModel.Recipe.BomTotalWeight.Should().Be(880m);
+        viewModel.Recipe.BomTotalCost.Should().Be(220m);
+        (viewModel.Recipe.BomTotalCost / viewModel.Recipe.BomTotalWeight).Should().Be(viewModel.SelectedRawMaterial!.BufferedCostPerBaseUnit,
             "the tiles are the two sides of the buffered cost the cascade saved");
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(0m, "a made ingredient carries no buffer of its own");
-        viewModel.BufferedCostText.Should().Be("0.2500");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.2500");
     });
 
     [Test]
@@ -883,10 +883,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == flourId);
 
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => "details never arrived");
-        viewModel.CurrentCostText.Should().Be("0.0500");
-        viewModel.BufferedCostText.Should().Be("0.0525", "only a made ingredient's follows the form");
-        viewModel.BomTotalWeight.Should().Be(0m, "it has no BOM");
-        viewModel.BomTotalCost.Should().Be(0m);
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("0.0500");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.0525", "only a made ingredient's follows the form");
+        viewModel.Recipe.BomTotalWeight.Should().Be(0m, "it has no BOM");
+        viewModel.Recipe.BomTotalCost.Should().Be(0m);
     });
 
     [Test]
@@ -898,8 +898,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == syrupId);
-        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.RecipeLines.Count == 1, () => $"lines={viewModel.RecipeLines.Count}");
-        viewModel.BomTotalCost.Should().Be(110m);
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.Recipe.Lines.Count == 1, () => $"lines={viewModel.Recipe.Lines.Count}");
+        viewModel.Recipe.BomTotalCost.Should().Be(110m);
 
         // Sugar goes up behind the screen's back, as another screen or the cascade would leave it.
         await using (var dbContext = CreateDbContext())
@@ -911,9 +911,9 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.LoadCommand.Execute();
 
-        viewModel.BomTotalCost.Should().Be(220m, "the refreshed component is what the rows point at");
-        viewModel.BomTotalWeight.Should().Be(1000m, "seeded with no weight loss");
-        viewModel.BufferedCostText.Should().Be("0.2200");
+        viewModel.Recipe.BomTotalCost.Should().Be(220m, "the refreshed component is what the rows point at");
+        viewModel.Recipe.BomTotalWeight.Should().Be(1000m, "seeded with no weight loss");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.2200");
     });
 
     [Test]
@@ -986,17 +986,17 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await AddUnitAsync(viewModel, bagId, 25000m);
         AddBrandPrice(viewModel, null, "bag", 90m);
         viewModel.EditingSource = RawMaterialSource.Made;
-        viewModel.AddInEdits.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
+        viewModel.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = viewModel.Ingredients.Single().Id, Grams = 100m });
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
 
-        viewModel.UnitRows.Should().BeEmpty();
-        viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
-        viewModel.BrandPriceRows.Should().BeEmpty();
-        viewModel.PurchaseCostText.Should().Be("—");
-        viewModel.AddInEdits.Should().BeEmpty();
+        viewModel.Units.Rows.Should().BeEmpty();
+        viewModel.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("—");
+        viewModel.Recipe.AddIns.Should().BeEmpty();
     });
 
     [Test]
@@ -1010,18 +1010,18 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.ExampleRawMaterial = viewModel.RawMaterials.Single();
-        viewModel.ExampleQuantity = 2m;
-        viewModel.ExampleUnit = viewModel.ExampleUnitOptions.Single(o => o.Name == "bag");
+        viewModel.UsageExample.Material = viewModel.RawMaterials.Single();
+        viewModel.UsageExample.Quantity = 2m;
+        viewModel.UsageExample.Unit = viewModel.UsageExample.UnitOptions.Single(o => o.Name == "bag");
 
-        await viewModel.CalculateExampleCommand.Execute();
+        await viewModel.UsageExample.CalculateCommand.Execute();
 
-        viewModel.ExampleResult.Should().NotBeNull();
-        viewModel.ExampleResult!.Title.Should().Be("Cost for 2 bag of Flour");
-        viewModel.ExampleResult.QuantityInBaseUnits.Should().Be(50000m);
-        viewModel.ExampleResult.BaseUnitAbbreviation.Should().Be("g");
-        viewModel.ExampleResult.CostPerBaseUnit.Should().Be(0.05m);
-        viewModel.ExampleResult.TotalCost.Should().Be(2500m);
+        viewModel.UsageExample.Result.Should().NotBeNull();
+        viewModel.UsageExample.Result!.Title.Should().Be("Cost for 2 bag of Flour");
+        viewModel.UsageExample.Result.QuantityInBaseUnits.Should().Be(50000m);
+        viewModel.UsageExample.Result.BaseUnitAbbreviation.Should().Be("g");
+        viewModel.UsageExample.Result.CostPerBaseUnit.Should().Be(0.05m);
+        viewModel.UsageExample.Result.TotalCost.Should().Be(2500m);
     });
 
     [Test]
@@ -1033,81 +1033,81 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(10m, "a new material starts at Settings' default buffer");
-        viewModel.EditingBufferedCost.Should().BeNull();
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "a new material starts at Settings' default buffer");
+        viewModel.PurchaseCost.EditingBufferedCost.Should().BeNull();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
         await AddUnitAsync(viewModel, bagId, 25000m);
         var brand = AddBrandPrice(viewModel, null, "bag", 1250m);
-        viewModel.TypedCostBufferPercent = 5m;
-        viewModel.EditingBufferedCost.Should().Be(0.0525m, "typing the percent puts it on top of the dearest brand");
-        viewModel.PurchaseCostText.Should().Be("0.0500");
-        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey, "a new material starts on its base unit");
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.PurchaseBufferedCostText.Should().Contain("1,312.50/bag");
+        viewModel.PurchaseCost.TypedCostBufferPercent = 5m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0525m, "typing the percent puts it on top of the dearest brand");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("0.0500");
+        viewModel.PurchaseCost.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey, "a new material starts on its base unit");
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.PurchaseCost.PurchaseBufferedCostText.Should().Contain("1,312.50/bag");
         brand.BufferPercent.Should().Be(5m, "the brand's Buffer % column is the buffered cost over its price");
         brand.CostPerBaseUnit.Should().Be(0.05m, "the brand's Unit Price: ₱1,250 a bag of 25,000 g");
 
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1,
-            () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SelectedRawMaterial!.CostBufferPercent.Should().Be(5m);
-        viewModel.EditingCostBufferPercent.Should().Be(5m, "the form reloads what was saved");
-        viewModel.EditingBufferedCost.Should().Be(0.0525m);
-        viewModel.BufferedCostUnit!.Name.Should().Be("bag", "a saved material starts on its dearest brand's unit");
-        viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
-        viewModel.HeaderCostUnitText.Should().Be("bag");
-        viewModel.CurrentCostText.Should().Be("1,250.00");
-        viewModel.BufferedCostText.Should().Be("1,312.50");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(5m, "the form reloads what was saved");
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0525m);
+        viewModel.PurchaseCost.BufferedCostUnit!.Name.Should().Be("bag", "a saved material starts on its dearest brand's unit");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1312.5m);
+        viewModel.PurchaseCost.HeaderCostUnitText.Should().Be("bag");
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("1,250.00");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("1,312.50");
 
         // The header follows the Per unit: per gram, to 4 decimals.
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
-        viewModel.HeaderCostUnitText.Should().Be("g");
-        viewModel.CurrentCostText.Should().Be("0.0500");
-        viewModel.BufferedCostText.Should().Be("0.0525");
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.BufferedCostWarningText.Should().BeEmpty();
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions[0];
+        viewModel.PurchaseCost.HeaderCostUnitText.Should().Be("g");
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("0.0500");
+        viewModel.PurchaseCost.BufferedCostText.Should().Be("0.0525");
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.PurchaseCost.BufferedCostWarningText.Should().BeEmpty();
 
         // The bag goes up to ₱1,500 (₱0.06/g): the buffered cost stays, the % follows it over the new price, and the
         // screen says the buffer's gone.
-        viewModel.BrandPriceRows.Single().Price = 1500m;
-        viewModel.EditingBufferedCost.Should().Be(0.0525m, "a new price doesn't move the amount");
-        viewModel.EditingCostBufferPercent.Should().Be(0m, "₱1,312.50 is under ₱1,500, so the buffer's gone");
-        viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(-12.5m, "₱1,312.50 is 12.5% under ₱1,500");
-        viewModel.BrandPriceRows.Single().CostPerBaseUnit.Should().Be(0.06m);
-        viewModel.BufferedCostWarningText.Should().NotBeEmpty();
+        viewModel.PurchaseCost.BrandPriceRows.Single().Price = 1500m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0525m, "a new price doesn't move the amount");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(0m, "₱1,312.50 is under ₱1,500, so the buffer's gone");
+        viewModel.PurchaseCost.BrandPriceRows.Single().BufferPercent.Should().Be(-12.5m, "₱1,312.50 is 12.5% under ₱1,500");
+        viewModel.PurchaseCost.BrandPriceRows.Single().CostPerBaseUnit.Should().Be(0.06m);
+        viewModel.PurchaseCost.BufferedCostWarningText.Should().NotBeEmpty();
 
         // Typing the percent works the buffered cost out from the new dearest price.
-        viewModel.TypedCostBufferPercent = 10m;
-        viewModel.EditingBufferedCost.Should().Be(0.066m, "₱0.06 with 10% on top");
-        viewModel.EditingBufferedCostInUnit.Should().Be(1650m);
-        viewModel.BufferedCostWarningText.Should().BeEmpty();
-        viewModel.BrandPriceRows.Single().BufferPercent.Should().Be(10m);
+        viewModel.PurchaseCost.TypedCostBufferPercent = 10m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.066m, "₱0.06 with 10% on top");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1650m);
+        viewModel.PurchaseCost.BufferedCostWarningText.Should().BeEmpty();
+        viewModel.PurchaseCost.BrandPriceRows.Single().BufferPercent.Should().Be(10m);
 
         // Typing the buffered cost works the percent out: ₱1,800 over ₱1,500 is 20%.
-        viewModel.EditingBufferedCostInUnit = 1800m;
-        viewModel.EditingBufferedCost.Should().Be(0.072m);
-        viewModel.EditingCostBufferPercent.Should().Be(20m);
-        viewModel.TypedCostBufferPercent.Should().Be(20m, "the box shows it");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit = 1800m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.072m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(20m);
+        viewModel.PurchaseCost.TypedCostBufferPercent.Should().Be(20m, "the box shows it");
 
         // A dearer bag leaves the amount alone and works the % out afresh: ₱1,800 over ₱1,600 is 12.5%.
-        viewModel.BrandPriceRows.Single().Price = 1600m;
-        viewModel.EditingBufferedCostInUnit.Should().Be(1800m);
-        viewModel.EditingCostBufferPercent.Should().Be(12.5m);
+        viewModel.PurchaseCost.BrandPriceRows.Single().Price = 1600m;
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1800m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(12.5m);
 
         // Typing the percent again puts it back on top of the new dearest price.
-        viewModel.TypedCostBufferPercent = 20m;
-        viewModel.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
+        viewModel.PurchaseCost.TypedCostBufferPercent = 20m;
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1920m, "₱1,600 with 20% on top");
 
         await viewModel.SaveCommand.Execute();
-        await Settle.UntilAsync(viewModel, () => viewModel.BufferedCostText == "1,920.00",
-            () => $"buffered={viewModel.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PurchaseCost.BufferedCostText == "1,920.00",
+            () => $"buffered={viewModel.PurchaseCost.BufferedCostText}, error={viewModel.ErrorMessage ?? "none"}");
 
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(10m, "the next new material starts at Settings' default again");
-        viewModel.EditingBufferedCost.Should().BeNull();
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "the next new material starts at Settings' default again");
+        viewModel.PurchaseCost.EditingBufferedCost.Should().BeNull();
     });
 
     [Test]
@@ -1120,19 +1120,19 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
 
         // In the Alternative Units grid's add row.
-        var kilogram = viewModel.NewUnitRow();
+        var kilogram = viewModel.Units.NewRow();
         kilogram.UnitOfMeasureId = kilogramId;
         (kilogram.BaseUnitsPerUnit, kilogram.CanTypeMultiplier).Should().Be((1000m, false));
-        var bag = viewModel.NewUnitRow();
+        var bag = viewModel.Units.NewRow();
         bag.UnitOfMeasureId = bagId;
         (bag.BaseUnitsPerUnit, bag.CanTypeMultiplier).Should().Be((0m, true), "a bag's size is the material's own to type");
 
         // Picked on a Purchase Cost Setup row, which adds the unit.
-        var brand = viewModel.NewBrandPriceRow();
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
         brand.UnitKey = kilogramId;
         brand.Quantity.Should().Be(1000m);
         brand.CanTypeQuantity.Should().BeFalse();
-        viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
+        viewModel.Units.Rows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
     });
 
     [Test]
@@ -1153,24 +1153,24 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == millimeterId);
 
         // In the Alternative Units grid's add row: metric to metric, and English to metric.
-        var meter = viewModel.NewUnitRow();
+        var meter = viewModel.Units.NewRow();
         meter.UnitOfMeasureId = meterId;
         (meter.BaseUnitsPerUnit, meter.CanTypeMultiplier).Should().Be((1000m, false));
-        var inch = viewModel.NewUnitRow();
+        var inch = viewModel.Units.NewRow();
         inch.UnitOfMeasureId = inchId;
         (inch.BaseUnitsPerUnit, inch.CanTypeMultiplier).Should().Be((25.4m, false));
-        var roll = viewModel.NewUnitRow();
+        var roll = viewModel.Units.NewRow();
         roll.UnitOfMeasureId = rollId;
         (roll.BaseUnitsPerUnit, roll.CanTypeMultiplier).Should().Be((0m, true), "a roll's length is the material's own to type");
 
         // Picked on a Purchase Cost Setup row, which adds the unit.
-        var brand = viewModel.NewBrandPriceRow();
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
         brand.UnitKey = meterId;
         brand.Quantity.Should().Be(1000m);
         brand.CanTypeQuantity.Should().BeFalse();
-        viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
+        viewModel.Units.Rows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(1000m);
 
-        viewModel.UnitRows.Add(inch);
+        viewModel.Units.Rows.Add(inch);
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -1197,17 +1197,17 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         PickCategory(viewModel);
         await AddUnitAsync(viewModel, bagId, 25000m);
         AddBrandPrice(viewModel, null, "bag", 1250m);
-        viewModel.TypedCostBufferPercent = 5m;
+        viewModel.PurchaseCost.TypedCostBufferPercent = 5m;
 
-        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
-        viewModel.EditingBufferedCostInUnit.Should().Be(0.0525m);
-        viewModel.PurchaseBufferedCostText.Should().Be("0.0525/g is 5% over the dearest brand's 0.0500/g.");
-        viewModel.EditingCostBufferPercent.Should().Be(5m);
+        viewModel.PurchaseCost.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(0.0525m);
+        viewModel.PurchaseCost.PurchaseBufferedCostText.Should().Be("0.0525/g is 5% over the dearest brand's 0.0500/g.");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(5m);
 
         // On the bag it's to the centavo, as before.
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.EditingBufferedCostInUnit.Should().Be(1312.5m);
-        viewModel.PurchaseBufferedCostText.Should().Be("1,312.50/bag is 5% over the dearest brand's 1,250.00/bag.");
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1312.5m);
+        viewModel.PurchaseCost.PurchaseBufferedCostText.Should().Be("1,312.50/bag is 5% over the dearest brand's 1,250.00/bag.");
     });
 
     [Test]
@@ -1221,30 +1221,30 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // ₱170 for a box of 240 g is ₱0.708333…/g to 28 places, which the decimal(28,20) column cuts to 20. No buffer, so
         // the buffered cost is the dearest brand's own.
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent = 0m;
+        viewModel.PurchaseCost.EditingCostBufferPercent = 0m;
         viewModel.EditingName = "Cello Sheet";
         PickCategory(viewModel);
         await AddUnitAsync(viewModel, boxId, 240m);
         AddBrandPrice(viewModel, null, "box", 170m);
-        viewModel.BufferedCostWarningText.Should().BeEmpty();
+        viewModel.PurchaseCost.BufferedCostWarningText.Should().BeEmpty();
 
         await viewModel.SaveCommand.Execute();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.PriceHistory.Count == 1,
-            () => $"price rows={viewModel.PriceHistory.Count}, error={viewModel.ErrorMessage ?? "none"}");
+        await Settle.UntilAsync(viewModel, () => viewModel.PriceLog.Entries.Count == 1,
+            () => $"price rows={viewModel.PriceLog.Entries.Count}, error={viewModel.ErrorMessage ?? "none"}");
         viewModel.ErrorMessage.Should().BeNull();
 
         // Opened afresh, as the next session does, the form has what the column kept.
         var reopened = CreateViewModel();
         await reopened.LoadCommand.Execute();
         await SelectAsync(reopened, reopened.RawMaterials.Single());
-        reopened.EditingBufferedCost.Should().Be(0.70833333333333333333m);
-        reopened.DearestPurchaseCost.Should().BeGreaterThan(reopened.EditingBufferedCost!.Value, "the grid works it out to 28 places");
-        reopened.BufferedCostWarningText.Should().BeEmpty("the dearest brand hasn't moved, only the stored amount was rounded");
+        reopened.PurchaseCost.EditingBufferedCost.Should().Be(0.70833333333333333333m);
+        reopened.PurchaseCost.DearestPurchaseCost.Should().BeGreaterThan(reopened.PurchaseCost.EditingBufferedCost!.Value, "the grid works it out to 28 places");
+        reopened.PurchaseCost.BufferedCostWarningText.Should().BeEmpty("the dearest brand hasn't moved, only the stored amount was rounded");
 
         // A real rise still warns.
-        reopened.BrandPriceRows.Single().Price = 171m;
-        reopened.BufferedCostWarningText.Should().NotBeEmpty();
+        reopened.PurchaseCost.BrandPriceRows.Single().Price = 171m;
+        reopened.PurchaseCost.BufferedCostWarningText.Should().NotBeEmpty();
     });
 
     [Test]
@@ -1257,23 +1257,23 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await viewModel.NewCommand.Execute();
         await AddUnitAsync(viewModel, bagId, 25000m);
-        viewModel.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
+        viewModel.PurchaseCost.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
 
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.EditingBufferedCostInUnit = 1297.37m;
-        viewModel.EditingBufferedCost.Should().Be(0.0518948m, "₱1,297.37 over 25,000 g, not rounded");
-        viewModel.EditingBufferedCostInUnit.Should().Be(1297.37m);
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit = 1297.37m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0518948m, "₱1,297.37 over 25,000 g, not rounded");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(1297.37m);
 
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions[0];
-        viewModel.EditingBufferedCostInUnit.Should().Be(0.0519m, "shown to 4 decimals on the base unit, where a centavo is too coarse");
-        viewModel.EditingBufferedCost.Should().Be(0.0518948m, "which only rounds what's shown");
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions[0];
+        viewModel.PurchaseCost.EditingBufferedCostInUnit.Should().Be(0.0519m, "shown to 4 decimals on the base unit, where a centavo is too coarse");
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0518948m, "which only rounds what's shown");
 
         // Removing the bag takes the picker back to the base unit.
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Name == "bag");
-        viewModel.SelectedUnitRow = viewModel.UnitRows.Single();
-        await viewModel.DeleteUnitCommand.Execute();
-        viewModel.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram");
-        viewModel.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Name == "bag");
+        viewModel.Units.SelectedRow = viewModel.Units.Rows.Single();
+        await viewModel.Units.DeleteCommand.Execute();
+        viewModel.PurchaseCost.BufferedCostUnitOptions.Select(o => o.Name).Should().Equal("gram");
+        viewModel.PurchaseCost.BufferedCostUnit!.Key.Should().Be(PurchaseUnitChoice.BaseUnitKey);
     });
 
     [Test]
@@ -1284,16 +1284,16 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await viewModel.NewCommand.Execute();
-        var dearer = viewModel.NewBrandPriceRow();
+        var dearer = viewModel.PurchaseCost.NewBrandPriceRow();
         dearer.BufferPercent.Should().BeNull("there's no price to work a buffer out from");
 
         dearer.UnitKey = PurchaseUnitChoice.BaseUnitKey;
         dearer.Price = 1m;
-        viewModel.BrandPriceRows.Add(dearer);
+        viewModel.PurchaseCost.BrandPriceRows.Add(dearer);
         dearer.BufferPercent.Should().Be(10m, "Settings' default buffer, until one is typed");
 
-        viewModel.TypedCostBufferPercent = 5m;
-        viewModel.EditingBufferedCost.Should().Be(1.05m);
+        viewModel.PurchaseCost.TypedCostBufferPercent = 5m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(1.05m);
         dearer.BufferPercent.Should().Be(5m);
 
         // A cheaper brand is further under the same buffered cost: ₱1.05 over ₱0.84 is 25%.
@@ -1302,8 +1302,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         (dearer.CostPerBaseUnit, cheaper.CostPerBaseUnit).Should().Be((1m, 0.84m), "each brand's own Unit Price, beside it");
 
         // Typing the buffered cost works the percent out against the dearest brand, and every row follows.
-        viewModel.EditingBufferedCostInUnit = 1.2m;
-        viewModel.EditingCostBufferPercent.Should().Be(20m);
+        viewModel.PurchaseCost.EditingBufferedCostInUnit = 1.2m;
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(20m);
         dearer.BufferPercent.Should().Be(20m);
         cheaper.BufferPercent.Should().BeApproximately(42.857m, 0.001m, "₱1.20 over ₱0.84");
 
@@ -1312,20 +1312,20 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         dearer.Price = 1.5m;
         changed.Should().Contain(nameof(BrandPriceRow.CostPerBaseUnit), "the Unit Price shows the new price");
         dearer.CostPerBaseUnit.Should().Be(1.5m);
-        viewModel.EditingBufferedCost.Should().Be(1.2m, "a new price doesn't move it");
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(1.2m, "a new price doesn't move it");
         dearer.BufferPercent.Should().Be(-20m);
-        viewModel.EditingCostBufferPercent.Should().Be(0m, "the % follows the price: ₱1.20 is under ₱1.50, so it pins at 0");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(0m, "the % follows the price: ₱1.20 is under ₱1.50, so it pins at 0");
 
         // The % the amount works out to is held to the 0-100 the box and the validator allow, and the buffered
         // cost itself stays exactly as typed.
-        viewModel.EditingBufferedCostInUnit = 1m;
-        viewModel.EditingBufferedCost.Should().Be(1m);
-        viewModel.EditingCostBufferPercent.Should().Be(0m, "₱1.00 is under the dearest ₱1.50, so the buffer's gone");
-        viewModel.BufferedCostWarningText.Should().NotBeEmpty();
+        viewModel.PurchaseCost.EditingBufferedCostInUnit = 1m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(1m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(0m, "₱1.00 is under the dearest ₱1.50, so the buffer's gone");
+        viewModel.PurchaseCost.BufferedCostWarningText.Should().NotBeEmpty();
 
-        viewModel.EditingBufferedCostInUnit = 4m;
-        viewModel.EditingBufferedCost.Should().Be(4m);
-        viewModel.EditingCostBufferPercent.Should().Be(100m, "₱4.00 is 166.67% over ₱1.50, more than the box allows");
+        viewModel.PurchaseCost.EditingBufferedCostInUnit = 4m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(4m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(100m, "₱4.00 is 166.67% over ₱1.50, more than the box allows");
     });
 
     [Test]
@@ -1344,12 +1344,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.BrandPriceRows.Count == 1,
-            () => $"brands={viewModel.BrandPriceRows.Count}");
-        viewModel.EditingCostBufferPercent.Should().Be(5m);
-        var brand = viewModel.BrandPriceRows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"brands={viewModel.PurchaseCost.BrandPriceRows.Count}");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(5m);
+        var brand = viewModel.PurchaseCost.BrandPriceRows.Single();
         (brand.UnitKey, brand.Price, brand.BufferPercent).Should().Be((PurchaseUnitChoice.BaseUnitKey, 930m, 5m));
-        viewModel.PurchaseCostText.Should().Be("930.0000");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("930.0000");
     });
 
     [Test]
@@ -1362,7 +1362,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Sugar";
         PickCategory(viewModel);
-        viewModel.EditingCostBufferPercent = null; // the box shows 0.00 when it's empty
+        viewModel.PurchaseCost.EditingCostBufferPercent = null; // the box shows 0.00 when it's empty
 
         await viewModel.SaveCommand.Execute();
 
@@ -1385,15 +1385,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.ExampleRawMaterial = viewModel.RawMaterials.Single();
-        viewModel.ExampleQuantity = 200m;
-        viewModel.ExampleUnit = viewModel.ExampleUnitOptions.Single(o => o.Name == "gram");
+        viewModel.UsageExample.Material = viewModel.RawMaterials.Single();
+        viewModel.UsageExample.Quantity = 200m;
+        viewModel.UsageExample.Unit = viewModel.UsageExample.UnitOptions.Single(o => o.Name == "gram");
 
-        await viewModel.CalculateExampleCommand.Execute();
+        await viewModel.UsageExample.CalculateCommand.Execute();
 
-        viewModel.ExampleResult!.TotalCost.Should().Be(10m);
-        viewModel.ExampleResult.BufferPercent.Should().Be(5m);
-        viewModel.ExampleResult.BufferedTotalCost.Should().Be(10.5m);
+        viewModel.UsageExample.Result!.TotalCost.Should().Be(10m);
+        viewModel.UsageExample.Result.BufferPercent.Should().Be(5m);
+        viewModel.UsageExample.Result.BufferedTotalCost.Should().Be(10.5m);
     });
 
     [Test]
@@ -1427,7 +1427,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == pieceId);
         viewModel.BaseUnitAbbreviation.Should().Be("pc", "the form names the base unit before the material is saved");
-        viewModel.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("piece");
+        viewModel.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("piece");
         viewModel.SavedBaseUnitText.Should().Be("—", "the Base Unit tile shows the unit only once it's saved");
         await viewModel.SaveCommand.Execute();
 
@@ -1436,7 +1436,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         box.Type.Should().Be(RawMaterialType.Packaging);
         box.BaseUnitId.Should().Be(pieceId);
         viewModel.SelectedRawMaterial.Should().BeSameAs(box, "saving a new material selects it");
-        viewModel.CurrentCostText.Should().Be("0.0000");
+        viewModel.PurchaseCost.CurrentCostText.Should().Be("0.0000");
         viewModel.SavedBaseUnitText.Should().Be("piece (pc)");
         viewModel.CanChangeTypeAndSource.Should().BeFalse("the type is fixed once saved");
         viewModel.Ingredients.Should().NotContain(box, "the BOM component picker lists ingredients only");
@@ -1451,25 +1451,25 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
         await viewModel.NewCommand.Execute();
 
-        viewModel.EditingCostBufferPercent.Should().Be(7.5m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(7.5m);
         viewModel.History.IsDirty.Should().BeFalse("the default isn't an edit to save");
 
         // Changed in Settings while the form is still as New left it: it takes the new default, and still has nothing to save.
         await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 12m }, Cancellation);
         await viewModel.LoadCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(12m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(12m);
         viewModel.History.IsDirty.Should().BeFalse();
 
         // A buffer typed is kept whatever Settings says next.
-        viewModel.EditingCostBufferPercent = 4m;
+        viewModel.PurchaseCost.EditingCostBufferPercent = 4m;
         await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 15m }, Cancellation);
         await viewModel.LoadCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(4m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(4m);
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await viewModel.NewCommand.Execute();
-        viewModel.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
     });
 
     [Test]
@@ -1482,9 +1482,9 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
         AddBrandPrice(viewModel, null, "bag", 1250m);
-        viewModel.ExampleRawMaterial.Should().NotBeNull("selecting a material puts it in the usage example");
-        viewModel.EditingCostBufferPercent = 5m;
-        viewModel.ExampleQuantity = 3m;
+        viewModel.UsageExample.Material.Should().NotBeNull("selecting a material puts it in the usage example");
+        viewModel.PurchaseCost.EditingCostBufferPercent = 5m;
+        viewModel.UsageExample.Quantity = 3m;
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
@@ -1494,14 +1494,14 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.EditingType.Should().Be(RawMaterialType.Ingredient, "most materials are purchased ingredients");
         viewModel.EditingSource.Should().Be(RawMaterialSource.Purchased);
         viewModel.EditingCategory.Should().BeNull("the category isn't guessed");
-        viewModel.BrandPriceRows.Should().BeEmpty();
-        viewModel.ExampleRawMaterial.Should().BeNull();
-        viewModel.ExampleUnit.Should().BeNull();
-        viewModel.ExampleUnitOptions.Should().BeEmpty();
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        viewModel.UsageExample.Material.Should().BeNull();
+        viewModel.UsageExample.Unit.Should().BeNull();
+        viewModel.UsageExample.UnitOptions.Should().BeEmpty();
 
-        viewModel.PurchaseCostText.Should().Be("—");
-        viewModel.EditingCostBufferPercent.Should().Be(10m, "Settings' default buffer, not the last material's");
-        viewModel.ExampleQuantity.Should().Be(3m, "the usage example's quantity stays");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("—");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "Settings' default buffer, not the last material's");
+        viewModel.UsageExample.Quantity.Should().Be(3m, "the usage example's quantity stays");
         viewModel.ShowPurchaseSetup.Should().BeTrue("a new purchased material can be priced before it's saved");
         viewModel.BaseUnitAbbreviation.Should().Be("g");
     });
@@ -1531,14 +1531,14 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
-        var brand = viewModel.NewBrandPriceRow();
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
         brand.Price = 1250m;
-        viewModel.BrandPriceRows.Add(brand);
+        viewModel.PurchaseCost.BrandPriceRows.Add(brand);
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Pick the purchase unit every price is for, or remove the empty row.");
-        viewModel.BrandPriceRows.Should().ContainSingle("the edits stay to be fixed");
+        viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle("the edits stay to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
     });
@@ -1561,8 +1561,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         viewModel.RawMaterials.Should().BeEmpty();
         viewModel.EditingName.Should().BeEmpty("the deleted material's details don't stay in the form");
         viewModel.EditingCategory.Should().BeNull();
-        viewModel.BrandPriceRows.Should().BeEmpty();
-        viewModel.ExampleRawMaterial.Should().BeNull();
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        viewModel.UsageExample.Material.Should().BeNull();
         viewModel.CanChangeTypeAndSource.Should().BeTrue("the form is a new material now");
     });
 
@@ -1733,12 +1733,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
 
         // The add row's own item, before the grid commits it: it names its unit as soon as one is picked.
-        var row = viewModel.NewUnitRow();
+        var row = viewModel.Units.NewRow();
         row.UnitOfMeasureId = bagId;
         row.BaseUnitsPerUnit = 25000m;
         (row.UnitName, row.Abbreviation, row.BaseEquivalentText).Should().Be(("bag", "bg", "25,000 g"));
 
-        viewModel.UnitRows.Add(row);
+        viewModel.Units.Rows.Add(row);
         var brand = AddBrandPrice(viewModel, null, "bag", 1000m);
         brand.Quantity.Should().Be(25000m, "a unit added in the grid can be priced in before Save");
         brand.CanTypeQuantity.Should().BeTrue("it isn't saved yet");
@@ -1746,7 +1746,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // A multiplier corrected in the grid shows as the brand's quantity, and reprices it.
         row.BaseUnitsPerUnit = 20000m;
         brand.Quantity.Should().Be(20000m);
-        viewModel.PurchaseCostText.Should().Be("0.0500");
+        viewModel.PurchaseCost.PurchaseCostText.Should().Be("0.0500");
     });
 
     [Test]
@@ -1762,7 +1762,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.NewCommand.Execute();
         viewModel.EditingName = "Flour";
         PickCategory(viewModel);
-        var row = viewModel.NewUnitRow();
+        var row = viewModel.Units.NewRow();
         if (pickUnit)
         {
             row.UnitOfMeasureId = bagId;
@@ -1773,12 +1773,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
             row.BaseUnitsPerUnit = 25000m;
         }
 
-        viewModel.UnitRows.Add(row);
+        viewModel.Units.Rows.Add(row);
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be(message);
-        viewModel.UnitRows.Should().ContainSingle("the row stays to be fixed");
+        viewModel.Units.Rows.Should().ContainSingle("the row stays to be fixed");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
     });
@@ -1813,7 +1813,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         await viewModel.LoadCommand.Execute();
 
         await SelectAsync(viewModel, viewModel.RawMaterials.Single());
-        viewModel.UnitRows.Single().BaseUnitsPerUnit = 20000m;
+        viewModel.Units.Rows.Single().BaseUnitsPerUnit = 20000m;
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -1840,7 +1840,7 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
                 await SelectAsync(viewModel, viewModel.RawMaterials.Single(m => m.Id == id));
                 await viewModel.WhenIdleAsync();
 
-                viewModel.BufferedCostUnit!.Name.Should().Be(unit, $"round {round + 1}");
+                viewModel.PurchaseCost.BufferedCostUnit!.Name.Should().Be(unit, $"round {round + 1}");
                 viewModel.History.IsDirty.Should().BeFalse($"round {round + 1}: nothing was typed into {viewModel.EditingName}");
             }
         }
@@ -1858,15 +1858,15 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
         // Picked in the Per box, as its picker does: one undo step.
         recorder.BeginUndoStep();
-        viewModel.BufferedCostUnit = viewModel.BufferedCostUnitOptions.Single(o => o.Key == PurchaseUnitChoice.BaseUnitKey);
+        viewModel.PurchaseCost.BufferedCostUnit = viewModel.PurchaseCost.BufferedCostUnitOptions.Single(o => o.Key == PurchaseUnitChoice.BaseUnitKey);
         recorder.EndUndoStep();
 
-        viewModel.HeaderCostUnitText.Should().Be("g");
+        viewModel.PurchaseCost.HeaderCostUnitText.Should().Be("g");
         viewModel.History.IsDirty.Should().BeFalse("the buffered cost is kept per base unit, whatever it's shown in");
         viewModel.History.CanUndo.Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.BufferedCostUnit!.Name.Should().Be("bag");
+        viewModel.PurchaseCost.BufferedCostUnit!.Name.Should().Be("bag");
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
@@ -1909,10 +1909,10 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     /// </summary>
     private static Task AddUnitAsync(RawMaterialsViewModel viewModel, int unitOfMeasureId, decimal baseUnitsPerUnit)
     {
-        var row = viewModel.NewUnitRow();
+        var row = viewModel.Units.NewRow();
         row.UnitOfMeasureId = unitOfMeasureId;
         row.BaseUnitsPerUnit = baseUnitsPerUnit;
-        viewModel.UnitRows.Add(row);
+        viewModel.Units.Rows.Add(row);
         return Task.CompletedTask;
     }
 
@@ -1936,12 +1936,12 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
         // Priced by the piece before the base unit is picked: the piece is added as an alternative unit.
         var brand = AddBrandPrice(viewModel, null, "piece", 5m);
         brand.Quantity = 1m;
-        viewModel.UnitRows.Select(r => r.UnitName).Should().Equal("piece");
+        viewModel.Units.Rows.Select(r => r.UnitName).Should().Equal("piece");
 
         viewModel.EditingBaseUnit = viewModel.UnitsOfMeasure.Single(u => u.Id == pieceId);
 
         (brand.UnitKey, brand.Quantity, brand.CanTypeQuantity).Should().Be((PurchaseUnitChoice.BaseUnitKey, 1m, false));
-        viewModel.UnitRows.Should().BeEmpty("the piece is the base unit now, which can't be an alternative unit too");
+        viewModel.Units.Rows.Should().BeEmpty("the piece is the base unit now, which can't be an alternative unit too");
 
         await viewModel.SaveCommand.Execute();
 
@@ -1953,11 +1953,11 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
     private static BrandPriceRow AddBrandPrice(RawMaterialsViewModel viewModel, string? brand, string unitName, decimal price)
     {
-        var row = viewModel.NewBrandPriceRow();
+        var row = viewModel.PurchaseCost.NewBrandPriceRow();
         row.Brand = brand;
-        row.UnitKey = viewModel.PurchaseUnitOptions.Single(o => o.Name == unitName).Key;
+        row.UnitKey = viewModel.PurchaseCost.PurchaseUnitOptions.Single(o => o.Name == unitName).Key;
         row.Price = price;
-        viewModel.BrandPriceRows.Add(row);
+        viewModel.PurchaseCost.BrandPriceRows.Add(row);
         return row;
     }
 
@@ -2040,8 +2040,8 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
     /// <summary>Picks the sub-assembly named <paramref name="name"/> on the Recipe card, and waits for its lines to show.</summary>
     private static async Task PickRecipeAsync(RawMaterialsViewModel viewModel, string name)
     {
-        viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == name);
-        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count > 0, () => $"recipe lines={viewModel.RecipeLines.Count}");
+        viewModel.Recipe.SubAssembly = viewModel.Recipe.SubAssemblyOptions.Single(s => s.Name == name);
+        await Settle.UntilAsync(viewModel, () => viewModel.Recipe.Lines.Count > 0, () => $"recipe lines={viewModel.Recipe.Lines.Count}");
     }
 
     /// <summary>Renames a unit of measure's abbreviation the way the Settings dialog would, behind the screen's back.</summary>

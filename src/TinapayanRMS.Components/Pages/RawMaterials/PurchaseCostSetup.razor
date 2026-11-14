@@ -5,7 +5,7 @@
 <div class="tab-card">
     <h2 class="section-header">Purchase Cost Setup</h2>
 
-    <LineGrid TRow="BrandPriceRow" Items="ViewModel.BrandPriceRows" NewItem="ViewModel.NewBrandPriceRow" @bind-SelectedItem="ViewModel.SelectedBrandPriceRow">
+    <LineGrid TRow="BrandPriceRow" Items="ViewModel.PurchaseCost.BrandPriceRows" NewItem="ViewModel.PurchaseCost.NewBrandPriceRow" @bind-SelectedItem="ViewModel.PurchaseCost.SelectedBrandPriceRow">
         <Header>
             <th>Brand</th>
             <th class="col-unit">Purchase Unit</th>
@@ -17,8 +17,8 @@
         <Row Context="row">
             <td><TextField Value="@row.Brand" ValueChanged="v => row.Brand = v" CssClass="cell-field" /></td>
             <td>
-                <PickField TItem="PurchaseUnitChoice" Items="ViewModel.PurchaseUnitOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="260px"
-                           Value="ViewModel.PurchaseUnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)" ValueChanged="o => row.UnitKey = o?.Key">
+                <PickField TItem="PurchaseUnitChoice" Items="ViewModel.PurchaseCost.PurchaseUnitOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="260px"
+                           Value="ViewModel.PurchaseCost.PurchaseUnitOptions.FirstOrDefault(o => o.Key == row.UnitKey)" ValueChanged="o => row.UnitKey = o?.Key">
                     <ItemTemplate Context="option"><span class="pick-columns"><span>@option.Name</span><span class="muted">@option.Abbreviation</span></span></ItemTemplate>
                 </PickField>
             </td>
@@ -30,41 +30,41 @@
     </LineGrid>
     <div class="cost-from-row form-extra">
         <label class="form-label" for="rm-cost-from">Basis</label>
-        <PickField ID="rm-cost-from" TItem="CostFromOption" Items="ViewModel.CostFromOptions" TextOf="o => o.Label"
-                   Value="ViewModel.CostFrom" ValueChanged="o => ViewModel.CostFrom = o" CssClass="cost-from-picker" PopupWidth="340px"
+        <PickField ID="rm-cost-from" TItem="CostFromOption" Items="ViewModel.PurchaseCost.CostFromOptions" TextOf="o => o.Label"
+                   Value="ViewModel.PurchaseCost.CostFrom" ValueChanged="o => ViewModel.PurchaseCost.CostFrom = o" CssClass="cost-from-picker" PopupWidth="340px"
                    Tooltip="The brand the material is costed at. Dearest brand costs it at the most it's bought for; pick a brand to cost it at that brand's price (its dearest unit, if it's priced in more than one). Save keeps it." />
-        <CommandButton Command="ViewModel.RemoveBrandPriceCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
+        <CommandButton Command="ViewModel.PurchaseCost.RemoveBrandPriceCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
     </div>
 
     <div class="buffer-row">
         <div class="field-stack">
             <label class="field-label" for="rm-buffer-percent">Cost Buffer %</label>
-            <NumberField ID="rm-buffer-percent" TValue="decimal?" @bind-Value="ViewModel.TypedCostBufferPercent" Min="0" Max="100"
+            <NumberField ID="rm-buffer-percent" TValue="decimal?" @bind-Value="ViewModel.PurchaseCost.TypedCostBufferPercent" Min="0" Max="100"
                          Tooltip="The cushion on top of the brand it's costed at (Basis), for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-buffered-cost">Buffered Cost</label>
-            <NumberField ID="rm-buffered-cost" TValue="decimal?" @bind-Value="ViewModel.EditingBufferedCostInUnit" Min="0" LandsOnLeave="true"
+            <NumberField ID="rm-buffered-cost" TValue="decimal?" @bind-Value="ViewModel.PurchaseCost.EditingBufferedCostInUnit" Min="0" LandsOnLeave="true"
                          Tooltip="A fixed amount recipes and products are costed with. New brand prices don't move it; typing the Cost Buffer % again does." />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-buffered-unit">Per</label>
-            <PickField ID="rm-buffered-unit" TItem="PurchaseUnitChoice" Items="ViewModel.BufferedCostUnitOptions" TextField="Name" @bind-Value="ViewModel.BufferedCostUnit"
+            <PickField ID="rm-buffered-unit" TItem="PurchaseUnitChoice" Items="ViewModel.PurchaseCost.BufferedCostUnitOptions" TextField="Name" @bind-Value="ViewModel.PurchaseCost.BufferedCostUnit"
                        Tooltip="The unit the buffered cost is shown and typed in. It's kept per base unit either way." />
         </div>
     </div>
-    @if (ViewModel.IsBufferOffTarget)
+    @if (ViewModel.PurchaseCost.IsBufferOffTarget)
     {
         <div class="target-buffer-row">
-            <span>@ViewModel.TargetBufferText</span>
-            <CommandButton Command="ViewModel.ReapplyTargetBufferCommand" Icon="AppIcon.Apply" Label="Re-apply Target"
+            <span>@ViewModel.PurchaseCost.TargetBufferText</span>
+            <CommandButton Command="ViewModel.PurchaseCost.ReapplyTargetBufferCommand" Icon="AppIcon.Apply" Label="Re-apply Target"
                            Tooltip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Basis) with it on top. Save keeps it." />
         </div>
     }
-    <p class="caption">@ViewModel.PurchaseBufferedCostText</p>
-    @if (!string.IsNullOrEmpty(ViewModel.BufferedCostWarningText))
+    <p class="caption">@ViewModel.PurchaseCost.PurchaseBufferedCostText</p>
+    @if (!string.IsNullOrEmpty(ViewModel.PurchaseCost.BufferedCostWarningText))
     {
-        <p class="warning-text">@ViewModel.BufferedCostWarningText</p>
+        <p class="warning-text">@ViewModel.PurchaseCost.BufferedCostWarningText</p>
     }
 </div>
 

@@ -1,10 +1,14 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
+using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -19,10 +23,14 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// piece size, and its packaging), its costing, its packaging link, and cloning it or making a variant of it. The name, description,
 /// recipe, packaging and costing are edited in memory, and Save writes them together
 /// (IProductRepository.SaveAsync). A composite product's recipe is the products it holds instead, in its Products tab
-/// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
+/// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost. Its parts each hold a piece of it: the
+/// list (<see cref="List"/>), the recipe's sections and tabs (<see cref="Recipe"/>), the section form
+/// (<see cref="UsageForm"/>), the Packaging tab (<see cref="Packaging"/>), a composite's Products table
+/// (<see cref="ComponentsTable"/>), the Costing tab (<see cref="Costing"/>) and the History tab (<see cref="VersionHistory"/>).
+/// The screen keeps the form's own fields, which product it shows, loading, Save, the costs, and the undo history over them all.
 /// </summary>
-public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen,
-    IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
+public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen,
+    IProductsListHost, IProductRecipeHost, IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -40,16 +48,14 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     public const string VariantOf = "Variant of";
 
     private readonly IProductRepository _productRepository;
-    private readonly IProductSubAssemblyUsageRepository _usageRepository;
     private readonly IPackagingLineRepository _packagingLineRepository;
-    private readonly ICostingParametersRepository _costingParametersRepository;
     private readonly ICostingDefaultsRepository _costingDefaultsRepository;
     private readonly IPackagingLinkRepository _packagingLinkRepository;
     private readonly IProductCloner _productCloner;
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
-    private readonly IProductVersionRepository _versionRepository;
+    private readonly ISubAssemblyRoleRepository _subAssemblyRoleRepository;
+    private readonly IRawMaterialRepository _rawMaterialRepository;
 
     // Reads the product opened here, as Reports and Print read theirs, from the repositories above.
     private readonly SavedProductReader _savedProducts;
@@ -62,16 +68,263 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     private readonly IProductFolderRepository _folderRepository;
     private readonly IValidator<ProductCategory> _categoryValidator;
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
-    private ReadOnlyObservableCollection<Product> _products;
-    private ReadOnlyObservableCollection<Product> _visibleProducts;
+    private readonly ReadOnlyObservableCollection<Product> _products;
     private readonly SourceCache<ProductCategory, int> _categoryCache = new(c => c.Id);
-    private ReadOnlyObservableCollection<ProductCategory> _categories;
+    private readonly ReadOnlyObservableCollection<ProductCategory> _categories;
+
+    /// <summary>The screen's derived updates, run as their inputs change, or once at the end of a restore.</summary>
+    private readonly DerivedUpdates _updates = new();
+
+    /// <summary>
+    /// Each product picked, by the user or for them (Open, a clone made, Save's reload), nothing picked included: what
+    /// loads a product into the form. Fed by <see cref="SelectedProduct"/>'s setter alone, starting with nothing picked.
+    /// </summary>
+    private readonly BehaviorSubject<Product?> _picks = new(null);
+
+    /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
+    private readonly CategoryPicker<ProductCategory> _categoryPicker;
+
+    /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
+    private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
+
+    private readonly Subject<PrintScope> _printRequests = new();
+
+    private readonly Subject<int> _subAssemblyOpenRequests = new();
+
+    /// <summary>A product whose versions the History tab should read: pushed as the tab shows, and after a Save.</summary>
+    private readonly Subject<int> _versionReads = new();
+
+    /// <summary>
+    /// Whether the new product showing goes in Settings' stage rather than a folder's: started by New, not New Product
+    /// Here. Such a product follows the setting when it changes (RefreshCostingDefaults).
+    /// </summary>
+    private bool _newProductInDefaultStage = true;
+
+    /// <summary>
+    /// A product for LoadCommand to open at its end: one <see cref="OpenProduct"/> was asked for before the list held it,
+    /// or the one in the screen's address (<see cref="OpenProductOnLoad"/>). New drops it.
+    /// </summary>
+    private int? _productToOpen;
+
+    /// <summary>
+    /// A sub-assembly <see cref="StartNewProductFrom"/> was asked to link, for LoadCommand to start the new product with
+    /// once its lists are fresh. New drops it.
+    /// </summary>
+    private int? _subAssemblyToStartFrom;
+
+    private int _editingId;
+
+    /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
+    private int? _detailProductId;
+
+    /// <summary>
+    /// The detail Save has read back already, for the load its selection starts to show at once instead of reading it
+    /// again (ShowSavedProduct).
+    /// </summary>
+    private (int ProductId, ProductDetail Detail)? _preloadedDetail;
+
+    /// <summary>Every sub-assembly that could be linked or copied, as last loaded; the section form's LinkableSubAssemblies filters it.</summary>
+    private IReadOnlyList<SubAssembly> _linkable = [];
+
+    // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
+    private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
+
+    public ProductsViewModel(
+        IProductRepository productRepository,
+        IProductSubAssemblyUsageRepository usageRepository,
+        IPackagingLineRepository packagingLineRepository,
+        ICostingParametersRepository costingParametersRepository,
+        ICostingDefaultsRepository costingDefaultsRepository,
+        IPackagingLinkRepository packagingLinkRepository,
+        IProductCloner productCloner,
+        IUnitOfWork unitOfWork,
+        ISubAssemblyRepository subAssemblyRepository,
+        ISubAssemblyLineRepository subAssemblyLineRepository,
+        ISubAssemblyRoleRepository subAssemblyRoleRepository,
+        IRawMaterialRepository rawMaterialRepository,
+        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
+        IProductCategoryRepository categoryRepository,
+        IProductFolderRepository folderRepository,
+        IProductVersionRepository versionRepository,
+        IValidator<Product> productValidator,
+        IValidator<CostingParameters> costingParametersValidator,
+        IValidator<ProductCategory> categoryValidator,
+        IViewStateStore viewStateStore,
+        ILogger logger)
+        : base(logger)
+    {
+        _categoryPicker = new CategoryPicker<ProductCategory>(
+            () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
+            () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
+            SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
+        _productRepository = productRepository;
+        _packagingLineRepository = packagingLineRepository;
+        _costingDefaultsRepository = costingDefaultsRepository;
+        _packagingLinkRepository = packagingLinkRepository;
+        _productCloner = productCloner;
+        _subAssemblyRepository = subAssemblyRepository;
+        _subAssemblyLineRepository = subAssemblyLineRepository;
+        _subAssemblyRoleRepository = subAssemblyRoleRepository;
+        _rawMaterialRepository = rawMaterialRepository;
+        _savedProducts = new SavedProductReader(
+            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
+            costingDefaultsRepository, unitOfWork);
+        Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
+        UsageForm = new ProductUsageForm(this);
+        ComponentsTable = new ProductComponents(this, _savedProducts);
+        VersionHistory = new ProductVersionHistory(
+            this, versionRepository, productRepository, _savedProducts, subAssemblyRepository, subAssemblyLineRepository, packagingLineRepository);
+        _versionedSaves = new VersionedSaves(
+            unitOfWork,
+            productRepository,
+            versionRepository,
+            costingParametersRepository,
+            _savedProducts,
+            new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
+        _productValidator = productValidator;
+        _costingParametersValidator = costingParametersValidator;
+        _categoryRepository = categoryRepository;
+        _folderRepository = folderRepository;
+        _categoryValidator = categoryValidator;
+
+        // The lists the form and its parts read, bound first: the parts below take them. The categories before the list
+        // part's own subscription to them, so the category filter's choices read them changed.
+        _productCache.Connect()
+            .SortAndBind(out _products, SortExpressionComparer<Product>.Ascending(p => p.Name))
+            .Subscribe();
+        _categoryCache.Connect()
+            .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
+            .Subscribe();
+
+        // The parts that hold the recipe and the list. Each subscribes to what it holds alone (the recipe's tabs and which
+        // of its tables shows, the list's search and filter), as it's made; what reaches from one part to another, or to
+        // the form, is subscribed below, in the order it always ran.
+        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, subAssemblyLineRepository, rawMaterialCategoryRepository);
+        List = new ProductsList(this, _productCache, _categoryCache, Categories, productRepository, folderRepository, viewStateStore);
+
+        // The subscriptions, in this order: two following one property run in the order they were made, and some count on it
+        // (WireDetailsTabs). Several run as they're made, WirePicks' included, so each comes after what it reads.
+
+        // A product opened, by its Save included, ends the new product's row: the form no longer shows the new one.
+        this.WhenAnyValue(x => x.SelectedProduct)
+            .Where(product => product is not null)
+            .Subscribe(_ => List.EndNewRow());
+        this.WhenAnyValue(x => x.SelectedProduct)
+            .Subscribe(_ => List.SyncTreeSelection());
+
+        // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
+        LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
+
+        WireHeader();
+        WireDetailsTabs();
+        WirePicks();
+        WireUsageForm();
+        WireCosts();
+        WireUnsavedChanges();
+
+        // The commands. Making one runs nothing but its can-execute flag, so they can come in any order.
+
+        // Runs each time the page opens (ScreenBase) and after this screen's own saves. It merges
+        // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
+        // picking up what changed elsewhere: a repriced ingredient, or a linked sub-assembly its owner
+        // changed.
+        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(LoadAsync));
+
+        // A new product replaces the one showing, so its unsaved changes are asked about first.
+        // Each adds the new product's row to the list, for its name to be typed into.
+        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList()));
+        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList(isComposite: true)));
+
+        DeleteCommand = ReactiveCommand.CreateFromTask(
+            () => DeleteProductAsync(SelectedProduct!),
+            this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
+
+        // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
+        var canMakeFromSelected = this.WhenAnyValue(
+            x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name));
+        CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CloneAsync, ClonedFrom), canMakeFromSelected);
+        CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CreateVariantAsync, VariantOf), canMakeFromSelected);
+
+        // A linked standalone sub-assembly's badge, the Packaging tab's for a packaging set.
+        OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
+
+        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(SaveAsync), History.WhenAnyValue(h => h.IsDirty));
+
+        // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
+        RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
+            "Undo every change made since this product was last saved?",
+            async () =>
+            {
+                await RevertToSavedAsync();
+                if (SelectedProduct is { } product)
+                {
+                    SuccessMessage = $"{product.Name} was put back as it was last saved.";
+                }
+            }));
+
+        // Print shows the product as the screen does, unsaved edits and all. A form left
+        // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
+        // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
+        // and does nothing if clicked then: disabled for that moment, it flickered on every pick. (Save is off then
+        // anyway, with nothing unsaved, so it doesn't flicker.)
+        PrintCommand = ReactiveCommand.CreateFromTask(
+            () => RunSafelyAsync(() =>
+            {
+                if (!AreDetailsReady)
+                {
+                    return;
+                }
+
+                // On the History tab it prints the version picked there (PreparePrintout), so the form isn't applied: its
+                // pages aren't the form's.
+                if (SelectedDetailsTab == HistoryTab)
+                {
+                    if (VersionHistory.SelectedRow is null)
+                    {
+                        ErrorMessage = "Pick a version in the History tab's table to print it.";
+                        return;
+                    }
+                }
+                else
+                {
+                    Recipe.ApplyOpenForm();
+                }
+
+                _printRequests.OnNext(new PrintScope.ThisProduct());
+            }));
+
+        ToggleCostBasisCommand = ReactiveCommand.Create(ToggleCostBasis);
+    }
+
+    /// <summary>The list: every product in its stage and the user's folders, searched, filtered, its menus, moves and folders.</summary>
+    public ProductsList List { get; }
+
+    /// <summary>The recipe: its sections and their tabs, the Packaging tab and a composite's Products tab, and the section form's flow.</summary>
+    public ProductRecipe Recipe { get; }
+
+    /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
+    public ProductCosting Costing { get; } = new();
+
+    /// <summary>
+    /// The Recipe Structure's Packaging tab, which every product has: the packaging lines for each piece, typed in or what
+    /// they link, Link and Copy, Move to Sub-Assemblies, and the bulk packaging.
+    /// </summary>
+    public ProductPackaging Packaging { get; }
+
+    /// <summary>A composite's Products table: its lines, the add row, the product cell's options, and what each product brings.</summary>
+    public ProductComponents ComponentsTable { get; }
+
+    /// <summary>The add/edit sub-assembly form: the section it edits or adds, its fields and tables, and what it shows.</summary>
+    public ProductUsageForm UsageForm { get; }
+
+    /// <summary>
+    /// The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>), and its Restore,
+    /// which the screen puts into the form (IProductVersionHistoryHost.ApplyVersion).
+    /// </summary>
+    public ProductVersionHistory VersionHistory { get; }
 
     /// <summary>Every product in use (none of the deleted), for the packaging link and clone pickers.</summary>
     public ReadOnlyObservableCollection<Product> Products => _products;
-
-    /// <summary>The products the list shows: those whose name matches SearchText, in the category CategoryFilter picks.</summary>
-    public ReadOnlyObservableCollection<Product> VisibleProducts => _visibleProducts;
 
     /// <summary>
     /// The products in the list's Deleted folder, by name (IProductRepository.GetDeletedAsync). Kept apart from
@@ -100,26 +353,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         }
     }
 
-    /// <summary>The Products list (ProductListCard): VisibleProducts filed in their stage, in the user's folders.</summary>
-    public ProductTree ProductTree { get; }
-
-    /// <summary>The view state key the closed folders of the Products list are kept under (IViewStateStore).</summary>
-    public const string ClosedFoldersKey = "Products.ClosedFolders";
-
-    /// <summary>
-    /// The view state key the list kept its open folders under, before it kept the closed ones: read while there are no
-    /// closed ones kept, so the list opens as it was left (FolderMemory.Read).
-    /// </summary>
-    public const string OpenFoldersKey = "Products.OpenFolders";
-
-    private readonly FolderStateWriter _closedFoldersWriter;
-
-    /// <summary>The products picked in the list, in the order they were picked, deleted ones left out.</summary>
-    public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted && !l.IsNew)];
-
-    /// <summary>Where what the last move took was before it: what Undo on the notice puts back. Null with nothing to undo.</summary>
-    private MoveUndo? _moveUndo;
-
     private ProductStage _newProductStage = CostingDefaults.DefaultNewProductStage;
     /// <summary>
     /// The stage Save files a new product in: the one Settings → Costing Defaults gives a new product after New
@@ -143,12 +376,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         private set => this.RaiseAndSetIfChanged(ref _newProductFolderId, value);
     }
 
-    /// <summary>
-    /// Whether the new product showing goes in Settings' stage rather than a folder's: started by New, not New Product
-    /// Here. Such a product follows the setting when it changes (RefreshCostingDefaults).
-    /// </summary>
-    private bool _newProductInDefaultStage = true;
-
     /// <summary>What the Category picker lists. A name that isn't one of them is added by typing it (CommitCategoryTextAsync).</summary>
     public ReadOnlyObservableCollection<ProductCategory> Categories => _categories;
 
@@ -159,29 +386,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
 
     /// <summary>The packaging materials only: ingredients never go on a packaging line.</summary>
     public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
-
-    /// <summary>Every sub-assembly, saved or not, its own and linked, in recipe order (ProductUsageEdit.RecipeOrder).</summary>
-    public ObservableCollection<ProductUsageEdit> UsageEdits { get; } = [];
-
-    /// <summary>
-    /// The Recipe Structure's tabs: a composite's ComponentsTab first, then a sub-assembly's for each of UsageEdits, in
-    /// the same order (MirrorUsageTabs, SectionTabOffset), then AddSubAssemblyTab while a sub-assembly is being added,
-    /// then PackagingTab, always last and always there, so bulk packaging can be typed into with no packaging for each piece.
-    /// A new product has only Packaging, and a new composite its Products and Packaging. Only this screen changes them: the
-    /// tab strip can't drag them into another order (RecipeStructureCard).
-    /// </summary>
-    public ObservableCollection<RecipeTab> RecipeTabs { get; } = [];
-
-    /// <summary>The recipe has a tab besides Packaging (a section's, New Sub-Assembly's, or a composite's Products); with none, the card says how to start.</summary>
-    public bool HasRecipeSections => RecipeTabs.Any(t => t is not PackagingRecipeTab);
-
-    /// <summary>The New Sub-Assembly tab, in RecipeTabs only while Add Sub-Assembly's form is open in it.</summary>
-    public AddSubAssemblyRecipeTab AddSubAssemblyTab { get; } = new();
-
-    public PackagingRecipeTab PackagingTab { get; } = new();
-
-    /// <summary>A composite's Products tab, in RecipeTabs only while the product showing is a composite (SetComposite).</summary>
-    public ComponentsRecipeTab ComponentsTab { get; } = new();
 
     private bool _isEditingComposite;
     /// <summary>
@@ -201,92 +405,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>The product showing is made of sub-assemblies, as every product that isn't a composite is.</summary>
     public bool IsEditingSingle => !IsEditingComposite;
 
-    private ObservableAsPropertyHelper<bool> _isComponentsShowing;
-    /// <summary>A composite's Products table shows under the Recipe Structure's tabs: on its Products tab.</summary>
-    public bool IsComponentsShowing => _isComponentsShowing.Value;
-
-    private RecipeTab? _selectedRecipeTab;
-    /// <summary>The Recipe Structure tab showing. Showing New Sub-Assembly opens the form that adds one.</summary>
-    public RecipeTab? SelectedRecipeTab
-    {
-        get => _selectedRecipeTab;
-        set => this.RaiseAndSetIfChanged(ref _selectedRecipeTab, value);
-    }
-
-    private ObservableAsPropertyHelper<bool> _isUsageFormShowing;
-    /// <summary>
-    /// The sub-assembly form shows under the Recipe Structure's tabs: on a sub-assembly's tab, and on New
-    /// Sub-Assembly's while its form is open. There's one form for them all (RecipeStructureCard).
-    /// </summary>
-    public bool IsUsageFormShowing => _isUsageFormShowing.Value;
-
-    private ObservableAsPropertyHelper<bool> _isPackagingShowing;
-    /// <summary>The packaging shows under the Recipe Structure's tabs: on the Packaging tab.</summary>
-    public bool IsPackagingShowing => _isPackagingShowing.Value;
-
-    /// <summary>The last tab other than New Sub-Assembly that showed, for cancelling an add.</summary>
-    private RecipeTab? _lastRecipeContentTab;
-
-    /// <summary>The tab whose form is open: the one a change of tab is leaving, whose form is applied on the way out.</summary>
-    private RecipeTab? _shownRecipeTab;
-
-    /// <summary>Set while a refused form puts the tab showing back, so the tab it puts back doesn't apply its own form again.</summary>
-    private bool _revertingRecipeTab;
-
-    /// <summary>
-    /// Set while the sections are rebuilt, or New Sub-Assembly's tab taken away. The tab strip picks a neighbour
-    /// when the tab showing is removed; that pick is ignored, and ReselectRecipeTab picks one after.
-    /// </summary>
-    private bool _arrangingRecipeTabs;
-
-    /// <summary>
-    /// Set while SelectRecipeTab's pick is on its way to the tab strip, which hears of it after this screen does:
-    /// New Sub-Assembly's tab can't be taken away until the strip has moved off it, or the strip would pick a
-    /// neighbour of its own in place of this one.
-    /// </summary>
-    private bool _selectingRecipeTab;
-
-    /// <summary>
-    /// The recipe showing was cleared for another product's, which opens on its first tab once it arrives
-    /// (ReplaceUsages). What the tab strip was left on as the tabs went says nothing: that's always Packaging.
-    /// </summary>
-    private bool _isRecipeClearedForAnother;
-
-    /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
-    private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
-
-    private string _searchText = string.Empty;
-    public string SearchText
-    {
-        get => _searchText;
-        set => this.RaiseAndSetIfChanged(ref _searchText, value);
-    }
-
-    private ProductCategoryFilter _categoryFilter = new ProductCategoryFilter.All();
-    /// <summary>
-    /// The list's category filter: every product, or only a category's (or the uncategorized ones), each in its folder,
-    /// with only the folders holding one showing, as a search shows its matches. With the search, both have to match.
-    /// </summary>
-    public ProductCategoryFilter CategoryFilter
-    {
-        get => _categoryFilter;
-        set => this.RaiseAndSetIfChanged(ref _categoryFilter, value ?? new ProductCategoryFilter.All());
-    }
-
-    /// <summary>The category filter's choices: All categories, each category by name, then Uncategorized.</summary>
-    public ObservableCollection<ProductCategoryFilter> CategoryFilters { get; } = [new ProductCategoryFilter.All(), new ProductCategoryFilter.Uncategorized()];
-
-    /// <summary>Whether the list shows only some products: a search typed, or a category picked.</summary>
-    private bool IsListFiltered => SearchText.Trim().Length > 0 || CategoryFilter is not ProductCategoryFilter.All;
-
     private Product? _selectedProduct;
-
-    /// <summary>
-    /// Each product picked, by the user or for them (Open, a clone made, Save's reload), nothing picked included: what
-    /// loads a product into the form. Fed by <see cref="SelectedProduct"/>'s setter alone, starting with nothing picked.
-    /// </summary>
-    private readonly BehaviorSubject<Product?> _picks = new(null);
-
     /// <summary>
     /// The product the form is about. Setting it is a pick, which loads that product into the form (_picks); a load that
     /// only finds a fresh copy of it re-points it quietly (<see cref="RepointSelection"/>), leaving the form and whatever's
@@ -306,32 +425,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
             _picks.OnNext(value);
         }
     }
-
-    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
-    private void RepointSelection(Product? fresh) => this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
-
-    /// <summary>
-    /// A product for LoadCommand to open at its end: one <see cref="OpenProduct"/> was asked for before the list held it,
-    /// or the one in the screen's address (<see cref="OpenProductOnLoad"/>). New drops it.
-    /// </summary>
-    private int? _productToOpen;
-
-    /// <summary>
-    /// A sub-assembly <see cref="StartNewProductFrom"/> was asked to link, for LoadCommand to start the new product with
-    /// once its lists are fresh. New drops it.
-    /// </summary>
-    private int? _subAssemblyToStartFrom;
-
-    private int _editingId;
-
-    /// <summary>The product whose recipe, packaging, costing and links the form holds, or null for a new product.</summary>
-    private int? _detailProductId;
-
-    /// <summary>
-    /// The detail Save has read back already, for the load its selection starts to show at once instead of reading it
-    /// again (ShowSavedProduct).
-    /// </summary>
-    private (int ProductId, ProductDetail Detail)? _preloadedDetail;
 
     private bool _areDetailsReady = true;
     /// <summary>
@@ -417,9 +510,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
     }
 
-    /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
-    private readonly CategoryPicker<ProductCategory> _categoryPicker;
-
     private ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
     public string HeaderTitle => _headerTitle.Value;
@@ -497,23 +587,76 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>A saved product: links and clones need one, so the tab only shows then.</summary>
     public bool ShowLinks => _showLinks.Value;
 
-    /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
-    public ProductCosting Costing { get; } = new();
+    private string _editingCloneName = string.Empty;
+    public string EditingCloneName
+    {
+        get => _editingCloneName;
+        set => this.RaiseAndSetIfChanged(ref _editingCloneName, value);
+    }
+
+    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+
+    /// <summary>New's New composite product: a new product made of other products, with its own packaging and toppings or fillings.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> NewCompositeCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
 
     /// <summary>
-    /// The Recipe Structure's Packaging tab, which every product has: the packaging lines for each piece, typed in or what
-    /// they link, Link and Copy, Move to Sub-Assemblies, and the bulk packaging.
+    /// Revert: reads the product back as it was last saved, throwing away everything staged since — the details, the
+    /// recipe's sections and their lines, the packaging, the packs and the costing. The sub-assembly form has no
+    /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
     /// </summary>
-    public ProductPackaging Packaging { get; }
+    public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
 
-    /// <summary>A composite's Products table: its lines, the add row, the product cell's options, and what each product brings.</summary>
-    public ProductComponents ComponentsTable { get; }
+    /// <summary>
+    /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
+    /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
+    /// refusing it shows its message here and the tab doesn't open.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
 
-    /// <summary>The add/edit sub-assembly form: the section it edits or adds, its fields and tables, and what it shows.</summary>
-    public ProductUsageForm UsageForm { get; }
+    /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (<see cref="CostBasis"/>).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
 
-    /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
-    private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
+    /// <summary>
+    /// What a Print here asks to print: the header's, This product; a folder's menu, the folder; the list's, all products.
+    /// ScreenLinks opens the Print screen with that choice (PrintTabViewModel.Pick), and that screen asks
+    /// <see cref="PreparePrintout"/> for This product.
+    /// </summary>
+    public IObservable<PrintScope> PrintRequests => _printRequests;
+
+    /// <summary>
+    /// A linked standalone sub-assembly's badge clicked (a recipe section's, or linked packaging's for a packaging set):
+    /// asks for the sub-assembly with this id to be opened, through <see cref="SubAssemblyOpenRequests"/>.
+    /// </summary>
+    public ReactiveCommand<int, RxVoid> OpenSubAssemblyCommand { get; }
+
+    /// <summary>
+    /// The sub-assemblies linked badges ask to open, by id. ScreenLinks subscribes and opens each on the Sub-Assemblies
+    /// screen, as Sub-Assemblies' Dependents tiles open their products here.
+    /// </summary>
+    public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
+
+    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
+
+    /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; }
+
+    /// <summary>
+    /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with.
+    /// Output: the name to add it as, or null if it was cancelled. The page answers it with a dialog (Prompts).
+    /// </summary>
+    public Interaction<string, string?> PromptForNewCategory { get; } = new();
+
+    /// <summary>A packaging material as the screen last loaded it, for a row that prices itself.</summary>
+    private RawMaterial? FindPackagingMaterial(int id) => PackagingMaterials.FirstOrDefault(m => m.Id == id);
+
+    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
+    private void RepointSelection(Product? fresh) => this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
 
     /// <summary>
     /// Flags each product in the list whose current price earns less than its target markup: every product
@@ -527,7 +670,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         var below = saved.Where(s => s.Costs.IsBelowTargetMarkup).Select(s => s.Product.Id).ToHashSet();
         foreach (var product in products)
         {
-            if (ProductTree.Find(product.Id) is { } leaf)
+            if (List.ProductTree.Find(product.Id) is { } leaf)
             {
                 leaf.IsBelowTargetMarkup = below.Contains(product.Id);
             }
@@ -541,345 +684,1628 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
             .Select(p => p.Name)
             .Order(StringComparer.CurrentCultureIgnoreCase)];
 
-    private string _editingCloneName = string.Empty;
-    public string EditingCloneName
+    /// <summary>The header's title, and where a new product goes.</summary>
+    [MemberNotNull(nameof(_headerTitle), nameof(_newProductTag))]
+    private void WireHeader()
     {
-        get => _editingCloneName;
-        set => this.RaiseAndSetIfChanged(ref _editingCloneName, value);
+        _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, x => x.IsEditingComposite, (product, name, isComposite) =>
+                product is null && string.IsNullOrWhiteSpace(name) ? (isComposite ? "New composite product" : "New product") : name)
+            .ToProperty(this, x => x.HeaderTitle, "New product");
+
+        // Its folder's path as it is now: renamed or moved since New Product Here, it says so (Folders).
+        _newProductTag = this.WhenAnyValue(x => x.SelectedProduct, x => x.NewProductStage, x => x.NewProductFolderId, x => x.Folders, (product, stage, folderId, folders) =>
+                product is null ? $"Goes in {ProductFolderRules.PathTitle(folders, stage, folderId)}" : null)
+            .ToProperty(this, x => x.NewProductTag);
     }
 
-    /// <summary>Every sub-assembly that could be linked or copied, as last loaded; LinkableSubAssemblies filters it.</summary>
-    private IReadOnlyList<SubAssembly> _linkable = [];
-
-    // What the product had when it was loaded, so Save only sends the parts that changed.
-    private RecipeDraft _savedRecipe = new([], []);
-
-    // The stage New files a product in (Settings → Costing Defaults), as of the last LoadCommand.
-    private ProductStage _defaultNewProductStage = CostingDefaults.DefaultNewProductStage;
-
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; private set; }
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; private set; }
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; private set; }
-
-    /// <summary>
-    /// What Save does, to be run in RunSafelyAsync: also how a new product named in the list is saved, which has no
-    /// unsaved change for SaveCommand to be on for.
-    /// </summary>
-    private Func<Task> _saveForm;
-
-    /// <summary>
-    /// Revert: reads the product back as it was last saved, throwing away everything staged since — the details, the
-    /// recipe's sections and their lines, the packaging, the packs and the costing. The sub-assembly form has no
-    /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
-    /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; private set; }
-
-    /// <summary>
-    /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
-    /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
-    /// refusing it shows its message here and the tab doesn't open.
-    /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; private set; }
-
-    /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (<see cref="CostBasis"/>).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; private set; }
-
-    private readonly Subject<PrintScope> _printRequests = new();
-
-    /// <summary>
-    /// What a Print here asks to print: the header's, This product; a folder's menu, the folder; the list's, all products.
-    /// The main window, which owns the tabs, shows its Print tab with that choice (PrintTabViewModel.Pick), and the tab
-    /// asks <see cref="PreparePrintout"/> for This product each time it's shown.
-    /// </summary>
-    public IObservable<PrintScope> PrintRequests => _printRequests;
-
-    /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, on the Print tab.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> PrintFolderCommand { get; private set; }
-
-    /// <summary>Print All Products on the list's empty space: every product, as saved, on the Print tab.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> PrintAllCommand { get; private set; }
-
-    /// <summary>
-    /// A linked standalone sub-assembly's badge clicked (a recipe section's, or linked packaging's for a packaging set):
-    /// asks for the sub-assembly with this id to be opened, through <see cref="SubAssemblyOpenRequests"/>.
-    /// </summary>
-    public ReactiveCommand<int, RxVoid> OpenSubAssemblyCommand { get; private set; }
-
-    /// <summary>
-    /// A linked recipe section's badge clicked: opens where it's kept, the product whose own it is for a variant's link
-    /// (OpenProduct), and otherwise the Sub-Assemblies screen, as <see cref="OpenSubAssemblyCommand"/> does.
-    /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> OpenLinkedSourceCommand { get; private set; }
-
-    private readonly Subject<int> _subAssemblyOpenRequests = new();
-
-    /// <summary>
-    /// The sub-assemblies linked badges ask to open, by id. The main window, which owns the tabs, subscribes and opens
-    /// each on the Sub-Assemblies screen, as Sub-Assemblies' Dependents tiles open their products here.
-    /// </summary>
-    public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
-
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; private set; }
-
-    /// <summary>
-    /// Products moved to other folders of the Products list (ProductListCard), by a drag or Move to: files each in its
-    /// folder and stage straight away, with no Save, and says so on the list's notice bar with an Undo (MoveNotice). Its
-    /// category stays as it is. The form's Save never writes a saved product's stage or folder, so whatever is typed into
-    /// the form stays as it is.
-    /// </summary>
-    public ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> MoveProductsCommand { get; private set; }
-
-    /// <summary>
-    /// Promote to Production, Send Back to Innovation, and a folder's Promote All: files the products in the other stage,
-    /// each in the folder at the same path as its own there, made if it isn't (IProductRepository.MoveToStageAsync), with
-    /// the notice bar's Undo, which takes away again the folders it made while they're still empty.
-    /// </summary>
-    public ReactiveCommand<StageMoveRequest, RxVoid> MoveToStageCommand { get; private set; }
-
-    /// <summary>
-    /// A folder of the user's dragged, or moved by its Move to: puts it, with all it holds, in another folder or at the top
-    /// of a stage, straight away (IProductFolderRepository.MoveAsync), with the notice bar's Undo. Moved to the other stage,
-    /// the folders and products in it go too.
-    /// </summary>
-    public ReactiveCommand<ProductFolderMove, RxVoid> MoveFolderCommand { get; private set; }
-
-    private IReadOnlyList<ProductTreeNode> _cutNodes = [];
-    /// <summary>
-    /// The rows Cut (Ctrl+X) took, as in a file explorer: products, or one folder of the user's, faded in the list until
-    /// Paste (Ctrl+V) moves them, Esc forgets them, or another Cut takes their place. Nothing is saved until the paste.
-    /// </summary>
-    public IReadOnlyList<ProductTreeNode> CutNodes
+    /// <summary>The Clone and History tabs, a saved product's only, and the versions History reads.</summary>
+    [MemberNotNull(nameof(_showLinks))]
+    private void WireDetailsTabs()
     {
-        get => _cutNodes;
-        private set => this.RaiseAndSetIfChanged(ref _cutNodes, value);
+        // A hidden tab can't stay the one showing: leaving a saved product while on Clone or History goes
+        // back to Recipe. Subscribed before ShowLinks, so the details tabs move to Recipe before those two hide.
+        this.WhenAnyValue(x => x.SelectedProduct)
+            .Where(product => product is null && SelectedDetailsTab is LinksTab or HistoryTab)
+            .Subscribe(_ => SelectedDetailsTab = RecipeTab);
+
+        // The History tab reads the product's versions while it shows, once per product: as it's picked, and as another
+        // product's details arrive under it. A Save reads them again (RequestVersions(force: true)).
+        this.WhenAnyValue(x => x.SelectedDetailsTab, x => x.AreDetailsReady, x => x.SelectedProduct)
+            .Subscribe(_ => RequestVersions());
+        LoadLatest(_versionReads, (productId, cancellationToken) => VersionHistory.ReadAsync(
+            productId, () => SelectedProduct?.Id == productId, cancellationToken));
+
+        _showLinks = this.WhenAnyValue(x => x.SelectedProduct)
+            .Select(product => product is not null)
+            .ToProperty(this, x => x.ShowLinks);
     }
 
-    /// <summary>Cut on the list: the products picked (or the one the menu was opened on), or one folder, wait to be pasted.</summary>
-    public ReactiveCommand<IReadOnlyList<ProductTreeNode>, RxVoid> CutCommand { get; private set; }
-
-    /// <summary>
-    /// Paste on the list: what was cut moves into the folder it was asked on (a stage's, one of the user's, or the folder of
-    /// the product it was asked on), as a drop there does, with the notice bar's Undo.
-    /// </summary>
-    public ReactiveCommand<ProductTreeNode, RxVoid> PasteCommand { get; private set; }
-
-    /// <summary>Esc on the list: what was cut is forgotten, and stays where it is.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ClearCutCommand { get; private set; }
-
-    /// <summary>
-    /// Sets the costing of the products picked in the list (or the one its menu was opened on) to Settings' costing
-    /// defaults, once it's confirmed, recording a version of each one it changes (VersionedSaves.ApplyCostingAsync).
-    /// </summary>
-    public ReactiveCommand<IReadOnlyList<Product>, RxVoid> ApplyCostingDefaultsCommand { get; private set; }
-
-    /// <summary>Undo on the list's notice bar: puts the products the last move took back where they were.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; private set; }
-
-    /// <summary>The notice bar's close button, and its timeout: the move stays, and can't be undone from there any more.</summary>
-    /// <summary>
-    /// New Product Here on a folder of the list: a new product, as New starts one, filed in that folder's stage and
-    /// category. Null, from the list's empty space, is New itself. Like New, it adds the product's row to the list for its
-    /// name to be typed into (TreeNameEdit), and the name typed saves it.
-    /// </summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewProductInCommand { get; private set; }
-
-    /// <summary>New's New composite product: a new product made of other products, with its own packaging and toppings or fillings.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> NewCompositeCommand { get; private set; }
-
-    /// <summary>New Composite Product Here on a folder of the list, as New Product Here; null, from the list's empty space, is New composite product itself.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewCompositeProductInCommand { get; private set; }
-
-    /// <summary>
-    /// Rename on a product of the list: its name becomes a box to type into, in place (TreeNameEdit), and the name typed is
-    /// saved at once, like a move (IProductRepository.RenameAsync).
-    /// </summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> RenameProductCommand { get; private set; }
-
-    /// <summary>Clone on a product of the list: asks for the new product's name, then clones it as saved, as the Clone tab does.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> CloneProductCommand { get; private set; }
-
-    /// <summary>Create Variant on a product of the list: asks for the variant's name, then makes it, as the Clone tab does.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> CreateVariantOfCommand { get; private set; }
-
-    /// <summary>Delete on a product of the list: Delete for that product, asking first.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> DeleteProductCommand { get; private set; }
-
-    /// <summary>Restore on a product in the Deleted folder: puts it back in its folder, and picks it.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> RestoreProductCommand { get; private set; }
-
-    /// <summary>Delete Permanently on a product in the Deleted folder: asks first, then deletes it for good.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> DeletePermanentlyCommand { get; private set; }
-
-    /// <summary>
-    /// New Folder on the list: adds a "New folder" row inside the folder it was asked on (a stage's or one of the user's)
-    /// for its name to be typed into (TreeNameEdit), and the name typed adds the folder there. From the list's empty space
-    /// or its toolbar, it goes in the folder picked, or the folder of the product picked, or at the top of Production.
-    /// </summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewFolderCommand { get; private set; }
-
-    /// <summary>Rename on one of the user's folders: its name becomes a box to type into, in place, and the name typed renames it.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> RenameFolderCommand { get; private set; }
-
-    /// <summary>
-    /// Delete on one of the user's folders: asks first, then deletes it, and nothing in it: its products and folders go up
-    /// into the folder it was in.
-    /// </summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> DeleteFolderCommand { get; private set; }
-
-    /// <summary>Expand All: opens every folder in the folder given (a stage's or one of the user's), or in both stages.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> ExpandAllCommand { get; private set; }
-
-    /// <summary>Collapse All: closes every folder in the folder given, or in both stages, leaving the one given and the stages open.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> CollapseAllCommand { get; private set; }
-
-    /// <summary>
-    /// Input: what the prompt is for, its box's label, the name it starts with, and a line saying more. Output: the name
-    /// typed, or null if it was cancelled. The View shows a TextPromptWindow. Asked by the list's Clone and Create Variant;
-    /// the list names everything else in place (TreeNameEdit).
-    /// </summary>
-    public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
-
-    /// <summary>
-    /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with.
-    /// Output: the name to add it as, or null if it was cancelled. The View shows a TextPromptWindow.
-    /// </summary>
-    public Interaction<string, string?> PromptForNewCategory { get; } = new();
-
-    /// <summary>Adds a sub-assembly the way the parameter says: Add Sub-Assembly's drop-down carries one item per way.</summary>
-    public ReactiveCommand<UsageFormMode, RxVoid> AddUsageCommand { get; private set; }
-    public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; private set; }
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; private set; }
-
-    /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; private set; }
-
-    /// <summary>
-    /// Move to Sub-Assemblies on one of the product's own: Save puts it on the Sub-Assemblies screen, keeping its name and
-    /// lines, and links it. Unlink the other way round.
-    /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MoveToSubAssembliesCommand { get; private set; }
-
-    /// <summary>
-    /// Move to In-House on one of the product's own: asks for the made ingredient's name and Made category, then Save moves
-    /// the section to the Sub-Assemblies screen, links it there, and adds that ingredient, made from it.
-    /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MoveToInHouseCommand { get; private set; }
-
-    /// <summary>
-    /// Input: Move to In-House's prompt, its name box starting with the section's saved name and its picker on a Made
-    /// category. Output: the name typed and the category picked, or null if it was cancelled. The View shows a
-    /// TextPromptWindow with a picker.
-    /// </summary>
-    public Interaction<ChoicePromptRequest, ChoicePromptResult?> PromptForMadeIngredient { get; } = new();
-
-    /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; private set; }
-    public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; private set; }
-
-    /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; private set; }
-
-    /// <summary>
-    /// The History tab: the product's versions, read while the tab shows (<see cref="RequestVersions"/>), and its Restore,
-    /// which the screen puts into the form (IProductVersionHistoryHost.ApplyVersion).
-    /// </summary>
-    public ProductVersionHistory VersionHistory { get; }
-
-    /// <summary>A product whose versions the History tab should read: pushed as the tab shows, and after a Save.</summary>
-    private readonly Subject<int> _versionReads = new();
-
-    public ProductsViewModel(
-        IProductRepository productRepository,
-        IProductSubAssemblyUsageRepository usageRepository,
-        IPackagingLineRepository packagingLineRepository,
-        ICostingParametersRepository costingParametersRepository,
-        ICostingDefaultsRepository costingDefaultsRepository,
-        IPackagingLinkRepository packagingLinkRepository,
-        IProductCloner productCloner,
-        IUnitOfWork unitOfWork,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        ISubAssemblyRoleRepository subAssemblyRoleRepository,
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
-        IProductCategoryRepository categoryRepository,
-        IProductFolderRepository folderRepository,
-        IProductVersionRepository versionRepository,
-        IValidator<Product> productValidator,
-        IValidator<CostingParameters> costingParametersValidator,
-        IValidator<ProductCategory> categoryValidator,
-        IViewStateStore viewStateStore,
-        ILogger logger)
-        : base(logger)
+    /// <summary>A product picked in the list loads into the form.</summary>
+    private void WirePicks()
     {
-        _categoryPicker = new CategoryPicker<ProductCategory>(
-            () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
-            () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
-            SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
-        _versionRepository = versionRepository;
-        _productRepository = productRepository;
-        _usageRepository = usageRepository;
-        _packagingLineRepository = packagingLineRepository;
-        _costingParametersRepository = costingParametersRepository;
-        _costingDefaultsRepository = costingDefaultsRepository;
-        _packagingLinkRepository = packagingLinkRepository;
-        _productCloner = productCloner;
-        _subAssemblyRepository = subAssemblyRepository;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
-        _savedProducts = new SavedProductReader(
-            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
-            costingDefaultsRepository, unitOfWork);
-        Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
-        UsageForm = new ProductUsageForm(this);
-        ComponentsTable = new ProductComponents(this, _savedProducts);
-        VersionHistory = new ProductVersionHistory(
-            this, versionRepository, productRepository, _savedProducts, subAssemblyRepository, subAssemblyLineRepository, packagingLineRepository);
-        _versionedSaves = new VersionedSaves(
-            unitOfWork,
-            productRepository,
-            versionRepository,
-            costingParametersRepository,
-            _savedProducts,
-            new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
-        _productValidator = productValidator;
-        _costingParametersValidator = costingParametersValidator;
-        _categoryRepository = categoryRepository;
-        _folderRepository = folderRepository;
-        _categoryValidator = categoryValidator;
+        // A pick loads the product into the form, in these three steps, in this order. Only a pick does (_picks): a load
+        // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
+        // Another product's name and price land in the form ahead of its details, so its history goes first, as
+        // ClearDetailsForAnother would take it anyway: measured against the previous product's saved form, they read
+        // as unsaved changes, and Save lit up until the details arrived — a flicker on every pick.
+        _picks
+            .Where(product => product is not null)
+            .Subscribe(product =>
+            {
+                if (product!.Id != _detailProductId)
+                {
+                    History.Clear();
+                }
 
-        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
-        // for next time (FolderStateWriter); Dispose writes any change still waiting.
-        ProductTree = new ProductTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
-        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, ProductTree.ExpansionChanged, ProductTree.ClosedFolderKeys);
+                LoadIntoForm(product);
+            });
 
-        // The subscriptions, in this order: two following one property run in the order they were made, and some count on it
-        // (WireDetailsTabs). Several run as they're made, WirePicks' included, so each comes after what it reads.
-        WireRecipeTabLists();
-        WireList();
-        WireHeader();
-        WireDetailsTabs();
-        WireRecipeTabFlags();
-        WirePicks();
-        WireRecipeTabPicks();
-        WireUsageForm();
-        WireCosts();
-        WireUnsavedChanges();
+        _picks.Subscribe(ResetDetails);
 
-        // The commands. Making one runs nothing but its can-execute flag, so they can come in any order.
-        WireLoadCommand(subAssemblyRoleRepository, rawMaterialRepository);
-        WireRecordCommands();
-        WireListCommands();
-        WireRecipeCommands();
-        WireSaveCommands();
-        WireCostingCommands();
+        // A newer pick cancels an older one still loading; one that fails shows why, and the next pick loads as usual.
+        LoadLatest(_picks, LoadProductDetailAsync);
     }
+
+    /// <summary>
+    /// The section form wired to the recipe: its way in, its lines priced as they're typed, and the sub-assembly picked to
+    /// link or copy.
+    /// </summary>
+    private void WireUsageForm()
+    {
+        // The sub-assembly form: where its sub-assembly comes from, then the one it links or copies. The form starts
+        // again empty in its new way, which is nothing to save yet, as a fresh add form isn't. Picks only
+        // (ProductUsageForm.ModePicks and the rest): an undo putting the form back, or the options rebuilt, isn't one.
+        UsageForm.ModePicks
+            .Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage)
+            .Subscribe(_ =>
+            {
+                Recipe.StartUsageFormMode();
+                Recipe.RebaseSettledForm();
+            });
+
+        // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
+        UsageForm.FormLines.ToObservableChangeSet()
+            .AutoRefresh(l => l.IngredientId)
+            .AutoRefresh(l => l.Grams)
+            .AutoRefresh(l => l.IsFormulaBase)
+            .Subscribe(_ => _updates.Run(Recipe.FormLinesEdited));
+
+        // An add-in picked, typed or deleted: it's priced, and the batch it joins follows.
+        UsageForm.FormAddIns.ToObservableChangeSet()
+            .AutoRefresh(l => l.IngredientId)
+            .AutoRefresh(l => l.Grams)
+            .Subscribe(_ => _updates.Run(Recipe.FormAddInsEdited));
+
+        // The preview, and whether Save moves a new one to the Sub-Assemblies screen, follow the form's mode, role and source.
+        UsageForm.WhenAnyValue(f => f.IsAddingUsage, f => f.EditingUsageMode, f => f.EditingUsageRole, f => f.EditingUsageSource)
+            .Subscribe(_ => _updates.Run(Recipe.FormKindChanged));
+
+        LoadLatest(
+            UsageForm.SourcePicks.Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
+            Recipe.LoadUsageSourceAsync);
+
+        // A sub-assembly picked to link instead relinks the section once its lines are in; a later pick overtakes it.
+        LoadLatest(
+            UsageForm.LinkTargetPicks
+                .Where(target => target is not null && UsageForm.IsChangingLink)
+                .Select(target => target!),
+            Recipe.ChangeLinkAsync);
+    }
+
+    /// <summary>
+    /// What reprices the product (its packaging, a composite's products, the costing percentages, its price, quantity
+    /// and category), and the captions naming its figures.
+    /// </summary>
+    private void WireCosts()
+    {
+        // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
+        Packaging.LineEdits.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ => _updates.Run(PackagingLinesEdited));
+
+        // The same for a bulk packaging line, and the products a bulk pack holds.
+        Packaging.WhenAnyValue(p => p.BulkQuantity).Skip(1).Subscribe(_ => _updates.Run(PackagingLinesEdited));
+        Packaging.BulkEdits.ToObservableChangeSet()
+            .AutoRefresh(l => l.PackagingMaterialId)
+            .AutoRefresh(l => l.CostPerUnit)
+            .Subscribe(_ => _updates.Run(PackagingLinesEdited));
+
+        // A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost
+        // has been read (a new pick's is read then), and the composite's costs follow.
+        //
+        // One refresh operator for all four properties, not an AutoRefresh each: each operator takes its own lock, and the
+        // subscriber sets the rows' costs (Resolve), so with a chain a cost set on one thread could hold one operator's lock
+        // while waiting for the next, and a cost set on another thread the other way round. One operator
+        // can't deadlock, whatever thread a cost is set on, and is the simpler way to say it.
+        ComponentsTable.ComponentEdits.ToObservableChangeSet()
+            .AutoRefreshOnObservable(r => r.WhenAnyPropertyChanged(
+                nameof(ProductComponentRow.ComponentProductId),
+                nameof(ProductComponentRow.Quantity),
+                nameof(ProductComponentRow.RecipeCost),
+                nameof(ProductComponentRow.PackagingCost)))
+            .Subscribe(_ => _updates.Run(ComponentsEdited));
+
+        Costing.WhenAnyValue(
+                c => c.EditingLaborPercent,
+                c => c.EditingOverheadPercent,
+                c => c.EditingAdministrativePercent,
+                c => c.EditingMarginPercent)
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
+
+        // The category too: it can set the Wastage % the product is priced with.
+        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
+            .Subscribe(_ => _updates.Run(RecomputeCosts));
+
+        // A composite's products' packaging joining its own, or leaving it: the header's Material Cost tooltip says so too.
+        ComponentsTable.WhenAnyValue(c => c.IncludesPackaging)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+                _updates.Run(RecomputeCosts);
+            });
+
+        // The caption on every figure names what it's for, so it follows the quantity, and a composite's is always one unit.
+        this.WhenAnyValue(x => x.EditingQuantityRequired, x => x.IsEditingComposite)
+            .Subscribe(_ =>
+            {
+                this.RaisePropertyChanged(nameof(CostUnitCaption));
+                this.RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
+                this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+                this.RaisePropertyChanged(nameof(MetricBaseTooltip));
+            });
+    }
+
+    /// <summary>Save offers itself whenever the form holds something the saved product doesn't.</summary>
+    private void WireUnsavedChanges()
+    {
+        // Save offers itself only when the form holds something the saved product doesn't. Re-read on every
+        // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
+        // button still disabled under the cursor would swallow the very click that enabled it.
+        this.Changed.Subscribe(_ => History.RefreshDirty());
+        Recipe.Changed.Subscribe(_ => History.RefreshDirty());
+        Costing.Changed.Subscribe(_ => History.RefreshDirty());
+        Packaging.Changed.Subscribe(_ => History.RefreshDirty());
+        ComponentsTable.Changed.Subscribe(_ => History.RefreshDirty());
+        UsageForm.Changed.Subscribe(_ => History.RefreshDirty());
+        WatchForSave(Recipe.UsageEdits);
+        WatchForSave(Packaging.LineEdits);
+        WatchForSave(Packaging.BulkEdits);
+        WatchForSave(ComponentsTable.ComponentEdits);
+        WatchForSave(UsageForm.FormLines);
+        WatchForSave(UsageForm.FormAddIns);
+        ((INotifyPropertyChanged)Recipe.RecipeTabs).PropertyChanged += (_, _) => Recipe.RebaseSettledForm();
+    }
+
+    /// <summary>Load: everything the screen shows is read again, and merged in.</summary>
+    private async Task LoadAsync()
+    {
+        // A linked section reads a sub-assembly kept on the Sub-Assemblies screen, which can change there (its
+        // lines, name or role), so those are fetched again; the product's own and new sections only need their
+        // ingredients' new costs. Every saved one is fetched: a role made product-owned, or no longer, in Settings
+        // turns a linked one into the product's own, or back.
+        var detailProductId = _detailProductId;
+        HashSet<int> linkedIds = [.. Recipe.UsageEdits.Where(u => u.SubAssemblyId > 0).Select(u => u.SubAssemblyId)];
+
+        // A composite's products can have changed elsewhere since they were read (a recipe, an ingredient's price, a
+        // quantity required), so what each brings is read again; its lines may hold unsaved edits and stay as they are.
+        List<int> componentIds = [.. ComponentsTable.ProductIds];
+
+        // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
+        // several times as long as the slowest of them, and the UI thread came back after each to start the next.
+        // Each has its own context (AddDbContextFactory), and none touches ViewModel state.
+        var rolesRead = Task.Run(() => _subAssemblyRoleRepository.GetAllAsync(CancellationToken.None));
+        var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
+        var foldersRead = Task.Run(() => _folderRepository.GetAllAsync(CancellationToken.None));
+        var rawMaterialsRead = Task.Run(() => _rawMaterialRepository.GetAllAsync(CancellationToken.None));
+        var productsRead = Task.Run(() => _productRepository.GetAllAsync(CancellationToken.None));
+        var deletedRead = Task.Run(() => _productRepository.GetDeletedAsync(CancellationToken.None));
+        var linkableRead = Task.Run(() => _subAssemblyRepository.GetLinkableAsync(CancellationToken.None));
+        var standaloneRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
+        var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+        var linkedSubAssembliesRead = Task.Run(() => _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
+        var linkedLinesRead = Task.Run(() => _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
+        var packagingLinkRead = detailProductId is { } linkProductId
+            ? Task.Run(() => _packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
+            : Task.FromResult<PackagingLink?>(null);
+        var componentLinksRead = Task.Run(() => _productRepository.GetAllComponentsAsync(CancellationToken.None));
+        var componentCostsRead = Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
+        await Task.WhenAll(
+            rolesRead, categoriesRead, foldersRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
+            linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
+
+        var roles = await rolesRead;
+        var categories = await categoriesRead;
+        var folders = await foldersRead;
+        var rawMaterials = await rawMaterialsRead;
+        var products = await productsRead;
+        var deleted = await deletedRead;
+        var linkable = await linkableRead;
+        var packagingSets = (await standaloneRead).Where(s => s.Role?.IsPackaging == true).ToList();
+        var costingDefaults = await costingDefaultsRead;
+        var linkedSubAssemblies = await linkedSubAssembliesRead;
+        var linkedLines = await linkedLinesRead;
+        var packagingLink = await packagingLinkRead;
+        var componentLinks = await componentLinksRead;
+        var componentCosts = await componentCostsRead;
+
+        // Linked packaging is kept elsewhere (another product, or a set on the Sub-Assemblies screen) and can
+        // have changed there, so it's fetched again — but only while the form still shows the link as saved. The
+        // product's own lines aren't, since they may hold unsaved edits, and nor is a link picked but not saved.
+        var savedLink = packagingLink is null ? null : PackagingLinkTarget.From(packagingLink);
+        var showsSavedLink = savedLink is not null && Packaging.ShowsSavedLink(savedLink);
+        var linkedPackagingLines = showsSavedLink
+            ? await _packagingLineRepository.GetEffectiveForProductAsync(packagingLink!.ProductId, CancellationToken.None)
+            : null;
+
+        // A role made product-owned in Settings, or no longer, since the product was loaded: a section it linked is its
+        // own now, or one of its own is linked now. With nothing typed into the form, the product is read again, so what
+        // Save compares against is how it's saved now; with something typed, RefreshRows turns the section round
+        // in place, and the next Save writes it as it shows.
+        var ownershipChanged = Recipe.UsageEdits.Any(u => linkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
+            && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
+        var reloadDetails = ownershipChanged && !History.IsDirty && detailProductId is not null;
+
+        // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
+        var selectedId = SelectedProduct?.Id;
+        var categoryId = EditingCategory?.Id;
+        var usageRoleId = UsageForm.EditingUsageRole?.Id;
+        var usageSourceKey = UsageForm.EditingUsageSource?.Key;
+
+        ApplyRefresh(() =>
+        {
+            Roles.MergeFrom(roles, r => r.Id);
+            _categoryCache.MergeFrom(categories);
+            EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
+            Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
+            PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
+            // The Deleted folder and the folders first, so the tree, refreshed as the products merge, files a product
+            // deleted, restored or moved since in its new place in one go. The tree is refreshed again for a change to
+            // those alone.
+            DeletedProducts = deleted;
+            Folders = folders;
+            _productCache.MergeFrom(products);
+            List.RefreshTree();
+            _markupChecks.OnNext(products);
+            _linkable = linkable;
+            Packaging.TakePackagingSets(packagingSets);
+            RefreshCostingDefaults(costingDefaults);
+
+            // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
+            ComponentsTable.TakeFresh(componentCosts, componentLinks);
+            RefreshComponentOptions();
+
+            RepointSelection(Products.FirstOrDefault(p => p.Id == selectedId));
+            if (SelectedProduct is not null)
+            {
+                ShowUpdatedAt(SelectedProduct.UpdatedAt);
+            }
+
+            if (detailProductId == _detailProductId && linkedPackagingLines is not null)
+            {
+                // A renamed product or set reads right in the banner too.
+                Packaging.ShowLink(savedLink);
+                Packaging.LoadLines(linkedPackagingLines);
+            }
+
+            Recipe.RefreshRows(linkedSubAssemblies, linkedLines);
+
+            // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
+            Packaging.ResolveRows();
+            UsageForm.ResolveRows();
+            Recipe.RefreshLinkableOptions();
+
+            // An add form opened before the roles were loaded takes the first role it can have, as it would have.
+            UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
+                ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null));
+            UsageForm.ShowSource(UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey));
+
+            UsageForm.Recompute();
+            RecomputeCosts();
+        });
+
+        if (reloadDetails && SelectedProduct is { } reloaded && reloaded.Id == detailProductId)
+        {
+            await LoadProductDetailAsync(reloaded, CancellationToken.None);
+        }
+
+        // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the product's form.
+        if (_productToOpen is { } productId)
+        {
+            _productToOpen = null;
+            TrySelectProduct(productId);
+        }
+
+        if (_subAssemblyToStartFrom is { } subAssemblyId)
+        {
+            _subAssemblyToStartFrom = null;
+            StartNewProductLinking(subAssemblyId);
+        }
+
+        // A save elsewhere can have recorded a version of this product since (a sub-assembly it links, saved on the
+        // Sub-Assemblies screen): a History tab showing reads its versions again, and one hidden when it next shows.
+        if (SelectedDetailsTab == HistoryTab)
+        {
+            RequestVersions(force: true);
+        }
+        else
+        {
+            VersionHistory.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Makes a product named <paramref name="name"/> from <paramref name="sourceProductId"/> as saved (a clone or a
+    /// variant) with its first version, noted "<paramref name="madeAs"/>" the source, both or neither
+    /// (VersionedSaves.MakeProductFromAsync), and opens it. Opening it replaces the product showing, so that one's unsaved
+    /// changes are asked about first: saved, they're in what's copied.
+    /// </summary>
+    private async Task MakeFromAsync(int sourceProductId, string name, Func<int, string, CancellationToken, Task<int>> make, string madeAs)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
+                sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
+
+            await LoadCommand.Execute();
+            SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
+        });
+    }
+
+    /// <summary>
+    /// Moves <paramref name="product"/> to the Deleted folder once it's confirmed. The form starts a new product if it was
+    /// showing this one, as it was after the header's Delete, which only ever deletes the product showing.
+    /// </summary>
+    private Task DeleteProductAsync(Product product) =>
+        RunWithConfirmationAsync(
+            $"Delete '{product.Name}'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.",
+            async () =>
+            {
+                await _productRepository.DeleteAsync(product.Id, CancellationToken.None);
+                if (SelectedProduct?.Id == product.Id || _editingId == product.Id)
+                {
+                    StartNewProduct();
+                }
+
+                await LoadCommand.Execute();
+            });
+
+    /// <summary>
+    /// Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would,
+    /// asking about the unsaved changes of the product showing first.
+    /// </summary>
+    private async Task RestoreProductAsync(Product product)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
+            await LoadCommand.Execute();
+            TrySelectProduct(product.Id);
+        });
+    }
+
+    /// <summary>Deletes <paramref name="product"/>, from the Deleted folder, for good once it's confirmed.</summary>
+    private Task DeletePermanentlyAsync(Product product) =>
+        RunWithConfirmationAsync(
+            product.IsComposite
+                ? $"Delete '{product.Name}' permanently? The products it holds stay. This can't be undone."
+                : $"Delete '{product.Name}' permanently? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
+            async () =>
+            {
+                await _productRepository.DeletePermanentlyAsync(product.Id, CancellationToken.None);
+                await LoadCommand.Execute();
+            });
+
+    /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
+    private void ShowUpdatedAt(DateTime? updatedAt) =>
+        LastUpdatedText = ProductPrintout.LastUpdatedTextFor(updatedAt);
+
+    private void LoadIntoForm(Product product)
+    {
+        // Not for the same product loaded again, as a Save does: the boxes still hold what's its.
+        if (product.Id != _editingId)
+        {
+            FormVersion++;
+        }
+
+        _editingId = product.Id;
+        EditingName = product.Name;
+        EditingDescription = product.Description ?? string.Empty;
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        EditingQuantityRequired = product.QuantityRequired;
+        ComponentsTable.IncludesPackaging = product.IncludesComponentPackaging;
+        EditingCurrentPrice = product.CurrentPrice;
+        ShowUpdatedAt(product.UpdatedAt);
+        EditingCloneName = $"{product.Name} Copy";
+    }
+
+    /// <summary>
+    /// What follows a new selection: nothing picked or open. Another product's details wait for its own to
+    /// arrive and go with them (AreDetailsReady); the same product picked again (a fresh copy after Save) keeps
+    /// showing until its reload, and none picked clears them.
+    /// </summary>
+    private void ResetDetails(Product? product)
+    {
+        // Another product's details replace these when they arrive, in the same pass (ClearDetailsForAnother).
+        // Cleared here, the screen drew an empty product in between: a flicker, with the recipe's frame
+        // collapsing and growing back.
+        if (product is not null && product.Id != _detailProductId)
+        {
+            AreDetailsReady = false;
+            return;
+        }
+
+        AreDetailsReady = true;
+        Recipe.CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
+
+        if (product?.Id != _detailProductId)
+        {
+            ClearDetails();
+        }
+    }
+
+    /// <summary>
+    /// What ResetDetails leaves for the picked product's details to replace: the previous product's. Its recipe's tabs
+    /// stay for the picked recipe's sections to take over (ProductRecipe.ShowSaved), unless nothing is coming to replace them.
+    /// </summary>
+    private void ClearDetailsForAnother(bool keepRecipeTabs)
+    {
+        Recipe.CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
+        VersionHistory.Clear();
+        ClearDetails(keepRecipeTabs);
+    }
+
+    /// <summary>
+    /// Opens a product as picking it in the list would, for another screen (Sub-Assemblies' Dependents tiles). A search
+    /// hiding it is cleared, so the list shows the row picked. A list that doesn't hold it yet (the screen not loaded
+    /// since, or ever) opens it at the end of the next LoadCommand, which showing the screen runs.
+    /// </summary>
+    public void OpenProduct(int productId)
+    {
+        _productToOpen = TrySelectProduct(productId) ? null : productId;
+    }
+
+    /// <summary>
+    /// Opens a product at the end of the next LoadCommand, for the one in the screen's address as the screen opens: its
+    /// list is fresh only then. New clicked meanwhile is the later word, and the product isn't opened over it.
+    /// </summary>
+    public void OpenProductOnLoad(int productId)
+    {
+        _productToOpen = productId;
+    }
+
+    /// <summary>
+    /// <see cref="OpenProduct"/>, asking first about the unsaved changes of the product showing when another is to replace
+    /// it; a deleted one is only picked in the Deleted folder, and replaces nothing. False when the user stays on it.
+    /// </summary>
+    public async Task<bool> OpenProductAsync(int productId)
+    {
+        if (productId != SelectedProduct?.Id
+            && DeletedProducts.All(p => p.Id != productId)
+            && !await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        OpenProduct(productId);
+        return true;
+    }
+
+    /// <summary>
+    /// Starts a new product that links a standalone sub-assembly, for Sub-Assemblies' New Product. It waits for the next
+    /// LoadCommand, which showing the screen runs, so the sub-assembly is found as it's saved now: it may have been made or
+    /// renamed there since this screen last loaded.
+    /// </summary>
+    public void StartNewProductFrom(int subAssemblyId)
+    {
+        _productToOpen = null;
+        _subAssemblyToStartFrom = subAssemblyId;
+    }
+
+    /// <summary><see cref="StartNewProductFrom"/>, asking first about the unsaved changes of the product showing. False when the user stays on it.</summary>
+    public async Task<bool> StartNewProductFromAsync(int subAssemblyId)
+    {
+        if (!await ResolveUnsavedChangesAsync(revert: false))
+        {
+            return false;
+        }
+
+        StartNewProductFrom(subAssemblyId);
+        return true;
+    }
+
+    /// <summary>
+    /// A new product named after the sub-assembly, with the Link form open on it, as Add Sub-Assembly's Link an existing
+    /// one would have it: its lines load, and the piece size is left to type. Like New, it replaces whatever the form
+    /// showed and has nothing to undo; it's measured against a blank product, so Save is offered straight away.
+    /// </summary>
+    private void StartNewProductLinking(int subAssemblyId)
+    {
+        if (_linkable.FirstOrDefault(s => s.Id == subAssemblyId && s.OwnerProductId is null && s.Role?.IsPackaging != true) is not { } subAssembly)
+        {
+            ErrorMessage = "That sub-assembly is no longer on the Sub-Assemblies screen.";
+            return;
+        }
+
+        StartNewProduct();
+        EditingName = subAssembly.Name;
+        Recipe.OpenAddSubAssemblyTab();
+        UsageForm.EditingUsageMode = UsageFormMode.Link;
+        UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId);
+        History.RefreshDirty();
+    }
+
+    /// <summary>IRecordScreen, for the Vim command line's <c>:e name</c>: opens the product the name means best.</summary>
+    public bool OpenByName(string text)
+    {
+        if (RecordNameMatch.Best(Products, product => product.Name, text) is not { } product)
+        {
+            return false;
+        }
+
+        _ = RunSafelyAsync(() => OpenProductAsync(product.Id));
+        return true;
+    }
+
+    private bool TrySelectProduct(int productId)
+    {
+        // A deleted one (a Dependents tile names it as deleted) has its row picked in the Deleted folder, opened; the form stays.
+        if (DeletedProducts.Any(p => p.Id == productId))
+        {
+            if (List.ProductTree.Find(productId) is null)
+            {
+                List.ClearListFilters();
+            }
+
+            List.ProductTree.DeletedFolder.IsExpanded = true;
+            List.SelectedTreeNode = List.ProductTree.Find(productId);
+            return true;
+        }
+
+        if (Products.FirstOrDefault(p => p.Id == productId) is not { } product)
+        {
+            return false;
+        }
+
+        if (!List.VisibleProducts.Contains(product))
+        {
+            List.ClearListFilters();
+        }
+
+        SelectedProduct = product;
+        return true;
+    }
+
+    /// <summary>
+    /// New, from the header or the list. A product still waiting for LoadCommand to open it, or a sub-assembly waiting
+    /// for it to start a product from, no longer is: it would load over the new form, and a name typed into it since
+    /// would then be saved as that product's.
+    /// </summary>
+    private void NewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
+    {
+        _productToOpen = null;
+        _subAssemblyToStartFrom = null;
+        StartNewProduct(stage, folderId, isComposite);
+    }
+
+    /// <summary>
+    /// A new product: no name, recipe, packaging or links, its costing at the defaults, and nothing selected. Save files it
+    /// in <paramref name="stage"/>, or Settings' stage for a new product when it's null, in the user's folder
+    /// <paramref name="folderId"/>, or at the top of the stage for none; it has no category until one is picked.
+    /// <paramref name="isComposite"/> makes it a composite, which opens on its empty Products table.
+    /// </summary>
+    private void StartNewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
+    {
+        _newProductInDefaultStage = stage is null;
+        NewProductStage = stage ?? _defaultNewProductStage;
+        NewProductFolderId = stage is null ? null : folderId;
+        SelectedProduct = null;
+        FormVersion++;
+        _editingId = 0;
+        EditingName = string.Empty;
+        EditingDescription = string.Empty;
+        EditingCategory = null;
+        EditingQuantityRequired = 1;
+        ComponentsTable.IncludesPackaging = false;
+        EditingCurrentPrice = null;
+        ShowUpdatedAt(null);
+        EditingCloneName = string.Empty;
+
+        // After an unsaved new product nothing was selected, so the selection subscriptions don't run. The kind goes
+        // first, so the tab ClearDetails picks is the new kind's.
+        Recipe.CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
+        SetComposite(isComposite);
+        ClearDetails();
+        RefreshComponentOptions();
+        Costing.ApplyDefaults();
+
+        // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
+        History.MarkClean();
+    }
+
+    /// <summary>
+    /// Makes the form a composite's, with its Products tab first, before its sections' tabs, or a product of
+    /// sub-assemblies', without it.
+    /// </summary>
+    private void SetComposite(bool isComposite)
+    {
+        IsEditingComposite = isComposite;
+        Recipe.ShowComponentsTab(isComposite);
+    }
+
+    /// <summary>What the Products table's product cell offers, for the product showing (a new one can hold any).</summary>
+    private void RefreshComponentOptions() => ComponentsTable.RefreshOptions(_detailProductId ?? 0, Products);
+
+    /// <summary>
+    /// Empties the recipe, packaging, costing and links, and what Save compares them against. With
+    /// <paramref name="keepRecipeTabs"/>, the recipe's sections and the Packaging tab stay for another product's to
+    /// replace in the same pass: the tab strip then keeps its tabs rather than building a new one for each.
+    /// </summary>
+    private void ClearDetails(bool keepRecipeTabs = false)
+    {
+        // The history is this product's form; another product's steps would put back a recipe that isn't its.
+        History.Clear();
+
+        _detailProductId = null;
+
+        Recipe.Clear(keepRecipeTabs);
+        Packaging.Clear();
+
+        // A composite's lines, and what its products were read to bring, are that composite's.
+        ComponentsTable.Clear();
+        Costing.Load(null);
+        Recipe.RefreshLinkableOptions();
+        RecomputeCosts();
+
+        // A picked product's sub-assemblies are on their way, and pick the tab when they arrive; a blank form opens on its
+        // first tab, a composite's on its Products, whatever showed before.
+        Recipe.AfterClear(forAnother: SelectedProduct is not null);
+    }
+
+    private async Task LoadProductDetailAsync(Product? product, CancellationToken cancellationToken)
+    {
+        if (product is null)
+        {
+            // Nothing picked: the form is a blank one, and there's nothing to save until it's typed into.
+            History.MarkClean();
+            return;
+        }
+
+        // Read on the thread pool, so the UI thread comes back once, when all of it has arrived, instead of
+        // after each read to start the next. The reads touch no ViewModel state; everything below them does.
+        // Save's reload has read it already: then this runs through without awaiting, in the pass that
+        // picked the product, so the form isn't drawn closed (ResetDetails) before it opens again.
+        ProductDetail detail;
+        try
+        {
+            detail = _preloadedDetail is { } preloaded && preloaded.ProductId == product.Id
+                ? preloaded.Detail
+                : await Task.Run(() => _savedProducts.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
+        {
+            // Nothing of the picked product's came: the previous product's mustn't stay showing under its name.
+            ClearDetailsForAnother(keepRecipeTabs: false);
+            AreDetailsReady = true;
+            throw;
+        }
+
+        // Only the product picked last is shown; a newer pick cancels this load.
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Out with the previous product's details and in with these, in one pass, so nothing is drawn between them. Its
+        // recipe's tabs stay, for this recipe's sections to take over.
+        if (product.Id != _detailProductId)
+        {
+            ClearDetailsForAnother(keepRecipeTabs: true);
+        }
+
+        // Whose details these are, before they're ready: the History tab reads the versions as AreDetailsReady turns true,
+        // only when they're the picked product's (RequestVersions). Set after, a product picked on that tab showed none.
+        _detailProductId = product.Id;
+        AreDetailsReady = true;
+
+        // A composite's Products tab (or none) goes in before the tabs are rebuilt, and its lines before the recipe
+        // settles what Save compares it against, which they're part of.
+        SetComposite(product.IsComposite);
+        ComponentsTable.Load(detail.Components);
+
+        // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
+        Packaging.LoadLink(detail.PackagingLink);
+        Packaging.LoadLines(detail.Lines);
+        Packaging.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
+        Recipe.ShowSaved(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
+        Costing.Load(detail.Costing);
+        Recipe.RefreshLinkableOptions();
+        RefreshComponentOptions();
+        RecomputeCosts();
+        History.MarkClean();
+
+        // Read and priced all the same, so it can be put right here; Save refuses it until one product is taken out of another.
+        if (detail.HoldsItself)
+        {
+            ErrorMessage = CompositeProductRules.HoldsItselfText(product.Name);
+        }
+        else if (detail.PackagingLinkedRoundInALoop)
+        {
+            ErrorMessage = PackagingLinkRules.LinkedRoundInALoopText(product.Name);
+        }
+    }
+
+    /// <summary>Save: the product with its recipe, packaging and costing, and the versions it records, all or nothing.</summary>
+    private async Task SaveAsync()
+    {
+        // The picked product's details haven't replaced the previous one's yet: saving now would write that recipe
+        // under this product's name. Save is off then, since the history records nothing until they come, so nothing
+        // is unsaved (UndoHistory's canRecord); this is the backstop for an Execute that doesn't ask.
+        if (!AreDetailsReady)
+        {
+            return;
+        }
+
+        // A form left open is part of what's being saved, unless it's an add form nothing was entered in, which
+        // has nothing to save. Its sub-assembly's tab shows, as Apply would show it, so an add made this way
+        // stays the tab showing through the reload.
+        Recipe.ApplyFormForSave();
+
+        var product = new Product
+        {
+            Id = _editingId,
+            Name = EditingName.Trim(),
+            Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
+            CategoryId = EditingCategory?.Id,
+            QuantityRequired = EditingQuantityRequired,
+            CurrentPrice = EditingCurrentPrice,
+
+            // Only a new product's is written: a saved one's changes by moving it in the list.
+            Stage = NewProductStage,
+            FolderId = NewProductFolderId,
+
+            // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
+            IsComposite = IsEditingComposite,
+            IncludesComponentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging,
+        };
+
+        var validation = _productValidator.Validate(product);
+        if (!validation.IsValid)
+        {
+            ErrorMessage = validation.ToString(" ");
+            return;
+        }
+
+        var costing = Costing.ToParameters();
+        var costingValidation = _costingParametersValidator.Validate(costing);
+        if (!costingValidation.IsValid)
+        {
+            ErrorMessage = costingValidation.ToString(" ");
+            return;
+        }
+
+        var recipe = Recipe.CurrentDraft();
+        if (!await ConfirmSharedLinesAsync())
+        {
+            return;
+        }
+
+        // Written with its versions, all or nothing (VersionedSaves): a saved product with none yet first gets how it
+        // stood until now, so there's one to go back to; then the product as saved; and the products sharing its
+        // sections' lines or linking its packaging each get one if this Save changes them. Only linked lines edited
+        // here and the packaging reach those, so a Save of neither reads none: a price-only Save would
+        // otherwise spend half a second reading every product sharing its dough, twice.
+        var packagingLink = Packaging.ChangedLink();
+        var packagingLines = Packaging.ChangedLines();
+        var bulkToSave = Packaging.ChangedBulk();
+        var changesSharing = Recipe.UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
+        var recipeToSave = Recipe.IsAsSaved(recipe) ? null : recipe;
+        var costingToSave = Costing.IsChanged ? costing : null;
+        var saved = await Task.Run(() => _versionedSaves.SaveProductAsync(
+            product, recipeToSave, packagingLink, packagingLines, bulkToSave, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
+
+        // What's saved is the new starting point: stepping back past it would show changes already written.
+        // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
+        History.Clear();
+
+        // The list picks up the new name; then the form shows what was saved, which is what the next Save compares
+        // against.
+        await LoadCommand.Execute();
+        ShowSavedProduct(saved.Product, saved.Detail);
+
+        // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
+        // reads them, so a Save made from the Recipe tab doesn't leave the tab without the new version.
+        if (SelectedDetailsTab == HistoryTab)
+        {
+            RequestVersions(force: true);
+        }
+        else
+        {
+            VersionHistory.Clear();
+        }
+
+        if (ProductVersionRecorder.RecordedMessage(saved.SharingVersioned) is { } message)
+        {
+            SuccessMessage = message;
+        }
+    }
+
+    /// <summary>
+    /// Asks before Save changes the lines of a linked sub-assembly that other products use too, or a made ingredient is made
+    /// from, naming them as they are now rather than as last loaded. True, without asking, when nothing else would change.
+    /// </summary>
+    private async Task<bool> ConfirmSharedLinesAsync()
+    {
+        var edited = Recipe.UsageEdits.Where(u => u.AreLinkedLinesEdited).ToList();
+        if (edited.Count == 0)
+        {
+            return true;
+        }
+
+        var dependents = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
+        var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
+        var shared = edited
+            .Select(u => (u.LinkedName, Others: (IReadOnlyList<string>)
+            [
+                .. OtherProductsUsing(u.SubAssemblyId, dependents),
+                .. (madeFrom.GetValueOrDefault(u.SubAssemblyId) ?? []).Select(m => m.Name),
+            ]))
+            .Where(s => s.Others.Count > 0)
+            .Select(s => $"{s.LinkedName}, also used by {string.Join(", ", s.Others)}")
+            .ToList();
+        if (shared.Count == 0)
+        {
+            return true;
+        }
+
+        return await ConfirmDelete.Handle(
+            $"Save changes the lines of {string.Join("; and ", shared)}. Their recipes and costs change with it. Save anyway?");
+    }
+
+    /// <summary>
+    /// Selects the product as Save left it, the fresh copy, so the form shows (and compares against) what was saved:
+    /// <paramref name="saved"/> and <paramref name="detail"/>, as the Save read them back. A new product, saved for the
+    /// first time, is still the recipe showing, not another product's: it keeps the tab it showed, as an existing one does.
+    ///
+    /// The detail goes in with the selection, so it shows in one pass. Picked with the detail still to read, the same
+    /// product closed its form (ResetDetails) and drew the screen that way until the read came back and opened it again:
+    /// a flicker on every Save.
+    /// </summary>
+    private void ShowSavedProduct(Product saved, ProductDetail detail)
+    {
+        _productCache.AddOrUpdate(saved);
+        _detailProductId = saved.Id;
+        _preloadedDetail = (saved.Id, detail);
+        try
+        {
+            SelectedProduct = saved;
+        }
+        finally
+        {
+            _preloadedDetail = null;
+        }
+    }
+
+    /// <summary>A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.</summary>
+    private void PackagingLinesEdited()
+    {
+        Packaging.ResolveRows();
+        Packaging.RaiseCostsChanged();
+        RecomputeCosts();
+    }
+
+    /// <summary>
+    /// A composite's line picked, typed or deleted in its Products table: it's priced once its product's recipe cost has
+    /// been read (a new pick's is read then), and the composite's costs follow.
+    /// </summary>
+    private void ComponentsEdited()
+    {
+        ComponentsTable.ResolveRows();
+        ComponentsTable.ReadMissingCosts();
+        RecomputeCosts();
+    }
+
+    /// <summary>
+    /// Applies Settings' costing defaults (labor, overhead, administrative and markup) to <paramref name="products"/>, once
+    /// it's confirmed. The product the form shows, when it's one of them, has its unsaved changes saved or thrown away
+    /// first, and shows its new costing after.
+    /// </summary>
+    private async Task ApplyCostingDefaultsAsync(IReadOnlyList<Product> products)
+    {
+        if (products.Count == 0 || (products.Any(p => p.Id == _detailProductId) && !await ResolveUnsavedChangesAsync(revert: true)))
+        {
+            return;
+        }
+
+        await RunSafelyAsync(async () =>
+        {
+            var defaults = await Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+            var question = $"Set the costing of {ProductNames(products)} to the costing defaults: labor {defaults.LaborPercent:0.##}%, overhead "
+                + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarginPercent:0.##}%?"
+                + "\n\nA version is recorded of each one this changes.";
+            if (!await ConfirmDelete.Handle(question))
+            {
+                return;
+            }
+
+            var costing = new CostingParameters
+            {
+                LaborPercent = defaults.LaborPercent,
+                OverheadPercent = defaults.OverheadPercent,
+                AdministrativePercent = defaults.AdministrativePercent,
+                MarginPercent = defaults.MarginPercent,
+            };
+            var changed = await Task.Run(() => _versionedSaves.ApplyCostingAsync(
+                [.. products.Select(p => p.Id)], costing, DateTime.Now, CancellationToken.None));
+            await LoadCommand.Execute();
+
+            // The product the form shows reads its new costing, as after its own Save.
+            if (_detailProductId is { } openId && products.Any(p => p.Id == openId)
+                && await Task.Run(() => _productRepository.GetByIdAsync(openId, CancellationToken.None)) is { } open)
+            {
+                var detail = await Task.Run(() => _savedProducts.ReadDetailAsync(openId, CancellationToken.None));
+                History.Clear();
+                ShowSavedProduct(open, detail);
+                if (SelectedDetailsTab == HistoryTab)
+                {
+                    RequestVersions(force: true);
+                }
+                else
+                {
+                    VersionHistory.Clear();
+                }
+            }
+
+            SuccessMessage = changed.Count == 0
+                ? $"{ProductNames(products)} already {(products.Count == 1 ? "has" : "have")} the costing defaults."
+                : $"The costing defaults were applied to {ProductNames(changed)}, with a version of each.";
+        });
+
+        static string ProductNames<T>(IReadOnlyList<T> items) where T : notnull
+        {
+            List<string> names = [.. items.Select(i => i is Product p ? p.Name : i.ToString()!)];
+            return names.Count switch
+            {
+                1 => names[0],
+                <= 5 => $"{string.Join(", ", names[..^1])} and {names[^1]}",
+                _ => $"{string.Join(", ", names.Take(4))} and {names.Count - 4} more",
+            };
+        }
+    }
+
+    /// <summary>
+    /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
+    /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
+    /// A new product started by New goes in the new stage whatever was typed, since its stage was never picked.
+    /// </summary>
+    private void RefreshCostingDefaults(CostingDefaults defaults)
+    {
+        var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
+        var shopFiguresChanged = Costing.SetDefaults(defaults);
+        _defaultNewProductStage = defaults.NewProductStage;
+        if (shopFiguresChanged)
+        {
+            // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing
+            // tab follows at once.
+            RecomputeCosts();
+        }
+        if (_editingId == 0 && _newProductInDefaultStage)
+        {
+            NewProductStage = _defaultNewProductStage;
+        }
+        if (untouchedNewProduct)
+        {
+            Costing.ApplyDefaults();
+
+            // The defaults landing on a form that was still showing the previous ones isn't the user's change -
+            // on the screen's first load they land on a blank form costed at nothing - so what Save measures
+            // against follows them. Only the costing moves: a product whose costing was typed into isn't here.
+            History.Rebase((settled, now) => settled with { Costing = now.Costing });
+        }
+    }
+
+    /// <summary>
+    /// Unbuffered or Buffered, pressed: every figure moves to the other of the materials' costs. The lines tables' rows are priced
+    /// again, the composite's products from what's already been read of them, and the sections from the costs they
+    /// already hold, so nothing is read again, and nothing about the product changes.
+    /// </summary>
+    private void ToggleCostBasis()
+    {
+        CostBasis = CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
+        this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+        UsageForm.Reprice();
+        Packaging.Reprice();
+        ComponentsTable.Reprice();
+
+        RecomputeCosts();
+        UsageForm.Recompute();
+        VersionHistory.Reprice(CostBasis);
+    }
+
+    /// <summary>The cost summary, from the recipe and packaging as they are now and the costing fields.</summary>
+    private void RecomputeCosts()
+    {
+        // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
+        // line still being filled in brings nothing yet), then its own sections, each per whole composite.
+        List<ProductComponentRow> lines = IsEditingComposite
+            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
+            : [];
+        List<(string Name, decimal Cost)> components = [.. lines.Select(r => (r.LineName, r.RecipeCostTotal))];
+
+        // The Products table's figure adds up its Cost column: the products' packaging is in it while the box is ticked.
+        ComponentsTable.ComponentsCost = lines.Sum(r => r.Cost);
+
+        // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
+        // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
+        decimal? componentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging
+            ? lines.Sum(r => r.PackagingCostTotal)
+            : null;
+        var usages = Recipe.UsageEdits;
+        Costing.Recompute(new ProductCostInputs
+        {
+            Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(CostBasis)))],
+            QuantityRequired = EditingQuantityRequired,
+            PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
+            ComponentPackaging = componentPackaging,
+            CurrentPrice = EditingCurrentPrice,
+            IsComposite = IsEditingComposite,
+            HasOwnSections = IsEditingComposite && usages.Count > 0,
+        },
+        EditingCategory?.WastagePercent);
+
+        List<string> belowCost =
+        [
+            .. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
+                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())
+                .Where(RawMaterialRules.IsBufferedBelowCost)
+                .Select(m => m.Name)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .Order(StringComparer.CurrentCultureIgnoreCase),
+        ];
+        BelowCostText = belowCost.Count switch
+        {
+            0 => null,
+            1 => $"Prices have risen past the buffered cost of {belowCost[0]}, so this product is priced under what it costs. "
+                + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.",
+            _ => $"Prices have risen past the buffered costs of {string.Join(", ", belowCost[..^1])} and {belowCost[^1]}, so this "
+                + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
+        };
+    }
+
+    /// <summary>
+    /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
+    /// the edits made here since, and the product opened here since. A sub-assembly form
+    /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
+    /// <see cref="PrintProblem"/> when a rule refuses the form, with its message (shown on this screen too, for when it's
+    /// next shown): the tab then keeps what it had.
+    /// </summary>
+    public PreparedPrintout PreparePrintout()
+    {
+        if (!AreDetailsReady)
+        {
+            return default;
+        }
+
+        // With the History tab showing, the pages are the version picked there.
+        if (SelectedDetailsTab == HistoryTab)
+        {
+            return VersionHistory.SelectedRow is { } row && SelectedProduct is { } product
+                ? VersionHistory.PrintoutOf(row, product)
+                : default(PreparedPrintout);
+        }
+
+        try
+        {
+            Recipe.ApplyOpenForm();
+        }
+        catch (BusinessRuleException ex)
+        {
+            ErrorMessage = ex.Message;
+            return new PrintProblem(ex.Message);
+        }
+
+        return CurrentPrintout();
+    }
+
+    /// <summary>
+    /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
+    /// packaging and its costing, with a note when that isn't what's saved.
+    /// </summary>
+    private ProductPrintout CurrentPrintout() => new(
+        string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
+        EditingCategory?.Name ?? "Uncategorized",
+        ProductRules.StageTitle(SelectedProduct?.Stage ?? NewProductStage),
+        CostUnitCaption,
+        LastUpdatedText,
+        _detailProductId is null
+            ? ProductPrintout.NotSavedNote
+            : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
+        DateTime.Now,
+        [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), CostBasis))],
+        Packaging.LineEdits.Count > 0 || Packaging.BulkEdits.Count > 0
+            ? PrintedPackaging.From(
+                Packaging.LineEdits.Select(l => l.ToPriced()),
+                Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null,
+                Packaging.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.BulkEdits.Select(l => l.ToPriced())], Packaging.BulkQuantity))
+            : null,
+        Costing.Costs,
+        IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
+    {
+        CostBasis = CostBasis,
+    };
+
+    /// <summary>
+    /// Reads the picked product's versions for the History tab, when it shows and they aren't showing already;
+    /// <paramref name="force"/> reads them again anyway (a Save has just recorded one).
+    /// </summary>
+    private void RequestVersions(bool force = false)
+    {
+        if (SelectedDetailsTab == HistoryTab
+            && AreDetailsReady
+            && SelectedProduct is { } product
+            && product.Id == _detailProductId
+            && (force || VersionHistory.ProductId != product.Id))
+        {
+            _versionReads.OnNext(product.Id);
+        }
+    }
+
+    /// <summary>
+    /// Saves a new category and reads the categories again; null, with the reason showing, if its name is refused. Only
+    /// the categories are read: nothing else on the screen changes with a new one.
+    /// </summary>
+    private async Task<ProductCategory?> SaveNewCategoryAsync(string name)
+    {
+        var category = new ProductCategory { Name = name };
+        var validation = _categoryValidator.Validate(category);
+        if (!validation.IsValid)
+        {
+            ErrorMessage = validation.ToString(" ");
+            return null;
+        }
+
+        // AddAsync fills in the saved Id, which the copy read back is found by.
+        await _categoryRepository.AddAsync(category, CancellationToken.None);
+        await ReloadCategoriesAsync();
+        return Categories.FirstOrDefault(c => c.Id == category.Id);
+    }
+
+    /// <summary>
+    /// Reads the categories again, keeping the Category picker on the one it holds: a picker whose item gets replaced can
+    /// clear its own selection mid-merge.
+    /// </summary>
+    private async Task ReloadCategoriesAsync()
+    {
+        var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+        var editingId = EditingCategory?.Id;
+        ApplyRefresh(() =>
+        {
+            _categoryCache.MergeFrom(categories);
+            EditingCategory = Categories.FirstOrDefault(c => c.Id == editingId);
+        });
+    }
+
+    /// <summary>The Category picker took the cursor (CategoryPicker.Begin).</summary>
+    public void BeginCategoryEdit() => _categoryPicker.Begin();
+
+    /// <summary>
+    /// What's typed into the Category picker, settled as it's left (CategoryPicker.CommitAsync), as on Raw Materials: a
+    /// name that isn't a category yet is offered as a new one. Save saves the product's choice.
+    /// </summary>
+    public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
+
+    /// <summary>Nothing is recorded until a product's details have arrived, nor while the screen is being written to wholesale.</summary>
+    protected override bool CanRecordUndo => AreDetailsReady && !IsBusyApplying;
+
+    protected override string UnsavedChangesName =>
+        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim()
+            : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product");
+
+    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
+
+    /// <summary>
+    /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
+    /// product's detail again, which replaces the recipe, packaging, packs and costing wholesale, so anything staged but
+    /// unsaved goes: a section added or edited in the form included, since the form has no discard of its own. A new
+    /// product was never saved, so it goes back to being a blank one.
+    /// </summary>
+    protected override async Task RevertToSavedAsync()
+    {
+        if (SelectedProduct is not { } product)
+        {
+            // A new composite named in the list keeps its row until it's saved: put back blank, it has none.
+            List.EndNewRow();
+            StartNewProduct(_newProductInDefaultStage ? null : NewProductStage, NewProductFolderId, IsEditingComposite);
+            return;
+        }
+
+        History.Clear();
+        Recipe.CloseUsageForm();
+        Packaging.SelectedLineEdit = null;
+        Packaging.SelectedBulkEdit = null;
+        LoadIntoForm(product);
+        await LoadProductDetailAsync(product, CancellationToken.None);
+    }
+
+    /// <summary>The form as it stands: everything an undo step puts back. See ProductFormSnapshot for what's left out.</summary>
+    protected override ProductFormSnapshot CaptureSnapshot() => new()
+    {
+        EditingId = _editingId,
+        Name = EditingName,
+        Description = EditingDescription,
+        CurrentPrice = EditingCurrentPrice,
+        QuantityRequired = EditingQuantityRequired,
+        IncludesComponentPackaging = ComponentsTable.IncludesPackaging,
+        CategoryId = EditingCategory?.Id,
+        CloneName = EditingCloneName,
+        Costing = Costing.Percentages,
+        Usages = [.. Recipe.UsageEdits],
+        SelectedTab = Recipe.CaptureTabChoice(),
+        HasAddSubAssemblyTab = Recipe.RecipeTabs.Contains(Recipe.AddSubAssemblyTab),
+        PackagingLink = Packaging.LinkTarget,
+        IsPackagingMoving = Packaging.IsPackagingMoving,
+        Lines = [.. Packaging.LineEdits.Select(PackagingLineState.Of)],
+        BulkLines = [.. Packaging.BulkEdits.Select(PackagingLineState.Of)],
+        BulkQuantity = Packaging.BulkQuantity,
+        Components = ComponentsTable.Capture(),
+        IsUsageFormOpen = UsageForm.IsUsageFormOpen,
+        IsAddingUsage = UsageForm.IsAddingUsage,
+        UsageFormTitle = UsageForm.UsageFormTitle,
+        UsageMode = UsageForm.EditingUsageMode,
+        IsFormEditingLines = UsageForm.IsFormEditingLines,
+        IsFormPickingSource = UsageForm.IsFormPickingSource,
+        EditingUsageIndex = UsageForm.EditingUsage is { } editing && Recipe.UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
+        UsageRoleId = UsageForm.EditingUsageRole?.Id,
+        UsageName = UsageForm.EditingUsageName,
+        UsageSourceKey = UsageForm.EditingUsageSource?.Key,
+        FormLines = [.. UsageForm.FormLines.Select(CaptureIngredientLine)],
+        FormAddIns = [.. UsageForm.FormAddIns.Select(CaptureIngredientLine)],
+        FormFormulaBase = UsageForm.FormFormulaBase,
+        UsageAuthoredField = UsageForm.AuthoredField,
+        UsageWeightPerPiece = UsageForm.EditingUsageWeightPerPiece,
+        UsageYield = UsageForm.EditingUsageYield,
+    };
+
+    private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
+        new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
+
+    /// <summary>
+    /// Puts the whole form back as <paramref name="snapshot"/> had it. Order matters throughout, and is explained
+    /// step by step below. Every figure the writes would work out again waits for the end (_updates' batch), so the
+    /// figures are worked out once from the restored form rather than over and over from a half-restored one.
+    /// </summary>
+    /// <param name="settledThen">What Save measured against when <paramref name="snapshot"/> was taken, or null.</param>
+    protected override void RestoreSnapshot(ProductFormSnapshot snapshot, ProductFormSnapshot? settledThen)
+    {
+        // A message about a form that no longer exists would outlive what it was about.
+        ErrorMessage = null;
+
+        ApplyRestore(() => _updates.Batch(() =>
+        {
+            // 1. The form goes first. EditingUsage has to be null before the sections are replaced: the tab mirror
+            //    refills FormLines from a section that replaces the one being edited, which would undo this restore.
+            Recipe.CloseUsageForm();
+            UsageForm.SelectedFormLine = null;
+            UsageForm.SelectedFormAddIn = null;
+            Packaging.SelectedLineEdit = null;
+            Packaging.SelectedBulkEdit = null;
+            ComponentsTable.SelectedComponentEdit = null;
+
+            // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
+            _editingId = snapshot.EditingId;
+            EditingName = snapshot.Name;
+            EditingDescription = snapshot.Description;
+            EditingCurrentPrice = snapshot.CurrentPrice;
+            EditingQuantityRequired = snapshot.QuantityRequired;
+            ComponentsTable.IncludesPackaging = snapshot.IncludesComponentPackaging;
+            EditingCloneName = snapshot.CloneName;
+            _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
+            this.RaisePropertyChanged(nameof(EditingCategory));
+
+            // 3. Costing.
+            Costing.Percentages = snapshot.Costing;
+
+            // 4. Packaging. The link as saved is deliberately left alone: it's what Save compares against. Showing the
+            //    link ends a Move to Sub-Assemblies, so the move goes back after it.
+            Packaging.ShowLink(snapshot.PackagingLink);
+            Packaging.IsPackagingMoving = snapshot.IsPackagingMoving;
+            Packaging.LineEdits.Clear();
+            foreach (var line in snapshot.Lines)
+            {
+                Packaging.LineEdits.Add(RestoreLine(line));
+            }
+
+            Packaging.BulkEdits.Clear();
+            foreach (var line in snapshot.BulkLines)
+            {
+                Packaging.BulkEdits.Add(RestoreLine(line));
+            }
+
+            Packaging.BulkQuantity = snapshot.BulkQuantity;
+
+            // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
+            // read now, and prices the line when it arrives).
+            ComponentsTable.Restore(snapshot.Components);
+
+            // 5. The sections and their tabs, under the recipe's guard against applying the form the tab moves off
+            //    (ProductRecipe.RestoreSections).
+            Recipe.RestoreSections(snapshot.Usages, snapshot.HasAddSubAssemblyTab, snapshot.SelectedTab);
+
+            // 6. The form itself, last. The option lists are rebuilt before the pickers are put back, as a load does,
+            //    and RefreshLinkableOptions runs inside the guard: outside it, the source it can null would start a
+            //    load that clears the very lines being restored.
+            UsageForm.IsAddingUsage = snapshot.IsAddingUsage;
+            UsageForm.UsageFormTitle = snapshot.UsageFormTitle;
+            UsageForm.RestoreMode(snapshot.UsageMode);
+            UsageForm.IsFormEditingLines = snapshot.IsFormEditingLines;
+            UsageForm.IsFormPickingSource = snapshot.IsFormPickingSource;
+
+            Recipe.RefreshLinkableOptions();
+            Recipe.RefreshFormRoleOptions();
+
+            UsageForm.RestorePicks(
+                snapshot.UsageRoleId is { } roleId ? UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null,
+                snapshot.UsageSourceKey is { } sourceKey ? UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null,
+                snapshot.UsageName);
+
+            UsageForm.FormFormulaBase = snapshot.FormFormulaBase;
+            RestoreIngredientLines(UsageForm.FormLines, snapshot.FormLines, snapshot.FormFormulaBase);
+            RestoreIngredientLines(UsageForm.FormAddIns, snapshot.FormAddIns, snapshot.FormFormulaBase);
+            UsageForm.RestorePieceSize(snapshot.UsageAuthoredField, snapshot.UsageWeightPerPiece, snapshot.UsageYield);
+
+            UsageForm.EditingUsage = snapshot.EditingUsageIndex is { } usageIndex && usageIndex < Recipe.UsageEdits.Count
+                ? Recipe.UsageEdits[usageIndex]
+                : null;
+            UsageForm.IsUsageFormOpen = snapshot.IsUsageFormOpen;
+        }));
+
+        // 8. One pass over the restored form, after the batch. FormLinesChanged is the recipe's own "the lines
+        //    changed, bring everything into line" entry point: it raises what the form's tables show, works the
+        //    derived piece-size figure out again, and runs the single ApplyFormulaBase pass that gives every row
+        //    back its BaseWeight and BatchWeight.
+        UsageForm.RaiseKindChanged();
+        Recipe.FormLinesChanged();
+        RecomputeCosts();
+
+        // 9. What Save measures the form against goes back to where it was when the step was taken, for the form and
+        //    tabs only (WithFormOf): the step being undone may have opened another section's form (Make a Copy, Unlink),
+        //    which moved it there (RebaseSettledForm), and a restore doesn't rebase, since the form it puts back may
+        //    hold typing that isn't in the recipe yet. Taking the settled form of that moment instead keeps both
+        //    right: a form put back as it was saved is clean again, and typing put back still counts. The recipe,
+        //    costing and the rest stay as settled now, so a costing-defaults rebase since then isn't lost.
+        if (settledThen is not null)
+        {
+            History.Rebase((settled, _) => settled.WithFormOf(settledThen));
+        }
+    }
+
+    private void RestoreIngredientLines(
+        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineState> states, decimal baseWeight)
+    {
+        rows.Clear();
+        foreach (var state in states)
+        {
+            rows.Add(IngredientLineRow.Restore(
+                id => Ingredients.FirstOrDefault(m => m.Id == id),
+                baseWeight,
+                state.IngredientId,
+                state.Grams,
+                state.IsFormulaBase,
+                state.AuthoredBakersPercent));
+        }
+    }
+
+    private PackagingLineRow RestoreLine(PackagingLineState state) => PackagingLineRow.Restore(state, FindPackagingMaterial);
+
+    // What the list asks of the screen (IProductsListHost): the lists it loaded, the product the form shows, and what the
+    // list's actions do to them.
+    IReadOnlyList<Product> IProductsListHost.Products => Products;
+
+    IReadOnlyList<ProductFolder> IProductsListHost.Folders
+    {
+        get => Folders;
+        set => Folders = value;
+    }
+
+    async Task IProductsListHost.LoadAsync() => await LoadCommand.Execute();
+
+    void IProductsListHost.Pick(Product product) =>
+        PickFromList(product.Id, () => SelectedProduct = product, List.SyncTreeSelection, OpenProductAsync);
+
+    void IProductsListHost.StartNew(ProductStage? stage, int? folderId, bool isComposite) => NewProduct(stage, folderId, isComposite);
+
+    /// <summary>
+    /// The name typed into a new product's row: the form, as New left it, is saved under it, as Save saves it, with its
+    /// first version, and opened, and the row gives way to the product's own (ProductsList.EndNewRow, as it opens). Refused
+    /// (a name taken), the row stays, and why shows.
+    /// </summary>
+    async Task IProductsListHost.SaveNewAsync(string name)
+    {
+        // Not an edit of the user's: there's no undo step for it, and nothing unsaved to ask about if the save is refused.
+        ApplyRefresh(() => EditingName = name);
+        await RunSafelyAsync(SaveAsync);
+        if (_editingId == 0 && ErrorMessage is null)
+        {
+            // Save turned it down without a reason of its own (the details weren't ready yet).
+            ErrorMessage = $"{name} couldn't be saved yet. Press Enter to try again.";
+        }
+    }
+
+    void IProductsListHost.NameNew(string name) => AsUndoStep(() => EditingName = name);
+
+    void IProductsListHost.ClearNewName() => ApplyRefresh(() => EditingName = string.Empty);
+
+    void IProductsListHost.RenamedOnForm(Product product, string name)
+    {
+        if (_editingId != product.Id)
+        {
+            return;
+        }
+
+        // The Clone tab's name follows too, while it's still the one it started with.
+        var oldCloneName = $"{product.Name} Copy";
+        var newCloneName = $"{name} Copy";
+        ApplyRefresh(() =>
+        {
+            EditingName = name;
+            if (EditingCloneName == oldCloneName)
+            {
+                EditingCloneName = newCloneName;
+            }
+        });
+        History.RewriteAll(snapshot => snapshot with
+        {
+            Name = name,
+            CloneName = snapshot.CloneName == oldCloneName ? newCloneName : snapshot.CloneName,
+        });
+    }
+
+    void IProductsListHost.ShowMoved(IReadOnlyList<Product> moved)
+    {
+        if (SelectedProduct is { } selected && moved.FirstOrDefault(p => p.Id == selected.Id) is { } fresh)
+        {
+            RepointSelection(fresh);
+        }
+
+        if (moved.FirstOrDefault(p => p.Id == _editingId) is { } onForm)
+        {
+            ShowUpdatedAt(onForm.UpdatedAt);
+        }
+    }
+
+    void IProductsListHost.FolderDeleted(int folderId, int? parentId)
+    {
+        if (NewProductFolderId == folderId)
+        {
+            NewProductFolderId = parentId;
+        }
+    }
+
+    Task IProductsListHost.CloneAsync(Product product, string name) => MakeFromAsync(product.Id, name, _productCloner.CloneAsync, ClonedFrom);
+
+    Task IProductsListHost.CreateVariantAsync(Product product, string name) => MakeFromAsync(product.Id, name, _productCloner.CreateVariantAsync, VariantOf);
+
+    Task IProductsListHost.DeleteAsync(Product product) => DeleteProductAsync(product);
+
+    Task IProductsListHost.RestoreAsync(Product product) => RestoreProductAsync(product);
+
+    Task IProductsListHost.DeletePermanentlyAsync(Product product) => DeletePermanentlyAsync(product);
+
+    Task IProductsListHost.ApplyCostingDefaultsAsync(IReadOnlyList<Product> products) => ApplyCostingDefaultsAsync(products);
+
+    void IProductsListHost.Print(PrintScope scope) => _printRequests.OnNext(scope);
+
+    // What the recipe asks of the screen (IProductRecipeHost): the lists it loaded and the product's costs.
+    IReadOnlyList<RawMaterial> IProductRecipeHost.Ingredients => Ingredients;
+
+    IReadOnlyList<SubAssemblyRole> IProductRecipeHost.Roles => Roles;
+
+    IReadOnlyList<SubAssembly> IProductRecipeHost.Linkable => _linkable;
+
+    int? IProductRecipeHost.DetailProductId => _detailProductId;
+
+    void IProductRecipeHost.RecomputeCosts() => RecomputeCosts();
+
+    void IProductRecipeHost.OpenSubAssembly(int subAssemblyId) => _subAssemblyOpenRequests.OnNext(subAssemblyId);
+
+    // What the Packaging tab asks of the screen (IProductPackagingHost); its cost basis is the screen's own CostBasis.
+    IReadOnlyList<RawMaterial> IProductPackagingHost.PackagingMaterials => PackagingMaterials;
+
+    IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
+
+    void IProductPackagingHost.RecomputeCosts() => RecomputeCosts();
+
+    // What the composite's Products table asks of the screen (IProductComponentsHost); its cost basis is the screen's own.
+    IReadOnlyList<Product> IProductComponentsHost.Products => Products;
+
+    // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the screen's own CostBasis.
+    IReadOnlyList<RawMaterial> IProductUsageFormHost.Ingredients => Ingredients;
+
+    IReadOnlyList<SubAssembly> IProductUsageFormHost.Linkable => _linkable;
+
+    IEnumerable<int> IProductUsageFormHost.SectionSubAssemblyIds => Recipe.UsageEdits.Select(u => u.SubAssemblyId);
+
+    // What the History tab asks of the screen (IProductVersionHistoryHost): the product showing, the lists as last loaded,
+    // and the form a restored version goes into. Its cost basis and Packaging tab are the screen's own.
+    Product? IProductVersionHistoryHost.ProductShowing => AreDetailsReady ? SelectedProduct : null;
+
+    IReadOnlyList<Product> IProductVersionHistoryHost.Products => Products;
+
+    IReadOnlyList<RawMaterial> IProductVersionHistoryHost.Ingredients => Ingredients;
+
+    IReadOnlyList<RawMaterial> IProductVersionHistoryHost.PackagingMaterials => PackagingMaterials;
+
+    IReadOnlyList<SubAssemblyRole> IProductVersionHistoryHost.Roles => Roles;
+
+    IReadOnlySet<int> IProductVersionHistoryHost.OwnedSectionIds => Recipe.SavedOwnSectionIds;
+
+    string? IProductVersionHistoryHost.SectionLabelOf(string subAssemblyName, SubAssemblyRole? role) => Recipe.SectionLabelOf(subAssemblyName, role);
+
+    /// <summary>
+    /// A version Restore worked out (ProductVersionHistory.RestoreCommand), into the form as unsaved edits in one undo step:
+    /// its sections, packaging, products, costing, quantity required and price, over the form as it stands, so the name,
+    /// description, category and stage stay.
+    /// </summary>
+    void IProductVersionHistoryHost.ApplyVersion(RestoredVersion version) => AsUndoStep(() =>
+    {
+        // The form goes, as any restore closes it: what it held comes back with Undo.
+        Recipe.CloseUsageForm();
+        RestoreSnapshot(
+            CaptureSnapshot() with
+            {
+                CurrentPrice = version.CurrentPrice,
+                QuantityRequired = version.QuantityRequired,
+                IncludesComponentPackaging = version.IncludesComponentPackaging,
+                Costing = version.Costing,
+                Usages = version.Sections,
+                SelectedTab = version.Sections.Count > 0 ? new RecipeTabChoice.Usage(0)
+                    : version.IsComposite ? new RecipeTabChoice.Components()
+                    : new RecipeTabChoice.Packaging(),
+                HasAddSubAssemblyTab = false,
+                PackagingLink = version.PackagingLink,
+                IsPackagingMoving = false,
+                Lines = version.PackagingLines,
+                BulkLines = version.BulkLines,
+                BulkQuantity = version.BulkQuantity,
+                Components = version.Components,
+                IsUsageFormOpen = false,
+                IsAddingUsage = false,
+                EditingUsageIndex = null,
+                FormLines = [],
+                FormAddIns = [],
+            },
+            null);
+
+        // The section tab showing opens its form, as showing it would: the restore puts tabs back without opening any,
+        // and a section's tab with its form closed showed an empty form (no lines, a 0 g batch).
+        if (Recipe.SelectedRecipeTab is SubAssemblyRecipeTab { Usage: var shown })
+        {
+            Recipe.OpenUsageForm(shown);
+        }
+
+        // The form closing and opening isn't the user's change, as it isn't when a tab change does it: only the recipe,
+        // packaging, costing and price the version put back count for Save. Without this, a version the same as the
+        // saved product (one whose only difference is a linked sub-assembly's lines, kept as they are now) left Save lit.
+        Recipe.RebaseSettledForm();
+    });
 
     public void Dispose()
     {
         // A change still settling when the app closes is written now, rather than lost.
-        _closedFoldersWriter.Dispose();
-        ProductTree.Dispose();
+        List.Dispose();
 
         _productCache.Dispose();
         _categoryCache.Dispose();
@@ -887,7 +2313,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         _printRequests.Dispose();
         _versionReads.Dispose();
         _markupChecks.Dispose();
-        _noMoveRunning.Dispose();
         _picks.Dispose();
         UsageForm.Dispose();
     }

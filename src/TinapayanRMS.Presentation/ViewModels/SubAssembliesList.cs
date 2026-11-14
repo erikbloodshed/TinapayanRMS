@@ -1,23 +1,121 @@
-﻿using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using DynamicData;
 using DynamicData.Binding;
+using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
-// The list: its filter and tree, its menus and keys, moves and their Undo, naming in place, the roles as its folders,
-// and Make In-House.
-public sealed partial class SubAssembliesViewModel
+/// <summary>
+/// What the Sub-Assemblies list asks of its screen, on top of what any record screen's list asks: the sub-assembly the form
+/// shows, and what the list's actions do to it.
+/// </summary>
+public interface ISubAssembliesListHost : IRecordListHost
 {
-    /// <summary>The list's rows, filtered by the search and filed in their roles' folders.</summary>
-    [MemberNotNull(nameof(_rows), nameof(_visibleRows))]
-    private void WireList()
+    /// <summary>The sub-assembly picked, which the form shows; null for a new one.</summary>
+    StandaloneSubAssemblyRow? SelectedRow { get; }
+
+    /// <summary>The sub-assembly the form holds: 0 for a new one, or a copy, not saved yet.</summary>
+    int EditingId { get; }
+
+    /// <summary>The role the form's sub-assembly is in, which a new one's row is filed under.</summary>
+    SubAssemblyRole? EditingRole { get; }
+
+    /// <summary>Reads the screen's lists again (its LoadCommand), keeping the form and what's typed into it.</summary>
+    Task LoadAsync();
+
+    /// <summary>A sub-assembly's row picked in the list: it opens, once the form's unsaved changes are saved or let go.</summary>
+    void Pick(StandaloneSubAssemblyRow row);
+
+    /// <summary>A fresh form for a new sub-assembly in <paramref name="role"/>, or the first role.</summary>
+    void StartNew(SubAssemblyRole? role);
+
+    /// <summary>Deletes the sub-assembly once it's confirmed, as the header's Delete does.</summary>
+    Task DeleteAsync(StandaloneSubAssemblyRow row);
+
+    /// <summary>The name typed into the new sub-assembly's row goes into the form, as typed there: one undo step.</summary>
+    void NameNew(string name);
+
+    /// <summary>The new sub-assembly's row went with Esc: the name its form was given goes too, as no edit of the user's.</summary>
+    void ClearNewName();
+
+    /// <summary>The sub-assembly the form shows was renamed in the list, saved: the form and its undo steps take the name as given.</summary>
+    void RenamedOnForm(string name);
+
+    /// <summary>The sub-assembly the form shows was moved to another role, saved: the form and its undo steps take the role as given.</summary>
+    void MovedOnForm(int roleId);
+
+    /// <summary>A role was deleted: the form's undo steps forget it, so none puts back a role there's no longer any of.</summary>
+    void RoleDeleted(int roleId);
+}
+
+/// <summary>
+/// The Sub-Assemblies list (through SubAssembliesViewModel.List; SubAssemblyList draws it): the standalone sub-assemblies,
+/// searched by name and filed in a folder for each role, the rows picked, its menus and keys, moves and their Undo, naming in
+/// place, the roles as its folders, and Make In-House. What its actions do to the sub-assembly the form shows, it asks of the
+/// screen (<see cref="ISubAssembliesListHost"/>).
+/// </summary>
+public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
+{
+    /// <summary>The view state key the closed folders of the Sub-Assemblies list are kept under (IViewStateStore).</summary>
+    public const string ClosedFoldersKey = "SubAssemblies.ClosedFolders";
+
+    /// <summary>What the name box on a role's folder says when pointed at: the prompts used to say it.</summary>
+    private const string RoleHint =
+        "A role: a folder here, and a section in the recipes that use it. Its place and whether products own it are set in Settings, on the Roles tab.";
+
+    private readonly ISubAssembliesListHost _host;
+    private readonly ObservableCollection<SubAssemblyRole> _roles;
+    private readonly IReadOnlyList<RawMaterial> _ingredients;
+    private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
+    private readonly ISubAssemblyRepository _subAssemblyRepository;
+    private readonly ISubAssemblyRoleRepository _roleRepository;
+    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
+    private readonly IValidator<SubAssemblyRole> _roleValidator;
+    private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
+    private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
+    private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
+    private readonly FolderStateWriter _closedFoldersWriter;
+
+    /// <summary>The roles the sub-assemblies the last move took were in before it: what Undo on the notice puts back.</summary>
+    private IReadOnlyList<SubAssemblyMove> _moveUndo = [];
+
+    /// <param name="host">The screen, which the list asks for the sub-assembly its form shows, and what to do to it.</param>
+    /// <param name="roles">The roles as the screen last loaded them, which are the list's folders.</param>
+    /// <param name="ingredients">The ingredients as the screen last loaded them, which a made ingredient's name can't be.</param>
+    /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a made ingredient's name can't be either.</param>
+    public SubAssembliesList(
+        ISubAssembliesListHost host,
+        ObservableCollection<SubAssemblyRole> roles,
+        IReadOnlyList<RawMaterial> ingredients,
+        IReadOnlyList<RawMaterial> packagingMaterials,
+        ISubAssemblyRepository subAssemblyRepository,
+        ISubAssemblyRoleRepository roleRepository,
+        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
+        IValidator<SubAssemblyRole> roleValidator,
+        IViewStateStore viewStateStore)
     {
+        _host = host;
+        _roles = roles;
+        _ingredients = ingredients;
+        _packagingMaterials = packagingMaterials;
+        _subAssemblyRepository = subAssemblyRepository;
+        _roleRepository = roleRepository;
+        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
+        _roleValidator = roleValidator;
+
+        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
+        // for next time (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so
+        // nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
+        SubAssemblyTree = new SubAssemblyTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey));
+        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
+
         var byName = SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name);
 
         _rowCache.Connect()
@@ -37,8 +135,9 @@ public sealed partial class SubAssembliesViewModel
             .SortAndBind(out _visibleRows, byName)
             .Subscribe(_ => RefreshTree());
 
-        // Through PropertyChanged, which a role added, removed or replaced raises too, for the reason WatchForSave gives.
-        ((INotifyPropertyChanged)Roles).PropertyChanged += (_, _) => RefreshTree();
+        // Through PropertyChanged, which a role added, removed or replaced raises too, for the reason
+        // RecordFormViewModel.WatchForSave gives.
+        ((INotifyPropertyChanged)roles).PropertyChanged += (_, _) => RefreshTree();
 
         // The search decides whether empty folders show, even when it leaves the same sub-assemblies showing. A name being
         // typed into a row is given up first: the search may hide the row.
@@ -48,30 +147,15 @@ public sealed partial class SubAssembliesViewModel
         this.WhenAnyValue(x => x.SearchText)
             .Subscribe(_ => RefreshTree());
 
-        // A sub-assembly opened, by its Save included, ends the new one's row: the form no longer shows the new one.
-        this.WhenAnyValue(x => x.SelectedRow)
-            .Where(row => row is not null)
-            .Subscribe(_ => EndNewSubAssemblyRow());
-        this.WhenAnyValue(x => x.SelectedRow)
-            .Subscribe(_ => SyncTreeSelection());
-    }
-
-    /// <summary>The list's commands: moves and their Undo, its menus' New, Rename, Delete and Make In-House, and the roles.</summary>
-    [MemberNotNull(
-        nameof(MoveSubAssembliesCommand), nameof(UndoMoveCommand), nameof(NewSubAssemblyInCommand), nameof(RenameSubAssemblyCommand),
-        nameof(DeleteSubAssemblyCommand), nameof(MakeInHouseIngredientCommand), nameof(NewRoleCommand), nameof(RenameRoleCommand),
-        nameof(DeleteRoleCommand), nameof(ExpandAllCommand), nameof(CollapseAllCommand))]
-    private void WireListCommands()
-    {
         MoveSubAssembliesCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<SubAssemblyMove>>(
-            moves => RunSafelyAsync(() => MoveSubAssembliesAsync(moves, isUndo: false)));
+            moves => host.RunSafelyAsync(() => MoveSubAssembliesAsync(moves, isUndo: false)));
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), hasMoveNotice);
-        NewSubAssemblyInCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewSubAssemblyInList(
-            folder is null ? null : Roles.FirstOrDefault(r => r.Id == folder.RoleId))));
+        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => host.RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), hasMoveNotice);
+        NewSubAssemblyInCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
+            folder is null ? null : _roles.FirstOrDefault(r => r.Id == folder.RoleId))));
         RenameSubAssemblyCommand = ReactiveCommand.Create<SubAssemblyLeafNode>(BeginRenameSubAssembly);
-        DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => DeleteSubAssemblyAsync(leaf.Row));
-        MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
+        DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => host.DeleteAsync(leaf.Row));
+        MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => host.RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
         NewRoleCommand = ReactiveCommand.Create(BeginNewFolder);
         RenameRoleCommand = ReactiveCommand.Create<SubAssemblyFolderNode>(BeginRenameRole);
         DeleteRoleCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode>(DeleteRoleAsync);
@@ -79,11 +163,80 @@ public sealed partial class SubAssembliesViewModel
         CollapseAllCommand = ReactiveCommand.Create(SubAssemblyTree.CollapseAll);
     }
 
+    /// <summary>Every standalone sub-assembly, whatever the list is filtered to.</summary>
+    public ReadOnlyObservableCollection<StandaloneSubAssemblyRow> Rows => _rows;
+
+    /// <summary>The sub-assemblies the list shows: those whose name matches SearchText.</summary>
+    public ReadOnlyObservableCollection<StandaloneSubAssemblyRow> VisibleRows => _visibleRows;
+
+    /// <summary>The list's tree (SubAssemblyList draws it): VisibleRows filed in a folder for their role.</summary>
+    public SubAssemblyTree SubAssemblyTree { get; }
+
+    private string _searchText = string.Empty;
+    public string SearchText
+    {
+        get => _searchText;
+        set => this.RaiseAndSetIfChanged(ref _searchText, value);
+    }
+
+    /// <summary>The sub-assemblies picked in the list, in the order they were picked.</summary>
+    public IReadOnlyList<SubAssemblyLeafNode> SelectedTreeSubAssemblies => [.. SelectedTreeNodes.OfType<SubAssemblyLeafNode>().Where(l => !l.IsNew)];
+
+    /// <summary>Gives sub-assemblies another role, saved at once: a drag in the list, or its menu's Move To.</summary>
+    public ReactiveCommand<IReadOnlyList<SubAssemblyMove>, RxVoid> MoveSubAssembliesCommand { get; }
+
+    /// <summary>Puts back the roles the last move took the sub-assemblies from (the notice bar's Undo).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+
+    /// <summary>
+    /// The list's New … Here: a new sub-assembly in the folder's role. With no folder (the list's empty space), as New
+    /// starts one. Like New, it adds the sub-assembly's row to the list for its name to be typed into (TreeNameEdit).
+    /// </summary>
+    public ReactiveCommand<SubAssemblyFolderNode?, RxVoid> NewSubAssemblyInCommand { get; }
+
+    /// <summary>The list's Rename: the sub-assembly's name becomes a box to type into, in place, and the name typed is saved at once.</summary>
+    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> RenameSubAssemblyCommand { get; }
+
+    /// <summary>The list's Delete, as the header's: asks first.</summary>
+    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> DeleteSubAssemblyCommand { get; }
+
+    /// <summary>
+    /// Make In-House Ingredient on a recipe of the list: asks for the made ingredient's name and Made category, then adds
+    /// that ingredient, made from the recipe, at once. The recipe stays as it is.
+    /// </summary>
+    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> MakeInHouseIngredientCommand { get; }
+
+    /// <summary>
+    /// Input: Make In-House Ingredient's prompt (MadeIngredientPrompt), its name box starting with the sub-assembly's name. Output:
+    /// the name typed and the Made category picked, or null if it was cancelled. The page answers it with a dialog with a
+    /// picker (Prompts).
+    /// </summary>
+    public Interaction<ChoicePromptRequest, ChoicePromptResult?> PromptForMadeIngredient { get; } = new();
+
+    /// <summary>
+    /// The list's New Folder: a "New folder" row for its name to be typed into (TreeNameEdit), and the name typed adds a
+    /// role after the others, as Settings → Roles adds one.
+    /// </summary>
+    public ReactiveCommand<RxVoid, RxVoid> NewRoleCommand { get; }
+
+    /// <summary>The list's Rename Role, typed in place, which keeps the role's place and whether products own it.</summary>
+    public ReactiveCommand<SubAssemblyFolderNode, RxVoid> RenameRoleCommand { get; }
+
+    /// <summary>The list's Delete Role, offered only for a role no sub-assembly in the list is in, and never the Packaging role.</summary>
+    public ReactiveCommand<SubAssemblyFolderNode, RxVoid> DeleteRoleCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> ExpandAllCommand { get; }
+
+    public ReactiveCommand<RxVoid, RxVoid> CollapseAllCommand { get; }
+
+    /// <summary>The sub-assemblies as a load read them, merged into the list: rows whose values haven't changed stay as they are.</summary>
+    public void TakeRows(IEnumerable<StandaloneSubAssemblyRow> rows) => _rowCache.MergeFrom(rows);
+
     private void RefreshTree()
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its sub-assembly the one picked.
-        ListSelection.Quietly(() => SubAssemblyTree.Refresh(Roles, VisibleRows, isFiltered: SearchText.Trim().Length > 0));
+        ListSelection.Quietly(() => SubAssemblyTree.Refresh(_roles, VisibleRows, isFiltered: SearchText.Trim().Length > 0));
 
         // A folder picked stays picked. Otherwise the row goes back to the sub-assembly picked: one moved to another folder
         // leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
@@ -93,16 +246,16 @@ public sealed partial class SubAssembliesViewModel
         }
     }
 
-    protected override object? ShowingRow => SelectedRow is { } row ? SubAssemblyTree.Find(row.Id) : SubAssemblyTree.PendingSubAssembly;
+    protected override object? ShowingRow => _host.SelectedRow is { } row ? SubAssemblyTree.Find(row.Id) : SubAssemblyTree.PendingSubAssembly;
 
     protected override string PickedRecordsProperty => nameof(SelectedTreeSubAssemblies);
 
     // A sub-assembly's row picks it; the new sub-assembly's row is the form's already.
     protected override void PickRowFromList(object row)
     {
-        if (row is SubAssemblyLeafNode { IsNew: false } leaf && leaf.Row.Id != SelectedRow?.Id)
+        if (row is SubAssemblyLeafNode { IsNew: false } leaf && leaf.Row.Id != _host.SelectedRow?.Id)
         {
-            PickFromList(leaf.Row.Id, () => SelectedRow = leaf.Row, SyncTreeSelection, OpenSubAssemblyAsync);
+            _host.Pick(leaf.Row);
         }
     }
 
@@ -129,11 +282,10 @@ public sealed partial class SubAssembliesViewModel
         await _subAssemblyRepository.MoveAsync(moves, CancellationToken.None);
 
         // The load only re-points the selection at the fresh copy: the form isn't loaded again, so what's typed stays.
-        await LoadCommand.Execute();
-        if (moves.FirstOrDefault(m => m.SubAssemblyId == _editingId) is { } onForm)
+        await _host.LoadAsync();
+        if (moves.FirstOrDefault(m => m.SubAssemblyId == _host.EditingId) is { } onForm)
         {
-            ApplyRefresh(() => EditingRole = Roles.FirstOrDefault(r => r.Id == onForm.RoleId));
-            History.RewriteAll(snapshot => snapshot with { RoleId = onForm.RoleId });
+            _host.MovedOnForm(onForm.RoleId);
         }
 
         // Picks again the rows the tree dropped from its selection as they moved.
@@ -151,7 +303,7 @@ public sealed partial class SubAssembliesViewModel
     {
         var what = moves.Count == 1 && _rowCache.Lookup(moves[0].SubAssemblyId) is { HasValue: true } one ? one.Value.Name : $"{moves.Count} sub-assemblies";
         var roleId = moves[0].RoleId;
-        return moves.All(m => m.RoleId == roleId) && Roles.FirstOrDefault(r => r.Id == roleId) is { } role
+        return moves.All(m => m.RoleId == roleId) && _roles.FirstOrDefault(r => r.Id == roleId) is { } role
             ? $"Moved {what} to {role.Name}"
             : $"Moved {what}";
     }
@@ -215,7 +367,7 @@ public sealed partial class SubAssembliesViewModel
         {
             List<TreeMenuItem> roles =
             [
-                .. Roles.Where(r => !r.IsPackaging).Select(r =>
+                .. _roles.Where(r => !r.IsPackaging).Select(r =>
                 {
                     var moves = SubAssemblyTree.MovesTo(r, subAssemblies);
                     return new TreeMenuItem(r.Name, MoveSubAssembliesCommand, moves) { IsEnabled = moves.Count > 0 };
@@ -296,17 +448,17 @@ public sealed partial class SubAssembliesViewModel
     /// </summary>
     private async Task MakeInHouseIngredientAsync(StandaloneSubAssemblyRow row)
     {
-        ErrorMessage = null;
-        if (_editingId == row.Id && History.IsDirty)
+        _host.ShowError(null);
+        if (_host.EditingId == row.Id && _host.IsDirty)
         {
-            ErrorMessage = $"Save {row.Name} first, or undo its changes: the made ingredient is made from it as it's saved.";
+            _host.ShowError($"Save {row.Name} first, or undo its changes: the made ingredient is made from it as it's saved.");
             return;
         }
 
         var categories = await MadeIngredientPrompt.MadeCategoriesAsync(_rawMaterialCategoryRepository);
         if (categories.Count == 0)
         {
-            ErrorMessage = MadeIngredientPrompt.NoMadeCategoryMessage;
+            _host.ShowError(MadeIngredientPrompt.NoMadeCategoryMessage);
             return;
         }
 
@@ -321,17 +473,17 @@ public sealed partial class SubAssembliesViewModel
         }
 
         var name = answer.Text.Trim();
-        if (Ingredients.Concat(PackagingMaterials).Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (_ingredients.Concat(_packagingMaterials).Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            ErrorMessage = MadeIngredientPrompt.NameTakenMessage(name);
+            _host.ShowError(MadeIngredientPrompt.NameTakenMessage(name));
             return;
         }
 
         var category = categories[answer.Choice];
         await _subAssemblyRepository.AddMadeIngredientAsync(row.Id, new MadeIngredientDraft(name, category.Id), CancellationToken.None);
 
-        await LoadCommand.Execute();
-        SuccessMessage = $"{name} was added to {category.Name}, made from {row.Name}.";
+        await _host.LoadAsync();
+        _host.ShowSuccess($"{name} was added to {category.Name}, made from {row.Name}.");
     }
 
     /// <summary>
@@ -355,7 +507,7 @@ public sealed partial class SubAssembliesViewModel
     /// </summary>
     private void BeginRenameRole(SubAssemblyFolderNode folder)
     {
-        if (Roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role)
+        if (_roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role)
         {
             return;
         }
@@ -366,7 +518,8 @@ public sealed partial class SubAssembliesViewModel
 
     /// <summary>
     /// The list's New Folder: a "New folder" row after the roles, picked, with its name ready to be typed, as in a file
-    /// explorer; the name typed adds a role (<see cref="CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
+    /// explorer; the name typed adds a role (<see cref="RecordList.CommitTreeNameAsync"/>). The search is cleared first, so
+    /// the row shows.
     /// </summary>
     private void BeginNewFolder() => BeginNewFolderWith(SubAssemblyFolderNode.NewFolderTitle);
 
@@ -377,22 +530,19 @@ public sealed partial class SubAssembliesViewModel
         ListNaming.Start(SubAssemblyTree.BeginNewFolder(), text, RoleHint);
     }
 
-    /// <summary>What the name box on a role's folder says when pointed at: the prompts used to say it.</summary>
-    private const string RoleHint =
-        "A role: a folder here, and a section in the recipes that use it. Its place and whether products own it are set in Settings, on the Roles tab.";
-
     /// <summary>
-    /// New and New … Here: <see cref="StartNewSubAssembly"/>, and the new sub-assembly's row in its role's folder, picked,
-    /// with its name ready to be typed, as a new file in a file explorer. The name typed goes into the form
-    /// (<see cref="CommitTreeNameAsync"/>), and the row stays until Save files the sub-assembly or the form leaves it. The
-    /// search is cleared first, so the row shows. With no role to put it in (none yet), the form starts as before.
+    /// New and New … Here: a fresh form for a new sub-assembly (<see cref="ISubAssembliesListHost.StartNew"/>), and its row
+    /// in its role's folder, picked, with its name ready to be typed, as a new file in a file explorer. The name typed goes
+    /// into the form (<see cref="RecordList.CommitTreeNameAsync"/>), and the row stays until Save files the sub-assembly or
+    /// the form leaves it. The search is cleared first, so the row shows. With no role to put it in (none yet), the form
+    /// starts as before.
     /// </summary>
-    private void NewSubAssemblyInList(SubAssemblyRole? role = null)
+    public void NewInList(SubAssemblyRole? role = null)
     {
         CancelTreeName();
         SearchText = string.Empty;
-        StartNewSubAssembly(role);
-        if (EditingRole is not { } inRole)
+        _host.StartNew(role);
+        if (_host.EditingRole is not { } inRole)
         {
             return;
         }
@@ -405,20 +555,19 @@ public sealed partial class SubAssembliesViewModel
     }
 
     /// <summary>
-    /// Takes the new sub-assembly's row out of the list (<see cref="NewSubAssemblyInList"/>), and the rows picked, and stops
-    /// the naming in it: the form no longer shows the new sub-assembly, or it's saved and has a row of its own. The form is
-    /// left as it is.
+    /// Takes the new sub-assembly's row out of the list (<see cref="NewInList"/>), and the rows picked, and stops the naming
+    /// in it: the form no longer shows the new sub-assembly, or it's saved and has a row of its own. The form is left as it is.
     /// </summary>
-    private void EndNewSubAssemblyRow() => ListNaming.EndNewRow(SubAssemblyTree.PendingSubAssembly, SubAssemblyTree.EndNewSubAssembly);
+    public void EndNewRow() => ListNaming.EndNewRow(SubAssemblyTree.PendingSubAssembly, SubAssemblyTree.EndNewSubAssembly);
 
     /// <summary>Whether a row of the list is a new sub-assembly's or a new folder's, still to be named.</summary>
     protected override bool IsNewRow(object node) => node is SubAssemblyLeafNode { IsNew: true } or SubAssemblyFolderNode { IsNewFolder: true };
 
     /// <summary>
-    /// What a name typed into the list's box does (<see cref="ListFormViewModel{TSnapshot}.CommitTreeNameAsync"/>), once
-    /// it's taken for one. A sub-assembly's or a role's is renamed at once; a new folder's adds a role after the others, or
-    /// picks the one of that name already; a new sub-assembly's goes into the form, as typed there, and its row takes it: it
-    /// needs a line before Save can file it.
+    /// What a name typed into the list's box does (<see cref="RecordList.CommitTreeNameAsync"/>), once it's taken for one. A
+    /// sub-assembly's or a role's is renamed at once; a new folder's adds a role after the others, or picks the one of that
+    /// name already; a new sub-assembly's goes into the form, as typed there, and its row takes it: it needs a line before
+    /// Save can file it.
     /// </summary>
     protected override async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
@@ -429,8 +578,8 @@ public sealed partial class SubAssembliesViewModel
                 break;
 
             case SubAssemblyLeafNode leaf:
-                await RunSafelyAsync(() => RenameSubAssemblyToAsync(leaf.Row, name));
-                if (ErrorMessage is not null && SubAssemblyTree.Find(leaf.Row.Id) is { } stillListed)
+                await _host.RunSafelyAsync(() => RenameSubAssemblyToAsync(leaf.Row, name));
+                if (_host.ErrorMessage is not null && SubAssemblyTree.Find(leaf.Row.Id) is { } stillListed)
                 {
                     ListNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
@@ -439,8 +588,8 @@ public sealed partial class SubAssembliesViewModel
 
             case SubAssemblyFolderNode { IsNewFolder: true } folder:
                 ListNaming.EndNewRow(folder, SubAssemblyTree.EndNewFolder);
-                await RunSafelyAsync(() => AddRoleAsync(name));
-                if (ErrorMessage is not null)
+                await _host.RunSafelyAsync(() => AddRoleAsync(name));
+                if (_host.ErrorMessage is not null)
                 {
                     BeginNewFolderWith(text);
                 }
@@ -448,8 +597,8 @@ public sealed partial class SubAssembliesViewModel
                 break;
 
             case SubAssemblyFolderNode folder:
-                await RunSafelyAsync(() => RenameRoleToAsync(folder, name));
-                if (ErrorMessage is not null && Roles.Any(r => r.Id == folder.RoleId))
+                await _host.RunSafelyAsync(() => RenameRoleToAsync(folder, name));
+                if (_host.ErrorMessage is not null && _roles.Any(r => r.Id == folder.RoleId))
                 {
                     ListNaming.Edit = edit with { InitialText = text };
                 }
@@ -459,17 +608,16 @@ public sealed partial class SubAssembliesViewModel
     }
 
     /// <summary>
-    /// What Esc does to the row named (<see cref="ListFormViewModel{TSnapshot}.CancelTreeName"/>), once its box is closed:
-    /// a new sub-assembly's or folder's row goes, with nothing saved. The form stays on the new sub-assembly, blank, as New
-    /// leaves it.
+    /// What Esc does to the row named (<see cref="RecordList.CancelTreeName"/>), once its box is closed: a new sub-assembly's
+    /// or folder's row goes, with nothing saved. The form stays on the new sub-assembly, blank, as New leaves it.
     /// </summary>
     protected override void TreeNameCancelled(object node)
     {
         switch (node)
         {
             case SubAssemblyLeafNode { IsNew: true }:
-                EndNewSubAssemblyRow();
-                ApplyRefresh(() => EditingName = string.Empty);
+                EndNewRow();
+                _host.ClearNewName();
                 break;
             case SubAssemblyFolderNode { IsNewFolder: true } folder:
                 ListNaming.EndNewRow(folder, SubAssemblyTree.EndNewFolder);
@@ -483,7 +631,7 @@ public sealed partial class SubAssembliesViewModel
     /// </summary>
     private void NameNewSubAssembly(SubAssemblyLeafNode row, string name)
     {
-        AsUndoStep(() => EditingName = name);
+        _host.NameNew(name);
         var subAssembly = row.SubAssembly;
         row.Row = new StandaloneSubAssemblyRow(new SubAssembly { Name = name, RoleId = subAssembly.RoleId, Role = subAssembly.Role }, []);
     }
@@ -496,12 +644,10 @@ public sealed partial class SubAssembliesViewModel
     private async Task RenameSubAssemblyToAsync(StandaloneSubAssemblyRow row, string name)
     {
         await _subAssemblyRepository.RenameAsync(row.Id, name, CancellationToken.None);
-        await LoadCommand.Execute();
-        if (_editingId == row.Id)
+        await _host.LoadAsync();
+        if (_host.EditingId == row.Id)
         {
-            HeaderTitle = name;
-            ApplyRefresh(() => EditingName = name);
-            History.RewriteAll(snapshot => snapshot with { Name = name });
+            _host.RenamedOnForm(name);
         }
     }
 
@@ -511,21 +657,21 @@ public sealed partial class SubAssembliesViewModel
     /// </summary>
     private async Task AddRoleAsync(string name)
     {
-        var role = Roles.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
+        var role = _roles.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
         if (role is null)
         {
             var added = new SubAssemblyRole { Name = name };
             var validation = _roleValidator.Validate(added);
             if (!validation.IsValid)
             {
-                ErrorMessage = validation.ToString(" ");
+                _host.ShowError(validation.ToString(" "));
                 return;
             }
 
             // AddAsync fills in the saved Id, which the copy read back is found by.
             await _roleRepository.AddAsync(added, CancellationToken.None);
-            await LoadCommand.Execute();
-            role = Roles.FirstOrDefault(r => r.Id == added.Id);
+            await _host.LoadAsync();
+            role = _roles.FirstOrDefault(r => r.Id == added.Id);
         }
 
         if (role is not null && SubAssemblyTree.Folder(role.Id) is { } folder && SubAssemblyTree.Roots.Contains(folder))
@@ -537,7 +683,7 @@ public sealed partial class SubAssembliesViewModel
     /// <summary>Renames the folder's role to <paramref name="name"/>, keeping its place and whether products own it. A name refused shows why.</summary>
     private async Task RenameRoleToAsync(SubAssemblyFolderNode folder, string name)
     {
-        if (Roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role)
+        if (_roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role)
         {
             return;
         }
@@ -553,14 +699,14 @@ public sealed partial class SubAssembliesViewModel
         var validation = _roleValidator.Validate(renamed);
         if (!validation.IsValid)
         {
-            ErrorMessage = validation.ToString(" ");
+            _host.ShowError(validation.ToString(" "));
             return;
         }
 
         // Everything is read again, the sub-assemblies with it, which carry their role's name. The Role picker keeps the
-        // role it holds (LoadCommand), under its new name.
+        // role it holds (the screen's LoadCommand), under its new name.
         await _roleRepository.UpdateAsync(renamed, CancellationToken.None);
-        await LoadCommand.Execute();
+        await _host.LoadAsync();
     }
 
     /// <summary>
@@ -570,14 +716,14 @@ public sealed partial class SubAssembliesViewModel
     /// </summary>
     private Task DeleteRoleAsync(SubAssemblyFolderNode folder)
     {
-        if (Roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role
+        if (_roles.FirstOrDefault(r => r.Id == folder.RoleId) is not { } role
             || role.IsPackaging
             || Rows.Any(r => r.SubAssembly.RoleId == role.Id))
         {
             return Task.CompletedTask;
         }
 
-        return RunWithConfirmationAsync(
+        return _host.RunWithConfirmationAsync(
             $"Delete the '{role.Name}' role? It holds no sub-assemblies here. This can't be undone.",
             async () =>
             {
@@ -585,8 +731,16 @@ public sealed partial class SubAssembliesViewModel
 
                 // A new sub-assembly's form may have had it picked: the undo steps forget it, so none puts back a role
                 // there's no longer any of to save.
-                await LoadCommand.Execute();
-                History.RewriteAll(snapshot => snapshot.RoleId == role.Id ? snapshot with { RoleId = null } : snapshot);
+                await _host.LoadAsync();
+                _host.RoleDeleted(role.Id);
             });
+    }
+
+    public void Dispose()
+    {
+        // A change still settling when the app closes is written now, rather than lost.
+        _closedFoldersWriter.Dispose();
+        SubAssemblyTree.Dispose();
+        _rowCache.Dispose();
     }
 }

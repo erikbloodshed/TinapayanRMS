@@ -40,7 +40,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Title.Should().Be("Production › Breads");
@@ -56,11 +56,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.StageFolder(ProductStage.Production)));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Production)));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf");
 
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.StageFolder(ProductStage.Innovation)));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Innovation)));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Title.Should().Be("Innovation");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
@@ -87,8 +87,8 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(cakes.Id)!));
 
         tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Production › Cakes", "All products");
         tab.SelectedScope.Label.Should().Be("Production › Cakes");
@@ -97,7 +97,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var chosen = tab.SelectedScope;
         var changes = 0;
         tab.PropertyChanged += (_, e) => changes += e.PropertyName == nameof(PrintTabViewModel.SelectedScope) ? 1 : 0;
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(cakes.Id)!));
         tab.SelectedScope.Should().BeSameAs(chosen);
         tab.Scopes.Should().HaveCount(3);
         changes.Should().Be(0);
@@ -109,7 +109,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var (breads, _) = await AddCatalogueAsync();
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
 
         var holiday = new ProductFolder { Name = "Holiday", Stage = ProductStage.Production, ParentId = breads.Id };
         await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(holiday, Cancellation);
@@ -141,7 +141,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.Execute();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Bibingka", "Cheese Roll", "Pan de Coco"], "Bibingka is in Breads › Holiday");
 
@@ -157,7 +157,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var (_, cakes) = await AddCatalogueAsync();
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
-        tab.Pick(PrintScope.Folder.Of(products.ProductTree.Folder(cakes.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(cakes.Id)!));
 
         // Its products go with it (ProductFolderRepository.MoveAsync).
         await new ProductFolderRepository(CreateDbContextFactory()).MoveAsync(new ProductFolderMove(cakes.Id, ProductStage.Innovation, null), Cancellation);
@@ -208,7 +208,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             []));
         await AddBoxAsync(productId);
         await SetCostingAsync(productId);
-        var products = await OpenProductsAsync("Ube Roll", vm => vm.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
+        var products = await OpenProductsAsync("Ube Roll", vm => vm.Recipe.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
 
         var screen = products.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
         var saved = (await CreateReader().ReadAsync(products.SelectedProduct!, Cancellation)).ToPrintout(screen.PrintedAt);
@@ -225,7 +225,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
         await AddBoxAsync(productId, unbufferedCost: 25m);
         await SetCostingAsync(productId);
-        var products = await OpenProductsAsync("Ensaymada", vm => vm.UsageEdits.Count == 1 && vm.Packaging.LineEdits.Count > 0);
+        var products = await OpenProductsAsync("Ensaymada", vm => vm.Recipe.UsageEdits.Count == 1 && vm.Packaging.LineEdits.Count > 0);
         await products.ToggleCostBasisCommand.Execute();
         var tab = CreatePrintTab(products);
 
@@ -364,7 +364,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == productName);
             await Settle.UntilAsync(viewModel,
                 () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? true),
-                () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}");
+                () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.Recipe.UsageEdits.Count}");
         }
 
         return viewModel;

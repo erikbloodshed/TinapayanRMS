@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+using System.Collections.ObjectModel;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using DynamicData;
@@ -9,41 +9,130 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
-// The list: its tree, search, menus, moves, naming in place and categories, and the pickers' lists.
-public sealed partial class RawMaterialsViewModel
+/// <summary>
+/// What the Raw Materials list asks of its screen, on top of what any record screen's list asks: the material the form
+/// shows, and what the list's actions do to it.
+/// </summary>
+public interface IRawMaterialsListHost : IRecordListHost
 {
+    /// <summary>The material picked, which the form shows; null for a new one.</summary>
+    RawMaterial? SelectedRawMaterial { get; }
+
+    /// <summary>The material the form holds: 0 for a new one not saved yet.</summary>
+    int EditingId { get; }
+
+    /// <summary>The category the form's material is in, which a new one's row is filed under.</summary>
+    RawMaterialCategory? EditingCategory { get; }
+
+    /// <summary>Reads the screen's lists again (its LoadCommand), keeping the form and what's typed into it.</summary>
+    Task LoadAsync();
+
+    /// <summary>A material's row picked in the list: it opens, once the form's unsaved changes are saved or let go.</summary>
+    void Pick(RawMaterial material);
+
+    /// <summary>A fresh form for a new material of <paramref name="type"/>, in <paramref name="categoryId"/>, made or purchased as <paramref name="source"/> says.</summary>
+    void StartNew(RawMaterialType type, int? categoryId, RawMaterialSource source);
+
+    /// <summary>A fresh form for a copy of <paramref name="material"/>: its type, category and base unit, named "… Copy".</summary>
+    void StartCopyOf(RawMaterial material);
+
+    /// <summary>Deletes the material once it's confirmed, as the header's Delete does.</summary>
+    Task DeleteAsync(RawMaterial material);
+
+    /// <summary>The name typed into the new material's row goes into the form, as typed there: one undo step.</summary>
+    void NameNew(string name);
+
+    /// <summary>The new material's row went with Esc: the name its form was given goes too, as no edit of the user's.</summary>
+    void ClearNewName();
+
+    /// <summary>The material the form shows was renamed in the list, saved: the form and its undo steps take the name as given.</summary>
+    void RenamedOnForm(string name);
+
+    /// <summary>The material the form shows was moved to another category, saved: the form and its undo steps take it as given.</summary>
+    void MovedOnForm(int categoryId);
+
+    /// <summary>A category was deleted: the form's undo steps forget it, so none puts back a category there's no longer any of.</summary>
+    void CategoryDeleted(int categoryId);
+}
+
+/// <summary>
+/// The Raw Materials list (through RawMaterialsViewModel.List; MaterialList draws it): the materials, searched by name and
+/// filed in a folder for their type, then their category; the rows picked, its menus and keys, moves and their Undo, naming
+/// in place, and the categories as its folders. The materials and categories are the screen's, which its form's pickers
+/// read too; what the list's actions do to the material the form shows, it asks of the screen
+/// (<see cref="IRawMaterialsListHost"/>).
+/// </summary>
+public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
+{
+    /// <summary>The view state key the closed folders of the Raw Materials list are kept under (IViewStateStore).</summary>
+    public const string ClosedFoldersKey = "RawMaterials.ClosedFolders";
+
     /// <summary>
-    /// The list's tree follows the materials, the categories and the search, and its selection the material showing;
-    /// the pickers' lists follow the materials too.
+    /// The view state key the list kept its open folders under, before it kept the closed ones: read while there are no
+    /// closed ones kept, so the list opens as it was left (FolderMemory.Read).
     /// </summary>
-    [MemberNotNull(
-        nameof(_categories), nameof(_rawMaterials), nameof(_visibleRawMaterials), nameof(_ingredients),
-        nameof(_linkTargets), nameof(_addInOptions), nameof(_categoryOptions))]
-    private void WireLists()
+    public const string OpenFoldersKey = "RawMaterials.OpenFolders";
+
+    private readonly IRawMaterialsListHost _host;
+    private readonly SourceCache<RawMaterial, int> _rawMaterialCache;
+    private readonly ReadOnlyObservableCollection<RawMaterial> _rawMaterials;
+    private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
+    private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
+    private readonly IRawMaterialRepository _rawMaterialRepository;
+    private readonly IRawMaterialCategoryRepository _categoryRepository;
+    private readonly IValidator<RawMaterialCategory> _categoryValidator;
+    private readonly FolderStateWriter _closedFoldersWriter;
+
+    /// <summary>Where the materials the last move took were before it: what Undo on the notice puts back.</summary>
+    private IReadOnlyList<RawMaterialMove> _moveUndo = [];
+
+    /// <param name="host">The screen, which the list asks for the material its form shows, and what to do to it.</param>
+    /// <param name="rawMaterialCache">The screen's materials, which the list searches and moves.</param>
+    /// <param name="categoryCache">The screen's categories, whose changes the list's folders follow.</param>
+    /// <param name="rawMaterials">Every material, by name, as the screen binds them.</param>
+    /// <param name="categories">Every category, by name, as the screen binds them: the list's folders.</param>
+    public RawMaterialsList(
+        IRawMaterialsListHost host,
+        SourceCache<RawMaterial, int> rawMaterialCache,
+        SourceCache<RawMaterialCategory, int> categoryCache,
+        ReadOnlyObservableCollection<RawMaterial> rawMaterials,
+        ReadOnlyObservableCollection<RawMaterialCategory> categories,
+        IRawMaterialRepository rawMaterialRepository,
+        IRawMaterialCategoryRepository categoryRepository,
+        IValidator<RawMaterialCategory> categoryValidator,
+        IViewStateStore viewStateStore)
     {
-        var byName = SortExpressionComparer<RawMaterial>.Ascending(m => m.Name);
+        _host = host;
+        _rawMaterialCache = rawMaterialCache;
+        _rawMaterials = rawMaterials;
+        _categories = categories;
+        _rawMaterialRepository = rawMaterialRepository;
+        _categoryRepository = categoryRepository;
+        _categoryValidator = categoryValidator;
 
-        // The list's tree follows both lists once each change has reached them: a material added, removed, renamed, moved
-        // or filtered out, and a category added, renamed or deleted. The categories are bound first, as the tree reads both.
-        _categoryCache.Connect()
-            .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
+        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
+        // for next time (FolderStateWriter), as on the Products screen; Dispose writes any change still waiting.
+        RawMaterialTree = new RawMaterialTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey, OpenFoldersKey));
+        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, RawMaterialTree.ExpansionChanged, RawMaterialTree.ClosedFolderKeys);
+
+        // The list's tree follows both lists once each change has reached them: a category added, renamed or deleted (the
+        // screen binds the categories first, so the tree reads them changed), and a material added, removed, renamed,
+        // moved or filtered out.
+        categoryCache.Connect()
             .Subscribe(_ => RefreshTree());
-
-        _rawMaterialCache.Connect()
-            .SortAndBind(out _rawMaterials, byName)
-            .Subscribe();
 
         var nameFilter = this.WhenAnyValue(x => x.SearchText)
             .Select(text => text.Trim())
             .DistinctUntilChanged()
             .Select(text => (Func<RawMaterial, bool>)(m => text.Length == 0 || m.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
 
-        _rawMaterialCache.Connect()
+        rawMaterialCache.Connect()
             .Filter(nameFilter)
-            .SortAndBind(out _visibleRawMaterials, byName)
+            .SortAndBind(out _visibleRawMaterials, SortExpressionComparer<RawMaterial>.Ascending(m => m.Name))
             .Subscribe(_ => RefreshTree());
 
         // The search decides whether empty folders show, even when it leaves the same materials showing. A name being typed
@@ -54,68 +143,17 @@ public sealed partial class RawMaterialsViewModel
         this.WhenAnyValue(x => x.SearchText)
             .Subscribe(_ => RefreshTree());
 
-        // A material opened, by its Save included, ends the new material's row: the form no longer shows the new one.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(material => material is not null)
-            .Subscribe(_ => EndNewMaterialRow());
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Subscribe(_ => SyncTreeSelection());
-
-        _rawMaterialCache.Connect()
-            .Filter(m => m.Type == RawMaterialType.Ingredient)
-            .SortAndBind(out _ingredients, byName)
-            .Subscribe();
-
-        // Shared by every picker that must leave out the ingredient being edited: Linked's target and an add-in.
-        var notTheSelection = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(selected => selected?.Id ?? 0)
-            .DistinctUntilChanged()
-            .Select(selectedId => (Func<RawMaterial, bool>)(m => m.Type == RawMaterialType.Ingredient && m.Id != selectedId));
-
-        _rawMaterialCache.Connect()
-            .Filter(notTheSelection)
-            .SortAndBind(out _linkTargets, byName)
-            .Subscribe();
-
-        _rawMaterialCache.Connect()
-            .Filter(notTheSelection)
-            .SortAndBind(out _addInOptions, byName)
-            .Subscribe();
-
-        // The picker offers only the categories of the material's own type, which is all it can be saved in: a made
-        // ingredient's are the Made ones (RawMaterialRules.CategoryTypeFor).
-        var categoryType = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource, RawMaterialRules.CategoryTypeFor);
-        _categoryCache.Connect()
-            .Filter(categoryType.Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
-            .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
-            .Subscribe();
-
-        // A new material's type or source changed under a category of another type: that category is no longer one it can
-        // go in. Only a new one's: a saved material's are fixed, and loading one sets its category before its source.
-        categoryType
-            .Where(type => CanChangeTypeAndSource && EditingCategory is { } category && category.Type != type)
-            .Subscribe(_ => EditingCategory = null);
-    }
-
-    /// <summary>The list's commands, each run on the folder or material its menu was opened on (TreeMenuFor).</summary>
-    [MemberNotNull(
-        nameof(MoveMaterialsCommand), nameof(UndoMoveCommand),
-        nameof(NewMaterialInCommand), nameof(RenameMaterialCommand), nameof(CopyMaterialCommand),
-        nameof(DeleteMaterialCommand), nameof(NewCategoryCommand), nameof(RenameCategoryCommand),
-        nameof(DeleteCategoryCommand), nameof(ExpandAllCommand), nameof(CollapseAllCommand))]
-    private void WireListCommands()
-    {
         MoveMaterialsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<RawMaterialMove>>(
-            moves => RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
+            moves => host.RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
         var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
-        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => AfterUnsavedChangesAsync(() => NewMaterialInList(
+        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => host.RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
+        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
             folder?.Type ?? RawMaterialType.Ingredient,
             folder?.CategoryId,
             folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
         RenameMaterialCommand = ReactiveCommand.Create<RawMaterialLeafNode>(BeginRenameMaterial);
-        CopyMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => AfterUnsavedChangesAsync(() => StartCopyOf(leaf.RawMaterial)));
-        DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => DeleteRawMaterialAsync(leaf.RawMaterial));
+        CopyMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => host.AfterUnsavedChangesAsync(() => host.StartCopyOf(leaf.RawMaterial)));
+        DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => host.DeleteAsync(leaf.RawMaterial));
         NewCategoryCommand = ReactiveCommand.Create<RawMaterialCategoryType>(BeginNewFolder);
         RenameCategoryCommand = ReactiveCommand.Create<RawMaterialFolderNode>(BeginRenameCategory);
         DeleteCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(DeleteCategoryAsync);
@@ -123,40 +161,70 @@ public sealed partial class RawMaterialsViewModel
         CollapseAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.CollapseAll);
     }
 
-    /// <summary>The Category picker took the cursor (CategoryPicker.Begin).</summary>
-    public void BeginCategoryEdit() => _categoryPicker.Begin();
+    /// <summary>The materials the list shows: those whose name matches SearchText.</summary>
+    public ReadOnlyObservableCollection<RawMaterial> VisibleRawMaterials => _visibleRawMaterials;
 
-    /// <summary>
-    /// What's typed into the Category picker, settled as it's left (CategoryPicker.CommitAsync): a name that isn't one of
-    /// the material type's categories is offered as a new one of that type.
-    /// </summary>
-    public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
+    /// <summary>The list's tree (MaterialList draws it): VisibleRawMaterials filed in a folder for their type, then their category.</summary>
+    public RawMaterialTree RawMaterialTree { get; }
 
-    /// <summary>
-    /// Saves a category of the material's own type, the only kind the picker offers it (a Made one for a made ingredient),
-    /// and reads it back with the screen's load; null, with the reason showing, if its name is refused.
-    /// </summary>
-    private async Task<RawMaterialCategory?> SaveNewCategoryAsync(string name)
+    private string _searchText = string.Empty;
+    public string SearchText
     {
-        var category = new RawMaterialCategory { Name = name, Type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource) };
-        var validation = _categoryValidator.Validate(category);
-        if (!validation.IsValid)
-        {
-            ErrorMessage = validation.ToString(" ");
-            return null;
-        }
-
-        // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
-        await _categoryRepository.AddAsync(category, CancellationToken.None);
-        await LoadCommand.Execute();
-        return Categories.FirstOrDefault(c => c.Id == category.Id);
+        get => _searchText;
+        set => this.RaiseAndSetIfChanged(ref _searchText, value);
     }
+
+    /// <summary>The materials picked in the list, in the order they were picked.</summary>
+    public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>().Where(l => !l.IsNew)];
+
+    /// <summary>Files materials under another category, saved at once: a drag in the list, or its menu's Move To.</summary>
+    public ReactiveCommand<IReadOnlyList<RawMaterialMove>, RxVoid> MoveMaterialsCommand { get; }
+
+    /// <summary>Puts back where the last move took the materials from (the notice bar's Undo).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+
+    /// <summary>
+    /// The list's New … Here: a new material of the folder's type, in its category when it's a category's folder. With no
+    /// folder (the list's empty space), a new ingredient, as New starts one. Like New, it adds the material's row to the list
+    /// for its name to be typed into (TreeNameEdit).
+    /// </summary>
+    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> NewMaterialInCommand { get; }
+
+    /// <summary>The list's Rename: the material's name becomes a box to type into, in place, and the name typed is saved at once.</summary>
+    public ReactiveCommand<RawMaterialLeafNode, RxVoid> RenameMaterialCommand { get; }
+
+    /// <summary>
+    /// The list's Copy: a new material with the material's type, category and base unit, named "… Copy", and nothing else.
+    /// It isn't saved until Save is clicked.
+    /// </summary>
+    public ReactiveCommand<RawMaterialLeafNode, RxVoid> CopyMaterialCommand { get; }
+
+    /// <summary>The list's Delete, as the header's: asks first.</summary>
+    public ReactiveCommand<RawMaterialLeafNode, RxVoid> DeleteMaterialCommand { get; }
+
+    /// <summary>
+    /// The list's New Folder, for materials of the type given: a "New folder" row for its name to be typed into
+    /// (TreeNameEdit), and the name typed adds the category.
+    /// </summary>
+    public ReactiveCommand<RawMaterialCategoryType, RxVoid> NewCategoryCommand { get; }
+
+    /// <summary>The list's Rename Category: the folder's name becomes a box to type into, in place, and the name typed renames the category.</summary>
+    public ReactiveCommand<RawMaterialFolderNode, RxVoid> RenameCategoryCommand { get; }
+
+    /// <summary>The list's Delete Category, offered only for a category no material is in.</summary>
+    public ReactiveCommand<RawMaterialFolderNode, RxVoid> DeleteCategoryCommand { get; }
+
+    /// <summary>Opens every folder of a type's, or of both types' with no folder given.</summary>
+    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> ExpandAllCommand { get; }
+
+    /// <summary>Closes every category folder of a type's, or of both types' with no folder given.</summary>
+    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> CollapseAllCommand { get; }
 
     private void RefreshTree()
     {
         // The tree drops a row from its selection as the row leaves its folder, which is no pick of the user's: with
         // several picked, the first left would otherwise become SelectedTreeNode, and its material the one picked.
-        ListSelection.Quietly(() => RawMaterialTree.Refresh(Categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0));
+        ListSelection.Quietly(() => RawMaterialTree.Refresh(_categories, VisibleRawMaterials, isFiltered: SearchText.Trim().Length > 0));
 
         // A folder picked stays picked. Otherwise the row goes back to the material picked: one moved to another folder
         // leaves the tree's selection as it goes, and one a search hid gets its row back when the search ends.
@@ -166,16 +234,16 @@ public sealed partial class RawMaterialsViewModel
         }
     }
 
-    protected override object? ShowingRow => SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : RawMaterialTree.PendingMaterial;
+    protected override object? ShowingRow => _host.SelectedRawMaterial is { } material ? RawMaterialTree.Find(material.Id) : RawMaterialTree.PendingMaterial;
 
     protected override string PickedRecordsProperty => nameof(SelectedTreeMaterials);
 
     // A material's row picks it; the new material's row is the form's already.
     protected override void PickRowFromList(object row)
     {
-        if (row is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != SelectedRawMaterial?.Id)
+        if (row is RawMaterialLeafNode { IsNew: false } leaf && leaf.RawMaterial.Id != _host.SelectedRawMaterial?.Id)
         {
-            PickFromList(leaf.RawMaterial.Id, () => SelectedRawMaterial = leaf.RawMaterial, SyncTreeSelection, OpenRawMaterialAsync);
+            _host.Pick(leaf.RawMaterial);
         }
     }
 
@@ -202,11 +270,10 @@ public sealed partial class RawMaterialsViewModel
         await _rawMaterialRepository.MoveAsync(moves, CancellationToken.None);
 
         // The load only re-points the selection at the fresh copy: the form isn't loaded again, so what's typed stays.
-        await LoadCommand.Execute();
-        if (moves.FirstOrDefault(m => m.RawMaterialId == _editingId) is { } onForm)
+        await _host.LoadAsync();
+        if (moves.FirstOrDefault(m => m.RawMaterialId == _host.EditingId) is { } onForm)
         {
-            ApplyRefresh(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == onForm.CategoryId));
-            History.RewriteAll(snapshot => snapshot with { CategoryId = onForm.CategoryId });
+            _host.MovedOnForm(onForm.CategoryId);
         }
 
         // Picks again the rows the tree dropped from its selection as they moved.
@@ -224,7 +291,7 @@ public sealed partial class RawMaterialsViewModel
     {
         var what = moves.Count == 1 && _rawMaterialCache.Lookup(moves[0].RawMaterialId) is { HasValue: true } one ? one.Value.Name : $"{moves.Count} materials";
         var categoryId = moves[0].CategoryId;
-        return moves.All(m => m.CategoryId == categoryId) && Categories.FirstOrDefault(c => c.Id == categoryId) is { } category
+        return moves.All(m => m.CategoryId == categoryId) && _categories.FirstOrDefault(c => c.Id == categoryId) is { } category
             ? $"Moved {what} to {RawMaterialFolderNode.TypeTitle(RawMaterialRules.MaterialTypeOf(category.Type))} › {category.Name}"
             : $"Moved {what}";
     }
@@ -297,7 +364,7 @@ public sealed partial class RawMaterialsViewModel
         {
             List<TreeMenuItem> folders =
             [
-                .. Categories.Where(c => c.Type == type).Select(c =>
+                .. _categories.Where(c => c.Type == type).Select(c =>
                 {
                     var moves = RawMaterialTree.MovesTo(c, materials);
                     return new TreeMenuItem(c.Name, MoveMaterialsCommand, moves) { IsEnabled = moves.Count > 0 };
@@ -356,7 +423,7 @@ public sealed partial class RawMaterialsViewModel
     private List<TreeMenuItem> CategoryFolderMenu(RawMaterialFolderNode folder)
     {
         // Every material in it, not just a search's matches: the database won't delete a category anything is in.
-        var holds = RawMaterials.Count(m => m.CategoryId == folder.CategoryId);
+        var holds = _rawMaterials.Count(m => m.CategoryId == folder.CategoryId);
         return
         [
             new($"New {MaterialNoun(folder)} Here", NewMaterialInCommand, folder) { Icon = AppIcon.Add },
@@ -404,7 +471,7 @@ public sealed partial class RawMaterialsViewModel
     /// </summary>
     private void BeginRenameCategory(RawMaterialFolderNode folder)
     {
-        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        if (_categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
         {
             return;
         }
@@ -416,7 +483,7 @@ public sealed partial class RawMaterialsViewModel
     /// <summary>
     /// The list's New Folder: a "New folder" row last in the type's folder for <paramref name="type"/>, picked, with its
     /// name ready to be typed, as in a file explorer; the name typed adds a category of that type
-    /// (<see cref="CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
+    /// (<see cref="RecordList.CommitTreeNameAsync"/>). The search is cleared first, so the row shows.
     /// </summary>
     private void BeginNewFolder(RawMaterialCategoryType type) => BeginNewFolderIn(type, RawMaterialFolderNode.NewFolderTitle);
 
@@ -435,24 +502,25 @@ public sealed partial class RawMaterialsViewModel
     }
 
     /// <summary>
-    /// New and New … Here: <see cref="StartNewMaterial"/>, and the new material's row in the list, in its category's folder
-    /// (with none yet, from the header or the list's empty space, last in its type's folder), picked, with its name ready to
-    /// be typed, as a new file in a file explorer. The name typed goes into the form (<see cref="CommitTreeNameAsync"/>),
-    /// and the row stays until Save files the material or the form leaves it. The search is cleared first, so the row shows.
+    /// New and New … Here: a fresh form for a new material (<see cref="IRawMaterialsListHost.StartNew"/>), and its row in the
+    /// list, in its category's folder (with none yet, from the header or the list's empty space, last in its type's folder),
+    /// picked, with its name ready to be typed, as a new file in a file explorer. The name typed goes into the form
+    /// (<see cref="RecordList.CommitTreeNameAsync"/>), and the row stays until Save files the material or the form leaves it.
+    /// The search is cleared first, so the row shows.
     /// </summary>
-    private void NewMaterialInList(
+    public void NewInList(
         RawMaterialType type = RawMaterialType.Ingredient, int? categoryId = null, RawMaterialSource source = RawMaterialSource.Purchased)
     {
         CancelTreeName();
         SearchText = string.Empty;
-        StartNewMaterial(type, categoryId, source);
+        _host.StartNew(type, categoryId, source);
         var title = NewMaterialTitle(type, source);
         var row = RawMaterialTree.BeginNewMaterial(new RawMaterial
         {
             Name = title,
             Type = type,
             Source = source,
-            CategoryId = EditingCategory?.Id ?? 0,
+            CategoryId = _host.EditingCategory?.Id ?? 0,
         });
         ListNaming.Start(row, title);
     }
@@ -464,20 +532,19 @@ public sealed partial class RawMaterialsViewModel
         : "New ingredient";
 
     /// <summary>
-    /// Takes the new material's row out of the list (<see cref="NewMaterialInList"/>), and the rows picked, and stops the
-    /// naming in it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left
-    /// as it is.
+    /// Takes the new material's row out of the list (<see cref="NewInList"/>), and the rows picked, and stops the naming in
+    /// it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left as it is.
     /// </summary>
-    private void EndNewMaterialRow() => ListNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
+    public void EndNewRow() => ListNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
 
     /// <summary>Whether a row of the list is a new material's or a new folder's, still to be named.</summary>
     protected override bool IsNewRow(object node) => node is RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true };
 
     /// <summary>
-    /// What a name typed into the list's box does (<see cref="ListFormViewModel{TSnapshot}.CommitTreeNameAsync"/>), once
-    /// it's taken for one. A material's or a category's is renamed at once; a new folder's adds a category of its type, or
-    /// picks the one of that name there already; a new material's goes into the form, as typed there, and its row takes
-    /// it: a material needs more than a name before Save can file it.
+    /// What a name typed into the list's box does (<see cref="RecordList.CommitTreeNameAsync"/>), once it's taken for one. A
+    /// material's or a category's is renamed at once; a new folder's adds a category of its type, or picks the one of that
+    /// name there already; a new material's goes into the form, as typed there, and its row takes it: a material needs more
+    /// than a name before Save can file it.
     /// </summary>
     protected override async Task CommitTreeNameToAsync(TreeNameEdit edit, string name, string text)
     {
@@ -488,8 +555,8 @@ public sealed partial class RawMaterialsViewModel
                 break;
 
             case RawMaterialLeafNode leaf:
-                await RunSafelyAsync(() => RenameMaterialToAsync(leaf, name));
-                if (ErrorMessage is not null && RawMaterialTree.Find(leaf.RawMaterial.Id) is { } stillListed)
+                await _host.RunSafelyAsync(() => RenameMaterialToAsync(leaf, name));
+                if (_host.ErrorMessage is not null && RawMaterialTree.Find(leaf.RawMaterial.Id) is { } stillListed)
                 {
                     ListNaming.Edit = edit with { Node = stillListed, InitialText = text };
                 }
@@ -498,8 +565,8 @@ public sealed partial class RawMaterialsViewModel
 
             case RawMaterialFolderNode { IsNewFolder: true, CategoryType: { } type } folder:
                 ListNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
-                await RunSafelyAsync(() => AddCategoryAsync(type, name));
-                if (ErrorMessage is not null)
+                await _host.RunSafelyAsync(() => AddCategoryAsync(type, name));
+                if (_host.ErrorMessage is not null)
                 {
                     BeginNewFolderIn(type, text);
                 }
@@ -507,8 +574,8 @@ public sealed partial class RawMaterialsViewModel
                 break;
 
             case RawMaterialFolderNode folder:
-                await RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
-                if (ErrorMessage is not null && Categories.Any(c => c.Id == folder.CategoryId))
+                await _host.RunSafelyAsync(() => RenameCategoryToAsync(folder, name));
+                if (_host.ErrorMessage is not null && _categories.Any(c => c.Id == folder.CategoryId))
                 {
                     ListNaming.Edit = edit with { InitialText = text };
                 }
@@ -518,16 +585,16 @@ public sealed partial class RawMaterialsViewModel
     }
 
     /// <summary>
-    /// What Esc does to the row named (<see cref="ListFormViewModel{TSnapshot}.CancelTreeName"/>), once its box is closed:
-    /// a new material's or folder's row goes, with nothing saved. The form stays on the new material, blank, as New leaves it.
+    /// What Esc does to the row named (<see cref="RecordList.CancelTreeName"/>), once its box is closed: a new material's or
+    /// folder's row goes, with nothing saved. The form stays on the new material, blank, as New leaves it.
     /// </summary>
     protected override void TreeNameCancelled(object node)
     {
         switch (node)
         {
             case RawMaterialLeafNode { IsNew: true }:
-                EndNewMaterialRow();
-                ApplyRefresh(() => EditingName = string.Empty);
+                EndNewRow();
+                _host.ClearNewName();
                 break;
             case RawMaterialFolderNode { IsNewFolder: true } folder:
                 ListNaming.EndNewRow(folder, RawMaterialTree.EndNewFolder);
@@ -541,7 +608,7 @@ public sealed partial class RawMaterialsViewModel
     /// </summary>
     private void NameNewMaterial(RawMaterialLeafNode row, string name)
     {
-        AsUndoStep(() => EditingName = name);
+        _host.NameNew(name);
         var material = row.RawMaterial;
         row.RawMaterial = new RawMaterial { Name = name, Type = material.Type, Source = material.Source, CategoryId = material.CategoryId };
     }
@@ -555,11 +622,10 @@ public sealed partial class RawMaterialsViewModel
     {
         var material = leaf.RawMaterial;
         await _rawMaterialRepository.RenameAsync(material.Id, name, CancellationToken.None);
-        await LoadCommand.Execute();
-        if (_editingId == material.Id)
+        await _host.LoadAsync();
+        if (_host.EditingId == material.Id)
         {
-            ApplyRefresh(() => EditingName = name);
-            History.RewriteAll(snapshot => snapshot with { Name = name });
+            _host.RenamedOnForm(name);
         }
     }
 
@@ -569,21 +635,21 @@ public sealed partial class RawMaterialsViewModel
     /// </summary>
     private async Task AddCategoryAsync(RawMaterialCategoryType type, string name)
     {
-        var category = Categories.FirstOrDefault(c => c.Type == type && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+        var category = _categories.FirstOrDefault(c => c.Type == type && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
         if (category is null)
         {
             var added = new RawMaterialCategory { Name = name, Type = type };
             var validation = _categoryValidator.Validate(added);
             if (!validation.IsValid)
             {
-                ErrorMessage = validation.ToString(" ");
+                _host.ShowError(validation.ToString(" "));
                 return;
             }
 
             // AddAsync fills in the saved Id, which the copy read back is found by.
             await _categoryRepository.AddAsync(added, CancellationToken.None);
-            await LoadCommand.Execute();
-            category = Categories.FirstOrDefault(c => c.Id == added.Id);
+            await _host.LoadAsync();
+            category = _categories.FirstOrDefault(c => c.Id == added.Id);
         }
 
         if (category is not null
@@ -597,7 +663,7 @@ public sealed partial class RawMaterialsViewModel
     /// <summary>Renames the folder's category to <paramref name="name"/>, keeping its type. A name refused shows why.</summary>
     private async Task RenameCategoryToAsync(RawMaterialFolderNode folder, string name)
     {
-        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
+        if (_categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category)
         {
             return;
         }
@@ -606,14 +672,14 @@ public sealed partial class RawMaterialsViewModel
         var validation = _categoryValidator.Validate(renamed);
         if (!validation.IsValid)
         {
-            ErrorMessage = validation.ToString(" ");
+            _host.ShowError(validation.ToString(" "));
             return;
         }
 
         // Everything is read again, the materials with it, which carry their category's name. The Category picker keeps
-        // the category it holds (LoadCommand), under its new name.
+        // the category it holds (the screen's LoadCommand), under its new name.
         await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
-        await LoadCommand.Execute();
+        await _host.LoadAsync();
     }
 
     /// <summary>
@@ -622,13 +688,13 @@ public sealed partial class RawMaterialsViewModel
     /// </summary>
     private Task DeleteCategoryAsync(RawMaterialFolderNode folder)
     {
-        if (Categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category
-            || RawMaterials.Any(m => m.CategoryId == category.Id))
+        if (_categories.FirstOrDefault(c => c.Id == folder.CategoryId) is not { } category
+            || _rawMaterials.Any(m => m.CategoryId == category.Id))
         {
             return Task.CompletedTask;
         }
 
-        return RunWithConfirmationAsync(
+        return _host.RunWithConfirmationAsync(
             $"Delete the '{category.Name}' category? It holds no materials. This can't be undone.",
             async () =>
             {
@@ -636,8 +702,15 @@ public sealed partial class RawMaterialsViewModel
 
                 // A new material's form may have had it picked: the undo steps forget it, so none puts back a category
                 // there's no longer any of to save.
-                await LoadCommand.Execute();
-                History.RewriteAll(snapshot => snapshot.CategoryId == category.Id ? snapshot with { CategoryId = null } : snapshot);
+                await _host.LoadAsync();
+                _host.CategoryDeleted(category.Id);
             });
+    }
+
+    public void Dispose()
+    {
+        // A change still settling when the app closes is written now, rather than lost.
+        _closedFoldersWriter.Dispose();
+        RawMaterialTree.Dispose();
     }
 }

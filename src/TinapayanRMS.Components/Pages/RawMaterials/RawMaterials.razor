@@ -14,7 +14,7 @@
    address, so the browser's Back and Forward step between the materials opened. *@
 <CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
     <div class="record-screen">
-        <MaterialList ViewModel="ViewModel!" />
+        <MaterialList List="ViewModel!.List" />
 
         <div class="record-details">
             <SummaryHeader ViewModel="ViewModel!" />
@@ -52,7 +52,7 @@
                             <ContentTemplate>
                                 <div class="tab-card">
                                     <h2 class="section-header">Dependents</h2>
-                                    <DependentTiles Products="ViewModel!.Dependents" Caption="@ViewModel!.DependentsText" Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" />
+                                    <DependentTiles Products="ViewModel!.Dependents.Products" Caption="@ViewModel!.Dependents.Text" Open="id => Commands.Run(ViewModel!.Dependents.OpenProductCommand, id)" />
                                 </div>
                             </ContentTemplate>
                         </TabItem>
@@ -81,7 +81,7 @@
 
         // Copy fills the form with a name to change: the cursor goes to Name. New names the material in the list instead,
         // where its row's box has the cursor.
-        AddSubscription(viewModel.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        AddSubscription(viewModel.List.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
     }
 
     protected override string AddressRoot => "raw-materials";

@@ -473,11 +473,11 @@ public class ProductTreeTests
         // As a build before the rename kept them, and before folders were the user's own.
         var store = new InMemoryViewStateStore(new Dictionary<string, IReadOnlyList<string>>
         {
-            [ProductsViewModel.ClosedFoldersKey] = ["Deleted", "ResearchAndDevelopment", "ResearchAndDevelopment/2", "Production/Uncategorized"],
+            [ProductsList.ClosedFoldersKey] = ["Deleted", "ResearchAndDevelopment", "ResearchAndDevelopment/2", "Production/Uncategorized"],
         });
 
         var tree = new ProductTree(FolderMemory.Read(
-            store, ProductsViewModel.ClosedFoldersKey, ProductsViewModel.OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
+            store, ProductsList.ClosedFoldersKey, ProductsList.OpenFoldersKey, ProductFolderNode.CurrentFolderKey));
         tree.Refresh(AllFolders, [], isFiltered: false);
 
         Root(tree, ProductStage.Innovation).IsExpanded.Should().BeFalse();

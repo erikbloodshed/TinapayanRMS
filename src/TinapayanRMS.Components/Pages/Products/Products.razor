@@ -14,7 +14,7 @@
    address, so the browser's Back and Forward step between the products opened. *@
 <CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
     <div class="record-screen">
-        <ProductList ViewModel="ViewModel!" />
+        <ProductList List="ViewModel!.List" />
 
         <div class="record-details">
             <ProductHeader ViewModel="ViewModel!" />
@@ -70,11 +70,11 @@
             interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
 
         // A name asked for by the list's menu: a clone's or a variant's. The list names everything else in place.
-        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+        AddSubscription(viewModel.List.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
 
         // Move to In-House: the made ingredient's name and the Made category it goes in.
-        AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+        AddSubscription(viewModel.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
     }
 

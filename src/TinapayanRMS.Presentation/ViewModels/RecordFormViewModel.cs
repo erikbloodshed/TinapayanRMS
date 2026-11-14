@@ -25,7 +25,7 @@ public interface IFormSnapshot<in TSnapshot>
 /// whether it holds anything to save, and the question about unsaved changes before it's left. Each screen says how its
 /// form is captured and put back, what it's called in the question, how it saves and how it goes back to what was saved.
 /// </summary>
-public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScreen, IUnsavedChangesScreen
+public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScreen, IUnsavedChangesScreen, IRecordListHost
     where TSnapshot : class, IFormSnapshot<TSnapshot>
 {
     protected RecordFormViewModel(ILogger logger)
@@ -213,4 +213,19 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
             then();
         }
     }
+
+    // What any part of the screen's form, and its list, asks of it (IFormPartHost, IRecordListHost).
+    bool IFormPartHost.IsRefreshing => IsRefreshing;
+
+    bool IFormPartHost.IsBusyApplying => IsBusyApplying;
+
+    Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => RunWithConfirmationAsync(question, action);
+
+    void IFormPartHost.ApplyRefresh(Action merge) => ApplyRefresh(merge);
+
+    bool IRecordListHost.IsDirty => History.IsDirty;
+
+    string? IRecordListHost.ErrorMessage => ErrorMessage;
+
+    Task IRecordListHost.AfterUnsavedChangesAsync(Action then) => AfterUnsavedChangesAsync(then);
 }

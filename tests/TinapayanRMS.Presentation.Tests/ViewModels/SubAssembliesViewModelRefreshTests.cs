@@ -35,9 +35,9 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.HeaderTitle.Should().Be("New sub-assembly");
         viewModel.EditingRole!.Name.Should().Be("Glaze", "a new form takes the first role");
         viewModel.EditingName = "Chocolate Glaze";
-        viewModel.Lines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 200m });
-        viewModel.BatchWeight.Should().Be(200m);
-        viewModel.BatchCost.Should().Be(18m);
+        viewModel.Batch.Lines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 200m });
+        viewModel.Batch.BatchWeight.Should().Be(200m);
+        viewModel.Batch.BatchCost.Should().Be(18m);
 
         await viewModel.SaveCommand.Execute();
 
@@ -50,11 +50,11 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             (await SubAssemblyTotalsAsync(saved.Id)).TotalCost.Should().Be(18m);
         }
 
-        var row = viewModel.Rows.Should().ContainSingle().Subject;
+        var row = viewModel.List.Rows.Should().ContainSingle().Subject;
         viewModel.SelectedRow.Should().BeSameAs(row);
-        viewModel.BatchWeight.Should().Be(200m);
+        viewModel.Batch.BatchWeight.Should().Be(200m);
         viewModel.HeaderTitle.Should().Be("Chocolate Glaze");
-        viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(200m);
+        viewModel.Batch.Lines.Should().ContainSingle().Which.Grams.Should().Be(200m);
     });
 
     [Test]
@@ -68,7 +68,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Add the ingredients that go into Chocolate Glaze, in grams.");
-        viewModel.Rows.Should().BeEmpty();
+        viewModel.List.Rows.Should().BeEmpty();
     });
 
     [Test]
@@ -80,10 +80,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new SubAssembly { Name = "Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 1, () => $"lines={viewModel.Batch.Lines.Count}");
 
-        viewModel.Lines.Single().Grams = 300m;
+        viewModel.Batch.Lines.Single().Grams = 300m;
         await using (var dbContext = CreateDbContext())
         {
             var sugar = await dbContext.RawMaterials.SingleAsync(m => m.Id == sugarId, Cancellation);
@@ -94,8 +94,8 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         await viewModel.LoadCommand.Execute();
 
-        viewModel.Lines.Should().ContainSingle().Which.Grams.Should().Be(300m, "an unsaved edit survives the refresh");
-        viewModel.BatchCost.Should().Be(30m, "the line is priced at sugar's new cost");
+        viewModel.Batch.Lines.Should().ContainSingle().Which.Grams.Should().Be(300m, "an unsaved edit survives the refresh");
+        viewModel.Batch.BatchCost.Should().Be(30m, "the line is priced at sugar's new cost");
         viewModel.SelectedRow!.Name.Should().Be("Glaze");
     });
 
@@ -111,24 +111,24 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         await viewModel.LoadCommand.Execute();
 
-        viewModel.Rows.Single().DependentsText.Should().Be("Cream Loaf");
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
-        var creamLoaf = viewModel.Dependents.Should().ContainSingle().Subject;
+        viewModel.List.Rows.Single().DependentsText.Should().Be("Cream Loaf");
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 1, () => $"lines={viewModel.Batch.Lines.Count}");
+        var creamLoaf = viewModel.Dependents.Products.Should().ContainSingle().Subject;
         creamLoaf.Name.Should().Be("Cream Loaf");
         int? opened = null;
-        using (viewModel.ProductOpenRequests.Subscribe(productId => opened = productId))
+        using (viewModel.Dependents.ProductOpenRequests.Subscribe(productId => opened = productId))
         {
-            await viewModel.OpenProductCommand.Execute(creamLoaf.Id);
+            await viewModel.Dependents.OpenProductCommand.Execute(creamLoaf.Id);
         }
 
         opened.Should().Be(creamLoaf.Id, "a tile hands its product's id on, for the main window to open it");
-        viewModel.DependentsText.Should().StartWith("These products follow every change");
+        viewModel.Dependents.Text.Should().StartWith("These products follow every change");
 
         await viewModel.DeleteCommand.Execute();
 
         viewModel.ErrorMessage.Should().StartWith("Cream Loaf links Glaze.");
-        viewModel.Rows.Should().ContainSingle();
+        viewModel.List.Rows.Should().ContainSingle();
     });
 
     [Test]
@@ -150,15 +150,15 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
         await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Ube Glaze", () => $"name={viewModel.EditingName}");
 
-        viewModel.SearchText = "Chocolate";
+        viewModel.List.SearchText = "Chocolate";
         viewModel.OpenSubAssembly(chocolateId);
         viewModel.SelectedRow!.Id.Should().Be(chocolateId);
-        viewModel.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
+        viewModel.List.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
 
         viewModel.OpenSubAssembly(ubeId);
         viewModel.SelectedRow!.Id.Should().Be(ubeId);
-        viewModel.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
-        viewModel.VisibleRows.Should().Contain(viewModel.SelectedRow);
+        viewModel.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        viewModel.List.VisibleRows.Should().Contain(viewModel.SelectedRow);
     });
 
     [Test]
@@ -218,10 +218,10 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SuccessMessage.Should().Be("Gift Box Set was saved.");
         await Settle.UntilAsync(viewModel, () => viewModel.PackagingSet.Lines.Count == 1, () => $"packaging lines={viewModel.PackagingSet.Lines.Count}");
         viewModel.IsPackaging.Should().BeTrue();
-        viewModel.Lines.Should().BeEmpty();
+        viewModel.Batch.Lines.Should().BeEmpty();
         viewModel.PackagingSet.Lines.Single().BaseUnitAbbreviation.Should().Be("pc");
         viewModel.PackagingSet.Cost.Should().Be(66m);
-        viewModel.DependentsText.Should().Contain("Add Sub-Assembly");
+        viewModel.Dependents.Text.Should().Contain("Add Sub-Assembly");
     });
 
     // A quantity reaches the line as it's typed, and Save has to be offered by then: the click on it is what leaves the
@@ -284,8 +284,8 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
 
         await viewModel.CopyCommand.Execute();
 
@@ -293,9 +293,9 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.HeaderTitle.Should().Be("Copy of House Glaze");
         viewModel.EditingName.Should().Be("House Glaze Copy");
         viewModel.EditingRole!.Name.Should().Be("Glaze", "the copy keeps the original's role, not a new form's first one");
-        viewModel.Lines.Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase)).Should().Equal((flourId, 100m, true), (sugarId, 50m, false));
-        viewModel.BatchCost.Should().Be(9.5m);
-        viewModel.Dependents.Should().BeEmpty();
+        viewModel.Batch.Lines.Select(l => (l.IngredientId, l.Grams, l.IsFormulaBase)).Should().Equal((flourId, 100m, true), (sugarId, 50m, false));
+        viewModel.Batch.BatchCost.Should().Be(9.5m);
+        viewModel.Dependents.Products.Should().BeEmpty();
         viewModel.History.IsDirty.Should().BeTrue("Save is offered straight away");
         viewModel.History.CanUndo.Should().BeFalse();
 
@@ -303,7 +303,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Rows.Select(r => r.Name).Should().Equal("House Glaze", "Ube Glaze");
+        viewModel.List.Rows.Select(r => r.Name).Should().Equal("House Glaze", "Ube Glaze");
         viewModel.SelectedRow!.Name.Should().Be("Ube Glaze");
         viewModel.SelectedRow.Id.Should().NotBe(originalId);
         await using var dbContext = CreateDbContext();
@@ -322,14 +322,14 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         await repository.SaveStandaloneAsync(new SubAssembly { Name = "Glaze Copy", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single(r => r.Name == "Glaze");
-        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Glaze" && viewModel.Lines.Count == 1, () => $"name={viewModel.EditingName}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single(r => r.Name == "Glaze");
+        await Settle.UntilAsync(viewModel, () => viewModel.EditingName == "Glaze" && viewModel.Batch.Lines.Count == 1, () => $"name={viewModel.EditingName}");
 
         await viewModel.CopyCommand.Execute();
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
+        viewModel.List.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
     });
 
     [Test]
@@ -359,7 +359,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId }, [(boxId, null, 2m)], Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single();
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
         await Settle.UntilAsync(viewModel, () => viewModel.PackagingSet.Lines.Count == 1, () => $"packaging lines={viewModel.PackagingSet.Lines.Count}");
 
         await viewModel.CopyCommand.Execute();
@@ -368,12 +368,12 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.EditingName.Should().Be("Gift Set Copy");
         viewModel.PackagingSet.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
         viewModel.PackagingSet.Cost.Should().Be(66m);
-        viewModel.DependentsText.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
+        viewModel.Dependents.Text.Should().Contain("Add Sub-Assembly", "a set's own hint, for nothing uses the copy yet");
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
+        viewModel.List.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
     });
 
     [Test]
@@ -390,8 +390,8 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("nothing is picked");
 
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 1, () => $"lines={viewModel.Batch.Lines.Count}");
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeTrue();
         viewModel.EditingName = "Sugar Glaze";
         await viewModel.NewProductCommand.Execute();
@@ -433,7 +433,7 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
 
-        viewModel.SelectedRow = viewModel.Rows.Single();
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
 
         (await viewModel.NewProductCommand.CanExecute.FirstAsync()).Should().BeFalse("a packaging set isn't a recipe");
     });
@@ -468,17 +468,17 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
 
-        viewModel.PercentHeader.Should().Be("Baker's %");
-        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent = 62.5m;
-        viewModel.FormulaBaseCaption.Should().Contain("162.5");
+        viewModel.Batch.PercentHeader.Should().Be("Baker's %");
+        viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == waterId).Percent = 62.5m;
+        viewModel.Batch.FormulaBaseCaption.Should().Contain("162.5");
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
 
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
-        var water = viewModel.Lines.Single(l => l.Ingredient!.Id == waterId);
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
+        var water = viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == waterId);
         water.Grams.Should().Be(625m);
         water.IsPercentTyped.Should().BeTrue("the form reopens with the percentage as the figure that was typed");
     });
@@ -495,16 +495,16 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
             Cancellation);
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single();
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
-        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(500m / 1500m * 100m);
+        viewModel.SelectedRow = viewModel.List.Rows.Single();
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
+        viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(500m / 1500m * 100m);
 
-        viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = false;
+        viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == flourId).IsFormulaBase = false;
 
-        viewModel.PercentHeader.Should().Be("Absolute %");
-        viewModel.FormulaBaseCaption.Should().StartWith("Absolute %");
-        viewModel.Lines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(75m, "1,500 g of the 2,000 g batch");
-        viewModel.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(25m);
+        viewModel.Batch.PercentHeader.Should().Be("Absolute %");
+        viewModel.Batch.FormulaBaseCaption.Should().StartWith("Absolute %");
+        viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == flourId).Percent.Should().Be(75m, "1,500 g of the 2,000 g batch");
+        viewModel.Batch.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(25m);
     });
 
     [Test]
@@ -581,6 +581,6 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
         viewModel.SelectedRow.Should().BeNull("New was the later word");
         viewModel.HeaderTitle.Should().Be("New sub-assembly");
         viewModel.EditingName.Should().Be("Chocolate Glaze");
-        viewModel.Lines.Should().BeEmpty("Ube Glaze's lines never loaded into it");
+        viewModel.Batch.Lines.Should().BeEmpty("Ube Glaze's lines never loaded into it");
     });
 }

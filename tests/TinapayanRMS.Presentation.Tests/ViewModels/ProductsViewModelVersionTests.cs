@@ -162,7 +162,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     public Task Restore_puts_a_version_into_the_form_as_unsaved_edits_and_Undo_takes_it_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, seeded) = await OpenToppedProductAsync();
-        var toppingId = viewModel.UsageEdits.Single().SubAssemblyId;
+        var toppingId = viewModel.Recipe.UsageEdits.Single().SubAssemblyId;
         Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 50m);
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
         await viewModel.SaveCommand.Execute();
@@ -173,7 +173,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().StartWith("Version 1 is in the form.");
-        var topping = viewModel.UsageEdits.Single();
+        var topping = viewModel.Recipe.UsageEdits.Single();
         topping.Lines.Single().Grams.Should().Be(100m);
         topping.SubAssemblyId.Should().Be(toppingId, "the product still owns it, so Save rewrites it in place");
         viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("the section's tab shows its form, as it does when a product opens");
@@ -182,7 +182,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.History.IsDirty.Should().BeTrue("it's unsaved until Save");
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.UsageEdits.Single().Lines.Single().Grams.Should().Be(50m);
+        viewModel.Recipe.UsageEdits.Single().Lines.Single().Grams.Should().Be(50m);
         viewModel.EditingCurrentPrice.Should().Be(25m);
         viewModel.History.IsDirty.Should().BeFalse();
 
@@ -241,7 +241,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
             new SubAssembly { Name = "House Dough", RoleId = doughRoleId }, [(flourId, 1000m)], Cancellation);
         var productId = await AddProductAsync("Ube Roll");
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 1);
 
         Edit(viewModel, () => viewModel.UsageForm.EditingUsageWeightPerPiece = 40m);
         await viewModel.SaveCommand.Execute();
@@ -253,7 +253,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        var dough = viewModel.UsageEdits.Single();
+        var dough = viewModel.Recipe.UsageEdits.Single();
         dough.SubAssemblyId.Should().Be(doughId);
         dough.IsLinked.Should().BeTrue();
         dough.AuthoredValue.Should().Be(50m, "the piece size is the product's own, and comes back");
@@ -286,10 +286,10 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         var (creamLoafId, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", doughRoleId, [new RecipeLine(flourId, 1000m)]);
         var miniId = await AddProductAsync("Cream Loaf Mini");
         await SaveRecipeAsync(miniId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
-        var viewModel = await OpenAsync(miniId, vm => vm.UsageEdits.Count == 1);
+        var viewModel = await OpenAsync(miniId, vm => vm.Recipe.UsageEdits.Count == 1);
         viewModel.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
 
-        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        await viewModel.Recipe.EditUsageCommand.Execute(viewModel.Recipe.UsageEdits.Single());
         Edit(viewModel, () => viewModel.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
         await viewModel.SaveCommand.Execute();
 
@@ -419,7 +419,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         await viewModel.VersionHistory.RestoreCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("Version 2 can't be restored: it needs Butter, which is no longer there.");
-        viewModel.UsageEdits.Single().Lines.Should().ContainSingle("nothing changed");
+        viewModel.Recipe.UsageEdits.Single().Lines.Should().ContainSingle("nothing changed");
         viewModel.History.CanUndo.Should().BeFalse();
         _ = seeded;
     });
@@ -467,7 +467,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
     /// </summary>
     private async Task<int> CommandsSavingPriceAsync(int productId)
     {
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 1);
+        var viewModel = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 1);
         Edit(viewModel, () => viewModel.EditingCurrentPrice = 25m);
         int commands;
         using (var counter = SqlCommandCounter.Start())
@@ -536,7 +536,7 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.Recipe.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 

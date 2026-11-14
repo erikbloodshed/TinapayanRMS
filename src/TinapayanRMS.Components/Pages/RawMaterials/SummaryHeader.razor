@@ -24,22 +24,22 @@
             <div class="figure-value">@ViewModel.SavedBaseUnitText</div>
         </div>
         <div class="figure-tile tile-peach">
-            <div class="figure-label">Current Cost per @ViewModel.HeaderCostUnitText</div>
-            <div class="figure-value">@ViewModel.CurrentCostText</div>
+            <div class="figure-label">Current Cost per @ViewModel.PurchaseCost.HeaderCostUnitText</div>
+            <div class="figure-value">@ViewModel.PurchaseCost.CurrentCostText</div>
         </div>
         <div class="figure-tile tile-yellow">
-            <div class="figure-label">Buffered Cost per @ViewModel.HeaderCostUnitText</div>
-            <div class="figure-value">@ViewModel.BufferedCostText</div>
+            <div class="figure-label">Buffered Cost per @ViewModel.PurchaseCost.HeaderCostUnitText</div>
+            <div class="figure-value">@ViewModel.PurchaseCost.BufferedCostText</div>
         </div>
         @if (ViewModel.IsEditingMade)
         {
             <div class="figure-tile tile-teal" title="What the batch yields as the BOM stands: its grams less the weight loss.">
                 <div class="figure-label">Total Weight</div>
-                <div class="figure-value">@ViewModel.BomTotalWeight.ToString("#,0.##") g</div>
+                <div class="figure-value">@ViewModel.Recipe.BomTotalWeight.ToString("#,0.##") g</div>
             </div>
             <div class="figure-tile tile-flamingo" title="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram.">
                 <div class="figure-label">Total Cost</div>
-                <div class="figure-value">@ViewModel.BomTotalCost.ToString("N2")</div>
+                <div class="figure-value">@ViewModel.Recipe.BomTotalCost.ToString("N2")</div>
             </div>
         }
         <div class="figure-tile tile-mauve" title="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component.">

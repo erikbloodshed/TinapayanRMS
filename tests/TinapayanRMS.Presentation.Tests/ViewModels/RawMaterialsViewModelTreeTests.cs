@@ -34,10 +34,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var viewModel = await LoadedViewModelAsync();
-        var leaf = viewModel.RawMaterialTree.Find(breadFlourId)!;
-        viewModel.SelectedTreeNode = leaf;
+        var leaf = viewModel.List.RawMaterialTree.Find(breadFlourId)!;
+        viewModel.List.SelectedTreeNode = leaf;
 
-        var menu = viewModel.TreeMenuFor(leaf);
+        var menu = viewModel.List.TreeMenuFor(leaf);
 
         Headers(menu).Should().Equal("Move to", "Rename", "Copy", "Delete");
         menu.Single(i => i.Header == "Rename").Gesture.Should().Be("F2");
@@ -55,18 +55,18 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var viewModel = await LoadedViewModelAsync();
-        IListTreeScreen screen = viewModel;
-        var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
+        IListTreeScreen screen = viewModel.List;
+        var breadFlour = viewModel.List.RawMaterialTree.Find(breadFlourId)!;
 
         screen.CanDrag(breadFlour).Should().BeTrue();
         screen.CanDrag(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Should().BeFalse("a folder isn't dragged");
         screen.CanDrop([breadFlour], TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes")).Should().BeFalse("a material's type is fixed");
-        screen.CanDrop([breadFlour], viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
+        screen.CanDrop([breadFlour], viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
 
         (await screen.DropAsync([breadFlour], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods"))).Should().BeSameAs(breadFlour);
 
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
-        viewModel.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+        viewModel.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
     });
 
     [Test]
@@ -77,12 +77,12 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var caneSugarId = await AddIngredientAsync("Cane Sugar", flourId);
         var viewModel = await LoadedViewModelAsync();
-        IListTreeScreen screen = viewModel;
+        IListTreeScreen screen = viewModel.List;
 
-        var firstMove = viewModel.MoveMaterialsCommand.Execute([new RawMaterialMove(breadFlourId, dryGoodsId)]).ToTask();
+        var firstMove = viewModel.List.MoveMaterialsCommand.Execute([new RawMaterialMove(breadFlourId, dryGoodsId)]).ToTask();
         // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
-        await viewModel.MoveMaterialsCommand.CanExecute.FirstAsync(offered => !offered);
-        (await screen.DropAsync([viewModel.RawMaterialTree.Find(caneSugarId)!], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods")))
+        await viewModel.List.MoveMaterialsCommand.CanExecute.FirstAsync(offered => !offered);
+        (await screen.DropAsync([viewModel.List.RawMaterialTree.Find(caneSugarId)!], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods")))
             .Should().BeNull("a move is still saving");
         await firstMove;
 
@@ -103,15 +103,15 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods").Materials.Should().ContainSingle();
-        viewModel.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+        viewModel.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
 
-        await viewModel.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(flourId);
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Should().ContainSingle();
-        viewModel.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        (await viewModel.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
+        (await viewModel.List.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
     });
 
     [Test]
@@ -123,14 +123,14 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
         var sugarId = await AddIngredientAsync("Sugar", dryGoodsId);
         var viewModel = await OpenedViewModelAsync(breadFlourId);
-        var tree = viewModel.RawMaterialTree;
+        var tree = viewModel.List.RawMaterialTree;
 
         // Ctrl+clicks: the rows join the first, which stays the one showing.
-        viewModel.SelectedTreeNodes.Add(tree.Find(cakeFlourId)!);
-        viewModel.SelectedTreeNodes.Add(tree.Find(sugarId)!);
+        viewModel.List.SelectedTreeNodes.Add(tree.Find(cakeFlourId)!);
+        viewModel.List.SelectedTreeNodes.Add(tree.Find(sugarId)!);
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
 
-        var menu = viewModel.TreeMenuFor(tree.Find(cakeFlourId));
+        var menu = viewModel.List.TreeMenuFor(tree.Find(cakeFlourId));
 
         Headers(menu).Should().Equal(["Move 3 Materials to"], "renaming or deleting is for one at a time");
         await RunAsync(menu[0].Items.Single(i => i.Header == "Dry Goods"));
@@ -138,8 +138,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
         (await CategoryOfAsync(cakeFlourId)).Should().Be(dryGoodsId);
-        viewModel.MoveNotice.Should().Be("Moved 2 materials to Ingredients › Dry Goods", "Sugar was there already");
-        viewModel.SelectedTreeMaterials.Select(l => l.RawMaterial.Id).Should().Equal(breadFlourId, cakeFlourId, sugarId);
+        viewModel.List.MoveNotice.Should().Be("Moved 2 materials to Ingredients › Dry Goods", "Sugar was there already");
+        viewModel.List.SelectedTreeMaterials.Select(l => l.RawMaterial.Id).Should().Equal(breadFlourId, cakeFlourId, sugarId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
     });
 
@@ -151,10 +151,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var cakeBoxId = await AddPackagingAsync("Cake Box", boxesId);
         var viewModel = await LoadedViewModelAsync();
-        viewModel.SelectedTreeNode = viewModel.RawMaterialTree.Find(breadFlourId);
-        viewModel.SelectedTreeNodes.Add(viewModel.RawMaterialTree.Find(cakeBoxId)!);
+        viewModel.List.SelectedTreeNode = viewModel.List.RawMaterialTree.Find(breadFlourId);
+        viewModel.List.SelectedTreeNodes.Add(viewModel.List.RawMaterialTree.Find(cakeBoxId)!);
 
-        viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(cakeBoxId)).Should().BeEmpty();
+        viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(cakeBoxId)).Should().BeEmpty();
     });
 
     [Test]
@@ -164,18 +164,18 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var dryGoodsId = await AddCategoryAsync("Dry Goods", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var viewModel = await OpenedViewModelAsync(breadFlourId);
-        Edit(viewModel, () => viewModel.EditingCostBufferPercent = 5m);
+        Edit(viewModel, () => viewModel.PurchaseCost.EditingCostBufferPercent = 5m);
 
         await RunAsync(MoveToItem(viewModel, breadFlourId, "Dry Goods"));
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.EditingCategory!.Id.Should().Be(dryGoodsId);
-        viewModel.EditingCostBufferPercent.Should().Be(5m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(5m);
         viewModel.History.IsDirty.Should().BeTrue("the buffer is still to be saved");
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.EditingCostBufferPercent.Should().Be(0m);
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(0m);
         viewModel.EditingCategory!.Id.Should().Be(dryGoodsId, "no undo takes back a move that's saved");
         viewModel.History.IsDirty.Should().BeFalse();
     });
@@ -186,18 +186,18 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var viewModel = await OpenedViewModelAsync(breadFlourId);
-        Edit(viewModel, () => viewModel.EditingCostBufferPercent = 5m);
-        var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
+        Edit(viewModel, () => viewModel.PurchaseCost.EditingCostBufferPercent = 5m);
+        var breadFlour = viewModel.List.RawMaterialTree.Find(breadFlourId)!;
 
-        await RunAsync(viewModel.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
+        await RunAsync(viewModel.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
 
-        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Bread Flour"));
+        viewModel.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Bread Flour"));
 
-        await viewModel.CommitTreeNameAsync(" Strong Flour ");
-        await viewModel.CommitTreeNameAsync("Strong Flour Again");
+        await viewModel.List.CommitTreeNameAsync(" Strong Flour ");
+        await viewModel.List.CommitTreeNameAsync("Strong Flour Again");
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.TreeNameEdit.Should().BeNull();
+        viewModel.List.TreeNameEdit.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var saved = await dbContext.RawMaterials.SingleAsync(m => m.Id == breadFlourId, Cancellation);
@@ -205,7 +205,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         }
 
         viewModel.EditingName.Should().Be("Strong Flour");
-        viewModel.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Strong Flour");
+        viewModel.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Strong Flour");
         viewModel.History.IsDirty.Should().BeTrue("the buffer is still to be saved");
 
         viewModel.TryUndo().Should().BeTrue();
@@ -221,26 +221,26 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         await AddIngredientAsync("Cake Flour", flourId);
         var viewModel = await LoadedViewModelAsync();
-        var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
+        var breadFlour = viewModel.List.RawMaterialTree.Find(breadFlourId)!;
 
-        await RunAsync(viewModel.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
-        await viewModel.CommitTreeNameAsync("Cake Flour");
+        await RunAsync(viewModel.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
+        await viewModel.List.CommitTreeNameAsync("Cake Flour");
 
         viewModel.ErrorMessage.Should().Be("That name is already in use.");
-        viewModel.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Bread Flour");
-        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Cake Flour"));
+        viewModel.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Bread Flour");
+        viewModel.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Cake Flour"));
 
         // Esc, an empty name and the same name leave it be; so does a search.
-        viewModel.CancelTreeName();
-        viewModel.TreeNameEdit.Should().BeNull();
-        viewModel.SelectedTreeNode = breadFlour;
-        await RunAsync(viewModel.TreeShortcut("F2")!);
-        await viewModel.CommitTreeNameAsync("  ");
-        await RunAsync(viewModel.TreeShortcut("F2")!);
-        await viewModel.CommitTreeNameAsync("Bread Flour");
-        await RunAsync(viewModel.TreeShortcut("F2")!);
-        viewModel.SearchText = "flour";
-        viewModel.TreeNameEdit.Should().BeNull();
+        viewModel.List.CancelTreeName();
+        viewModel.List.TreeNameEdit.Should().BeNull();
+        viewModel.List.SelectedTreeNode = breadFlour;
+        await RunAsync(viewModel.List.TreeShortcut("F2")!);
+        await viewModel.List.CommitTreeNameAsync("  ");
+        await RunAsync(viewModel.List.TreeShortcut("F2")!);
+        await viewModel.List.CommitTreeNameAsync("Bread Flour");
+        await RunAsync(viewModel.List.TreeShortcut("F2")!);
+        viewModel.List.SearchText = "flour";
+        viewModel.List.TreeNameEdit.Should().BeNull();
         (await NameOfAsync(breadFlourId)).Should().Be("Bread Flour");
     });
 
@@ -250,41 +250,41 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var viewModel = await LoadedViewModelAsync();
         var flour = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
-        viewModel.SearchText = "nothing like it";
+        viewModel.List.SearchText = "nothing like it";
 
-        await RunAsync(viewModel.TreeMenuFor(flour).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(viewModel.List.TreeMenuFor(flour).Single(i => i.Header == "New Ingredient Here"));
 
-        viewModel.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
-        var row = viewModel.RawMaterialTree.PendingMaterial!;
+        viewModel.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
+        var row = viewModel.List.RawMaterialTree.PendingMaterial!;
         flour.Children.Should().Equal(row);
         flour.MaterialCount.Should().Be(0, "it isn't a material until it's saved");
-        viewModel.SelectedTreeNode.Should().BeSameAs(row);
-        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New ingredient"));
-        viewModel.TreeMenuFor(row).Should().BeEmpty();
-        viewModel.SelectedTreeMaterials.Should().BeEmpty();
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(row);
+        viewModel.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New ingredient"));
+        viewModel.List.TreeMenuFor(row).Should().BeEmpty();
+        viewModel.List.SelectedTreeMaterials.Should().BeEmpty();
         viewModel.EditingCategory!.Id.Should().Be(flourId);
 
-        await viewModel.CommitTreeNameAsync("Rye Flour");
+        await viewModel.List.CommitTreeNameAsync("Rye Flour");
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.RawMaterials.Should().BeEmpty("a material needs more than a name, so Save files it");
-        viewModel.TreeNameEdit.Should().BeNull();
+        viewModel.List.TreeNameEdit.Should().BeNull();
         row.Title.Should().Be("Rye Flour");
         viewModel.EditingName.Should().Be("Rye Flour");
         viewModel.History.IsDirty.Should().BeTrue("Save is offered for it");
 
         await viewModel.LoadCommand.Execute();
         flour.Children.Should().Equal([row], "a load keeps it");
-        viewModel.SelectedTreeNode.Should().BeSameAs(row);
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(row);
 
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.RawMaterialTree.PendingMaterial.Should().BeNull();
-        var saved = viewModel.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id)!;
+        viewModel.List.RawMaterialTree.PendingMaterial.Should().BeNull();
+        var saved = viewModel.List.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id)!;
         flour.Children.Should().Equal(saved);
         saved.Title.Should().Be("Rye Flour");
-        viewModel.SelectedTreeNode.Should().BeSameAs(saved);
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(saved);
     });
 
     [Test]
@@ -293,24 +293,24 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var viewModel = await LoadedViewModelAsync();
         AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
-        var ingredients = viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
         await viewModel.NewCommand.Execute();
 
-        var row = viewModel.RawMaterialTree.PendingMaterial!;
+        var row = viewModel.List.RawMaterialTree.PendingMaterial!;
         TitlesIn(ingredients).Should().Equal(["Flour", "New ingredient"], "with no category yet, it's last in its type's folder");
-        viewModel.CancelTreeName();
+        viewModel.List.CancelTreeName();
         TitlesIn(ingredients).Should().Equal("Flour");
-        viewModel.SelectedTreeNode.Should().BeNull();
+        viewModel.List.SelectedTreeNode.Should().BeNull();
         viewModel.SelectedRawMaterial.Should().BeNull("the form stays on the blank new material");
 
         await viewModel.NewCommand.Execute();
-        await viewModel.CommitTreeNameAsync("Rye Flour");
+        await viewModel.List.CommitTreeNameAsync("Rye Flour");
         TitlesIn(ingredients).Should().Equal("Flour", "Rye Flour");
 
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("Don't Save puts the form back blank");
 
-        viewModel.RawMaterialTree.PendingMaterial.Should().BeNull("put back blank, it has no row");
+        viewModel.List.RawMaterialTree.PendingMaterial.Should().BeNull("put back blank, it has no row");
         TitlesIn(ingredients).Should().Equal("Flour");
         viewModel.RawMaterials.Should().BeEmpty();
     });
@@ -322,25 +322,25 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var viewModel = await LoadedViewModelAsync();
 
-        await RunAsync(viewModel.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes")).Single(i => i.Header == "New Packaging Material Here"));
+        await RunAsync(viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes")).Single(i => i.Header == "New Packaging Material Here"));
 
         viewModel.SelectedRawMaterial.Should().BeNull();
         viewModel.EditingType.Should().Be(RawMaterialType.Packaging);
         viewModel.EditingCategory!.Id.Should().Be(boxesId);
         viewModel.History.IsDirty.Should().BeFalse("nothing is typed yet");
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Single(i => i.Header == "New Ingredient Here"));
 
         viewModel.EditingType.Should().Be(RawMaterialType.Ingredient);
         viewModel.EditingCategory.Should().BeNull("a type's folder has no category");
 
-        await RunAsync(viewModel.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Ingredient Here"));
         Edit(viewModel, () => viewModel.EditingName = "Rye Flour");
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Select(l => l.Title).Should().Equal("Rye Flour");
-        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id));
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.RawMaterialTree.Find(viewModel.SelectedRawMaterial!.Id));
         (await CategoryOfAsync(viewModel.SelectedRawMaterial.Id)).Should().Be(flourId);
     });
 
@@ -350,10 +350,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var spoonId = await AddPackagingAsync("Disposable Spoon", boxesId);
         var viewModel = await OpenedViewModelAsync(spoonId);
-        Edit(viewModel, () => viewModel.EditingCostBufferPercent = 25m);
+        Edit(viewModel, () => viewModel.PurchaseCost.EditingCostBufferPercent = 25m);
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(spoonId)).Single(i => i.Header == "Copy"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(spoonId)).Single(i => i.Header == "Copy"));
 
         asked.Should().HaveCount(1, "the spoon's unsaved buffer is asked about first");
         viewModel.SelectedRawMaterial.Should().BeNull("the copy is a new material");
@@ -361,8 +361,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingType.Should().Be(RawMaterialType.Packaging);
         viewModel.EditingCategory!.Id.Should().Be(boxesId);
         viewModel.EditingBaseUnit!.Name.Should().Be("piece");
-        viewModel.EditingCostBufferPercent.Should().Be(10m, "the buffer is the new material's default, not the spoon's");
-        viewModel.BrandPriceRows.Should().BeEmpty();
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "the buffer is the new material's default, not the spoon's");
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
         viewModel.CanChangeTypeAndSource.Should().BeTrue();
         viewModel.History.IsDirty.Should().BeTrue("the copy is there to be saved");
 
@@ -372,7 +372,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").Materials.Select(l => l.Title).Should().Equal("Disposable Spoon", "Disposable Spoon Copy");
         await using var dbContext = CreateDbContext();
         var copy = await dbContext.RawMaterials.SingleAsync(m => m.Id == viewModel.SelectedRawMaterial!.Id, Cancellation);
-        (copy.Type, copy.CategoryId, copy.BaseUnitId).Should().Be((RawMaterialType.Packaging, boxesId, viewModel.RawMaterialTree.Find(spoonId)!.RawMaterial.BaseUnitId));
+        (copy.Type, copy.CategoryId, copy.BaseUnitId).Should().Be((RawMaterialType.Packaging, boxesId, viewModel.List.RawMaterialTree.Find(spoonId)!.RawMaterial.BaseUnitId));
     });
 
     [Test]
@@ -386,19 +386,19 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var viewModel = await LoadedViewModelAsync();
         AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Copy"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Copy"));
 
         viewModel.EditingName.Should().Be("Bread Flour Copy 2", "names are told apart without their case");
         (viewModel.EditingType, viewModel.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Purchased));
         viewModel.EditingCategory!.Id.Should().Be(flourId);
         viewModel.EditingBaseUnit.Should().BeNull("an ingredient's base unit is always the gram");
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Copy"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Copy"));
 
         viewModel.EditingName.Should().Be("Simple Syrup Copy");
         (viewModel.EditingType, viewModel.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
         viewModel.EditingCategory!.Id.Should().Be(inHouseId);
-        viewModel.EditingSubAssembly.Should().BeNull("its recipe isn't copied");
+        viewModel.Recipe.SubAssembly.Should().BeNull("its recipe isn't copied");
     });
 
     [Test]
@@ -407,21 +407,21 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var viewModel = await LoadedViewModelAsync();
-        var ingredients = viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
-        Headers(viewModel.TreeMenuFor(ingredients)).Should().Equal("New Ingredient Here", "New Folder", "New Made Folder", "Expand All", "Collapse All");
-        Headers(viewModel.TreeMenuFor(viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Packaging)))
+        Headers(viewModel.List.TreeMenuFor(ingredients)).Should().Equal("New Ingredient Here", "New Folder", "New Made Folder", "Expand All", "Collapse All");
+        Headers(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Packaging)))
             .Should().Equal("New Packaging Material Here", "New Folder", "Expand All", "Collapse All");
-        var listMenu = viewModel.TreeMenuFor(null);
+        var listMenu = viewModel.List.TreeMenuFor(null);
         Headers(listMenu).Should().Equal(
             "New Raw Material", "New Ingredient Folder", "New Made Folder", "New Packaging Folder", "Expand All", "Collapse All");
 
         await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
-        viewModel.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
+        viewModel.List.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
 
-        await RunAsync(viewModel.TreeMenuFor(ingredients).Single(i => i.Header == "Expand All"));
+        await RunAsync(viewModel.List.TreeMenuFor(ingredients).Single(i => i.Header == "Expand All"));
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue();
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse("only that type's folders");
 
@@ -434,48 +434,48 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     {
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var viewModel = await LoadedViewModelAsync();
-        var ingredients = viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
-        await RunAsync(viewModel.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Folder"));
+        await RunAsync(viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Folder"));
 
-        var folder = viewModel.RawMaterialTree.PendingFolder!;
+        var folder = viewModel.List.RawMaterialTree.PendingFolder!;
         TitlesIn(ingredients).Should().Equal("Flour", "New folder");
-        viewModel.SelectedTreeNode.Should().BeSameAs(folder);
-        viewModel.TreeNameEdit!.Node.Should().BeSameAs(folder);
-        viewModel.TreeNameEdit.Hint.Should().Be("A folder in Ingredients.");
-        viewModel.TreeMenuFor(folder).Should().BeEmpty();
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(folder);
+        viewModel.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
+        viewModel.List.TreeNameEdit.Hint.Should().Be("A folder in Ingredients.");
+        viewModel.List.TreeMenuFor(folder).Should().BeEmpty();
 
-        await viewModel.CommitTreeNameAsync("Dairy");
+        await viewModel.List.CommitTreeNameAsync("Dairy");
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.RawMaterialTree.PendingFolder.Should().BeNull();
+        viewModel.List.RawMaterialTree.PendingFolder.Should().BeNull();
         viewModel.Categories.Should().ContainSingle(c => c.Name == "Dairy" && c.Type == RawMaterialCategoryType.Ingredient);
-        viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy"));
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy"));
 
-        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Packaging Folder"));
-        await viewModel.CommitTreeNameAsync("Labels");
+        await RunAsync(viewModel.List.TreeMenuFor(null).Single(i => i.Header == "New Packaging Folder"));
+        await viewModel.List.CommitTreeNameAsync("Labels");
 
         viewModel.Categories.Should().ContainSingle(c => c.Name == "Labels" && c.Type == RawMaterialCategoryType.Packaging);
-        viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Packaging, "Labels"));
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Packaging, "Labels"));
 
-        await RunAsync(viewModel.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        await viewModel.CommitTreeNameAsync("flour");
+        await RunAsync(viewModel.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        await viewModel.List.CommitTreeNameAsync("flour");
 
         viewModel.Categories.Should().HaveCount(3, "a name that's one of the type's categories already adds none");
-        viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"));
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"));
 
-        await RunAsync(viewModel.TreeMenuFor(null).Single(i => i.Header == "New Made Folder"));
-        viewModel.TreeNameEdit!.Hint.Should().Be("A folder in Ingredients, for made ingredients only.");
-        await viewModel.CommitTreeNameAsync("In-House");
+        await RunAsync(viewModel.List.TreeMenuFor(null).Single(i => i.Header == "New Made Folder"));
+        viewModel.List.TreeNameEdit!.Hint.Should().Be("A folder in Ingredients, for made ingredients only.");
+        await viewModel.List.CommitTreeNameAsync("In-House");
 
         viewModel.Categories.Should().ContainSingle(c => c.Name == "In-House" && c.Type == RawMaterialCategoryType.Made);
-        viewModel.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "In-House"), "a Made category's folder is among the ingredient ones");
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(viewModel, RawMaterialType.Ingredient, "In-House"), "a Made category's folder is among the ingredient ones");
 
         // Esc and an empty name add nothing.
-        await RunAsync(viewModel.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        viewModel.CancelTreeName();
-        await RunAsync(viewModel.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        await viewModel.CommitTreeNameAsync(string.Empty);
+        await RunAsync(viewModel.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        viewModel.List.CancelTreeName();
+        await RunAsync(viewModel.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        await viewModel.List.CommitTreeNameAsync(string.Empty);
         TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "In-House");
         viewModel.Categories.Should().HaveCount(4);
     });
@@ -490,19 +490,19 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var viewModel = await LoadedViewModelAsync();
         var inHouse = TreeFolder(viewModel, RawMaterialType.Ingredient, "In-House");
 
-        TitlesIn(viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour", "In-House");
+        TitlesIn(viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour", "In-House");
         inHouse.Materials.Select(l => l.Title).Should().Equal("Simple Syrup");
-        Headers(viewModel.TreeMenuFor(inHouse)).Should().StartWith(["New Made Ingredient Here", "New Folder"]);
-        viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Move to").Items
+        Headers(viewModel.List.TreeMenuFor(inHouse)).Should().StartWith(["New Made Ingredient Here", "New Folder"]);
+        viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Move to").Items
             .Select(i => i.Header).Should().Equal(["Flour"], "a purchased ingredient can't go in a Made category");
-        viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Move to").Items
+        viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Move to").Items
             .Select(i => i.Header).Should().Equal(["In-House"], "and a made one goes in nothing else");
-        RawMaterialTree.MoveTo(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"), viewModel.RawMaterialTree.Find(syrupId)!.RawMaterial)
+        RawMaterialTree.MoveTo(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"), viewModel.List.RawMaterialTree.Find(syrupId)!.RawMaterial)
             .Should().BeNull("a drop on an ingredient category does nothing for a made ingredient");
-        RawMaterialTree.MoveTo(viewModel.RawMaterialTree.Find(syrupId), viewModel.RawMaterialTree.Find(breadFlourId)!.RawMaterial)
+        RawMaterialTree.MoveTo(viewModel.List.RawMaterialTree.Find(syrupId), viewModel.List.RawMaterialTree.Find(breadFlourId)!.RawMaterial)
             .Should().BeNull("nor a drop on a made ingredient for a purchased one");
 
-        await RunAsync(viewModel.TreeMenuFor(inHouse).Single(i => i.Header == "New Made Ingredient Here"));
+        await RunAsync(viewModel.List.TreeMenuFor(inHouse).Single(i => i.Header == "New Made Ingredient Here"));
 
         (viewModel.EditingType, viewModel.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
         viewModel.EditingWeightLossPercent.Should().Be(3m, "a made ingredient starts at 3%, as New and a Source change start it");
@@ -526,10 +526,10 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var viewModel = await OpenedViewModelAsync(breadFlourId);
         var flour = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
 
-        await RunAsync(viewModel.TreeMenuFor(flour).Single(i => i.Header == "Rename Category"));
+        await RunAsync(viewModel.List.TreeMenuFor(flour).Single(i => i.Header == "Rename Category"));
 
-        viewModel.TreeNameEdit.Should().Be(new TreeNameEdit(flour, "Flour"));
-        await viewModel.CommitTreeNameAsync("Flours");
+        viewModel.List.TreeNameEdit.Should().Be(new TreeNameEdit(flour, "Flour"));
+        await viewModel.List.CommitTreeNameAsync("Flours");
 
         viewModel.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
@@ -559,20 +559,20 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         });
 
         // With a search on, the folder shows only one of them, but both keep the category.
-        viewModel.SearchText = "Bread";
-        var flourMenu = viewModel.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"));
+        viewModel.List.SearchText = "Bread";
+        var flourMenu = viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour"));
         Headers(flourMenu).Should().Equal("New Ingredient Here", "New Folder", "Rename Category", "Delete Category (holds 2)");
         flourMenu.Single(i => i.Header.StartsWith("Delete Category", StringComparison.Ordinal)).IsEnabled.Should().BeFalse();
-        viewModel.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
-        viewModel.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
-        viewModel.SearchText = string.Empty;
+        viewModel.List.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
+        viewModel.List.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
+        viewModel.List.SearchText = string.Empty;
 
-        await RunAsync(viewModel.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy")).Single(i => i.Header == "Delete Category"));
+        await RunAsync(viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy")).Single(i => i.Header == "Delete Category"));
 
         viewModel.ErrorMessage.Should().BeNull();
         question.Should().Be("Delete the 'Dairy' category? It holds no materials. This can't be undone.");
         viewModel.Categories.Select(c => c.Name).Should().Equal("Flour");
-        TitlesIn(viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
+        TitlesIn(viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
     });
 
     [Test]
@@ -589,13 +589,13 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
             interaction.SetOutput(true);
         });
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(cakeFlourId)).Single(i => i.Header == "Delete"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(cakeFlourId)).Single(i => i.Header == "Delete"));
 
         question.Should().StartWith("Delete 'Cake Flour'?");
         viewModel.RawMaterials.Select(m => m.Name).Should().Equal("Bread Flour");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId, "the one showing wasn't the one deleted");
 
-        await RunAsync(viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Delete"));
+        await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Delete"));
 
         viewModel.RawMaterials.Should().BeEmpty();
         viewModel.SelectedRawMaterial.Should().BeNull();
@@ -610,22 +610,22 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
         var viewModel = await LoadedViewModelAsync();
-        var breadFlour = viewModel.RawMaterialTree.Find(breadFlourId)!;
+        var breadFlour = viewModel.List.RawMaterialTree.Find(breadFlourId)!;
 
-        viewModel.SelectedTreeNode = breadFlour;
-        viewModel.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == viewModel.RenameMaterialCommand && i.Parameter == breadFlour);
-        viewModel.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == viewModel.DeleteMaterialCommand && i.Parameter == breadFlour);
+        viewModel.List.SelectedTreeNode = breadFlour;
+        viewModel.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == viewModel.List.RenameMaterialCommand && i.Parameter == breadFlour);
+        viewModel.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == viewModel.List.DeleteMaterialCommand && i.Parameter == breadFlour);
 
-        viewModel.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy");
-        viewModel.TreeShortcut("F2")!.Command.Should().BeSameAs(viewModel.RenameCategoryCommand);
-        viewModel.TreeShortcut("Del")!.Command.Should().BeSameAs(viewModel.DeleteCategoryCommand);
+        viewModel.List.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Dairy");
+        viewModel.List.TreeShortcut("F2")!.Command.Should().BeSameAs(viewModel.List.RenameCategoryCommand);
+        viewModel.List.TreeShortcut("Del")!.Command.Should().BeSameAs(viewModel.List.DeleteCategoryCommand);
 
-        viewModel.SelectedTreeNode = viewModel.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
-        viewModel.TreeShortcut("F2").Should().BeNull("a type can't be renamed");
+        viewModel.List.SelectedTreeNode = viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        viewModel.List.TreeShortcut("F2").Should().BeNull("a type can't be renamed");
 
-        viewModel.SelectedTreeNode = breadFlour;
-        viewModel.SelectedTreeNodes.Add(viewModel.RawMaterialTree.Find(cakeFlourId)!);
-        viewModel.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
+        viewModel.List.SelectedTreeNode = breadFlour;
+        viewModel.List.SelectedTreeNodes.Add(viewModel.List.RawMaterialTree.Find(cakeFlourId)!);
+        viewModel.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
     [Test]
@@ -637,18 +637,18 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var ryeFlourId = await AddIngredientAsync("Rye Flour", flourId);
         var viewModel = await LoadedViewModelAsync();
 
-        viewModel.SelectedTreeNode = viewModel.RawMaterialTree.Find(breadFlourId);
+        viewModel.List.SelectedTreeNode = viewModel.List.RawMaterialTree.Find(breadFlourId);
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
 
-        viewModel.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
+        viewModel.List.SelectedTreeNode = TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId, "a folder picked leaves the material showing");
 
-        viewModel.SelectedTreeNode = viewModel.RawMaterialTree.Find(breadFlourId);
-        viewModel.SelectedTreeNodes.Add(viewModel.RawMaterialTree.Find(cakeFlourId)!);
+        viewModel.List.SelectedTreeNode = viewModel.List.RawMaterialTree.Find(breadFlourId);
+        viewModel.List.SelectedTreeNodes.Add(viewModel.List.RawMaterialTree.Find(cakeFlourId)!);
         viewModel.OpenRawMaterial(ryeFlourId);
 
-        viewModel.SelectedTreeNodes.Should().Equal(viewModel.RawMaterialTree.Find(ryeFlourId)!);
-        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(ryeFlourId));
+        viewModel.List.SelectedTreeNodes.Should().Equal(viewModel.List.RawMaterialTree.Find(ryeFlourId)!);
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.RawMaterialTree.Find(ryeFlourId));
     });
 
     [Test]
@@ -661,7 +661,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await RunAsync(MoveToItem(viewModel, breadFlourId, "Dry Goods"));
         await new RawMaterialCategoryRepository(CreateDbContextFactory()).DeleteAsync(flourId, Cancellation);
 
-        await viewModel.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.Execute();
 
         viewModel.ErrorMessage.Should().Be("The category to move it to no longer exists.");
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
@@ -680,8 +680,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(first, RawMaterialType.Ingredient, "Flour").IsExpanded = false;
 
         await Settle.EventuallyAsync(
-            () => store.ReadList(RawMaterialsViewModel.ClosedFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
-            () => string.Join(", ", store.ReadList(RawMaterialsViewModel.ClosedFoldersKey) ?? []));
+            () => store.ReadList(RawMaterialsList.ClosedFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
+            () => string.Join(", ", store.ReadList(RawMaterialsList.ClosedFoldersKey) ?? []));
         first.Dispose();
 
         await AddCategoryAsync("Dairy", RawMaterialCategoryType.Ingredient);
@@ -693,7 +693,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         // One closed just before the app closes is written as it closes.
         TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded = false;
         next.Dispose();
-        store.ReadList(RawMaterialsViewModel.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}");
+        store.ReadList(RawMaterialsList.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}");
     });
 
     [Test]
@@ -702,7 +702,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var store = new InMemoryViewStateStore();
-        store.WriteList(RawMaterialsViewModel.OpenFoldersKey, ["Ingredient", $"Ingredient/{flourId}", "Packaging"]);
+        store.WriteList(RawMaterialsList.OpenFoldersKey, ["Ingredient", $"Ingredient/{flourId}", "Packaging"]);
 
         var viewModel = await LoadedViewModelAsync(store);
 
@@ -711,7 +711,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         // Kept as closed folders from then on.
         viewModel.Dispose();
-        store.ReadList(RawMaterialsViewModel.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}").And.NotContain($"Ingredient/{flourId}");
+        store.ReadList(RawMaterialsList.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}").And.NotContain($"Ingredient/{flourId}");
     });
 
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
@@ -719,11 +719,11 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     private static IEnumerable<string> TitlesIn(RawMaterialFolderNode folder) => folder.Children.Select(c => c.Title);
 
     private static RawMaterialFolderNode TreeFolder(RawMaterialsViewModel viewModel, RawMaterialType type, string title) =>
-        viewModel.RawMaterialTree.TypeFolder(type).Children.OfType<RawMaterialFolderNode>().Single(f => f.Title == title);
+        viewModel.List.RawMaterialTree.TypeFolder(type).Children.OfType<RawMaterialFolderNode>().Single(f => f.Title == title);
 
     /// <summary>The material's menu's Move To item for <paramref name="category"/>.</summary>
     private static TreeMenuItem MoveToItem(RawMaterialsViewModel viewModel, int rawMaterialId, string category) =>
-        viewModel.TreeMenuFor(viewModel.RawMaterialTree.Find(rawMaterialId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == category);
+        viewModel.List.TreeMenuFor(viewModel.List.RawMaterialTree.Find(rawMaterialId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == category);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Test]
@@ -736,12 +736,12 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
         viewModel.EditingName = "Strong Bread Flour";
 
-        Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
+        Click(viewModel, viewModel.List.RawMaterialTree.Find(cakeFlourId)!);
         await Settle.UntilAsync(viewModel, () => asked.Count == 1, () => $"asked={asked.Count}");
 
         asked.Single().Should().StartWith("Save the changes to Strong Bread Flour?");
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
-        viewModel.SelectedTreeNode.Should().BeSameAs(viewModel.RawMaterialTree.Find(breadFlourId), "the list goes back to the row showing");
+        viewModel.List.SelectedTreeNode.Should().BeSameAs(viewModel.List.RawMaterialTree.Find(breadFlourId), "the list goes back to the row showing");
         viewModel.EditingName.Should().Be("Strong Bread Flour");
         viewModel.History.IsDirty.Should().BeTrue();
     });
@@ -758,7 +758,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         AnswerUnsavedChanges(viewModel, answer);
         viewModel.EditingName = "Strong Bread Flour";
 
-        Click(viewModel, viewModel.RawMaterialTree.Find(cakeFlourId)!);
+        Click(viewModel, viewModel.List.RawMaterialTree.Find(cakeFlourId)!);
         await Settle.UntilAsync(viewModel,
             () => viewModel.SelectedRawMaterial?.Id == cakeFlourId && viewModel.AreDetailsReady && !viewModel.History.IsDirty,
             () => $"selected={viewModel.SelectedRawMaterial?.Id} ready={viewModel.AreDetailsReady}");
@@ -861,8 +861,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
     private static void Click(RawMaterialsViewModel viewModel, object row)
     {
-        viewModel.SelectedTreeNodes.Clear();
-        viewModel.SelectedTreeNodes.Add(row);
+        viewModel.List.SelectedTreeNodes.Clear();
+        viewModel.List.SelectedTreeNodes.Add(row);
     }
 
     private async Task<string> NameOfAsync(int rawMaterialId)

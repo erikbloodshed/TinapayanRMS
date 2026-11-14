@@ -44,14 +44,14 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         // RawMaterialUnitRow writes straight through into the stored RawMaterialUnit, and Save hands those very
         // entities to the repository — a unit that lost its id would be saved as a new one and the stored one deleted.
         var (viewModel, materialId) = await OpenPurchasedIngredientAsync();
-        var savedUnitId = viewModel.UnitRows.Should().ContainSingle().Subject.Unit.Id;
+        var savedUnitId = viewModel.Units.Rows.Should().ContainSingle().Subject.Unit.Id;
         savedUnitId.Should().NotBe(0);
 
-        Edit(viewModel, () => viewModel.UnitRows[0].BaseUnitsPerUnit = 50000m);
+        Edit(viewModel, () => viewModel.Units.Rows[0].BaseUnitsPerUnit = 50000m);
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.UnitRows[0].BaseUnitsPerUnit.Should().Be(25000m);
-        viewModel.UnitRows[0].Unit.Id.Should().Be(savedUnitId, "an id of 0 would make Save add a replacement");
+        viewModel.Units.Rows[0].BaseUnitsPerUnit.Should().Be(25000m);
+        viewModel.Units.Rows[0].Unit.Id.Should().Be(savedUnitId, "an id of 0 would make Save add a replacement");
 
         await viewModel.SaveCommand.Execute();
         viewModel.ErrorMessage.Should().BeNull();
@@ -66,13 +66,13 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     public Task Undoing_a_removed_alternative_unit_puts_it_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
-        viewModel.SelectedUnitRow = viewModel.UnitRows[0];
+        viewModel.Units.SelectedRow = viewModel.Units.Rows[0];
 
-        await viewModel.DeleteUnitCommand.Execute();
-        viewModel.UnitRows.Should().BeEmpty();
+        await viewModel.Units.DeleteCommand.Execute();
+        viewModel.Units.Rows.Should().BeEmpty();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.UnitRows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(25000m);
+        viewModel.Units.Rows.Should().ContainSingle().Which.BaseUnitsPerUnit.Should().Be(25000m);
     });
 
     [Test]
@@ -82,19 +82,19 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         Edit(viewModel, () =>
         {
-            var row = viewModel.NewBrandPriceRow();
+            var row = viewModel.PurchaseCost.NewBrandPriceRow();
             row.Brand = "Baker's Best";
-            row.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+            row.UnitKey = viewModel.Units.Rows[0].UnitOfMeasureId!.Value;
             row.Price = 1200m;
-            viewModel.BrandPriceRows.Add(row);
+            viewModel.PurchaseCost.BrandPriceRows.Add(row);
         });
-        viewModel.BrandPriceRows.Should().ContainSingle();
+        viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.BrandPriceRows.Should().BeEmpty();
+        viewModel.PurchaseCost.BrandPriceRows.Should().BeEmpty();
 
         viewModel.TryRedo().Should().BeTrue();
-        var restored = viewModel.BrandPriceRows.Should().ContainSingle().Subject;
+        var restored = viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle().Subject;
         restored.Brand.Should().Be("Baker's Best");
         restored.Price.Should().Be(1200m);
     });
@@ -168,32 +168,32 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
 
         await Settle.UntilAsync(viewModel,
-            () => viewModel.AreDetailsReady && viewModel.BrandPriceRows.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.BrandPriceRows.Count}");
+            () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, brands={viewModel.PurchaseCost.BrandPriceRows.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("nothing typed before the details arrived is worth a step");
         viewModel.TryUndo().Should().BeFalse();
-        viewModel.BrandPriceRows.Should().ContainSingle("the brand prices that arrived are still showing");
+        viewModel.PurchaseCost.BrandPriceRows.Should().ContainSingle("the brand prices that arrived are still showing");
     });
 
     [Test]
     public Task Undoing_an_add_in_edit_puts_the_headers_totals_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
-        viewModel.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% weight loss");
-        viewModel.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
+        viewModel.Recipe.BomTotalWeight.Should().Be(970m, "1,000 g less the 3% weight loss");
+        viewModel.Recipe.BomTotalCost.Should().Be(110m, "1,000 g of sugar at its buffered ₱0.11");
 
-        Edit(viewModel, () => viewModel.AddInEdits.Single().Grams = 0m);
-        viewModel.BomTotalWeight.Should().Be(485m, "the recipe's 500 g, less 3%");
-        viewModel.BomTotalCost.Should().Be(55m);
+        Edit(viewModel, () => viewModel.Recipe.AddIns.Single().Grams = 0m);
+        viewModel.Recipe.BomTotalWeight.Should().Be(485m, "the recipe's 500 g, less 3%");
+        viewModel.Recipe.BomTotalCost.Should().Be(55m);
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.BomTotalWeight.Should().Be(970m, "the restore works the totals out again");
-        viewModel.BomTotalCost.Should().Be(110m);
+        viewModel.Recipe.BomTotalWeight.Should().Be(970m, "the restore works the totals out again");
+        viewModel.Recipe.BomTotalCost.Should().Be(110m);
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.BomTotalWeight.Should().Be(485m);
-        viewModel.BomTotalCost.Should().Be(55m);
+        viewModel.Recipe.BomTotalWeight.Should().Be(485m);
+        viewModel.Recipe.BomTotalCost.Should().Be(55m);
     });
 
     [Test]
@@ -201,14 +201,14 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     {
         var (viewModel, _) = await OpenMadeIngredientAsync();
 
-        Edit(viewModel, () => viewModel.EditingSubAssembly = viewModel.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
-        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count == 2, () => $"recipe lines={viewModel.RecipeLines.Count}");
-        viewModel.BomTotalWeight.Should().Be(1455m, "1,000 g of the thinner recipe and the 500 g add-in, less 3%");
+        Edit(viewModel, () => viewModel.Recipe.SubAssembly = viewModel.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
+        await Settle.UntilAsync(viewModel, () => viewModel.Recipe.Lines.Count == 2, () => $"recipe lines={viewModel.Recipe.Lines.Count}");
+        viewModel.Recipe.BomTotalWeight.Should().Be(1455m, "1,000 g of the thinner recipe and the 500 g add-in, less 3%");
 
         viewModel.TryUndo().Should().BeTrue();
-        await Settle.UntilAsync(viewModel, () => viewModel.RecipeLines.Count == 1, () => $"recipe lines={viewModel.RecipeLines.Count}");
-        viewModel.EditingSubAssembly!.Name.Should().Be("Syrup Base");
-        viewModel.BomTotalWeight.Should().Be(970m);
+        await Settle.UntilAsync(viewModel, () => viewModel.Recipe.Lines.Count == 1, () => $"recipe lines={viewModel.Recipe.Lines.Count}");
+        viewModel.Recipe.SubAssembly!.Name.Should().Be("Syrup Base");
+        viewModel.Recipe.BomTotalWeight.Should().Be(970m);
         viewModel.History.IsDirty.Should().BeFalse("it's back as it was saved");
     });
 
@@ -218,12 +218,12 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, _) = await OpenMadeIngredientAsync();
 
         Edit(viewModel, () => viewModel.EditingWeightLossPercent = 20m);
-        viewModel.BomTotalWeight.Should().Be(800m);
-        viewModel.BomTotalCost.Should().Be(110m, "the weight loss doesn't move the cost");
+        viewModel.Recipe.BomTotalWeight.Should().Be(800m);
+        viewModel.Recipe.BomTotalCost.Should().Be(110m, "the weight loss doesn't move the cost");
 
         viewModel.TryUndo().Should().BeTrue();
         viewModel.EditingWeightLossPercent.Should().Be(3m);
-        viewModel.BomTotalWeight.Should().Be(970m);
+        viewModel.Recipe.BomTotalWeight.Should().Be(970m);
     });
 
     [Test]
@@ -243,7 +243,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     public Task Save_stops_being_offered_once_the_change_is_taken_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
-        Edit(viewModel, () => viewModel.UnitRows[0].BaseUnitsPerUnit = 50000m);
+        Edit(viewModel, () => viewModel.Units.Rows[0].BaseUnitsPerUnit = 50000m);
         (await CanSave(viewModel)).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
@@ -335,25 +335,25 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
         // A 25 kg bag at 1,250, 0.05 a gram, the 10% buffer on top: 0.055. Then it rises to 1,300, 0.052, and the buffer wears to 5.77%.
-        var brand = viewModel.NewBrandPriceRow();
-        brand.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+        var brand = viewModel.PurchaseCost.NewBrandPriceRow();
+        brand.UnitKey = viewModel.Units.Rows[0].UnitOfMeasureId!.Value;
         brand.Price = 1250m;
-        viewModel.BrandPriceRows.Add(brand);
-        viewModel.TypedCostBufferPercent = 10m;
-        viewModel.EditingBufferedCost.Should().Be(0.055m);
-        viewModel.IsBufferOffTarget.Should().BeFalse();
+        viewModel.PurchaseCost.BrandPriceRows.Add(brand);
+        viewModel.PurchaseCost.TypedCostBufferPercent = 10m;
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.055m);
+        viewModel.PurchaseCost.IsBufferOffTarget.Should().BeFalse();
 
         brand.Price = 1300m;
-        viewModel.IsBufferOffTarget.Should().BeTrue();
-        viewModel.TargetBufferText.Should().Be("Target 10%");
+        viewModel.PurchaseCost.IsBufferOffTarget.Should().BeTrue();
+        viewModel.PurchaseCost.TargetBufferText.Should().Be("Target 10%");
 
-        await viewModel.ReapplyTargetBufferCommand.Execute();
+        await viewModel.PurchaseCost.ReapplyTargetBufferCommand.Execute();
 
-        viewModel.EditingCostBufferPercent.Should().Be(10m);
-        viewModel.EditingBufferedCost.Should().Be(0.0572m);
-        viewModel.IsBufferOffTarget.Should().BeFalse();
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m);
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0572m);
+        viewModel.PurchaseCost.IsBufferOffTarget.Should().BeFalse();
         viewModel.TryUndo().Should().BeTrue("it's one step to take back");
-        viewModel.EditingBufferedCost.Should().Be(0.055m);
+        viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.055m);
     });
 
     [Test]
@@ -366,32 +366,32 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         {
             foreach (var (brand, price) in new[] { ("Kingbake", 1300m), ("Gold", 1100m) })
             {
-                var row = viewModel.NewBrandPriceRow();
+                var row = viewModel.PurchaseCost.NewBrandPriceRow();
                 row.Brand = brand;
-                row.UnitKey = viewModel.UnitRows[0].UnitOfMeasureId!.Value;
+                row.UnitKey = viewModel.Units.Rows[0].UnitOfMeasureId!.Value;
                 row.Price = price;
-                viewModel.BrandPriceRows.Add(row);
+                viewModel.PurchaseCost.BrandPriceRows.Add(row);
             }
 
-            viewModel.TypedCostBufferPercent = 10m;
+            viewModel.PurchaseCost.TypedCostBufferPercent = 10m;
         });
-        viewModel.CostFromOptions.Select(o => o.Label).Should().Equal("Dearest brand", "Kingbake", "Gold");
-        viewModel.DearestPurchaseCost.Should().Be(0.052m);
+        viewModel.PurchaseCost.CostFromOptions.Select(o => o.Label).Should().Equal("Dearest brand", "Kingbake", "Gold");
+        viewModel.PurchaseCost.DearestPurchaseCost.Should().Be(0.052m);
 
-        Edit(viewModel, () => viewModel.CostFrom = viewModel.CostFromOptions.Single(o => o.Brand == "Gold"));
+        Edit(viewModel, () => viewModel.PurchaseCost.CostFrom = viewModel.PurchaseCost.CostFromOptions.Single(o => o.Brand == "Gold"));
 
-        viewModel.EditingPreferredBrand.Should().Be("Gold");
-        viewModel.DearestPurchaseCost.Should().Be(0.044m, "Gold's price is what Save costs it at");
-        viewModel.EditingCostBufferPercent.Should().Be(30m, "the fixed 0.0572 is 30% over Gold's 0.044");
-        viewModel.PurchaseBufferedCostText.Should().Contain("over Gold's");
+        viewModel.PurchaseCost.EditingPreferredBrand.Should().Be("Gold");
+        viewModel.PurchaseCost.DearestPurchaseCost.Should().Be(0.044m, "Gold's price is what Save costs it at");
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(30m, "the fixed 0.0572 is 30% over Gold's 0.044");
+        viewModel.PurchaseCost.PurchaseBufferedCostText.Should().Contain("over Gold's");
 
         List<string?> raised = [];
-        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        viewModel.PurchaseCost.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.EditingPreferredBrand.Should().BeNull();
-        viewModel.EditingCostBufferPercent.Should().Be(10m);
-        raised.Should().Contain(nameof(RawMaterialsViewModel.TypedCostBufferPercent), "the Cost Buffer % box shows it");
+        viewModel.PurchaseCost.EditingPreferredBrand.Should().BeNull();
+        viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m);
+        raised.Should().Contain(nameof(RawMaterialPurchaseCost.TypedCostBufferPercent), "the Cost Buffer % box shows it");
     });
 
     private async Task<(RawMaterialsViewModel ViewModel, int MaterialId)> OpenPurchasedIngredientAsync()
@@ -419,8 +419,8 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         await Settle.UntilAsync(viewModel,
-            () => viewModel.AreDetailsReady && viewModel.UnitRows.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, units={viewModel.UnitRows.Count}");
+            () => viewModel.AreDetailsReady && viewModel.Units.Rows.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, units={viewModel.Units.Rows.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, materialId);
@@ -472,8 +472,8 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await viewModel.LoadCommand.Execute();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         await Settle.UntilAsync(viewModel,
-            () => viewModel.AreDetailsReady && viewModel.AddInEdits.Count == 1 && viewModel.RecipeLines.Count == 1,
-            () => $"ready={viewModel.AreDetailsReady}, add-ins={viewModel.AddInEdits.Count}, recipe lines={viewModel.RecipeLines.Count}");
+            () => viewModel.AreDetailsReady && viewModel.Recipe.AddIns.Count == 1 && viewModel.Recipe.Lines.Count == 1,
+            () => $"ready={viewModel.AreDetailsReady}, add-ins={viewModel.Recipe.AddIns.Count}, recipe lines={viewModel.Recipe.Lines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, materialId);

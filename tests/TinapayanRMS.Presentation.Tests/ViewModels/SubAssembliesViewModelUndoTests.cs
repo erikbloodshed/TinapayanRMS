@@ -25,21 +25,21 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     public Task Undoing_a_grams_edit_puts_the_line_and_the_totals_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
-        var weightBefore = viewModel.BatchWeight;
-        var costBefore = viewModel.BatchCost;
+        var weightBefore = viewModel.Batch.BatchWeight;
+        var costBefore = viewModel.Batch.BatchCost;
 
-        Edit(viewModel, () => viewModel.Lines[0].Grams = 500m);
-        viewModel.BatchWeight.Should().NotBe(weightBefore);
+        Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 500m);
+        viewModel.Batch.BatchWeight.Should().NotBe(weightBefore);
 
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.Lines[0].Grams.Should().Be(1000m);
-        viewModel.BatchWeight.Should().Be(weightBefore, "the restore works the totals out again, once");
-        viewModel.BatchCost.Should().Be(costBefore);
+        viewModel.Batch.Lines[0].Grams.Should().Be(1000m);
+        viewModel.Batch.BatchWeight.Should().Be(weightBefore, "the restore works the totals out again, once");
+        viewModel.Batch.BatchCost.Should().Be(costBefore);
         viewModel.History.CanRedo.Should().BeTrue();
 
         viewModel.TryRedo().Should().BeTrue();
-        viewModel.Lines[0].Grams.Should().Be(500m);
+        viewModel.Batch.Lines[0].Grams.Should().Be(500m);
     });
 
     [Test]
@@ -48,33 +48,33 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         // The same trap as on Products: a percentage typed, then the base unticked, so nothing can be typed into
         // the percentage column and the figure is only being held. Restoring through the setters loses it.
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
-        viewModel.Lines[0].IsFormulaBase = true;
-        viewModel.Lines[1].Percent = 65m;
-        viewModel.Lines[0].IsFormulaBase = false;
-        viewModel.Lines[1].CanTypeBakersPercent.Should().BeFalse();
+        viewModel.Batch.Lines[0].IsFormulaBase = true;
+        viewModel.Batch.Lines[1].Percent = 65m;
+        viewModel.Batch.Lines[0].IsFormulaBase = false;
+        viewModel.Batch.Lines[1].CanTypeBakersPercent.Should().BeFalse();
 
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
         viewModel.TryUndo().Should().BeTrue();
 
-        viewModel.Lines[1].AuthoredBakersPercent.Should().Be(65m, "the percentage was waiting for a base, not thrown away");
+        viewModel.Batch.Lines[1].AuthoredBakersPercent.Should().Be(65m, "the percentage was waiting for a base, not thrown away");
 
-        viewModel.Lines[0].IsFormulaBase = true;
-        viewModel.Lines[0].Grams = 2000m;
-        viewModel.Lines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
+        viewModel.Batch.Lines[0].IsFormulaBase = true;
+        viewModel.Batch.Lines[0].Grams = 2000m;
+        viewModel.Batch.Lines[1].Grams.Should().Be(1300m, "65% of the 2,000 g base");
     });
 
     [Test]
     public Task Undoing_a_removed_line_puts_it_back() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
-        viewModel.SelectedLine = viewModel.Lines[1];
+        viewModel.Batch.SelectedLine = viewModel.Batch.Lines[1];
 
         await viewModel.RemoveLineCommand.Execute();
-        viewModel.Lines.Should().ContainSingle();
+        viewModel.Batch.Lines.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.Lines.Should().HaveCount(2);
-        viewModel.BatchWeight.Should().Be(1200m);
+        viewModel.Batch.Lines.Should().HaveCount(2);
+        viewModel.Batch.BatchWeight.Should().Be(1200m);
     });
 
     [Test]
@@ -82,7 +82,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     {
         var (viewModel, subAssemblyId) = await OpenSavedSubAssemblyAsync();
 
-        Edit(viewModel, () => viewModel.Lines[0].Grams = 500m);
+        Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
 
         await viewModel.SaveCommand.Execute();
@@ -107,7 +107,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         recorder.EndUndoStep();
         viewModel.History.CanUndo.Should().BeFalse();
 
-        Edit(viewModel, () => viewModel.Lines[0].Grams = 1000m);
+        Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 1000m);
         viewModel.History.CanUndo.Should().BeFalse("it was retyped to the figure it already had");
     });
 
@@ -139,15 +139,15 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
 
         // 1,000 g of flour and 200 g of sugar, 1,200 g, made 2,400 g: twice each.
-        viewModel.ScaleTo = 2400m;
-        await viewModel.ScaleCommand.Execute();
+        viewModel.Batch.ScaleTo = 2400m;
+        await viewModel.Batch.ScaleCommand.Execute();
 
-        viewModel.Lines.Select(l => l.Grams).Should().Equal(2000m, 400m);
-        viewModel.BatchWeight.Should().Be(2400m);
+        viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(2000m, 400m);
+        viewModel.Batch.BatchWeight.Should().Be(2400m);
         viewModel.History.IsDirty.Should().BeTrue("Save keeps it");
 
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
+        viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
         viewModel.History.IsDirty.Should().BeFalse();
     });
 
@@ -155,20 +155,20 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     public Task Scale_can_make_the_base_weigh_what_is_typed_and_says_when_nothing_is_ticked() => UiThread.RunAsync(async () =>
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
-        viewModel.ScaleOption = viewModel.ScaleOptions.Single(o => o.Basis == BatchScaleBasis.Base);
-        viewModel.ScaleTo = 500m;
+        viewModel.Batch.ScaleOption = viewModel.Batch.ScaleOptions.Single(o => o.Basis == BatchScaleBasis.Base);
+        viewModel.Batch.ScaleTo = 500m;
 
-        await viewModel.ScaleCommand.Execute();
+        await viewModel.Batch.ScaleCommand.Execute();
         viewModel.ErrorMessage.Should().Contain("Nothing is ticked as the base");
-        viewModel.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
+        viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
 
         // The flour ticked as the base: 500 g of it, so the sugar is halved too, still 20% of the flour.
-        Edit(viewModel, () => viewModel.Lines[0].IsFormulaBase = true);
-        await viewModel.ScaleCommand.Execute();
+        Edit(viewModel, () => viewModel.Batch.Lines[0].IsFormulaBase = true);
+        await viewModel.Batch.ScaleCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Lines.Select(l => l.Grams).Should().Equal(500m, 100m);
-        viewModel.Lines[1].Percent.Should().Be(20m);
+        viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(500m, 100m);
+        viewModel.Batch.Lines[1].Percent.Should().Be(20m);
     });
 
     [Test]
@@ -179,7 +179,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
         (await CanSave(viewModel)).Should().BeFalse();
 
-        Edit(viewModel, () => viewModel.Lines[0].Grams = 500m);
+        Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 500m);
 
         viewModel.History.IsDirty.Should().BeTrue();
         (await CanSave(viewModel)).Should().BeTrue();
@@ -287,8 +287,8 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
 
         var viewModel = CreateViewModel();
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single(r => r.Id == subAssemblyId);
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 2, () => $"lines={viewModel.Lines.Count}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single(r => r.Id == subAssemblyId);
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
 
         viewModel.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (viewModel, subAssemblyId);

@@ -7,23 +7,23 @@
         <h2 class="section-header">Sub-Assemblies</h2>
         @* Not one of the form's boxes: it keeps the cursor, and what's typed, when another record takes the form. *@
         <CascadingValue TValue="IUndoRecorder" Value="null" IsFixed="true">
-            <TextField @bind-Value="ViewModel.SearchText" Placeholder="Search sub-assembly" CssClass="list-search" />
+            <TextField @bind-Value="List.SearchText" Placeholder="Search sub-assembly" CssClass="list-search" />
         </CascadingValue>
     </div>
 
     <div class="list-toolbar">
-        <ActionButton Icon="AppIcon.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.NewSubAssemblyInCommand, null)" />
-        <CommandButton Command="ViewModel.NewRoleCommand" Icon="AppIcon.NewFolder" Tooltip="New Folder: a role" Flat="true" />
-        <CommandButton Command="ViewModel.ExpandAllCommand" Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" />
-        <CommandButton Command="ViewModel.CollapseAllCommand" Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" />
+        <ActionButton Icon="AppIcon.Add" Tooltip="New Sub-Assembly" Flat="true" OnClick="() => Commands.Run(List.NewSubAssemblyInCommand, null)" />
+        <CommandButton Command="List.NewRoleCommand" Icon="AppIcon.NewFolder" Tooltip="New Folder: a role" Flat="true" />
+        <CommandButton Command="List.ExpandAllCommand" Icon="AppIcon.ExpandAll" Tooltip="Expand All" Flat="true" />
+        <CommandButton Command="List.CollapseAllCommand" Icon="AppIcon.CollapseAll" Tooltip="Collapse All" Flat="true" />
     </div>
 
     <FolderTree TNode="SubAssemblyTreeNode"
-                Roots="ViewModel.SubAssemblyTree.Roots"
+                Roots="List.SubAssemblyTree.Roots"
                 ChildrenOf="n => n is SubAssemblyFolderNode folder ? folder.Children : null"
                 IsExpanded="n => n is SubAssemblyFolderNode { IsExpanded: true }"
                 SetExpanded="(n, open) => { if (n is SubAssemblyFolderNode folder) folder.IsExpanded = open; }"
-                Selected="ViewModel.SelectedTreeNodes"
+                Selected="List.SelectedTreeNodes"
                 KeyOf="KeyOf"
                 RowClass="@(n => n.IsFolder ? "top-level" : null)"
                 CanDrag="n => Screen.CanDrag(n)"
@@ -31,18 +31,18 @@
                 RenamesOnSecondClick="n => n is SubAssemblyLeafNode { IsNew: false }"
                 CanDrop="(dragged, target) => Screen.CanDrop(dragged, target)"
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
-                MenuFor="ViewModel.TreeMenuFor"
-                Shortcut="ViewModel.TreeShortcut">
+                MenuFor="List.TreeMenuFor"
+                Shortcut="List.TreeShortcut">
         <RowTemplate Context="node">
             @if (node.IsFolder)
             {
                 <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
             }
-            @if (ViewModel.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
+            @if (List.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
             {
                 @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
                 <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
-                             OnCommit="ViewModel.CommitTreeNameAsync" OnCancel="ViewModel.CancelTreeName" />
+                             OnCommit="List.CommitTreeNameAsync" OnCancel="List.CancelTreeName" />
             }
             else
             {
@@ -55,11 +55,11 @@
         </RowTemplate>
     </FolderTree>
 
-    <MoveNoticeBar Notice="@ViewModel.MoveNotice" UndoCommand="ViewModel.UndoMoveCommand" DismissCommand="ViewModel.DismissMoveNoticeCommand" />
+    <MoveNoticeBar Notice="@List.MoveNotice" UndoCommand="List.UndoMoveCommand" DismissCommand="List.DismissMoveNoticeCommand" />
 </section>
 
 @code {
-    [Parameter, EditorRequired] public SubAssembliesViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public SubAssembliesList List { get; set; } = null!;
 
     private static string KeyOf(SubAssemblyTreeNode node) => node switch
     {
@@ -68,8 +68,8 @@
         _ => node.Title,
     };
 
-    private bool IsEditing(SubAssemblyTreeNode node) => ReferenceEquals(ViewModel.TreeNameEdit?.Node, node);
+    private bool IsEditing(SubAssemblyTreeNode node) => ReferenceEquals(List.TreeNameEdit?.Node, node);
 
-    // What can be dragged and dropped where is the screen's to say (IListTreeScreen), as its tests check it.
-    private IListTreeScreen Screen => ViewModel;
+    // What can be dragged and dropped where is the list's to say (IListTreeScreen), as its tests check it.
+    private IListTreeScreen Screen => List;
 }

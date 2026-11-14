@@ -12,7 +12,7 @@
    set instead of ingredients in grams, and one figure, Set Cost. *@
 <CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
     <div class="record-screen">
-        <SubAssemblyList ViewModel="ViewModel!" />
+        <SubAssemblyList List="ViewModel!.List" />
 
         <div class="record-details">
             <section class="card header-card">
@@ -47,15 +47,15 @@
                     {
                         <div class="figure-tile tile-teal">
                             <div class="figure-label">Batch Weight</div>
-                            <div class="figure-value">@ViewModel!.BatchWeight.ToString("#,0.##") g</div>
+                            <div class="figure-value">@ViewModel!.Batch.BatchWeight.ToString("#,0.##") g</div>
                         </div>
                         <div class="figure-tile tile-flamingo">
                             <div class="figure-label">Batch Cost</div>
-                            <div class="figure-value">@ViewModel!.BatchCost.ToString("N2")</div>
+                            <div class="figure-value">@ViewModel!.Batch.BatchCost.ToString("N2")</div>
                         </div>
                         <div class="figure-tile tile-yellow">
                             <div class="figure-label">Cost per g</div>
-                            <div class="figure-value">@ViewModel!.CostPerGram.ToString("N4")</div>
+                            <div class="figure-value">@ViewModel!.Batch.CostPerGram.ToString("N4")</div>
                         </div>
                     }
                 </div>
@@ -83,14 +83,14 @@
                                     }
                                     else
                                     {
-                                        <IngredientLinesGrid @ref="_lines" Items="ViewModel!.Lines" NewItem="ViewModel!.NewLine" Ingredients="ViewModel!.Ingredients"
-                                                             @bind-SelectedItem="ViewModel!.SelectedLine" PercentHeader="@ViewModel!.PercentHeader" />
+                                        <IngredientLinesGrid @ref="_lines" Items="ViewModel!.Batch.Lines" NewItem="ViewModel!.Batch.NewLine" Ingredients="ViewModel!.Ingredients"
+                                                             @bind-SelectedItem="ViewModel!.Batch.SelectedLine" PercentHeader="@ViewModel!.Batch.PercentHeader" />
                                     }
                                     <div class="lines-footer">
                                         <p class="caption">
                                             @(ViewModel!.IsPackaging
                                                 ? "A product whose packaging links this set takes one whole set per sellable unit."
-                                                : ViewModel!.FormulaBaseCaption)
+                                                : ViewModel!.Batch.FormulaBaseCaption)
                                         </p>
                                         <div class="button-row">
                                             <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="InsertLineAsync"
@@ -102,13 +102,13 @@
                                     {
                                         <div class="scale-row">
                                             <label class="form-label" for="sa-scale-basis">Scale</label>
-                                            <PickField ID="sa-scale-basis" TItem="BatchScaleOption" Items="ViewModel!.ScaleOptions" TextOf="o => o.Label"
-                                                       Value="ViewModel!.ScaleOption" ValueChanged="o => { if (o is not null) ViewModel!.ScaleOption = o; }" CssClass="scale-basis" />
+                                            <PickField ID="sa-scale-basis" TItem="BatchScaleOption" Items="ViewModel!.Batch.ScaleOptions" TextOf="o => o.Label"
+                                                       Value="ViewModel!.Batch.ScaleOption" ValueChanged="o => { if (o is not null) ViewModel!.Batch.ScaleOption = o; }" CssClass="scale-basis" />
                                             <span>to</span>
-                                            <NumberField TValue="decimal?" Value="ViewModel!.ScaleTo" ValueChanged="v => ViewModel!.ScaleTo = v" Format="#,0.##" Min="0"
+                                            <NumberField TValue="decimal?" Value="ViewModel!.Batch.ScaleTo" ValueChanged="v => ViewModel!.Batch.ScaleTo = v" Format="#,0.##" Min="0"
                                                          Placeholder="Grams" CssClass="scale-to" />
                                             <span>g</span>
-                                            <CommandButton Command="ViewModel!.ScaleCommand" Icon="AppIcon.Calculate" Label="Scale"
+                                            <CommandButton Command="ViewModel!.Batch.ScaleCommand" Icon="AppIcon.Calculate" Label="Scale"
                                                            Tooltip="Multiplies every line so the batch, or its base, weighs this much. Each line keeps its percentage. Undo takes it back." />
                                         </div>
                                     }
@@ -120,8 +120,8 @@
                             <ContentTemplate>
                                 <div class="tab-card">
                                     <h2 class="section-header">Dependents</h2>
-                                    <DependentTiles Products="ViewModel!.Dependents" MadeIngredients="ViewModel!.MadeIngredients" Caption="@ViewModel!.DependentsText"
-                                                 Open="id => Commands.Run(ViewModel!.OpenProductCommand, id)" OpenMadeIngredient="id => Commands.Run(ViewModel!.OpenRawMaterialCommand, id)" />
+                                    <DependentTiles Products="ViewModel!.Dependents.Products" MadeIngredients="ViewModel!.Dependents.MadeIngredients" Caption="@ViewModel!.Dependents.Text"
+                                                 Open="id => Commands.Run(ViewModel!.Dependents.OpenProductCommand, id)" OpenMadeIngredient="id => Commands.Run(ViewModel!.Dependents.OpenRawMaterialCommand, id)" />
                                 </div>
                             </ContentTemplate>
                         </TabItem>
@@ -148,7 +148,7 @@
         var viewModel = ViewModel!;
 
         // Make In-House Ingredient: the made ingredient's name and the Made category it goes in.
-        AddSubscription(viewModel.PromptForMadeIngredient.RegisterHandler(async interaction =>
+        AddSubscription(viewModel.List.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
     }
 

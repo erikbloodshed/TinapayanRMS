@@ -1,32 +1,48 @@
 using System.Collections.ObjectModel;
 using ReactiveUI;
 using RxVoid = ReactiveUI.Primitives.RxVoid;
-using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A record screen with a list beside its form: Products, Raw Materials and Sub-Assemblies. What the three lists work the
-/// same way: the rows picked, shared with the tree, and what picking one does; the row whose name is being typed in place;
-/// and the notice of the last move. Each screen gives it its own tree's rows (<see cref="ShowingRow"/>,
-/// <see cref="PickRowFromList"/>), what a name typed does (<see cref="CommitTreeNameToAsync"/>) and what Esc takes away
-/// (<see cref="TreeNameCancelled"/>); its moves, menus and folders stay its own.
+/// What a record screen's list asks of the screen, whichever screen it is: what any part of its form asks
+/// (<see cref="IFormPartHost"/>), and what the list's own actions need of the form. Every record screen is one
+/// (RecordFormViewModel); each list asks for the record it shows, and what its actions do to it, through an interface of its
+/// own on top of this one (ISubAssembliesListHost).
 /// </summary>
-public abstract class ListFormViewModel<TSnapshot> : RecordFormViewModel<TSnapshot>
-    where TSnapshot : class, IFormSnapshot<TSnapshot>
+public interface IRecordListHost : IFormPartHost
+{
+    /// <summary>Whether the form holds changes not saved yet.</summary>
+    bool IsDirty { get; }
+
+    /// <summary>The screen's error showing, if any: what the last action refused, for the list to put its box back.</summary>
+    string? ErrorMessage { get; }
+
+    /// <summary>Runs <paramref name="then"/>, which replaces the record the form shows, once its unsaved changes are saved or let go.</summary>
+    Task AfterUnsavedChangesAsync(Action then);
+}
+
+/// <summary>
+/// A record screen's list, a part of the screen (SubAssembliesViewModel.List): what the lists of Products, Raw Materials and
+/// Sub-Assemblies work the same way. The rows picked, shared with the tree, and what picking one does; the row whose name is
+/// being typed in place; and the notice of the last move. Each screen's list says which row shows the form's record
+/// (<see cref="ShowingRow"/>), what picking a row does (<see cref="PickRowFromList"/>), what a name typed does
+/// (<see cref="CommitTreeNameToAsync"/>) and what Esc takes away (<see cref="TreeNameCancelled"/>), and holds its own tree,
+/// menus, moves and folders. Its list card binds to it, and its tree asks it what can be dragged where (IListTreeScreen).
+/// </summary>
+public abstract class RecordList : ReactiveObject
 {
     private object? _selectedTreeNode;
     private string? _moveNotice;
 
-    protected ListFormViewModel(ILogger logger)
-        : base(logger)
+    protected RecordList()
     {
         ListNaming = new TreeNaming(ListSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
         DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
     }
 
-    /// <summary>The rows picked in the list, as the tree and this screen change them (TreeSelection).</summary>
+    /// <summary>The rows picked in the list, as the tree and the screen change them (TreeSelection).</summary>
     protected TreeSelection ListSelection { get; } = new();
 
     /// <summary>The naming in place the list does, and its rules (TreeNaming).</summary>
@@ -73,7 +89,7 @@ public abstract class ListFormViewModel<TSnapshot> : RecordFormViewModel<TSnapsh
 
     /// <summary>
     /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it: what it does is the
-    /// screen's (<see cref="CommitTreeNameToAsync"/>). An empty name, or the name it had, is an Esc; a name refused shows
+    /// list's (<see cref="CommitTreeNameToAsync"/>). An empty name, or the name it had, is an Esc; a name refused shows
     /// why, and the box comes back with it. A second call for the same box, as Enter's box is left, does nothing.
     /// </summary>
     public Task CommitTreeNameAsync(string text) => ListNaming.CommitAsync(text);
@@ -81,15 +97,23 @@ public abstract class ListFormViewModel<TSnapshot> : RecordFormViewModel<TSnapsh
     /// <summary>Esc in the list's name box: the name stays as it was, and a new record's or folder's row goes, with nothing saved.</summary>
     public void CancelTreeName() => ListNaming.Cancel();
 
+    /// <summary>
+    /// Puts the row of the record shown first among the rows picked, and so makes it <see cref="SelectedTreeNode"/>: alone,
+    /// unless it's picked already, when the rows picked with it stay. Nothing shown, or a search hiding it, picks no row. The
+    /// screen calls it as the record it shows changes.
+    /// </summary>
+    public void SyncTreeSelection() => ListSelection.BringFirst(ShowingRow);
+
     /// <summary>The row of the record the form shows, or the new record's row, or null for neither (or a search hiding it).</summary>
     protected abstract object? ShowingRow { get; }
 
-    /// <summary>The name of the screen's property listing the records picked (SelectedTreeProducts and the like), raised as the rows picked change.</summary>
+    /// <summary>The name of the list's property listing the records picked (SelectedTreeSubAssemblies and the like), raised as the rows picked change.</summary>
     protected abstract string PickedRecordsProperty { get; }
 
     /// <summary>
     /// The user picked <paramref name="row"/> first in the list, by a click or a key: a saved record's row other than the one
-    /// shown picks its record (PickFromList); any other row (a folder's, the new record's) leaves the form as it is.
+    /// shown picks its record (RecordFormViewModel.PickFromList); any other row (a folder's, the new record's) leaves the form
+    /// as it is.
     /// </summary>
     protected abstract void PickRowFromList(object row);
 
@@ -103,13 +127,7 @@ public abstract class ListFormViewModel<TSnapshot> : RecordFormViewModel<TSnapsh
     protected abstract void TreeNameCancelled(object node);
 
     /// <summary>
-    /// Puts the row of the record shown first among the rows picked, and so makes it <see cref="SelectedTreeNode"/>: alone,
-    /// unless it's picked already, when the rows picked with it stay. Nothing shown, or a search hiding it, picks no row.
-    /// </summary>
-    protected void SyncTreeSelection() => ListSelection.BringFirst(ShowingRow);
-
-    /// <summary>
-    /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by this screen. Its first row is
+    /// The list's selection changed: by a click (or several, with Ctrl or Shift), or by the screen. Its first row is
     /// SelectedTreeNode, and a row the user picked first goes to the screen (<see cref="PickRowFromList"/>).
     /// </summary>
     private void TreeSelectionChanged()

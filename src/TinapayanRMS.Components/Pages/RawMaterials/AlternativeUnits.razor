@@ -4,7 +4,7 @@
 <div class="tab-columns">
     <div class="tab-card">
         <h2 class="section-header">Alternative Units</h2>
-        <LineGrid TRow="RawMaterialUnitRow" Items="ViewModel.UnitRows" NewItem="ViewModel.NewUnitRow" @bind-SelectedItem="ViewModel.SelectedUnitRow">
+        <LineGrid TRow="RawMaterialUnitRow" Items="ViewModel.Units.Rows" NewItem="ViewModel.Units.NewRow" @bind-SelectedItem="ViewModel.Units.SelectedRow">
             <Header>
                 <th>Alternative Unit</th>
                 <th class="col-unit">Abbreviation</th>
@@ -22,20 +22,20 @@
             </Row>
         </LineGrid>
         <div class="button-row align-right form-extra">
-            <CommandButton Command="ViewModel.DeleteUnitCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
+            <CommandButton Command="ViewModel.Units.DeleteCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
         </div>
     </div>
 
     <div class="tab-card">
         <h2 class="section-header">Unit Conversion Overview</h2>
-        @if (ViewModel.UnitRows.Count == 0)
+        @if (ViewModel.Units.Rows.Count == 0)
         {
             <p class="empty-state">No alternative units yet. Add one to see how it converts to @(ViewModel.BaseUnitName).</p>
         }
         else
         {
             <div class="conversions">
-                @foreach (var row in ViewModel.UnitRows)
+                @foreach (var row in ViewModel.Units.Rows)
                 {
                     <div class="conversion">
                         <span class="conversion-unit">1 @row.UnitName</span>

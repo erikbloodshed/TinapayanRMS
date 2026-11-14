@@ -1,7 +1,7 @@
 @* A saved purchased material's prices over time (the WPF PriceHistoryCard), newest first, each worked out per base unit. *@
 <div class="tab-card tab-card-fill">
     <h2 class="section-header">Price History</h2>
-    <PickGrid TItem="RawMaterialPriceRow" DataSource="ViewModel.PriceHistory" @bind-SelectedItem="ViewModel.SelectedPriceRow">
+    <PickGrid TItem="RawMaterialPriceRow" DataSource="ViewModel.PriceLog.Entries" @bind-SelectedItem="ViewModel.PriceLog.SelectedEntry">
         <Columns>
             <GridColumn Field="Entry.Id" IsPrimaryKey="true" Visible="false" />
             <GridColumn Field="@nameof(RawMaterialPriceRow.Date)" HeaderText="Date" Width="130">
@@ -14,7 +14,7 @@
         </Columns>
     </PickGrid>
     <div class="button-row align-right form-extra">
-        <CommandButton Command="ViewModel.DeletePriceCommand" Icon="AppIcon.Delete" Label="Delete Price" />
+        <CommandButton Command="ViewModel.PriceLog.DeleteCommand" Icon="AppIcon.Delete" Label="Delete Price" />
     </div>
 </div>
 

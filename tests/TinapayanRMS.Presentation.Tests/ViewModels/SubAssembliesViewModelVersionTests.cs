@@ -40,7 +40,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         await RecordAsItStandsAsync(packId);
 
         var viewModel = await OpenAsync(doughId);
-        viewModel.Lines.Single().Grams = 450m;
+        viewModel.Batch.Lines.Single().Grams = 450m;
         await viewModel.SaveCommand.Execute();
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -73,7 +73,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         List<string> asked = [];
         var viewModel = await OpenAsync(doughId, asksAboutCosts: true);
         viewModel.ConfirmDelete.RegisterHandler(context => { asked.Add(context.Input); context.SetOutput(false); });
-        viewModel.Lines.Single().Grams = 450m;
+        viewModel.Batch.Lines.Single().Grams = 450m;
         await viewModel.SaveCommand.Execute();
 
         asked.Should().ContainSingle().Which.Should().Be(
@@ -169,8 +169,8 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
     {
         var viewModel = CreateViewModel(asksAboutCosts);
         await viewModel.LoadCommand.Execute();
-        viewModel.SelectedRow = viewModel.Rows.Single(r => r.Id == subAssemblyId);
-        await Settle.UntilAsync(viewModel, () => viewModel.Lines.Count == 1, () => $"lines={viewModel.Lines.Count}, error={viewModel.ErrorMessage}");
+        viewModel.SelectedRow = viewModel.List.Rows.Single(r => r.Id == subAssemblyId);
+        await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 1, () => $"lines={viewModel.Batch.Lines.Count}, error={viewModel.ErrorMessage}");
         return viewModel;
     }
 

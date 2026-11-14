@@ -28,3 +28,28 @@ public interface IScreenPartHost
     /// <summary>Shows and logs a failure the part caught itself, after <paramref name="context"/> when there is one (ViewModelBase.ShowFailure).</summary>
     void ShowFailure(Exception exception, string? context = null);
 }
+
+/// <summary>
+/// What a part of a record screen's form asks of the screen: to run as the screen's own (<see cref="IScreenPartHost"/>), to
+/// record each change it makes as one step of the form's undo history (<see cref="IUndoRecorder"/>, the
+/// <see cref="UndoRecorderExtensions.AsUndoStep"/> extension), and whether a change it hears of is the user's. Every record
+/// screen is one (RecordFormViewModel); a part that needs more of its screen asks through an interface of its own on top of
+/// this one.
+/// </summary>
+public interface IFormPartHost : IScreenPartHost, IUndoRecorder
+{
+    /// <summary>A load is merging fresh data into the screen (ViewModelBase.IsRefreshing): what changes meanwhile isn't the user's.</summary>
+    bool IsRefreshing { get; }
+
+    /// <summary>A load or an undo is writing the screen wholesale (ViewModelBase.IsBusyApplying): what changes meanwhile isn't the user's.</summary>
+    bool IsBusyApplying { get; }
+
+    /// <summary>Runs <paramref name="action"/> once <paramref name="question"/> is answered Yes, as the screen's own (ViewModelBase.RunWithConfirmationAsync).</summary>
+    Task RunWithConfirmationAsync(string question, Func<Task> action);
+
+    /// <summary>
+    /// Runs <paramref name="merge"/>, fresh data a part read going into the screen, as a load's merge (ViewModelBase.ApplyRefresh):
+    /// what it changes isn't the user's, so nothing takes it for an edit.
+    /// </summary>
+    void ApplyRefresh(Action merge);
+}

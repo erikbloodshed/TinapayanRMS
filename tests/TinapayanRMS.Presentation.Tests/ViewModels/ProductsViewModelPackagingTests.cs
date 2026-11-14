@@ -59,7 +59,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.EditingName = "Ensaymada";
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab, "a new product has only the Packaging tab");
+        viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.PackagingTab, "a new product has only the Packaging tab");
         viewModel.Packaging.IsPackagingEditable.Should().BeTrue("its table is there to type into from the start");
 
         viewModel.Packaging.LineEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
@@ -88,7 +88,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         foreach (var mode in new[] { UsageFormMode.New, UsageFormMode.Link, UsageFormMode.Copy })
         {
-            await viewModel.AddUsageCommand.Execute(mode);
+            await viewModel.Recipe.AddUsageCommand.Execute(mode);
             viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
             viewModel.UsageForm.LinkableSubAssemblies.Should().BeEmpty("neither the packaging set nor Cream Loaf's packaging is a recipe section");
         }
@@ -107,7 +107,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel, () => viewModel.SelectedProduct?.Id == productId && viewModel.AreDetailsReady, () => $"selected={viewModel.SelectedProduct?.Id}, ready={viewModel.AreDetailsReady}");
-        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
+        viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
 
         // Link offers only the Sub-Assemblies screen's packaging sets, never another product's packaging.
         await viewModel.Packaging.StartLinkingCommand.Execute();
@@ -225,7 +225,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single();
         await Settle.UntilAsync(viewModel, () => viewModel.Packaging.LineEdits.Count == 1, () => $"lines={viewModel.Packaging.LineEdits.Count}");
-        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
+        viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
 
         await viewModel.Packaging.MakeCopyCommand.Execute();
@@ -325,12 +325,12 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await SaveBulkAsync(productId, boxId, productsPerPack: 6);
         var viewModel = await OpenLinkedAsync();
         viewModel.Costing.Costs.Packaging.Should().Be(4m, "a ₱2 wrapper a piece, and a ₱12 box shared by 6");
-        (await viewModel.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
+        (await viewModel.Recipe.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
         (await viewModel.Packaging.RemoveLinkCommand.CanExecute.FirstAsync()).Should().BeTrue();
 
         await viewModel.Packaging.RemoveLinkCommand.Execute();
 
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
+        viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.PackagingTab);
         viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
         viewModel.Packaging.IsPackagingEditable.Should().BeTrue();
         viewModel.Packaging.LineEdits.Should().BeEmpty();
@@ -353,9 +353,9 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var cartonId = await AddPackagingAsync("Carton", 12m);
         var viewModel = await CreateLoadedViewModelAsync();
         await viewModel.NewCommand.Execute();
-        viewModel.RecipeTabs.Should().Equal(viewModel.PackagingTab);
-        viewModel.SelectedRecipeTab.Should().BeSameAs(viewModel.PackagingTab);
-        viewModel.HasRecipeSections.Should().BeFalse();
+        viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
+        viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.PackagingTab);
+        viewModel.Recipe.HasRecipeSections.Should().BeFalse();
         viewModel.Packaging.BulkCostText.Should().Be("No bulk packaging. Add what one bulk pack takes, such as a box several products share.");
 
         viewModel.EditingName = "Pandesal";
@@ -474,7 +474,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == "Ensaymada");
         await Settle.UntilAsync(viewModel,
-            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+            () => viewModel.Recipe.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.Recipe.SelectedRecipeTab?.Header}");
         return viewModel;
     }
 
@@ -487,7 +487,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await CreateLoadedViewModelAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
-            () => viewModel.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.SelectedRecipeTab?.Header}");
+            () => viewModel.Recipe.SelectedRecipeTab is PackagingRecipeTab && viewModel.Packaging.LineEdits.Count == 1, () => $"tab={viewModel.Recipe.SelectedRecipeTab?.Header}");
         return viewModel;
     }
 

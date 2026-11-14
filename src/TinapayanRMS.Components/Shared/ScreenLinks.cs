@@ -25,8 +25,8 @@ public sealed class ScreenLinks : IDisposable
         PriceSimulatorViewModel priceSimulator,
         PrintTabViewModel print)
     {
-        _subscriptions.Add(subAssemblies.ProductOpenRequests
-            .Merge(rawMaterials.ProductOpenRequests)
+        _subscriptions.Add(subAssemblies.Dependents.ProductOpenRequests
+            .Merge(rawMaterials.Dependents.ProductOpenRequests)
             .Merge(reports.ProductOpenRequests)
             .Merge(priceSimulator.ProductOpenRequests)
             .Subscribe(productId => navigation.NavigateTo($"products/{productId}")));
@@ -39,11 +39,11 @@ public sealed class ScreenLinks : IDisposable
         }));
 
         _subscriptions.Add(reports.RawMaterialOpenRequests
-            .Merge(subAssemblies.RawMaterialOpenRequests)
+            .Merge(subAssemblies.Dependents.RawMaterialOpenRequests)
             .Subscribe(rawMaterialId => navigation.NavigateTo($"raw-materials/{rawMaterialId}")));
 
         _subscriptions.Add(products.SubAssemblyOpenRequests
-            .Merge(rawMaterials.SubAssemblyOpenRequests)
+            .Merge(rawMaterials.Recipe.SubAssemblyOpenRequests)
             .Subscribe(subAssemblyId => navigation.NavigateTo($"sub-assemblies/{subAssemblyId}")));
 
         _subscriptions.Add(products.PrintRequests.Subscribe(scope =>

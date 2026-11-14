@@ -36,7 +36,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
             ],
             []));
         await AddPackagingLineAsync(productId);
-        var viewModel = await OpenAsync(productId, vm => vm.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
+        var viewModel = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 2 && vm.Packaging.LineEdits.Count > 0);
 
         var printout = await PrintAsync(viewModel);
 
@@ -81,12 +81,12 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         printout.Sections.Single().Lines.Select(l => (l.Ingredient, l.Grams)).Should().Equal(("Flour", 1000m), ("Sugar", 500m));
         printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
-        viewModel.UsageEdits.Single().Lines.Should().HaveCount(2, "the form was applied, as Save applies it");
+        viewModel.Recipe.UsageEdits.Single().Lines.Should().HaveCount(2, "the form was applied, as Save applies it");
         viewModel.UsageForm.IsUsageFormOpen.Should().BeTrue("its tab shows it again, as after a Save");
 
         // Applying it was one step, which Undo takes back.
         viewModel.TryUndo().Should().BeTrue();
-        viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
+        viewModel.Recipe.UsageEdits.Single().Lines.Should().ContainSingle();
     });
 
     [Test]
@@ -101,7 +101,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
         viewModel.ErrorMessage.Should().Contain("Sugar", "a line with no grams can't go into the recipe");
         requests.Should().Be(0, "the Print tab doesn't open");
-        viewModel.UsageEdits.Single().Lines.Should().ContainSingle();
+        viewModel.Recipe.UsageEdits.Single().Lines.Should().ContainSingle();
     });
 
     [Test]
@@ -201,7 +201,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
-            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
+            () => $"ready={viewModel.AreDetailsReady}, usages={viewModel.Recipe.UsageEdits.Count}, lines={viewModel.UsageForm.FormLines.Count}");
         return viewModel;
     }
 

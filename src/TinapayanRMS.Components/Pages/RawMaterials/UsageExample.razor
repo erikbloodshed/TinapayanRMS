@@ -6,18 +6,18 @@
     <div class="buffer-row">
         <div class="field-stack">
             <label class="field-label" for="rm-example-quantity">Use Quantity</label>
-            <NumberField ID="rm-example-quantity" TValue="decimal" @bind-Value="ViewModel.ExampleQuantity" Format="#,0.####" Min="0" />
+            <NumberField ID="rm-example-quantity" TValue="decimal" @bind-Value="ViewModel.UsageExample.Quantity" Format="#,0.####" Min="0" />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-example-unit">Unit</label>
-            <PickField ID="rm-example-unit" TItem="RawMaterialUnitOption" Items="ViewModel.ExampleUnitOptions" TextField="Name" @bind-Value="ViewModel.ExampleUnit" />
+            <PickField ID="rm-example-unit" TItem="RawMaterialUnitOption" Items="ViewModel.UsageExample.UnitOptions" TextField="Name" @bind-Value="ViewModel.UsageExample.Unit" />
         </div>
         <div class="field-stack field-stack-button">
-            <CommandButton Command="ViewModel.CalculateExampleCommand" Icon="AppIcon.Calculate" Label="Calculate" Primary="true" />
+            <CommandButton Command="ViewModel.UsageExample.CalculateCommand" Icon="AppIcon.Calculate" Label="Calculate" Primary="true" />
         </div>
     </div>
 
-    @if (ViewModel.ExampleResult is { } result)
+    @if (ViewModel.UsageExample.Result is { } result)
     {
         <div class="example-result">
             <div class="example-title">@result.Title</div>
