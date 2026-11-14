@@ -116,7 +116,7 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
         var (viewModel, _) = await OpenTwoLineProductAsync();
         viewModel.UsageForm.SelectedFormLine = viewModel.UsageForm.FormLines[1];
 
-        await viewModel.RemoveFormLineCommand.Execute();
+        await viewModel.UsageForm.RemoveLineCommand.Execute();
         viewModel.UsageForm.FormLines.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();

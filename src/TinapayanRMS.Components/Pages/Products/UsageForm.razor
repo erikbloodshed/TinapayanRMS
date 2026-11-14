@@ -42,14 +42,14 @@
                         title="@linked.LinkedFromToolTip">
                     @linked.LinkedFromText
                 </button>
-                <CommandButton Command="ViewModel.StartChangingLinkCommand" Icon="AppIcon.Edit" Flat="true"
+                <CommandButton Command="ViewModel.UsageForm.StartChangingLinkCommand" Icon="AppIcon.Edit" Flat="true"
                                Tooltip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept." />
             }
             @if (ViewModel.UsageForm.IsChangingLink)
             {
                 <PickField TItem="LinkableSubAssemblyOption" Items="ViewModel.UsageForm.ChangeLinkOptions" TextField="DisplayName" @bind-Value="ViewModel.UsageForm.ChangeLinkTarget"
                            Placeholder="Link instead…" CssClass="change-link" Tooltip="A sub-assembly from the Sub-Assemblies screen to link in this one's place" />
-                <CommandButton Command="ViewModel.CancelChangingLinkCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the link as it is" />
+                <CommandButton Command="ViewModel.UsageForm.CancelChangingLinkCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the link as it is" />
             }
         </div>
 
@@ -113,7 +113,7 @@
                         <div class="button-row">
                             <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
                                           Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                            <CommandButton Command="ViewModel.RemoveFormLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                            <CommandButton Command="ViewModel.UsageForm.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                         </div>
                     }
                 </div>
@@ -134,7 +134,7 @@
                         <div class="button-row">
                             <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
                                           Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
-                            <CommandButton Command="ViewModel.RemoveFormAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
+                            <CommandButton Command="ViewModel.UsageForm.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
                         </div>
                     </div>
                 </div>

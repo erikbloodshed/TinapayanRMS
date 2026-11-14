@@ -172,7 +172,7 @@ public sealed partial class ProductsViewModel
                 }
 
                 RefreshRecipeRows(linkedSubAssemblies, linkedLines);
-                RefreshFormLines();
+                UsageForm.ResolveRows();
                 RefreshLinkableOptions();
 
                 // An add form opened before the roles were loaded takes the first role it can have, as it would have.

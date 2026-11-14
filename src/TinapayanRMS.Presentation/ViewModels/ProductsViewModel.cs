@@ -22,7 +22,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (<see cref="ProductComponents.ComponentEdits"/>), each bringing its recipe cost.
 /// </summary>
 public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, IListTreeScreen,
-    IProductPackagingHost, IProductVersionHistoryHost
+    IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -799,12 +799,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
     /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
     public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; private set; }
 
-    /// <summary>The linked badge's Edit: shows the picker of what the section could link instead (IsChangingLink).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> StartChangingLinkCommand { get; private set; }
-
-    /// <summary>Puts the badge back without changing the link.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CancelChangingLinkCommand { get; private set; }
-
     /// <summary>
     /// Move to Sub-Assemblies on one of the product's own: Save puts it on the Sub-Assemblies screen, keeping its name and
     /// lines, and links it. Unlink the other way round.
@@ -826,9 +820,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
 
     /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; private set; }
-    public ReactiveCommand<RxVoid, RxVoid> RemoveFormLineCommand { get; private set; }
-
-    public ReactiveCommand<RxVoid, RxVoid> RemoveFormAddInCommand { get; private set; }
     public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; private set; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
@@ -886,7 +877,7 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
             packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
             costingDefaultsRepository, unitOfWork);
         Packaging = new ProductPackaging(this, subAssemblyRepository, packagingLineRepository);
-        UsageForm = new ProductUsageForm(id => Ingredients.FirstOrDefault(m => m.Id == id), () => CostBasis);
+        UsageForm = new ProductUsageForm(this);
         ComponentsTable = new ProductComponents(
             _savedProducts,
             id => Products.FirstOrDefault(p => p.Id == id),
@@ -933,7 +924,6 @@ public sealed partial class ProductsViewModel : ListFormViewModel<ProductFormSna
         WireRecordCommands();
         WireListCommands();
         WireRecipeCommands();
-        WireUsageFormCommands();
         WireSaveCommands();
         WireCostingCommands();
     }

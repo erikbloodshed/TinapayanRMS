@@ -1,25 +1,92 @@
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using DynamicData;
+using DynamicData.Binding;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
+using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// The Products screen's add/edit sub-assembly form (UsageFormPanel, through ProductsViewModel.UsageForm):
-/// the section it edits or the one it adds, its fields and tables, and what it shows worked out from them.
-/// The screen keeps what the form does to the recipe (opening it, Apply, a link changed, a move), since that changes the
-/// recipe's sections, its tabs and the undo history these fields are part of, and says when the lines or what the form
-/// adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
+/// What the section form (<see cref="ProductUsageForm"/>) asks of the Products screen, besides its runners, messages and
+/// undo steps: the screen's cost basis and ingredients, which its rows are priced at and from, and what a linked section
+/// could link instead. The screen implements it explicitly.
 /// </summary>
-/// <param name="findIngredient">An ingredient as the screen last loaded it, for a row that prices itself.</param>
-/// <param name="costBasis">The screen's cost basis, buffered or not, which a new row is priced at.</param>
-public sealed class ProductUsageForm(
-    Func<int, RawMaterial?> findIngredient, Func<CostBasis> costBasis) : ReactiveObject, IDisposable
+public interface IProductUsageFormHost : IScreenPartHost, IUndoRecorder
 {
+    /// <summary>Which of the materials' costs the screen shows, buffered or not: what a row is priced at.</summary>
+    CostBasis CostBasis { get; }
+
+    /// <summary>The ingredients as the screen last loaded them, which a row prices itself from.</summary>
+    IReadOnlyList<RawMaterial> Ingredients { get; }
+
+    /// <summary>Every sub-assembly that could be linked or copied, as the screen last loaded them.</summary>
+    IReadOnlyList<SubAssembly> Linkable { get; }
+
+    /// <summary>The sub-assemblies the recipe's sections link or own (0 for a section not saved yet).</summary>
+    IEnumerable<int> SectionSubAssemblyIds { get; }
+}
+
+/// <summary>
+/// The Products screen's add/edit sub-assembly form (UsageFormPanel, through ProductsViewModel.UsageForm):
+/// the section it edits or the one it adds, its fields and tables, and what it shows worked out from them. Its own
+/// controls are its own: the Remove Line under each table, a linked section's Edit and Cancel, and the piece size an add
+/// starts at. The screen keeps what the form does to the recipe (opening it, Apply, a link changed, a move), since that
+/// changes the recipe's sections, its tabs and the undo history these fields are part of, and says when the lines or what
+/// the form adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
+/// </summary>
+public sealed class ProductUsageForm : ReactiveObject, IDisposable
+{
+    private readonly IProductUsageFormHost _host;
+
+    /// <param name="host">The Products screen: its cost basis and ingredients, what can be linked, its messages and its undo steps.</param>
+    public ProductUsageForm(IProductUsageFormHost host)
+    {
+        _host = host;
+
+        // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
+        // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
+        FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe();
+        FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe();
+
+        // The add form's piece size starts as its role has it (StartingPieceSize), so it follows a role picked, or a
+        // copy's taken, while it's still what the role before started it at: neither figure typed.
+        RolePicks
+            .Where(pick => IsUsageFormOpen && IsAddingUsage && IsPieceSizeAsStarted(pick.Before))
+            .Subscribe(_ => StartPieceSize());
+
+        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(f => f.IsEditingLinkedUsage));
+        CancelChangingLinkCommand = ReactiveCommand.Create(() => { IsChangingLink = false; });
+
+        RemoveLineCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => FormLines.Remove(SelectedFormLine!)),
+            this.WhenAnyValue(f => f.SelectedFormLine).Select(line => line is not null));
+
+        RemoveAddInCommand = ReactiveCommand.Create(
+            () => host.AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
+            this.WhenAnyValue(f => f.SelectedFormAddIn).Select(line => line is not null));
+    }
+
+    /// <summary>The linked badge's Edit: shows the picker of what the section could link instead (IsChangingLink).</summary>
+    public ReactiveCommand<RxVoid, RxVoid> StartChangingLinkCommand { get; }
+
+    /// <summary>Puts the badge back without changing the link.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> CancelChangingLinkCommand { get; }
+
+    /// <summary>Removes the line picked in the form's lines table, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+
+    /// <summary>Removes the add-in picked in the form's add-ins table, as one undo step.</summary>
+    public ReactiveCommand<RxVoid, RxVoid> RemoveAddInCommand { get; }
+
+    /// <summary>An ingredient as the screen last loaded it, for a row that prices itself.</summary>
+    private RawMaterial? FindIngredient(int id) => _host.Ingredients.FirstOrDefault(m => m.Id == id);
+
     /// <summary>
     /// The roles the form offers: every recipe role, as a recipe can have several sub-assemblies in one, told apart by
     /// their names. Never the Packaging role: the Packaging tab takes the product's packaging.
@@ -44,7 +111,7 @@ public sealed class ProductUsageForm(
     public ObservableCollection<IngredientLineRow> FormLines { get; } = [];
 
     /// <summary>The line the form table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
-    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(findIngredient, FormFormulaBase) { CostBasis = costBasis() };
+    public Func<IngredientLineRow> NewFormLine => () => new IngredientLineRow(FindIngredient, FormFormulaBase) { CostBasis = _host.CostBasis };
 
     /// <summary>
     /// The form's add-ins, for a sub-assembly the product links: its own extras on top of the owner's
@@ -53,7 +120,7 @@ public sealed class ProductUsageForm(
     public ObservableCollection<IngredientLineRow> FormAddIns { get; } = [];
 
     /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
-    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(findIngredient, FormFormulaBase) { CostBasis = costBasis() };
+    public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(FindIngredient, FormFormulaBase) { CostBasis = _host.CostBasis };
 
     /// <summary>The form's formula base as last worked out, for a line started in either table's add row.</summary>
     internal decimal FormFormulaBase { get; set; }
@@ -552,6 +619,99 @@ public sealed class ProductUsageForm(
         this.RaisePropertyChanged(nameof(HasFormAddIns));
         this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
         this.RaisePropertyChanged(nameof(FormAddInsBadgeText));
+    }
+
+    /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
+    private void StartChangingLink()
+    {
+        var usedIds = _host.SectionSubAssemblyIds.ToHashSet();
+        ChangeLinkOptions.MergeFrom(
+            [.. _host.Linkable
+                .Where(s => s.OwnerProductId is null && s.Role?.IsPackaging != true && !usedIds.Contains(s.Id))
+                .Select(s => new LinkableSubAssemblyOption(s))],
+            o => o.Key);
+
+        if (ChangeLinkOptions.Count == 0)
+        {
+            _host.ShowError("There's no other sub-assembly to link: every one on the Sub-Assemblies screen is in this recipe already.");
+            return;
+        }
+
+        _host.ShowError(null);
+        ChangeLinkTarget = null;
+        IsChangingLink = true;
+    }
+
+    /// <summary>
+    /// The piece size the add form starts at in <paramref name="role"/>. A section made in a product-owned role
+    /// (SubAssemblyRole.IsProductOwned), new or copied, is written for the one piece it goes into, so it starts at a
+    /// yield of 1: its weight per piece is the whole batch, and follows the lines as they're typed. Any other starts
+    /// with no size. So does a link, whose batch is the Sub-Assemblies screen's and shared.
+    /// </summary>
+    private (UsageAuthoredField Field, decimal Value) StartingPieceSize(SubAssemblyRole? role) =>
+        EditingUsageMode != UsageFormMode.Link && role is { IsProductOwned: true }
+            ? (UsageAuthoredField.Yield, 1m)
+            : (UsageAuthoredField.WeightPerPiece, 0m);
+
+    /// <summary>Shows the piece size the add form's role starts at.</summary>
+    internal void StartPieceSize()
+    {
+        var (field, value) = StartingPieceSize(EditingUsageRole);
+        ShowPieceSize(field, value);
+    }
+
+    /// <summary>
+    /// Whether the add form's piece size is still the one <paramref name="role"/> starts it at, with neither figure
+    /// typed. Worked out from the form, not remembered, so it holds for a form an undo put back. No size is no size,
+    /// whichever box it was left in.
+    /// </summary>
+    internal bool IsPieceSizeAsStarted(SubAssemblyRole? role)
+    {
+        var (field, value) = StartingPieceSize(role);
+        return AuthoredValue == value && (value == 0 || AuthoredField == field);
+    }
+
+    /// <summary>Puts <paramref name="lines"/> in the form's lines table, in place of whatever it held.</summary>
+    internal void ShowLines(IEnumerable<SectionLine> lines)
+    {
+        FormLines.Clear();
+        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
+    }
+
+    /// <summary>The same for the add-ins table under it.</summary>
+    internal void ShowAddIns(IEnumerable<SectionLine> addIns)
+    {
+        FormAddIns.Clear();
+        FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
+    }
+
+    /// <summary>Whether the lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
+    internal bool IsShowing(IReadOnlyList<SectionLine> lines) =>
+        FormLines.Count == lines.Count
+        && FormLines.Zip(lines).All(pair =>
+            pair.First.IngredientId == pair.Second.Ingredient.Id
+            && pair.First.Grams == pair.Second.Grams
+            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
+            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
+
+    /// <summary>
+    /// The lines and add-ins at their ingredients' refreshed costs, as the screen last loaded them. It reprices in place
+    /// rather than refilling the tables, so a refresh arriving while an add-in is being typed doesn't throw it away.
+    /// </summary>
+    internal void ResolveRows()
+    {
+        var ingredientsById = _host.Ingredients.ToDictionary(m => m.Id);
+        IngredientLineRow.Resolve(FormLines, ingredientsById);
+        IngredientLineRow.Resolve(FormAddIns, ingredientsById);
+    }
+
+    /// <summary>Every row priced at the screen's cost basis again: Unbuffered or Buffered was pressed.</summary>
+    internal void Reprice()
+    {
+        foreach (var row in FormLines.Concat(FormAddIns))
+        {
+            row.CostBasis = _host.CostBasis;
+        }
     }
 
     public void Dispose()

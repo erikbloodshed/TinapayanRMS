@@ -338,10 +338,10 @@ public sealed partial class ProductsViewModel
                         UsageForm.EditingUsage = replacement;
 
                         // A linked one's lines as they now are, from the Sub-Assemblies screen or changed here and applied;
-                        // lines typed into the form and not applied yet stay, repriced by RefreshFormLines.
-                        if (replacement.IsLinked && IsFormShowing(previous.Lines))
+                        // lines typed into the form and not applied yet stay, repriced by UsageForm.ResolveRows.
+                        if (replacement.IsLinked && UsageForm.IsShowing(previous.Lines))
                         {
-                            ShowFormLines(replacement.Lines);
+                            UsageForm.ShowLines(replacement.Lines);
                         }
                     }
                 }
@@ -656,39 +656,5 @@ public sealed partial class ProductsViewModel
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
         Packaging.ResolveRows();
-    }
-
-    /// <summary>
-    /// The form's lines and add-ins at their ingredients' refreshed costs. It reprices in place rather than
-    /// refilling the tables, so a refresh arriving while an add-in is being typed doesn't throw it away.
-    /// </summary>
-    private void RefreshFormLines()
-    {
-        var ingredientsById = Ingredients.ToDictionary(m => m.Id);
-        IngredientLineRow.Resolve(UsageForm.FormLines, ingredientsById);
-        IngredientLineRow.Resolve(UsageForm.FormAddIns, ingredientsById);
-    }
-
-    /// <summary>Puts <paramref name="lines"/> in the form's table, in place of whatever it held.</summary>
-    private void ShowFormLines(IEnumerable<SectionLine> lines)
-    {
-        UsageForm.FormLines.Clear();
-        UsageForm.FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
-    }
-
-    /// <summary>Whether the form's lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
-    private bool IsFormShowing(IReadOnlyList<SectionLine> lines) =>
-        UsageForm.FormLines.Count == lines.Count
-        && UsageForm.FormLines.Zip(lines).All(pair =>
-            pair.First.IngredientId == pair.Second.Ingredient.Id
-            && pair.First.Grams == pair.Second.Grams
-            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
-            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
-
-    /// <summary>The same for the add-ins table under it.</summary>
-    private void ShowFormAddIns(IEnumerable<SectionLine> addIns)
-    {
-        UsageForm.FormAddIns.Clear();
-        UsageForm.FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
     }
 }

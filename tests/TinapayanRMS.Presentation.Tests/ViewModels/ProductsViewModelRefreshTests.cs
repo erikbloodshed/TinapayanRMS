@@ -944,7 +944,7 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
         await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
 
-        await viewModel.StartChangingLinkCommand.Execute();
+        await viewModel.UsageForm.StartChangingLinkCommand.Execute();
 
         viewModel.UsageForm.IsChangingLink.Should().BeTrue();
         viewModel.UsageForm.IsShowingLinkBadge.Should().BeFalse("the picker takes the badge's place");
@@ -977,6 +977,61 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
         usage.SubAssemblyId.Should().Be(richId);
         usage.AuthoredValue.Should().Be(30m);
         (await dbContext.SubAssemblies.CountAsync(s => s.Id == houseId, Cancellation)).Should().Be(1, "the old one stays on the Sub-Assemblies screen");
+    });
+
+    [Test]
+    public Task Cancel_on_a_link_being_changed_puts_the_badge_back_and_keeps_the_link() => UiThread.RunAsync(async () =>
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var subAssemblies = new SubAssemblyRepository(CreateDbContextFactory());
+        var houseId = await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "House Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        await subAssemblies.SaveStandaloneAsync(new SubAssembly { Name = "Rich Dough", RoleId = roleId }, [(flourId, 1200m)], Cancellation);
+        var productId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m)]));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        await viewModel.UsageForm.StartChangingLinkCommand.Execute();
+        viewModel.UsageForm.IsChangingLink.Should().BeTrue();
+
+        await viewModel.UsageForm.CancelChangingLinkCommand.Execute();
+
+        viewModel.UsageForm.IsChangingLink.Should().BeFalse();
+        viewModel.UsageForm.IsShowingLinkBadge.Should().BeTrue("the badge comes back in the picker's place");
+        viewModel.UsageEdits.Single().SubAssemblyId.Should().Be(houseId, "nothing was picked, so the link stays");
+        viewModel.History.IsDirty.Should().BeFalse("opening and closing the picker changes nothing Save writes");
+    });
+
+    [Test]
+    public Task Remove_Line_under_a_linked_sections_add_ins_takes_out_the_one_picked_as_one_undo_step() => UiThread.RunAsync(async () =>
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.2m);
+        var houseId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        var productId = await AddProductAsync("Cream Loaf");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)] }]));
+        var viewModel = CreateViewModel();
+        await viewModel.LoadCommand.Execute();
+        viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
+        await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady && viewModel.UsageEdits.Count == 1, () => $"usage rows={viewModel.UsageEdits.Count}");
+        await viewModel.EditUsageCommand.Execute(viewModel.UsageEdits.Single());
+        var form = viewModel.UsageForm;
+        (await form.RemoveAddInCommand.CanExecute.FirstAsync()).Should().BeFalse("no add-in is picked yet");
+
+        form.SelectedFormAddIn = form.FormAddIns.Single(l => l.IngredientId == butterId);
+        (await form.RemoveAddInCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        await form.RemoveAddInCommand.Execute();
+
+        form.FormAddIns.Select(l => l.IngredientId).Should().Equal(ubeId);
+        viewModel.TryUndo().Should().BeTrue();
+        form.FormAddIns.Select(l => l.IngredientId).Should().BeEquivalentTo([butterId, ubeId], "Undo puts it back");
     });
 
     [Test]

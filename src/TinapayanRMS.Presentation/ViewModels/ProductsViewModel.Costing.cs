@@ -227,11 +227,7 @@ public sealed partial class ProductsViewModel
     {
         CostBasis = CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
         this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-        foreach (var row in UsageForm.FormLines.Concat(UsageForm.FormAddIns))
-        {
-            row.CostBasis = CostBasis;
-        }
-
+        UsageForm.Reprice();
         Packaging.Reprice();
         ComponentsTable.Reprice();
 

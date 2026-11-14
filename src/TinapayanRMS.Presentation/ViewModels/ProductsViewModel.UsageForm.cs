@@ -31,12 +31,6 @@ public sealed partial class ProductsViewModel
                 RebaseSettledForm();
             });
 
-        // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
-        // screen's costs, buffered or not; the add rows' factories see to a row still being typed. The Packaging tab prices
-        // its own rows.
-        UsageForm.FormLines.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-        UsageForm.FormAddIns.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = CostBasis).Subscribe();
-
         // A line picked, typed or deleted in the form's table: it's priced, and the batch and preview follow.
         UsageForm.FormLines.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
@@ -64,31 +58,14 @@ public sealed partial class ProductsViewModel
                 .Where(target => target is not null && UsageForm.IsChangingLink)
                 .Select(target => target!),
             ChangeLinkAsync);
-
-        // The add form's piece size starts as its role has it (StartingPieceSize), so it follows a role picked, or a
-        // copy's taken, while it's still what the role before started it at: neither figure typed.
-        UsageForm.RolePicks
-            .Where(pick => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage && IsPieceSizeAsStarted(pick.Before))
-            .Subscribe(_ => StartPieceSize());
     }
 
-    /// <summary>The section form's commands.</summary>
-    [MemberNotNull(
-        nameof(StartChangingLinkCommand), nameof(CancelChangingLinkCommand), nameof(RemoveFormLineCommand),
-        nameof(RemoveFormAddInCommand))]
-    private void WireUsageFormCommands()
-    {
-        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(x => x.UsageForm.IsEditingLinkedUsage));
-        CancelChangingLinkCommand = ReactiveCommand.Create(() => { UsageForm.IsChangingLink = false; });
+    // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the screen's own CostBasis.
+    IReadOnlyList<RawMaterial> IProductUsageFormHost.Ingredients => Ingredients;
 
-        RemoveFormLineCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => UsageForm.FormLines.Remove(UsageForm.SelectedFormLine!)),
-            this.WhenAnyValue(x => x.UsageForm.SelectedFormLine).Select(line => line is not null));
+    IReadOnlyList<SubAssembly> IProductUsageFormHost.Linkable => _linkable;
 
-        RemoveFormAddInCommand = ReactiveCommand.Create(
-            () => AsUndoStep(() => UsageForm.FormAddIns.Remove(UsageForm.SelectedFormAddIn!)),
-            this.WhenAnyValue(x => x.UsageForm.SelectedFormAddIn).Select(line => line is not null));
-    }
+    IEnumerable<int> IProductUsageFormHost.SectionSubAssemblyIds => UsageEdits.Select(u => u.SubAssemblyId);
 
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     private void StartUsageFormMode()
@@ -118,57 +95,7 @@ public sealed partial class ProductsViewModel
         UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? UsageForm.FormRoleOptions.FirstOrDefault();
         UsageForm.EditingUsageName = null;
         UsageForm.EditingUsageSource = null;
-        StartPieceSize();
-    }
-
-    /// <summary>
-    /// The piece size the add form starts at in <paramref name="role"/>. A section made in a product-owned role
-    /// (SubAssemblyRole.IsProductOwned), new or copied, is written for the one piece it goes into, so it starts at a
-    /// yield of 1: its weight per piece is the whole batch, and follows the lines as they're typed. Any other starts
-    /// with no size. So does a link, whose batch is the Sub-Assemblies screen's and shared.
-    /// </summary>
-    private (UsageAuthoredField Field, decimal Value) StartingPieceSize(SubAssemblyRole? role) =>
-        UsageForm.EditingUsageMode != UsageFormMode.Link && role is { IsProductOwned: true }
-            ? (UsageAuthoredField.Yield, 1m)
-            : (UsageAuthoredField.WeightPerPiece, 0m);
-
-    /// <summary>Shows the piece size the add form's role starts at.</summary>
-    private void StartPieceSize()
-    {
-        var (field, value) = StartingPieceSize(UsageForm.EditingUsageRole);
-        UsageForm.ShowPieceSize(field, value);
-    }
-
-    /// <summary>
-    /// Whether the add form's piece size is still the one <paramref name="role"/> starts it at, with neither figure
-    /// typed. Worked out from the form, not remembered, so it holds for a form an undo put back. No size is no size,
-    /// whichever box it was left in.
-    /// </summary>
-    private bool IsPieceSizeAsStarted(SubAssemblyRole? role)
-    {
-        var (field, value) = StartingPieceSize(role);
-        return UsageForm.AuthoredValue == value && (value == 0 || UsageForm.AuthoredField == field);
-    }
-
-    /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>
-    private void StartChangingLink()
-    {
-        var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
-        UsageForm.ChangeLinkOptions.MergeFrom(
-            [.. _linkable
-                .Where(s => s.OwnerProductId is null && s.Role?.IsPackaging != true && !usedIds.Contains(s.Id))
-                .Select(s => new LinkableSubAssemblyOption(s))],
-            o => o.Key);
-
-        if (UsageForm.ChangeLinkOptions.Count == 0)
-        {
-            ErrorMessage = "There's no other sub-assembly to link: every one on the Sub-Assemblies screen is in this recipe already.";
-            return;
-        }
-
-        ErrorMessage = null;
-        UsageForm.ChangeLinkTarget = null;
-        UsageForm.IsChangingLink = true;
+        UsageForm.StartPieceSize();
     }
 
     /// <summary>
@@ -253,7 +180,7 @@ public sealed partial class ProductsViewModel
             return;
         }
 
-        ShowFormLines(lines);
+        UsageForm.ShowLines(lines);
 
         // A copy takes its source's role. Not its name, which is another product's and role's ("Cheese Roll Filling:
         // Cheese"): Save names the copy after this product.
@@ -575,8 +502,8 @@ public sealed partial class ProductsViewModel
 
         // A linked one's lines show too, read-only: they're the Sub-Assemblies screen's. What is this product's is its piece
         // size and its add-ins, which go in the table under them, open if there are any.
-        ShowFormLines(usage.Lines);
-        ShowFormAddIns(usage.AddIns);
+        UsageForm.ShowLines(usage.Lines);
+        UsageForm.ShowAddIns(usage.AddIns);
         UsageForm.SelectedFormLine = null;
         UsageForm.SelectedFormAddIn = null;
         UsageForm.ShowPieceSize(usage.AuthoredField, usage.AuthoredValue);
@@ -608,7 +535,7 @@ public sealed partial class ProductsViewModel
         && string.IsNullOrWhiteSpace(UsageForm.EditingUsageName)
         && UsageForm.FormLines.All(l => l.IngredientId is null && l.Grams == 0)
         && UsageForm.FormAddIns.All(l => l.IngredientId is null && l.Grams == 0)
-        && IsPieceSizeAsStarted(UsageForm.EditingUsageRole);
+        && UsageForm.IsPieceSizeAsStarted(UsageForm.EditingUsageRole);
 
     /// <summary>The screen's derived updates, run as their inputs change, or once at the end of a restore.</summary>
     private readonly DerivedUpdates _updates = new();
