@@ -116,13 +116,14 @@
         }
     };
 
-    private Task LoadAsync() => RunAsync(() => ViewModel.LoadCommand.Execute());
+    // A load draws the boxes as they come: only a try, which clears what was typed, draws them afresh.
+    private Task LoadAsync() => RunAsync(() => ViewModel.LoadCommand.Execute(), isTry: false);
 
-    private Task SignInAsync() => RunAsync(() => ViewModel.SignInCommand.Execute());
+    private Task SignInAsync() => RunAsync(() => ViewModel.SignInCommand.Execute(), isTry: true);
 
-    private Task SetPasswordAsync() => RunAsync(() => ViewModel.SetPasswordCommand.Execute());
+    private Task SetPasswordAsync() => RunAsync(() => ViewModel.SetPasswordCommand.Execute(), isTry: true);
 
-    private async Task RunAsync(Func<IObservable<RxVoid>> command)
+    private async Task RunAsync(Func<IObservable<RxVoid>> command, bool isTry)
     {
         if (_busy)
         {
@@ -137,7 +138,11 @@
         finally
         {
             _busy = false;
-            _attempt++;
+            if (isTry)
+            {
+                _attempt++;
+            }
+
             _focusWanted = true;
 
             // Gone already when the try signed in: the window drew the screens in its place.
