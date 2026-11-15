@@ -12,12 +12,13 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("93ab4857-9bfb-44df-a525-2dc7868e5385"), entityTypeCount: 25)
+        : base(skipDetectChanges: false, modelId: new Guid("ec0f4bf4-7633-4394-8ed9-a2a9acca7f3c"), entityTypeCount: 26)
     {
     }
 
     partial void Initialize()
     {
+        var accessSettings = AccessSettingsEntityType.Create(this);
         var costingDefaults = CostingDefaultsEntityType.Create(this);
         var costingParameters = CostingParametersEntityType.Create(this);
         var ingredientAddInLine = IngredientAddInLineEntityType.Create(this);
@@ -83,6 +84,7 @@ public partial class TinapayanRMSDbContextModel
         UsageAddInLineEntityType.CreateForeignKey1(usageAddInLine, rawMaterial);
         UsageAddInLineEntityType.CreateForeignKey2(usageAddInLine, productSubAssemblyUsage);
 
+        AccessSettingsEntityType.CreateAnnotations(accessSettings);
         CostingDefaultsEntityType.CreateAnnotations(costingDefaults);
         CostingParametersEntityType.CreateAnnotations(costingParameters);
         IngredientAddInLineEntityType.CreateAnnotations(ingredientAddInLine);

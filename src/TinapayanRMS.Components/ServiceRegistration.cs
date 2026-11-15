@@ -71,6 +71,12 @@ public static class ServiceRegistration
         services.AddScoped<ProductCategoriesViewModel>();
         services.AddScoped<SubAssemblyRolesViewModel>();
         services.AddScoped<CostingDefaultsViewModel>();
+        services.AddScoped<SecuritySettingsViewModel>();
+
+        // Whether the window is locked, one for the process, so the page loading again after a restore keeps it; the
+        // sign-in panel's ViewModel is the page's.
+        services.AddSingleton(new AppLock(TimeProvider.System));
+        services.AddScoped<SignInViewModel>();
 
         // The Vim keys, for this page: ticking the box in Settings → Keyboard turns them on or off at once.
         services.AddScoped<VimKeysState>();

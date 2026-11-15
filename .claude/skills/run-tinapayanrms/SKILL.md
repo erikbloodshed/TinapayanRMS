@@ -65,7 +65,7 @@ does. To check the build the shop will run, install it into a trial folder (`scr
 Addresses: `raw-materials`, `sub-assemblies`, `products` (`products/<id>` opens one), `reports`, `price-simulator`,
 `print`, `settings` (`settings/units-of-measure`, `material-categories`, `product-categories`, `roles`,
 `costing-defaults`, `keyboard`, `database`). Useful selectors: `text=<label>`, `button[aria-label='Close']` (the title
-bar's buttons are named: Navigation menu, Find, Back, Forward, Minimize, Maximize, Close), `.screen-tab-link[href='reports']`,
+bar's buttons are named: Navigation menu, Find, Lock, Back, Forward, Minimize, Maximize, Close), `.screen-tab-link[href='reports']`,
 `.tree-row` (a list's rows; folders carry `aria-expanded`, `.tree-expander` opens one), `.e-dialog .e-footer-content
 button:has-text('No')` (a dialog's button), and the fields' ids (`eval "[...document.querySelectorAll('input[id]')].map(i => i.id)"`).
 
@@ -93,6 +93,11 @@ dotnet test --solution TinapayanRMS.slnx
 
 ## Gotchas
 
+- **It starts signed in.** `launch` sets `TINAPAYANRMS_SIGNED_IN=1`, which a Debug build honours: no sign-in panel and
+  no auto-lock, since a check can't know the user's password. To check the panel itself, set `TINAPAYANRMS_SIGN_IN=1`
+  and run against a copy of the dev database (`ConnectionStrings__Default=Host=localhost;Database=<copy>;Username=tinapayanrms`),
+  never the user's: setting a password there would lock them out. Don't click **Lock** on the dev database either way:
+  with no password set there, the panel offers to set one. A Release copy (`TINAPAYANRMS_EXE`) always asks for the password.
 - **The page's shot leaves out the window's frame and its title bar's caption**; `window` captures them. Shots of the
   page are of the page as drawn, popups and dialogs included.
 - **A load takes a moment.** An action's shot waits 1.2 s, but the first visit to a screen after a start (a Debug build

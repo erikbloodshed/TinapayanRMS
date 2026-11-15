@@ -132,6 +132,18 @@ public static class MauiProgram
                 .OnPlatformMessage(WindowsWindow.OnMessage)));
 
             var app = builder.Build();
+#if DEBUG
+            // A check in the window (the run-tinapayanrms skill) starts signed in, with no auto-lock: it can't know the
+            // user's password, and it drives the page by script, which the auto-lock wouldn't see as a key or a click. A
+            // Debug build only: the installed app is a Release one, which always asks.
+            if (Environment.GetEnvironmentVariable("TINAPAYANRMS_SIGNED_IN") == "1")
+            {
+                var appLock = app.Services.GetRequiredService<TinapayanRMS.Presentation.ViewModels.AppLock>();
+                appLock.SetAutoLockMinutes(0);
+                appLock.Unlock();
+                Log.Warning("Started signed in, for a check (TINAPAYANRMS_SIGNED_IN)");
+            }
+#endif
             BackgroundWork.Start(app.Services);
             return app;
         }

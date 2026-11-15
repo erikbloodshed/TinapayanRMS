@@ -58,6 +58,7 @@ public static class DatabaseHost
         services.AddSingleton<IPackagingLineRepository, PackagingLineRepository>();
         services.AddSingleton<ICostingParametersRepository, CostingParametersRepository>();
         services.AddSingleton<ICostingDefaultsRepository, CostingDefaultsRepository>();
+        services.AddSingleton<IAccessSettingsRepository, AccessSettingsRepository>();
         services.AddSingleton<IPackagingLinkRepository, PackagingLinkRepository>();
         services.AddSingleton<IProductVersionRepository, ProductVersionRepository>();
         services.AddSingleton<IPriceScenarioRepository, PriceScenarioRepository>();

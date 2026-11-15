@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261112122740_ProductFolders";
+    public override string LastMigrationId => "20261115054714_AccessSettings";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -27,6 +27,47 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.AccessSettings", b =>
+            {
+                b.Property<int>("Id")
+                    .HasColumnType("integer")
+                    .HasColumnName("id");
+
+                b.Property<int>("AutoLockMinutes")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer")
+                    .HasDefaultValue(15)
+                    .HasColumnName("auto_lock_minutes");
+
+                b.Property<DateTime?>("PasswordChangedAt")
+                    .HasColumnType("timestamp without time zone")
+                    .HasColumnName("password_changed_at");
+
+                b.Property<byte[]>("PasswordHash")
+                    .HasColumnType("bytea")
+                    .HasColumnName("password_hash");
+
+                b.Property<int>("PasswordIterations")
+                    .HasColumnType("integer")
+                    .HasColumnName("password_iterations");
+
+                b.Property<byte[]>("PasswordSalt")
+                    .HasColumnType("bytea")
+                    .HasColumnName("password_salt");
+
+                b.HasKey("Id")
+                    .HasName("pk_access_settings");
+
+                b.ToTable("access_settings", t =>
+                    {
+                        t.HasCheckConstraint("CK_AccessSettings_AutoLockMinutes", "auto_lock_minutes >= 0 AND auto_lock_minutes <= 240");
+
+                        t.HasCheckConstraint("CK_AccessSettings_PasswordWhole", "(password_hash IS NULL AND password_salt IS NULL) OR (password_hash IS NOT NULL AND password_salt IS NOT NULL AND password_iterations > 0)");
+
+                        t.HasCheckConstraint("CK_AccessSettings_SingleRow", "id = 1");
+                    });
+            });
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.CostingDefaults", b =>
             {

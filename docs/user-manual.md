@@ -149,7 +149,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 ### The main window
 
 - **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens on the PC at a time: opening it again brings the window that's open to the front. If it's open in another Windows sign-in on the PC, it says so and doesn't open (see [Troubleshooting](#14-troubleshooting-and-questions)).
-- **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
+- **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Lock**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
   - **Raw Materials**, **Sub-Assemblies** and **Products** have a tab from the start. **Reports**, **Price Simulator**, **Print** and **Settings** get one the first time you open them.
@@ -160,6 +160,17 @@ The column heading changes to show which one you're looking at. Only the grams a
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find (press it twice with the Vim keys on: the first press only leaves Insert). The best 50 matches are listed; type more of the name to narrow them. Your last search is still there the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
 - Changes made on one screen show up on another the next time you open it.
 - **Closing the window** closes the app. What you've saved is kept. If a product, sub-assembly or raw material has changes you **haven't** saved, the app asks whether to save them first, as it does when you go to another screen (see [Editing and saving](#editing-and-saving)). While a save is still on its way, the window waits for it rather than ask. While **Settings → Database** is backing up, copying or restoring, the window doesn't close, and a red notice says why: close it once that's done (a restore restarts the app by itself).
+
+### Signing in and locking
+
+The app has one password, for whoever uses it: there's no user name.
+
+- **When the app opens** it asks for the password before it shows anything else. Type it and press **Enter** or **Sign In**. The very first time, or after the password was cleared (see [Troubleshooting](#14-troubleshooting-and-questions)), it asks you to **set** one instead: type it in both boxes, at least 6 characters. Capitals, spaces and accents all count, exactly as typed.
+- **Lock** (the padlock at the top right, before Back) covers the window with the password box at once, for when you step away. Everything stays as you left it underneath, changes not yet saved included, and the password brings you back to it. While it's locked, only the password box takes typing, and the title bar keeps just **Minimize**, **Maximize** and **Close**.
+- **The window locks itself** after 15 minutes without a key press, a click, a scroll or a mouse movement in it. Change the time, or turn it off, in [Settings → Security](#security). A backup running in Settings → Database carries on while it's locked.
+- **A wrong password** says so, and the box empties. After five wrong ones in a row, the next try has to wait 30 seconds.
+- **Closing a locked window** still asks about changes you haven't saved, as it always does.
+- The password is kept in the app's data, so it's the same for every Windows user on the PC, and a backup keeps the password it had: restoring an older backup brings back the password from then. Anyone who can sign in to Windows as the app's user can clear it (see [Troubleshooting](#14-troubleshooting-and-questions)), so keep that Windows sign-in to yourself too.
 
 ### Lists as folder trees
 
@@ -270,7 +281,7 @@ A command can be shortened as long as it stays clear, as in **:del**, **:pro** a
 
 ## 3. First-time setup
 
-On a new database, set things up in this order. Each step uses what the one before it made.
+On a new database, the app first asks you to set its password (see [Signing in and locking](#signing-in-and-locking)). Then set things up in this order. Each step uses what the one before it made.
 
 1. **Units of measure** (Settings → Units of Measure): the units you buy and use things in: g, kg, piece, pack, bag, cm, roll, and so on.
 2. **Material categories** (Settings → Material Categories): how raw materials are grouped, such as Flour, Dairy, In-House, Boxes and Ribbons. Each category is for ingredients, made ingredients or packaging.
@@ -288,7 +299,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It opens as a screen of its own, with a tab at the end of the tab strip, and has seven tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
+Open **Settings** from the bottom of the navigation menu. It opens as a screen of its own, with a tab at the end of the tab strip, and has eight tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard**, **Security** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
 
 ### Units of Measure
 
@@ -354,6 +365,13 @@ Each product keeps its own stage and percentages, and each raw material its own 
 **Vim keys** turns on the keys described in [Vim keys](#vim-keys). The change takes effect at once.
 
 The setting is kept for you on this computer, not in the bakeshop's data. Turning it on doesn't change the app for anyone else, or for you on another computer.
+
+### Security
+
+The app's password and how soon the window locks itself (see [Signing in and locking](#signing-in-and-locking)). Both are kept in the app's data, not just for you.
+
+- **Password**: to change it, type the **Current Password**, then the new one in **New Password** and again in **Type It Again**, and press **Change Password** (or **Enter**). The boxes empty after each try. If there's no password (after restoring a backup from before passwords, say), there's no Current Password box: type the new one twice and press **Set Password**.
+- **Auto-Lock**: **Lock After (Minutes)** is how long the window waits, with no key press, click, scroll or mouse movement in it, before it locks itself: 1 to 240, or **0** to lock it only when you click **Lock**. Press **Save**; it takes effect at once.
 
 ### Database
 
@@ -1311,7 +1329,7 @@ TinapayanRMS is installed from its source folder, on the PC that holds its datab
 
 1. Close TinapayanRMS if it's open. If you forget, the script closes it for you, unless it's asking whether to save changes: then it stops, and you answer, close the app and run it again.
 2. Open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-TinapayanRMS.ps1`. It builds the app, which takes a few minutes, copies it to `%LocalAppData%\Programs\TinapayanRMS`, and puts a **TinapayanRMS** shortcut in the Start menu and on the Desktop. Add `-NoDesktopShortcut` to leave the Desktop as it is.
-3. If the update changed the database, the script's last lines say how to apply it. Do that before opening the app, or some screens show an error.
+3. If the update changed the database, the script's last lines say how to apply it. Do that before opening the app, or it can't open: its password box says the database is behind this version.
 
 Run the same command again to update the app after the code changes. How the lists were left, your Vim keys setting, the backups and the database all stay as they are. To remove the app, run `scripts\Uninstall-TinapayanRMS.ps1` the same way.
 
@@ -1324,7 +1342,7 @@ The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanR
 
 1. Close TinapayanRMS if it's open. If it's still open, the installer closes it, and any changes not saved are lost.
 2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
-3. If the update changed the database, apply it before opening the app, or some screens show an error.
+3. If the update changed the database, apply it before opening the app, or it can't open: its password box says the database is behind this version.
 
 To update, open the newer installer the same way: it replaces the version installed. It won't install over a newer version. Each user's lists, Vim keys setting, backups and the database stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
 
@@ -1442,6 +1460,15 @@ Only one copy of TinapayanRMS opens at a time, because a save in one copy could 
 
 **Opening the app says it's open in another Windows sign-in on this PC.**
 Someone else signed in to Windows on this PC has TinapayanRMS open. Only one copy can be open on the PC, for the same reason as above. Sign in as them and close it there, or ask them to, then open it again.
+
+**The password is forgotten.**
+Clear it, and the app asks for a new one. On the PC that holds the database, signed in to Windows as the app's user, open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Reset-Password.ps1`. It asks first; answer **y**. The next time the app opens, or its window is locked, it asks you to set a new password. Nothing else changes, the auto-lock's minutes included.
+
+**"Too many wrong tries: wait 30 seconds, then try again."**
+Five wrong passwords in a row make the next try wait half a minute. Check Caps Lock while you wait.
+
+**The password box shows an error instead of asking for the password.**
+The app couldn't reach its data: the message says why, such as the database being off or behind this version of the app. Once that's put right, press **Try Again**. The app never opens without the password, even then.
 
 **Opening the app says TinapayanRMS couldn't start.**
 Something stopped it before its window opened. The message says what, and where the log file is: show both to whoever looks after the app.

@@ -23,6 +23,10 @@
     close                   the title bar's Close, which asks about unsaved changes; says so if the window stays
 
     TINAPAYANRMS_EXE, when set, is the copy to drive (a trial install, say) in place of the Debug build.
+
+    A check starts signed in, with no auto-lock (TINAPAYANRMS_SIGNED_IN, which only a Debug build honours): it can't know
+    the user's password. TINAPAYANRMS_SIGN_IN=1 starts it at the sign-in panel instead, to check that; a Release copy
+    (TINAPAYANRMS_EXE) always starts there.
 #>
 param(
     [Parameter(Mandatory, Position = 0)][string]$Command,
@@ -93,6 +97,7 @@ switch ($Command) {
             if (-not (Test-Path $exe)) { throw "Not built: dotnet build src/TinapayanRMS.Maui ($exe)" }
             if (Test-Debugging) { throw "Port $port is taken by another web view: close it first." }
             $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$port"
+            $env:TINAPAYANRMS_SIGNED_IN = if ($env:TINAPAYANRMS_SIGN_IN -eq '1') { '' } else { '1' }
             Start-Process -FilePath $exe | Out-Null
             $deadline = (Get-Date).AddSeconds(60)
             while (-not (Test-Debugging)) {

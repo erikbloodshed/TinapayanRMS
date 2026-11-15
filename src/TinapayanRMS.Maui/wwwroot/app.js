@@ -650,6 +650,54 @@ window.tinapayan = {
         return { dispose: () => document.removeEventListener("keydown", handler) };
     },
 
+    // While the window is locked (Layout/SignInScreen), no key reaches the screens waiting under the sign-in panel: the
+    // document's own key watches (Find, Undo, a list's keys) and Blazor's handlers never see one. Caught on the window, as
+    // it starts down, before any of them. A key outside the panel is stopped there, and so is every Ctrl, Alt or Win
+    // combination anywhere: the ones that edit a box's text (select all, copy, cut, paste, undo) still do so in the
+    // panel's boxes, and the rest (Alt+Left, Ctrl+P, F5…) do nothing at all. Plain keys in the panel's boxes type, and
+    // Enter signs in. Returns an object whose dispose() lets keys through again.
+    lockKeys(panel) {
+        const editing = ["a", "c", "v", "x", "z", "y"];
+        const guard = e => {
+            const inPanel = panel?.contains(e.target) ?? false;
+            const combination = e.ctrlKey || e.altKey || e.metaKey;
+            const browserKey = e.key === "F5" || e.key === "F3" || e.key === "F7" || e.key?.startsWith("Browser");
+            if (inPanel && !combination && !browserKey) {
+                return;
+            }
+            e.stopImmediatePropagation();
+            const editsText = inPanel && e.ctrlKey && !e.altKey && !e.metaKey && editing.includes(e.key?.toLowerCase());
+            if ((combination || browserKey) && !editsText) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("keydown", guard, true);
+        window.addEventListener("keyup", guard, true);
+        return {
+            dispose: () => {
+                window.removeEventListener("keydown", guard, true);
+                window.removeEventListener("keyup", guard, true);
+            },
+        };
+    },
+
+    // A key, click, scroll or mouse move anywhere in the window, told to the app at most once every everyMs, for its
+    // auto-lock (AppLock.NoteActivity). Returns an object whose dispose() stops it.
+    watchActivity(dotNet, everyMs) {
+        let last = 0;
+        const note = () => {
+            const now = Date.now();
+            if (now - last >= everyMs) {
+                last = now;
+                dotNet.invokeMethodAsync("NoteActivity")
+                    .catch(error => console.error("The auto-lock wasn't told of a key or click.", error));
+            }
+        };
+        const kinds = ["keydown", "pointerdown", "pointermove", "wheel"];
+        kinds.forEach(kind => window.addEventListener(kind, note, { capture: true, passive: true }));
+        return { dispose: () => kinds.forEach(kind => window.removeEventListener(kind, note, { capture: true })) };
+    },
+
     // Opens the web view's print dialog for the page (the print views lay themselves out with @page CSS).
     print() {
         window.print();

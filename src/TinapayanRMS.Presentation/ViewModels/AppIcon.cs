@@ -80,6 +80,9 @@ public enum AppIcon
     Upload,
     Menu,
 
+    /// <summary>The title bar's Lock, which puts the sign-in panel over the window (AppLock).</summary>
+    Lock,
+
     // The Products list's Cut and Paste, which move products and folders as a drag does.
     Cut,
     Paste,

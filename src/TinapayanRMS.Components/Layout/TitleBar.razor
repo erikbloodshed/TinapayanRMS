@@ -1,33 +1,34 @@
 @implements IAsyncDisposable
 @inject IAppWindow Window
 @inject MainWindowViewModel Shell
+@inject AppLock Lock
 @inject IJSRuntime JS
 
 @* The window's title bar, drawn by the page: the window has none of Windows' (IAppWindow). On the left, the menu toggle
-   and the heading; on the right, the Vim keys' mode, Find, Back and Forward, then Minimize, Maximize (Restore while
+   and the heading; on the right, the Vim keys' mode, Find, Lock, Back and Forward, then Minimize, Maximize (Restore while
    maximized) and Close. The rest of the bar is the window's caption, which Windows itself drags, double-clicks and
    right-clicks (wwwroot/app.js, watchTitleBar). The menu opens under it, so its toggle stays where it is to put the
-   menu away again. *@
+   menu away again. Lock puts the sign-in panel over the window (AppLock); while it's locked the bar keeps only the app's
+   name and the window's own buttons, so the window can still be moved, sized and closed. *@
 <header class="app-titlebar" @ref="_bar">
-    <button type="button" class="titlebar-button" title="Show the navigation menu" aria-label="Navigation menu" @onclick="OnMenu">
-        <Icon Of="AppIcon.Menu" />
-    </button>
-    <span class="app-heading">@Shell.Heading</span>
+    @if (Locked)
+    {
+        <span class="app-heading">@Shell.Title</span>
+    }
+    else
+    {
+        <button type="button" class="titlebar-button" title="Show the navigation menu" aria-label="Navigation menu" @onclick="OnMenu">
+            <Icon Of="AppIcon.Menu" />
+        </button>
+        <span class="app-heading">@Shell.Heading</span>
+    }
 
     <span class="titlebar-fill"></span>
 
-    <VimKeys />
-    <FindHost />
-    @* Back and Forward between the screens' addresses (a record's included), as Alt+Left and Alt+Right, and the Vim keys'
-       H and L, go. The screen being left asks about its unsaved changes first. *@
-    <button type="button" class="titlebar-button titlebar-small-glyph" title="Back (Alt+Left)" aria-label="Back"
-            disabled="@(!_canGoBack)" @onclick="GoBackAsync">
-        <Icon Of="AppIcon.Back" />
-    </button>
-    <button type="button" class="titlebar-button titlebar-small-glyph" title="Forward (Alt+Right)" aria-label="Forward"
-            disabled="@(!_canGoForward)" @onclick="GoForwardAsync">
-        <Icon Of="AppIcon.Forward" />
-    </button>
+    @if (!Locked)
+    {
+        @RightOfHeading
+    }
 
     @* The window's own buttons are drawn here, not taken from an icon font: Syncfusion's icons have none for them. *@
     <div class="caption-buttons">
@@ -62,6 +63,31 @@
 
     /// <summary>The menu toggle's click: MainLayout opens or closes the menu.</summary>
     [Parameter] public EventCallback OnMenu { get; set; }
+
+    /// <summary>Whether the window is locked (AppLock): the bar keeps only the app's name and the window's buttons.</summary>
+    [Parameter] public bool Locked { get; set; }
+
+    // The Vim keys' mode, Find, Lock, Back and Forward, which a locked window leaves out: the Vim keys and Find's key go
+    // with their components.
+    private RenderFragment RightOfHeading => __builder =>
+    {
+        <VimKeys />
+        <FindHost />
+        <button type="button" class="titlebar-button titlebar-small-glyph" title="Lock: put the sign-in panel over the window until the password is given"
+                aria-label="Lock" @onclick="Lock.Lock">
+            <Icon Of="AppIcon.Lock" />
+        </button>
+        @* Back and Forward between the screens' addresses (a record's included), as Alt+Left and Alt+Right, and the Vim keys'
+           H and L, go. The screen being left asks about its unsaved changes first. *@
+        <button type="button" class="titlebar-button titlebar-small-glyph" title="Back (Alt+Left)" aria-label="Back"
+                disabled="@(!_canGoBack)" @onclick="GoBackAsync">
+            <Icon Of="AppIcon.Back" />
+        </button>
+        <button type="button" class="titlebar-button titlebar-small-glyph" title="Forward (Alt+Right)" aria-label="Forward"
+                disabled="@(!_canGoForward)" @onclick="GoForwardAsync">
+            <Icon Of="AppIcon.Forward" />
+        </button>
+    };
 
     protected override void OnInitialized()
     {

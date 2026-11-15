@@ -1,5 +1,6 @@
-@* The window's root component: the screen in the address, in the window's layout (Layout.MainLayout). There's no sign-in
-   and nothing to wait for first: a database that can't be reached shows on each screen's load, as a message. *@
+@* The window's root component: the screen in the address, in the window's layout (Layout.MainLayout), which draws no
+   screen until the password is given (AppLock, Layout.SignInScreen). A database that can't be reached shows on the
+   sign-in panel, and after that on each screen's load, as a message. *@
 <Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />

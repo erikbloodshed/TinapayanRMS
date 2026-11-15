@@ -50,6 +50,18 @@ public class FieldTests
     }
 
     [Test]
+    public async Task A_password_box_hides_its_characters_and_a_text_box_doesnt()
+    {
+        await using var context = AppServices.NewContext();
+
+        var password = context.Render<TextField>(parameters => parameters.Add(f => f.Password, true));
+        var text = context.Render<TextField>();
+
+        password.Find("input").GetAttribute("type").Should().Be("password");
+        text.Find("input").GetAttribute("type").Should().Be("text");
+    }
+
+    [Test]
     public async Task A_text_box_with_the_cursor_isnt_written_to_until_its_left()
     {
         await using var context = AppServices.NewContext();

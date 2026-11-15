@@ -1,23 +1,26 @@
 @inherits LayoutComponentBase
-@implements IDisposable
+@implements IAsyncDisposable
 @inject AppStatus Status
+@inject AppLock Lock
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 @inject Serilog.ILogger Logger
 @* Started here, once per page, so one screen can open another (a Dependents tile, a Print). *@
 @inject ScreenLinks Links
 
 <div class="app-shell">
-    @* The window's title bar, which the page draws: the window has none of Windows' own. *@
-    <TitleBar OnMenu="ToggleNavigation" />
+    @* The window's title bar, which the page draws: the window has none of Windows' own. Locked, it keeps only what moves,
+       sizes and closes the window. *@
+    <TitleBar OnMenu="ToggleNavigation" Locked="_locked" />
 
-    @if (Status.DatabaseWarning is { } warning)
+    @if (!_locked && Status.DatabaseWarning is { } warning)
     {
         <div class="app-banner" role="alert">
             <Icon Of="AppIcon.Warning" />
             <span>@warning</span>
         </div>
     }
-    @if (Status.BackupWarning is { } backupWarning)
+    @if (!_locked && Status.BackupWarning is { } backupWarning)
     {
         <div class="app-banner app-banner-text" role="alert">
             <Icon Of="AppIcon.Warning" />
@@ -26,24 +29,34 @@
     }
 
     <div class="app-body">
-        @* The menu floats over the screen: summoned by the title bar's button, gone on a click away. *@
-        <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
-            <ChildContent>
-                <NavMenu Navigated="CloseNavigation" />
-            </ChildContent>
-        </SfSidebar>
+        @* The window opens locked (AppLock), and nothing of the screens is drawn, or loaded, until the password is given.
+           Locked again after that, by the title bar's Lock or the auto-lock, the screens stay as they were, unsaved edits
+           and all, but take no click or focus (inert) and are covered by the sign-in panel. *@
+        @if (_signedIn)
+        {
+            @* The menu floats over the screen: summoned by the title bar's button, gone on a click away. *@
+            <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
+                <ChildContent>
+                    <NavMenu Navigated="CloseNavigation" />
+                </ChildContent>
+            </SfSidebar>
 
-        @* The tabs are under the menu when it's out. *@
-        <div class="app-screen">
-            <ScreenTabStrip />
+            @* The tabs are under the menu when it's out. *@
+            <div class="app-screen" inert="@_locked">
+                <ScreenTabStrip />
 
-            <main class="app-page">
-                @* A screen that fails gives way to a panel saying so, rather than taking the window's page with it. *@
-                <ScreenErrorBoundary>
-                    @Body
-                </ScreenErrorBoundary>
-            </main>
-        </div>
+                <main class="app-page">
+                    @* A screen that fails gives way to a panel saying so, rather than taking the window's page with it. *@
+                    <ScreenErrorBoundary>
+                        @Body
+                    </ScreenErrorBoundary>
+                </main>
+            </div>
+        }
+        @if (_locked)
+        {
+            <SignInScreen />
+        }
     </div>
 </div>
 
@@ -52,13 +65,84 @@
 <PromptHost />
 
 @code {
+    // How often the page tells AppLock of a key or click: often enough that a minute's auto-lock never comes early.
+    private const int ActivityEveryMs = 10_000;
+
+    private readonly CancellationTokenSource _stopping = new();
+    private RedrawGate _redraws = null!;
+    private IDisposable? _navigationGuard;
+    private DotNetObjectReference<MainLayout>? _self;
+    private IJSObjectReference? _activity;
+    private bool _disposed;
     private bool _navigationOpen;
+    private bool _locked;
+    private bool _signedIn;
 
     protected override void OnInitialized()
     {
+        _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
+        (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
         Status.Restored += OnRestored;
         Status.Changed += OnStatusChanged;
+        Lock.Changed += OnLockChanged;
+
+        // No move to another address while locked: Back, Forward, a mouse's back button, a link.
+        _navigationGuard = Navigation.RegisterLocationChangingHandler(context =>
+        {
+            if (Lock.IsLocked)
+            {
+                context.PreventNavigation();
+            }
+
+            return ValueTask.CompletedTask;
+        });
+
+        WatchIdleAsync(_stopping.Token).Forget(Logger);
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _redraws.Drawn();
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _activity = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchActivity", _self, ActivityEveryMs)
+                .KeepUnlessGoneAsync(() => _disposed);
+        }
+    }
+
+    /// <summary>A key, click, scroll or mouse move in the window: the auto-lock's idle time starts again.</summary>
+    [JSInvokable]
+    public void NoteActivity() => Lock.NoteActivity();
+
+    // Locks the window once it's been idle for the auto-lock's minutes, checked every half minute while the page is up.
+    private async Task WatchIdleAsync(CancellationToken stopping)
+    {
+        using var timer = new PeriodicTimer(AppLock.CheckIdleEvery);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stopping))
+            {
+                Lock.CheckIdle();
+            }
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
+            // The page has gone.
+        }
+    }
+
+    // On whichever thread locked or unlocked: drawn with the state it's in by then. The menu goes as the window locks.
+    private void OnLockChanged() => InvokeAsync(() =>
+    {
+        (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
+        if (_locked)
+        {
+            _navigationOpen = false;
+        }
+
+        _redraws.Request();
+    }).Forget(Logger);
 
     private void OnStatusChanged() => InvokeAsync(StateHasChanged).Forget(Logger);
 
@@ -69,9 +153,16 @@
 
     private void CloseNavigation() => _navigationOpen = false;
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+        await _stopping.CancelAsync();
+        _stopping.Dispose();
         Status.Restored -= OnRestored;
         Status.Changed -= OnStatusChanged;
+        Lock.Changed -= OnLockChanged;
+        _navigationGuard?.Dispose();
+        await _activity.StopAsync();
+        _self?.Dispose();
     }
 }

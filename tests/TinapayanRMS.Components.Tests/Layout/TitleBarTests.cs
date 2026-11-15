@@ -22,7 +22,7 @@ public class TitleBarTests
 
         bar.Find(".app-heading").TextContent.Should().Be("TINAPAYAN FESTIVAL BAKESHOPPE — RECIPE & COSTING");
         bar.FindAll("button").Select(b => b.GetAttribute("aria-label")).Should().Equal(
-            "Navigation menu", "Find", "Back", "Forward", "Minimize", "Maximize", "Close");
+            "Navigation menu", "Find", "Lock", "Back", "Forward", "Minimize", "Maximize", "Close");
     }
 
     [Test]

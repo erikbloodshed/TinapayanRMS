@@ -1,0 +1,172 @@
+@using TinapayanRMS.ApplicationCore.Rules
+@using System.Reactive.Linq
+@implements IAsyncDisposable
+@inject SignInViewModel ViewModel
+@inject AppLock Lock
+@inject IJSRuntime JS
+@inject Serilog.ILogger Logger
+
+@* The locked window's panel (AppLock, MainLayout): the password, or a new one twice while none is set. Before the first
+   sign-in it's all the window shows under its title bar; after, it covers the screens, which wait under it as they were.
+   While it shows, no key reaches them (tinapayan.lockKeys): only the panel's own boxes take typing. What's typed is
+   cleared after every try, so the boxes are drawn afresh then (a box never has its text rewritten while it has the
+   cursor), and the cursor goes back to the first. What a box sends during a try is dropped: Enter in a box also sends
+   its text as a change, which would otherwise land after the try had cleared it and come back in the fresh box. *@
+<div class="sign-in-screen" @ref="_panel">
+    <section class="card sign-in-card" aria-label="Sign in">
+        <h2 class="section-header">TinapayanRMS</h2>
+        @if (!ViewModel.IsLoaded)
+        {
+            @if (ViewModel.ErrorMessage is { } failure)
+            {
+                <p class="sign-in-error" role="alert">@failure</p>
+                <div class="button-row">
+                    <ActionButton Label="Try Again" OnClick="LoadAsync" Disabled="_busy" />
+                </div>
+            }
+            else
+            {
+                <p class="caption">Opening…</p>
+            }
+        }
+        else if (ViewModel.IsSettingUp)
+        {
+            <p class="caption">Set a password for the app. It's asked for as the app opens, and whenever the window is locked. At least @PasswordRules.MinLength characters.</p>
+            <div @key="_attempt">
+                <FormRow Label="New Password" For="@PasswordId">
+                    <TextField ID="@PasswordId" Password="true" Value="@ViewModel.Password" ValueChanged="v => Typed(() => ViewModel.Password = v)"
+                               OnEnter="() => FocusAsync(ConfirmationId)" />
+                </FormRow>
+                <FormRow Label="Type It Again" For="@ConfirmationId">
+                    <TextField ID="@ConfirmationId" Password="true" Value="@ViewModel.Confirmation" ValueChanged="v => Typed(() => ViewModel.Confirmation = v)"
+                               OnEnter="SetPasswordAsync" />
+                </FormRow>
+            </div>
+            @Error()
+            <div class="button-row form-extra">
+                <ActionButton Label="Set Password" Icon="AppIcon.Lock" Primary="true" OnClick="SetPasswordAsync" Disabled="_busy" />
+            </div>
+        }
+        else
+        {
+            <p class="caption">@(Lock.HasSignedIn ? "The window is locked. Type the password to go on where you left off." : "Type the password to open the app.")</p>
+            <div @key="_attempt">
+                <FormRow Label="Password" For="@PasswordId">
+                    <TextField ID="@PasswordId" Password="true" Value="@ViewModel.Password" ValueChanged="v => Typed(() => ViewModel.Password = v)"
+                               OnEnter="SignInAsync" />
+                </FormRow>
+            </div>
+            @Error()
+            <div class="button-row form-extra">
+                <ActionButton Label="Sign In" Primary="true" OnClick="SignInAsync" Disabled="_busy" />
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    private const string PasswordId = "sign-in-password";
+    private const string ConfirmationId = "sign-in-confirmation";
+
+    private readonly RedrawGate _redraws;
+    private ElementReference _panel;
+    private IJSObjectReference? _keys;
+    private bool _disposed;
+    private bool _busy;
+    private bool _focusWanted;
+
+    // Bumped after every try: the boxes are drawn afresh, empty.
+    private int _attempt;
+
+    public SignInScreen()
+    {
+        _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ViewModel.PropertyChanged += OnViewModelChanged;
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _redraws.Drawn();
+        if (firstRender)
+        {
+            _keys = await JS.InvokeAsync<IJSObjectReference>("tinapayan.lockKeys", _panel).KeepUnlessGoneAsync(() => _disposed);
+        }
+
+        if (_focusWanted && ViewModel.IsLoaded)
+        {
+            _focusWanted = false;
+            await FocusAsync(PasswordId);
+        }
+    }
+
+    private RenderFragment Error() => __builder =>
+    {
+        if (ViewModel.ErrorMessage is { } error)
+        {
+            <p class="sign-in-error" role="alert">@error</p>
+        }
+    };
+
+    private Task LoadAsync() => RunAsync(() => ViewModel.LoadCommand.Execute());
+
+    private Task SignInAsync() => RunAsync(() => ViewModel.SignInCommand.Execute());
+
+    private Task SetPasswordAsync() => RunAsync(() => ViewModel.SetPasswordCommand.Execute());
+
+    private async Task RunAsync(Func<IObservable<RxVoid>> command)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await command();
+        }
+        finally
+        {
+            _busy = false;
+            _attempt++;
+            _focusWanted = true;
+
+            // Gone already when the try signed in: the window drew the screens in its place.
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
+        }
+    }
+
+    // A box's text, unless a try is running: see the note at the top.
+    private void Typed(Action set)
+    {
+        if (!_busy)
+        {
+            set();
+        }
+    }
+
+    private async Task FocusAsync(string id)
+    {
+        if (!_disposed)
+        {
+            await JS.InvokeVoidAsync("tinapayan.focus", id);
+        }
+    }
+
+    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e) => _redraws.Request();
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        ViewModel.PropertyChanged -= OnViewModelChanged;
+        await _keys.StopAsync();
+    }
+}
