@@ -149,6 +149,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 ### The main window
 
 - **The window** opens in the middle of the screen the mouse pointer is on. On a screen too small for it, it opens as large as the screen leaves room for, above the taskbar. Only one copy of the app opens on the PC at a time: opening it again brings the window that's open to the front. If it's open in another Windows sign-in on the PC, it says so and doesn't open (see [Troubleshooting](#14-troubleshooting-and-questions)).
+- **The window doesn't zoom**: Ctrl with the mouse wheel, Ctrl with **+**, **-** or **0**, and a pinch on a touchpad leave it as it is. To make everything larger, change the scale in Windows' display settings.
 - **The title bar**, along the top, has the menu button and the app's name on the left, and **Find**, **Lock**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **Menu button (☰)**, at the top left, opens the navigation menu: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator**. **Settings** is at the bottom of the menu. Click anywhere outside the menu to close it.
 - **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
