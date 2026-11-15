@@ -496,24 +496,48 @@ html, body {
     font-size: 16px;
 }
 
-/* The sign-in panel (Layout/SignInScreen): a card in the middle of the window, under the title bar. Locked after a
-   sign-in, it covers the screens, which wait under it as they were: the page's own colour, so nothing of them shows. */
+/* The sign-in page (Layout/SignInScreen): the whole window under the title bar, in the card colour, its title, text,
+   boxes and button one column centred on the window, each centred in it, the labels over their boxes. Locked after a
+   sign-in, it covers the screens, which wait under it as they were, so nothing of them shows. */
 
 .sign-in-screen {
     position: absolute;
     inset: 0;
     z-index: 10;
     display: flex;
-    align-items: center;
-    justify-content: center;
     padding: 16px;
-    background: var(--page-background);
+    background: var(--card-background);
     overflow: auto;
 }
 
-.sign-in-card {
-    width: 400px;
+/* margin: auto rather than the flex parent's centring, so a window too short for it scrolls from its top. */
+.sign-in-page {
+    width: 320px;
     max-width: 100%;
+    margin: auto;
+    text-align: center;
+}
+
+.sign-in-page .sign-in-title {
+    margin: 0 0 8px;
+    font-size: 28px;
+}
+
+.sign-in-page .caption {
+    margin: 0 0 20px;
+}
+
+.sign-in-page .form-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+}
+
+.sign-in-page .form-field {
+    text-align: left;
+}
+
+.sign-in-page .button-row {
+    justify-content: center;
 }
 
 .sign-in-error {
