@@ -58,6 +58,14 @@
     <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
   </ItemGroup>
+  <ItemGroup Label="Installer">
+    <!-- The MSI's WiX extensions (installer/TinapayanRMS.Installer.wixproj), at the WiX SDK's version in global.json
+         (msbuild-sdks): move them together. Held at 5.0.2, the last WiX under the plain MS-RL licence: from 6.0 its
+         binaries come under the Open Source Maintenance Fee EULA, a monthly fee for a user whose revenue is US$10,000 a
+         year or more (the user's choice, 2026-11-15). -->
+    <PackageVersion Include="WixToolset.Heat" Version="5.0.2" />
+    <PackageVersion Include="WixToolset.Netfx.wixext" Version="5.0.2" />
+  </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <!-- Renders the MAUI app's Blazor components in a test, without a web view (TinapayanRMS.Components.Tests). -->

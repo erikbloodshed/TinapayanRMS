@@ -1315,6 +1315,19 @@ TinapayanRMS is installed from its source folder, on the PC that holds its datab
 
 Run the same command again to update the app after the code changes. How the lists were left, your Vim keys setting, the backups and the database all stay as they are. To remove the app, run `scripts\Uninstall-TinapayanRMS.ps1` the same way.
 
+### Install TinapayanRMS from its installer (MSI)
+
+The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanRMS on a PC for every Windows user, in `C:\Program Files\TinapayanRMS`, with a **TinapayanRMS** shortcut in everyone's Start menu and on everyone's Desktop. Whoever looks after the app makes it from the source folder (the developer manual says how). The PC it goes on needs no build tools, only:
+
+- the **.NET 11 Runtime (x64)**, from Microsoft's .NET download page. Without it the installer stops before changing anything and says where to get it;
+- PostgreSQL with the app's database, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing.
+
+1. Close TinapayanRMS if it's open. If it's still open, the installer closes it, and any changes not saved are lost.
+2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
+3. If the update changed the database, apply it before opening the app, or some screens show an error.
+
+To update, open the newer installer the same way: it replaces the version installed. It won't install over a newer version. Each user's lists, Vim keys setting, backups and the database stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
+
 ### Share the recipes with TinapayanBMS
 
 TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.

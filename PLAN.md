@@ -57,7 +57,9 @@ TinapayanRMS.slnx
 │                                       on Windows against PostgreSQL 18.6, for every push to main and pull request that changes code
 ├── scripts/                          — Install-RecipeApi.ps1, Uninstall-RecipeApi.ps1 and New-DatabaseReader.ps1 (the Recipe API);
 │                                       Start-McpServer.ps1 (which .mcp.json runs); Test-Changed.ps1 and Watch-Tests.ps1 (fewer tests while developing);
-│                                       Install-TinapayanRMS.ps1 and Uninstall-TinapayanRMS.ps1 (the app)
+│                                       Install-TinapayanRMS.ps1 and Uninstall-TinapayanRMS.ps1 (the app, for one Windows user);
+│                                       Build-Installer.ps1 (the app's MSI, for every user of a PC, into artifacts\installer\)
+├── installer/                        — the MSI's WiX 5 project (TinapayanRMS.Installer.wixproj, Package.wxs), outside the solution
 ├── README.md                         — what the app is, and where the manuals and these guides are
 ├── docs/
 │   ├── user-manual.md                — for the shop's staff: every screen, and how costs are worked out

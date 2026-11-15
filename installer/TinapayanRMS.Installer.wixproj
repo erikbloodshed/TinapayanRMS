@@ -1,0 +1,48 @@
+<!-- The app's MSI, a per-machine install into Program Files (Package.wxs). Built from a publish of src\TinapayanRMS.Maui
+     by scripts\Build-Installer.ps1, which passes AppPublishDir and ProductVersion. It isn't in TinapayanRMS.slnx: the
+     publish needs the Syncfusion licence key, which neither a solution build nor CI has. The WiX SDK's version is in
+     global.json (msbuild-sdks), its extensions' in Directory.Packages.props. -->
+<Project Sdk="WixToolset.Sdk">
+
+  <PropertyGroup>
+    <OutputName>TinapayanRMS</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <!-- 1.0 is the app's ApplicationDisplayVersion; the script adds the commit count. An MSI replaces an installed copy
+         only when its version is higher, or the same (Package.wxs, MajorUpgrade). -->
+    <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
+    <AppPublishDir>$([MSBuild]::EnsureTrailingSlash('$(AppPublishDir)'))</AppPublishDir>
+    <AppIconFile>$(MSBuildThisFileDirectory)..\src\TinapayanRMS.Maui\Resources\AppIcon\tinapayan-rms-icon.ico</AppIconFile>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);AppPublishDir=$(AppPublishDir);AppIconFile=$(AppIconFile)</DefineConstants>
+    <!-- Windows Installer's checks that are wrong about this package:
+         - ICE03: the Windows App SDK's WinUI files carry their own languages, which the binder copies into the File
+           table: its .mui files for Scottish Gaelic, Maori and Uyghur (gd-gb, mi-NZ, ug-CN) have language ids older
+           validation tables don't know, and Microsoft.ui.xaml.dll lists more languages than the column holds.
+         - ICE38, ICE43, ICE57: they take the Start menu and the Desktop for the user's own folders, which want an HKCU
+           key path; in a per-machine package they're every user's, and the shortcuts' key paths are in HKLM.
+         - ICE61: MajorUpgrade replaces the same version on purpose (Package.wxs). -->
+    <SuppressIces>ICE03;ICE38;ICE43;ICE57;ICE61</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" />
+    <PackageReference Include="WixToolset.Netfx.wixext" />
+  </ItemGroup>
+
+  <!-- Every file the publish made, as the AppFiles component group, under INSTALLFOLDER. Heat is deprecated from WiX 6
+       on (its Files element does this), but 6 isn't free (Directory.Packages.props). -->
+  <ItemGroup>
+    <HarvestDirectory Include="$(AppPublishDir)">
+      <ComponentGroupName>AppFiles</ComponentGroupName>
+      <DirectoryRefId>INSTALLFOLDER</DirectoryRefId>
+      <PreprocessorVariable>var.AppPublishDir</PreprocessorVariable>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+      <SuppressCom>true</SuppressCom>
+      <SuppressRegistry>true</SuppressRegistry>
+    </HarvestDirectory>
+  </ItemGroup>
+
+  <Target Name="RequireAppPublish" BeforeTargets="HarvestDirectory" Condition="!Exists('$(AppPublishDir)TinapayanRMS.Maui.exe')">
+    <Error Text="No published app in '$(AppPublishDir)'. Build the MSI with scripts\Build-Installer.ps1, which publishes it first." />
+  </Target>
+
+</Project>

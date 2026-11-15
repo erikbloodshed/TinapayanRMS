@@ -1,0 +1,65 @@
+<!-- TinapayanRMS for every Windows user on the PC: the published app in Program Files\TinapayanRMS, with Start menu and
+     Desktop shortcuts for everyone. Each user's own data stays theirs, in %LocalAppData%\TinapayanRMS\Maui (the view
+     state, the log and the web view's folder), and the MSI never touches it, nor the database. -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx">
+
+  <!-- The UpgradeCode is the app's for good: a new MSI with it replaces the copy installed. -->
+  <Package Name="TinapayanRMS"
+           Manufacturer="Tinapayan Festival Bakeshoppe"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="4E4A8926-1F88-40FF-A780-B8EC774B5CE3"
+           Scope="perMachine"
+           Language="1033">
+
+    <!-- The same version replaces too, so an MSI rebuilt from one commit still installs over its last build. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of TinapayanRMS is already installed. Uninstall it first to go back to this one." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.AppIconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPCOMMENTS" Value="Recipes and costing for Tinapayan Festival Bakeshoppe." />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!-- The app is framework-dependent: it runs on the PC's .NET 11 (Microsoft.NETCore.App 11.x, x64), which the MSI
+         can't install. Not there, and the install stops before changing anything, saying where to get it. -->
+    <netfx:DotNetCompatibilityCheck Property="DOTNET_RUNTIME_CHECK" RuntimeType="core" Platform="x64" Version="11.0.0" RollForward="minor" />
+    <Launch Condition="Installed OR DOTNET_RUNTIME_CHECK=&quot;0&quot;"
+            Message="TinapayanRMS needs the .NET 11 Runtime (x64). Install it from https://dotnet.microsoft.com/download/dotnet/11.0, then run this installer again." />
+
+    <!-- A copy that's open holds its files: Windows Installer's Restart Manager closes it (InstallValidate), finding it by
+         the files it holds, so only the copy in INSTALLFOLDER. It isn't the window's Close, so a form's unsaved changes
+         are lost: close the app first. WiX's util:CloseApplication, tried on 2026-11-15, came after it and could only
+         reach copies run from elsewhere, as it finds the app by its .exe's name alone. -->
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="TinapayanRMS" />
+    </StandardDirectory>
+
+    <!-- Each shortcut is kept by a value of its own under HKLM, as a per-machine shortcut has no file to be kept by. It
+         takes its icon from the .exe. -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="StartMenuShortcut" Name="TinapayanRMS" Description="Recipes and costing for Tinapayan Festival Bakeshoppe."
+                  Target="[INSTALLFOLDER]TinapayanRMS.Maui.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\TinapayanRMS" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut">
+        <Shortcut Id="DesktopShortcut" Name="TinapayanRMS" Description="Recipes and costing for Tinapayan Festival Bakeshoppe."
+                  Target="[INSTALLFOLDER]TinapayanRMS.Maui.exe" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKLM" Key="Software\TinapayanRMS" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="TinapayanRMS">
+      <!-- The published app, harvested by the project (HarvestDirectory). -->
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+  </Package>
+</Wix>

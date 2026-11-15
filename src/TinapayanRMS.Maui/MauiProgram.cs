@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Reflection;
 using System.Runtime;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
@@ -34,6 +36,23 @@ public static class MauiProgram
     /// </summary>
     public static string ViewStateFile { get; } = Path.Combine(DataFolder, "view-state.json");
 
+    /// <summary>
+    /// This copy on the disk, as a key: a hash of its folder. Each copy has its own claim to run (SingleInstance) and its
+    /// own web view folder.
+    /// </summary>
+    public static string CopyKey { get; } =
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
+
+    /// <summary>
+    /// The web view's own folder (WebView2's cache and profile), for this Windows user and this copy. Left to itself it
+    /// goes beside the .exe, which in a per-machine install is under Program Files, where the user can't write, so the
+    /// page never loads. One per copy, as beside the .exe it was: WebView2 won't start a second process on a folder in use
+    /// with other options, such as a check's debugging port while the user's own copy is open. Given to WebView2 as its
+    /// WEBVIEW2_USER_DATA_FOLDER variable: BlazorWebViewInitializing's UserDataFolder goes into an environment MAUI makes
+    /// and then doesn't hand the WinUI control, which starts with a default one of its own.
+    /// </summary>
+    public static string WebViewFolder { get; } = Path.Combine(DataFolder, "WebView2", CopyKey);
+
     public static MauiApp CreateMauiApp()
     {
         // Syncfusion's grid and charts report their use to Syncfusion, over HTTPS (Syncfusion.Telemetry). Off before any
@@ -59,6 +78,12 @@ public static class MauiProgram
         // logs neither. The window's own thread is hooked by the WinUI app (Platforms/Windows/App), ReactiveUI's by its
         // bootstrapper.
         UnhandledFailures.Watch();
+
+        // Before the web view starts, which reads it from the process's environment. One set already (a check's) wins.
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER")))
+        {
+            Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", WebViewFolder);
+        }
 
         // Which garbage collector this copy runs on: Satori's in a build with -p:UseSatoriGC=true (the Maui project's
         // experiment), which lists its settings under its own name, or .NET's own.

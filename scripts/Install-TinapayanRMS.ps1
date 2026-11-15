@@ -10,10 +10,12 @@
     An installed copy that's open is closed first, as its own Close does. One that's asking about changes not saved stays
     open, and the script stops there: answer it, close the app, and run this again. Nothing is ever lost by updating.
 
-    Whatever an earlier version left in the folder goes, apart from the web view's own folder (TinapayanRMS.Maui.exe.WebView2,
-    its cache, kept so the first start after an update isn't slower) and a logs folder. The app keeps its view state and
-    its log in %LocalAppData%\TinapayanRMS\Maui, which this never touches, nor the database: apply any new migrations with
-    `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
+    Whatever an earlier version left in the folder goes, apart from a logs folder; that includes the web view's folder an
+    earlier version kept beside the .exe (TinapayanRMS.Maui.exe.WebView2). The app keeps its view state, its log and its
+    web view's folder in %LocalAppData%\TinapayanRMS\Maui, which this never touches, nor the database: apply any new
+    migrations with `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
+
+    For every Windows user on the PC, in Program Files, build the MSI instead: scripts\Build-Installer.ps1.
 
     Building needs what building from source does: the .NET SDK in global.json, the maui-windows workload, and the
     SYNCFUSION_LICENSE_KEY user environment variable, which the build compiles into the app. The app reaches PostgreSQL
@@ -40,7 +42,6 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repo 'src\TinapayanRMS.Maui\TinapayanRMS.Maui.csproj'
 $exe = Join-Path $InstallFolder 'TinapayanRMS.Maui.exe'
-$webViewFolder = 'TinapayanRMS.Maui.exe.WebView2'
 
 # A copy running from the install folder holds its files: closed as its Close button does, so a copy asking about
 # changes not saved stays open rather than losing them.
@@ -99,7 +100,7 @@ catch {
 # The folder is made to hold what was published and no more: copying over it would leave what an earlier version
 # needed and this one doesn't.
 Write-Host "Copying to $InstallFolder ..."
-& robocopy $published $InstallFolder /MIR /XD $webViewFolder logs /NFL /NDL /NJH /NJS /NP | Out-Null
+& robocopy $published $InstallFolder /MIR /XD logs/NFL /NDL /NJH /NJS /NP | Out-Null
 $copied = $LASTEXITCODE
 Remove-Item -LiteralPath $published -Recurse -Force -ErrorAction SilentlyContinue
 if ($copied -ge 8) {

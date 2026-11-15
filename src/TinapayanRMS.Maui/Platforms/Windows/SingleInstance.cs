@@ -1,8 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
 using TinapayanRMS.Components;
 
 namespace TinapayanRMS.Maui.WinUI;
@@ -27,8 +25,7 @@ public static partial class SingleInstance
     /// </summary>
     public static bool Claim()
     {
-        var folder = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
-        _claim = new Mutex(initiallyOwned: true, $@"Local\TinapayanRMS.Maui-{folder}", out var first);
+        _claim = new Mutex(initiallyOwned: true, $@"Local\TinapayanRMS.Maui-{MauiProgram.CopyKey}", out var first);
         if (!first)
         {
             ShowFirst();

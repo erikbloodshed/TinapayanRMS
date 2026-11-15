@@ -35,3 +35,6 @@ ThemeStudioReference/
 
 # APM dependencies
 apm_modules/
+
+# The MSI and the publish it is built from (scripts/Build-Installer.ps1)
+artifacts/

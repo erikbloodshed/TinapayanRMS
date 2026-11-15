@@ -4,6 +4,9 @@
     "allowPrerelease": false,
     "rollForward": "latestFeature"
   },
+  "msbuild-sdks": {
+    "WixToolset.Sdk": "5.0.2"
+  },
   "test": {
     "runner": "Microsoft.Testing.Platform"
   }
