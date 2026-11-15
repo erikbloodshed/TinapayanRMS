@@ -12,8 +12,8 @@
 
     Whatever an earlier version left in the folder goes, apart from a logs folder; that includes the web view's folder an
     earlier version kept beside the .exe (TinapayanRMS.Maui.exe.WebView2). The app keeps its view state, its log and its
-    web view's folder in %LocalAppData%\TinapayanRMS\Maui, which this never touches, nor the database: apply any new
-    migrations with `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
+    web view's folder in %LocalAppData%\TinapayanRMS\Maui, which this never touches, nor the database: the app brings the
+    database up to its version itself the next time it opens, after a backup (IDatabaseUpdater).
 
     For every Windows user on the PC, in Program Files, build the MSI instead: scripts\Build-Installer.ps1.
 
@@ -131,4 +131,4 @@ if (-not $NoDesktopShortcut) {
 
 Write-Host ''
 Write-Host "Installed in $InstallFolder. Open TinapayanRMS from the Start menu or the Desktop, or run `"$exe`"."
-Write-Host 'If the code brought new migrations, apply them before opening it: dotnet ef database update --project src/TinapayanRMS.Infrastructure'
+Write-Host 'If this version changes the database, the app backs it up and updates it as it next opens.'

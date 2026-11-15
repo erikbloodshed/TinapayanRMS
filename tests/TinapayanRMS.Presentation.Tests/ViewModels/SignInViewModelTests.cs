@@ -3,7 +3,10 @@ using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using TinapayanRMS.Infrastructure;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -20,11 +23,31 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
 {
     private static readonly DateTime Start = new(2026, 11, 15, 8, 0, 0);
 
-    private SignInViewModel CreateViewModel(AppLock appLock, IDbContextFactory<TinapayanRMSDbContext>? factory = null)
+    private static readonly string BackupsFolder = Path.Combine(Path.GetTempPath(), "tinapayanrms-sign-in-tests");
+
+    private SignInViewModel CreateViewModel(
+        AppLock appLock, IDbContextFactory<TinapayanRMSDbContext>? factory = null, IDatabaseUpdater? updater = null)
     {
         ReactiveUIBootstrapper.EnsureInitialized();
-        return new SignInViewModel(
-            new AccessSettingsRepository(factory ?? CreateDbContextFactory()), appLock, new LoggerConfiguration().CreateLogger());
+        factory ??= CreateDbContextFactory();
+        var logger = new LoggerConfiguration().CreateLogger();
+
+        // The real updater over the test database, which the fixture keeps up to date: it finds nothing to do, and backs
+        // nothing up. Its backups' folder is only ever made for a backup.
+        updater ??= new DatabaseUpdater(factory, new DatabaseBackups(factory, BackupsFolder));
+        return new SignInViewModel(new AccessSettingsRepository(factory), appLock, new DatabaseReadiness(updater, logger), logger);
+    }
+
+    /// <summary>A database a newer copy of the app has updated.</summary>
+    private sealed class NewerDatabase : IDatabaseUpdater
+    {
+        public int Asked { get; private set; }
+
+        public Task<DatabaseUpdate> UpdateAsync(Action<int>? applying, CancellationToken cancellationToken)
+        {
+            Asked++;
+            throw new BusinessRuleException(BackupRules.DatabaseFromLaterVersionText);
+        }
     }
 
     private AccessSettingsRepository Repository() => new(CreateDbContextFactory());
@@ -172,6 +195,23 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         viewModel.ErrorMessage.Should().Be("A password has been set already: sign in with it.");
         appLock.IsLocked.Should().BeTrue();
         (await Repository().VerifyAsync("pandesal 6am", Cancellation)).Should().BeTrue();
+    });
+
+    [Test]
+    public Task A_database_a_newer_copy_updated_says_so_in_the_panel_never_unlocks_and_is_asked_again_by_Try_Again() => UiThread.RunAsync(async () =>
+    {
+        var appLock = new AppLock(new TestClock(Start));
+        var newer = new NewerDatabase();
+        var viewModel = CreateViewModel(appLock, updater: newer);
+
+        await viewModel.LoadCommand.Execute();
+
+        viewModel.IsLoaded.Should().BeFalse("the password isn't read from a database this copy can't use");
+        viewModel.ErrorMessage.Should().Be(BackupRules.DatabaseFromLaterVersionText);
+        appLock.IsLocked.Should().BeTrue();
+
+        await viewModel.LoadCommand.Execute();
+        newer.Asked.Should().Be(2, "a failed run is run again by the next load");
     });
 
     [Test]

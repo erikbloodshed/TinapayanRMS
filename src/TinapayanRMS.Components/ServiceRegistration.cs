@@ -37,6 +37,10 @@ public static class ServiceRegistration
         // backups' own folder is one every Windows user on the PC shares (DatabaseBackups.DefaultFolder).
         services.AddSingleton<IDatabaseBackups>(provider => new DatabaseBackups(
             provider.GetRequiredService<IDbContextFactory<TinapayanRMSDbContext>>(), DatabaseBackups.DefaultFolder, configuration["Backups:ToolsFolder"]));
+        // The database made ready for this version as the app opens, once, before the sign-in panel reads it: a backup and
+        // the updates it lacks (here, not in DatabaseHost: the Recipe API and the MCP server never change the database).
+        services.AddSingleton<IDatabaseUpdater, DatabaseUpdater>();
+        services.AddSingleton<DatabaseReadiness>();
         services.AddSingleton<SavedProductReader>();
         services.AddSingleton<MaterialCostShares>();
         services.AddSingleton<SharedRecipeImpact>();

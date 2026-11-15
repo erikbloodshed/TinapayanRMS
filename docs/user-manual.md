@@ -382,6 +382,7 @@ Backups of all of the app's data: every raw material, price, sub-assembly, produ
   - **Manual**: taken with **Back Up Now**.
   - **Automatic**: the app takes one by itself each day, while it's open: when it starts, and if it's left open overnight, within the hour after midnight. The newest 14 are kept, and older automatic ones are deleted.
   - **Before restore**: the safety backup a restore takes of the data it replaces.
+  - **Before update**: the safety backup the app takes the first time a new version opens, before it brings the data up to that version (see [What an update does](#what-an-update-does)).
   - **Copied in**: a backup brought in with **Restore from File…**.
   - Only automatic backups are ever deleted by the app. Delete others in File Explorer when you no longer need them.
 - **Also Copy To** is a second folder each automatic backup is copied to as well, such as a USB stick that stays plugged in or a OneDrive folder. Press **Choose…** to pick it: the newest automatic backup is copied there straight away. The newest 14 automatic backups are kept there too; nothing else in the folder is touched. **Stop Copying** stops it, and leaves what was copied. If the folder isn't there when a backup is taken (the USB stick was taken out), the backup is still taken here, and a note in amber says it wasn't copied. The note stays until a copy goes through or you change the folder. The folder is kept for you on this computer.
@@ -1329,7 +1330,7 @@ TinapayanRMS is installed from its source folder, on the PC that holds its datab
 
 1. Close TinapayanRMS if it's open. If you forget, the script closes it for you, unless it's asking whether to save changes: then it stops, and you answer, close the app and run it again.
 2. Open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Install-TinapayanRMS.ps1`. It builds the app, which takes a few minutes, copies it to `%LocalAppData%\Programs\TinapayanRMS`, and puts a **TinapayanRMS** shortcut in the Start menu and on the Desktop. Add `-NoDesktopShortcut` to leave the Desktop as it is.
-3. If the update changed the database, the script's last lines say how to apply it. Do that before opening the app, or it can't open: its password box says the database is behind this version.
+3. Open the app. If this version changes the data, the first start updates it, after a backup (see [What an update does](#what-an-update-does)).
 
 Run the same command again to update the app after the code changes. How the lists were left, your Vim keys setting, the backups and the database all stay as they are. To remove the app, run `scripts\Uninstall-TinapayanRMS.ps1` the same way.
 
@@ -1338,13 +1339,22 @@ Run the same command again to update the app after the code changes. How the lis
 The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanRMS on a PC for every Windows user, in `C:\Program Files\TinapayanRMS`, with a **TinapayanRMS** shortcut in everyone's Start menu and on everyone's Desktop. Whoever looks after the app makes it from the source folder (the developer manual says how). The PC it goes on needs no build tools, only:
 
 - the **.NET 11 Runtime (x64)**, from Microsoft's .NET download page. Without it the installer stops before changing anything and says where to get it;
-- PostgreSQL with the app's database, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing.
+- PostgreSQL, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing. The app's database itself needn't be there: the app makes it the first time it opens.
 
 1. Close TinapayanRMS if it's open. If it's still open, the installer closes it, and any changes not saved are lost.
 2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
-3. If the update changed the database, apply it before opening the app, or it can't open: its password box says the database is behind this version.
+3. Open the app. If this version changes the data, the first start updates it, after a backup (see [What an update does](#what-an-update-does)).
 
-To update, open the newer installer the same way: it replaces the version installed. It won't install over a newer version. Each user's lists, Vim keys setting, backups and the database stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
+To update, on this PC or another, open the newer installer the same way: it replaces the version installed. It won't install over a newer version. Each user's lists, Vim keys setting, backups and the data stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
+
+### What an update does
+
+A new version of the app sometimes needs to add to how the data is kept, such as the table for the password. You don't have to do anything for it:
+
+- **The first time the new version opens**, before it asks for the password, it sees the data is from an earlier version. It takes a backup of it, listed in **Settings → Database** as **Before update**, then brings the data up to the new version. The password box says so while it works; it takes a few seconds. This happens once: the next start opens as usual.
+- **On a PC where the app's data isn't there yet**, the app makes it, empty, and asks you to set a password. Then set things up as in [First-time setup](#3-first-time-setup), or restore a backup in Settings → Database.
+- **If several PCs use the same data**, update them all. The first one to open the new version updates the data, and a PC still on the older version then won't open, saying the data was updated by a newer version: install the newer version there too.
+- **If the backup can't be taken**, nothing is changed and the password box says why. Nothing is updated without a backup to go back to.
 
 ### Share the recipes with TinapayanBMS
 
@@ -1467,8 +1477,11 @@ Clear it, and the app asks for a new one. On the PC that holds the database, sig
 **"Too many wrong tries: wait 30 seconds, then try again."**
 Five wrong passwords in a row make the next try wait half a minute. Check Caps Lock while you wait.
 
+**"The database has been updated by a newer version of TinapayanRMS than this one…"**
+Another PC, or another copy, with a newer version has already updated the data, and this copy can't use it. Nothing was changed. Install the newer version on this PC (see [What an update does](#what-an-update-does)).
+
 **The password box shows an error instead of asking for the password.**
-The app couldn't reach its data: the message says why, such as the database being off or behind this version of the app. Once that's put right, press **Try Again**. The app never opens without the password, even then.
+The app couldn't reach or update its data: the message says why, such as the database being off, or a backup before an update that couldn't be taken. Once that's put right, press **Try Again**. The app never opens without the password, even then.
 
 **Opening the app says TinapayanRMS couldn't start.**
 Something stopped it before its window opened. The message says what, and where the log file is: show both to whoever looks after the app.

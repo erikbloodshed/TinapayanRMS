@@ -20,6 +20,7 @@ public sealed class DatabaseBackupRow(DatabaseBackup backup)
         BackupKind.Manual => "Manual",
         BackupKind.Automatic => "Automatic",
         BackupKind.BeforeRestore => "Before restore",
+        BackupKind.BeforeUpdate => "Before update",
         _ => "Copied in",
     };
 

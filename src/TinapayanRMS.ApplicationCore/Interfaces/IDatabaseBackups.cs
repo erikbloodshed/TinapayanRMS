@@ -58,13 +58,17 @@ public interface IDatabaseBackups
     Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>What made a backup: Back Up Now, the day's automatic one, the safety copy a restore takes first, or a file brought in to restore.</summary>
+/// <summary>
+/// What made a backup: Back Up Now, the day's automatic one, the safety copy a restore takes first, a file brought in to
+/// restore, or the safety copy an updated app takes before it brings the database up to its version (IDatabaseUpdater).
+/// </summary>
 public enum BackupKind
 {
     Manual,
     Automatic,
     BeforeRestore,
     CopiedIn,
+    BeforeUpdate,
 }
 
 /// <summary>

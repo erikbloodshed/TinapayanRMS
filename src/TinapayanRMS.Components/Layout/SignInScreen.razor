@@ -3,6 +3,7 @@
 @implements IAsyncDisposable
 @inject SignInViewModel ViewModel
 @inject AppLock Lock
+@inject DatabaseReadiness Readiness
 @inject IJSRuntime JS
 @inject Serilog.ILogger Logger
 
@@ -20,13 +21,15 @@
             @if (ViewModel.ErrorMessage is { } failure)
             {
                 <p class="sign-in-error" role="alert">@failure</p>
-                <div class="button-row">
+                <div class="button-row form-extra">
                     <ActionButton Label="Try Again" OnClick="LoadAsync" Disabled="_busy" />
                 </div>
             }
             else
             {
-                <p class="caption">Opening…</p>
+                <p class="caption">@(Readiness.IsUpdating
+                    ? "Bringing the data up to this version of TinapayanRMS, after a backup of it. This happens once, on the first start after an update."
+                    : "Opening…")</p>
             }
         }
         else if (ViewModel.IsSettingUp)
@@ -86,6 +89,7 @@
     protected override async Task OnInitializedAsync()
     {
         ViewModel.PropertyChanged += OnViewModelChanged;
+        Readiness.Changed += OnReadinessChanged;
         await LoadAsync();
     }
 
@@ -163,10 +167,13 @@
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e) => _redraws.Request();
 
+    private void OnReadinessChanged() => _redraws.Request();
+
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
         ViewModel.PropertyChanged -= OnViewModelChanged;
+        Readiness.Changed -= OnReadinessChanged;
         await _keys.StopAsync();
     }
 }

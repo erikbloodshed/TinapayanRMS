@@ -1,6 +1,7 @@
 <!-- TinapayanRMS for every Windows user on the PC: the published app in Program Files\TinapayanRMS, with Start menu and
      Desktop shortcuts for everyone. Each user's own data stays theirs, in %LocalAppData%\TinapayanRMS\Maui (the view
-     state, the log and the web view's folder), and the MSI never touches it, nor the database. -->
+     state, the log and the web view's folder), and the MSI never touches it, nor the database: the app brings the
+     database up to its version the first time it opens after an install, after a backup (IDatabaseUpdater). -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx">
 

@@ -13,6 +13,7 @@ public class BackupRulesTests
     [Arguments(BackupKind.Automatic, "TinapayanRMS_20261003_081512_auto.backup")]
     [Arguments(BackupKind.BeforeRestore, "TinapayanRMS_20261003_081512_before-restore.backup")]
     [Arguments(BackupKind.CopiedIn, "TinapayanRMS_20261003_081512_copied-in.backup")]
+    [Arguments(BackupKind.BeforeUpdate, "TinapayanRMS_20261003_081512_before-update.backup")]
     public void A_backup_is_named_by_database_time_and_kind_and_read_back(BackupKind kind, string fileName)
     {
         BackupRules.FileNameFor("TinapayanRMS", kind, Morning).Should().Be(fileName);

@@ -14,8 +14,9 @@
 
     The PC it's installed on needs the .NET 11 Runtime (x64), which the MSI checks for, and WebView2, which Windows 10 and
     11 have. Each Windows user who opens the app reaches PostgreSQL with the password in their own
-    %APPDATA%\postgresql\pgpass.conf. The MSI never touches the database: apply any new migrations with
-    `dotnet ef database update --project src/TinapayanRMS.Infrastructure`.
+    %APPDATA%\postgresql\pgpass.conf. The MSI never touches the database: the app brings it up to its version the first
+    time it opens after the install, on this PC or another, after a backup (IDatabaseUpdater), and makes it on a PC where
+    it isn't there yet.
 
     Install it by opening it (it asks for an administrator), or `msiexec /i <msi>`; remove it from Settings > Apps.
 

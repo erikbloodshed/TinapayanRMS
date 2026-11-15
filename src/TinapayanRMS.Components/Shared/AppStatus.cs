@@ -1,8 +1,9 @@
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// What the window needs to know about the app as a whole, one for the process. The database missing updates this
-/// version of the app needs (checked at startup, shown as a banner over every screen); automatic backups that have
+/// What the window needs to know about the app as a whole, one for the process. A database that couldn't be made ready
+/// for this version of the app (StartupTasks, over DatabaseReadiness; shown as a banner over every screen, which only a
+/// check started signed in gets to see, as the sign-in panel says it first); automatic backups that have
 /// stopped working, with the newest one getting old (AutomaticBackups, shown the same way); and a restore, which
 /// replaces what every screen holds, so the window's page loads afresh.
 /// </summary>
@@ -13,7 +14,7 @@ public sealed class AppStatus
     private readonly Lock _lock = new();
     private (string Message, DateTime At)? _restored;
 
-    /// <summary>Why some screens won't work, when the database lacks updates; null when it's up to date.</summary>
+    /// <summary>Why some screens won't work, when the database couldn't be made ready; null when it was.</summary>
     public string? DatabaseWarning { get; private set; }
 
     /// <summary>That automatic backups aren't working and the newest backup is getting old; null while they work.</summary>

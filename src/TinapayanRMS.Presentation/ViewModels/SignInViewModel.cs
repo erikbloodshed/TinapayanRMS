@@ -10,12 +10,15 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// The sign-in panel the locked window shows (AppLock). With a password set it asks for it; with none yet (a new
 /// database, or one cleared by scripts/Reset-Password.ps1) it asks for a new one, twice, and that sets it. Either way the
 /// window then unlocks, with the auto-lock's minutes read from the database. What's typed is cleared after every try,
-/// and a database that can't be reached says so in the panel, where a Try Again reads it again.
+/// and a database that can't be reached says so in the panel, where a Try Again reads it again. Before it reads anything,
+/// it waits for the database to be made ready for this version (DatabaseReadiness): the first start after an update backs
+/// it up and applies the updates, and a database a newer copy updated is refused there, in the panel.
 /// </summary>
 public sealed class SignInViewModel : ViewModelBase
 {
     private readonly IAccessSettingsRepository _repository;
     private readonly AppLock _appLock;
+    private readonly DatabaseReadiness _readiness;
 
     private bool _isLoaded;
     /// <summary>Whether it's known yet if a password is set: until then the panel shows neither form.</summary>
@@ -55,11 +58,12 @@ public sealed class SignInViewModel : ViewModelBase
 
     public ReactiveCommand<RxVoid, RxVoid> SetPasswordCommand { get; }
 
-    public SignInViewModel(IAccessSettingsRepository repository, AppLock appLock, ILogger logger)
+    public SignInViewModel(IAccessSettingsRepository repository, AppLock appLock, DatabaseReadiness readiness, ILogger logger)
         : base(logger)
     {
         _repository = repository;
         _appLock = appLock;
+        _readiness = readiness;
 
         LoadCommand = ReactiveCommand.CreateFromTask(() =>
         {
@@ -68,6 +72,7 @@ public sealed class SignInViewModel : ViewModelBase
             ErrorMessage = null;
             return LoadSafelyAsync(async () =>
             {
+                await _readiness.EnsureReadyAsync();
                 var settings = await _repository.GetAsync(CancellationToken.None);
                 IsSettingUp = !settings.HasPassword;
                 IsLoaded = true;

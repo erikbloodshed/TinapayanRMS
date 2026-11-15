@@ -40,6 +40,14 @@ public static class BackupRules
     public const string LaterVersionText =
         "That backup was made by a later version of TinapayanRMS, so this version can't use it. Nothing has changed: update the app, then restore it.";
 
+    /// <summary>The app's own database has an update this copy doesn't know: another PC's newer copy updated it.</summary>
+    public const string DatabaseFromLaterVersionText =
+        "The database has been updated by a newer version of TinapayanRMS than this one, so this copy can't open it. Nothing was changed: install the newer version on this PC.";
+
+    /// <summary>The database the app is set to use has tables but none of the app's updates: someone else's.</summary>
+    public const string DatabaseNotThisAppsText =
+        "The database the app is set to use isn't TinapayanRMS's, so the app left it alone. Check the database named in the app's settings.";
+
     /// <summary>To the second, so a file name sorts by when it was taken.</summary>
     private const string TimeFormat = "yyyyMMdd_HHmmss";
 
@@ -55,6 +63,7 @@ public static class BackupRules
         [BackupKind.Automatic] = "auto",
         [BackupKind.BeforeRestore] = "before-restore",
         [BackupKind.CopiedIn] = "copied-in",
+        [BackupKind.BeforeUpdate] = "before-update",
     }.ToFrozenDictionary();
 
     /// <summary>"tinapayanrms_20261003_081512_manual.backup": the database, when, and what made it.</summary>
@@ -189,16 +198,28 @@ public static class BackupRules
     /// </summary>
     /// <param name="applied">The updates the restored database has.</param>
     /// <param name="known">Every update this version of the app has, in order.</param>
-    public static IReadOnlyList<string> UpdatesNeeded(IReadOnlyCollection<string> applied, IReadOnlyList<string> known)
+    public static IReadOnlyList<string> UpdatesNeeded(IReadOnlyCollection<string> applied, IReadOnlyList<string> known) =>
+        Needed(applied, known, NotThisAppsText, LaterVersionText);
+
+    /// <summary>
+    /// The same for the app's own database as an updated copy opens it (IDatabaseUpdater): the updates this copy has that
+    /// it hasn't, refusing one a newer copy has updated, and one with tables but none of the app's updates. An empty
+    /// database, with no tables at all, isn't asked: it's given every update, as a new one is.
+    /// </summary>
+    public static IReadOnlyList<string> DatabaseUpdatesNeeded(IReadOnlyCollection<string> applied, IReadOnlyList<string> known) =>
+        Needed(applied, known, DatabaseNotThisAppsText, DatabaseFromLaterVersionText);
+
+    private static IReadOnlyList<string> Needed(
+        IReadOnlyCollection<string> applied, IReadOnlyList<string> known, string notThisAppsText, string laterVersionText)
     {
         if (applied.Count == 0)
         {
-            throw new BusinessRuleException(NotThisAppsText);
+            throw new BusinessRuleException(notThisAppsText);
         }
 
         if (applied.Any(update => !known.Contains(update)))
         {
-            throw new BusinessRuleException(LaterVersionText);
+            throw new BusinessRuleException(laterVersionText);
         }
 
         return [.. known.Where(update => !applied.Contains(update))];

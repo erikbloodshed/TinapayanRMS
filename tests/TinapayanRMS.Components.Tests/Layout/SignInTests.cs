@@ -18,10 +18,11 @@ public class SignInTests
 {
     private static readonly TimeSpan Hashing = TimeSpan.FromSeconds(10);
 
-    private static BunitContext NewContext(InMemoryAccessSettings settings)
+    private static BunitContext NewContext(InMemoryAccessSettings settings, StubDatabaseUpdater? database = null)
     {
         var context = AppServices.NewContext();
         context.Services.AddSingleton<IAccessSettingsRepository>(settings);
+        context.Services.AddSingleton<IDatabaseUpdater>(database ?? new StubDatabaseUpdater());
         return context.RenderingAsTheWebView();
     }
 
@@ -97,6 +98,24 @@ public class SignInTests
     }
 
     [Test]
+    public async Task The_first_start_after_an_update_says_its_updating_the_data_then_asks_for_the_password()
+    {
+        var settings = new InMemoryAccessSettings();
+        await settings.CreatePasswordAsync("pandesal 6am", CancellationToken.None);
+        var database = new StubDatabaseUpdater { Updates = 1 };
+        await using var context = NewContext(settings, database);
+
+        var panel = context.Render<SignInScreen>();
+
+        panel.WaitForAssertion(() => panel.Find(".caption").TextContent.Should().StartWith("Bringing the data up to this version"));
+        panel.FindAll("input[type=password]").Should().BeEmpty("nothing is read from the database until it's ready");
+
+        database.Release.SetResult();
+
+        panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().ContainSingle());
+    }
+
+    [Test]
     public async Task Locked_after_a_sign_in_the_panel_says_the_window_is_locked()
     {
         var settings = new InMemoryAccessSettings();
@@ -117,7 +136,9 @@ public class SignInTests
         var settings = new InMemoryAccessSettings();
         await using var context = NewContext(settings);
 
-        // No WaitForAssertion on the panel: bUnit's wait would hold it. The in-memory password reads at once.
+        // No WaitForAssertion on the panel: bUnit's wait would hold it. The database made ready first, so the panel's load
+        // finds it ready, and the in-memory password reads at once.
+        await context.Services.GetRequiredService<DatabaseReadiness>().EnsureReadyAsync();
         var left = context.ShowAndLeave<SignInScreen>(
             whileShown: panel => panel.FindAll("input[type=password]").Should().HaveCount(2));
 
