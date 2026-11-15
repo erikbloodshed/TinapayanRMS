@@ -143,14 +143,17 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         viewModel.SelectedRole!.Id.Should().Be(fillingId);
         viewModel.EditingName.Should().Be("Stuffing", "a move leaves the form's unsaved edits alone");
         (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeFalse("it's first now");
-        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeTrue();
+
+        // ReactiveUI marks a move finished on its scheduler, after Execute has returned: under load the other move can
+        // still read as not offered for a moment (GitHub's runner, 2026-11-15).
+        await Settle.UntilOfferedAsync(viewModel.MoveDownCommand.CanExecute, "Move Down");
 
         await viewModel.MoveDownCommand.Execute();
         await viewModel.MoveDownCommand.Execute();
 
         viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
         (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse("it's last now");
-        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        await Settle.UntilOfferedAsync(viewModel.MoveUpCommand.CanExecute, "Move Up");
     });
 
     [Test]
