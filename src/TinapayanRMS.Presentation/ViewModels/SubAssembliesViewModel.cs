@@ -240,6 +240,12 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
 
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
+    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
+
     /// <summary>Remove Line on whichever table shows: the recipe's lines, or a packaging set's.</summary>
     public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
 

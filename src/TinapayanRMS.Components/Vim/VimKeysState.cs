@@ -97,19 +97,19 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsViewModel pr
     }
 
     /// <summary>Runs <paramref name="command"/> as its button does, errors and all going where they always go.</summary>
-    private static VimCommandResult Execute(ReactiveCommand<RxVoid, RxVoid>? command, string missing, string unavailable)
+    private static VimCommandResult Execute(ICommand? command, string missing, string unavailable)
     {
-        if (command is not ICommand button)
+        if (command is null)
         {
             return new VimCommandResult(missing);
         }
 
-        if (!button.CanExecute(null))
+        if (!command.CanExecute(null))
         {
             return new VimCommandResult(unavailable);
         }
 
-        command.Execute().Subscribe();
+        command.Execute(null);
         return new VimCommandResult();
     }
 }

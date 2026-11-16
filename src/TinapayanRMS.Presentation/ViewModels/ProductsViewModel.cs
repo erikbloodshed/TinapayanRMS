@@ -535,6 +535,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
+    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
+
+    System.Windows.Input.ICommand IRevertScreen.RevertCommand => RevertCommand;
+
     public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>

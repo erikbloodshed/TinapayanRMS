@@ -557,6 +557,12 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
     public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
 
+    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
+
+    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
+
     /// <summary>
     /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with so it
     /// needn't be typed twice. Output: the name to add it as, or null if it was cancelled. The page answers it with a dialog

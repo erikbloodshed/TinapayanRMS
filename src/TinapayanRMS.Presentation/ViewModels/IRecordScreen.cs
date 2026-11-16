@@ -1,5 +1,4 @@
-using ReactiveUI;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
+using System.Windows.Input;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -10,11 +9,11 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// </summary>
 public interface IRecordScreen
 {
-    ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+    ICommand NewCommand { get; }
 
-    ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+    ICommand SaveCommand { get; }
 
-    ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    ICommand DeleteCommand { get; }
 
     /// <summary>
     /// Opens the record <paramref name="text"/> names best (<see cref="RecordNameMatch"/>), as a link from another
@@ -39,7 +38,7 @@ public interface IRecordOpener
 /// <summary>A screen whose form can throw away its changes since the last Save (Products): <c>:revert</c>.</summary>
 public interface IRevertScreen
 {
-    ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
+    ICommand RevertCommand { get; }
 }
 
 /// <summary>

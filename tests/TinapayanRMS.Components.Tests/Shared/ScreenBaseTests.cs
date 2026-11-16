@@ -26,6 +26,7 @@ public class ScreenBaseTests
             : base(logger)
         {
             SaveCommand = ReactiveCommand.Create(() => { }, CanSave);
+            PrintCommand = new ScreenCommand(() => PrintDone.Task);
         }
 
         public string Name
@@ -41,6 +42,12 @@ public class ScreenBaseTests
         public BehaviorSubject<bool> CanSave { get; } = new(false);
 
         public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+
+        /// <summary>What ends a Print run.</summary>
+        public TaskCompletionSource PrintDone { get; } = new();
+
+        /// <summary>One of the app's own commands, which can't run while it runs.</summary>
+        public ScreenCommand PrintCommand { get; }
 
         /// <summary>A part, as a tab's is, with a command of its own.</summary>
         public TestScreenPart Part { get; } = new();
@@ -69,6 +76,9 @@ public class ScreenBaseTests
             builder.CloseElement();
             builder.OpenElement(4, "em");
             builder.AddContent(5, CanRun(ViewModel.Part.RemoveCommand));
+            builder.CloseElement();
+            builder.OpenElement(6, "b");
+            builder.AddContent(7, CanRun(ViewModel.PrintCommand));
             builder.CloseElement();
         }
     }
@@ -175,6 +185,22 @@ public class ScreenBaseTests
         await screen.InvokeAsync(() => viewModel.CanSave.OnNext(true));
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|True"));
+    }
+
+    [Test]
+    public async Task A_screen_command_starting_and_ending_a_run_redraws_the_screen()
+    {
+        await using var context = AppServices.NewContext();
+        var (screen, viewModel) = Render(context);
+        screen.Find("b").TextContent.Should().Be("True");
+
+        var printing = Task.CompletedTask;
+        await screen.InvokeAsync(() => { printing = viewModel.PrintCommand.ExecuteAsync(); });
+        screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("False"));
+
+        await screen.InvokeAsync(viewModel.PrintDone.SetResult);
+        await printing;
+        screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("True"));
     }
 
     // A part's commands are its own (the Products screen's Packaging tab's Remove Line, say), so the screen watches them

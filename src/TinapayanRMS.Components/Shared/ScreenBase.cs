@@ -62,7 +62,7 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     [Inject] private Serilog.ILogger Logger { get; set; } = null!;
 
     /// <summary>The command that loads the screen, run each time it's opened; null for a screen with nothing to load.</summary>
-    protected abstract ReactiveCommand<RxVoid, RxVoid>? LoadCommand { get; }
+    protected abstract ICommand? LoadCommand { get; }
 
     protected override void OnInitialized()
     {
@@ -105,7 +105,7 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     {
         if (LoadCommand is { } load)
         {
-            await load.Execute();
+            await Commands.ExecuteAsync(load);
         }
     }
 

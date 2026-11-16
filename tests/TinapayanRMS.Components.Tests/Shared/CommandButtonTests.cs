@@ -48,6 +48,26 @@ public class CommandButtonTests
     }
 
     [Test]
+    public async Task A_screen_command_runs_on_a_click_and_disables_the_button_while_it_cant_run()
+    {
+        await using var context = AppServices.NewContext();
+        var picked = false;
+        var runs = 0;
+        var command = ScreenCommand.Of(() => runs++, () => picked);
+        var button = context.Render<CommandButton>(parameters => parameters.Add(b => b.Command, command).Add(b => b.Label, "Delete"));
+
+        button.Find("button").HasAttribute("disabled").Should().BeTrue();
+
+        // Asked as the button is drawn: the screen draws it again as anything on it changes (ScreenBase).
+        picked = true;
+        button.Render();
+        button.Find("button").HasAttribute("disabled").Should().BeFalse();
+        button.Find("button").Click();
+
+        runs.Should().Be(1, "it runs as it's clicked, with no scheduler between");
+    }
+
+    [Test]
     public async Task A_button_with_only_an_icon_is_an_icon_button()
     {
         await using var context = AppServices.NewContext();

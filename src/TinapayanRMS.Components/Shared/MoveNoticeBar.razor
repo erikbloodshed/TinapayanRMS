@@ -20,9 +20,9 @@
 
     [Parameter] public string? Notice { get; set; }
 
-    [Parameter, EditorRequired] public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; set; } = null!;
+    [Parameter, EditorRequired] public System.Windows.Input.ICommand UndoCommand { get; set; } = null!;
 
-    [Parameter, EditorRequired] public ReactiveCommand<RxVoid, RxVoid> DismissCommand { get; set; } = null!;
+    [Parameter, EditorRequired] public System.Windows.Input.ICommand DismissCommand { get; set; } = null!;
 
     protected override void OnParametersSet()
     {
