@@ -16,7 +16,11 @@ public sealed class MainPage : ContentPage
         WebView = new BlazorWebView { HostPage = "wwwroot/index.html" };
         WebView.RootComponents.Add(new RootComponent { Selector = "#app", ComponentType = typeof(Routes) });
         WebView.RootComponents.Add(new RootComponent { Selector = "head::after", ComponentType = typeof(HeadOutlet) });
-        WebView.BlazorWebViewInitialized += (_, e) => DisableZoom(e);
+        WebView.BlazorWebViewInitialized += (_, e) =>
+        {
+            DisableZoom(e);
+            RefuseDrops(e);
+        };
         Content = WebView;
     }
 
@@ -37,6 +41,19 @@ public sealed class MainPage : ContentPage
             settings.IsZoomControlEnabled = false;
             settings.IsPinchZoomEnabled = false;
         }
+#endif
+    }
+
+    /// <summary>
+    /// Nothing dragged in from outside the window lands in it: a file from File Explorer is refused, as the app has no use
+    /// for one. MAUI 11.0.10 lets the web view take drops, and a file the page doesn't take is handed to Windows to open in
+    /// its own program. The app's own drags (a table's lines, a list's rows onto a folder) follow the pointer, not the
+    /// browser's drag and drop (app.js), so this doesn't touch them.
+    /// </summary>
+    private static void RefuseDrops(BlazorWebViewInitializedEventArgs e)
+    {
+#if WINDOWS
+        e.WebView.AllowDrop = false;
 #endif
     }
 }

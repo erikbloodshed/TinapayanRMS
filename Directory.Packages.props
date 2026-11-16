@@ -9,8 +9,9 @@
     <EFCoreVersion>11.0.0-rc.3.26522.148</EFCoreVersion>
     <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
     <MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
-    <!-- MAUI's packages are the installed workload's (`dotnet workload list`, maui-windows): move them with it. -->
-    <MauiPackagesVersion>11.0.0</MauiPackagesVersion>
+    <!-- MAUI's packages (Controls, BlazorWebView): MAUI ships as these, and the maui-windows workload only builds with them,
+         so they can be ahead of it (11.0.10 over the 11.0.0 workload). Keep both on the same release. -->
+    <MauiPackagesVersion>11.0.10</MauiPackagesVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
     <SyncfusionVersion>35.1.46</SyncfusionVersion>
   </PropertyGroup>
