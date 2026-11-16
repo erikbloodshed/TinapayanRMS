@@ -50,7 +50,7 @@
 
     <div class="header-fields">
         <label class="form-label" for="rm-name">Name</label>
-        <TextField ID="rm-name" @bind-Value="ViewModel.EditingName" OnLeave="ViewModel.CheckNameAvailability" CssClass="field-wide" />
+        <TextField ID="rm-name" @bind-Value="ViewModel.EditingName" OnLeave="ViewModel.CheckNameAvailability" CssClass="field-roomy" />
 
         <label class="form-label" for="rm-type">Type</label>
         <PickField ID="rm-type" TItem="RawMaterialType" Items="ViewModel.Types" @bind-Value="ViewModel.EditingType" Disabled="!ViewModel.CanChangeTypeAndSource"
@@ -58,7 +58,7 @@
 
         <label class="form-label" for="rm-category">Category</label>
         <PickField ID="rm-category" TItem="RawMaterialCategory" Items="ViewModel.CategoryOptions" TextField="Name"
-                   Value="ViewModel.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true"
+                   Value="ViewModel.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true" CssClass="field-roomy"
                    OnArrive="ArriveAtCategory" OnTyped="t => ViewModel.CategorySearchText = t" OnLeave="ViewModel.CommitCategoryTextAsync"
                    Tooltip="Pick a category, or type a new one's name to add it." />
 

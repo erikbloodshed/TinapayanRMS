@@ -398,6 +398,10 @@
     flex: 1.5;
 }
 
+.header-fields > .field-roomy {
+    flex: 1.25;
+}
+
 .header-fields > .field-narrow {
     flex: 0 0 90px;
 }
