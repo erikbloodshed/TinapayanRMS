@@ -3,8 +3,8 @@
   <!-- Satori GC, an experiment (2026-11-08): github.com/VSadov/Satori, a low-pause garbage collector that isn't .NET's.
        The SDK swaps the runtime's own files (coreclr, the JIT, System.Private.CoreLib) for Satori's builds of them, so it
        only works for a self-contained app. Off unless asked for: -p:UseSatoriGC=true (below). Its runtime is built from
-       .NET's release/11.0, so choose an 11.0.0-satori.* version (nuget.org/packages/PublishWithSatoriGC). -->
-  <Sdk Name="PublishWithSatoriGC" Version="11.0.0-satori.42242472725.2" />
+       .NET's release/11.0, so choose an 11.0.*-satori.* version (nuget.org/packages/PublishWithSatoriGC). -->
+  <Sdk Name="PublishWithSatoriGC" Version="11.0.1-satori.43688079600.1" />
 
   <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2.
        Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target. -->
