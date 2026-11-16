@@ -54,7 +54,7 @@ TinapayanRMS.slnx
 ├── global.json                       — the pinned SDK, and test.runner (Microsoft.Testing.Platform)
 ├── .mcp.json                         — how an AI assistant starts the MCP servers (src/TinapayanRMS.Mcp, and Syncfusion's Blazor docs server)
 ├── .github/workflows/build.yml       — CI on GitHub: the build (warnings as errors), the migration check and the whole suite,
-│                                       on Windows against PostgreSQL 18.6, for every push to main and pull request that changes code
+│                                       on Windows against PostgreSQL 18.7, for every push to main and pull request that changes code
 ├── scripts/                          — Install-RecipeApi.ps1, Uninstall-RecipeApi.ps1 and New-DatabaseReader.ps1 (the Recipe API);
 │                                       Reset-Password.ps1 (clears a forgotten password: the app then asks for a new one);
 │                                       Start-McpServer.ps1 (which .mcp.json runs); Test-Changed.ps1 and Watch-Tests.ps1 (fewer tests while developing);
