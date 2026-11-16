@@ -6,8 +6,8 @@
        .NET's release/11.0, so choose an 11.0.*-satori.* version (nuget.org/packages/PublishWithSatoriGC). -->
   <Sdk Name="PublishWithSatoriGC" Version="11.0.1-satori.43688079600.1" />
 
-  <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2.
-       Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target. -->
+  <!-- The app: a .NET MAUI Blazor Hybrid window that draws the screens (TinapayanRMS.Components) in its WebView2. Its
+       wwwroot is the host page alone, which links the screens' styles and scripts from their library. Windows only. Ported from the TinapayanRMS_Web repo's on 2026-11-07, without its shop accounts or its Mac target. -->
   <PropertyGroup>
     <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
     <OutputType>Exe</OutputType>
@@ -82,7 +82,7 @@
          Syncfusion makes, some 240 MB, whose names (bootstrap5.3-dark.css) MakePri takes for resource qualifiers and
          warns about;
        - the all-components script, syncfusion-blazor.min.js (7 MB): the page loads only its components' scripts
-         (wwwroot/syncfusion.js). -->
+         (TinapayanRMS.Components' syncfusion.js). -->
   <Target Name="LeaveOutUnusedSyncfusionFiles" AfterTargets="UpdateExistingPackageStaticWebAssets">
     <ItemGroup>
       <_UnusedSyncfusionFile Include="@(StaticWebAsset)" Condition="'%(SourceId)' == 'Syncfusion.Blazor.Themes' and '%(RelativePath)' != 'fluent2-lite.css'" />

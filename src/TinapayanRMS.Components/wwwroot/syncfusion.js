@@ -4,8 +4,9 @@
 // which fetches a component's scripts and those they need (the base script's map) and runs them.
 //
 // Nothing in Syncfusion waits for them: the window starts Blazor once the page is parsed, and a component whose script
-// isn't in yet throws (the "Something went wrong" bar) or quietly does without it. So index.html starts this module as
-// the page is parsed, and Blazor's start waits for it (TinapayanRMS.Maui.lib.module.js, the app's JS initializer).
+// isn't in yet throws (the "Something went wrong" bar) or quietly does without it. So the host page (the MAUI app's
+// index.html) starts this module as it's parsed, and Blazor's start waits for it (TinapayanRMS.Components.lib.module.js,
+// the screens' JS initializer).
 
 // The Syncfusion components the screens use, by the names Syncfusion's loader knows them by (SfGrid is "sfgrid"); SfButton
 // has no script. A component new to the screens goes here too: SyncfusionScriptsTests (Components.Tests) checks the list

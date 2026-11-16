@@ -7,7 +7,7 @@ using TinapayanRMS.Components.Shared;
 namespace TinapayanRMS.Components.Tests;
 
 /// <summary>
-/// The page loads the scripts of only the Syncfusion components on the list in the Maui project's wwwroot/syncfusion.js,
+/// The page loads the scripts of only the Syncfusion components on the list in the screens' wwwroot/syncfusion.js,
 /// through the loader in Syncfusion's base script. A component the screens use that isn't on the list has no script, and
 /// fails on its screen in the window, where nothing else would see it first.
 /// </summary>

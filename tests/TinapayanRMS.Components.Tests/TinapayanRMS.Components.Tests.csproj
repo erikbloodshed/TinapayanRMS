@@ -14,7 +14,7 @@
   <ItemGroup>
     <!-- SyncfusionScriptsTests: the page's list of the Syncfusion components whose scripts it loads, and Syncfusion's
          loader, from the package at SyncfusionVersion, that it's checked against. -->
-    <Content Include="..\..\src\TinapayanRMS.Maui\wwwroot\syncfusion.js" Link="syncfusion.js">
+    <Content Include="..\..\src\TinapayanRMS.Components\wwwroot\syncfusion.js" Link="syncfusion.js">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="$(NuGetPackageRoot)syncfusion.blazor.core\$(SyncfusionVersion)\staticwebassets\scripts\syncfusion-blazor-base.min.js"

@@ -6,14 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TinapayanRMS</title>
     <base href="/" />
+    <!-- The screens' styles and scripts are their library's (TinapayanRMS.Components), served under its _content path. -->
     <link rel="stylesheet" href="_content/Syncfusion.Blazor.Themes/fluent2-lite.css" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="css/record-screens.css" />
-    <link rel="stylesheet" href="css/products.css" />
-    <link rel="stylesheet" href="css/reports.css" />
-    <link rel="stylesheet" href="css/print.css" />
+    <link rel="stylesheet" href="_content/TinapayanRMS.Components/app.css" />
+    <link rel="stylesheet" href="_content/TinapayanRMS.Components/css/record-screens.css" />
+    <link rel="stylesheet" href="_content/TinapayanRMS.Components/css/products.css" />
+    <link rel="stylesheet" href="_content/TinapayanRMS.Components/css/reports.css" />
+    <link rel="stylesheet" href="_content/TinapayanRMS.Components/css/print.css" />
     <!-- Syncfusion's scripts for the screens' components, started as the page is parsed; Blazor's start waits for them. -->
-    <script type="module" src="syncfusion.js" async></script>
+    <script type="module" src="_content/TinapayanRMS.Components/syncfusion.js" async></script>
 </head>
 
 <body>
@@ -25,8 +26,8 @@
         <span class="dismiss">🗙</span>
     </div>
 
-    <script src="app.js"></script>
-    <script src="vim.js"></script>
+    <script src="_content/TinapayanRMS.Components/app.js"></script>
+    <script src="_content/TinapayanRMS.Components/vim.js"></script>
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 </body>
 
