@@ -1,12 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -32,15 +29,15 @@ public interface IRawMaterialRecipeHost : IFormPartHost
 /// Sub-Assemblies screen, for show, the made ingredient's own add-ins on top, typed straight into their table, and the
 /// batch's totals. The screen keeps the Weight Loss % and says when the recipe's lines are read again.
 /// </summary>
-public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
+public sealed class RawMaterialRecipe : ObservableState, IDisposable
 {
     private readonly IRawMaterialRecipeHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
     private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
     private readonly Subject<int> _subAssemblyOpenRequests = new();
-    private readonly ObservableAsPropertyHelper<bool> _isPickingSubAssembly;
-    private readonly ObservableAsPropertyHelper<bool> _isShowingSubAssemblyBadge;
-    private readonly ObservableAsPropertyHelper<string> _subAssemblyBadgeText;
+
+    /// <summary>Each sub-assembly picked or shown, nothing picked first: what reads the recipe's lines (<see cref="SubAssemblies"/>).</summary>
+    private readonly BehaviorSubject<SubAssembly?> _subAssemblies = new(null);
 
     /// <summary>The add-ins as last loaded, so Save only sends them when they were changed.</summary>
     private List<(int IngredientId, decimal Grams)> _savedAddIns = [];
@@ -53,29 +50,10 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
         _ingredients = ingredients;
         _subAssemblyLineRepository = subAssemblyLineRepository;
 
-        // Once a sub-assembly is picked, it shows as a badge with Edit beside it, and the picker only comes back on Edit.
-        _isPickingSubAssembly = this.WhenAnyValue(x => x.SubAssembly, x => x.IsChangingSubAssembly,
-                (subAssembly, isChanging) => subAssembly is null || isChanging)
-            .ToProperty(this, x => x.IsPickingSubAssembly, true);
-        _isShowingSubAssemblyBadge = this.WhenAnyValue(x => x.IsPickingSubAssembly)
-            .Select(isPicking => !isPicking)
-            .ToProperty(this, x => x.IsShowingSubAssemblyBadge);
-        _subAssemblyBadgeText = this.WhenAnyValue(x => x.SubAssembly)
-            .Select(subAssembly => subAssembly is null ? string.Empty : $"{subAssembly.Name}, from Sub-Assemblies")
-            .ToProperty(this, x => x.SubAssemblyBadgeText, string.Empty);
-
-        StartChangingSubAssemblyCommand = ReactiveCommand.Create(
-            () => { IsChangingSubAssembly = true; },
-            this.WhenAnyValue(x => x.IsShowingSubAssemblyBadge));
-        CancelChangingSubAssemblyCommand = ReactiveCommand.Create(() => { IsChangingSubAssembly = false; });
-
-        OpenSubAssemblyCommand = ReactiveCommand.Create(
-            () => _subAssemblyOpenRequests.OnNext(SubAssembly!.Id),
-            this.WhenAnyValue(x => x.SubAssembly).Select(subAssembly => subAssembly is not null));
-
-        RemoveAddInCommand = ReactiveCommand.Create(
-            () => host.AsUndoStep(() => AddIns.Remove(SelectedAddIn!)),
-            this.WhenAnyValue(x => x.SelectedAddIn).Select(line => line is not null));
+        StartChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = true, () => IsShowingSubAssemblyBadge);
+        CancelChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = false);
+        OpenSubAssemblyCommand = ScreenCommand.Of(() => _subAssemblyOpenRequests.OnNext(SubAssembly!.Id), () => SubAssembly is not null);
+        RemoveAddInCommand = ScreenCommand.Of(() => host.AsUndoStep(() => AddIns.Remove(SelectedAddIn!)), () => SelectedAddIn is not null);
     }
 
     /// <summary>
@@ -92,12 +70,10 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
         get => _subAssembly;
         set
         {
-            if (EqualityComparer<SubAssembly?>.Default.Equals(_subAssembly, value))
+            if (!SetSubAssembly(value))
             {
                 return;
             }
-
-            this.RaiseAndSetIfChanged(ref _subAssembly, value);
 
             // Another sub-assembly picked after Edit settles it, and the badge comes back.
             if (value is not null && IsChangingSubAssembly)
@@ -107,34 +83,42 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
         }
     }
 
-    private bool _isChangingSubAssembly;
     /// <summary>
     /// Edit was pressed: the Made from picker shows again in place of the badge, until another sub-assembly is picked or
     /// Cancel is pressed, so the recipe it's made from isn't changed by accident.
     /// </summary>
     public bool IsChangingSubAssembly
     {
-        get => _isChangingSubAssembly;
-        internal set => this.RaiseAndSetIfChanged(ref _isChangingSubAssembly, value);
+        get;
+        internal set => RaiseAndSetIfChanged(ref field, value);
     }
 
-    /// <summary>The Made from picker shows: no sub-assembly is picked yet, or Edit was pressed. Otherwise the badge and Edit show.</summary>
-    public bool IsPickingSubAssembly => _isPickingSubAssembly.Value;
+    /// <summary>
+    /// The Made from picker shows: no sub-assembly is picked yet, or Edit was pressed. Otherwise the badge and Edit show, so
+    /// once a sub-assembly is picked the picker only comes back on Edit.
+    /// </summary>
+    public bool IsPickingSubAssembly => SubAssembly is null || IsChangingSubAssembly;
 
     /// <summary>The picked sub-assembly shows as a badge that opens it, with Edit beside it, so a stray click or scroll can't change it.</summary>
-    public bool IsShowingSubAssemblyBadge => _isShowingSubAssemblyBadge.Value;
+    public bool IsShowingSubAssemblyBadge => !IsPickingSubAssembly;
 
     /// <summary>"Butter Icing Base, from Sub-Assemblies", as a linked section's badge reads on the Products screen.</summary>
-    public string SubAssemblyBadgeText => _subAssemblyBadgeText.Value;
+    public string SubAssemblyBadgeText => SubAssembly is { } subAssembly ? $"{subAssembly.Name}, from Sub-Assemblies" : string.Empty;
 
     /// <summary>The badge's Edit: shows the Made from picker again (<see cref="IsChangingSubAssembly"/>).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> StartChangingSubAssemblyCommand { get; }
+    public ScreenCommand StartChangingSubAssemblyCommand { get; }
 
     /// <summary>The picker's Cancel: puts the badge back, keeping the sub-assembly as it is.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CancelChangingSubAssemblyCommand { get; }
+    public ScreenCommand CancelChangingSubAssemblyCommand { get; }
 
     /// <summary>The badge: asks for the sub-assembly it's made from to be opened, through <see cref="SubAssemblyOpenRequests"/>.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> OpenSubAssemblyCommand { get; }
+    public ScreenCommand OpenSubAssemblyCommand { get; }
+
+    /// <summary>
+    /// The sub-assembly as each pick or load shows it, nothing picked first: the screen reads the recipe's lines from it
+    /// (LoadLatest), so a newer one cancels a read still under way.
+    /// </summary>
+    public IObservable<SubAssembly?> SubAssemblies => _subAssemblies;
 
     /// <summary>
     /// The sub-assemblies the badge asks to open, by id. ScreenLinks subscribes and opens each on the Sub-Assemblies screen,
@@ -154,27 +138,24 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
     /// <summary>The line the Add-Ins table's add row edits: it prices itself as its ingredient is picked, before it's committed.</summary>
     public Func<IngredientLineRow> NewAddIn => () => new IngredientLineRow(id => _ingredients.FirstOrDefault(m => m.Id == id));
 
-    private IngredientLineRow? _selectedAddIn;
     public IngredientLineRow? SelectedAddIn
     {
-        get => _selectedAddIn;
-        set => this.RaiseAndSetIfChanged(ref _selectedAddIn, value);
+        get;
+        set => RaiseAndSetIfChanged(ref field, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> RemoveAddInCommand { get; }
+    public ScreenCommand RemoveAddInCommand { get; }
 
-    private decimal _bomTotalWeight;
     /// <summary>
     /// The batch's yield as the form has it, the sub-assembly's grams and the add-ins' less the weight loss, so it follows the
     /// pick, the Add-Ins table and the Weight Loss % box as they change. 0 with no sub-assembly picked.
     /// </summary>
     public decimal BomTotalWeight
     {
-        get => _bomTotalWeight;
-        private set => this.RaiseAndSetIfChanged(ref _bomTotalWeight, value);
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
     }
 
-    private decimal _bomTotalCost;
     /// <summary>
     /// What the batch costs at its components' buffered costs: the sum of both tables' Cost columns, the recipe's and the
     /// add-ins'. BomTotalCost ÷ BomTotalWeight is the buffered cost per gram Save stores, since a made ingredient adds no
@@ -182,13 +163,24 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
     /// </summary>
     public decimal BomTotalCost
     {
-        get => _bomTotalCost;
-        private set => this.RaiseAndSetIfChanged(ref _bomTotalCost, value);
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>The sub-assembly picked, said to have changed without the edit that picking it is (the badge's Edit stays as it was).</summary>
-    public void ShowSubAssembly(SubAssembly? subAssembly) =>
-        this.RaiseAndSetIfChanged(ref _subAssembly, subAssembly, nameof(SubAssembly));
+    public void ShowSubAssembly(SubAssembly? subAssembly) => SetSubAssembly(subAssembly);
+
+    /// <summary>The sub-assembly set, and its lines read again, when it's another; false when it was that one already.</summary>
+    private bool SetSubAssembly(SubAssembly? subAssembly)
+    {
+        if (!RaiseAndSetIfChanged(ref _subAssembly, subAssembly, nameof(SubAssembly)))
+        {
+            return false;
+        }
+
+        _subAssemblies.OnNext(subAssembly);
+        return true;
+    }
 
     /// <summary>The sub-assemblies as a load read them, packaging sets left out, merged into the picker's list.</summary>
     public void TakeOptions(IEnumerable<SubAssembly> subAssemblies) =>
@@ -278,5 +270,9 @@ public sealed class RawMaterialRecipe : ReactiveObject, IDisposable
     private List<(int IngredientId, decimal Grams)> CurrentAddIns() =>
         [.. IngredientLineRow.CompleteLines(AddIns, _host.EditingName.Trim()).Select(l => (l.Ingredient.Id, l.Grams))];
 
-    public void Dispose() => _subAssemblyOpenRequests.Dispose();
+    public void Dispose()
+    {
+        _subAssemblyOpenRequests.Dispose();
+        _subAssemblies.Dispose();
+    }
 }

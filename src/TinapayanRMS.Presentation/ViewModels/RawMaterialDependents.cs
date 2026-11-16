@@ -1,7 +1,6 @@
+using System.Reactive;
 using System.Reactive.Subjects;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -10,7 +9,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// goes into, one tile each, which opens it, with what the material makes up of each one's material cost once the tab shows.
 /// The screen says what to show as each material is loaded, and when to work the shares out.
 /// </summary>
-public sealed class RawMaterialDependents : ReactiveObject, IDisposable
+public sealed class RawMaterialDependents : ObservableState, IDisposable
 {
     private const string NotUsedText = "No product uses it yet.";
 
@@ -19,36 +18,34 @@ public sealed class RawMaterialDependents : ReactiveObject, IDisposable
 
     private readonly MaterialCostShares? _costShares;
     private readonly Subject<int> _productOpenRequests = new();
-    private readonly Subject<RxVoid> _sharesWanted = new();
+    private readonly Subject<Unit> _sharesWanted = new();
 
     /// <param name="costShares">What each product's share is worked out by; null in a screen built without it (tests that don't need it).</param>
     public RawMaterialDependents(MaterialCostShares? costShares)
     {
         _costShares = costShares;
-        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+        OpenProductCommand = ScreenCommand.Of<int>(_productOpenRequests.OnNext);
     }
 
-    private IReadOnlyList<LinkingProduct> _products = [];
     /// <summary>
     /// The products the material showing goes into, by name (IRawMaterialRepository.GetDependentsAsync): one tile each, which
     /// opens it. Empty for a new material.
     /// </summary>
     public IReadOnlyList<LinkingProduct> Products
     {
-        get => _products;
-        private set => this.RaiseAndSetIfChanged(ref _products, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = [];
 
-    private string _text = NotUsedText;
     /// <summary>The caption under the tiles: what they mean for a change of cost, or that nothing uses the material.</summary>
     public string Text
     {
-        get => _text;
-        private set => this.RaiseAndSetIfChanged(ref _text, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = NotUsedText;
 
     /// <summary>A tile's click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+    public ScreenCommand<int> OpenProductCommand { get; }
 
     /// <summary>
     /// The products the tiles ask to open, by id. ScreenLinks subscribes and opens each on the Products screen, as it does
@@ -57,14 +54,14 @@ public sealed class RawMaterialDependents : ReactiveObject, IDisposable
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
     /// <summary>The tiles changed, so their shares are wanted again, once the tab shows.</summary>
-    public IObservable<RxVoid> SharesWanted => _sharesWanted;
+    public IObservable<Unit> SharesWanted => _sharesWanted;
 
     /// <summary>What uses the material showing: <paramref name="products"/>, by name, their shares still to be worked out.</summary>
     public void Show(IReadOnlyList<LinkingProduct> products)
     {
         Products = products;
         Text = products.Count == 0 ? NotUsedText : UsedText;
-        _sharesWanted.OnNext(RxVoid.Default);
+        _sharesWanted.OnNext(Unit.Default);
     }
 
     /// <summary>

@@ -99,7 +99,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         RawMaterial WithId(int id) => viewModel.RawMaterials.Single(m => m.Id == id);
 
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[0]), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
@@ -218,7 +218,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Strong Flour";
@@ -271,7 +271,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         }
 
         var viewModel = CreateRawMaterialsViewModel(new FailingDbContextFactory(CreateDbContextFactory()));
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == ids[0]), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
         viewModel.EditingName = "Salted Butter";

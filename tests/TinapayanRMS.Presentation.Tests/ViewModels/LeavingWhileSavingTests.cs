@@ -74,12 +74,12 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Strong Flour";
 
-        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.Execute().ToTask());
+        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.ExecuteAsync());
 
         mayLeave.Should().BeTrue("the Save went through, so there's nothing left to ask about");
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", viewModel.ErrorMessage);
@@ -118,7 +118,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
         var answers = 0;
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context =>
@@ -130,7 +130,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
 
         // The Save fails at its first read, as a database that stopped answering does.
         factory.Fail = true;
-        var saving = viewModel.SaveCommand.Execute().ToTask();
+        var saving = viewModel.SaveCommand.ExecuteAsync();
         var leaving = viewModel.ResolveUnsavedChangesAsync(revert: true);
         await saving;
 

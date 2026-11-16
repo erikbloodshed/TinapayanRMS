@@ -1,9 +1,6 @@
-using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
 using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using ReactiveUI;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
@@ -13,7 +10,6 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -79,9 +75,8 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var viewModel = await LoadedViewModelAsync();
         IListTreeScreen screen = viewModel.List;
 
-        var firstMove = viewModel.List.MoveMaterialsCommand.Execute([new RawMaterialMove(breadFlourId, dryGoodsId)]).ToTask();
-        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
-        await viewModel.List.MoveMaterialsCommand.CanExecute.FirstAsync(offered => !offered);
+        var firstMove = viewModel.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(breadFlourId, dryGoodsId)]);
+        viewModel.List.MoveMaterialsCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
         (await screen.DropAsync([viewModel.List.RawMaterialTree.Find(caneSugarId)!], TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods")))
             .Should().BeNull("a move is still saving");
         await firstMove;
@@ -105,13 +100,13 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Dry Goods").Materials.Should().ContainSingle();
         viewModel.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(flourId);
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Should().ContainSingle();
         viewModel.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        (await viewModel.List.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -273,11 +268,11 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.EditingName.Should().Be("Rye Flour");
         viewModel.History.IsDirty.Should().BeTrue("Save is offered for it");
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         flour.Children.Should().Equal([row], "a load keeps it");
         viewModel.List.SelectedTreeNode.Should().BeSameAs(row);
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.List.RawMaterialTree.PendingMaterial.Should().BeNull();
@@ -295,7 +290,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
         var ingredients = viewModel.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
 
         var row = viewModel.List.RawMaterialTree.PendingMaterial!;
         TitlesIn(ingredients).Should().Equal(["Flour", "New ingredient"], "with no category yet, it's last in its type's folder");
@@ -304,7 +299,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.List.SelectedTreeNode.Should().BeNull();
         viewModel.SelectedRawMaterial.Should().BeNull("the form stays on the blank new material");
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         await viewModel.List.CommitTreeNameAsync("Rye Flour");
         TitlesIn(ingredients).Should().Equal("Flour", "Rye Flour");
 
@@ -336,7 +331,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
         await RunAsync(viewModel.List.TreeMenuFor(TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Ingredient Here"));
         Edit(viewModel, () => viewModel.EditingName = "Rye Flour");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         TreeFolder(viewModel, RawMaterialType.Ingredient, "Flour").Materials.Select(l => l.Title).Should().Equal("Rye Flour");
@@ -366,7 +361,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         viewModel.CanChangeTypeAndSource.Should().BeTrue();
         viewModel.History.IsDirty.Should().BeTrue("the copy is there to be saved");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         TreeFolder(viewModel, RawMaterialType.Packaging, "Boxes").Materials.Select(l => l.Title).Should().Equal("Disposable Spoon", "Disposable Spoon Copy");
@@ -661,7 +656,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         await RunAsync(MoveToItem(viewModel, breadFlourId, "Dry Goods"));
         await new RawMaterialCategoryRepository(CreateDbContextFactory()).DeleteAsync(flourId, Cancellation);
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be("The category to move it to no longer exists.");
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
@@ -777,7 +772,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
         viewModel.EditingName = "Strong Bread Flour";
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
 
         asked.Should().ContainSingle();
         viewModel.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
@@ -875,17 +870,17 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     {
         switch (item.Command)
         {
-            case ReactiveCommand<IReadOnlyList<RawMaterialMove>, RxVoid> move:
-                await move.Execute((IReadOnlyList<RawMaterialMove>)item.Parameter!);
+            case ScreenCommand<IReadOnlyList<RawMaterialMove>> move:
+                await move.ExecuteAsync((IReadOnlyList<RawMaterialMove>)item.Parameter!);
                 break;
-            case ReactiveCommand<RawMaterialLeafNode, RxVoid> onMaterial:
-                await onMaterial.Execute((RawMaterialLeafNode)item.Parameter!);
+            case ScreenCommand<RawMaterialLeafNode> onMaterial:
+                await onMaterial.ExecuteAsync((RawMaterialLeafNode)item.Parameter!);
                 break;
-            case ReactiveCommand<RawMaterialFolderNode, RxVoid> onFolder:
-                await onFolder.Execute((RawMaterialFolderNode?)item.Parameter!);
+            case ScreenCommand<RawMaterialFolderNode?> onFolder:
+                await onFolder.ExecuteAsync((RawMaterialFolderNode?)item.Parameter);
                 break;
-            case ReactiveCommand<RawMaterialCategoryType, RxVoid> onCategoryType:
-                await onCategoryType.Execute((RawMaterialCategoryType)item.Parameter!);
+            case ScreenCommand<RawMaterialCategoryType> onCategoryType:
+                await onCategoryType.ExecuteAsync((RawMaterialCategoryType)item.Parameter!);
                 break;
             default:
                 throw new InvalidOperationException($"'{item.Header}' runs nothing a test knows how to wait for.");
@@ -955,7 +950,7 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
     private async Task<RawMaterialsViewModel> LoadedViewModelAsync(IViewStateStore? viewStateStore = null)
     {
         var viewModel = CreateViewModel(viewStateStore);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         return viewModel;
     }
 

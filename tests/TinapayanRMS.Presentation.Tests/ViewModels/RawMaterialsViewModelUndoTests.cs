@@ -53,7 +53,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.Units.Rows[0].BaseUnitsPerUnit.Should().Be(25000m);
         viewModel.Units.Rows[0].Unit.Id.Should().Be(savedUnitId, "an id of 0 would make Save add a replacement");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
 
         await using var dbContext = CreateDbContext();
@@ -68,7 +68,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
         viewModel.Units.SelectedRow = viewModel.Units.Rows[0];
 
-        await viewModel.Units.DeleteCommand.Execute();
+        await viewModel.Units.DeleteCommand.ExecuteAsync();
         viewModel.Units.Rows.Should().BeEmpty();
 
         viewModel.TryUndo().Should().BeTrue();
@@ -107,7 +107,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
         viewModel.TryUndo().Should().BeTrue();
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
 
         await using var dbContext = CreateDbContext();
@@ -138,7 +138,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.History.CanUndo.Should().BeTrue();
 
         // A Save reloads what was saved, which re-points the selection and so reloads the form.
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
         await Settle.UntilAsync(viewModel, () => viewModel.AreDetailsReady, () => $"ready={viewModel.AreDetailsReady}");
         viewModel.History.CanUndo.Should().BeFalse("what's saved is the new starting point");
@@ -148,7 +148,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.History.CanUndo.Should().BeFalse("a new material has no history of its own");
     });
 
@@ -161,7 +161,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await CreateBrandPriceRepository().SetAsync(
             materialId, [new RawMaterialBrandPrice { Brand = "Baker's Best", Price = 0.05m }], Cancellation);
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         viewModel.AreDetailsReady.Should().BeFalse("the details are still on their way");
@@ -232,11 +232,11 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
         viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
-        (await CanSave(viewModel)).Should().BeFalse();
+        CanSave(viewModel).Should().BeFalse();
 
         Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
 
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
     });
 
     [Test]
@@ -244,11 +244,11 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
         Edit(viewModel, () => viewModel.Units.Rows[0].BaseUnitsPerUnit = 50000m);
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
+        CanSave(viewModel).Should().BeFalse("the form shows what was saved again");
     });
 
     [Test]
@@ -257,13 +257,13 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var (viewModel, materialId) = await OpenPurchasedIngredientAsync();
         Edit(viewModel, () => viewModel.EditingName = "Flour, Renamed");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.SelectedRawMaterial?.Id == materialId,
             () => $"ready={viewModel.AreDetailsReady}, selected={viewModel.SelectedRawMaterial?.Id}");
 
-        (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
+        CanSave(viewModel).Should().BeFalse("what was written is the new starting point");
     });
 
     [Test]
@@ -271,11 +271,11 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
     {
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
-        await viewModel.NewCommand.Execute();
-        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+        await viewModel.NewCommand.ExecuteAsync();
+        CanSave(viewModel).Should().BeFalse("an empty form has nothing to write");
 
         Edit(viewModel, () => viewModel.EditingName = "Bread Flour");
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
     });
 
     [Test]
@@ -287,10 +287,10 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         var recorder = (IUndoRecorder)viewModel;
 
         recorder.IsEditPending = true;
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
 
         recorder.IsEditPending = false;
-        (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
+        CanSave(viewModel).Should().BeFalse("the cell closed with nothing typed");
     });
 
     [Test]
@@ -299,9 +299,9 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         await GetOrCreateUnitOfMeasureAsync("kilogram", "kg");
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
-        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+        CanSave(viewModel).Should().BeFalse("an empty form has nothing to write");
     });
 
     [Test]
@@ -310,14 +310,13 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
         var (viewModel, _) = await OpenPurchasedIngredientAsync();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
-        (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
+        CanSave(viewModel).Should().BeFalse("a refresh isn't an edit");
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static async Task<bool> CanSave(RawMaterialsViewModel viewModel) =>
-        await viewModel.SaveCommand.CanExecute.FirstAsync();
+    private static bool CanSave(RawMaterialsViewModel viewModel) => viewModel.SaveCommand.CanExecute();
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(RawMaterialsViewModel viewModel, Action change)
@@ -347,7 +346,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         viewModel.PurchaseCost.IsBufferOffTarget.Should().BeTrue();
         viewModel.PurchaseCost.TargetBufferText.Should().Be("Target 10%");
 
-        await viewModel.PurchaseCost.ReapplyTargetBufferCommand.Execute();
+        await viewModel.PurchaseCost.ReapplyTargetBufferCommand.ExecuteAsync();
 
         viewModel.PurchaseCost.EditingCostBufferPercent.Should().Be(10m);
         viewModel.PurchaseCost.EditingBufferedCost.Should().Be(0.0572m);
@@ -416,7 +415,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         }
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.Units.Rows.Count == 1,
@@ -469,7 +468,7 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
         }
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == materialId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && viewModel.Recipe.AddIns.Count == 1 && viewModel.Recipe.Lines.Count == 1,

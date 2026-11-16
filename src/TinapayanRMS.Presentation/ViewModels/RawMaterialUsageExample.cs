@@ -1,11 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -14,58 +11,75 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// in one of its units, costs as saved and buffered. It starts on the material picked, and any other can be picked; it isn't
 /// part of the form, so nothing in it is an edit to save.
 /// </summary>
-public sealed class RawMaterialUsageExample : ReactiveObject
+public sealed class RawMaterialUsageExample : ObservableState
 {
+    private readonly IFormPartHost _host;
+
     /// <param name="host">The screen, whose loads re-point the material picked without it being the user's pick.</param>
     public RawMaterialUsageExample(IFormPartHost host)
     {
-        this.WhenAnyValue(x => x.Material)
-            .Where(_ => !host.IsRefreshing)
-            .Subscribe(material => ReplaceUnitOptions(material, kept: null));
-
-        // A worked-out example belongs to the inputs it was worked out from.
-        this.WhenAnyValue(x => x.Material, x => x.Quantity, x => x.Unit)
-            .Where(_ => !host.IsRefreshing)
-            .Subscribe(_ => Result = null);
-
-        CalculateCommand = ReactiveCommand.Create(
-            Calculate,
-            this.WhenAnyValue(x => x.Material, x => x.Unit, x => x.Quantity,
-                (material, unit, quantity) => material is not null && unit is not null && quantity > 0));
+        _host = host;
+        ReplaceUnitOptions(null, kept: null);
+        CalculateCommand = ScreenCommand.Of(Calculate, () => Material is not null && Unit is not null && Quantity > 0);
     }
 
-    private RawMaterial? _material;
+    /// <summary>The material costed: another one picked brings its own units, and the example goes.</summary>
     public RawMaterial? Material
     {
-        get => _material;
-        set => this.RaiseAndSetIfChanged(ref _material, value);
+        get;
+        set
+        {
+            if (RaiseAndSetIfChanged(ref field, value) && !_host.IsRefreshing)
+            {
+                ReplaceUnitOptions(value, kept: null);
+                InputsEdited();
+            }
+        }
     }
 
-    private decimal _quantity = 1m;
     public decimal Quantity
     {
-        get => _quantity;
-        set => this.RaiseAndSetIfChanged(ref _quantity, value);
-    }
+        get;
+        set
+        {
+            if (RaiseAndSetIfChanged(ref field, value))
+            {
+                InputsEdited();
+            }
+        }
+    } = 1m;
 
     /// <summary>The units <see cref="Material"/> can be counted in: its base unit, then its alternative units.</summary>
     public ObservableCollection<RawMaterialUnitOption> UnitOptions { get; } = [];
 
-    private RawMaterialUnitOption? _unit;
     public RawMaterialUnitOption? Unit
     {
-        get => _unit;
-        set => this.RaiseAndSetIfChanged(ref _unit, value);
+        get;
+        set
+        {
+            if (RaiseAndSetIfChanged(ref field, value))
+            {
+                InputsEdited();
+            }
+        }
     }
 
-    private UsageExampleResult? _result;
     public UsageExampleResult? Result
     {
-        get => _result;
-        private set => this.RaiseAndSetIfChanged(ref _result, value);
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> CalculateCommand { get; }
+    public ScreenCommand CalculateCommand { get; }
+
+    /// <summary>A worked-out example belongs to the inputs it was worked out from, so it goes as they're changed.</summary>
+    private void InputsEdited()
+    {
+        if (!_host.IsRefreshing)
+        {
+            Result = null;
+        }
+    }
 
     /// <summary>
     /// A load's fresh copy of the material picked (<paramref name="material"/>): another material means other units, so they're

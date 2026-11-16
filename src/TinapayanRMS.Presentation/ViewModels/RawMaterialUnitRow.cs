@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -11,7 +10,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// half filled in; Save checks them all first. A standard unit of the base unit's kind (a kilogram of an ingredient) takes
 /// its fixed multiplier as it's picked, and its multiplier can't be typed (StandardUnitRules).
 /// </summary>
-public sealed class RawMaterialUnitRow : ReactiveObject
+public sealed class RawMaterialUnitRow : ObservableRow
 {
     /// <summary>Looks up a unit of measure by id as the screen has it.</summary>
     private readonly Func<int, UnitOfMeasure?>? _findUnitOfMeasure;
@@ -49,7 +48,7 @@ public sealed class RawMaterialUnitRow : ReactiveObject
 
             Unit.UnitOfMeasureId = value ?? 0;
             Unit.UnitOfMeasure = value is { } id ? _findUnitOfMeasure?.Invoke(id) : null;
-            this.RaisePropertyChanged();
+            RaisePropertyChanged();
             RaiseUnitOfMeasureChanged();
             ApplyStandardMultiplier();
         }
@@ -83,7 +82,7 @@ public sealed class RawMaterialUnitRow : ReactiveObject
             BaseUnitsPerUnit = standard;
         }
 
-        this.RaisePropertyChanged(nameof(CanTypeMultiplier));
+        RaisePropertyChanged(nameof(CanTypeMultiplier));
     }
 
     public string UnitName => Unit.UnitOfMeasure?.Name ?? "?";
@@ -103,8 +102,8 @@ public sealed class RawMaterialUnitRow : ReactiveObject
             }
 
             Unit.BaseUnitsPerUnit = value;
-            this.RaisePropertyChanged();
-            this.RaisePropertyChanged(nameof(BaseEquivalentText));
+            RaisePropertyChanged();
+            RaisePropertyChanged(nameof(BaseEquivalentText));
         }
     }
 
@@ -115,8 +114,8 @@ public sealed class RawMaterialUnitRow : ReactiveObject
         get => _baseUnitAbbreviation;
         set
         {
-            this.RaiseAndSetIfChanged(ref _baseUnitAbbreviation, value);
-            this.RaisePropertyChanged(nameof(BaseEquivalentText));
+            RaiseAndSetIfChanged(ref _baseUnitAbbreviation, value);
+            RaisePropertyChanged(nameof(BaseEquivalentText));
         }
     }
 
@@ -125,7 +124,7 @@ public sealed class RawMaterialUnitRow : ReactiveObject
 
     private void RaiseUnitOfMeasureChanged()
     {
-        this.RaisePropertyChanged(nameof(UnitName));
-        this.RaisePropertyChanged(nameof(Abbreviation));
+        RaisePropertyChanged(nameof(UnitName));
+        RaisePropertyChanged(nameof(Abbreviation));
     }
 }

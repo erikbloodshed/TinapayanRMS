@@ -68,7 +68,7 @@
 </CascadingValue>
 
 @code {
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
     {
@@ -81,7 +81,8 @@
 
         // Copy fills the form with a name to change: the cursor goes to Name. New names the material in the list instead,
         // where its row's box has the cursor.
-        AddSubscription(viewModel.List.CopyMaterialCommand.Subscribe(created => { _ = FocusNameAsync(); }));
+        viewModel.List.Copied += FocusName;
+        AddSubscription(System.Reactive.Disposables.Disposable.Create(() => viewModel.List.Copied -= FocusName));
     }
 
     protected override string AddressRoot => "raw-materials";
@@ -89,6 +90,8 @@
     protected override int? ShownId => ViewModel!.SelectedRawMaterial?.Id;
 
     protected override string ShownProperty => nameof(RawMaterialsViewModel.SelectedRawMaterial);
+
+    private void FocusName() => _ = FocusNameAsync();
 
     private async Task FocusNameAsync()
     {

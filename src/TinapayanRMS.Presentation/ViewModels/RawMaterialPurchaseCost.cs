@@ -1,14 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Reactive.Linq;
 using DynamicData;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -47,7 +44,7 @@ public interface IRawMaterialPurchaseCostHost : IFormPartHost
 /// at; and the header's saved costs, in the unit picked to show them in (Per). The brand rows' units are the form's
 /// alternative units (RawMaterialUnits): a unit picked on a row that the material didn't have is added there.
 /// </summary>
-public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
+public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHost
 {
     private readonly IRawMaterialPurchaseCostHost _host;
     private readonly RawMaterialUnits _units;
@@ -80,39 +77,34 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
         _brandPriceValidator = brandPriceValidator;
         _updates = updates;
 
-        // The target buffer beside the Cost Buffer % box shows while the buffer has drifted from it.
-        this.WhenAnyValue(x => x.EditingCostBufferPercent, x => x.EditingBufferedCost, x => x.DearestPurchaseCost)
-            .Subscribe(_ => this.RaisePropertyChanged(nameof(IsBufferOffTarget)));
-
-        ReapplyTargetBufferCommand = ReactiveCommand.Create(
+        ReapplyTargetBufferCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() => TypedCostBufferPercent = EditingTargetCostBufferPercent),
-            this.WhenAnyValue(x => x.IsBufferOffTarget));
+            () => IsBufferOffTarget);
 
         // Nothing to confirm: the brand only leaves the table, and its price goes when the material is saved.
-        RemoveBrandPriceCommand = ReactiveCommand.Create(
+        RemoveBrandPriceCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() =>
             {
                 BrandPriceRows.Remove(SelectedBrandPriceRow!);
                 DropUnusedAddedUnits(pickedRow: null);
             }),
-            this.WhenAnyValue(x => x.SelectedBrandPriceRow).Select(row => row is not null));
+            () => SelectedBrandPriceRow is not null);
     }
 
     /// <summary>The form's brand prices, saved or not. The material is costed at the preferred brand's, else the dearest, per base unit.</summary>
     public ObservableCollection<BrandPriceRow> BrandPriceRows { get; } = [];
 
-    private BrandPriceRow? _selectedBrandPriceRow;
     public BrandPriceRow? SelectedBrandPriceRow
     {
-        get => _selectedBrandPriceRow;
-        set => this.RaiseAndSetIfChanged(ref _selectedBrandPriceRow, value);
+        get;
+        set => RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>The row the table's add row edits: one that follows the form's units and buffer.</summary>
     public Func<BrandPriceRow> NewBrandPriceRow => () => new BrandPriceRow(this);
 
     /// <summary>Takes the brand picked out of the table; Save deletes its price.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveBrandPriceCommand { get; }
+    public ScreenCommand RemoveBrandPriceCommand { get; }
 
     /// <summary>The brand table's unit choices: the base unit, then every unit of measure it can be bought in.</summary>
     public ObservableCollection<PurchaseUnitChoice> PurchaseUnitOptions { get; } = [];
@@ -120,32 +112,31 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
     /// <summary>How many brand prices the material has saved, which fix a packaging material's base unit.</summary>
     public int SavedBrandPriceCount { get; private set; }
 
-    private decimal? _editingCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
     /// <summary>
     /// The material's cost buffer; empty saves as 0%, since the box shows 0.00 when cleared. A new one starts at Settings'
     /// default (<see cref="CostingDefaults.CostBufferPercent"/>).
     /// </summary>
     public decimal? EditingCostBufferPercent
     {
-        get => _editingCostBufferPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
-    }
+        get;
+        set
+        {
+            if (RaiseAndSetIfChanged(ref field, value))
+            {
+                BufferEdited();
+            }
+        }
+    } = CostingDefaults.DefaultCostBufferPercent;
 
-    private decimal? _editingTargetCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
     /// <summary>
     /// Purchased only: the buffer last typed, which the Cost Buffer % box drifts from as prices move while the
     /// buffered cost stays fixed. Re-apply Target types it again.
     /// </summary>
     public decimal? EditingTargetCostBufferPercent
     {
-        get => _editingTargetCostBufferPercent;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _editingTargetCostBufferPercent, value);
-            this.RaisePropertyChanged(nameof(TargetBufferText));
-            this.RaisePropertyChanged(nameof(IsBufferOffTarget));
-        }
-    }
+        get;
+        set => RaiseAndSetIfChanged(ref field, value);
+    } = CostingDefaults.DefaultCostBufferPercent;
 
     private string? _editingPreferredBrand;
     /// <summary>
@@ -162,8 +153,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
                 return;
             }
 
-            this.RaiseAndSetIfChanged(ref _editingPreferredBrand, value);
-            this.RaisePropertyChanged(nameof(CostFrom));
+            RaiseAndSetIfChanged(ref _editingPreferredBrand, value);
             _updates.Run(UpdatePurchaseCostTexts);
         }
     }
@@ -197,7 +187,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
         && RawMaterialRules.IsOffTarget(EditingCostBufferPercent ?? 0m, EditingTargetCostBufferPercent ?? 0m);
 
     /// <summary>Types the target buffer into the Cost Buffer % box again, which puts it back on top of the dearest brand; one undo step.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ReapplyTargetBufferCommand { get; }
+    public ScreenCommand ReapplyTargetBufferCommand { get; }
 
     /// <summary>
     /// The Cost Buffer % box. Typing it works the buffered cost out afresh: the dearest brand, as the table now is, with
@@ -218,7 +208,6 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
         }
     }
 
-    private decimal? _editingBufferedCost;
     /// <summary>
     /// Purchased only: the fixed buffered cost per base unit, which brand prices don't move (the Cost Buffer % follows
     /// them instead). Typed, or worked out from the dearest brand when the percent is typed; a cleared box saves as 0,
@@ -226,9 +215,22 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
     /// </summary>
     public decimal? EditingBufferedCost
     {
-        get => _editingBufferedCost;
-        set => this.RaiseAndSetIfChanged(ref _editingBufferedCost, value);
+        get;
+        set
+        {
+            if (RaiseAndSetIfChanged(ref field, value))
+            {
+                BufferEdited();
+            }
+        }
     }
+
+    /// <summary>
+    /// The buffer or the buffered cost changed: each brand's buffered price follows the fixed buffered cost, once the
+    /// screen's derived updates run (an undo's restore holds them back until the form is whole). Only typing the percent
+    /// moves the amount (TypedCostBufferPercent).
+    /// </summary>
+    private void BufferEdited() => _updates.Run(BufferedCostChanged);
 
     /// <summary>
     /// The units the buffered cost can be shown and typed in: the base unit, then the form's alternative units that have
@@ -252,7 +254,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
                 return;
             }
 
-            this.RaiseAndSetIfChanged(ref _bufferedCostUnit, value);
+            RaiseAndSetIfChanged(ref _bufferedCostUnit, value);
             UpdatePurchaseCostTexts();
         }
     }
@@ -276,72 +278,64 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
         }
     }
 
-    private string _purchaseCostText = "—";
     /// <summary>What the dearest brand comes to per base unit, recalculated as the table is typed into, e.g. "0.0372".</summary>
     public string PurchaseCostText
     {
-        get => _purchaseCostText;
-        private set => this.RaiseAndSetIfChanged(ref _purchaseCostText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = "—";
 
-    private string _purchaseBufferedCostText = string.Empty;
     /// <summary>What EditingBufferedCost comes to over the dearest brand, e.g. "0.0391/g is 5.11% over the dearest brand's 0.0372/g.", or empty while unpriced.</summary>
     public string PurchaseBufferedCostText
     {
-        get => _purchaseBufferedCostText;
-        private set => this.RaiseAndSetIfChanged(ref _purchaseBufferedCostText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
-    private string _bufferedCostWarningText = string.Empty;
     /// <summary>Set while the dearest brand costs more per base unit than EditingBufferedCost, so the buffer has been eaten up; empty otherwise.</summary>
     public string BufferedCostWarningText
     {
-        get => _bufferedCostWarningText;
-        private set => this.RaiseAndSetIfChanged(ref _bufferedCostWarningText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
-    private decimal? _dearestPurchaseCost;
     /// <summary>The dearest brand per base unit as the table is typed into, which the buffer percent goes on top of; null while unpriced.</summary>
     public decimal? DearestPurchaseCost
     {
-        get => _dearestPurchaseCost;
-        private set => this.RaiseAndSetIfChanged(ref _dearestPurchaseCost, value);
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
     }
 
-    private string _purchaseCostSourceText = string.Empty;
     /// <summary>Which brand the cost comes from, when there's more than one, e.g. "From Gold Medal, the dearest of 2 brands."</summary>
     public string PurchaseCostSourceText
     {
-        get => _purchaseCostSourceText;
-        private set => this.RaiseAndSetIfChanged(ref _purchaseCostSourceText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
-    private string _currentCostText = "—";
     /// <summary>
     /// The header's saved cost in the Per unit (BufferedCostUnit): "0.0372" a gram, to 4 decimals, or "930.00" a bag, to 2;
     /// "—" for a material not saved yet.
     /// </summary>
     public string CurrentCostText
     {
-        get => _currentCostText;
-        private set => this.RaiseAndSetIfChanged(ref _currentCostText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = "—";
 
-    private string _bufferedCostText = "—";
     /// <summary>The header's saved buffered cost, as CurrentCostText: "0.0391" a gram, "976.50" a bag, or "—" for a material not saved yet.</summary>
     public string BufferedCostText
     {
-        get => _bufferedCostText;
-        private set => this.RaiseAndSetIfChanged(ref _bufferedCostText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = "—";
 
-    private string _headerCostUnitText = "g";
     /// <summary>The unit the header's costs are in, for their labels: the Per unit's abbreviation, e.g. "g" or "bag".</summary>
     public string HeaderCostUnitText
     {
-        get => _headerCostUnitText;
-        private set => this.RaiseAndSetIfChanged(ref _headerCostUnitText, value);
-    }
+        get;
+        private set => RaiseAndSetIfChanged(ref field, value);
+    } = "g";
 
     /// <summary>How many base units BufferedCostUnit holds: 1 for the base unit.</summary>
     private decimal BufferedCostUnitSize() =>
@@ -380,12 +374,12 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
     }
 
     /// <summary>The Cost Buffer % box shows TypedCostBufferPercent, which an undo leaving the buffer as it was doesn't raise.</summary>
-    public void RaiseTypedCostBufferPercent() => this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
+    public void RaiseTypedCostBufferPercent() => RaisePropertyChanged(nameof(TypedCostBufferPercent));
 
     /// <summary>Each brand's buffered price follows the fixed buffered cost. Only typing the percent moves the amount (TypedCostBufferPercent).</summary>
     public void BufferedCostChanged()
     {
-        this.RaisePropertyChanged(nameof(TypedCostBufferPercent));
+        RaisePropertyChanged(nameof(TypedCostBufferPercent));
         RefreshBrandPriceRows();
         UpdatePurchaseCostTexts();
     }
@@ -443,7 +437,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
             BufferedCostUnitOptions.Clear();
             BufferedCostUnitOptions.AddRange(choices);
             _bufferedCostUnit = choices.FirstOrDefault(c => c.Key == picked?.Key) ?? choices[0];
-            this.RaisePropertyChanged(nameof(BufferedCostUnit));
+            RaisePropertyChanged(nameof(BufferedCostUnit));
         }
         finally
         {
@@ -510,7 +504,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
             _rebuildingCostFromOptions = false;
         }
 
-        this.RaisePropertyChanged(nameof(CostFrom));
+        RaisePropertyChanged(nameof(CostFrom));
     }
 
     /// <summary>
@@ -552,7 +546,7 @@ public sealed class RawMaterialPurchaseCost : ReactiveObject, IBrandPriceRowHost
 
         RebuildBufferedCostUnitOptions();
         RebuildCostFromOptions();
-        this.RaisePropertyChanged(nameof(EditingBufferedCostInUnit));
+        RaisePropertyChanged(nameof(EditingBufferedCostInUnit));
         UpdateHeaderCostTexts();
 
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();

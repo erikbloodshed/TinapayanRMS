@@ -4,10 +4,12 @@ using System.Runtime.CompilerServices;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A row that says when it changes, for the screens' grids and bindings to follow: a lighter base than ReactiveObject for
-/// the editable rows, which need nothing else from it. WhenAnyValue and AutoRefresh follow plain property changes.
+/// Something a screen shows that says when it changes, without ReactiveUI: a part of a screen's ViewModel (Raw Materials'
+/// Cost Setup tab, say), or an editable row. A screen draws itself again whenever its ViewModel or one of its parts says
+/// anything changed (ScreenBase), and reads every value then, so only what's stored says so: a value worked out from others
+/// is a plain getter, and what follows from a change is called by the setter that made it, in the order it has to run.
 /// </summary>
-public abstract class ObservableRow : INotifyPropertyChanged
+public abstract class ObservableState : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -15,13 +17,25 @@ public abstract class ObservableRow : INotifyPropertyChanged
     protected void RaisePropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
-    /// <summary>Sets <paramref name="field"/> to <paramref name="value"/>, and says so, unless it holds that already.</summary>
-    protected void RaiseAndSetIfChanged<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    /// <summary>
+    /// Sets <paramref name="field"/> to <paramref name="value"/>, and says so, unless it holds that already. True when it
+    /// changed, for a setter with more to do then.
+    /// </summary>
+    protected bool RaiseAndSetIfChanged<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (!EqualityComparer<T>.Default.Equals(field, value))
+        if (EqualityComparer<T>.Default.Equals(field, value))
         {
-            field = value;
-            RaisePropertyChanged(propertyName);
+            return false;
         }
+
+        field = value;
+        RaisePropertyChanged(propertyName);
+        return true;
     }
 }
+
+/// <summary>
+/// A row that says when it changes, for the screens' grids and bindings to follow: a lighter base than ReactiveObject for
+/// the editable rows, which need nothing else from it. WhenAnyValue and AutoRefresh follow plain property changes.
+/// </summary>
+public abstract class ObservableRow : ObservableState;

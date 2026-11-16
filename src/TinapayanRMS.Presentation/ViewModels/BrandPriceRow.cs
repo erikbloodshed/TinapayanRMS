@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
@@ -20,7 +19,7 @@ public sealed record PurchaseUnitChoice(int Key, string Name, string Abbreviatio
 /// units that unit holds, and a unit the material didn't have yet takes its multiplier from <see cref="Quantity"/>.
 /// A row can be half filled in; Save checks them all first.
 /// </summary>
-public sealed class BrandPriceRow : ReactiveObject
+public sealed class BrandPriceRow : ObservableRow
 {
     private readonly IBrandPriceRowHost _host;
 
@@ -43,7 +42,7 @@ public sealed class BrandPriceRow : ReactiveObject
     public string? Brand
     {
         get => _brand;
-        set => this.RaiseAndSetIfChanged(ref _brand, value);
+        set => RaiseAndSetIfChanged(ref _brand, value);
     }
 
     private int? _unitKey;
@@ -59,7 +58,7 @@ public sealed class BrandPriceRow : ReactiveObject
             }
 
             _unitKey = value;
-            this.RaisePropertyChanged();
+            RaisePropertyChanged();
             _host.OnUnitPicked(this);
             Refresh();
         }
@@ -72,9 +71,9 @@ public sealed class BrandPriceRow : ReactiveObject
         get => _price;
         set
         {
-            this.RaiseAndSetIfChanged(ref _price, value);
-            this.RaisePropertyChanged(nameof(CostPerBaseUnit));
-            this.RaisePropertyChanged(nameof(BufferPercent));
+            RaiseAndSetIfChanged(ref _price, value);
+            RaisePropertyChanged(nameof(CostPerBaseUnit));
+            RaisePropertyChanged(nameof(BufferPercent));
         }
     }
 
@@ -96,7 +95,7 @@ public sealed class BrandPriceRow : ReactiveObject
             if (CanTypeQuantity && value != Quantity)
             {
                 _host.SetMultiplier(UnitKey!.Value, value ?? 0m);
-                this.RaisePropertyChanged();
+                RaisePropertyChanged();
             }
         }
     }
@@ -128,14 +127,14 @@ public sealed class BrandPriceRow : ReactiveObject
     /// <summary>Shows the screen's current units and buffered cost: after a unit's multiplier changes, or the buffered cost.</summary>
     public void Refresh()
     {
-        this.RaisePropertyChanged(nameof(Quantity));
-        this.RaisePropertyChanged(nameof(CanTypeQuantity));
-        this.RaisePropertyChanged(nameof(CostPerBaseUnit));
-        this.RaisePropertyChanged(nameof(BufferPercent));
+        RaisePropertyChanged(nameof(Quantity));
+        RaisePropertyChanged(nameof(CanTypeQuantity));
+        RaisePropertyChanged(nameof(CostPerBaseUnit));
+        RaisePropertyChanged(nameof(BufferPercent));
     }
 
     /// <summary>Shows the screen's current buffered cost, which moves with the prices while Save is still to work it out.</summary>
-    public void RefreshBufferPercent() => this.RaisePropertyChanged(nameof(BufferPercent));
+    public void RefreshBufferPercent() => RaisePropertyChanged(nameof(BufferPercent));
 }
 
 /// <summary>What a <see cref="BrandPriceRow"/> needs from the screen it's on.</summary>

@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -12,7 +11,6 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -62,6 +60,16 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     /// into the form. Fed by <see cref="SelectedRawMaterial"/>'s setter alone, starting with nothing picked.
     /// </summary>
     private readonly BehaviorSubject<RawMaterial?> _picks = new(null);
+
+    /// <summary>The material picked's id, 0 for none: what the pickers that leave it out (Linked's target, an add-in) follow.</summary>
+    private readonly BehaviorSubject<int> _selectedIds = new(0);
+
+    /// <summary>The kind of category the form's type and source can go in: what the Category picker's list follows.</summary>
+    private readonly BehaviorSubject<RawMaterialCategoryType> _categoryTypes =
+        new(RawMaterialRules.CategoryTypeFor(RawMaterialType.Ingredient, RawMaterialSource.Purchased));
+
+    /// <summary>Each details tab shown, Cost Setup first: the Dependents tab's shares are worked out as it shows.</summary>
+    private readonly BehaviorSubject<int> _detailsTabs = new(0);
 
     /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
     private readonly CategoryPicker<RawMaterialCategory> _categoryPicker;
@@ -133,19 +141,13 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         PriceLog = new RawMaterialPriceLog(this, priceHistoryRepository);
         Dependents = new RawMaterialDependents(costShares);
 
-        // The subscriptions, in the order they were made: two following one property run in that order, some count on it
-        // (WireForm), and several run as they're made, the picks' included, so each comes after what it reads.
-
-        // The list's row follows the material showing; a material opened, by its Save included, ends the new one's row.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(material => material is not null)
-            .Subscribe(_ => List.EndNewRow());
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Subscribe(_ => List.SyncTreeSelection());
+        // What follows the form's fields as they change is called by their setters (SelectionChanged, TypeChanged and the
+        // rest), in the order it has to run. What follows here runs once now, as the screen starts, in the order it always
+        // did: several of the subscriptions run as they're made, the picks' included, so each comes after what it reads.
+        List.SyncTreeSelection();
 
         // Shared by every picker that must leave out the ingredient being edited: Linked's target and an add-in.
-        var notTheSelection = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(selected => selected?.Id ?? 0)
+        var notTheSelection = _selectedIds
             .DistinctUntilChanged()
             .Select(selectedId => (Func<RawMaterial, bool>)(m => m.Type == RawMaterialType.Ingredient && m.Id != selectedId));
         _rawMaterialCache.Connect()
@@ -159,37 +161,27 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
         // The picker offers only the categories of the material's own type, which is all it can be saved in: a made
         // ingredient's are the Made ones (RawMaterialRules.CategoryTypeFor).
-        var categoryType = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource, RawMaterialRules.CategoryTypeFor);
         _categoryCache.Connect()
-            .Filter(categoryType.Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
+            .Filter(_categoryTypes.Select(type => (Func<RawMaterialCategory, bool>)(c => c.Type == type)))
             .SortAndBind(out _categoryOptions, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
-
-        // A new material's type or source changed under a category of another type: that category is no longer one it can
-        // go in. Only a new one's: a saved material's are fixed, and loading one sets its category before its source.
-        categoryType
-            .Where(type => CanChangeTypeAndSource && EditingCategory is { } category && category.Type != type)
-            .Subscribe(_ => EditingCategory = null);
-
-        WireForm();
-        WireBaseUnitNames();
 
         // Save offers itself only when the form holds something the saved material doesn't. Measured on every change rather
         // than only when an undo step settles: a step closes on the way out of a field, and a Save button still disabled
         // under the cursor would swallow the very click that enabled it. A table's add row is the same story the other way
         // round - the table raises nothing when it commits, so the step stays open. The parts that hold the form's own
-        // fields too: the Cost Setup's buffer, the units, and a made ingredient's recipe.
-        this.Changed.Subscribe(_ => History.RefreshDirty());
-        PurchaseCost.Changed.Subscribe(_ => History.RefreshDirty());
-        Units.Changed.Subscribe(_ => History.RefreshDirty());
-        Recipe.Changed.Subscribe(_ => History.RefreshDirty());
+        // fields too: the Cost Setup's buffer, the units, and a made ingredient's recipe. What a field's change sets off is
+        // measured again once it has run (SelectionChanged, TypeChanged and the rest).
+        PropertyChanged += (_, _) => History.RefreshDirty();
+        PurchaseCost.PropertyChanged += (_, _) => History.RefreshDirty();
+        Units.PropertyChanged += (_, _) => History.RefreshDirty();
+        Recipe.PropertyChanged += (_, _) => History.RefreshDirty();
         WatchForSave(Units.Rows);
         WatchForSave(PurchaseCost.BrandPriceRows);
         WatchForSave(Recipe.AddIns);
 
         // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Subscribe(_ => PurchaseCost.UpdateHeaderCostTexts());
+        PurchaseCost.UpdateHeaderCostTexts();
 
         // The summary follows the brand table as it's typed into: the dearest brand, as Save will cost the material.
         PurchaseCost.BrandPriceRows.ToObservableChangeSet()
@@ -198,23 +190,18 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             .AutoRefresh(r => r.Brand)
             .Subscribe(_ => _updates.Run(PurchaseCost.UpdatePurchaseCostTexts));
 
-        // Each brand's buffered price follows the fixed buffered cost. Only typing the percent moves the amount (TypedCostBufferPercent).
-        PurchaseCost.WhenAnyValue(x => x.EditingBufferedCost, x => x.EditingCostBufferPercent)
-            .Subscribe(_ => _updates.Run(PurchaseCost.BufferedCostChanged));
-
-        // A made ingredient's totals follow the Weight Loss % box, which moves the yield the cost is spread over.
-        this.WhenAnyValue(x => x.EditingWeightLossPercent)
-            .Subscribe(_ => _updates.Run(Recipe.RecomputeBomTotals));
+        // Each brand's buffered price follows the fixed buffered cost (the Cost Setup's BufferEdited), and a made
+        // ingredient's totals the Weight Loss % box, which moves the yield the cost is spread over.
+        _updates.Run(PurchaseCost.BufferedCostChanged);
+        _updates.Run(Recipe.RecomputeBomTotals);
 
         // The Recipe card shows the picked sub-assembly's lines as it's saved: read again on every pick, an undo's included,
         // and on every load, which re-points the pick at the refreshed copy, so a change made on the Sub-Assemblies screen
         // shows here. The totals follow them.
-        LoadLatest(Recipe.WhenAnyValue(x => x.SubAssembly), Recipe.LoadLinesAsync);
+        LoadLatest(Recipe.SubAssemblies, Recipe.LoadLinesAsync);
 
-        // The alternative units and the purchase unit choices name the base unit: worked out again whenever it or the type
-        // changes, a load's or an undo's included, as they're only ever derived from them.
-        this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit)
-            .Subscribe(_ => RebuildUnitViews());
+        // The alternative units and the purchase unit choices name the base unit (TypeChanged, BaseUnitChanged).
+        RebuildUnitViews();
 
         // A pick loads the material into the form, in these three steps, in this order. Only a pick does (_picks): a load
         // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
@@ -229,7 +216,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
         // The Dependents tiles' shares, when the tab shows or its tiles change: a newer ask cancels one still working.
         LoadLatest(
-            Dependents.SharesWanted.Merge(this.WhenAnyValue(x => x.SelectedDetailsTab).Select(_ => RxVoid.Default)),
+            Dependents.SharesWanted.Merge(_detailsTabs.Select(_ => System.Reactive.Unit.Default)),
             (_, cancellationToken) => SelectedDetailsTab == DependentsTab && SelectedRawMaterial is { } material
                 ? Dependents.ShowCostSharesAsync(material.Id, cancellationToken)
                 : Task.CompletedTask);
@@ -252,19 +239,17 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             .AutoRefresh(l => l.Cost)
             .Subscribe(_ => _updates.Run(Recipe.RecomputeBomTotals));
 
-        // The commands. Making one runs nothing but its can-execute flag.
+        // The commands. Making one runs nothing.
 
         // Runs each time the page opens (ScreenBase) and after this screen's own saves. It merges rather than replaces, so
         // the screen keeps its selection, picker choices and unsaved edits while picking up what changed elsewhere, such as
         // a unit renamed in Settings.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(LoadAsync));
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
 
         // A new material replaces the one showing, so its unsaved changes are asked about first.
-        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList()));
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(SaveAsync), History.WhenAnyValue(h => h.IsDirty));
-        DeleteCommand = ReactiveCommand.CreateFromTask(
-            () => DeleteRawMaterialAsync(SelectedRawMaterial!),
-            this.WhenAnyValue(x => x.SelectedRawMaterial).Select(material => material is not null));
+        NewCommand = new ScreenCommand(() => AfterUnsavedChangesAsync(() => List.NewInList()));
+        SaveCommand = new ScreenCommand(() => RunSaveAsync(SaveAsync), () => History.IsDirty);
+        DeleteCommand = new ScreenCommand(() => DeleteRawMaterialAsync(SelectedRawMaterial!), () => SelectedRawMaterial is not null);
     }
 
     /// <summary>The list: the materials by type and category, searched, the rows picked, their menus, moves and naming in place.</summary>
@@ -345,8 +330,36 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             }
 
             this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
+            SelectionChanged();
             _picks.OnNext(value);
         }
+    }
+
+    /// <summary>
+    /// What follows the material showing, a pick's or a load's fresh copy: the list's row, the pickers that leave it out,
+    /// the details tab, and the header's saved costs (a new Per unit, or a unit's multiplier, updates them through
+    /// UpdatePurchaseCostTexts).
+    /// </summary>
+    private void SelectionChanged()
+    {
+        // A material opened, by its Save included, ends the new one's row.
+        if (SelectedRawMaterial is not null)
+        {
+            List.EndNewRow();
+        }
+
+        List.SyncTreeSelection();
+        _selectedIds.OnNext(SelectedRawMaterial?.Id ?? 0);
+
+        // A hidden tab can't stay the one showing: picking a made or new material while on Price History goes back to Cost
+        // Setup.
+        if (SelectedRawMaterial is not { Source: RawMaterialSource.Purchased } && SelectedDetailsTab == PriceHistoryTab)
+        {
+            SelectedDetailsTab = 0;
+        }
+
+        PurchaseCost.UpdateHeaderCostTexts();
+        History.RefreshDirty();
     }
 
     private bool _areDetailsReady = true;
@@ -380,8 +393,35 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             }
 
             this.RaiseAndSetIfChanged(ref _editingType, value);
+            TypeChanged();
             TypeEdited(value);
             BaseUnitEdited();
+        }
+    }
+
+    /// <summary>
+    /// What follows the form's type, set by the user or shown: the categories it can go in, and the alternative units and
+    /// purchase unit choices, which name its base unit.
+    /// </summary>
+    private void TypeChanged()
+    {
+        CategoryTypeChanged();
+        RebuildUnitViews();
+        History.RefreshDirty();
+    }
+
+    /// <summary>
+    /// The form's type or source changed: the Category picker offers that kind's categories. A new material's category of
+    /// another kind is no longer one it can go in, so it goes. Only a new one's: a saved material's are fixed, and loading
+    /// one sets its category before its source.
+    /// </summary>
+    private void CategoryTypeChanged()
+    {
+        var type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource);
+        _categoryTypes.OnNext(type);
+        if (CanChangeTypeAndSource && EditingCategory is { } category && category.Type != type)
+        {
+            EditingCategory = null;
         }
     }
 
@@ -404,6 +444,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             }
 
             this.RaiseAndSetIfChanged(ref _editingSource, value);
+            SourceChanged();
 
             // A made ingredient starts at 3% weight loss, since a small shrink is the normal
             // case in the shop, and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
@@ -415,12 +456,31 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         }
     }
 
+    /// <summary>What follows the form's source, set by the user or shown: the categories it can go in.</summary>
+    private void SourceChanged()
+    {
+        CategoryTypeChanged();
+        History.RefreshDirty();
+    }
+
     private decimal? _editingWeightLossPercent;
-    /// <summary>Made only: how much of the batch's weight is lost in the making, which its yield is less.</summary>
+    /// <summary>
+    /// Made only: how much of the batch's weight is lost in the making, which its yield is less. A made ingredient's totals
+    /// follow it, as it moves the yield the cost is spread over.
+    /// </summary>
     public decimal? EditingWeightLossPercent
     {
         get => _editingWeightLossPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
+        set
+        {
+            if (_editingWeightLossPercent == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
+            _updates.Run(Recipe.RecomputeBomTotals);
+        }
     }
 
     private RawMaterial? _editingLinkedTo;
@@ -460,8 +520,16 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
             }
 
             this.RaiseAndSetIfChanged(ref _editingBaseUnit, value);
+            BaseUnitChanged();
             BaseUnitEdited();
         }
+    }
+
+    /// <summary>What follows the form's base unit, set by the user or shown: the alternative units and purchase unit choices name it.</summary>
+    private void BaseUnitChanged()
+    {
+        RebuildUnitViews();
+        History.RefreshDirty();
     }
 
     private bool _canChangeTypeAndSource = true;
@@ -484,62 +552,65 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         private set => this.RaiseAndSetIfChanged(ref _canChangeBaseUnit, value);
     }
 
-    private ObservableAsPropertyHelper<bool> _isEditingIngredient;
-    public bool IsEditingIngredient => _isEditingIngredient.Value;
+    // The form's cards follow its type and source, not the selection, so a new material can be filled in completely before
+    // its one Save; the Price History tab follows a purchased material, and the header its name.
+    public bool IsEditingIngredient => EditingType == RawMaterialType.Ingredient;
 
-    private ObservableAsPropertyHelper<bool> _isEditingPackaging;
-    public bool IsEditingPackaging => _isEditingPackaging.Value;
+    public bool IsEditingPackaging => EditingType == RawMaterialType.Packaging;
 
-    private ObservableAsPropertyHelper<bool> _isEditingMade;
     /// <summary>A made ingredient: it has a sub-assembly, add-ins and a weight loss percent instead of a purchase price.</summary>
-    public bool IsEditingMade => _isEditingMade.Value;
+    public bool IsEditingMade => EditingType == RawMaterialType.Ingredient && EditingSource == RawMaterialSource.Made;
 
-    private ObservableAsPropertyHelper<bool> _isEditingLinked;
     /// <summary>A linked ingredient: its cost is a share of another ingredient's, instead of a price or a BOM.</summary>
-    public bool IsEditingLinked => _isEditingLinked.Value;
+    public bool IsEditingLinked => EditingType == RawMaterialType.Ingredient && EditingSource == RawMaterialSource.Linked;
 
-    private ObservableAsPropertyHelper<string> _linkedCostPreviewText;
     /// <summary>What the link works out to as it's filled in: the linked-to ingredient's cost per gram, and this part's.</summary>
-    public string LinkedCostPreviewText => _linkedCostPreviewText.Value;
+    public string LinkedCostPreviewText => LinkedCostPreview(EditingLinkedTo, EditingWeightSharePercent, EditingCostSharePercent);
 
-    private ObservableAsPropertyHelper<string> _linkedPartsText;
     /// <summary>The linked-to ingredient's other parts, and how much of its weight and cost all of them take with this one.</summary>
-    public string LinkedPartsText => _linkedPartsText.Value;
+    public string LinkedPartsText => LinkedPartsSummary(EditingLinkedTo, EditingWeightSharePercent, EditingCostSharePercent);
 
-    private ObservableAsPropertyHelper<bool> _showPurchaseSetup;
     /// <summary>A purchased material, saved or still being filled in, so a new one can be priced before its first Save.</summary>
-    public bool ShowPurchaseSetup => _showPurchaseSetup.Value;
+    public bool ShowPurchaseSetup => EditingType == RawMaterialType.Packaging || EditingSource == RawMaterialSource.Purchased;
 
-    private ObservableAsPropertyHelper<bool> _showPriceHistory;
     /// <summary>A saved purchased material: a new one has no price history yet.</summary>
-    public bool ShowPriceHistory => _showPriceHistory.Value;
+    public bool ShowPriceHistory => SelectedRawMaterial is { Source: RawMaterialSource.Purchased };
 
     private int _selectedDetailsTab;
-    /// <summary>The details tab showing. Moves to Cost Setup when Price History is about to hide (ShowPriceHistory).</summary>
+    /// <summary>
+    /// The details tab showing. Moves to Cost Setup when Price History is about to hide (SelectionChanged); the Dependents
+    /// tab's shares are worked out as it shows.
+    /// </summary>
     public int SelectedDetailsTab
     {
         get => _selectedDetailsTab;
-        set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+        set
+        {
+            if (_selectedDetailsTab == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+            _detailsTabs.OnNext(value);
+        }
     }
 
-    private ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The summary header's big title: the material's name, or "New raw material".</summary>
-    public string HeaderTitle => _headerTitle.Value;
+    public string HeaderTitle =>
+        SelectedRawMaterial is null && string.IsNullOrWhiteSpace(EditingName) ? "New raw material" : EditingName;
 
-    private ObservableAsPropertyHelper<string> _baseUnitName;
     /// <summary>The form's base unit name: "gram" for an ingredient, e.g. "centimeter" for ribbon.</summary>
-    public string BaseUnitName => _baseUnitName.Value;
+    public string BaseUnitName => BaseUnitText.NameOf(EditingType, EditingBaseUnit);
 
-    private ObservableAsPropertyHelper<string> _baseUnitAbbreviation;
-    public string BaseUnitAbbreviation => _baseUnitAbbreviation.Value;
+    public string BaseUnitAbbreviation => BaseUnitText.AbbreviationOf(EditingType, EditingBaseUnit);
 
-    private ObservableAsPropertyHelper<string> _savedBaseUnitText;
     /// <summary>
     /// The Base Unit tile: "gram (g)" for an ingredient, and a packaging material's base unit as last saved, e.g.
     /// "centimeter (cm)", or "—" until its first Save. The unit is picked in the fields row (EditingBaseUnit), so
     /// the tile shows what's saved, as the cost tiles beside it do.
     /// </summary>
-    public string SavedBaseUnitText => _savedBaseUnitText.Value;
+    public string SavedBaseUnitText => SavedBaseUnitTextOf(EditingType, SelectedRawMaterial);
 
     private string _lastUpdatedText = "—";
     /// <summary>The day the material's cost last changed, or "—" for one whose cost has never moved.</summary>
@@ -549,13 +620,13 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+    public ScreenCommand NewCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+    public ScreenCommand SaveCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
 
@@ -601,80 +672,17 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     /// </summary>
     public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
 
-    /// <summary>
-    /// The form's cards follow its type and source, the Price History tab a purchased material, and the header its
-    /// name.
-    /// </summary>
-    [MemberNotNull(
-        nameof(_isEditingIngredient), nameof(_isEditingPackaging), nameof(_isEditingMade), nameof(_isEditingLinked),
-        nameof(_linkedCostPreviewText), nameof(_linkedPartsText), nameof(_showPurchaseSetup), nameof(_showPriceHistory),
-        nameof(_headerTitle))]
-    private void WireForm()
-    {
-        _isEditingIngredient = this.WhenAnyValue(x => x.EditingType)
-            .Select(type => type == RawMaterialType.Ingredient)
-            .ToProperty(this, x => x.IsEditingIngredient);
-
-        _isEditingPackaging = this.WhenAnyValue(x => x.EditingType)
-            .Select(type => type == RawMaterialType.Packaging)
-            .ToProperty(this, x => x.IsEditingPackaging);
-
-        _isEditingMade = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
-                (type, source) => type == RawMaterialType.Ingredient && source == RawMaterialSource.Made)
-            .ToProperty(this, x => x.IsEditingMade);
-
-        _isEditingLinked = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
-                (type, source) => type == RawMaterialType.Ingredient && source == RawMaterialSource.Linked)
-            .ToProperty(this, x => x.IsEditingLinked);
-
-        _linkedCostPreviewText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent,
-                LinkedCostPreview)
-            .ToProperty(this, x => x.LinkedCostPreviewText, string.Empty);
-
-        _linkedPartsText = this.WhenAnyValue(x => x.EditingLinkedTo, x => x.EditingWeightSharePercent, x => x.EditingCostSharePercent,
-                LinkedPartsSummary)
-            .ToProperty(this, x => x.LinkedPartsText, string.Empty);
-
-        // The cards follow the form, not the selection, so a new material can be filled in completely
-        // before its one Save.
-        _showPurchaseSetup = this.WhenAnyValue(x => x.EditingType, x => x.EditingSource,
-                (type, source) => type == RawMaterialType.Packaging || source == RawMaterialSource.Purchased)
-            .ToProperty(this, x => x.ShowPurchaseSetup);
-
-        // A hidden tab can't stay the one showing: picking a made or new material while on Price History goes back to Cost
-        // Setup. Subscribed before ShowPriceHistory, so the details tabs move to Cost Setup before that one hides.
-        this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Where(material => material is not { Source: RawMaterialSource.Purchased } && SelectedDetailsTab == PriceHistoryTab)
-            .Subscribe(_ => SelectedDetailsTab = 0);
-
-        _showPriceHistory = this.WhenAnyValue(x => x.SelectedRawMaterial)
-            .Select(material => material is { Source: RawMaterialSource.Purchased })
-            .ToProperty(this, x => x.ShowPriceHistory);
-
-        _headerTitle = this.WhenAnyValue(x => x.SelectedRawMaterial, x => x.EditingName, (material, name) =>
-                material is null && string.IsNullOrWhiteSpace(name) ? "New raw material" : name)
-            .ToProperty(this, x => x.HeaderTitle, "New raw material");
-    }
-
-    /// <summary>What the base unit is called, as the form and the saved material have it.</summary>
-    [MemberNotNull(nameof(_baseUnitName), nameof(_baseUnitAbbreviation), nameof(_savedBaseUnitText))]
-    private void WireBaseUnitNames()
-    {
-        _baseUnitName = this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit,
-                (type, baseUnit) => BaseUnitText.NameOf(type, baseUnit))
-            .ToProperty(this, x => x.BaseUnitName, "gram");
-
-        _baseUnitAbbreviation = this.WhenAnyValue(x => x.EditingType, x => x.EditingBaseUnit,
-                (type, baseUnit) => BaseUnitText.AbbreviationOf(type, baseUnit))
-            .ToProperty(this, x => x.BaseUnitAbbreviation, "g");
-
-        _savedBaseUnitText = this.WhenAnyValue(x => x.EditingType, x => x.SelectedRawMaterial, SavedBaseUnitTextOf)
-            .ToProperty(this, x => x.SavedBaseUnitText, "gram (g)");
-    }
-
     /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the material picked: shown, not picked again.</summary>
-    private void RepointSelection(RawMaterial? fresh) =>
+    private void RepointSelection(RawMaterial? fresh)
+    {
+        if (EqualityComparer<RawMaterial?>.Default.Equals(_selectedRawMaterial, fresh))
+        {
+            return;
+        }
+
         this.RaiseAndSetIfChanged(ref _selectedRawMaterial, fresh, nameof(SelectedRawMaterial));
+        SelectionChanged();
+    }
 
     /// <summary>Load: everything the screen shows is read again, and merged in.</summary>
     private async Task LoadAsync()
@@ -827,7 +835,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
         // The list picks up any cost that cascaded to other materials; then the form reloads what
         // was saved, so new units get their ids and the brand prices, price history and BOM show the new rows.
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
         await ReloadSavedRawMaterialAsync(id);
         SuccessMessage = $"{EditingName} was saved.";
     }
@@ -944,11 +952,32 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     // A material loaded, an undo putting the form back, or a load's fresh copy: each field written and said to have changed
     // without the edit that setting it is (TypeEdited, the made ingredient's starting weight loss, BaseUnitEdited), so
     // nothing follows from it but what's worked out from it.
-    private void ShowType(RawMaterialType type) => this.RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType));
+    private void ShowType(RawMaterialType type)
+    {
+        if (_editingType != type)
+        {
+            this.RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType));
+            TypeChanged();
+        }
+    }
 
-    private void ShowSource(RawMaterialSource source) => this.RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource));
+    private void ShowSource(RawMaterialSource source)
+    {
+        if (_editingSource != source)
+        {
+            this.RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource));
+            SourceChanged();
+        }
+    }
 
-    private void ShowBaseUnit(UnitOfMeasure? unit) => this.RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit));
+    private void ShowBaseUnit(UnitOfMeasure? unit)
+    {
+        if (!EqualityComparer<UnitOfMeasure?>.Default.Equals(_editingBaseUnit, unit))
+        {
+            this.RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit));
+            BaseUnitChanged();
+        }
+    }
 
     /// <summary>
     /// The type changed by the user, on a new material: a packaging material is always purchased, and an ingredient's base
@@ -1168,7 +1197,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
 
         // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
         await _categoryRepository.AddAsync(category, CancellationToken.None);
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
         return Categories.FirstOrDefault(c => c.Id == category.Id);
     }
 
@@ -1205,7 +1234,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
                 ClearForm();
             }
 
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
         });
 
     /// <summary>
@@ -1365,7 +1394,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     protected override string UnsavedChangesName =>
         !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRawMaterial?.Name ?? "the new raw material";
 
-    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
+    protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the material as it was last saved, read again, since its
@@ -1387,7 +1416,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     // What the list asks of the screen (IRawMaterialsListHost): the material the form shows, and what the list's actions do to it.
     int IRawMaterialsListHost.EditingId => _editingId;
 
-    async Task IRawMaterialsListHost.LoadAsync() => await LoadCommand.Execute();
+    Task IRawMaterialsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IRawMaterialsListHost.Pick(RawMaterial material) =>
         PickFromList(material.Id, () => SelectedRawMaterial = material, List.SyncTreeSelection);
@@ -1440,5 +1469,8 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         Dependents.Dispose();
         Recipe.Dispose();
         _picks.Dispose();
+        _selectedIds.Dispose();
+        _categoryTypes.Dispose();
+        _detailsTabs.Dispose();
     }
 }

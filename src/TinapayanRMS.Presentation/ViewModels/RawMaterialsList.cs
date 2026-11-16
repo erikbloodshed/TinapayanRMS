@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Linq;
-using System.Windows.Input;
+using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
@@ -9,7 +9,6 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -87,6 +86,9 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     private readonly IValidator<RawMaterialCategory> _categoryValidator;
     private readonly FolderStateWriter _closedFoldersWriter;
 
+    /// <summary>Each search typed, what the list's filter follows: the materials whose name holds it.</summary>
+    private readonly BehaviorSubject<string> _searches = new(string.Empty);
+
     /// <summary>Where the materials the last move took were before it: what Undo on the notice puts back.</summary>
     private IReadOnlyList<RawMaterialMove> _moveUndo = [];
 
@@ -125,7 +127,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         categoryCache.Connect()
             .Subscribe(_ => RefreshTree());
 
-        var nameFilter = this.WhenAnyValue(x => x.SearchText)
+        var nameFilter = _searches
             .Select(text => text.Trim())
             .DistinctUntilChanged()
             .Select(text => (Func<RawMaterial, bool>)(m => text.Length == 0 || m.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
@@ -135,30 +137,28 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
             .SortAndBind(out _visibleRawMaterials, SortExpressionComparer<RawMaterial>.Ascending(m => m.Name))
             .Subscribe(_ => RefreshTree());
 
-        // The search decides whether empty folders show, even when it leaves the same materials showing. A name being typed
-        // into a row is given up first: the search may hide the row.
-        this.WhenAnyValue(x => x.SearchText)
-            .Skip(1)
-            .Subscribe(_ => CancelTreeName());
-        this.WhenAnyValue(x => x.SearchText)
-            .Subscribe(_ => RefreshTree());
+        // The search decides whether empty folders show, even when it leaves the same materials showing (SearchText).
+        RefreshTree();
 
-        MoveMaterialsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<RawMaterialMove>>(
+        MoveMaterialsCommand = new ScreenCommand<IReadOnlyList<RawMaterialMove>>(
             moves => host.RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
-        var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => host.RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), hasMoveNotice);
-        NewMaterialInCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
+        UndoMoveCommand = new ScreenCommand(() => host.RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), () => MoveNotice is not null);
+        NewMaterialInCommand = new ScreenCommand<RawMaterialFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
             folder?.Type ?? RawMaterialType.Ingredient,
             folder?.CategoryId,
             folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
-        RenameMaterialCommand = ReactiveCommand.Create<RawMaterialLeafNode>(BeginRenameMaterial);
-        CopyMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => host.AfterUnsavedChangesAsync(() => host.StartCopyOf(leaf.RawMaterial)));
-        DeleteMaterialCommand = ReactiveCommand.CreateFromTask<RawMaterialLeafNode>(leaf => host.DeleteAsync(leaf.RawMaterial));
-        NewCategoryCommand = ReactiveCommand.Create<RawMaterialCategoryType>(BeginNewFolder);
-        RenameCategoryCommand = ReactiveCommand.Create<RawMaterialFolderNode>(BeginRenameCategory);
-        DeleteCategoryCommand = ReactiveCommand.CreateFromTask<RawMaterialFolderNode>(DeleteCategoryAsync);
-        ExpandAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.ExpandAll);
-        CollapseAllCommand = ReactiveCommand.Create<RawMaterialFolderNode?>(RawMaterialTree.CollapseAll);
+        RenameMaterialCommand = ScreenCommand.Of<RawMaterialLeafNode>(BeginRenameMaterial);
+        CopyMaterialCommand = new ScreenCommand<RawMaterialLeafNode>(async leaf =>
+        {
+            await host.AfterUnsavedChangesAsync(() => host.StartCopyOf(leaf.RawMaterial));
+            Copied?.Invoke();
+        });
+        DeleteMaterialCommand = new ScreenCommand<RawMaterialLeafNode>(leaf => host.DeleteAsync(leaf.RawMaterial));
+        NewCategoryCommand = ScreenCommand.Of<RawMaterialCategoryType>(BeginNewFolder);
+        RenameCategoryCommand = ScreenCommand.Of<RawMaterialFolderNode>(BeginRenameCategory);
+        DeleteCategoryCommand = new ScreenCommand<RawMaterialFolderNode>(DeleteCategoryAsync);
+        ExpandAllCommand = ScreenCommand.Of<RawMaterialFolderNode?>(RawMaterialTree.ExpandAll);
+        CollapseAllCommand = ScreenCommand.Of<RawMaterialFolderNode?>(RawMaterialTree.CollapseAll);
     }
 
     /// <summary>The materials the list shows: those whose name matches SearchText.</summary>
@@ -168,57 +168,76 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     public RawMaterialTree RawMaterialTree { get; }
 
     private string _searchText = string.Empty;
+    /// <summary>
+    /// What's typed into the list's search: the materials whose name holds it show. It decides whether empty folders show
+    /// too, even when it leaves the same materials showing, and a name being typed into a row is given up first, since the
+    /// search may hide the row.
+    /// </summary>
     public string SearchText
     {
         get => _searchText;
-        set => this.RaiseAndSetIfChanged(ref _searchText, value);
+        set
+        {
+            if (_searchText == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _searchText, value);
+            _searches.OnNext(value);
+            CancelTreeName();
+            RefreshTree();
+        }
     }
 
     /// <summary>The materials picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<RawMaterialLeafNode> SelectedTreeMaterials => [.. SelectedTreeNodes.OfType<RawMaterialLeafNode>().Where(l => !l.IsNew)];
 
     /// <summary>Files materials under another category, saved at once: a drag in the list, or its menu's Move To.</summary>
-    public ReactiveCommand<IReadOnlyList<RawMaterialMove>, RxVoid> MoveMaterialsCommand { get; }
+    public ScreenCommand<IReadOnlyList<RawMaterialMove>> MoveMaterialsCommand { get; }
 
     /// <summary>Puts back where the last move took the materials from (the notice bar's Undo).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+    public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
     /// The list's New … Here: a new material of the folder's type, in its category when it's a category's folder. With no
     /// folder (the list's empty space), a new ingredient, as New starts one. Like New, it adds the material's row to the list
     /// for its name to be typed into (TreeNameEdit).
     /// </summary>
-    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> NewMaterialInCommand { get; }
+    public ScreenCommand<RawMaterialFolderNode?> NewMaterialInCommand { get; }
 
     /// <summary>The list's Rename: the material's name becomes a box to type into, in place, and the name typed is saved at once.</summary>
-    public ReactiveCommand<RawMaterialLeafNode, RxVoid> RenameMaterialCommand { get; }
+    public ScreenCommand<RawMaterialLeafNode> RenameMaterialCommand { get; }
 
     /// <summary>
     /// The list's Copy: a new material with the material's type, category and base unit, named "… Copy", and nothing else.
     /// It isn't saved until Save is clicked.
     /// </summary>
-    public ReactiveCommand<RawMaterialLeafNode, RxVoid> CopyMaterialCommand { get; }
+    public ScreenCommand<RawMaterialLeafNode> CopyMaterialCommand { get; }
+
+    /// <summary>A Copy has run: the form holds the copy, whose name is there to change (the page puts the cursor in it).</summary>
+    public event Action? Copied;
 
     /// <summary>The list's Delete, as the header's: asks first.</summary>
-    public ReactiveCommand<RawMaterialLeafNode, RxVoid> DeleteMaterialCommand { get; }
+    public ScreenCommand<RawMaterialLeafNode> DeleteMaterialCommand { get; }
 
     /// <summary>
     /// The list's New Folder, for materials of the type given: a "New folder" row for its name to be typed into
     /// (TreeNameEdit), and the name typed adds the category.
     /// </summary>
-    public ReactiveCommand<RawMaterialCategoryType, RxVoid> NewCategoryCommand { get; }
+    public ScreenCommand<RawMaterialCategoryType> NewCategoryCommand { get; }
 
     /// <summary>The list's Rename Category: the folder's name becomes a box to type into, in place, and the name typed renames the category.</summary>
-    public ReactiveCommand<RawMaterialFolderNode, RxVoid> RenameCategoryCommand { get; }
+    public ScreenCommand<RawMaterialFolderNode> RenameCategoryCommand { get; }
 
     /// <summary>The list's Delete Category, offered only for a category no material is in.</summary>
-    public ReactiveCommand<RawMaterialFolderNode, RxVoid> DeleteCategoryCommand { get; }
+    public ScreenCommand<RawMaterialFolderNode> DeleteCategoryCommand { get; }
 
     /// <summary>Opens every folder of a type's, or of both types' with no folder given.</summary>
-    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> ExpandAllCommand { get; }
+    public ScreenCommand<RawMaterialFolderNode?> ExpandAllCommand { get; }
 
     /// <summary>Closes every category folder of a type's, or of both types' with no folder given.</summary>
-    public ReactiveCommand<RawMaterialFolderNode?, RxVoid> CollapseAllCommand { get; }
+    public ScreenCommand<RawMaterialFolderNode?> CollapseAllCommand { get; }
 
     private void RefreshTree()
     {
@@ -329,12 +348,12 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     async Task<object?> IListTreeScreen.DropAsync(IEnumerable<object> nodes, object? target)
     {
         var moves = DropMoves(nodes, target);
-        if (moves.Count == 0 || !((ICommand)MoveMaterialsCommand).CanExecute(moves))
+        if (moves.Count == 0 || !MoveMaterialsCommand.CanExecute(moves))
         {
             return null;
         }
 
-        await MoveMaterialsCommand.Execute(moves);
+        await MoveMaterialsCommand.ExecuteAsync(moves);
         return RawMaterialTree.Find(moves[0].RawMaterialId);
     }
 
@@ -712,5 +731,6 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         // A change still settling when the app closes is written now, rather than lost.
         _closedFoldersWriter.Dispose();
         RawMaterialTree.Dispose();
+        _searches.Dispose();
     }
 }

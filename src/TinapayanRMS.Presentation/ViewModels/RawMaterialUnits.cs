@@ -1,13 +1,10 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -33,7 +30,7 @@ public interface IRawMaterialUnitsHost : IFormPartHost
 /// A unit picked on a brand row that the material didn't have is added here too, with its multiplier typed as the row's
 /// quantity, and goes again once no row is in it (the Cost Setup tab, RawMaterialPurchaseCost, asks for both).
 /// </summary>
-public sealed class RawMaterialUnits : ReactiveObject
+public sealed class RawMaterialUnits : ObservableState
 {
     private readonly IRawMaterialUnitsHost _host;
     private readonly IReadOnlyList<UnitOfMeasure> _unitsOfMeasure;
@@ -54,7 +51,7 @@ public sealed class RawMaterialUnits : ReactiveObject
         _unitValidator = unitValidator;
 
         // Nothing to confirm: the unit only leaves the list, and is deleted when the material is saved.
-        DeleteCommand = ReactiveCommand.Create(
+        DeleteCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() =>
             {
                 var removed = SelectedRow!.Unit;
@@ -62,18 +59,17 @@ public sealed class RawMaterialUnits : ReactiveObject
                 Replace([.. Rows.Select(r => r.Unit).Where(u => !ReferenceEquals(u, removed))], selectedUnit: null);
                 host.UnitsChanged();
             }),
-            this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
+            () => SelectedRow is not null);
     }
 
     /// <summary>The form's alternative units, saved or not. Their units are the form's own copies, edited in place.</summary>
     public ObservableCollection<RawMaterialUnitRow> Rows { get; } = [];
 
-    private RawMaterialUnitRow? _selectedRow;
     /// <summary>The row picked, which Remove takes out.</summary>
     public RawMaterialUnitRow? SelectedRow
     {
-        get => _selectedRow;
-        set => this.RaiseAndSetIfChanged(ref _selectedRow, value);
+        get;
+        set => RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -83,7 +79,7 @@ public sealed class RawMaterialUnits : ReactiveObject
     public Func<RawMaterialUnitRow> NewRow => () => new RawMaterialUnitRow(new RawMaterialUnit(), _host.BaseUnitAbbreviation, FindUnitOfMeasure, StandardMultiplierOf);
 
     /// <summary>Removes the unit picked from the form; Save deletes it.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     /// <summary>Set while the screen itself replaces or changes the rows, so only the user's edits count as edits.</summary>
     public bool IsSyncing { get; private set; }
