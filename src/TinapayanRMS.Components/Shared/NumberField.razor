@@ -2,7 +2,7 @@
 @using System.Globalization
 @using System.Text.RegularExpressions
 
-@* A number box bound to a ViewModel's decimal or decimal?: shown in its Format, selected whole on taking the cursor (so
+@* A number box bound to a ViewModel's decimal or decimal? (or a count's int or int?, and nothing else): shown in its Format, selected whole on taking the cursor (so
    it's typed over), right-aligned, and kept between Min and Max. As TextField, it's never written to while it has the
    cursor. Each number typed reaches the ViewModel as it's typed,
    so totals and percentages follow it; a box that LandsOnLeave passes its value only once it's left, and keeps Save
@@ -21,6 +21,11 @@
 
 @code {
     private static readonly bool IsNullable = Nullable.GetUnderlyingType(typeof(TValue)) is not null;
+
+    // A box holds a decimal, or an int for a count. A double can't hold what's typed exactly (0.1, 28.35), and since .NET
+    // 11 Convert.ToDecimal keeps its binary noise (28.35 becomes 28.3499…), so a box bound to one is refused as it's drawn.
+    private static readonly bool HoldsExactNumbers =
+        (Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue)) is var type && (type == typeof(decimal) || type == typeof(int));
 
     // A number still being typed that would read back differently once tidied ("1.", "2.50"): passed on when left.
     private static readonly Regex Settled = new(@"^-?[\d,]+(\.\d*[1-9])?$", RegexOptions.CultureInvariant);
@@ -80,6 +85,15 @@
     [CascadingParameter] public IUndoRecorder? Recorder { get; set; }
 
     private decimal? Current => Value is null ? null : Convert.ToDecimal(Value, CultureInfo.InvariantCulture);
+
+    protected override void OnInitialized()
+    {
+        if (!HoldsExactNumbers)
+        {
+            throw new InvalidOperationException(
+                $"A NumberField holds a decimal, decimal?, int or int?, not a {typeof(TValue).Name}: bind it to a decimal.");
+        }
+    }
 
     protected override void OnParametersSet()
     {

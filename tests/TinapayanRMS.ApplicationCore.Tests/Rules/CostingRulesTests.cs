@@ -177,13 +177,13 @@ public class CostingRulesTests
         baseCost.Should().Be(4m);
     }
 
+    public static IEnumerable<decimal> WastagesInRange() => [0m, 3m, 100m];
+
     [Test]
-    [Arguments(0)]
-    [Arguments(3)]
-    [Arguments(100)]
-    public void EnsureValidWastage_accepts_0_to_100(double wastagePercent)
+    [MethodDataSource(nameof(WastagesInRange))]
+    public void EnsureValidWastage_accepts_0_to_100(decimal wastagePercent)
     {
-        var act = () => CostingRules.EnsureValidWastage((decimal)wastagePercent);
+        var act = () => CostingRules.EnsureValidWastage(wastagePercent);
 
         act.Should().NotThrow();
     }

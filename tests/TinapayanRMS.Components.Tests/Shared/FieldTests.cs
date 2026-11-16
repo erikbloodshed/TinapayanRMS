@@ -193,6 +193,18 @@ public class FieldTests
     }
 
     [Test]
+    public async Task A_number_box_bound_to_a_double_or_a_float_is_refused()
+    {
+        await using var context = AppServices.NewContext();
+
+        var toDouble = () => context.Render<NumberField<double>>();
+        var toFloat = () => context.Render<NumberField<float?>>();
+
+        toDouble.Should().Throw<InvalidOperationException>().WithMessage("*not a Double*");
+        toFloat.Should().Throw<InvalidOperationException>().WithMessage("*not a Nullable*");
+    }
+
+    [Test]
     public async Task A_number_passes_on_as_its_typed_once_it_reads_as_a_number()
     {
         await using var context = AppServices.NewContext();
