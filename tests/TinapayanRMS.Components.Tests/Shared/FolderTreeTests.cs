@@ -4,7 +4,7 @@ using AwesomeAssertions;
 using Microsoft.AspNetCore.Components.Web;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Trees;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 

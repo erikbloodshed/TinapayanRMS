@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Components.Layout;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.App;
 
 namespace TinapayanRMS.Components.Tests.Layout;
 

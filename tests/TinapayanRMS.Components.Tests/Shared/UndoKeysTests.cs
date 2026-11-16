@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 

@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Tests.Fixtures;
 

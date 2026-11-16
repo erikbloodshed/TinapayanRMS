@@ -1,5 +1,5 @@
 using Serilog;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Components;

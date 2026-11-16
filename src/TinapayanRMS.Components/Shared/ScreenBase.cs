@@ -6,7 +6,7 @@ using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Components.Vim;
 
 namespace TinapayanRMS.Components.Shared;
@@ -204,8 +204,9 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
 
     /// <summary>
     /// What a screen watches on a ViewModel or one of its parts, worked out once a type: the properties declared as a list
-    /// (INotifyCollectionChanged) or a command (ICommand), and the parts, get-only properties of a type from the ViewModels'
-    /// namespace that tells of its changes and is neither a list (TableRows is watched as one) nor a screen's ViewModel.
+    /// (INotifyCollectionChanged) or a command (ICommand), and the parts, get-only properties of a type from the
+    /// Presentation project's namespaces that tells of its changes and is neither a list (TableRows is watched as one) nor
+    /// a screen's ViewModel.
     /// Chosen by the type a property is declared as, so a worked-out property (a caption, a filtered list) is never read for
     /// it: a list or command the screen should redraw for is declared as one.
     /// </summary>
@@ -218,12 +219,15 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
             [.. properties.Where(p => Is<ICommand>(p) && !Is<INotifyCollectionChanged>(p))],
             [
                 .. properties.Where(p => !p.CanWrite
-                    && p.PropertyType.Namespace == typeof(ViewModelBase).Namespace
+                    && p.PropertyType.Namespace?.StartsWith(PresentationNamespaces, StringComparison.Ordinal) == true
                     && Is<INotifyPropertyChanged>(p)
                     && !Is<ViewModelBase>(p)
                     && !Is<INotifyCollectionChanged>(p)),
             ]);
     });
+
+    // Every ViewModel, part and row is in one of these, the namespace of its folder (TinapayanRMS.Presentation.Products).
+    private const string PresentationNamespaces = "TinapayanRMS.Presentation.";
 
     private static readonly ConcurrentDictionary<Type, Watched> WatchedTypes = new();
 

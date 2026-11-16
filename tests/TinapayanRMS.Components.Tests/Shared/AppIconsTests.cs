@@ -1,6 +1,6 @@
 using AwesomeAssertions;
 using TinapayanRMS.Components.Shared;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 

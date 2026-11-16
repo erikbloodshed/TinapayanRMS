@@ -1,5 +1,5 @@
 using TinapayanRMS.Infrastructure.Services;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Components.Shared;
 
 namespace TinapayanRMS.Components;

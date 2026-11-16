@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using Bunit;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Components.Tests.Printing;

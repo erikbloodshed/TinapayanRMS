@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Components.Shared;
 
 namespace TinapayanRMS.Components.Tests.Shared;

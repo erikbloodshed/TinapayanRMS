@@ -2,7 +2,7 @@ using System.Reflection;
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Products;
 
 namespace TinapayanRMS.Components.Tests;
 

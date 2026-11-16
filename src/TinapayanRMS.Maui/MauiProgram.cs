@@ -137,7 +137,7 @@ public static class MauiProgram
             // Debug build only: the installed app is a Release one, which always asks.
             if (Environment.GetEnvironmentVariable("TINAPAYANRMS_SIGNED_IN") == "1")
             {
-                var appLock = app.Services.GetRequiredService<TinapayanRMS.Presentation.ViewModels.AppLock>();
+                var appLock = app.Services.GetRequiredService<TinapayanRMS.Presentation.App.AppLock>();
                 appLock.SetAutoLockMinutes(0);
                 appLock.Unlock();
                 Log.Warning("Started signed in, for a check (TINAPAYANRMS_SIGNED_IN)");

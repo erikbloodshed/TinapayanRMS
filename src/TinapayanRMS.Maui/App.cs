@@ -1,4 +1,4 @@
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.App;
 using BackgroundWork = TinapayanRMS.Maui.Services.BackgroundWork;
 
 namespace TinapayanRMS.Maui;

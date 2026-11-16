@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Components;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Shared;
 

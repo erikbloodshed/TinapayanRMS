@@ -2,7 +2,7 @@ using System.Collections.Frozen;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Syncfusion.Blazor.Buttons;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Shared;
 

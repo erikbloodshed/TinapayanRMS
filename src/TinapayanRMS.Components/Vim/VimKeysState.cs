@@ -1,6 +1,8 @@
 using System.Windows.Input;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Products;
+using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Vim;
 

@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Products;
+using TinapayanRMS.Presentation.Reports;
 using TinapayanRMS.Components.Tests.Fixtures;
 using TinapayanRMS.Components.Vim;
 

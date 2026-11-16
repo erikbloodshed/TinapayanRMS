@@ -1,4 +1,4 @@
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Components.Vim;
 
 namespace TinapayanRMS.Components.Shared;

@@ -1,4 +1,4 @@
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Printing;
 
 namespace TinapayanRMS.Components.Printing;
 

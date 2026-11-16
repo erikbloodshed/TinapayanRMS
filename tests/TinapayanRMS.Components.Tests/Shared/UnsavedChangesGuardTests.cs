@@ -2,7 +2,8 @@ using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 

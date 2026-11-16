@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using ILogger = Serilog.ILogger;

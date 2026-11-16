@@ -2,7 +2,7 @@ using System.Windows.Input;
 using AwesomeAssertions;
 using Serilog.Events;
 using TinapayanRMS.Components.Tests.Fixtures;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Tests;
 

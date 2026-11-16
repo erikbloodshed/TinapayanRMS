@@ -1,6 +1,11 @@
 using System.Reactive.Linq;
 using Microsoft.AspNetCore.Components;
-using TinapayanRMS.Presentation.ViewModels;
+using TinapayanRMS.Presentation.PriceSimulator;
+using TinapayanRMS.Presentation.Printing;
+using TinapayanRMS.Presentation.Products;
+using TinapayanRMS.Presentation.RawMaterials;
+using TinapayanRMS.Presentation.Reports;
+using TinapayanRMS.Presentation.SubAssemblies;
 
 namespace TinapayanRMS.Components.Shared;
 
