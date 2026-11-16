@@ -917,7 +917,7 @@ A screen's page inherits [ScreenBase&lt;TViewModel&gt;](../src/TinapayanRMS.Comp
 - **tells the Vim keys which screen is on show** (`VimKeysState`);
 - gives the page `AddSubscription` (to keep an `Interaction` handler, or anything else the page lends its ViewModel, until the page goes), `ScreenNotices`, `OnViewModelChanged(propertyName)` to override, and `RedrawNowAsync` for the few things that have to follow the drawing, such as moving the cursor into a field the redraw fills in.
 
-A component that redraws on a ViewModel's events asks its own `RedrawGate` (`Request`), and never calls `InvokeAsync(StateHasChanged)` from a handler that runs once per change.
+A component that redraws on a ViewModel's events asks its own `RedrawGate` (`Request`), and never calls `InvokeAsync(StateHasChanged)` from a handler that runs once per change. One that tells its gate it's drawn (`Drawn`, which drops the redraw queued for what's been asked so far) tells it as the drawing starts, at the top of its markup (`FolderTree`, `MainLayout`, the sign-in panel) or before its `StateHasChanged` (`RedrawNowAsync`), never after: a change on another thread can ask while the component draws, and told afterwards the gate would drop that request though the drawing missed it.
 
 A large screen is split into components in a folder named after it (`Pages/RawMaterials/`, `Pages/Products/`). A part takes the screen's ViewModel as a `ViewModel` parameter and has no state the ViewModel should own. The screen's page decides when each part shows. Keep a part's `@code` to view-only work, such as focus.
 

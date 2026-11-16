@@ -163,8 +163,8 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
         _redrawingNow = true;
         try
         {
-            StateHasChanged();
             _redraws.Drawn();
+            StateHasChanged();
         }
         finally
         {

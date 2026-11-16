@@ -13,6 +13,10 @@
    cleared after every try, so the boxes are drawn afresh then (a box never has its text rewritten while it has the
    cursor), and the cursor goes back to the first. What a box sends during a try is dropped: Enter in a box also sends
    its text as a change, which would otherwise land after the try had cleared it and come back in the fresh box. *@
+@{
+    // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
+    _redraws.Drawn();
+}
 <div class="sign-in-screen" @ref="_panel">
     <section class="sign-in-page" aria-label="Sign in">
         <h1 class="section-header sign-in-title">TinapayanRMS</h1>
@@ -95,7 +99,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _redraws.Drawn();
         if (firstRender)
         {
             _keys = await JS.InvokeAsync<IJSObjectReference>("tinapayan.lockKeys", _panel).KeepUnlessGoneAsync(() => _disposed);

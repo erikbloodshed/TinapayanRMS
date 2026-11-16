@@ -8,6 +8,10 @@
 @* Started here, once per page, so one screen can open another (a Dependents tile, a Print). *@
 @inject ScreenLinks Links
 
+@{
+    // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
+    _redraws.Drawn();
+}
 <div class="app-shell">
     @* The window's title bar, which the page draws: the window has none of Windows' own. Locked, it keeps only what moves,
        sizes and closes the window. *@
@@ -102,7 +106,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _redraws.Drawn();
         if (firstRender)
         {
             _self = DotNetObjectReference.Create(this);

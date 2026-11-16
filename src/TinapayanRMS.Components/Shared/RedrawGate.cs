@@ -39,8 +39,10 @@ public sealed class RedrawGate(Func<Func<Task>, Task> invokeAsync, Action redraw
     }
 
     /// <summary>
-    /// The component has just been drawn some other way (by its parent, or at once), with everything asked for so far
-    /// in it: the redraw queued for those requests is dropped.
+    /// The component is being drawn some other way (by its parent, or at once), so everything asked for so far will be in
+    /// it: the redraw queued for those requests is dropped. Called as the drawing starts, before it reads anything
+    /// (FolderTree's markup begins with it), never after it: a change on another thread can ask while the component is
+    /// drawn, and after the drawing that request would be dropped though the drawing missed it.
     /// </summary>
     public void Drawn() => Volatile.Write(ref _wanted, 0);
 }
