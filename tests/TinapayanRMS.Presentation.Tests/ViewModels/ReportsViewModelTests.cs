@@ -73,7 +73,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
             [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 100m) { AddIns = [(ubeId, 20m)] }]));
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         var plain = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Cream Loaf Plain").Subject;
         var ube = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Cream Loaf Ube").Subject;
@@ -115,7 +115,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         }
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         var ensaymada = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Ensaymada").Subject;
         ensaymada.IngredientsCost.Should().Be(2.5m, "50 g of a ₱50, 1,000 g dough");
@@ -137,7 +137,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         await SetPriceAsync(flourId, kilogramId, 60m);
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         var flour = viewModel.RawMaterialPrices.Should().ContainSingle(r => r.Name == "Flour").Subject;
         flour.UnitName.Should().Be("kilogram");
@@ -167,7 +167,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         viewModel.RawMaterialPrices.CollectionChanged += (_, e) => rawMaterialPrices.Add(e.Action);
         viewModel.CostBuffers.CollectionChanged += (_, e) => costBuffers.Add(e.Action);
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.ProductCosts.Should().HaveCount(2);
         productCosts.Should().Equal(NotifyCollectionChangedAction.Reset);
@@ -184,7 +184,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         await AddProductAsync("Pandesal");
         await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.04m);
         using var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         var pandesal = viewModel.ProductCosts.Single();
         viewModel.SelectedCostBuffers.Add(viewModel.CostBuffers.Single());
         List<NotifyCollectionChangedAction> changes = [];
@@ -192,7 +192,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         viewModel.RawMaterialPrices.CollectionChanged += (_, e) => changes.Add(e.Action);
         viewModel.CostBuffers.CollectionChanged += (_, e) => changes.Add(e.Action);
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         changes.Should().BeEmpty();
         viewModel.ProductCosts.Single().Should().BeSameAs(pandesal);
@@ -205,7 +205,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         await AddProductAsync("Pandesal");
         await AddIngredientAsync("Flour", costPerGram: 0.05m, bufferedCostPerGram: 0.04m);
         using var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedCostBuffers.Add(viewModel.CostBuffers.Single());
         List<NotifyCollectionChangedAction> productCosts = [];
         List<NotifyCollectionChangedAction> costBuffers = [];
@@ -214,7 +214,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
         await AddProductAsync("Ensaymada");
         await AddIngredientAsync("Sugar", costPerGram: 0.08m, bufferedCostPerGram: 0.07m);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.ProductCosts.Select(r => r.ProductName).Should().Equal("Ensaymada", "Pandesal");
         productCosts.Should().Equal(NotifyCollectionChangedAction.Reset);
@@ -229,14 +229,14 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         await AddProductAsync("Ensaymada");
 
         using var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.ProductCosts.Select(r => r.ProductName).Should().Equal(["Ensaymada", "Pandesal"], "read several at once, they still come by name");
         var row = viewModel.ProductCosts.Should().ContainSingle(r => r.ProductName == "Pandesal").Subject;
 
         var opened = new List<int>();
         using (viewModel.ProductOpenRequests.Subscribe(opened.Add))
         {
-            await viewModel.OpenProductCommand.Execute(row.ProductId);
+            await viewModel.OpenProductCommand.ExecuteAsync(row.ProductId);
         }
 
         opened.Should().Equal(pandesalId);
@@ -249,13 +249,13 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var sugarId = await AddIngredientAsync("Sugar");
 
         using var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         var row = viewModel.RawMaterialPrices.Should().ContainSingle(r => r.Name == "Sugar").Subject;
 
         var opened = new List<int>();
         using (viewModel.RawMaterialOpenRequests.Subscribe(opened.Add))
         {
-            await viewModel.OpenRawMaterialCommand.Execute(row.RawMaterialId);
+            await viewModel.OpenRawMaterialCommand.ExecuteAsync(row.RawMaterialId);
         }
 
         opened.Should().Equal(sugarId);
@@ -272,7 +272,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
             interaction.SetOutput(@"C:\Reports\Product Cost Summary 2026-10-03.xlsx");
         });
 
-        await viewModel.ExportProductCostsCommand.Execute();
+        await viewModel.ExportProductCostsCommand.ExecuteAsync();
 
         asked.Should().Be(ReportsViewModel.ProductCostSummaryTitle, "the page picks the grid by the title, and the file is named after it");
         viewModel.SuccessMessage.Should().Be(@"Saved Product Cost Summary 2026-10-03.xlsx in C:\Reports.");
@@ -290,7 +290,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
             interaction.SetOutput(null);
         });
 
-        await viewModel.ExportRawMaterialPricesCommand.Execute();
+        await viewModel.ExportRawMaterialPricesCommand.ExecuteAsync();
 
         asked.Should().Be(ReportsViewModel.RawMaterialPriceSummaryTitle);
     });
@@ -301,7 +301,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         var viewModel = CreateViewModel();
         viewModel.ExportToExcel.RegisterHandler(interaction => interaction.SetOutput(null));
 
-        await viewModel.ExportProductCostsCommand.Execute();
+        await viewModel.ExportProductCostsCommand.ExecuteAsync();
 
         viewModel.SuccessMessage.Should().BeNull();
         viewModel.ErrorMessage.Should().BeNull();
@@ -314,7 +314,7 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
         viewModel.ExportToExcel.RegisterHandler(_ =>
             throw new IOException("The process cannot access the file because it is being used by another process.", unchecked((int)0x80070020)));
 
-        await viewModel.ExportProductCostsCommand.Execute();
+        await viewModel.ExportProductCostsCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be(Failure.FileInUseText);
         viewModel.SuccessMessage.Should().BeNull();

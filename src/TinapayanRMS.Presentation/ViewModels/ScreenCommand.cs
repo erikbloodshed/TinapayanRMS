@@ -3,16 +3,14 @@ using System.Windows.Input;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// A screen's action for a button, a menu or a key to run: a body, and whether it can run now. The app's own, in place of
-/// ReactiveUI's ReactiveCommand on the screens moved off it (Raw Materials first). Whether it can run is asked when it's
-/// wanted (a button being drawn, a key pressed) rather than pushed as it changes: a screen is drawn again whenever its
+/// A screen's action for a button, a menu or a key to run: a body, and whether it can run now. Whether it can run is asked
+/// when it's wanted (a button being drawn, a key pressed) rather than pushed as it changes: a screen is drawn again whenever its
 /// ViewModel or a part of it changes (ScreenBase), which is what a can-run test reads. It can't run while it's running,
-/// as a ReactiveCommand can't, and says so as it starts and ends (<see cref="ICommand.CanExecuteChanged"/>).
+/// and says so as it starts and ends (<see cref="ICommand.CanExecuteChanged"/>).
 /// <para>
-/// <see cref="ScreenCommand.ExecuteAsync"/> runs the body whatever CanExecute says, as ReactiveCommand's Execute() did: a
-/// button, a menu or a key asks first (Commands.Run in the screens). The body is the screen's to keep from throwing, as a
-/// ReactiveCommand's was (ViewModelBase.RunSafelyAsync); one run through <see cref="ICommand.Execute"/>, which nothing
-/// awaits, that throws anyway is logged.
+/// <see cref="ScreenCommand.ExecuteAsync"/> runs the body whatever CanExecute says: a button, a menu or a key asks first
+/// (Commands.Run in the screens). The body is the screen's to keep from throwing (ViewModelBase.RunSafelyAsync); one run
+/// through <see cref="ICommand.Execute"/>, which nothing awaits, that throws anyway goes to <see cref="UnawaitedRunFailed"/>.
 /// </para>
 /// </summary>
 public abstract class ScreenCommandBase : ICommand
@@ -20,6 +18,12 @@ public abstract class ScreenCommandBase : ICommand
     private int _running;
 
     public event EventHandler? CanExecuteChanged;
+
+    /// <summary>
+    /// What a run nothing awaited (one started through <see cref="ICommand.Execute"/>, as a menu's item or a key does)
+    /// failed with, for the app to log and show (UnhandledFailures in the screens). Logged here when nothing listens.
+    /// </summary>
+    public static event Action<Exception>? UnawaitedRunFailed;
 
     /// <summary>Whether a run is under way, which it can't run again until it ends.</summary>
     public bool IsRunning => _running > 0;
@@ -56,10 +60,22 @@ public abstract class ScreenCommandBase : ICommand
 
     void ICommand.Execute(object? parameter) =>
         ExecuteParameterAsync(parameter).ContinueWith(
-            static run => Serilog.Log.Error(run.Exception, "A command run with nothing awaiting it failed"),
+            static run => ReportUnawaited(run.Exception!.InnerExceptions is [var only] ? only : run.Exception),
             CancellationToken.None,
             TaskContinuationOptions.OnlyOnFaulted,
             TaskScheduler.Default);
+
+    private static void ReportUnawaited(Exception exception)
+    {
+        if (UnawaitedRunFailed is { } failed)
+        {
+            failed(exception);
+        }
+        else
+        {
+            Serilog.Log.Error(exception, "A command run with nothing awaiting it failed");
+        }
+    }
 }
 
 /// <summary>A <see cref="ScreenCommandBase"/> that takes nothing.</summary>
@@ -124,7 +140,7 @@ public sealed class ScreenCommand<T> : ScreenCommandBase
 
     protected override Task ExecuteParameterAsync(object? parameter) => ExecuteAsync(Cast(parameter));
 
-    // What ICommand hands over, as ReactiveCommand took it: nothing is T's default, anything else must be a T.
+    // What ICommand hands over: nothing is T's default, anything else must be a T.
     private static T Cast(object? parameter) => parameter switch
     {
         null => default!,

@@ -1,4 +1,3 @@
-using ReactiveUI;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -65,7 +64,7 @@ public sealed class UndoHistory<TSnapshot>(
     Func<TSnapshot, TSnapshot, bool> showsSame,
     Func<bool> canRecord,
     Func<TSnapshot, TSnapshot, bool>? savesSame = null,
-    int depth = 50) : ReactiveObject
+    int depth = 50) : ObservableState
     where TSnapshot : class
 {
     // Lists rather than Stacks: capping the depth means dropping from the far end, which a Stack can't do. Each step
@@ -99,7 +98,7 @@ public sealed class UndoHistory<TSnapshot>(
     public bool IsDirty
     {
         get => _isDirty;
-        private set => this.RaiseAndSetIfChanged(ref _isDirty, value);
+        private set => RaiseAndSetIfChanged(ref _isDirty, value);
     }
 
     private bool _isEditPending;
@@ -292,10 +291,10 @@ public sealed class UndoHistory<TSnapshot>(
 
     private void RaiseCanChanged(bool redoToo)
     {
-        this.RaisePropertyChanged(nameof(CanUndo));
+        RaisePropertyChanged(nameof(CanUndo));
         if (redoToo)
         {
-            this.RaisePropertyChanged(nameof(CanRedo));
+            RaisePropertyChanged(nameof(CanRedo));
         }
     }
 }

@@ -1,17 +1,16 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ReactiveUI;
+using System.Reactive;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Configurations;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>A row of the Products list's tree (ProductTree): a folder, or a product in one.</summary>
-public closed class ProductTreeNode : ReactiveObject
+public closed class ProductTreeNode : ObservableState
 {
     public abstract string Title { get; }
 
@@ -37,7 +36,7 @@ public closed class ProductTreeNode : ReactiveObject
     public bool IsBelowTargetMarkup
     {
         get => _isBelowTargetMarkup;
-        set => this.RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
+        set => RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
     }
 }
 
@@ -57,7 +56,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         IsDeletedFolder = isDeletedFolder;
         IsNewFolder = isNewFolder;
         _title = title;
-        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
+        Children.CollectionChanged += (_, _) => RaisePropertyChanged(nameof(Icon));
     }
 
     /// <summary>
@@ -92,7 +91,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
     public ProductStage Stage
     {
         get => _stage;
-        internal set => this.RaiseAndSetIfChanged(ref _stage, value);
+        internal set => RaiseAndSetIfChanged(ref _stage, value);
     }
 
     /// <summary>The user's folder (ProductFolder) it shows, or null for a stage's folder, Deleted, and a new folder's row.</summary>
@@ -170,7 +169,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         if (_productCount != count)
         {
             _productCount = count;
-            this.RaisePropertyChanged(nameof(ProductCount));
+            RaisePropertyChanged(nameof(ProductCount));
         }
     }
 
@@ -183,7 +182,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         if (_title != title)
         {
             _title = title;
-            this.RaisePropertyChanged(nameof(Title));
+            RaisePropertyChanged(nameof(Title));
         }
     }
 
@@ -207,13 +206,13 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         get => _isExpanded;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isExpanded, value);
-            this.RaisePropertyChanged(nameof(Icon));
+            RaiseAndSetIfChanged(ref _isExpanded, value);
+            RaisePropertyChanged(nameof(Icon));
         }
     }
 
     /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
-    internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+    internal void AnnounceExpanded() => RaisePropertyChanged(nameof(IsExpanded));
 
     void ITreeFolder<ProductTreeNode>.ShowCount(int count) => ShowCount(count);
 
@@ -236,8 +235,8 @@ public sealed class ProductLeafNode(Product product) : ProductTreeNode
             if (!ReferenceEquals(_product, value))
             {
                 _product = value;
-                this.RaisePropertyChanged();
-                this.RaisePropertyChanged(nameof(Title));
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(Title));
             }
         }
     }
@@ -315,7 +314,7 @@ public sealed class ProductTree : IDisposable
     public ProductFolderNode DeletedFolder { get; }
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
+    public IObservable<Unit> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The product's row, or null while it isn't listed (a filter hides it, or it isn't loaded).</summary>
     public ProductLeafNode? Find(int productId) => _leaves.Find(productId);

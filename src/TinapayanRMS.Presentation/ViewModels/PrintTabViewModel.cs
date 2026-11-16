@@ -1,13 +1,10 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using Npgsql;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -112,12 +109,7 @@ public sealed class PrintTabViewModel : ViewModelBase
         _folderRepository = folderRepository;
         _savedProducts = savedProducts;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(PrepareAsync));
-
-        this.WhenAnyValue(x => x.SelectedScope)
-            .Skip(1)
-            .Where(_ => !_isPicking)
-            .Subscribe(_ => LoadCommand.Execute().Subscribe());
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(PrepareAsync));
     }
 
     /// <summary>The choices the tab offers: This product, the folder a menu asked for (while there is one), All products.</summary>
@@ -130,9 +122,10 @@ public sealed class PrintTabViewModel : ViewModelBase
         get => _selectedScope;
         set
         {
-            if (value is not null)
+            // Another choice picked prepares its pages; one the tab picks itself (_isPicking) is prepared by whatever picked it.
+            if (value is not null && RaiseAndSetIfChanged(ref _selectedScope, value) && !_isPicking)
             {
-                this.RaiseAndSetIfChanged(ref _selectedScope, value);
+                _ = LoadCommand.ExecuteAsync();
             }
         }
     }
@@ -142,7 +135,7 @@ public sealed class PrintTabViewModel : ViewModelBase
     public ProductPrintSet? PrintSet
     {
         get => _printSet;
-        private set => this.RaiseAndSetIfChanged(ref _printSet, value);
+        private set => RaiseAndSetIfChanged(ref _printSet, value);
     }
 
     private string? _progress;
@@ -150,7 +143,7 @@ public sealed class PrintTabViewModel : ViewModelBase
     public string? Progress
     {
         get => _progress;
-        private set => this.RaiseAndSetIfChanged(ref _progress, value);
+        private set => RaiseAndSetIfChanged(ref _progress, value);
     }
 
     private string? _note;
@@ -158,11 +151,11 @@ public sealed class PrintTabViewModel : ViewModelBase
     public string? Note
     {
         get => _note;
-        private set => this.RaiseAndSetIfChanged(ref _note, value);
+        private set => RaiseAndSetIfChanged(ref _note, value);
     }
 
     /// <summary>Prepares the pages for the choice showing.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
     /// <summary>
     /// A Print on Products: the header's for This product, a folder's or the list's for a set. A folder takes the place of

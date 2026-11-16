@@ -1,15 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -37,7 +36,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     /// <summary>The table's changes as last opened or saved, to tell whether it holds changes that aren't saved.</summary>
     private IReadOnlyList<ScenarioLineKey> _savedLines = [];
 
-    private readonly Subject<RxVoid> _recalculations = new();
+    private readonly Subject<Unit> _recalculations = new();
     private readonly Subject<int> _productOpenRequests = new();
     private readonly HashSet<SimulatedPriceChange> _followed = [];
 
@@ -67,10 +66,10 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         get => _costBasis;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _costBasis, value);
-            this.RaisePropertyChanged(nameof(IsUnbuffered));
-            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
-            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
+            RaiseAndSetIfChanged(ref _costBasis, value);
+            RaisePropertyChanged(nameof(IsUnbuffered));
+            RaisePropertyChanged(nameof(CostBasisButtonLabel));
+            RaisePropertyChanged(nameof(CostBasisButtonTooltip));
         }
     }
 
@@ -86,7 +85,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         : "Shows every product's figures, now and simulated, at the materials' true costs, without their cost buffers, as Print Report and Export to Excel will. Nothing is saved.";
 
     /// <summary>Unbuffered or Buffered, pressed: every product is priced again at the other of the materials' costs, from what's already read.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
+    public ScreenCommand ToggleCostBasisCommand { get; }
 
     /// <summary>The workbook Export to Excel suggests: "Price Simulator", with " (Unbuffered)" while the figures are.</summary>
     public string ExportTitleNow => IsUnbuffered ? $"{ExportTitle} (Unbuffered)" : ExportTitle;
@@ -99,7 +98,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<RawMaterial> Materials
     {
         get => _materials;
-        private set => this.RaiseAndSetIfChanged(ref _materials, value);
+        private set => RaiseAndSetIfChanged(ref _materials, value);
     }
 
     /// <summary>
@@ -144,7 +143,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         get => _onlyAffected;
         set
         {
-            this.RaiseAndSetIfChanged(ref _onlyAffected, value);
+            RaiseAndSetIfChanged(ref _onlyAffected, value);
             ShowRows();
         }
     }
@@ -153,7 +152,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public SimulatedPriceChange? SelectedChange
     {
         get => _selectedChange;
-        set => this.RaiseAndSetIfChanged(ref _selectedChange, value);
+        set => RaiseAndSetIfChanged(ref _selectedChange, value);
     }
 
     /// <summary>The Price Changes table's add row's item.</summary>
@@ -164,7 +163,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<PriceScenario> Scenarios
     {
         get => _scenarios;
-        private set => this.RaiseAndSetIfChanged(ref _scenarios, value);
+        private set => RaiseAndSetIfChanged(ref _scenarios, value);
     }
 
     private PriceScenario? _selectedScenario;
@@ -180,7 +179,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
         {
             if (value is not null && !ReferenceEquals(value, _selectedScenario))
             {
-                OpenScenarioCommand.Execute(value).Subscribe();
+                _ = OpenScenarioCommand.ExecuteAsync(value);
             }
         }
     }
@@ -189,38 +188,38 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     public bool HasUnsavedChanges => !ScenarioLineKey.Of(ScenarioLines()).SequenceEqual(_savedLines);
 
     /// <summary>Opens a saved scenario: its changes replace the table's, after asking when those aren't saved.</summary>
-    public ReactiveCommand<PriceScenario, RxVoid> OpenScenarioCommand { get; }
+    public ScreenCommand<PriceScenario> OpenScenarioCommand { get; }
 
     /// <summary>Saves the table's changes under a name asked for (<see cref="PromptForName"/>), the open scenario's to start with.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> SaveScenarioCommand { get; }
+    public ScreenCommand SaveScenarioCommand { get; }
 
     /// <summary>Deletes the open scenario, after asking. The changes stay in the table.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> DeleteScenarioCommand { get; }
+    public ScreenCommand DeleteScenarioCommand { get; }
 
     /// <summary>Input: what to ask for. Output: the name typed, or null when cancelled. The page asks it in a dialog (Prompts).</summary>
     public Interaction<TextPromptRequest, string?> PromptForName { get; } = new();
 
     /// <summary>Runs whenever the screen is opened (ScreenBase): today's products and prices, the changes kept.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> RemoveChangeCommand { get; }
+    public ScreenCommand RemoveChangeCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> ClearCommand { get; }
+    public ScreenCommand ClearCommand { get; }
 
     /// <summary>The products as the table shows them, and the changes, to an Excel workbook.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ExportCommand { get; }
+    public ScreenCommand ExportCommand { get; }
 
     /// <summary>Each product's recipe and costing at the simulated prices, beside today's, in a print preview (<see cref="ShowPrint"/>).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
+    public ScreenCommand PrintCommand { get; }
 
     /// <summary>
     /// Input: the report's sets, the one to show first first: the selected products, when any are, then all the products
     /// shown. The print preview page shows them (PrintPreviews).
     /// </summary>
-    public Interaction<IReadOnlyList<PrintChoice>, RxVoid> ShowPrint { get; } = new();
+    public Interaction<IReadOnlyList<PrintChoice>, Unit> ShowPrint { get; } = new();
 
     /// <summary>A product row's double-click: asks for the product to be opened, through <see cref="ProductOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+    public ScreenCommand<int> OpenProductCommand { get; }
 
     /// <summary>The products asked to be opened, by id, which the main window opens on Products.</summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
@@ -244,7 +243,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
 
         Changes.CollectionChanged += ChangesChanged;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             _data = await Task.Run(ReadAsync);
             Materials = [.. _data.Materials.Values.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
@@ -266,28 +265,28 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
             Recalculate();
         }));
 
-        RemoveChangeCommand = ReactiveCommand.Create(
+        RemoveChangeCommand = ScreenCommand.Of(
             () => { Changes.Remove(SelectedChange!); },
-            this.WhenAnyValue(x => x.SelectedChange).Select(change => change is not null));
+            () => SelectedChange is not null);
         // Starting over: the table empties, and no scenario is open any more.
-        ClearCommand = ReactiveCommand.Create(() =>
+        ClearCommand = ScreenCommand.Of(() =>
         {
             Changes.Clear();
             ShowOpenScenario(null);
         });
-        OpenScenarioCommand = ReactiveCommand.CreateFromTask<PriceScenario>(OpenScenarioAsync);
-        SaveScenarioCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(SaveScenarioAsync));
-        DeleteScenarioCommand = ReactiveCommand.CreateFromTask(
+        OpenScenarioCommand = new ScreenCommand<PriceScenario>(OpenScenarioAsync);
+        SaveScenarioCommand = new ScreenCommand(() => RunSafelyAsync(SaveScenarioAsync));
+        DeleteScenarioCommand = new ScreenCommand(
             () => RunWithConfirmationAsync($"Delete the scenario {_selectedScenario!.Name}? The price changes stay in the table.", DeleteScenarioAsync),
-            this.WhenAnyValue(x => x.SelectedScenario).Select(scenario => scenario is not null));
-        ExportCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ExportTitleNow));
-        ToggleCostBasisCommand = ReactiveCommand.Create(() =>
+            () => SelectedScenario is not null);
+        ExportCommand = new ScreenCommand(() => ExportToExcelAsync(ExportTitleNow));
+        ToggleCostBasisCommand = ScreenCommand.Of(() =>
         {
             CostBasis = IsUnbuffered ? CostBasis.Buffered : CostBasis.Unbuffered;
             Recalculate();
         });
-        PrintCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
-        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
+        PrintCommand = new ScreenCommand(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintChoices(DateTime.Now))));
+        OpenProductCommand = ScreenCommand.Of<int>(_productOpenRequests.OnNext);
 
         // A newer change cancels a recalculation still running, and one that's refused (a price of 0) says why and keeps
         // the figures it had, until the change is put right.
@@ -295,7 +294,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>Asks for the figures to be worked out again, after the last change is in.</summary>
-    private void Recalculate() => _recalculations.OnNext(RxVoid.Default);
+    private void Recalculate() => _recalculations.OnNext(Unit.Default);
 
     private async Task RecalculateAsync(CancellationToken cancellationToken)
     {
@@ -475,7 +474,7 @@ public sealed class PriceSimulatorViewModel : ViewModelBase, IDisposable
     private void ShowSelectedScenario(PriceScenario? scenario)
     {
         _selectedScenario = scenario;
-        this.RaisePropertyChanged(nameof(SelectedScenario));
+        RaisePropertyChanged(nameof(SelectedScenario));
     }
 
     /// <summary>

@@ -1,7 +1,5 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -25,7 +23,7 @@ public sealed class SignInViewModel : ViewModelBase
     public bool IsLoaded
     {
         get => _isLoaded;
-        private set => this.RaiseAndSetIfChanged(ref _isLoaded, value);
+        private set => RaiseAndSetIfChanged(ref _isLoaded, value);
     }
 
     private bool _isSettingUp;
@@ -33,14 +31,14 @@ public sealed class SignInViewModel : ViewModelBase
     public bool IsSettingUp
     {
         get => _isSettingUp;
-        private set => this.RaiseAndSetIfChanged(ref _isSettingUp, value);
+        private set => RaiseAndSetIfChanged(ref _isSettingUp, value);
     }
 
     private string _password = "";
     public string Password
     {
         get => _password;
-        set => this.RaiseAndSetIfChanged(ref _password, value ?? "");
+        set => RaiseAndSetIfChanged(ref _password, value ?? "");
     }
 
     private string _confirmation = "";
@@ -48,15 +46,15 @@ public sealed class SignInViewModel : ViewModelBase
     public string Confirmation
     {
         get => _confirmation;
-        set => this.RaiseAndSetIfChanged(ref _confirmation, value ?? "");
+        set => RaiseAndSetIfChanged(ref _confirmation, value ?? "");
     }
 
     /// <summary>Reads whether a password is set, clearing what was typed and said last time.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SignInCommand { get; }
+    public ScreenCommand SignInCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SetPasswordCommand { get; }
+    public ScreenCommand SetPasswordCommand { get; }
 
     public SignInViewModel(IAccessSettingsRepository repository, AppLock appLock, DatabaseReadiness readiness, ILogger logger)
         : base(logger)
@@ -65,7 +63,7 @@ public sealed class SignInViewModel : ViewModelBase
         _appLock = appLock;
         _readiness = readiness;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() =>
+        LoadCommand = new ScreenCommand(() =>
         {
             Password = "";
             Confirmation = "";
@@ -79,8 +77,8 @@ public sealed class SignInViewModel : ViewModelBase
             });
         });
 
-        SignInCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(SignInAsync));
-        SetPasswordCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(SetPasswordAsync));
+        SignInCommand = new ScreenCommand(() => RunSafelyAsync(SignInAsync));
+        SetPasswordCommand = new ScreenCommand(() => RunSafelyAsync(SetPasswordAsync));
     }
 
     private async Task SignInAsync()

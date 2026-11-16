@@ -18,7 +18,7 @@ using TinapayanRMS.Maui.WinUI;
 namespace TinapayanRMS.Maui;
 
 /// <summary>
-/// Builds the app: the log, the Syncfusion licence, ReactiveUI, the configuration and the app's services, then the
+/// Builds the app: the log, the Syncfusion licence, the configuration and the app's services, then the
 /// window's own (its file dialogs, its title bar, its close question). The hourly backups (StartupTasks) start once the
 /// app is built and stop as its window closes (BackgroundWork).
 /// </summary>
@@ -74,9 +74,9 @@ public static class MauiProgram
                 formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
 
-        // An exception that ends the process, and a task that failed with nothing awaiting it, are logged from here on: MAUI
-        // logs neither. The window's own thread is hooked by the WinUI app (Platforms/Windows/App), ReactiveUI's by its
-        // bootstrapper.
+        // An exception that ends the process, a task that failed with nothing awaiting it, and a command run nothing awaited
+        // that failed, are logged from here on: MAUI logs none of them. The window's own thread is hooked by the WinUI app
+        // (Platforms/Windows/App).
         UnhandledFailures.Watch();
 
         // Before the web view starts, which reads it from the process's environment. One set already (a check's) wins.
@@ -95,7 +95,6 @@ public static class MauiProgram
         try
         {
             RegisterSyncfusionLicence();
-            ReactiveUIBootstrapper.EnsureInitialized();
 
             var builder = MauiApp.CreateBuilder();
             builder.UseMauiApp<App>();

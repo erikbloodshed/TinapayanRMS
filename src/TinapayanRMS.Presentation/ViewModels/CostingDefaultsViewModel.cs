@@ -1,10 +1,8 @@
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -31,28 +29,28 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public ProductStage EditingNewProductStage
     {
         get => _editingNewProductStage;
-        set => this.RaiseAndSetIfChanged(ref _editingNewProductStage, value);
+        set => RaiseAndSetIfChanged(ref _editingNewProductStage, value);
     }
 
     private decimal _editingLaborPercent;
     public decimal EditingLaborPercent
     {
         get => _editingLaborPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingLaborPercent, value);
+        set => RaiseAndSetIfChanged(ref _editingLaborPercent, value);
     }
 
     private decimal _editingOverheadPercent;
     public decimal EditingOverheadPercent
     {
         get => _editingOverheadPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingOverheadPercent, value);
+        set => RaiseAndSetIfChanged(ref _editingOverheadPercent, value);
     }
 
     private decimal _editingAdministrativePercent;
     public decimal EditingAdministrativePercent
     {
         get => _editingAdministrativePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
+        set => RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
     }
 
     private decimal _editingMarginPercent;
@@ -60,14 +58,14 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public decimal EditingMarginPercent
     {
         get => _editingMarginPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingMarginPercent, value);
+        set => RaiseAndSetIfChanged(ref _editingMarginPercent, value);
     }
 
     private decimal _editingVatPercent;
     public decimal EditingVatPercent
     {
         get => _editingVatPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingVatPercent, value);
+        set => RaiseAndSetIfChanged(ref _editingVatPercent, value);
     }
 
     private decimal _editingWastagePercent = CostingDefaults.DefaultWastagePercent;
@@ -75,7 +73,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public decimal EditingWastagePercent
     {
         get => _editingWastagePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingWastagePercent, value);
+        set => RaiseAndSetIfChanged(ref _editingWastagePercent, value);
     }
 
     private decimal _editingCostBufferPercent = CostingDefaults.DefaultCostBufferPercent;
@@ -83,7 +81,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public decimal EditingCostBufferPercent
     {
         get => _editingCostBufferPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
+        set => RaiseAndSetIfChanged(ref _editingCostBufferPercent, value);
     }
 
     /// <summary>What Price Rounding offers: none, then each step CostingRules.PriceRoundingSteps allows.</summary>
@@ -95,17 +93,17 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
     public PriceRoundingOption EditingPriceRounding
     {
         get => _editingPriceRounding;
-        set => this.RaiseAndSetIfChanged(ref _editingPriceRounding, value);
+        set => RaiseAndSetIfChanged(ref _editingPriceRounding, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+    public ScreenCommand LoadCommand { get; }
+    public ScreenCommand SaveCommand { get; }
 
     /// <summary>
     /// Recalculate Costs: every made and linked ingredient's costs worked out again from what they're made of
     /// (ICostRecalculator), for after the database was changed outside the app. Says how many were out of date.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> RecalculateCostsCommand { get; }
+    public ScreenCommand RecalculateCostsCommand { get; }
 
     public CostingDefaultsViewModel(
         ICostingDefaultsRepository repository, IValidator<CostingParameters> validator, ICostRecalculator costRecalculator, ILogger logger)
@@ -117,7 +115,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
         EditingPriceRounding = PriceRoundingOptions[0];
 
         // What's saved replaces the fields: an unsaved edit doesn't outlive the dialog it was typed in.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             var defaults = await _repository.GetAsync(CancellationToken.None);
             EditingNewProductStage = defaults.NewProductStage;
@@ -131,7 +129,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             EditingPriceRounding = PriceRoundingOptions.FirstOrDefault(o => o.Step == defaults.PriceRoundingStep) ?? PriceRoundingOptions[0];
         }));
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             // The same checks, and messages, as a product's own costing; the VAT and the rest are the repository's to check.
             var validation = _validator.Validate(new CostingParameters
@@ -164,7 +162,7 @@ public sealed class CostingDefaultsViewModel : ViewModelBase
             SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the VAT and the wastage.";
         }));
 
-        RecalculateCostsCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        RecalculateCostsCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var result = await _costRecalculator.RecalculateAllAsync(CancellationToken.None);
             SuccessMessage = RecalculatedText(result);

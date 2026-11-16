@@ -78,19 +78,19 @@
             {
                 @if (ViewModel.UsageForm.IsEditingLinkedUsage)
                 {
-                    <ActionButton Icon="AppIcon.Unlink" Label="Unlink" OnClick="() => Commands.Run(ViewModel.Recipe.UnlinkCommand, usage)" Disabled="!Commands.CanRun(ViewModel.Recipe.UnlinkCommand, usage)"
+                    <ActionButton Icon="AppIcon.Unlink" Label="Unlink" OnClick="() => Commands.Run(ViewModel.Recipe.UnlinkCommand, usage)" Disabled="!ViewModel.Recipe.UnlinkCommand.CanExecute(usage)"
                                   Tooltip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it." />
-                    <ActionButton Icon="AppIcon.Copy" Label="Copy" OnClick="() => Commands.Run(ViewModel.Recipe.MakeCopyCommand, usage)" Disabled="!Commands.CanRun(ViewModel.Recipe.MakeCopyCommand, usage)"
+                    <ActionButton Icon="AppIcon.Copy" Label="Copy" OnClick="() => Commands.Run(ViewModel.Recipe.MakeCopyCommand, usage)" Disabled="!ViewModel.Recipe.MakeCopyCommand.CanExecute(usage)"
                                   Tooltip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
                 }
                 @if (ViewModel.UsageForm.IsEditingOwnedUsage)
                 {
-                    <ActionButton Icon="AppIcon.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(ViewModel.Recipe.MoveToSubAssembliesCommand, usage)" Disabled="!Commands.CanRun(ViewModel.Recipe.MoveToSubAssembliesCommand, usage)"
+                    <ActionButton Icon="AppIcon.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(ViewModel.Recipe.MoveToSubAssembliesCommand, usage)" Disabled="!ViewModel.Recipe.MoveToSubAssembliesCommand.CanExecute(usage)"
                                   Tooltip="Save puts it on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
                 }
                 @if (ViewModel.UsageForm.CanMoveEditingUsageToInHouse)
                 {
-                    <ActionButton Icon="AppIcon.InHouse" Label="Move to In-House" OnClick="() => Commands.Run(ViewModel.Recipe.MoveToInHouseCommand, usage)" Disabled="!Commands.CanRun(ViewModel.Recipe.MoveToInHouseCommand, usage)"
+                    <ActionButton Icon="AppIcon.InHouse" Label="Move to In-House" OnClick="() => Commands.Run(ViewModel.Recipe.MoveToInHouseCommand, usage)" Disabled="!ViewModel.Recipe.MoveToInHouseCommand.CanExecute(usage)"
                                   Tooltip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there at the same piece size." />
                 }
             }

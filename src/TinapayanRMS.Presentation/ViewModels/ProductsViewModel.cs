@@ -5,7 +5,6 @@ using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -318,7 +317,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         private set
         {
             NewProductPlace.FoldersRead(value);
-            this.RaiseAndSetIfChanged(ref _folders, value);
+            RaiseAndSetIfChanged(ref _folders, value);
         }
     }
 
@@ -344,7 +343,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public bool IsEditingComposite
     {
         get => _isEditingComposite;
-        private set => this.RaiseAndSetIfChanged(ref _isEditingComposite, value);
+        private set => RaiseAndSetIfChanged(ref _isEditingComposite, value);
     }
 
     /// <summary>The product showing is made of sub-assemblies, as every product that isn't a composite is.</summary>
@@ -361,14 +360,11 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _selectedProduct;
         set
         {
-            if (EqualityComparer<Product?>.Default.Equals(_selectedProduct, value))
+            if (RaiseAndSetIfChanged(ref _selectedProduct, value))
             {
-                return;
+                SelectionChanged();
+                _picks.OnNext(value);
             }
-
-            this.RaiseAndSetIfChanged(ref _selectedProduct, value);
-            SelectionChanged();
-            _picks.OnNext(value);
         }
     }
 
@@ -406,9 +402,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _areDetailsReady;
         private set
         {
-            if (_areDetailsReady != value)
+            if (RaiseAndSetIfChanged(ref _areDetailsReady, value))
             {
-                this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
                 RequestVersions();
             }
         }
@@ -418,14 +413,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private string _editingDescription = string.Empty;
     public string EditingDescription
     {
         get => _editingDescription;
-        set => this.RaiseAndSetIfChanged(ref _editingDescription, value);
+        set => RaiseAndSetIfChanged(ref _editingDescription, value);
     }
 
     private int _editingQuantityRequired = 1;
@@ -439,9 +434,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _editingQuantityRequired;
         set
         {
-            if (_editingQuantityRequired != value)
+            if (RaiseAndSetIfChanged(ref _editingQuantityRequired, value))
             {
-                this.RaiseAndSetIfChanged(ref _editingQuantityRequired, value);
                 _updates.Run(RecomputeCosts);
             }
         }
@@ -454,9 +448,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _editingCurrentPrice;
         set
         {
-            if (_editingCurrentPrice != value)
+            if (RaiseAndSetIfChanged(ref _editingCurrentPrice, value))
             {
-                this.RaiseAndSetIfChanged(ref _editingCurrentPrice, value);
                 _updates.Run(RecomputeCosts);
             }
         }
@@ -470,7 +463,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public string CategorySearchText
     {
         get => _categorySearchText;
-        set => this.RaiseAndSetIfChanged(ref _categorySearchText, value);
+        set => RaiseAndSetIfChanged(ref _categorySearchText, value);
     }
 
     private ProductCategory? _editingCategory;
@@ -480,9 +473,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _editingCategory;
         set
         {
-            if (!EqualityComparer<ProductCategory?>.Default.Equals(_editingCategory, value))
+            if (RaiseAndSetIfChanged(ref _editingCategory, value))
             {
-                this.RaiseAndSetIfChanged(ref _editingCategory, value);
                 _updates.Run(RecomputeCosts);
             }
         }
@@ -505,7 +497,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public string LastUpdatedText
     {
         get => _lastUpdatedText;
-        private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
+        private set => RaiseAndSetIfChanged(ref _lastUpdatedText, value);
     }
 
     /// <summary>
@@ -518,9 +510,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         get => _selectedDetailsTab;
         set
         {
-            if (_selectedDetailsTab != value)
+            if (RaiseAndSetIfChanged(ref _selectedDetailsTab, value))
             {
-                this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
                 RequestVersions();
             }
         }
@@ -533,7 +524,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public string EditingCloneName
     {
         get => _editingCloneName;
-        set => this.RaiseAndSetIfChanged(ref _editingCloneName, value);
+        set => RaiseAndSetIfChanged(ref _editingCloneName, value);
     }
 
     public ScreenCommand LoadCommand { get; }
@@ -583,14 +574,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
     public ScreenCommand DeleteCommand { get; }
 
-    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
-
-    System.Windows.Input.ICommand IRevertScreen.RevertCommand => RevertCommand;
-
     public ScreenCommand CloneCommand { get; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
@@ -605,13 +588,10 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
     private void RepointSelection(Product? fresh)
     {
-        if (EqualityComparer<Product?>.Default.Equals(_selectedProduct, fresh))
+        if (RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct)))
         {
-            return;
+            SelectionChanged();
         }
-
-        this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
-        SelectionChanged();
     }
 
     /// <summary>
@@ -1798,7 +1778,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             ComponentsTable.IncludesPackaging = snapshot.IncludesComponentPackaging;
             EditingCloneName = snapshot.CloneName;
             _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
-            this.RaisePropertyChanged(nameof(EditingCategory));
+            RaisePropertyChanged(nameof(EditingCategory));
             _updates.Run(RecomputeCosts);
 
             // 3. Costing.

@@ -69,8 +69,8 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         var viewModel = CreateViewModel();
         var reports = CreateReportsViewModel();
 
-        await viewModel.LoadCommand.Execute();
-        await reports.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
+        await reports.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
 
         foreach (var row in viewModel.Products)
@@ -92,7 +92,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
 
         // Its grid draws every row again for each change it hears of: a row at a time, a change held the window over a second.
@@ -117,7 +117,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         var change = viewModel.NewChange();
         viewModel.Changes.Add(change);
@@ -154,7 +154,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         var change = viewModel.NewChange();
         viewModel.Changes.Add(change);
         change.MaterialId = bakery.EggId;
@@ -200,14 +200,14 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.ShowPrint.RegisterHandler(interaction =>
         {
             printed = interaction.Input;
-            interaction.SetOutput(ReactiveUI.Primitives.RxVoid.Default);
+            interaction.SetOutput(System.Reactive.Unit.Default);
         });
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
 
         viewModel.SelectedProducts.Add(Row(viewModel, bakery.PandesalId)!);
         viewModel.SelectedProducts.Add(Row(viewModel, bakery.MeringueId)!);
-        await viewModel.PrintCommand.Execute();
+        await viewModel.PrintCommand.ExecuteAsync();
 
         printed.Should().NotBeNull();
         printed!.Select(c => c.Label).Should().Equal("Selected products (2)", "All products shown (3)");
@@ -234,7 +234,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.Products.Count == 3, () => $"{viewModel.Products.Count} rows");
         IEnumerable<string> Printed() => viewModel.PrintChoices(DateTime.Now).Single().Set.Products.Select(p => p.ProductName);
 
@@ -254,7 +254,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         var change = viewModel.NewChange();
         viewModel.Changes.Add(change);
         change.MaterialId = bakery.EggId;
@@ -271,7 +271,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         var flour = viewModel.NewChange();
         viewModel.Changes.Add(flour);
@@ -317,7 +317,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         AddChange(viewModel, bakery.FlourId, newPrice: 0.06m);
         viewModel.HasUnsavedChanges.Should().BeTrue();
 
-        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Saved the scenario Supplier A.");
@@ -331,7 +331,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         later.Changes.Should().BeEmpty();
         later.SelectedScenario.Should().BeNull();
 
-        await later.OpenScenarioCommand.Execute(later.Scenarios.Single());
+        await later.OpenScenarioCommand.ExecuteAsync(later.Scenarios.Single());
 
         later.SelectedScenario.Should().BeSameAs(later.Scenarios.Single());
         later.Changes.Select(c => (c.MaterialId, c.CurrentPrice, c.ChangePercent, c.NewPrice)).Should().Equal(
@@ -353,20 +353,20 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             return !keep;
         });
         AddChange(viewModel, bakery.EggId, percent: 10m);
-        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
         var scenario = viewModel.Scenarios.Single();
-        viewModel.ClearCommand.Execute().Subscribe();
+        _ = viewModel.ClearCommand.ExecuteAsync();
         viewModel.SelectedScenario.Should().BeNull("Clear All closes the scenario");
         AddChange(viewModel, bakery.FlourId, newPrice: 0.06m);
 
-        await viewModel.OpenScenarioCommand.Execute(scenario);
+        await viewModel.OpenScenarioCommand.ExecuteAsync(scenario);
 
         asked.Should().Be("Open the scenario Supplier A? The price changes in the table aren't saved, and it replaces them.");
         viewModel.Changes.Select(c => c.MaterialId).Should().Equal(bakery.FlourId);
         viewModel.SelectedScenario.Should().BeNull();
 
         keep = false;
-        await viewModel.OpenScenarioCommand.Execute(scenario);
+        await viewModel.OpenScenarioCommand.ExecuteAsync(scenario);
 
         viewModel.Changes.Select(c => (c.MaterialId, c.ChangePercent)).Should().Equal((bakery.EggId, (decimal?)10m));
         viewModel.SelectedScenario.Should().BeSameAs(scenario);
@@ -384,17 +384,17 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             return replace;
         });
         AddChange(viewModel, bakery.EggId, percent: 10m);
-        await viewModel.SaveScenarioCommand.Execute();
-        viewModel.ClearCommand.Execute().Subscribe();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
+        _ = viewModel.ClearCommand.ExecuteAsync();
         AddChange(viewModel, bakery.EggId, percent: 20m);
 
-        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
 
         asked.Should().Be("Replace the price changes saved as supplier a with the ones in the table?");
         (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Single().Lines.Single().ChangePercent.Should().Be(10m);
 
         replace = true;
-        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
 
         var saved = (await new PriceScenarioRepository(CreateDbContextFactory()).GetAllAsync(Cancellation)).Should().ContainSingle().Subject;
         saved.Lines.Single().ChangePercent.Should().Be(20m);
@@ -406,13 +406,13 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
     {
         var bakery = await AddBakeryAsync();
         var viewModel = await CreateLoadedViewModelAsync();
-        await viewModel.SaveScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be(PriceScenarioRules.NoChangesText);
         viewModel.Scenarios.Should().BeEmpty();
 
         AddChange(viewModel, bakery.EggId, percent: 10m);
-        await viewModel.SaveScenarioCommand.Execute();
-        await viewModel.DeleteScenarioCommand.Execute();
+        await viewModel.SaveScenarioCommand.ExecuteAsync();
+        await viewModel.DeleteScenarioCommand.ExecuteAsync();
 
         viewModel.SuccessMessage.Should().Be("Deleted the scenario Supplier A.");
         viewModel.Scenarios.Should().BeEmpty();
@@ -440,7 +440,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         viewModel.CostBasisButtonLabel.Should().Be("Unbuffered");
         viewModel.IsUnbuffered.Should().BeFalse();
 
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         viewModel.IsUnbuffered.Should().BeTrue();
         viewModel.CostBasisButtonLabel.Should().Be("Buffered");
@@ -456,7 +456,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         pandesal.Costs.BaseCost.Should().Be(unbuffered.SimulatedBaseCost);
         pandesal.Simulation!.Now.BaseCost.Should().Be(unbuffered.BaseCost);
 
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         await Settle.UntilAsync(viewModel, () => Row(viewModel, bakery.PandesalId)?.BaseCost == buffered.BaseCost, () => "still unbuffered");
         Row(viewModel, bakery.PandesalId)!.SimulatedBaseCost.Should().Be(buffered.SimulatedBaseCost);
@@ -474,8 +474,8 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             interaction.SetOutput(null);
         });
 
-        await viewModel.ToggleCostBasisCommand.Execute();
-        await viewModel.ExportCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
+        await viewModel.ExportCommand.ExecuteAsync();
 
         asked.Should().Be("Price Simulator (Unbuffered)");
     });
@@ -487,7 +487,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         List<int> opened = [];
         using var subscription = viewModel.ProductOpenRequests.Subscribe(opened.Add);
 
-        await viewModel.OpenProductCommand.Execute(42);
+        await viewModel.OpenProductCommand.ExecuteAsync(42);
 
         opened.Should().Equal(42);
     });
@@ -503,7 +503,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
             interaction.SetOutput(@"C:\Reports\Price Simulator 2026-10-04.xlsx");
         });
 
-        await viewModel.ExportCommand.Execute();
+        await viewModel.ExportCommand.ExecuteAsync();
 
         asked.Should().Be(PriceSimulatorViewModel.ExportTitle);
         viewModel.SuccessMessage.Should().Be(@"Saved Price Simulator 2026-10-04.xlsx in C:\Reports.");
@@ -530,7 +530,7 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
         var viewModel = CreateViewModel();
         viewModel.PromptForName.RegisterHandler(interaction => interaction.SetOutput(name));
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(confirm?.Invoke(interaction.Input) ?? true));
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         return viewModel;
     }
 

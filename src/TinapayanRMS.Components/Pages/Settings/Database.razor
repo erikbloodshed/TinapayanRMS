@@ -61,7 +61,7 @@
 
     [Inject] private IFileDialogs Dialogs { get; set; } = null!;
 
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
     {
@@ -72,7 +72,7 @@
         AddSubscription(ViewModel!.ShowFolder.RegisterHandler(interaction =>
         {
             Dialogs.ShowFolder(interaction.Input);
-            interaction.SetOutput(RxVoid.Default);
+            interaction.SetOutput(System.Reactive.Unit.Default);
         }));
         AddSubscription(ViewModel!.ChooseCopyDestination.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseSaveFileAsync(interaction.Input, BackupKind))));

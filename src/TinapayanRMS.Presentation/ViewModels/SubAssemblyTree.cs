@@ -1,14 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ReactiveUI;
+using System.Reactive;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>A row of the Sub-Assemblies list's tree (SubAssemblyTree): a role's folder, or a sub-assembly in one.</summary>
-public closed class SubAssemblyTreeNode : ReactiveObject
+public closed class SubAssemblyTreeNode : ObservableState
 {
     public abstract string Title { get; }
 
@@ -34,7 +33,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         IsPackaging = role.IsPackaging;
         IsNewFolder = isNewFolder;
         _title = role.Name;
-        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
+        Children.CollectionChanged += (_, _) => RaisePropertyChanged(nameof(Icon));
     }
 
     /// <summary>
@@ -67,7 +66,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         if (_subAssemblyCount != count)
         {
             _subAssemblyCount = count;
-            this.RaisePropertyChanged(nameof(SubAssemblyCount));
+            RaisePropertyChanged(nameof(SubAssemblyCount));
         }
     }
 
@@ -80,7 +79,7 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         if (_title != title)
         {
             _title = title;
-            this.RaisePropertyChanged(nameof(Title));
+            RaisePropertyChanged(nameof(Title));
         }
     }
 
@@ -101,13 +100,13 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
         get => _isExpanded;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isExpanded, value);
-            this.RaisePropertyChanged(nameof(Icon));
+            RaiseAndSetIfChanged(ref _isExpanded, value);
+            RaisePropertyChanged(nameof(Icon));
         }
     }
 
     /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
-    internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+    internal void AnnounceExpanded() => RaisePropertyChanged(nameof(IsExpanded));
 
     void ITreeFolder<SubAssemblyTreeNode>.ShowCount(int count) => ShowCount(count);
 
@@ -129,8 +128,8 @@ public sealed class SubAssemblyLeafNode(StandaloneSubAssemblyRow row) : SubAssem
             if (!ReferenceEquals(_row, value))
             {
                 _row = value;
-                this.RaisePropertyChanged();
-                this.RaisePropertyChanged(nameof(Title));
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(Title));
             }
         }
     }
@@ -178,7 +177,7 @@ public sealed class SubAssemblyTree : IDisposable
     public ObservableCollection<SubAssemblyFolderNode> Roots { get; } = [];
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
+    public IObservable<Unit> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The sub-assembly's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
     public SubAssemblyLeafNode? Find(int subAssemblyId) => _leaves.Find(subAssemblyId);

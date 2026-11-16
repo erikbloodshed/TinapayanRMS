@@ -142,7 +142,7 @@
     /// <summary>The products as the table last showed them, in its sort and with its filters; null until it has.</summary>
     private IReadOnlyList<PriceSimulatorProductRow>? _shown;
 
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
     {
@@ -162,7 +162,7 @@
         {
             Previews.Show(interaction.Input, "price-simulator");
             Navigation.NavigateTo("print/preview");
-            interaction.SetOutput(RxVoid.Default);
+            interaction.SetOutput(System.Reactive.Unit.Default);
         }));
 
         // Export to Excel: the products as shown and the price changes, a sheet each.

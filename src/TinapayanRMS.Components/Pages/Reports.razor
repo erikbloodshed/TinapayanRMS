@@ -226,7 +226,7 @@
     private SfGrid<CostDriverRow>? _costDrivers;
     private SfGrid<MarginErosionRow>? _marginErosion;
 
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
     {

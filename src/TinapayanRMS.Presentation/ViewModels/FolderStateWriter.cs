@@ -1,6 +1,6 @@
+using System.Reactive;
 using System.Reactive.Linq;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -25,7 +25,7 @@ public sealed class FolderStateWriter : IDisposable
 
     /// <param name="expansionChanged">The list's folders opening and closing (the tree's ExpansionChanged).</param>
     /// <param name="readFolders">The folders to keep as the list has them now, such as ProductTree.ClosedFolderKeys.</param>
-    public FolderStateWriter(IViewStateStore viewStateStore, string key, IObservable<RxVoid> expansionChanged, Func<IReadOnlyList<string>> readFolders)
+    public FolderStateWriter(IViewStateStore viewStateStore, string key, IObservable<Unit> expansionChanged, Func<IReadOnlyList<string>> readFolders)
     {
         _viewStateStore = viewStateStore;
         _key = key;

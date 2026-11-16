@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -41,7 +40,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var tab = CreatePrintTab(products);
 
         tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Title.Should().Be("Production › Breads");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco");
@@ -57,11 +56,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var tab = CreatePrintTab(products);
 
         tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Production)));
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf");
 
         tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Innovation)));
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Title.Should().Be("Innovation");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
     });
@@ -73,7 +72,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var tab = CreatePrintTab(await OpenProductsAsync());
 
         tab.Pick(new PrintScope.AllProducts());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Title.Should().Be("All Products");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf", "Test Bread");
@@ -120,7 +119,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         }
 
         await products.LoadCommand.ExecuteAsync();
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Bibingka", "Cheese Roll", "Pan de Coco");
     });
@@ -142,11 +141,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         }
 
         tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Bibingka", "Cheese Roll", "Pan de Coco"], "Bibingka is in Breads › Holiday");
 
         tab.Pick(new PrintScope.AllProducts());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(
             ["Bibingka", "Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf", "Test Bread"], "in its folder's place, not loose at the top of Production");
     });
@@ -161,7 +160,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
 
         // Its products go with it (ProductFolderRepository.MoveAsync).
         await new ProductFolderRepository(CreateDbContextFactory()).MoveAsync(new ProductFolderMove(cakes.Id, ProductStage.Innovation, null), Cancellation);
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Mocha Roll"], "it went to Innovation with it");
         tab.PrintSet.Title.Should().Be("Innovation › Cakes");
@@ -178,13 +177,13 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var tab = CreatePrintTab(products);
 
         tab.Pick(new PrintScope.AllProducts());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Products.Single(p => p.ProductName == "Cheese Roll").Costs.CurrentPrice.Should().BeNull("it isn't saved");
         tab.Note.Should().Be("Cheese Roll has unsaved changes on Products; it's printed as saved.");
 
         tab.Pick(new PrintScope.ThisProduct());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Title.Should().BeNull();
         tab.PrintSet.Products.Single().Costs.CurrentPrice.Should().Be(45m);
@@ -230,11 +229,11 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         var tab = CreatePrintTab(products);
 
         tab.Pick(new PrintScope.ThisProduct());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         var screen = tab.PrintSet!.Products.Single();
 
         tab.Pick(new PrintScope.AllProducts());
-        await tab.LoadCommand.Execute();
+        await tab.LoadCommand.ExecuteAsync();
         var saved = tab.PrintSet!.Products.Single();
 
         saved.CostBasis.Should().Be(CostBasis.Unbuffered);

@@ -1,6 +1,5 @@
 using System.IO;
 using System.Reactive.Linq;
-using ReactiveUI;
 using TinapayanRMS.Infrastructure.Services;
 using ILogger = Serilog.ILogger;
 
@@ -11,9 +10,9 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// error toast, through ScreenBase's Notices) instead of letting a failed action or load fail
 /// silently or crash the app, a SuccessMessage for what an action did (a toast too), and a
 /// Delete-confirmation Interaction the screen answers with a dialog (ConfirmationHost). Introduced in Phase 13 once every screen needed the same things — not before, since
-/// one screen needing them wouldn't have justified a shared base class over ReactiveObject directly.
+/// one screen needing them wouldn't have justified a shared base class.
 /// </summary>
-public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
+public abstract class ViewModelBase : ObservableState, IScreenPartHost
 {
     private readonly ILogger _logger;
 
@@ -26,7 +25,7 @@ public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
     public string? ErrorMessage
     {
         get => _errorMessage;
-        protected set => this.RaiseAndSetIfChanged(ref _errorMessage, value);
+        protected set => RaiseAndSetIfChanged(ref _errorMessage, value);
     }
 
     private string? _successMessage;
@@ -34,7 +33,7 @@ public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
     public string? SuccessMessage
     {
         get => _successMessage;
-        protected set => this.RaiseAndSetIfChanged(ref _successMessage, value);
+        protected set => RaiseAndSetIfChanged(ref _successMessage, value);
     }
 
     /// <summary>
@@ -180,8 +179,8 @@ public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
     /// Runs action, clearing any previous ErrorMessage and SuccessMessage first (which also closes their toasts). Whatever
     /// it throws is shown as ErrorMessage, in the words <see cref="Failure"/> gives it, and logged: a rule's refusal
     /// (BusinessRuleException) as written, what the database refused or couldn't do put plainly, and anything else, a bug,
-    /// as "Something went wrong", logged as an error with its stack. Nothing reaches ReactiveUI, which would take the app
-    /// down with it, and nothing fails silently.
+    /// as "Something went wrong", logged as an error with its stack. Nothing reaches the button or key that ran it, and
+    /// nothing fails silently.
     /// </summary>
     protected Task RunSafelyAsync(Func<Task> action) => Work.RunAsync(async () =>
     {
@@ -207,7 +206,7 @@ public abstract class ViewModelBase : ReactiveObject, IScreenPartHost
 
     /// <summary>
     /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync"/>'s
-    /// actions are, rather than reaching ReactiveUI, and the next load tries again (showing the tab again). Unlike an
+    /// actions are, rather than reaching the screen that ran it, and the next load tries again (showing the tab again). Unlike an
     /// action it leaves the notices alone, since a screen loads after its own Save too and mustn't take that Save's message
     /// away; but a load that succeeds takes away the error a failed one left.
     /// </summary>

@@ -148,13 +148,10 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
         get => _editingPreferredBrand;
         set
         {
-            if (_editingPreferredBrand == value)
+            if (RaiseAndSetIfChanged(ref _editingPreferredBrand, value))
             {
-                return;
+                _updates.Run(UpdatePurchaseCostTexts);
             }
-
-            RaiseAndSetIfChanged(ref _editingPreferredBrand, value);
-            _updates.Run(UpdatePurchaseCostTexts);
         }
     }
 

@@ -1,13 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -33,7 +29,17 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     public SubAssemblyRole? SelectedRole
     {
         get => _selectedRole;
-        set => this.RaiseAndSetIfChanged(ref _selectedRole, value);
+        set
+        {
+            // Not while LoadCommand merges, which only re-points the selection at its refreshed copy.
+            if (RaiseAndSetIfChanged(ref _selectedRole, value) && value is { } role && !IsRefreshing)
+            {
+                _editingId = role.Id;
+                EditingName = role.Name;
+                EditingIsProductOwned = role.IsProductOwned;
+                CanEditProductOwned = !role.IsPackaging;
+            }
+        }
     }
 
     private int _editingId;
@@ -42,7 +48,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private bool _editingIsProductOwned;
@@ -53,7 +59,7 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     public bool EditingIsProductOwned
     {
         get => _editingIsProductOwned;
-        set => this.RaiseAndSetIfChanged(ref _editingIsProductOwned, value);
+        set => RaiseAndSetIfChanged(ref _editingIsProductOwned, value);
     }
 
     private bool _canEditProductOwned = true;
@@ -61,23 +67,22 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     public bool CanEditProductOwned
     {
         get => _canEditProductOwned;
-        private set => this.RaiseAndSetIfChanged(ref _canEditProductOwned, value);
+        private set => RaiseAndSetIfChanged(ref _canEditProductOwned, value);
     }
 
-    private readonly ObservableAsPropertyHelper<string> _formTitle;
     /// <summary>"New Role", or "Edit Role" while one is picked, so it's clear what Save will do.</summary>
-    public string FormTitle => _formTitle.Value;
+    public string FormTitle => SelectedRole is null ? "New Role" : "Edit Role";
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand LoadCommand { get; }
+    public ScreenCommand NewCommand { get; }
+    public ScreenCommand SaveCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     /// <summary>Swaps the picked role with the one above it; off for the first.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> MoveUpCommand { get; }
+    public ScreenCommand MoveUpCommand { get; }
 
     /// <summary>Swaps the picked role with the one below it; off for the last.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> MoveDownCommand { get; }
+    public ScreenCommand MoveDownCommand { get; }
 
     public SubAssemblyRolesViewModel(ISubAssemblyRoleRepository roleRepository, IValidator<SubAssemblyRole> roleValidator, ILogger logger)
         : base(logger)
@@ -89,24 +94,9 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             .SortAndBind(out _roles, SortExpressionComparer<SubAssemblyRole>.Ascending(r => r.SortOrder).ThenByAscending(r => r.Name))
             .Subscribe();
 
-        _formTitle = this.WhenAnyValue(x => x.SelectedRole)
-            .Select(role => role is null ? "New Role" : "Edit Role")
-            .ToProperty(this, x => x.FormTitle, "New Role");
-
-        // Skips while LoadCommand merges, which only re-points the selection at its refreshed copy.
-        this.WhenAnyValue(x => x.SelectedRole)
-            .Where(role => role is not null && !IsRefreshing)
-            .Subscribe(role =>
-            {
-                _editingId = role!.Id;
-                EditingName = role.Name;
-                EditingIsProductOwned = role.IsProductOwned;
-                CanEditProductOwned = !role.IsPackaging;
-            });
-
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             var roles = await _roleRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedRole?.Id;
@@ -118,9 +108,9 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             });
         }));
 
-        NewCommand = ReactiveCommand.Create(ClearForm);
+        NewCommand = ScreenCommand.Of(ClearForm);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var stored = Roles.FirstOrDefault(r => r.Id == _editingId);
             var role = new SubAssemblyRole
@@ -163,24 +153,22 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
             await FinishSaveAsync();
         }));
 
-        DeleteCommand = ReactiveCommand.CreateFromTask(
+        DeleteCommand = new ScreenCommand(
             () => RunWithConfirmationAsync($"Delete the '{SelectedRole!.Name}' role? This can't be undone.", async () =>
             {
                 await _roleRepository.DeleteAsync(SelectedRole!.Id, CancellationToken.None);
                 ClearForm();
-                await LoadCommand.Execute();
+                await LoadCommand.ExecuteAsync();
             }),
-            this.WhenAnyValue(x => x.SelectedRole).Select(role => role is not null));
+            () => SelectedRole is not null);
 
-        // Re-checked when the pick changes and when the list does, since a move or a new role changes what's first and last.
-        var placeChanged = this.WhenAnyValue(x => x.SelectedRole).Select(_ => RxVoid.Default)
-            .Merge(ObservableCollectionEx.ObserveCollectionChanges((INotifyCollectionChanged)_roles).Select(_ => RxVoid.Default));
-        MoveUpCommand = ReactiveCommand.CreateFromTask(
+        // Asked of the pick's place in the list as it is, since a move or a new role changes what's first and last.
+        MoveUpCommand = new ScreenCommand(
             () => MoveAsync(up: true),
-            placeChanged.Select(_ => SelectedRole is { } role && Roles.IndexOf(role) > 0));
-        MoveDownCommand = ReactiveCommand.CreateFromTask(
+            () => SelectedRole is { } role && Roles.IndexOf(role) > 0);
+        MoveDownCommand = new ScreenCommand(
             () => MoveAsync(up: false),
-            placeChanged.Select(_ => SelectedRole is { } role && Roles.IndexOf(role) is var index && index >= 0 && index < Roles.Count - 1));
+            () => SelectedRole is { } role && Roles.IndexOf(role) is var index && index >= 0 && index < Roles.Count - 1);
     }
 
     /// <summary>
@@ -190,13 +178,13 @@ public sealed class SubAssemblyRolesViewModel : ViewModelBase, IDisposable
     private Task MoveAsync(bool up) => RunSafelyAsync(async () =>
     {
         await _roleRepository.MoveAsync(SelectedRole!.Id, up, CancellationToken.None);
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
     });
 
     private async Task FinishSaveAsync()
     {
         ClearForm();
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
     }
 
     /// <summary>What Save asks before turning a role product-owned, or back, saying how many sub-assemblies it moves.</summary>

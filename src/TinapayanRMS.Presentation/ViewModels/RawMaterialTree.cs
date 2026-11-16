@@ -1,16 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ReactiveUI;
+using System.Reactive;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>A row of the Raw Materials list's tree (RawMaterialTree): a folder, or a material in one.</summary>
-public closed class RawMaterialTreeNode : ReactiveObject
+public closed class RawMaterialTreeNode : ObservableState
 {
     public abstract string Title { get; }
 
@@ -41,7 +40,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
         CategoryType = categoryType;
         IsNewFolder = isNewFolder;
         _title = title;
-        Children.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(Icon));
+        Children.CollectionChanged += (_, _) => RaisePropertyChanged(nameof(Icon));
     }
 
     /// <summary>
@@ -100,7 +99,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
         if (_materialCount != count)
         {
             _materialCount = count;
-            this.RaisePropertyChanged(nameof(MaterialCount));
+            RaisePropertyChanged(nameof(MaterialCount));
         }
     }
 
@@ -113,7 +112,7 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
         if (_title != title)
         {
             _title = title;
-            this.RaisePropertyChanged(nameof(Title));
+            RaisePropertyChanged(nameof(Title));
         }
     }
 
@@ -134,13 +133,13 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
         get => _isExpanded;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isExpanded, value);
-            this.RaisePropertyChanged(nameof(Icon));
+            RaiseAndSetIfChanged(ref _isExpanded, value);
+            RaisePropertyChanged(nameof(Icon));
         }
     }
 
     /// <summary>Tells the tree again whether the folder is open (ITreeFolder.AnnounceExpanded says when, and why).</summary>
-    internal void AnnounceExpanded() => this.RaisePropertyChanged(nameof(IsExpanded));
+    internal void AnnounceExpanded() => RaisePropertyChanged(nameof(IsExpanded));
 
     void ITreeFolder<RawMaterialTreeNode>.ShowCount(int count) => ShowCount(count);
 
@@ -162,8 +161,8 @@ public sealed class RawMaterialLeafNode(RawMaterial rawMaterial) : RawMaterialTr
             if (!ReferenceEquals(_rawMaterial, value))
             {
                 _rawMaterial = value;
-                this.RaisePropertyChanged();
-                this.RaisePropertyChanged(nameof(Title));
+                RaisePropertyChanged();
+                RaisePropertyChanged(nameof(Title));
             }
         }
     }
@@ -218,7 +217,7 @@ public sealed class RawMaterialTree : IDisposable
     public IReadOnlyList<RawMaterialFolderNode> Roots { get; }
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for remembering them (ClosedFolderKeys).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _memory.ExpansionChanged;
+    public IObservable<Unit> ExpansionChanged => _memory.ExpansionChanged;
 
     /// <summary>The material's row, or null while it isn't listed (a search hides it, or it isn't loaded).</summary>
     public RawMaterialLeafNode? Find(int rawMaterialId) => _leaves.Find(rawMaterialId);

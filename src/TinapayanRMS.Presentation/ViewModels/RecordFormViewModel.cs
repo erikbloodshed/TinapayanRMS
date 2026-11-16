@@ -1,7 +1,4 @@
 using System.ComponentModel;
-using System.Reactive.Linq;
-using ReactiveUI;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -45,20 +42,9 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
             (before, after) => before.ShowsSameAs(after),
             () => CanRecordUndo,
             (settled, now) => settled.SavesSameAs(now));
-        UndoCommand = ReactiveCommand.Create(() => { TryUndo(); }, HistoryFlag(nameof(UndoHistory<TSnapshot>.CanUndo), h => h.CanUndo));
-        RedoCommand = ReactiveCommand.Create(() => { TryRedo(); }, HistoryFlag(nameof(UndoHistory<TSnapshot>.CanRedo), h => h.CanRedo));
+        UndoCommand = ScreenCommand.Of(() => TryUndo(), () => History.CanUndo);
+        RedoCommand = ScreenCommand.Of(() => TryRedo(), () => History.CanRedo);
     }
-
-    /// <summary>
-    /// One of History's flags as it is and as it changes. Read from its Changed stream rather than WhenAnyValue, whose
-    /// generated code can't stand in for a property of a type built from a type parameter.
-    /// </summary>
-    private IObservable<bool> HistoryFlag(string name, Func<UndoHistory<TSnapshot>, bool> read) =>
-        History.Changed
-            .Where(change => change.PropertyName == name)
-            .Select(_ => read(History))
-            .StartWith(read(History))
-            .DistinctUntilChanged();
 
     /// <summary>
     /// The form's undo and redo stacks. One step is one finished change (a cell edit committed, a row added or taken out,
@@ -69,9 +55,9 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
     /// </summary>
     public UndoHistory<TSnapshot> History { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> UndoCommand { get; }
+    public ScreenCommand UndoCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> RedoCommand { get; }
+    public ScreenCommand RedoCommand { get; }
 
     /// <summary>IUndoRecorder: goes up as another record, or a new one, takes the form's place.</summary>
     public int FormVersion { get; protected set; }
@@ -161,8 +147,8 @@ public abstract class RecordFormViewModel<TSnapshot> : ViewModelBase, IUndoScree
     /// does, and keeps it while it runs. The form holds unsaved changes until its Save is done, so the question about them
     /// waits for it (<see cref="ResolveUnsavedChangesAsync"/>): asked meanwhile (Save, then a tab or the window's Close
     /// before it was back), its Yes started a second Save of the same form beside the first, since SaveCommand.Execute()
-    /// runs whatever CanExecute says. Kept here rather than read from the command's IsExecuting, which ReactiveUI sets on
-    /// its output scheduler, and so not always by the time Execute() returns.
+    /// runs whatever CanExecute says. Kept here rather than read from the command, as the question is asked of the form, not
+    /// of the button that saves it.
     /// </summary>
     protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(save);
 

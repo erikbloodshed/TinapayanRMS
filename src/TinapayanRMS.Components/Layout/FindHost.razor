@@ -81,7 +81,7 @@
     {
         _open = true;
         StateHasChanged();
-        await Find.LoadCommand.Execute();
+        await Find.LoadCommand.ExecuteAsync();
     }
 
     private void Close() => _open = false;

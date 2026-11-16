@@ -4,10 +4,12 @@ using System.Runtime.CompilerServices;
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
-/// Something a screen shows that says when it changes, without ReactiveUI: a part of a screen's ViewModel (Raw Materials'
+/// Something a screen shows that says when it changes: a screen's ViewModel (ViewModelBase), a part of one (Raw Materials'
 /// Cost Setup tab, say), or an editable row. A screen draws itself again whenever its ViewModel or one of its parts says
-/// anything changed (ScreenBase), and reads every value then, so only what's stored says so: a value worked out from others
-/// is a plain getter, and what follows from a change is called by the setter that made it, in the order it has to run.
+/// anything changed (ScreenBase), and reads every value then, so a value worked out from others is a plain getter, and what
+/// follows from a change is called by the setter that made it, in the order it has to run. A worked-out value is said to
+/// have changed only where something follows it by name (a row's table, a tree's row, a test) or where nothing stored
+/// changed with it (UndoHistory.CanUndo).
 /// </summary>
 public abstract class ObservableState : INotifyPropertyChanged
 {
@@ -47,7 +49,7 @@ public abstract class ObservableState : INotifyPropertyChanged
 }
 
 /// <summary>
-/// A row that says when it changes, for the screens' grids and bindings to follow: a lighter base than ReactiveObject for
-/// the editable rows, which need nothing else from it. WhenAnyValue and AutoRefresh follow plain property changes.
+/// A row that says when it changes, for the screens' grids and bindings to follow, and DynamicData's AutoRefresh, which
+/// follows plain property changes.
 /// </summary>
 public abstract class ObservableRow : ObservableState;

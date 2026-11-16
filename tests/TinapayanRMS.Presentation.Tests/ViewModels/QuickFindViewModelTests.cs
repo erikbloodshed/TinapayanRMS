@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -21,7 +20,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         var pandesalId = await AddProductAsync("Ube Cheese Pandesal");
         await AddProductAsync("Cheese Roll");
         var find = Create();
-        await find.LoadCommand.Execute();
+        await find.LoadCommand.ExecuteAsync();
 
         find.Query = "ube";
 
@@ -41,7 +40,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
         var gone = await AddProductAsync("Pandesal Old");
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(gone, Cancellation);
         var find = Create();
-        await find.LoadCommand.Execute();
+        await find.LoadCommand.ExecuteAsync();
 
         find.Query = "pandesal";
 
@@ -72,7 +71,7 @@ public class QuickFindViewModelTests(DatabaseFixture fixture) : PersistenceTestB
     {
         await AddProductAsync("Pandesal");
         var find = Create();
-        await find.LoadCommand.Execute();
+        await find.LoadCommand.ExecuteAsync();
 
         find.ResultsNote.Should().Be("Type part of a name.");
         find.Query = "zzz";

@@ -70,7 +70,7 @@ public class ScreenCommandTests
         command.CanExecute(0).Should().BeFalse();
         command.CanExecute(42).Should().BeTrue();
         ((ICommand)command).CanExecute(42).Should().BeTrue();
-        ((ICommand)command).CanExecute(null).Should().BeFalse("nothing is the default, as ReactiveCommand took it");
+        ((ICommand)command).CanExecute(null).Should().BeFalse("nothing is the default");
         await command.ExecuteAsync(42);
 
         opened.Should().Equal(42);

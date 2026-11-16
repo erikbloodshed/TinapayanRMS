@@ -1,6 +1,6 @@
+using System.Reactive;
 using System.Reactive.Subjects;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -27,7 +27,7 @@ public sealed class FolderMemory : IDisposable
     /// </summary>
     private readonly HashSet<string> _closedAtFirst = new(StringComparer.Ordinal);
 
-    private readonly Subject<RxVoid> _expansionChanged = new();
+    private readonly Subject<Unit> _expansionChanged = new();
 
     /// <param name="closedKeys">The folders left closed last time, as <see cref="ClosedKeys"/> gave them; null for none kept.</param>
     /// <param name="openKeys">The folders left open last time, kept by a list before it kept the closed ones; read only when <paramref name="closedKeys"/> is null.</param>
@@ -54,7 +54,7 @@ public sealed class FolderMemory : IDisposable
     }
 
     /// <summary>A folder opened or closed, by a click, a search or Expand All: for keeping them (<see cref="ClosedKeys"/>).</summary>
-    public IObservable<RxVoid> ExpansionChanged => _expansionChanged;
+    public IObservable<Unit> ExpansionChanged => _expansionChanged;
 
     /// <summary>
     /// Opens <paramref name="folder"/> or closes it, as it was left last time, or as <paramref name="startsOpen"/> says
@@ -71,7 +71,6 @@ public sealed class FolderMemory : IDisposable
             _closedAtFirst.Add(folder.Key);
         }
 
-        // The event itself rather than WhenAnyValue, which needs ReactiveUI set up first: the trees are used without it too.
         // Only a change counts: a tree raises it again, unchanged, for a folder the tree has to be told about
         // (ITreeFolder.AnnounceExpanded).
         var wasExpanded = folder.IsExpanded;
@@ -80,7 +79,7 @@ public sealed class FolderMemory : IDisposable
             if (e.PropertyName == nameof(IListFolder.IsExpanded) && folder.IsExpanded != wasExpanded)
             {
                 wasExpanded = folder.IsExpanded;
-                _expansionChanged.OnNext(RxVoid.Default);
+                _expansionChanged.OnNext(Unit.Default);
             }
         };
         return folder;

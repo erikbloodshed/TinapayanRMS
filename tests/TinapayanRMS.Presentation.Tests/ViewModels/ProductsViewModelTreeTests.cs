@@ -1318,8 +1318,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
     /// <summary>
     /// The moves are offered again once a move or its Undo is done, before a drop or a paste: a command's run is over as
-    /// its ExecuteAsync ends. (Under ReactiveUI it was marked over on its scheduler a moment later, and on GitHub's runner
-    /// a paste after an Undo, and a drop after a drop, did nothing.)
+    /// its ExecuteAsync ends.
     /// </summary>
     private static Task MovesOfferedAgainAsync(ProductsViewModel viewModel)
     {

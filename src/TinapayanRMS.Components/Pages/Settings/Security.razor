@@ -65,7 +65,7 @@
     // Bumped after every try: the password boxes are drawn afresh, empty.
     private int _attempt;
 
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     // A box's text, unless a try is running: see the note at the top.
     private void Typed(Action set)
@@ -86,7 +86,7 @@
         _busy = true;
         try
         {
-            await ViewModel!.ChangePasswordCommand.Execute();
+            await ViewModel!.ChangePasswordCommand.ExecuteAsync();
         }
         finally
         {

@@ -5,7 +5,6 @@ using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -311,7 +310,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public string CategorySearchText
     {
         get => _categorySearchText;
-        set => this.RaiseAndSetIfChanged(ref _categorySearchText, value);
+        set => RaiseAndSetIfChanged(ref _categorySearchText, value);
     }
 
     private RawMaterial? _selectedRawMaterial;
@@ -324,14 +323,11 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _selectedRawMaterial;
         set
         {
-            if (EqualityComparer<RawMaterial?>.Default.Equals(_selectedRawMaterial, value))
+            if (RaiseAndSetIfChanged(ref _selectedRawMaterial, value))
             {
-                return;
+                SelectionChanged();
+                _picks.OnNext(value);
             }
-
-            this.RaiseAndSetIfChanged(ref _selectedRawMaterial, value);
-            SelectionChanged();
-            _picks.OnNext(value);
         }
     }
 
@@ -371,14 +367,14 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public bool AreDetailsReady
     {
         get => _areDetailsReady;
-        private set => this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
+        private set => RaiseAndSetIfChanged(ref _areDetailsReady, value);
     }
 
     private string _editingName = string.Empty;
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private RawMaterialType _editingType = RawMaterialType.Ingredient;
@@ -387,15 +383,12 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _editingType;
         set
         {
-            if (_editingType == value)
+            if (RaiseAndSetIfChanged(ref _editingType, value))
             {
-                return;
+                TypeChanged();
+                TypeEdited(value);
+                BaseUnitEdited();
             }
-
-            this.RaiseAndSetIfChanged(ref _editingType, value);
-            TypeChanged();
-            TypeEdited(value);
-            BaseUnitEdited();
         }
     }
 
@@ -429,7 +422,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public RawMaterialCategory? EditingCategory
     {
         get => _editingCategory;
-        set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
+        set => RaiseAndSetIfChanged(ref _editingCategory, value);
     }
 
     private RawMaterialSource _editingSource = RawMaterialSource.Purchased;
@@ -438,20 +431,17 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _editingSource;
         set
         {
-            if (_editingSource == value)
+            if (RaiseAndSetIfChanged(ref _editingSource, value))
             {
-                return;
-            }
+                SourceChanged();
 
-            this.RaiseAndSetIfChanged(ref _editingSource, value);
-            SourceChanged();
-
-            // A made ingredient starts at 3% weight loss, since a small shrink is the normal
-            // case in the shop, and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
-            // box is empty, so a saved material keeps what it was saved with.
-            if (value == RawMaterialSource.Made)
-            {
-                EditingWeightLossPercent ??= 3m;
+                // A made ingredient starts at 3% weight loss, since a small shrink is the normal
+                // case in the shop, and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
+                // box is empty, so a saved material keeps what it was saved with.
+                if (value == RawMaterialSource.Made)
+                {
+                    EditingWeightLossPercent ??= 3m;
+                }
             }
         }
     }
@@ -473,13 +463,10 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _editingWeightLossPercent;
         set
         {
-            if (_editingWeightLossPercent == value)
+            if (RaiseAndSetIfChanged(ref _editingWeightLossPercent, value))
             {
-                return;
+                _updates.Run(Recipe.RecomputeBomTotals);
             }
-
-            this.RaiseAndSetIfChanged(ref _editingWeightLossPercent, value);
-            _updates.Run(Recipe.RecomputeBomTotals);
         }
     }
 
@@ -488,7 +475,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public RawMaterial? EditingLinkedTo
     {
         get => _editingLinkedTo;
-        set => this.RaiseAndSetIfChanged(ref _editingLinkedTo, value);
+        set => RaiseAndSetIfChanged(ref _editingLinkedTo, value);
     }
 
     private decimal? _editingWeightSharePercent;
@@ -496,7 +483,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public decimal? EditingWeightSharePercent
     {
         get => _editingWeightSharePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingWeightSharePercent, value);
+        set => RaiseAndSetIfChanged(ref _editingWeightSharePercent, value);
     }
 
     private decimal? _editingCostSharePercent;
@@ -504,7 +491,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public decimal? EditingCostSharePercent
     {
         get => _editingCostSharePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingCostSharePercent, value);
+        set => RaiseAndSetIfChanged(ref _editingCostSharePercent, value);
     }
 
     private UnitOfMeasure? _editingBaseUnit;
@@ -514,14 +501,11 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _editingBaseUnit;
         set
         {
-            if (EqualityComparer<UnitOfMeasure?>.Default.Equals(_editingBaseUnit, value))
+            if (RaiseAndSetIfChanged(ref _editingBaseUnit, value))
             {
-                return;
+                BaseUnitChanged();
+                BaseUnitEdited();
             }
-
-            this.RaiseAndSetIfChanged(ref _editingBaseUnit, value);
-            BaseUnitChanged();
-            BaseUnitEdited();
         }
     }
 
@@ -537,7 +521,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public bool CanChangeTypeAndSource
     {
         get => _canChangeTypeAndSource;
-        private set => this.RaiseAndSetIfChanged(ref _canChangeTypeAndSource, value);
+        private set => RaiseAndSetIfChanged(ref _canChangeTypeAndSource, value);
     }
 
     private bool _canChangeBaseUnit = true;
@@ -549,7 +533,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public bool CanChangeBaseUnit
     {
         get => _canChangeBaseUnit;
-        private set => this.RaiseAndSetIfChanged(ref _canChangeBaseUnit, value);
+        private set => RaiseAndSetIfChanged(ref _canChangeBaseUnit, value);
     }
 
     // The form's cards follow its type and source, not the selection, so a new material can be filled in completely before
@@ -586,13 +570,10 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
         get => _selectedDetailsTab;
         set
         {
-            if (_selectedDetailsTab == value)
+            if (RaiseAndSetIfChanged(ref _selectedDetailsTab, value))
             {
-                return;
+                _detailsTabs.OnNext(value);
             }
-
-            this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
-            _detailsTabs.OnNext(value);
         }
     }
 
@@ -617,7 +598,7 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public string LastUpdatedText
     {
         get => _lastUpdatedText;
-        private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
+        private set => RaiseAndSetIfChanged(ref _lastUpdatedText, value);
     }
 
     public ScreenCommand LoadCommand { get; }
@@ -627,12 +608,6 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     public ScreenCommand SaveCommand { get; }
 
     public ScreenCommand DeleteCommand { get; }
-
-    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
 
     /// <summary>
     /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with so it
@@ -675,13 +650,10 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the material picked: shown, not picked again.</summary>
     private void RepointSelection(RawMaterial? fresh)
     {
-        if (EqualityComparer<RawMaterial?>.Default.Equals(_selectedRawMaterial, fresh))
+        if (RaiseAndSetIfChanged(ref _selectedRawMaterial, fresh, nameof(SelectedRawMaterial)))
         {
-            return;
+            SelectionChanged();
         }
-
-        this.RaiseAndSetIfChanged(ref _selectedRawMaterial, fresh, nameof(SelectedRawMaterial));
-        SelectionChanged();
     }
 
     /// <summary>Load: everything the screen shows is read again, and merged in.</summary>
@@ -954,27 +926,24 @@ public sealed class RawMaterialsViewModel : RecordFormViewModel<RawMaterialFormS
     // nothing follows from it but what's worked out from it.
     private void ShowType(RawMaterialType type)
     {
-        if (_editingType != type)
+        if (RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType)))
         {
-            this.RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType));
             TypeChanged();
         }
     }
 
     private void ShowSource(RawMaterialSource source)
     {
-        if (_editingSource != source)
+        if (RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource)))
         {
-            this.RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource));
             SourceChanged();
         }
     }
 
     private void ShowBaseUnit(UnitOfMeasure? unit)
     {
-        if (!EqualityComparer<UnitOfMeasure?>.Default.Equals(_editingBaseUnit, unit))
+        if (RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit)))
         {
-            this.RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit));
             BaseUnitChanged();
         }
     }

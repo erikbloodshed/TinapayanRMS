@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reactive;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +12,6 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -53,10 +53,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     public Task Back_Up_Now_lists_the_new_backup_picked_and_says_so() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.Backups.Should().BeEmpty();
 
-        await viewModel.BackUpNowCommand.Execute();
+        await viewModel.BackUpNowCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         var row = viewModel.Backups.Should().ContainSingle().Subject;
@@ -77,10 +77,10 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         {
             shown = interaction.Input;
             existed = Directory.Exists(interaction.Input);
-            interaction.SetOutput(RxVoid.Default);
+            interaction.SetOutput(Unit.Default);
         });
 
-        await viewModel.OpenFolderCommand.Execute();
+        await viewModel.OpenFolderCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         shown.Should().Be(_folder);
@@ -91,7 +91,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     public Task Copy_to_puts_the_picked_backup_where_the_user_chose() =>UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.BackUpNowCommand.Execute();
+        await viewModel.BackUpNowCommand.ExecuteAsync();
         var destination = Path.Combine(Path.GetTempPath(), $"stick {Guid.NewGuid():N}.backup");
         string? suggested = null;
         viewModel.ChooseCopyDestination.RegisterHandler(interaction =>
@@ -101,7 +101,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         });
         try
         {
-            await viewModel.CopyToCommand.Execute();
+            await viewModel.CopyToCommand.ExecuteAsync();
 
             suggested.Should().Be(Path.GetFileName(viewModel.SelectedBackup!.Backup.Path));
             new FileInfo(destination).Length.Should().Be(viewModel.SelectedBackup.Backup.SizeBytes);
@@ -118,7 +118,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     {
         var viewModel = CreateViewModel();
         await AddCategoryAsync("Breads");
-        await viewModel.BackUpNowCommand.Execute();
+        await viewModel.BackUpNowCommand.ExecuteAsync();
         await AddCategoryAsync("Cakes");
         string? asked = null;
         viewModel.ConfirmDelete.RegisterHandler(interaction =>
@@ -127,7 +127,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
             interaction.SetOutput(false);
         });
 
-        await viewModel.RestoreCommand.Execute();
+        await viewModel.RestoreCommand.ExecuteAsync();
 
         asked.Should().StartWith("Restore the backup taken ").And.Contain("A safety backup of the data as it is now is taken first.");
         (await CategoryNamesAsync()).Should().Equal("Breads", "Cakes");
@@ -140,11 +140,11 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
     {
         var viewModel = CreateViewModel();
         await AddCategoryAsync("Breads");
-        await viewModel.BackUpNowCommand.Execute();
+        await viewModel.BackUpNowCommand.ExecuteAsync();
         await AddCategoryAsync("Cakes");
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
 
-        await viewModel.RestoreCommand.Execute();
+        await viewModel.RestoreCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await CategoryNamesAsync()).Should().Equal("Breads");
@@ -161,7 +161,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
         try
         {
-            await viewModel.RestoreFromFileCommand.Execute();
+            await viewModel.RestoreFromFileCommand.ExecuteAsync();
 
             viewModel.ErrorMessage.Should().Be(BackupRules.NotADatabaseBackupText);
             _backups.List().Should().BeEmpty("the copy brought in to restore goes again");
@@ -179,7 +179,7 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
         var viewModel = CreateViewModel();
         viewModel.ChooseBackupFile.RegisterHandler(interaction => interaction.SetOutput(null));
 
-        await viewModel.RestoreFromFileCommand.Execute();
+        await viewModel.RestoreFromFileCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         _backups.List().Should().BeEmpty();

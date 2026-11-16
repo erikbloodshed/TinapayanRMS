@@ -1,5 +1,4 @@
-﻿using ReactiveUI;
-using TinapayanRMS.ApplicationCore.Rules;
+﻿using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
@@ -11,7 +10,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// screen points <see cref="Ingredient"/> at that ingredient (<see cref="Resolve"/>), which prices the row.
 /// A row can be half filled in: <see cref="CompleteLines"/> checks them all before they're used.
 /// </summary>
-public sealed class IngredientLineRow : ReactiveObject
+public sealed class IngredientLineRow : ObservableRow
 {
     /// <summary>Looks up an ingredient by id as the screen has it; null for a row the screen resolves itself.</summary>
     private readonly Func<int, RawMaterial?>? _findIngredient;
@@ -74,7 +73,7 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _ingredientId;
         set
         {
-            this.RaiseAndSetIfChanged(ref _ingredientId, value);
+            RaiseAndSetIfChanged(ref _ingredientId, value);
             if (_findIngredient is not null)
             {
                 Ingredient = value is { } id ? _findIngredient(id) : null;
@@ -89,9 +88,9 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _ingredient;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _ingredient, value);
-            this.RaisePropertyChanged(nameof(CostPerGram));
-            this.RaisePropertyChanged(nameof(Cost));
+            RaiseAndSetIfChanged(ref _ingredient, value);
+            RaisePropertyChanged(nameof(CostPerGram));
+            RaisePropertyChanged(nameof(Cost));
         }
     }
 
@@ -105,14 +104,11 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _costBasis;
         set
         {
-            if (_costBasis == value)
+            if (RaiseAndSetIfChanged(ref _costBasis, value))
             {
-                return;
+                RaisePropertyChanged(nameof(CostPerGram));
+                RaisePropertyChanged(nameof(Cost));
             }
-
-            this.RaiseAndSetIfChanged(ref _costBasis, value);
-            this.RaisePropertyChanged(nameof(CostPerGram));
-            this.RaisePropertyChanged(nameof(Cost));
         }
     }
 
@@ -137,9 +133,9 @@ public sealed class IngredientLineRow : ReactiveObject
     /// <summary>Grams worked out rather than typed: from a typed percentage, which stays the figure that's kept.</summary>
     private void SetGrams(decimal? value)
     {
-        this.RaiseAndSetIfChanged(ref _grams, value, nameof(Grams));
-        this.RaisePropertyChanged(nameof(Percent));
-        this.RaisePropertyChanged(nameof(Cost));
+        RaiseAndSetIfChanged(ref _grams, value, nameof(Grams));
+        RaisePropertyChanged(nameof(Percent));
+        RaisePropertyChanged(nameof(Cost));
     }
 
     private bool _isFormulaBase;
@@ -159,8 +155,8 @@ public sealed class IngredientLineRow : ReactiveObject
                 AuthoredBakersPercent = null;
             }
 
-            this.RaiseAndSetIfChanged(ref _isFormulaBase, value);
-            this.RaisePropertyChanged(nameof(CanTypeBakersPercent));
+            RaiseAndSetIfChanged(ref _isFormulaBase, value);
+            RaisePropertyChanged(nameof(CanTypeBakersPercent));
         }
     }
 
@@ -171,10 +167,10 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _baseWeight;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _baseWeight, value);
-            this.RaisePropertyChanged(nameof(Percent));
-            this.RaisePropertyChanged(nameof(CanTypeBakersPercent));
-            this.RaisePropertyChanged(nameof(IsPercentTyped));
+            RaiseAndSetIfChanged(ref _baseWeight, value);
+            RaisePropertyChanged(nameof(Percent));
+            RaisePropertyChanged(nameof(CanTypeBakersPercent));
+            RaisePropertyChanged(nameof(IsPercentTyped));
         }
     }
 
@@ -188,8 +184,8 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _batchWeight;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _batchWeight, value);
-            this.RaisePropertyChanged(nameof(Percent));
+            RaiseAndSetIfChanged(ref _batchWeight, value);
+            RaisePropertyChanged(nameof(Percent));
         }
     }
 
@@ -203,8 +199,8 @@ public sealed class IngredientLineRow : ReactiveObject
         get => _authoredBakersPercent;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _authoredBakersPercent, value);
-            this.RaisePropertyChanged(nameof(IsPercentTyped));
+            RaiseAndSetIfChanged(ref _authoredBakersPercent, value);
+            RaisePropertyChanged(nameof(IsPercentTyped));
         }
     }
 
@@ -244,14 +240,14 @@ public sealed class IngredientLineRow : ReactiveObject
             // first, so a line whose typed baker's percentage is waiting for a base to come back doesn't lose it.
             if (!CanTypeBakersPercent)
             {
-                this.RaisePropertyChanged(nameof(Percent));
+                RaisePropertyChanged(nameof(Percent));
                 return;
             }
 
             if (value is not > 0m)
             {
                 AuthoredBakersPercent = null;
-                this.RaisePropertyChanged(nameof(Percent));
+                RaisePropertyChanged(nameof(Percent));
                 return;
             }
 

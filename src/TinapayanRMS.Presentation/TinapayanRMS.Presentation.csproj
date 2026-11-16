@@ -5,7 +5,6 @@
 
   <ItemGroup>
     <PackageReference Include="DynamicData" />
-    <PackageReference Include="ReactiveUI" />
     <PackageReference Include="Serilog" />
     <PackageReference Include="System.Reactive" />
   </ItemGroup>

@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -153,12 +152,12 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var viewModel = CreateReportsViewModel(factory);
 
         factory.Fail = true;
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText, "the load said why, and didn't throw");
 
         factory.Fail = false;
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.ProductCosts.Should().ContainSingle().Which.ProductName.Should().Be("Pandesal");
@@ -169,16 +168,16 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = new CategoriesViewModel(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingName = "Breads";
 
         factory.Fail = true;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");

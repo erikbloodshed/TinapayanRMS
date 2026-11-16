@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -42,13 +41,13 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         var (productId, fillingId) = await AddProductWithSubAssemblyAsync("Cheese Roll", fillingRoleId, [(cheeseId, 100m)]);
         List<string> asked = [];
         var viewModel = CreateViewModel(confirm: true, asked);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == fillingRoleId);
         viewModel.EditingIsProductOwned.Should().BeFalse();
         viewModel.CanEditProductOwned.Should().BeTrue();
 
         viewModel.EditingIsProductOwned = true;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         asked.Should().ContainSingle().Which.Should().StartWith("Make Filling product-owned? 1 sub-assembly on the Sub-Assemblies screen used by just one product");
@@ -62,12 +61,12 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
     {
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var viewModel = CreateViewModel(confirm: false);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == fillingRoleId);
         viewModel.EditingIsProductOwned.Should().BeTrue();
 
         viewModel.EditingIsProductOwned = false;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         (await RoleAsync(fillingRoleId)).IsProductOwned.Should().BeTrue();
     });
@@ -78,11 +77,11 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         List<string> asked = [];
         var viewModel = CreateViewModel(confirm: false, asked);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == fillingRoleId);
 
         viewModel.EditingName = "Stuffing";
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         asked.Should().BeEmpty();
         var saved = await RoleAsync(fillingRoleId);
@@ -94,16 +93,16 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
     {
         var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
         var viewModel = CreateViewModel(confirm: true);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == packagingRoleId);
         viewModel.CanEditProductOwned.Should().BeFalse();
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.CanEditProductOwned.Should().BeTrue();
         viewModel.EditingName = "Glaze";
         viewModel.EditingIsProductOwned = true;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Roles.Single(r => r.Name == "Glaze").IsProductOwned.Should().BeTrue();
@@ -115,11 +114,11 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Filling", sortOrder: 2);
         var viewModel = CreateViewModel(confirm: true);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.EditingName = "Glaze";
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 2), ("Glaze", 3));
@@ -132,27 +131,25 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         var fillingId = await AddRoleAsync("Filling", sortOrder: 2);
         await AddRoleAsync("Topping", sortOrder: 3);
         var viewModel = CreateViewModel(confirm: true);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRole = viewModel.Roles.Single(r => r.Id == fillingId);
         viewModel.EditingName = "Stuffing";
 
-        await viewModel.MoveUpCommand.Execute();
+        await viewModel.MoveUpCommand.ExecuteAsync();
 
         viewModel.Roles.Select(r => r.Name).Should().Equal("Filling", "Dough", "Topping");
         viewModel.SelectedRole!.Id.Should().Be(fillingId);
         viewModel.EditingName.Should().Be("Stuffing", "a move leaves the form's unsaved edits alone");
-        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeFalse("it's first now");
+        viewModel.MoveUpCommand.CanExecute().Should().BeFalse("it's first now");
 
-        // ReactiveUI marks a move finished on its scheduler, after Execute has returned: under load the other move can
-        // still read as not offered for a moment (GitHub's runner, 2026-11-15).
-        await Settle.UntilOfferedAsync(viewModel.MoveDownCommand.CanExecute, "Move Down");
+        viewModel.MoveDownCommand.CanExecute().Should().BeTrue("the move is done");
 
-        await viewModel.MoveDownCommand.Execute();
-        await viewModel.MoveDownCommand.Execute();
+        await viewModel.MoveDownCommand.ExecuteAsync();
+        await viewModel.MoveDownCommand.ExecuteAsync();
 
         viewModel.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
-        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse("it's last now");
-        await Settle.UntilOfferedAsync(viewModel.MoveUpCommand.CanExecute, "Move Up");
+        viewModel.MoveDownCommand.CanExecute().Should().BeFalse("it's last now");
+        viewModel.MoveUpCommand.CanExecute().Should().BeTrue();
     });
 
     [Test]
@@ -161,10 +158,10 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
         await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Filling", sortOrder: 2);
         var viewModel = CreateViewModel(confirm: true);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
-        (await viewModel.MoveUpCommand.CanExecute.FirstAsync()).Should().BeFalse();
-        (await viewModel.MoveDownCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.MoveUpCommand.CanExecute().Should().BeFalse();
+        viewModel.MoveDownCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]

@@ -1,5 +1,3 @@
-using System.Windows.Input;
-
 namespace TinapayanRMS.Presentation.ViewModels;
 
 /// <summary>
@@ -9,11 +7,11 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// </summary>
 public interface IRecordScreen
 {
-    ICommand NewCommand { get; }
+    ScreenCommand NewCommand { get; }
 
-    ICommand SaveCommand { get; }
+    ScreenCommand SaveCommand { get; }
 
-    ICommand DeleteCommand { get; }
+    ScreenCommand DeleteCommand { get; }
 
     /// <summary>
     /// Opens the record <paramref name="text"/> names best (<see cref="RecordNameMatch"/>), as a link from another
@@ -38,7 +36,7 @@ public interface IRecordOpener
 /// <summary>A screen whose form can throw away its changes since the last Save (Products): <c>:revert</c>.</summary>
 public interface IRevertScreen
 {
-    ICommand RevertCommand { get; }
+    ScreenCommand RevertCommand { get; }
 }
 
 /// <summary>

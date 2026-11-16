@@ -29,9 +29,9 @@ public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, Purcha
             Material = found?.Material;
             Unit = found?.Unit;
             Follow();
-            this.RaisePropertyChanged(nameof(UnitName));
-            this.RaisePropertyChanged(nameof(CurrentPrice));
-            this.RaisePropertyChanged();
+            RaisePropertyChanged(nameof(UnitName));
+            RaisePropertyChanged(nameof(CurrentPrice));
+            RaisePropertyChanged();
         }
     }
 
@@ -77,7 +77,7 @@ public sealed class SimulatedPriceChange(Func<int, (RawMaterial Material, Purcha
             Follow();
         }
 
-        this.RaisePropertyChanged(propertyName);
+        RaisePropertyChanged(propertyName);
     }
 
     /// <summary>

@@ -2,12 +2,10 @@ using AwesomeAssertions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
-using ReactiveUI;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using ILogger = Serilog.ILogger;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -41,7 +39,7 @@ public class ScreenBaseUnsavedChangesTests
 
     private sealed class FormScreen : ScreenBase<Form>
     {
-        protected override ReactiveCommand<RxVoid, RxVoid>? LoadCommand => null;
+        protected override ScreenCommand? LoadCommand => null;
 
         public void ShowRecord(string path) => MoveAddressTo(path);
 

@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
-    <PackageReference Include="ReactiveUI.Blazor" />
     <PackageReference Include="Syncfusion.Blazor.Buttons" />
     <PackageReference Include="Syncfusion.Blazor.Charts" />
     <PackageReference Include="Syncfusion.Blazor.DropDowns" />

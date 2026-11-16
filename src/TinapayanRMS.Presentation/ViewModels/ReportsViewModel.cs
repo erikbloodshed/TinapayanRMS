@@ -1,13 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -205,13 +204,10 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         get => _marginErosionSince;
         set
         {
-            if (value.Date == _marginErosionSince)
+            if (RaiseAndSetIfChanged(ref _marginErosionSince, value.Date))
             {
-                return;
+                _marginErosionWanted.OnNext(Unit.Default);
             }
-
-            this.RaiseAndSetIfChanged(ref _marginErosionSince, value.Date);
-            _marginErosionWanted.OnNext(RxVoid.Default);
         }
     }
 
@@ -222,16 +218,16 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         get => _onlyDropped;
         set
         {
-            this.RaiseAndSetIfChanged(ref _onlyDropped, value);
+            RaiseAndSetIfChanged(ref _onlyDropped, value);
             ShowMarginErosion();
         }
     }
 
-    private readonly Subject<RxVoid> _marginErosionWanted = new();
+    private readonly Subject<Unit> _marginErosionWanted = new();
 
-    public ReactiveCommand<RxVoid, RxVoid> ExportCostDriversCommand { get; }
+    public ScreenCommand ExportCostDriversCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> ExportMarginErosionCommand { get; }
+    public ScreenCommand ExportMarginErosionCommand { get; }
 
     private readonly IProductVersionRepository? _versionRepository;
     private readonly IIngredientBomLineRepository? _bomLineRepository;
@@ -251,7 +247,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         get => _onlyBelowTarget;
         set
         {
-            this.RaiseAndSetIfChanged(ref _onlyBelowTarget, value);
+            RaiseAndSetIfChanged(ref _onlyBelowTarget, value);
             ShowCostBuffers();
         }
     }
@@ -260,10 +256,10 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     /// Puts the target buffer back on top of the dearest brand for the materials picked, or for every one shown that's below
     /// target, once it's confirmed (IRawMaterialRepository.ReapplyTargetBuffersAsync, with the cascade a Save runs).
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> ReapplyTargetBuffersCommand { get; }
+    public ScreenCommand ReapplyTargetBuffersCommand { get; }
 
     /// <summary>The Cost Buffers table to an Excel workbook, as its grid shows it.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ExportCostBuffersCommand { get; }
+    public ScreenCommand ExportCostBuffersCommand { get; }
 
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
@@ -275,7 +271,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     public TableRows<RawMaterialPriceSummaryRow> RawMaterialPrices { get; } = [];
 
     /// <summary>A Product Cost Summary row's double-click: asks for the product with this id to be opened, through <see cref="ProductOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+    public ScreenCommand<int> OpenProductCommand { get; }
 
     private readonly Subject<int> _productOpenRequests = new();
 
@@ -286,7 +282,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
     /// <summary>A Raw Materials Price Summary row's double-click: asks for the material with this id to be opened, through <see cref="RawMaterialOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
+    public ScreenCommand<int> OpenRawMaterialCommand { get; }
 
     private readonly Subject<int> _rawMaterialOpenRequests = new();
 
@@ -294,13 +290,13 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
     /// <summary>Runs whenever the screen is opened (ScreenBase), so both summaries are from current prices.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
     /// <summary>The Product Cost Summary to an Excel workbook, as its grid shows it: sorted, filtered and with its shown columns.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ExportProductCostsCommand { get; }
+    public ScreenCommand ExportProductCostsCommand { get; }
 
     /// <summary>The Raw Materials Price Summary to an Excel workbook, as its grid shows it.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ExportRawMaterialPricesCommand { get; }
+    public ScreenCommand ExportRawMaterialPricesCommand { get; }
 
     public ReportsViewModel(
         IRawMaterialPriceHistoryRepository priceHistoryRepository,
@@ -314,8 +310,8 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
     {
         _versionRepository = versionRepository;
         _bomLineRepository = bomLineRepository;
-        ExportCostDriversCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostDriversTitle));
-        ExportMarginErosionCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(MarginErosionTitle));
+        ExportCostDriversCommand = new ScreenCommand(() => ExportToExcelAsync(CostDriversTitle));
+        ExportMarginErosionCommand = new ScreenCommand(() => ExportToExcelAsync(MarginErosionTitle));
 
         // A new day to compare with reads the versions again; a newer one cancels a read still running.
         LoadLatest(_marginErosionWanted, (_, cancellationToken) => LoadMarginErosionAsync(cancellationToken));
@@ -323,15 +319,15 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         _rawMaterialRepository = rawMaterialRepository;
         _productRepository = productRepository;
         _savedProducts = savedProducts;
-        ExportCostBuffersCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(CostBuffersTitle));
-        ReapplyTargetBuffersCommand = ReactiveCommand.CreateFromTask(ReapplyTargetBuffersAsync);
+        ExportCostBuffersCommand = new ScreenCommand(() => ExportToExcelAsync(CostBuffersTitle));
+        ReapplyTargetBuffersCommand = new ScreenCommand(ReapplyTargetBuffersAsync);
 
-        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
-        OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
-        ExportProductCostsCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(ProductCostSummaryTitle));
-        ExportRawMaterialPricesCommand = ReactiveCommand.CreateFromTask(() => ExportToExcelAsync(RawMaterialPriceSummaryTitle));
+        OpenProductCommand = ScreenCommand.Of<int>(_productOpenRequests.OnNext);
+        OpenRawMaterialCommand = ScreenCommand.Of<int>(_rawMaterialOpenRequests.OnNext);
+        ExportProductCostsCommand = new ScreenCommand(() => ExportToExcelAsync(ProductCostSummaryTitle));
+        ExportRawMaterialPricesCommand = new ScreenCommand(() => ExportToExcelAsync(RawMaterialPriceSummaryTitle));
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             // Off the UI thread, as Products and Raw Materials read their details.
             var read = await Task.Run(ReadAsync);
@@ -343,7 +339,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
             ShowCostBuffers();
             CostDrivers.ReplaceWith(read.CostDrivers);
             _priced = read.Priced;
-            _marginErosionWanted.OnNext(RxVoid.Default);
+            _marginErosionWanted.OnNext(Unit.Default);
         }));
     }
 
@@ -455,7 +451,7 @@ public sealed class ReportsViewModel : ViewModelBase, IDisposable
         await RunSafelyAsync(async () =>
         {
             var changed = await Task.Run(() => _rawMaterialRepository.ReapplyTargetBuffersAsync([.. rows.Select(r => r.RawMaterialId)], CancellationToken.None));
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
             SuccessMessage = $"The target buffer is back on {(changed == 1 ? "1 material" : $"{changed} materials")}.";
         });
     }

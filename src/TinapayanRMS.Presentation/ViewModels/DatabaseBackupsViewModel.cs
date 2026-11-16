@@ -1,9 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Reactive.Linq;
-using ReactiveUI;
+using System.Reactive;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -47,24 +45,24 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
     public DatabaseBackupRow? SelectedBackup
     {
         get => _selectedBackup;
-        set => this.RaiseAndSetIfChanged(ref _selectedBackup, value);
+        set => RaiseAndSetIfChanged(ref _selectedBackup, value);
     }
 
     /// <summary>Where the backups are kept, shown so they can be found in File Explorer.</summary>
     public string Folder => _backups.Folder;
 
     /// <summary>Input: the backups folder, to show. The page opens it in File Explorer (IFileDialogs.ShowFolder).</summary>
-    public Interaction<string, RxVoid> ShowFolder { get; } = new();
+    public Interaction<string, Unit> ShowFolder { get; } = new();
 
     /// <summary>Shows the backups folder in File Explorer, making it first if no backup has yet.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> OpenFolderCommand { get; }
+    public ScreenCommand OpenFolderCommand { get; }
 
     private string? _busyText;
     /// <summary>What's being done while a backup, copy or restore runs, which can take a while; null otherwise.</summary>
     public string? BusyText
     {
         get => _busyText;
-        private set => this.RaiseAndSetIfChanged(ref _busyText, value);
+        private set => RaiseAndSetIfChanged(ref _busyText, value);
     }
 
     /// <inheritdoc/>
@@ -76,17 +74,17 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
     public Interaction<string, string?> ChooseCopyDestination { get; } = new();
 
     /// <summary>Output: a backup file to restore, or null when cancelled. The page shows the Open dialog (IFileDialogs).</summary>
-    public Interaction<RxVoid, string?> ChooseBackupFile { get; } = new();
+    public Interaction<Unit, string?> ChooseBackupFile { get; } = new();
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> BackUpNowCommand { get; }
+    public ScreenCommand BackUpNowCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> CopyToCommand { get; }
+    public ScreenCommand CopyToCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> RestoreCommand { get; }
+    public ScreenCommand RestoreCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> RestoreFromFileCommand { get; }
+    public ScreenCommand RestoreFromFileCommand { get; }
 
     /// <summary>What takes the day's backup and copies it to the second folder; null in a screen built without it.</summary>
     private readonly AutomaticBackups? _automatic;
@@ -101,13 +99,13 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
     public string? BackupProblemText => _automatic?.LastBackupProblem;
 
     /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The page shows the folder dialog (IFileDialogs).</summary>
-    public Interaction<RxVoid, string?> ChooseCopyFolder { get; } = new();
+    public Interaction<Unit, string?> ChooseCopyFolder { get; } = new();
 
     /// <summary>Picks the second folder each automatic backup is copied to, then copies the newest automatic one there now.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ChooseCopyFolderCommand { get; }
+    public ScreenCommand ChooseCopyFolderCommand { get; }
 
     /// <summary>Stops copying automatic backups anywhere else. What was copied stays.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ClearCopyFolderCommand { get; }
+    public ScreenCommand ClearCopyFolderCommand { get; }
 
     /// <param name="restartApp">Closes the app and starts it again, after showing the message it's given.</param>
     public DatabaseBackupsViewModel(IDatabaseBackups backups, Action<string> restartApp, ILogger logger, AutomaticBackups? automatic = null)
@@ -117,16 +115,16 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
         _restartApp = restartApp;
         _automatic = automatic;
 
-        OpenFolderCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        OpenFolderCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             _backups.EnsureFolder();
             await ShowFolder.Handle(Folder);
         }));
 
-        ChooseCopyFolderCommand =ReactiveCommand.CreateFromTask(
+        ChooseCopyFolderCommand = new ScreenCommand(
             () => RunSafelyAsync(async () =>
             {
-                var folder = await ChooseCopyFolder.Handle(RxVoid.Default);
+                var folder = await ChooseCopyFolder.Handle(Unit.Default);
                 if (folder is null || _automatic is null)
                 {
                     return;
@@ -144,34 +142,34 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
                     ? $"Each automatic backup is copied to {folder} too{(newest is null ? "." : ", starting with the newest.")}"
                     : null;
             }),
-            Observable.Return(automatic is not null));
-        ClearCopyFolderCommand = ReactiveCommand.Create(
+            () => automatic is not null);
+        ClearCopyFolderCommand = ScreenCommand.Of(
             () =>
             {
                 _automatic!.CopyFolder = null;
                 RaiseAutomaticBackupsChanged();
             },
-            Observable.Return(automatic is not null));
+            () => automatic is not null);
 
-        var idle = this.WhenAnyValue(x => x.BusyText).Select(text => text is null);
-        var idleWithBackup = this.WhenAnyValue(x => x.BusyText, x => x.SelectedBackup, (text, backup) => text is null && backup is not null);
+        bool Idle() => BusyText is null;
+        bool IdleWithBackup() => BusyText is null && SelectedBackup is not null;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             await RefreshAsync(SelectedBackup?.Backup.Path);
             RaiseAutomaticBackupsChanged();
         }));
 
-        BackUpNowCommand = ReactiveCommand.CreateFromTask(
+        BackUpNowCommand = new ScreenCommand(
             () => RunSafelyAsync(() => WhileBusyAsync("Backing up…", async () =>
             {
                 var backup = await Task.Run(() => _backups.BackUpAsync(BackupKind.Manual, CancellationToken.None));
                 await RefreshAsync(backup.Path);
                 SuccessMessage = $"Backed up to {Path.GetFileName(backup.Path)}.";
             })),
-            idle);
+            Idle);
 
-        CopyToCommand = ReactiveCommand.CreateFromTask(
+        CopyToCommand = new ScreenCommand(
             () => RunSafelyAsync(async () =>
             {
                 var backup = SelectedBackup!.Backup;
@@ -184,18 +182,18 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
                 await WhileBusyAsync("Copying…", () => Task.Run(() => _backups.CopyToAsync(backup, destination, CancellationToken.None)));
                 SuccessMessage = $"Copied the backup to {destination}.";
             }),
-            idleWithBackup);
+            IdleWithBackup);
 
-        RestoreCommand = ReactiveCommand.CreateFromTask(
+        RestoreCommand = new ScreenCommand(
             () => RunSafelyAsync(() => RestoreAsync(SelectedBackup!.Backup)),
-            idleWithBackup);
+            IdleWithBackup);
 
         // A file from elsewhere goes into the backups folder first, to be restored from there. If it's then refused or
         // not restored after all, the copy goes again.
-        RestoreFromFileCommand = ReactiveCommand.CreateFromTask(
+        RestoreFromFileCommand = new ScreenCommand(
             () => RunSafelyAsync(async () =>
             {
-                var file = await ChooseBackupFile.Handle(RxVoid.Default);
+                var file = await ChooseBackupFile.Handle(Unit.Default);
                 if (file is null)
                 {
                     return;
@@ -215,7 +213,7 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
                     }
                 }
             }),
-            idle);
+            Idle);
     }
 
     /// <summary>
@@ -305,8 +303,8 @@ public sealed class DatabaseBackupsViewModel : ViewModelBase, IBusyWork
 
     private void RaiseAutomaticBackupsChanged()
     {
-        this.RaisePropertyChanged(nameof(CopyFolderText));
-        this.RaisePropertyChanged(nameof(CopyProblemText));
-        this.RaisePropertyChanged(nameof(BackupProblemText));
+        RaisePropertyChanged(nameof(CopyFolderText));
+        RaisePropertyChanged(nameof(CopyProblemText));
+        RaisePropertyChanged(nameof(BackupProblemText));
     }
 }

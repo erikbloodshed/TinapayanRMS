@@ -1,7 +1,5 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -21,21 +19,21 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
     public bool HasPassword
     {
         get => _hasPassword;
-        private set => this.RaiseAndSetIfChanged(ref _hasPassword, value);
+        private set => RaiseAndSetIfChanged(ref _hasPassword, value);
     }
 
     private string _currentPassword = "";
     public string CurrentPassword
     {
         get => _currentPassword;
-        set => this.RaiseAndSetIfChanged(ref _currentPassword, value ?? "");
+        set => RaiseAndSetIfChanged(ref _currentPassword, value ?? "");
     }
 
     private string _newPassword = "";
     public string NewPassword
     {
         get => _newPassword;
-        set => this.RaiseAndSetIfChanged(ref _newPassword, value ?? "");
+        set => RaiseAndSetIfChanged(ref _newPassword, value ?? "");
     }
 
     private string _confirmation = "";
@@ -43,7 +41,7 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
     public string Confirmation
     {
         get => _confirmation;
-        set => this.RaiseAndSetIfChanged(ref _confirmation, value ?? "");
+        set => RaiseAndSetIfChanged(ref _confirmation, value ?? "");
     }
 
     private int _editingAutoLockMinutes = Domain.Entities.AccessSettings.DefaultAutoLockMinutes;
@@ -51,14 +49,14 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
     public int EditingAutoLockMinutes
     {
         get => _editingAutoLockMinutes;
-        set => this.RaiseAndSetIfChanged(ref _editingAutoLockMinutes, value);
+        set => RaiseAndSetIfChanged(ref _editingAutoLockMinutes, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> ChangePasswordCommand { get; }
+    public ScreenCommand ChangePasswordCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SaveAutoLockCommand { get; }
+    public ScreenCommand SaveAutoLockCommand { get; }
 
     public SecuritySettingsViewModel(IAccessSettingsRepository repository, AppLock appLock, ILogger logger)
         : base(logger)
@@ -66,7 +64,7 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
         _repository = repository;
         _appLock = appLock;
 
-        LoadCommand = ReactiveCommand.CreateFromTask(() =>
+        LoadCommand = new ScreenCommand(() =>
         {
             ClearPasswords();
             return LoadSafelyAsync(async () =>
@@ -77,7 +75,7 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
             });
         });
 
-        ChangePasswordCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        ChangePasswordCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var (current, typed, again) = (CurrentPassword, NewPassword, Confirmation);
             ClearPasswords();
@@ -96,7 +94,7 @@ public sealed class SecuritySettingsViewModel : ViewModelBase
             }
         }));
 
-        SaveAutoLockCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveAutoLockCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var minutes = EditingAutoLockMinutes;
             await _repository.SetAutoLockMinutesAsync(minutes, CancellationToken.None);

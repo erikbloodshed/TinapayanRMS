@@ -1,6 +1,4 @@
 using System.Collections.ObjectModel;
-using ReactiveUI;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -30,16 +28,16 @@ public interface IRecordListHost : IFormPartHost
 /// (<see cref="CommitTreeNameToAsync"/>) and what Esc takes away (<see cref="TreeNameCancelled"/>), and holds its own tree,
 /// menus, moves and folders. Its list card binds to it, and its tree asks it what can be dragged where (IListTreeScreen).
 /// </summary>
-public abstract class RecordList : ReactiveObject
+public abstract class RecordList : ObservableState
 {
     private object? _selectedTreeNode;
     private string? _moveNotice;
 
     protected RecordList()
     {
-        ListNaming = new TreeNaming(ListSelection, () => this.RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
+        ListNaming = new TreeNaming(ListSelection, () => RaisePropertyChanged(nameof(TreeNameEdit)), IsNewRow, CommitTreeNameToAsync, TreeNameCancelled);
         SelectedTreeNodes.CollectionChanged += (_, _) => TreeSelectionChanged();
-        DismissMoveNoticeCommand = ReactiveCommand.Create(() => { MoveNotice = null; });
+        DismissMoveNoticeCommand = ScreenCommand.Of(() => MoveNotice = null);
     }
 
     /// <summary>The rows picked in the list, as the tree and the screen change them (TreeSelection).</summary>
@@ -81,11 +79,11 @@ public abstract class RecordList : ReactiveObject
     public string? MoveNotice
     {
         get => _moveNotice;
-        protected set => this.RaiseAndSetIfChanged(ref _moveNotice, value);
+        protected set => RaiseAndSetIfChanged(ref _moveNotice, value);
     }
 
     /// <summary>Puts the notice of the last move away.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> DismissMoveNoticeCommand { get; }
+    public ScreenCommand DismissMoveNoticeCommand { get; }
 
     /// <summary>
     /// The name typed into the list's box (<see cref="TreeNameEdit"/>), on Enter or on leaving it: what it does is the
@@ -133,14 +131,14 @@ public abstract class RecordList : ReactiveObject
     private void TreeSelectionChanged()
     {
         var first = SelectedTreeNodes.Count > 0 ? SelectedTreeNodes[0] : null;
-        this.RaisePropertyChanged(PickedRecordsProperty);
+        RaisePropertyChanged(PickedRecordsProperty);
         if (ReferenceEquals(first, _selectedTreeNode))
         {
             return;
         }
 
         _selectedTreeNode = first;
-        this.RaisePropertyChanged(nameof(SelectedTreeNode));
+        RaisePropertyChanged(nameof(SelectedTreeNode));
 
         // The tree calls this in the middle of changing SelectedItems: picking the record leads to SyncTreeSelection,
         // which then finds its row first already and leaves the collection alone, as it must mid-change.

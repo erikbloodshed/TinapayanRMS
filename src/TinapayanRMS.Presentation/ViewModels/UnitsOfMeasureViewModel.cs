@@ -1,12 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -29,7 +26,16 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
     public UnitOfMeasure? SelectedUnit
     {
         get => _selectedUnit;
-        set => this.RaiseAndSetIfChanged(ref _selectedUnit, value);
+        set
+        {
+            // Not while LoadCommand merges, which only re-points the selection at its refreshed copy.
+            if (RaiseAndSetIfChanged(ref _selectedUnit, value) && value is { } unit && !IsRefreshing)
+            {
+                _editingId = unit.Id;
+                EditingName = unit.Name;
+                EditingAbbreviation = unit.Abbreviation;
+            }
+        }
     }
 
     private int _editingId;
@@ -38,24 +44,23 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private string _editingAbbreviation = string.Empty;
     public string EditingAbbreviation
     {
         get => _editingAbbreviation;
-        set => this.RaiseAndSetIfChanged(ref _editingAbbreviation, value);
+        set => RaiseAndSetIfChanged(ref _editingAbbreviation, value);
     }
 
-    private readonly ObservableAsPropertyHelper<string> _formTitle;
     /// <summary>"New Unit", or "Edit Unit" while one is picked, so it's clear what Save will do.</summary>
-    public string FormTitle => _formTitle.Value;
+    public string FormTitle => SelectedUnit is null ? "New Unit" : "Edit Unit";
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand LoadCommand { get; }
+    public ScreenCommand NewCommand { get; }
+    public ScreenCommand SaveCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     public UnitsOfMeasureViewModel(IUnitOfMeasureRepository unitOfMeasureRepository, IValidator<UnitOfMeasure> unitOfMeasureValidator, ILogger logger)
         : base(logger)
@@ -67,23 +72,9 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
             .SortAndBind(out _units, SortExpressionComparer<UnitOfMeasure>.Ascending(u => u.Name))
             .Subscribe();
 
-        _formTitle = this.WhenAnyValue(x => x.SelectedUnit)
-            .Select(unit => unit is null ? "New Unit" : "Edit Unit")
-            .ToProperty(this, x => x.FormTitle, "New Unit");
-
-        // Skips while LoadCommand merges, which only re-points the selection at its refreshed copy.
-        this.WhenAnyValue(x => x.SelectedUnit)
-            .Where(unit => unit is not null && !IsRefreshing)
-            .Subscribe(unit =>
-            {
-                _editingId = unit!.Id;
-                EditingName = unit.Name;
-                EditingAbbreviation = unit.Abbreviation;
-            });
-
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             var units = await _unitOfMeasureRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedUnit?.Id;
@@ -95,9 +86,9 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
             });
         }));
 
-        NewCommand = ReactiveCommand.Create(ClearForm);
+        NewCommand = ScreenCommand.Of(ClearForm);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var unit = new UnitOfMeasure
             {
@@ -123,17 +114,17 @@ public sealed class UnitsOfMeasureViewModel : ViewModelBase, IDisposable
             }
 
             ClearForm();
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
         }));
 
-        DeleteCommand = ReactiveCommand.CreateFromTask(
+        DeleteCommand = new ScreenCommand(
             () => RunWithConfirmationAsync($"Delete '{SelectedUnit!.Name}'? This can't be undone.", async () =>
             {
                 await _unitOfMeasureRepository.DeleteAsync(SelectedUnit!.Id, CancellationToken.None);
                 ClearForm();
-                await LoadCommand.Execute();
+                await LoadCommand.ExecuteAsync();
             }),
-            this.WhenAnyValue(x => x.SelectedUnit).Select(unit => unit is not null));
+            () => SelectedUnit is not null);
     }
 
     private void ClearForm()

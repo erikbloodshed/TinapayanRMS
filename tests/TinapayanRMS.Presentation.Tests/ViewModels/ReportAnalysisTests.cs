@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -110,7 +109,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         var viewModel = CreateReports();
         viewModel.MarginErosionSince = monthAgo;
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
 
         var costs = viewModel.ProductCosts.Should().ContainSingle().Subject;
@@ -126,7 +125,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
         viewModel.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost);
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1 && viewModel.MarginErosion[0].BaseCostNow > costs.BaseCost, () => "not read again");
         viewModel.MarginErosion[0].BaseCostNow.Should().Be(viewModel.ProductCosts.Single().BaseCost);
     });

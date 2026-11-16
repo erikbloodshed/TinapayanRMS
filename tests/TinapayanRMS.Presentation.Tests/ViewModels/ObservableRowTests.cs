@@ -4,7 +4,7 @@ using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
-/// <summary>What a row's grid and the screen's WhenAnyValue and AutoRefresh depend on, as ReactiveObject gave them.</summary>
+/// <summary>What a row's grid, the screen's redraws and DynamicData's AutoRefresh depend on.</summary>
 public class ObservableRowTests
 {
     private readonly Row _row = new();

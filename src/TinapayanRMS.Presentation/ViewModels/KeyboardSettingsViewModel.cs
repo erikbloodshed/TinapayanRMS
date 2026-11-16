@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -7,7 +6,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// Settings' Keyboard tab: whether the Vim keys are on. Kept for the Windows user on this computer, with the
 /// lists' open folders (IViewStateStore), not in the database: it's how one person likes to work, not the bakeshop's data.
 /// </summary>
-public sealed class KeyboardSettingsViewModel : ReactiveObject
+public sealed class KeyboardSettingsViewModel : ObservableState
 {
     /// <summary>The view-state key the setting is kept under: <c>["on"]</c> when the keys are on.</summary>
     public const string VimKeysKey = "vim-keys";
@@ -33,14 +32,11 @@ public sealed class KeyboardSettingsViewModel : ReactiveObject
         get => _isVimKeysOn;
         set
         {
-            if (_isVimKeysOn == value)
+            if (RaiseAndSetIfChanged(ref _isVimKeysOn, value))
             {
-                return;
+                _viewState.WriteList(VimKeysKey, value ? ["on"] : []);
+                _applyVimKeys(value);
             }
-
-            this.RaiseAndSetIfChanged(ref _isVimKeysOn, value);
-            _viewState.WriteList(VimKeysKey, value ? ["on"] : []);
-            _applyVimKeys(value);
         }
     }
 }

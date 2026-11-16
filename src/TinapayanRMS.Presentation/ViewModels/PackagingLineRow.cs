@@ -83,17 +83,14 @@ public sealed class PackagingLineRow : ObservableRow
         get => _costBasis;
         set
         {
-            if (_costBasis == value)
+            if (RaiseAndSetIfChanged(ref _costBasis, value))
             {
-                return;
+                var key = _unitKey;
+                UnitOptions = OptionsFor(_packagingMaterial, value);
+                UnitKey = KeptKey(key, _unitOptions);
+                RaisePropertyChanged(nameof(UnitCost));
+                RaisePropertyChanged(nameof(CostPerUnit));
             }
-
-            this.RaiseAndSetIfChanged(ref _costBasis, value);
-            var key = _unitKey;
-            UnitOptions = OptionsFor(_packagingMaterial, value);
-            UnitKey = KeptKey(key, _unitOptions);
-            this.RaisePropertyChanged(nameof(UnitCost));
-            this.RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
@@ -103,7 +100,7 @@ public sealed class PackagingLineRow : ObservableRow
         get => _packagingMaterialId;
         set
         {
-            this.RaiseAndSetIfChanged(ref _packagingMaterialId, value);
+            RaiseAndSetIfChanged(ref _packagingMaterialId, value);
             if (_findMaterial is not null)
             {
                 PackagingMaterial = value is { } id ? _findMaterial(id) : null;
@@ -118,12 +115,12 @@ public sealed class PackagingLineRow : ObservableRow
         get => _packagingMaterial;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _packagingMaterial, value);
+            RaiseAndSetIfChanged(ref _packagingMaterial, value);
             UnitOptions = OptionsFor(value, _costBasis);
-            this.RaisePropertyChanged(nameof(UnitCost));
-            this.RaisePropertyChanged(nameof(BaseUnitAbbreviation));
-            this.RaisePropertyChanged(nameof(BaseQty));
-            this.RaisePropertyChanged(nameof(CostPerUnit));
+            RaisePropertyChanged(nameof(UnitCost));
+            RaisePropertyChanged(nameof(BaseUnitAbbreviation));
+            RaisePropertyChanged(nameof(BaseQty));
+            RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
@@ -138,7 +135,7 @@ public sealed class PackagingLineRow : ObservableRow
         get => _unitOptions;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _unitOptions, value);
+            RaiseAndSetIfChanged(ref _unitOptions, value);
 
             // A unit the new material doesn't have falls back to its base unit, so the row is never in a unit
             // that isn't the material's — which the repository would refuse at Save.
@@ -158,10 +155,10 @@ public sealed class PackagingLineRow : ObservableRow
         get => _unitKey;
         set
         {
-            this.RaiseAndSetIfChanged(ref _unitKey, KeptKey(value, _unitOptions));
-            this.RaisePropertyChanged(nameof(BaseQty));
-            this.RaisePropertyChanged(nameof(UnitCost));
-            this.RaisePropertyChanged(nameof(CostPerUnit));
+            RaiseAndSetIfChanged(ref _unitKey, KeptKey(value, _unitOptions));
+            RaisePropertyChanged(nameof(BaseQty));
+            RaisePropertyChanged(nameof(UnitCost));
+            RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 
@@ -178,9 +175,9 @@ public sealed class PackagingLineRow : ObservableRow
         get => _qtyPerUnit;
         set
         {
-            this.RaiseAndSetIfChanged(ref _qtyPerUnit, value);
-            this.RaisePropertyChanged(nameof(BaseQty));
-            this.RaisePropertyChanged(nameof(CostPerUnit));
+            RaiseAndSetIfChanged(ref _qtyPerUnit, value);
+            RaisePropertyChanged(nameof(BaseQty));
+            RaisePropertyChanged(nameof(CostPerUnit));
         }
     }
 

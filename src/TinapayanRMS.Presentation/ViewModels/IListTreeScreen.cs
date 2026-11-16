@@ -1,7 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using ReactiveUI;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -24,7 +22,7 @@ public interface IListTreeScreen : INotifyPropertyChanged
     string? MoveNotice { get; }
 
     /// <summary>Puts the notice of the last move away.</summary>
-    ReactiveCommand<RxVoid, RxVoid> DismissMoveNoticeCommand { get; }
+    ScreenCommand DismissMoveNoticeCommand { get; }
 
     /// <summary>The menu for a row, or with null for the list's empty space; empty when there's nothing to offer.</summary>
     IReadOnlyList<TreeMenuItem> TreeMenuFor(object? node);

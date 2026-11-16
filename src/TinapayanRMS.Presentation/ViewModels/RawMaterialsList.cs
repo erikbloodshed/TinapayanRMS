@@ -4,7 +4,6 @@ using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -178,15 +177,12 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         get => _searchText;
         set
         {
-            if (_searchText == value)
+            if (RaiseAndSetIfChanged(ref _searchText, value))
             {
-                return;
+                _searches.OnNext(value);
+                CancelTreeName();
+                RefreshTree();
             }
-
-            this.RaiseAndSetIfChanged(ref _searchText, value);
-            _searches.OnNext(value);
-            CancelTreeName();
-            RefreshTree();
         }
     }
 

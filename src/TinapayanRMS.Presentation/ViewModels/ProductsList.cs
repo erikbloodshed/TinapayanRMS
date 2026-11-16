@@ -3,7 +3,6 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -218,13 +217,10 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         get => _searchText;
         set
         {
-            if (_searchText == value)
+            if (RaiseAndSetIfChanged(ref _searchText, value))
             {
-                return;
+                FilterChanged();
             }
-
-            this.RaiseAndSetIfChanged(ref _searchText, value);
-            FilterChanged();
         }
     }
 
@@ -239,13 +235,10 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         set
         {
             var filter = value ?? new ProductCategoryFilter.All();
-            if (EqualityComparer<ProductCategoryFilter>.Default.Equals(_categoryFilter, filter))
+            if (RaiseAndSetIfChanged(ref _categoryFilter, filter))
             {
-                return;
+                FilterChanged();
             }
-
-            this.RaiseAndSetIfChanged(ref _categoryFilter, filter);
-            FilterChanged();
         }
     }
 
@@ -275,7 +268,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     public IReadOnlyList<ProductTreeNode> CutNodes
     {
         get => _cutNodes;
-        private set => this.RaiseAndSetIfChanged(ref _cutNodes, value);
+        private set => RaiseAndSetIfChanged(ref _cutNodes, value);
     }
 
     /// <summary>

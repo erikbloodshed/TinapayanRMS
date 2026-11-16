@@ -1,14 +1,11 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Subjects;
 using AwesomeAssertions;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
-using ReactiveUI;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using ILogger = Serilog.ILogger;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -25,23 +22,30 @@ public class ScreenBaseTests
         public Lines(ILogger logger)
             : base(logger)
         {
-            SaveCommand = ReactiveCommand.Create(() => { }, CanSave);
+            SaveCommand = ScreenCommand.Of(() => { }, () => _canSave);
             PrintCommand = new ScreenCommand(() => PrintDone.Task);
         }
 
         public string Name
         {
             get => _name;
-            set => this.RaiseAndSetIfChanged(ref _name, value);
+            set => RaiseAndSetIfChanged(ref _name, value);
         }
 
         public ObservableCollection<int> Rows { get; } = [];
 
         public TableRows<int> Table { get; } = [];
 
-        public BehaviorSubject<bool> CanSave { get; } = new(false);
+        private bool _canSave;
 
-        public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+        /// <summary>Lets Save run, saying so through the command alone, as a command whose test changed does.</summary>
+        public void AllowSave()
+        {
+            _canSave = true;
+            SaveCommand.Refresh();
+        }
+
+        public ScreenCommand SaveCommand { get; }
 
         /// <summary>What ends a Print run.</summary>
         public TaskCompletionSource PrintDone { get; } = new();
@@ -61,7 +65,7 @@ public class ScreenBaseTests
     {
         public int Drawings { get; private set; }
 
-        protected override ReactiveCommand<RxVoid, RxVoid>? LoadCommand => null;
+        protected override ScreenCommand? LoadCommand => null;
 
         public Task DrawNowAsync() => RedrawNowAsync();
 
@@ -69,16 +73,16 @@ public class ScreenBaseTests
         {
             Drawings++;
             builder.OpenElement(0, "p");
-            builder.AddContent(1, $"{ViewModel!.Name}|{ViewModel.Rows.Count}|{CanRun(ViewModel.SaveCommand)}");
+            builder.AddContent(1, $"{ViewModel!.Name}|{ViewModel.Rows.Count}|{ViewModel.SaveCommand.CanExecute()}");
             builder.CloseElement();
             builder.OpenElement(2, "span");
             builder.AddContent(3, string.Join(",", ViewModel.Table));
             builder.CloseElement();
             builder.OpenElement(4, "em");
-            builder.AddContent(5, CanRun(ViewModel.Part.RemoveCommand));
+            builder.AddContent(5, ViewModel.Part.RemoveCommand.CanExecute());
             builder.CloseElement();
             builder.OpenElement(6, "b");
-            builder.AddContent(7, CanRun(ViewModel.PrintCommand));
+            builder.AddContent(7, ViewModel.PrintCommand.CanExecute());
             builder.CloseElement();
         }
     }
@@ -98,7 +102,7 @@ public class ScreenBaseTests
     /// <summary>A screen that shows only its ViewModel's rows.</summary>
     private sealed class WorkedOutScreen : ScreenBase<WorkedOut>
     {
-        protected override ReactiveCommand<RxVoid, RxVoid>? LoadCommand => null;
+        protected override ScreenCommand? LoadCommand => null;
 
         protected override void BuildRenderTree(RenderTreeBuilder builder)
         {
@@ -127,7 +131,7 @@ public class ScreenBaseTests
         context.Services.AddScoped<Lines>();
         var screen = context.Render<LinesScreen>();
 
-        // The screen's first drawings settle (ReactiveUI's base draws it once more as it starts watching).
+        // The screen's first drawings settle.
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|False"));
         return (screen, context.Services.GetRequiredService<Lines>());
     }
@@ -182,7 +186,7 @@ public class ScreenBaseTests
         await using var context = AppServices.NewContext();
         var (screen, viewModel) = Render(context);
 
-        await screen.InvokeAsync(() => viewModel.CanSave.OnNext(true));
+        await screen.InvokeAsync(viewModel.AllowSave);
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|True"));
     }
@@ -211,7 +215,7 @@ public class ScreenBaseTests
         await using var context = AppServices.NewContext();
         var (screen, viewModel) = Render(context);
 
-        await screen.InvokeAsync(() => viewModel.Part.CanRemove.OnNext(true));
+        await screen.InvokeAsync(viewModel.Part.AllowRemove);
 
         screen.WaitForAssertion(() => screen.Find("em").TextContent.Should().Be("True"));
     }
@@ -269,8 +273,8 @@ public class ScreenBaseTests
             viewModel.Name = "Cheese Roll";
             viewModel.Rows.Add(1);
             viewModel.Table.ReplaceWith([1]);
-            viewModel.CanSave.OnNext(true);
-            viewModel.Part.CanRemove.OnNext(true);
+            viewModel.AllowSave();
+            viewModel.Part.AllowRemove();
         });
 
         left.IsCollected().Should().BeTrue("the ViewModel outlives every visit to its screen, and must hold on to none of them");

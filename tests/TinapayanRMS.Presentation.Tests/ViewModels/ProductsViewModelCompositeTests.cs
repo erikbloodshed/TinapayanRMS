@@ -1,7 +1,5 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using ReactiveUI;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -13,7 +11,6 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -300,13 +297,13 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
         CanSave(viewModel).Should().BeTrue();
 
-        await viewModel.UndoCommand.Execute();
+        await viewModel.UndoCommand.ExecuteAsync();
 
         viewModel.ComponentsTable.ComponentEdits.Select(r => (r.ComponentProductId, r.Quantity)).Should().Equal((ensaymadaId, 6), (cheeseRollId, 4));
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m);
         CanSave(viewModel).Should().BeFalse();
 
-        await viewModel.RedoCommand.Execute();
+        await viewModel.RedoCommand.ExecuteAsync();
 
         viewModel.ComponentsTable.ComponentEdits[0].Quantity.Should().Be(8);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(40m);
@@ -315,7 +312,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentsTable.SelectedComponentEdit = viewModel.ComponentsTable.ComponentEdits[1];
         await viewModel.ComponentsTable.RemoveLineCommand.ExecuteAsync();
         viewModel.ComponentsTable.ComponentEdits.Should().ContainSingle();
-        await viewModel.UndoCommand.Execute();
+        await viewModel.UndoCommand.ExecuteAsync();
         viewModel.ComponentsTable.ComponentEdits.Should().HaveCount(2);
     });
 
@@ -358,7 +355,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentsTable.Caption.Should().Contain("and its own packaging");
         CanSave(viewModel).Should().BeTrue();
 
-        await viewModel.UndoCommand.Execute();
+        await viewModel.UndoCommand.ExecuteAsync();
 
         viewModel.ComponentsTable.IncludesPackaging.Should().BeFalse();
         viewModel.Costing.Costs.Packaging.Should().Be(0m);
@@ -366,7 +363,7 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
         viewModel.ComponentsTable.ComponentsCost.Should().Be(35m);
         CanSave(viewModel).Should().BeFalse();
 
-        await viewModel.RedoCommand.Execute();
+        await viewModel.RedoCommand.ExecuteAsync();
         viewModel.Costing.Costs.Packaging.Should().Be(9m);
 
         await viewModel.SaveCommand.ExecuteAsync();

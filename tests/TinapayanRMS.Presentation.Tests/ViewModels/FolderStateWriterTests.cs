@@ -1,9 +1,9 @@
 using System.Diagnostics;
+using System.Reactive;
 using System.Reactive.Subjects;
 using AwesomeAssertions;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -19,7 +19,7 @@ public class FolderStateWriterTests
     public void Dispose_NothingOpenedOrClosed_WritesNothing()
     {
         var store = new InMemoryViewStateStore();
-        using var changed = new Subject<RxVoid>();
+        using var changed = new Subject<Unit>();
         List<string> open = ["Production"];
 
         new FolderStateWriter(store, Key, changed, () => [.. open]).Dispose();
@@ -31,12 +31,12 @@ public class FolderStateWriterTests
     public void Dispose_AChangeStillSettling_WritesItNow()
     {
         var store = new InMemoryViewStateStore();
-        using var changed = new Subject<RxVoid>();
+        using var changed = new Subject<Unit>();
         List<string> open = ["Production"];
         var writer = new FolderStateWriter(store, Key, changed, () => [.. open]);
 
         open.Add("Production/12");
-        changed.OnNext(RxVoid.Default);
+        changed.OnNext(Unit.Default);
         writer.Dispose();
 
         store.ReadList(Key).Should().Equal("Production", "Production/12");
@@ -47,7 +47,7 @@ public class FolderStateWriterTests
     public Task ExpansionChanged_SettledChanges_WritesTheLastOnceAfterThem() => UiThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
-        using var changed = new Subject<RxVoid>();
+        using var changed = new Subject<Unit>();
         List<string> open = [];
         using var writer = new FolderStateWriter(store, Key, changed, () => [.. open]);
 
@@ -55,7 +55,7 @@ public class FolderStateWriterTests
         foreach (var folder in (string[])["Production", "Production/12", "Production/Uncategorized"])
         {
             open.Add(folder);
-            changed.OnNext(RxVoid.Default);
+            changed.OnNext(Unit.Default);
         }
 
         await WaitForAsync(() => store.WriteCount > 0);
@@ -67,15 +67,15 @@ public class FolderStateWriterTests
     public Task ExpansionChanged_BackAsItWas_WritesNothing() => UiThread.RunAsync(async () =>
     {
         var store = new InMemoryViewStateStore();
-        using var changed = new Subject<RxVoid>();
+        using var changed = new Subject<Unit>();
         List<string> open = ["Production"];
         var writer = new FolderStateWriter(store, Key, changed, () => [.. open]);
 
         // Closed and opened again before it settled: the same folders as were read.
         open.Clear();
-        changed.OnNext(RxVoid.Default);
+        changed.OnNext(Unit.Default);
         open.Add("Production");
-        changed.OnNext(RxVoid.Default);
+        changed.OnNext(Unit.Default);
         await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current!.Execution.CancellationToken);
         writer.Dispose();
 

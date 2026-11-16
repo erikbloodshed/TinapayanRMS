@@ -1,10 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -38,11 +36,11 @@ public sealed class QuickFindViewModel : ViewModelBase
         _rawMaterials = rawMaterials;
         _subAssemblies = subAssemblies;
         _products = products;
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(LoadAsync));
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
     }
 
     /// <summary>Reads every record's name, then lists what <see cref="Query"/> matches.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
     private string _query = string.Empty;
 
@@ -52,7 +50,7 @@ public sealed class QuickFindViewModel : ViewModelBase
         get => _query;
         set
         {
-            this.RaiseAndSetIfChanged(ref _query, value ?? string.Empty);
+            RaiseAndSetIfChanged(ref _query, value ?? string.Empty);
             Filter();
         }
     }
@@ -66,7 +64,7 @@ public sealed class QuickFindViewModel : ViewModelBase
     public QuickFindResult? SelectedResult
     {
         get => _selectedResult;
-        set => this.RaiseAndSetIfChanged(ref _selectedResult, value);
+        set => RaiseAndSetIfChanged(ref _selectedResult, value);
     }
 
     private string? _resultsNote = "Type part of a name.";
@@ -75,7 +73,7 @@ public sealed class QuickFindViewModel : ViewModelBase
     public string? ResultsNote
     {
         get => _resultsNote;
-        private set => this.RaiseAndSetIfChanged(ref _resultsNote, value);
+        private set => RaiseAndSetIfChanged(ref _resultsNote, value);
     }
 
     /// <summary>

@@ -1,7 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Subjects;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -168,14 +167,11 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         get => _selectedRow;
         set
         {
-            if (EqualityComparer<StandaloneSubAssemblyRow?>.Default.Equals(_selectedRow, value))
+            if (RaiseAndSetIfChanged(ref _selectedRow, value))
             {
-                return;
+                SelectionChanged();
+                _picks.OnNext(value);
             }
-
-            this.RaiseAndSetIfChanged(ref _selectedRow, value);
-            SelectionChanged();
-            _picks.OnNext(value);
         }
     }
 
@@ -197,14 +193,14 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private SubAssemblyRole? _editingRole;
     public SubAssemblyRole? EditingRole
     {
         get => _editingRole;
-        set => this.RaiseAndSetIfChanged(ref _editingRole, value);
+        set => RaiseAndSetIfChanged(ref _editingRole, value);
     }
 
     private string _headerTitle = "New sub-assembly";
@@ -212,7 +208,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     public string HeaderTitle
     {
         get => _headerTitle;
-        private set => this.RaiseAndSetIfChanged(ref _headerTitle, value);
+        private set => RaiseAndSetIfChanged(ref _headerTitle, value);
     }
 
     private int _selectedDetailsTab = RecipeTab;
@@ -223,7 +219,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     public int SelectedDetailsTab
     {
         get => _selectedDetailsTab;
-        set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+        set => RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
     }
 
     public ScreenCommand LoadCommand { get; }
@@ -236,12 +232,6 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     public ScreenCommand SaveCommand { get; }
 
     public ScreenCommand DeleteCommand { get; }
-
-    System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.SaveCommand => SaveCommand;
-
-    System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
 
     /// <summary>Remove Line on whichever table shows: the recipe's lines, or a packaging set's.</summary>
     public ScreenCommand RemoveLineCommand { get; }
@@ -262,13 +252,10 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     /// reload (which loads the form itself), New's empty selection. The list follows; the form isn't loaded.</summary>
     private void RepointSelection(StandaloneSubAssemblyRow? row)
     {
-        if (EqualityComparer<StandaloneSubAssemblyRow?>.Default.Equals(_selectedRow, row))
+        if (RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow)))
         {
-            return;
+            SelectionChanged();
         }
-
-        this.RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow));
-        SelectionChanged();
     }
 
     /// <summary>The roles, materials and sub-assemblies read again and merged, the form and its selection kept.</summary>

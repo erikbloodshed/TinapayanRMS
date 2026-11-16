@@ -1,8 +1,6 @@
-@using System.Windows.Input
-
 @* A button bound to a ViewModel's command: enabled while the command can run, and running it on a click. The screen
    redraws it when the command's CanExecute changes (ScreenBase). *@
-<SfButton CssClass="@Css" Disabled="@(!Command.CanExecute(null))" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
+<SfButton CssClass="@Css" Disabled="@(!Command.CanExecute())" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
     @if (Icon is { } icon)
     {
         <Icon Of="icon" />
@@ -14,7 +12,7 @@
 </SfButton>
 
 @code {
-    [Parameter, EditorRequired] public ICommand Command { get; set; } = null!;
+    [Parameter, EditorRequired] public ScreenCommand Command { get; set; } = null!;
 
     [Parameter] public string? Label { get; set; }
 

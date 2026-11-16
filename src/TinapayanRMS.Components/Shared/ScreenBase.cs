@@ -1,17 +1,13 @@
 using System.Collections.Concurrent;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Reactive.Linq;
 using System.Reflection;
 using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
-using ReactiveUI;
-using ReactiveUI.Blazor;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Components.Vim;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Components.Shared;
 
@@ -20,10 +16,10 @@ namespace TinapayanRMS.Components.Shared;
 /// SuccessMessage as toasts (<see cref="Notices"/>), answers its ConfirmDelete and ConfirmUnsavedChanges with a dialog
 /// (<see cref="Confirmations"/>), runs its load each time the screen is opened, and draws
 /// itself again whenever the ViewModel, one of its parts (the Products screen's Costing, say), one of their lists or one
-/// of their commands changes. ReactiveInjectableComponentBase injects the ViewModel, the page's own (they're scoped),
-/// and redraws on the ViewModel's property changes; the rest are added here, since a grid's rows or a button's enabled
-/// state change without a property of the ViewModel changing. However many of them change together, the screen is drawn
-/// once for them all (<see cref="RedrawGate"/>).
+/// of their commands changes. The ViewModel is injected, the page's own (they're scoped). The lists and commands are
+/// watched as well as the properties, since a grid's rows or a button's enabled state change without a property of the
+/// ViewModel changing. However many of them change together, the screen is drawn once for them all
+/// (<see cref="RedrawGate"/>).
 /// <para>
 /// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them: a
 /// move to another address (the tab strip, the menu, a link, Back and Forward) asks
@@ -31,7 +27,7 @@ namespace TinapayanRMS.Components.Shared;
 /// reloading its page has the web view ask.
 /// </para>
 /// </summary>
-public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<TViewModel>
+public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     where TViewModel : ViewModelBase
 {
     private readonly List<IDisposable> _subscriptions = [];
@@ -46,6 +42,9 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     {
         _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
     }
+
+    /// <summary>The screen's ViewModel: the page's own, as they're scoped.</summary>
+    [Inject] public TViewModel? ViewModel { get; set; }
 
     [Inject] private Notices Notices { get; set; } = null!;
 
@@ -62,7 +61,7 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     [Inject] private Serilog.ILogger Logger { get; set; } = null!;
 
     /// <summary>The command that loads the screen, run each time it's opened; null for a screen with nothing to load.</summary>
-    protected abstract ICommand? LoadCommand { get; }
+    protected abstract ScreenCommand? LoadCommand { get; }
 
     protected override void OnInitialized()
     {
@@ -105,7 +104,7 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     {
         if (LoadCommand is { } load)
         {
-            await Commands.ExecuteAsync(load);
+            await load.ExecuteAsync();
         }
     }
 
@@ -123,9 +122,6 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
 
     /// <summary>The page's toasts, for a failure the screen meets outside its ViewModel.</summary>
     protected Notices ScreenNotices => Notices;
-
-    /// <summary>Whether <paramref name="command"/> can run now, for a button's Disabled.</summary>
-    protected static bool CanRun(ICommand command) => command.CanExecute(null);
 
     /// <summary>
     /// Moves the screen's address to <paramref name="path"/>, as its form shows another record: no question about the
@@ -153,8 +149,8 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
     protected virtual bool IsOwnAddress(string path) => false;
 
     /// <summary>
-    /// A redraw asked for while one is queued is left to it, whoever asks: ReactiveInjectableComponentBase asks on every
-    /// property change too, after this class's own handler has queued one.
+    /// A redraw asked for while one is queued is left to it, whoever asks: Blazor asks after each event the screen
+    /// handles too, as a click may have queued one.
     /// </summary>
     protected override bool ShouldRender() => _redrawingNow || !_redraws.IsPending;
 
@@ -303,7 +299,13 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
 
     private void OnCommandChanged(object? sender, EventArgs e) => _redraws.Request();
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
     {
         if (disposing)
         {
@@ -314,8 +316,6 @@ public abstract class ScreenBase<TViewModel> : ReactiveInjectableComponentBase<T
 
             _subscriptions.Clear();
         }
-
-        base.Dispose(disposing);
     }
 
     private sealed class Unsubscriber(Action unsubscribe) : IDisposable

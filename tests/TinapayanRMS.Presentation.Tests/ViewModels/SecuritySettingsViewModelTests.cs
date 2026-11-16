@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -27,13 +26,13 @@ public class SecuritySettingsViewModelTests(DatabaseFixture fixture) : Persisten
     {
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.HasPassword.Should().BeTrue();
 
         viewModel.CurrentPassword = "pandesal 6am";
         viewModel.NewPassword = "ensaymada";
         viewModel.Confirmation = "ensaymada";
-        await viewModel.ChangePasswordCommand.Execute();
+        await viewModel.ChangePasswordCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("The password was changed: use the new one from now on.");
@@ -46,18 +45,18 @@ public class SecuritySettingsViewModelTests(DatabaseFixture fixture) : Persisten
     {
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.CurrentPassword = "pandesal 7am";
         viewModel.NewPassword = "ensaymada";
         viewModel.Confirmation = "ensaymada";
-        await viewModel.ChangePasswordCommand.Execute();
+        await viewModel.ChangePasswordCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be("That isn't the current password.");
 
         viewModel.CurrentPassword = "pandesal 6am";
         viewModel.NewPassword = "ensaymada";
         viewModel.Confirmation = "ensaymadas";
-        await viewModel.ChangePasswordCommand.Execute();
+        await viewModel.ChangePasswordCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().StartWith("The two passwords aren't the same");
 
         (await Repository().VerifyAsync("pandesal 6am", Cancellation)).Should().BeTrue();
@@ -67,12 +66,12 @@ public class SecuritySettingsViewModelTests(DatabaseFixture fixture) : Persisten
     public Task With_no_password_it_sets_one_without_a_current_one() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.HasPassword.Should().BeFalse();
 
         viewModel.NewPassword = "ensaymada";
         viewModel.Confirmation = "ensaymada";
-        await viewModel.ChangePasswordCommand.Execute();
+        await viewModel.ChangePasswordCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.HasPassword.Should().BeTrue();
@@ -83,18 +82,18 @@ public class SecuritySettingsViewModelTests(DatabaseFixture fixture) : Persisten
     public Task The_auto_lock_is_saved_and_takes_effect_at_once() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingAutoLockMinutes.Should().Be(15);
 
         viewModel.EditingAutoLockMinutes = 3;
-        await viewModel.SaveAutoLockCommand.Execute();
+        await viewModel.SaveAutoLockCommand.ExecuteAsync();
 
         viewModel.SuccessMessage.Should().Be("Auto-lock saved: the window locks after 3 minutes without a key, click or scroll.");
         _appLock.AutoLockMinutes.Should().Be(3);
         (await Repository().GetAsync(Cancellation)).AutoLockMinutes.Should().Be(3);
 
         viewModel.EditingAutoLockMinutes = 241;
-        await viewModel.SaveAutoLockCommand.Execute();
+        await viewModel.SaveAutoLockCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be("The auto-lock must be from 0 (never) to 240 minutes.");
         _appLock.AutoLockMinutes.Should().Be(3);
     });

@@ -1,5 +1,4 @@
 @using TinapayanRMS.ApplicationCore.Rules
-@using System.Reactive.Linq
 @implements IAsyncDisposable
 @inject SignInViewModel ViewModel
 @inject AppLock Lock
@@ -118,13 +117,13 @@
     };
 
     // A load draws the boxes as they come: only a try, which clears what was typed, draws them afresh.
-    private Task LoadAsync() => RunAsync(() => ViewModel.LoadCommand.Execute(), isTry: false);
+    private Task LoadAsync() => RunAsync(ViewModel.LoadCommand, isTry: false);
 
-    private Task SignInAsync() => RunAsync(() => ViewModel.SignInCommand.Execute(), isTry: true);
+    private Task SignInAsync() => RunAsync(ViewModel.SignInCommand, isTry: true);
 
-    private Task SetPasswordAsync() => RunAsync(() => ViewModel.SetPasswordCommand.Execute(), isTry: true);
+    private Task SetPasswordAsync() => RunAsync(ViewModel.SetPasswordCommand, isTry: true);
 
-    private async Task RunAsync(Func<IObservable<RxVoid>> command, bool isTry)
+    private async Task RunAsync(ScreenCommand command, bool isTry)
     {
         if (_busy)
         {
@@ -134,7 +133,7 @@
         _busy = true;
         try
         {
-            await command();
+            await command.ExecuteAsync();
         }
         finally
         {

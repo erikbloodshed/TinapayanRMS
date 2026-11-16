@@ -1,15 +1,14 @@
 using System.Windows.Input;
 using AwesomeAssertions;
-using ReactiveUI;
 using Serilog.Events;
 using TinapayanRMS.Components.Tests.Fixtures;
+using TinapayanRMS.Presentation.ViewModels;
 
 namespace TinapayanRMS.Components.Tests;
 
 /// <summary>
-/// UnhandledFailures: what fails with nothing to catch it reaches the log, and a ReactiveUI pipeline's failure reaches the
-/// page as well, where ReactiveUI's own handler threw it on whatever thread it failed on. Held apart from each other, since
-/// what's reported is the process's.
+/// UnhandledFailures: what fails with nothing to catch it reaches the log, and a command run nothing awaited that fails
+/// reaches the page as well. Held apart from each other, since what's reported is the process's.
 /// </summary>
 [NotInParallel(nameof(UnhandledFailures))]
 public class UnhandledFailuresTests
@@ -55,8 +54,7 @@ public class UnhandledFailuresTests
         }
     }
 
-    // ReactiveUI's own handler threw what a command's body threw, with nothing subscribed to its ThrownExceptions: the
-    // page's error bar on the window's thread, and the end of the process on any other.
+    // A menu's item or a key runs a command through ICommand.Execute, which nothing awaits.
     [Test]
     public async Task A_command_that_throws_with_nothing_to_catch_it_is_reported_rather_than_thrown()
     {
@@ -65,7 +63,7 @@ public class UnhandledFailuresTests
         UnhandledFailures.Reported += Tell;
         try
         {
-            var command = ReactiveCommand.Create(() => throw new InvalidOperationException("Broken command"));
+            var command = ScreenCommand.Of(() => throw new InvalidOperationException("Broken command"));
 
             var click = () => ((ICommand)command).Execute(null);
 

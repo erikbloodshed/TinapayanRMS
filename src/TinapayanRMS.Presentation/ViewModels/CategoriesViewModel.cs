@@ -1,13 +1,10 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -30,7 +27,16 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
     public RawMaterialCategory? SelectedCategory
     {
         get => _selectedCategory;
-        set => this.RaiseAndSetIfChanged(ref _selectedCategory, value);
+        set
+        {
+            // Not while LoadCommand merges, which only re-points the selection at its refreshed copy.
+            if (RaiseAndSetIfChanged(ref _selectedCategory, value) && value is { } category && !IsRefreshing)
+            {
+                _editingId = category.Id;
+                EditingName = category.Name;
+                EditingType = category.Type;
+            }
+        }
     }
 
     private int _editingId;
@@ -39,7 +45,7 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
     public string EditingName
     {
         get => _editingName;
-        set => this.RaiseAndSetIfChanged(ref _editingName, value);
+        set => RaiseAndSetIfChanged(ref _editingName, value);
     }
 
     private RawMaterialCategoryType _editingType;
@@ -47,20 +53,19 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
     public RawMaterialCategoryType EditingType
     {
         get => _editingType;
-        set => this.RaiseAndSetIfChanged(ref _editingType, value);
+        set => RaiseAndSetIfChanged(ref _editingType, value);
     }
 
     /// <summary>The Type picker's choices.</summary>
     public IReadOnlyList<RawMaterialCategoryType> Types { get; } = Enum.GetValues<RawMaterialCategoryType>();
 
-    private readonly ObservableAsPropertyHelper<string> _formTitle;
     /// <summary>"New Category", or "Edit Category" while one is picked, so it's clear what Save will do.</summary>
-    public string FormTitle => _formTitle.Value;
+    public string FormTitle => SelectedCategory is null ? "New Category" : "Edit Category";
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand LoadCommand { get; }
+    public ScreenCommand NewCommand { get; }
+    public ScreenCommand SaveCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     public CategoriesViewModel(IRawMaterialCategoryRepository categoryRepository, IValidator<RawMaterialCategory> categoryValidator, ILogger logger)
         : base(logger)
@@ -72,23 +77,9 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
             .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
             .Subscribe();
 
-        _formTitle = this.WhenAnyValue(x => x.SelectedCategory)
-            .Select(category => category is null ? "New Category" : "Edit Category")
-            .ToProperty(this, x => x.FormTitle, "New Category");
-
-        // Skips while LoadCommand merges, which only re-points the selection at its refreshed copy.
-        this.WhenAnyValue(x => x.SelectedCategory)
-            .Where(category => category is not null && !IsRefreshing)
-            .Subscribe(category =>
-            {
-                _editingId = category!.Id;
-                EditingName = category.Name;
-                EditingType = category.Type;
-            });
-
         // Runs each time Settings opens and after this tab's own saves. It merges rather than
         // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(async () =>
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
             var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedCategory?.Id;
@@ -100,9 +91,9 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
             });
         }));
 
-        NewCommand = ReactiveCommand.Create(ClearForm);
+        NewCommand = ScreenCommand.Of(ClearForm);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSafelyAsync(async () =>
+        SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var category = new RawMaterialCategory { Id = _editingId, Name = EditingName.Trim(), Type = EditingType };
 
@@ -123,17 +114,17 @@ public sealed class CategoriesViewModel : ViewModelBase, IDisposable
             }
 
             ClearForm();
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
         }));
 
-        DeleteCommand = ReactiveCommand.CreateFromTask(
+        DeleteCommand = new ScreenCommand(
             () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
             {
                 await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
                 ClearForm();
-                await LoadCommand.Execute();
+                await LoadCommand.ExecuteAsync();
             }),
-            this.WhenAnyValue(x => x.SelectedCategory).Select(category => category is not null));
+            () => SelectedCategory is not null);
     }
 
     private void ClearForm()

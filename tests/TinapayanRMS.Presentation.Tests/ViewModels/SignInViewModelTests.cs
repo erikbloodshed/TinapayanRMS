@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -56,13 +55,13 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     {
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.IsLoaded.Should().BeTrue();
         viewModel.IsSettingUp.Should().BeTrue();
 
         viewModel.Password = "pandesal 6am";
         viewModel.Confirmation = "pandesal 6am";
-        await viewModel.SetPasswordCommand.Execute();
+        await viewModel.SetPasswordCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         appLock.IsLocked.Should().BeFalse();
@@ -75,16 +74,16 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     {
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.Password = "pandesal 6am";
         viewModel.Confirmation = "pandesal 7am";
-        await viewModel.SetPasswordCommand.Execute();
+        await viewModel.SetPasswordCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().StartWith("The two passwords aren't the same");
 
         viewModel.Password = "123";
         viewModel.Confirmation = "123";
-        await viewModel.SetPasswordCommand.Execute();
+        await viewModel.SetPasswordCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be("The password must have at least 6 characters.");
 
         appLock.IsLocked.Should().BeTrue();
@@ -98,11 +97,11 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         await Repository().SetAutoLockMinutesAsync(7, Cancellation);
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.IsSettingUp.Should().BeFalse();
 
         viewModel.Password = "pandesal 6am";
-        await viewModel.SignInCommand.Execute();
+        await viewModel.SignInCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         appLock.IsLocked.Should().BeFalse();
@@ -116,24 +115,24 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.Password = "pandesal 7am";
-        await viewModel.SignInCommand.Execute();
+        await viewModel.SignInCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be("That isn't the password.");
         viewModel.Password.Should().BeEmpty("what's typed is cleared after every try");
 
         for (var i = 1; i < AppLock.WrongTriesBeforeWait; i++)
         {
             viewModel.Password = "pandesal 7am";
-            await viewModel.SignInCommand.Execute();
+            await viewModel.SignInCommand.ExecuteAsync();
         }
 
         viewModel.ErrorMessage.Should().Be("That isn't the password. Too many wrong tries: wait 30 seconds, then try again.");
 
         // Even the right one waits: the clock hasn't moved.
         viewModel.Password = "pandesal 6am";
-        await viewModel.SignInCommand.Execute();
+        await viewModel.SignInCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Be("Too many wrong tries: wait 30 seconds, then try again.");
         appLock.IsLocked.Should().BeTrue();
     });
@@ -144,11 +143,11 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         for (var i = 0; i < AppLock.WrongTriesBeforeWait; i++)
         {
-            await viewModel.SignInCommand.Execute();
+            await viewModel.SignInCommand.ExecuteAsync();
         }
 
         viewModel.ErrorMessage.Should().Be("Type the password.");
@@ -161,7 +160,7 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         // scripts/Reset-Password.ps1, run meanwhile.
         await using (var dbContext = CreateDbContext())
@@ -171,7 +170,7 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         }
 
         viewModel.Password = "pandesal 6am";
-        await viewModel.SignInCommand.Execute();
+        await viewModel.SignInCommand.ExecuteAsync();
 
         viewModel.IsSettingUp.Should().BeTrue();
         viewModel.ErrorMessage.Should().Be("There's no password any more: set a new one.");
@@ -183,12 +182,12 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     {
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Repository().CreatePasswordAsync("pandesal 6am", Cancellation);
 
         viewModel.Password = "ensaymada";
         viewModel.Confirmation = "ensaymada";
-        await viewModel.SetPasswordCommand.Execute();
+        await viewModel.SetPasswordCommand.ExecuteAsync();
 
         viewModel.IsSettingUp.Should().BeFalse();
         viewModel.ErrorMessage.Should().Be("A password has been set already: sign in with it.");
@@ -203,13 +202,13 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         var newer = new NewerDatabase();
         var viewModel = CreateViewModel(appLock, updater: newer);
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.IsLoaded.Should().BeFalse("the password isn't read from a database this copy can't use");
         viewModel.ErrorMessage.Should().Be(BackupRules.DatabaseFromLaterVersionText);
         appLock.IsLocked.Should().BeTrue();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         newer.Asked.Should().Be(2, "a failed run is run again by the next load");
     });
 
@@ -221,16 +220,16 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
         var appLock = new AppLock(new TestClock(Start));
         var viewModel = CreateViewModel(appLock, factory);
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.IsLoaded.Should().BeFalse();
         viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
 
         viewModel.Password = "pandesal 6am";
-        await viewModel.SignInCommand.Execute();
+        await viewModel.SignInCommand.ExecuteAsync();
         appLock.IsLocked.Should().BeTrue();
 
         factory.Fail = false;
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.IsLoaded.Should().BeTrue();
         viewModel.ErrorMessage.Should().BeNull();
     });

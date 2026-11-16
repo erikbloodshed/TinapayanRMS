@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -31,7 +30,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     public Task Save_keeps_the_percentages_and_Load_reads_them_back() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingLaborPercent = 25m;
         viewModel.EditingOverheadPercent = 10m;
         viewModel.EditingAdministrativePercent = 5m;
@@ -42,12 +41,12 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         viewModel.EditingCostBufferPercent = 8m;
         viewModel.EditingPriceRounding = viewModel.PriceRoundingOptions.Single(o => o.Step == 0.25m);
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().NotBeNull();
         var reloaded = CreateViewModel();
-        await reloaded.LoadCommand.Execute();
+        await reloaded.LoadCommand.ExecuteAsync();
         (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarginPercent, reloaded.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m));
         reloaded.EditingWastagePercent.Should().Be(4.5m);
@@ -63,11 +62,11 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         viewModel.EditingCostBufferPercent = 50m;
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingCostBufferPercent.Should().Be(10m);
 
         viewModel.EditingCostBufferPercent = 101m;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be("Cost buffer must be at least 0 and at most 100 percent.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).CostBufferPercent.Should().Be(10m);
@@ -79,7 +78,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         viewModel.EditingNewProductStage = ProductStage.Innovation;
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.EditingNewProductStage.Should().Be(ProductStage.Production);
         viewModel.Stages.Select(s => s.Value).Should().Equal("Production", "Innovation");
@@ -91,7 +90,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         var viewModel = CreateViewModel();
         viewModel.EditingWastagePercent = 9m;
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.EditingWastagePercent.Should().Be(3m);
     });
@@ -100,10 +99,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     public Task Save_refuses_a_wastage_over_100_percent_and_saves_nothing() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingWastagePercent = 101m;
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be("The wastage must be from 0% to 100%.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).WastagePercent.Should().Be(3m);
@@ -113,10 +112,10 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
     public Task Save_refuses_a_negative_percentage_and_saves_nothing() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingVatPercent = -12m;
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be("The VAT percentage can't be negative.");
         (await new CostingDefaultsRepository(CreateDbContextFactory()).GetAsync(Cancellation)).VatPercent.Should().Be(0m);
@@ -134,7 +133,7 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
         }
 
         var viewModel = CreateViewModel();
-        await viewModel.RecalculateCostsCommand.Execute();
+        await viewModel.RecalculateCostsCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Costs recalculated: 1 made or linked ingredient was out of date, and is right now.");

@@ -139,9 +139,9 @@ public sealed class ProductUsageEdit : ObservableRow
         get => _isRoleRepeated;
         set
         {
-            this.RaiseAndSetIfChanged(ref _isRoleRepeated, value);
-            this.RaisePropertyChanged(nameof(SectionName));
-            this.RaisePropertyChanged(nameof(DisplayName));
+            RaiseAndSetIfChanged(ref _isRoleRepeated, value);
+            RaisePropertyChanged(nameof(SectionName));
+            RaisePropertyChanged(nameof(DisplayName));
         }
     }
 

@@ -2,12 +2,10 @@ using AwesomeAssertions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
-using ReactiveUI;
 using TinapayanRMS.Presentation.ViewModels;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using ILogger = Serilog.ILogger;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -28,7 +26,7 @@ public class RecordScreenBaseTests
         public int? Shown
         {
             get;
-            set => this.RaiseAndSetIfChanged(ref field, value);
+            set => RaiseAndSetIfChanged(ref field, value);
         }
 
         public List<int> Opened { get; } = [];
@@ -42,7 +40,7 @@ public class RecordScreenBaseTests
 
     private sealed class RecordScreen : RecordScreenBase<Records>
     {
-        protected override ReactiveCommand<RxVoid, RxVoid>? LoadCommand => null;
+        protected override ScreenCommand? LoadCommand => null;
 
         protected override string AddressRoot => "things";
 

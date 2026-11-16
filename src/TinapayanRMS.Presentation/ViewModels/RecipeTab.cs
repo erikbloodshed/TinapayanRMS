@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -8,7 +7,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// recipe order (after a composite's Products), then New Sub-Assembly while one is being added, then Packaging while
 /// the product has any.
 /// </summary>
-public closed class RecipeTab : ReactiveObject
+public closed class RecipeTab : ObservableState
 {
     public abstract string Header { get; }
 
@@ -29,9 +28,9 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
         get => _usage;
         set
         {
-            this.RaiseAndSetIfChanged(ref _usage, value);
-            this.RaisePropertyChanged(nameof(Header));
-            this.RaisePropertyChanged(nameof(Icon));
+            RaiseAndSetIfChanged(ref _usage, value);
+            RaisePropertyChanged(nameof(Header));
+            RaisePropertyChanged(nameof(Icon));
         }
     }
 
@@ -39,7 +38,7 @@ public sealed class SubAssemblyRecipeTab(ProductUsageEdit usage) : RecipeTab
     public override string Header => Usage.SectionName;
 
     /// <summary>Shows the header again once the recipe has gained or lost another section in the role (ProductUsageEdit.IsRoleRepeated).</summary>
-    public void RefreshHeader() => this.RaisePropertyChanged(nameof(Header));
+    public void RefreshHeader() => RaisePropertyChanged(nameof(Header));
 
     /// <summary>A list for a new section, whose lines are typed in here; a link for a linked one.</summary>
     public override AppIcon Icon => Usage.IsLinked ? AppIcon.Link : AppIcon.Section;

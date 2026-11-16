@@ -1,14 +1,13 @@
 using System.Collections.ObjectModel;
+using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -179,9 +178,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         get => _changeLinkTarget;
         set
         {
-            if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_changeLinkTarget, value))
+            if (RaiseAndSetIfChanged(ref _changeLinkTarget, value))
             {
-                RaiseAndSetIfChanged(ref _changeLinkTarget, value);
                 _linkTargetPicks.OnNext(value);
             }
         }
@@ -245,9 +243,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         get => _editingUsageMode;
         set
         {
-            if (_editingUsageMode != value)
+            if (RaiseAndSetIfChanged(ref _editingUsageMode, value))
             {
-                RaiseAndSetIfChanged(ref _editingUsageMode, value);
                 _modePicks.OnNext(value);
             }
         }
@@ -323,9 +320,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         set
         {
             var before = _editingUsageRole;
-            if (!EqualityComparer<SubAssemblyRole?>.Default.Equals(before, value))
+            if (RaiseAndSetIfChanged(ref _editingUsageRole, value))
             {
-                RaiseAndSetIfChanged(ref _editingUsageRole, value);
                 _rolePicks.OnNext((before, value));
             }
         }
@@ -349,9 +345,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         get => _editingUsageSource;
         set
         {
-            if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_editingUsageSource, value))
+            if (RaiseAndSetIfChanged(ref _editingUsageSource, value))
             {
-                RaiseAndSetIfChanged(ref _editingUsageSource, value);
                 _sourcePicks.OnNext(value);
             }
         }
