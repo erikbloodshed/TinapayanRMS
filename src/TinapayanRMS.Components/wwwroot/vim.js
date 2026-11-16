@@ -820,6 +820,18 @@ window.tinapayanVim = (() => {
             }
             if (isEscape) {
                 // Typing stops, and what was typed stays. An open list closes first; a window closes on the next Esc.
+                // A window whose own keys all work while typing (Find, marked closes-on-first-esc) closes on this one,
+                // as with the keys off, since a stop in NORMAL would only cost a key there: the Esc goes on to it, or
+                // for Ctrl+[ one is raised.
+                if (!popupIsOpen() && dialog.closest(".closes-on-first-esc")) {
+                    setMode("NORMAL");
+                    if (event.key !== "Escape") {
+                        swallow(event);
+                        press(element || dialog, "Escape");
+                    }
+                    return;
+                }
+
                 // The key the list is given bubbles: a Syncfusion list hears keys through Blazor, which listens at the
                 // page's root, so one that didn't bubble left the list open. A Syncfusion window around the list
                 // hears it too, but doesn't close on an Esc while a list is open.

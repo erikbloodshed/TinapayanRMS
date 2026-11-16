@@ -9,15 +9,16 @@
    raw material, standalone sub-assembly and product, read afresh each time it opens. Every word typed has to be in a
    name, in any order, ignoring capitals and accents; the best matches come first. The keyboard stays in the box: Up and
    Down (and Page Up and Page Down) move the pick, Enter opens it on its own screen, as a link from another screen opens
-   one, and Esc closes Find. A double-click on a match opens it too. The last search is still there, selected, the next
-   time Find opens. *@
+   one, and Esc closes Find: at the first press with the Vim keys on too, typing or not (its dialog's
+   closes-on-first-esc, which vim.js reads). A double-click on a match opens it too. The last search is still there,
+   selected, the next time Find opens. *@
 @* On the title bar's right: a glyph button built like Back, Forward and the window's own. *@
 <button type="button" class="titlebar-button titlebar-small-glyph" title="Find a raw material, sub-assembly or product (Ctrl+K)"
         aria-label="Find" @onclick="OpenAsync">
     <Icon Of="AppIcon.Search" />
 </button>
 
-<SfDialog Visible="_open" IsModal="true" Width="680px" ShowCloseIcon="true" CloseOnEscape="true" CssClass="find-dialog">
+<SfDialog Visible="_open" IsModal="true" Width="680px" ShowCloseIcon="true" CloseOnEscape="true" CssClass="find-dialog closes-on-first-esc">
     <DialogEvents OnClose="Close" Opened="OnOpenedAsync" />
     <DialogTemplates>
         <Header>Find</Header>
