@@ -12,8 +12,6 @@ namespace TinapayanRMS.Presentation.Tests.ViewModels;
 /// </summary>
 public class ProductPrintoutTests
 {
-    public ProductPrintoutTests() => ReactiveUIBootstrapper.EnsureInitialized();
-
     private static readonly SubAssemblyRole Dough = new() { Id = 1, Name = "Dough", SortOrder = 1 };
     private static readonly SubAssemblyRole Glaze = new() { Id = 2, Name = "Glaze", SortOrder = 2 };
 

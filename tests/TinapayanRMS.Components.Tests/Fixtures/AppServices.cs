@@ -17,7 +17,6 @@ public static class AppServices
 
     public static BunitContext NewContext()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
 
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;

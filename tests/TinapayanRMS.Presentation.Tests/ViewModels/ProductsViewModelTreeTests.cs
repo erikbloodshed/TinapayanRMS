@@ -1453,7 +1453,6 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
     private ProductsViewModel CreateViewModel(IViewStateStore? viewStateStore)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

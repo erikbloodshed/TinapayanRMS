@@ -176,7 +176,6 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
 
     private SubAssembliesViewModel CreateViewModel(bool asksAboutCosts = false)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var productRepository = new ProductRepository(factory);
 

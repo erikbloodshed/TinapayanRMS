@@ -805,7 +805,6 @@ public class ProductsViewModelUndoTests(DatabaseFixture fixture) : PersistenceTe
 
     private ProductsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

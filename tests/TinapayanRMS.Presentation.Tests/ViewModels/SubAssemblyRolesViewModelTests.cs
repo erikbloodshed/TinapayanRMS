@@ -21,7 +21,6 @@ public class SubAssemblyRolesViewModelTests(DatabaseFixture fixture) : Persisten
 {
     private SubAssemblyRolesViewModel CreateViewModel(bool confirm, List<string>? asked = null)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var viewModel = new SubAssemblyRolesViewModel(
             new SubAssemblyRoleRepository(CreateDbContextFactory()), new SubAssemblyRoleValidator(), new LoggerConfiguration().CreateLogger());
         viewModel.ConfirmDelete.RegisterHandler(context =>

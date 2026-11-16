@@ -1882,7 +1882,6 @@ public class RawMaterialsViewModelRefreshTests(DatabaseFixture fixture) : Persis
 
     private RawMaterialsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new RawMaterialsViewModel(

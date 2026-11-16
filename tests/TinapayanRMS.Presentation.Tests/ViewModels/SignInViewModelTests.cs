@@ -28,7 +28,6 @@ public class SignInViewModelTests(DatabaseFixture fixture) : PersistenceTestBase
     private SignInViewModel CreateViewModel(
         AppLock appLock, IDbContextFactory<TinapayanRMSDbContext>? factory = null, IDatabaseUpdater? updater = null)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         factory ??= CreateDbContextFactory();
         var logger = new LoggerConfiguration().CreateLogger();
 

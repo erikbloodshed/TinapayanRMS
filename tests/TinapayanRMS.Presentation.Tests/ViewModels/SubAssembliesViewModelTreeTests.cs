@@ -904,7 +904,6 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
     private SubAssembliesViewModel CreateViewModel(IViewStateStore? viewStateStore)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new SubAssembliesViewModel(

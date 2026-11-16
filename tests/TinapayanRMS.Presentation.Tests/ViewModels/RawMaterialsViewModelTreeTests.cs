@@ -972,7 +972,6 @@ public class RawMaterialsViewModelTreeTests(DatabaseFixture fixture) : Persisten
 
     private RawMaterialsViewModel CreateViewModel(IViewStateStore? viewStateStore)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new RawMaterialsViewModel(

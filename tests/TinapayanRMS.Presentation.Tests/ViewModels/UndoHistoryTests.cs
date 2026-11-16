@@ -9,8 +9,6 @@ namespace TinapayanRMS.Presentation.Tests.ViewModels;
 /// </summary>
 public class UndoHistoryTests
 {
-    public UndoHistoryTests() => ReactiveUIBootstrapper.EnsureInitialized();
-
     /// <summary>A form of one value, which the history captures and compares by its text.</summary>
     private sealed class Form
     {

@@ -212,7 +212,6 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
 
     private ProductsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

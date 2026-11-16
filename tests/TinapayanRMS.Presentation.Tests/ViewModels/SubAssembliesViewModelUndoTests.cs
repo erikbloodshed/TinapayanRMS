@@ -296,7 +296,6 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
 
     private SubAssembliesViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new SubAssembliesViewModel(

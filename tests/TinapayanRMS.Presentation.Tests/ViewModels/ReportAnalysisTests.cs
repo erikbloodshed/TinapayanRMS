@@ -142,7 +142,6 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
 
     private ReportsViewModel CreateReports()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         return new ReportsViewModel(
             new RawMaterialPriceHistoryRepository(factory),

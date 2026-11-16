@@ -17,7 +17,6 @@ public class SecuritySettingsViewModelTests(DatabaseFixture fixture) : Persisten
 
     private SecuritySettingsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new SecuritySettingsViewModel(new AccessSettingsRepository(CreateDbContextFactory()), _appLock, new LoggerConfiguration().CreateLogger());
     }
 

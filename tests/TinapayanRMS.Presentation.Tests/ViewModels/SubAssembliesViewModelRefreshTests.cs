@@ -440,7 +440,6 @@ public class SubAssembliesViewModelRefreshTests(DatabaseFixture fixture) : Persi
 
     private SubAssembliesViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new SubAssembliesViewModel(

@@ -2411,7 +2411,6 @@ public class ProductsViewModelRefreshTests(DatabaseFixture fixture) : Persistenc
 
     private ProductsViewModel CreateViewModel(IViewStateStore? viewStateStore = null)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

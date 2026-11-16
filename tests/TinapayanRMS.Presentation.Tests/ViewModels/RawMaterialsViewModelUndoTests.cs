@@ -492,7 +492,6 @@ public class RawMaterialsViewModelUndoTests(DatabaseFixture fixture) : Persisten
 
     private RawMaterialsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new RawMaterialsViewModel(

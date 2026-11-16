@@ -60,7 +60,6 @@ public class UnhandledFailuresTests
     [Test]
     public async Task A_command_that_throws_with_nothing_to_catch_it_is_reported_rather_than_thrown()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var told = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
         void Tell(Exception exception) => told.TrySetResult(exception);
         UnhandledFailures.Reported += Tell;

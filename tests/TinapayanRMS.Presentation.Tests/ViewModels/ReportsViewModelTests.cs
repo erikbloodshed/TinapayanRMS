@@ -35,7 +35,6 @@ public class ReportsViewModelTests(DatabaseFixture fixture) : PersistenceTestBas
 
     private ReportsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

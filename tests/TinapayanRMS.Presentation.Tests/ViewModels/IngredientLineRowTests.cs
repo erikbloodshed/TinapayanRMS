@@ -7,8 +7,6 @@ namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
 public class IngredientLineRowTests
 {
-    public IngredientLineRowTests() => ReactiveUIBootstrapper.EnsureInitialized();
-
     private static readonly RawMaterial Flour = new() { Id = 1, Name = "Flour", BufferedCostPerBaseUnit = 0.05m };
     private static readonly RawMaterial Sugar = new() { Id = 2, Name = "Sugar", BufferedCostPerBaseUnit = 0.09m };
 

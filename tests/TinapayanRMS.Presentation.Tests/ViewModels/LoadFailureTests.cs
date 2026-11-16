@@ -168,7 +168,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     public Task A_save_that_fails_says_why_and_doesnt_throw() => UiThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        ReactiveUIBootstrapper.EnsureInitialized();
         var viewModel = new CategoriesViewModel(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
         await viewModel.LoadCommand.Execute();
         viewModel.EditingName = "Breads";
@@ -287,7 +286,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var packagingLineRepository = new PackagingLineRepository(factory);
         return new ProductsViewModel(
             new ProductRepository(factory),
@@ -315,7 +313,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private static RawMaterialsViewModel CreateRawMaterialsViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new RawMaterialsViewModel(
             new RawMaterialRepository(factory),
             new RawMaterialPriceHistoryRepository(factory),
@@ -336,7 +333,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private SubAssembliesViewModel CreateSubAssembliesViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new SubAssembliesViewModel(
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
@@ -352,7 +348,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private ReportsViewModel CreateReportsViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var productRepository = new ProductRepository(factory);
         return new ReportsViewModel(
             new RawMaterialPriceHistoryRepository(factory),

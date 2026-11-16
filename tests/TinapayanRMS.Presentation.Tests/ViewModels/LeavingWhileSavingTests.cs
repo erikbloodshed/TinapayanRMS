@@ -174,7 +174,6 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
 
     private ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new ProductsViewModel(
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
@@ -201,7 +200,6 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
 
     private static RawMaterialsViewModel CreateRawMaterialsViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new RawMaterialsViewModel(
             new RawMaterialRepository(factory),
             new RawMaterialPriceHistoryRepository(factory),
@@ -222,7 +220,6 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
 
     private SubAssembliesViewModel CreateSubAssembliesViewModel(FailingDbContextFactory factory)
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new SubAssembliesViewModel(
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),

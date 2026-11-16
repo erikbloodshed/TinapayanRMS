@@ -489,7 +489,6 @@ public class ProductsViewModelCompositeTests(DatabaseFixture fixture) : Persiste
 
     private async Task<ProductsViewModel> CreateLoadedViewModelAsync()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

@@ -542,7 +542,6 @@ public class ProductsViewModelVersionTests(DatabaseFixture fixture) : Persistenc
 
     private ProductsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
 
         return new ProductsViewModel(

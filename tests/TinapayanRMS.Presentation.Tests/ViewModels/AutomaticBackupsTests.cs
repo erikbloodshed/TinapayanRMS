@@ -175,7 +175,6 @@ public sealed class AutomaticBackupsTests : IDisposable
     [Test]
     public Task The_Database_tab_shows_why_the_last_backup_wasnt_taken() => UiThread.RunAsync(async () =>
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
         var logger = new LoggerConfiguration().CreateLogger();
         var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), logger);

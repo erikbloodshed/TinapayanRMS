@@ -20,7 +20,6 @@ public class CostingDefaultsViewModelTests(DatabaseFixture fixture) : Persistenc
 {
     private CostingDefaultsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new CostingDefaultsViewModel(
             new CostingDefaultsRepository(CreateDbContextFactory()),
             new CostingParametersValidator(),

@@ -207,7 +207,6 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
 
     private ProductsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 

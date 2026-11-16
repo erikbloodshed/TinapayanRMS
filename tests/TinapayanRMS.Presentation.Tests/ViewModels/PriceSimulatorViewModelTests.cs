@@ -513,7 +513,6 @@ public class PriceSimulatorViewModelTests(DatabaseFixture fixture) : Persistence
 
     private PriceSimulatorViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         var factory = CreateDbContextFactory();
         return new PriceSimulatorViewModel(
             new ProductRepository(factory),

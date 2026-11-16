@@ -187,7 +187,6 @@ public sealed class DatabaseBackupsViewModelTests(DatabaseFixture fixture) : IAs
 
     private DatabaseBackupsViewModel CreateViewModel()
     {
-        ReactiveUIBootstrapper.EnsureInitialized();
         return new DatabaseBackupsViewModel(_backups, _restarts.Add, new LoggerConfiguration().CreateLogger());
     }
 
