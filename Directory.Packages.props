@@ -32,8 +32,8 @@
     <PackageVersion Include="ModelContextProtocol" Version="2.4.0" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-rc.3" />
     <!-- ReactiveUI and its Blazor host: move them together. -->
-    <PackageVersion Include="ReactiveUI" Version="26.0.1" />
-    <PackageVersion Include="ReactiveUI.Blazor" Version="26.0.1" />
+    <PackageVersion Include="ReactiveUI" Version="27.0.0" />
+    <PackageVersion Include="ReactiveUI.Blazor" Version="27.0.0" />
     <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
