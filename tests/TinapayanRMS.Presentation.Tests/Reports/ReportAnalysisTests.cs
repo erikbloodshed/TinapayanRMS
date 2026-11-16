@@ -106,28 +106,28 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         await new ProductVersionRepository(CreateDbContextFactory()).AddAsync(
             pandesalId, ProductVersionSnapshot.From((await products.GetByIdAsync(pandesalId, Cancellation))!, await SavedProducts().ReadDetailAsync(pandesalId, Cancellation)), monthAgo, null, Cancellation);
         await SetFlourCostAsync(flourId, 0.06m);
-        var viewModel = CreateReports();
-        viewModel.MarginErosionSince = monthAgo;
+        var state = CreateReports();
+        state.MarginErosionSince = monthAgo;
 
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.MarginErosion.Count == 1, () => $"{state.MarginErosion.Count} eroded");
 
-        var costs = viewModel.ProductCosts.Should().ContainSingle().Subject;
-        viewModel.CostDrivers.Select(r => r.Name).Should().Equal("Flour");
-        viewModel.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost, "both tables price the products the visit read");
+        var costs = state.ProductCosts.Should().ContainSingle().Subject;
+        state.CostDrivers.Select(r => r.Name).Should().Equal("Flour");
+        state.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost, "both tables price the products the visit read");
 
         // Flour changes after the visit. Another day compares the products as the visit read them, beside the other tables,
         // until the next visit reads them again.
         await SetFlourCostAsync(flourId, 0.07m);
-        viewModel.MarginErosionSince = monthAgo.AddDays(-1);
-        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 0, () => $"{viewModel.MarginErosion.Count} eroded");
-        viewModel.MarginErosionSince = monthAgo.AddDays(1);
-        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1, () => $"{viewModel.MarginErosion.Count} eroded");
-        viewModel.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost);
+        state.MarginErosionSince = monthAgo.AddDays(-1);
+        await Settle.UntilAsync(state, () => state.MarginErosion.Count == 0, () => $"{state.MarginErosion.Count} eroded");
+        state.MarginErosionSince = monthAgo.AddDays(1);
+        await Settle.UntilAsync(state, () => state.MarginErosion.Count == 1, () => $"{state.MarginErosion.Count} eroded");
+        state.MarginErosion[0].BaseCostNow.Should().Be(costs.BaseCost);
 
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.UntilAsync(viewModel, () => viewModel.MarginErosion.Count == 1 && viewModel.MarginErosion[0].BaseCostNow > costs.BaseCost, () => "not read again");
-        viewModel.MarginErosion[0].BaseCostNow.Should().Be(viewModel.ProductCosts.Single().BaseCost);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.MarginErosion.Count == 1 && state.MarginErosion[0].BaseCostNow > costs.BaseCost, () => "not read again");
+        state.MarginErosion[0].BaseCostNow.Should().Be(state.ProductCosts.Single().BaseCost);
     });
 
     private async Task SetFlourCostAsync(int flourId, decimal costPerGram)
@@ -139,10 +139,10 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private ReportsViewModel CreateReports()
+    private ReportsState CreateReports()
     {
         var factory = CreateDbContextFactory();
-        return new ReportsViewModel(
+        return new ReportsState(
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialRepository(factory),
             new ProductRepository(factory),

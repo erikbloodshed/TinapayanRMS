@@ -9,7 +9,7 @@ namespace TinapayanRMS.Presentation.Tests.Trees;
 
 /// <summary>
 /// The writer that keeps a list's folders between runs, on its own: a subject stands in for the tree's ExpansionChanged
-/// and a list for its open folders. The screens' use of it is in their *ViewModelTreeTests.
+/// and a list for its open folders. The screens' use of it is in their *StateTreeTests.
 /// </summary>
 public class FolderStateWriterTests
 {

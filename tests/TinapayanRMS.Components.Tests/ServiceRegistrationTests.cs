@@ -36,29 +36,29 @@ public class ServiceRegistrationTests
     {
         await using var context = AppServices.NewContext();
 
-        var viewModel = context.Services.GetRequiredService<MainWindowViewModel>();
+        var state = context.Services.GetRequiredService<MainWindowState>();
 
         // An independent literal, not just internal consistency with Title: this would still pass if Heading derived
         // correctly from a Title that was itself wrong.
-        viewModel.Title.Should().Be("Tinapayan Festival Bakeshoppe — Recipe & Costing");
-        viewModel.Heading.Should().Be(viewModel.Title.ToUpperInvariant());
+        state.Title.Should().Be("Tinapayan Festival Bakeshoppe — Recipe & Costing");
+        state.Heading.Should().Be(state.Title.ToUpperInvariant());
     }
 
     [Test]
-    [Arguments(typeof(RawMaterialsViewModel))]
-    [Arguments(typeof(SubAssembliesViewModel))]
-    [Arguments(typeof(ProductsViewModel))]
-    [Arguments(typeof(ReportsViewModel))]
-    [Arguments(typeof(PriceSimulatorViewModel))]
-    [Arguments(typeof(QuickFindViewModel))]
-    [Arguments(typeof(PrintTabViewModel))]
-    [Arguments(typeof(UnitsOfMeasureViewModel))]
-    [Arguments(typeof(CategoriesViewModel))]
-    [Arguments(typeof(ProductCategoriesViewModel))]
-    [Arguments(typeof(SubAssemblyRolesViewModel))]
-    [Arguments(typeof(CostingDefaultsViewModel))]
-    [Arguments(typeof(KeyboardSettingsViewModel))]
-    [Arguments(typeof(DatabaseBackupsViewModel))]
+    [Arguments(typeof(RawMaterialsState))]
+    [Arguments(typeof(SubAssembliesState))]
+    [Arguments(typeof(ProductsState))]
+    [Arguments(typeof(ReportsState))]
+    [Arguments(typeof(PriceSimulatorState))]
+    [Arguments(typeof(QuickFindState))]
+    [Arguments(typeof(PrintTabState))]
+    [Arguments(typeof(UnitsOfMeasureState))]
+    [Arguments(typeof(CategoriesState))]
+    [Arguments(typeof(ProductCategoriesState))]
+    [Arguments(typeof(SubAssemblyRolesState))]
+    [Arguments(typeof(CostingDefaultsState))]
+    [Arguments(typeof(KeyboardSettingsState))]
+    [Arguments(typeof(DatabaseBackupsState))]
     [Arguments(typeof(ScreenLinks))]
     [Arguments(typeof(ScreenTabs))]
     [Arguments(typeof(Notices))]
@@ -85,9 +85,9 @@ public class ServiceRegistrationTests
         using var firstPage = context.Services.CreateScope();
         using var reloaded = context.Services.CreateScope();
 
-        var first = firstPage.ServiceProvider.GetRequiredService<ProductsViewModel>();
-        first.Should().BeSameAs(firstPage.ServiceProvider.GetRequiredService<ProductsViewModel>());
-        first.Should().NotBeSameAs(reloaded.ServiceProvider.GetRequiredService<ProductsViewModel>());
+        var first = firstPage.ServiceProvider.GetRequiredService<ProductsState>();
+        first.Should().BeSameAs(firstPage.ServiceProvider.GetRequiredService<ProductsState>());
+        first.Should().NotBeSameAs(reloaded.ServiceProvider.GetRequiredService<ProductsState>());
     }
 
     [Test]
@@ -99,7 +99,7 @@ public class ServiceRegistrationTests
         keys.Changed += () => changes++;
         keys.IsOn.Should().BeFalse("they're off until the Windows user turns them on");
 
-        context.Services.GetRequiredService<KeyboardSettingsViewModel>().IsVimKeysOn = true;
+        context.Services.GetRequiredService<KeyboardSettingsState>().IsVimKeysOn = true;
 
         keys.IsOn.Should().BeTrue();
         changes.Should().Be(1);

@@ -1,7 +1,7 @@
 @* A saved purchased material's prices over time, newest first, each worked out per base unit. *@
 <div class="tab-card tab-card-fill">
     <h2 class="section-header">Price History</h2>
-    <PickGrid TItem="RawMaterialPriceRow" DataSource="ViewModel.PriceLog.Entries" @bind-SelectedItem="ViewModel.PriceLog.SelectedEntry">
+    <PickGrid TItem="RawMaterialPriceRow" DataSource="State.PriceLog.Entries" @bind-SelectedItem="State.PriceLog.SelectedEntry">
         <Columns>
             <GridColumn Field="Entry.Id" IsPrimaryKey="true" Visible="false" />
             <GridColumn Field="@nameof(RawMaterialPriceRow.Date)" HeaderText="Date" Width="130">
@@ -14,10 +14,10 @@
         </Columns>
     </PickGrid>
     <div class="button-row align-right form-extra">
-        <CommandButton Command="ViewModel.PriceLog.DeleteCommand" Icon="AppIcon.Delete" Label="Delete Price" />
+        <CommandButton Command="State.PriceLog.DeleteCommand" Icon="AppIcon.Delete" Label="Delete Price" />
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public RawMaterialsState State { get; set; } = null!;
 }

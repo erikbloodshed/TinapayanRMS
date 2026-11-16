@@ -5,10 +5,10 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// Where Save files the new product the Products screen's form holds (through ProductsViewModel.NewProductPlace): its stage
+/// Where Save files the new product the Products screen's form holds (through ProductsState.NewProductPlace): its stage
 /// and the user's folder, as New, New Product Here and Settings' stage for a new product decide them, following a folder
 /// moved to the other stage or deleted since. The list's new row starts there, and the header's tag names it
-/// (ProductsViewModel.NewProductTag). Revert keeps it.
+/// (ProductsState.NewProductTag). Revert keeps it.
 /// </summary>
 public sealed class NewProductPlace : ObservableState
 {
@@ -74,7 +74,7 @@ public sealed class NewProductPlace : ObservableState
     }
 
     /// <summary>
-    /// The folders as read again (ProductsViewModel.Folders): the product's folder, moved to the other stage since, takes it
+    /// The folders as read again (ProductsState.Folders): the product's folder, moved to the other stage since, takes it
     /// there with it, as Save would file it there.
     /// </summary>
     public void FoldersRead(IReadOnlyList<ProductFolder> folders)

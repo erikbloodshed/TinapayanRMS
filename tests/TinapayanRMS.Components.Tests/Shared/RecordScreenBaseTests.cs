@@ -16,7 +16,7 @@ namespace TinapayanRMS.Components.Tests.Shared;
 /// </summary>
 public class RecordScreenBaseTests
 {
-    private sealed class Records : ViewModelBase, IRecordOpener
+    private sealed class Records : ScreenState, IRecordOpener
     {
         public Records(ILogger logger)
             : base(logger)
@@ -44,7 +44,7 @@ public class RecordScreenBaseTests
 
         protected override string AddressRoot => "things";
 
-        protected override int? ShownId => ViewModel!.Shown;
+        protected override int? ShownId => State!.Shown;
 
         protected override string ShownProperty => nameof(Records.Shown);
 

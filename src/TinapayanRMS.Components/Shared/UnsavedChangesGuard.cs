@@ -8,7 +8,7 @@ namespace TinapayanRMS.Components.Shared;
 /// a backup or restore running in Settings → Database), which the window waits for, saying why; and a form's unsaved
 /// changes, asked about as leaving the form asks. ScreenBase keeps its form here while its screen is up. A form whose
 /// screen went while it still held unsaved changes is kept too: a screen that failed gives way to its error panel
-/// (ScreenErrorBoundary) without the question leaving it would have asked, and what it held is still its ViewModel's. One
+/// (ScreenErrorBoundary) without the question leaving it would have asked, and what it held is still its state's. One
 /// per page the window loads.
 /// </summary>
 /// <param name="services">The page's services, for the screens that may be busy: asked only as the window closes.</param>

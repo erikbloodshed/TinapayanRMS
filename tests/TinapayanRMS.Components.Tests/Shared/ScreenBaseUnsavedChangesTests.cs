@@ -16,7 +16,7 @@ namespace TinapayanRMS.Components.Tests.Shared;
 /// </summary>
 public class ScreenBaseUnsavedChangesTests
 {
-    private sealed class Form : ViewModelBase, IUnsavedChangesScreen
+    private sealed class Form : ScreenState, IUnsavedChangesScreen
     {
         public Form(ILogger logger)
             : base(logger)

@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// What the Products list's category filter shows (ProductsViewModel.CategoryFilter): every product, a category's, or the
+/// What the Products list's category filter shows (ProductsState.CategoryFilter): every product, a category's, or the
 /// uncategorized ones, each in its folder. A category isn't a folder: its products are found wherever they're filed.
 /// </summary>
 public closed record ProductCategoryFilter

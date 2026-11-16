@@ -16,10 +16,10 @@ public sealed record SubAssemblyFormSnapshot : IFormSnapshot<SubAssemblyFormSnap
     public required int? RoleId { get; init; }
 
     /// <summary>A recipe sub-assembly's ingredient lines; empty for a packaging set.</summary>
-    public required IReadOnlyList<IngredientLineState> Lines { get; init; }
+    public required IReadOnlyList<IngredientLineSnapshot> Lines { get; init; }
 
     /// <summary>A packaging set's lines; empty for a recipe sub-assembly.</summary>
-    public required IReadOnlyList<PackagingLineState> PackagingLines { get; init; }
+    public required IReadOnlyList<PackagingLineSnapshot> PackagingLines { get; init; }
 
     public required decimal FormulaBase { get; init; }
 

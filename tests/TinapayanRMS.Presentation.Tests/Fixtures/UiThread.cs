@@ -6,9 +6,9 @@ namespace TinapayanRMS.Presentation.Tests.Fixtures;
 /// <summary>
 /// Runs a test on a thread of its own with a synchronization context that runs one thing at a time, in the order it was
 /// posted, as the app's UI thread runs its screens: the window's, which its web view's Blazor renderer runs on. Every
-/// await in the test, a ViewModel's own included, comes back to that thread. A ViewModel only ever runs on the UI
+/// await in the test, a screen state's own included, comes back to that thread. A screen state only ever runs on the UI
 /// thread: without this, a background read's await came back on the thread pool and changed the screen's state while
-/// the test was changing it too (ProductsViewModelCompositeTests, where a lost update left a line's cost unread).
+/// the test was changing it too (ProductsStateCompositeTests, where a lost update left a line's cost unread).
 /// </summary>
 public static class UiThread
 {

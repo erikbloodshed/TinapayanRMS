@@ -1,6 +1,6 @@
 @using TinapayanRMS.ApplicationCore.Rules
 @implements IAsyncDisposable
-@inject SignInViewModel ViewModel
+@inject SignInState State
 @inject AppLock Lock
 @inject DatabaseReadiness Readiness
 @inject IJSRuntime JS
@@ -20,9 +20,9 @@
 <div class="sign-in-screen" @ref="_panel">
     <section class="sign-in-page" aria-label="Sign in">
         <h1 class="section-header sign-in-title">TinapayanRMS</h1>
-        @if (!ViewModel.IsLoaded)
+        @if (!State.IsLoaded)
         {
-            @if (ViewModel.ErrorMessage is { } failure)
+            @if (State.ErrorMessage is { } failure)
             {
                 <p class="sign-in-error" role="alert">@failure</p>
                 <div class="button-row form-extra">
@@ -36,16 +36,16 @@
                     : "Opening…")</p>
             }
         }
-        else if (ViewModel.IsSettingUp)
+        else if (State.IsSettingUp)
         {
             <p class="caption">Set a password for the app. It's asked for as the app opens, and whenever the window is locked. At least @PasswordRules.MinLength characters.</p>
             <div @key="_attempt">
                 <FormRow Label="New Password" For="@PasswordId">
-                    <TextField ID="@PasswordId" Password="true" Value="@ViewModel.Password" ValueChanged="v => Typed(() => ViewModel.Password = v)"
+                    <TextField ID="@PasswordId" Password="true" Value="@State.Password" ValueChanged="v => Typed(() => State.Password = v)"
                                OnEnter="() => FocusAsync(ConfirmationId)" />
                 </FormRow>
                 <FormRow Label="Type It Again" For="@ConfirmationId">
-                    <TextField ID="@ConfirmationId" Password="true" Value="@ViewModel.Confirmation" ValueChanged="v => Typed(() => ViewModel.Confirmation = v)"
+                    <TextField ID="@ConfirmationId" Password="true" Value="@State.Confirmation" ValueChanged="v => Typed(() => State.Confirmation = v)"
                                OnEnter="SetPasswordAsync" />
                 </FormRow>
             </div>
@@ -59,7 +59,7 @@
             <p class="caption">@(Lock.HasSignedIn ? "The window is locked. Type the password to go on where you left off." : "Type the password to open the app.")</p>
             <div @key="_attempt">
                 <FormRow Label="Password" For="@PasswordId">
-                    <TextField ID="@PasswordId" Password="true" Value="@ViewModel.Password" ValueChanged="v => Typed(() => ViewModel.Password = v)"
+                    <TextField ID="@PasswordId" Password="true" Value="@State.Password" ValueChanged="v => Typed(() => State.Password = v)"
                                OnEnter="SignInAsync" />
                 </FormRow>
             </div>
@@ -92,7 +92,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        ViewModel.PropertyChanged += OnViewModelChanged;
+        State.PropertyChanged += OnStateChanged;
         Readiness.Changed += OnReadinessChanged;
         await LoadAsync();
     }
@@ -104,7 +104,7 @@
             _keys = await JS.InvokeAsync<IJSObjectReference>("tinapayan.lockKeys", _panel).KeepUnlessGoneAsync(() => _disposed);
         }
 
-        if (_focusWanted && ViewModel.IsLoaded)
+        if (_focusWanted && State.IsLoaded)
         {
             _focusWanted = false;
             await FocusAsync(PasswordId);
@@ -113,18 +113,18 @@
 
     private RenderFragment Error() => __builder =>
     {
-        if (ViewModel.ErrorMessage is { } error)
+        if (State.ErrorMessage is { } error)
         {
             <p class="sign-in-error" role="alert">@error</p>
         }
     };
 
     // A load draws the boxes as they come: only a try, which clears what was typed, draws them afresh.
-    private Task LoadAsync() => RunAsync(ViewModel.LoadCommand, isTry: false);
+    private Task LoadAsync() => RunAsync(State.LoadCommand, isTry: false);
 
-    private Task SignInAsync() => RunAsync(ViewModel.SignInCommand, isTry: true);
+    private Task SignInAsync() => RunAsync(State.SignInCommand, isTry: true);
 
-    private Task SetPasswordAsync() => RunAsync(ViewModel.SetPasswordCommand, isTry: true);
+    private Task SetPasswordAsync() => RunAsync(State.SetPasswordCommand, isTry: true);
 
     private async Task RunAsync(ScreenCommand command, bool isTry)
     {
@@ -173,14 +173,14 @@
         }
     }
 
-    private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e) => _redraws.Request();
+    private void OnStateChanged(object? sender, PropertyChangedEventArgs e) => _redraws.Request();
 
     private void OnReadinessChanged() => _redraws.Request();
 
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
-        ViewModel.PropertyChanged -= OnViewModelChanged;
+        State.PropertyChanged -= OnStateChanged;
         Readiness.Changed -= OnReadinessChanged;
         await _keys.StopAsync();
     }

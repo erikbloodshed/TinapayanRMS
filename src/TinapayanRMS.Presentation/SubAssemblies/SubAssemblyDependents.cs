@@ -5,7 +5,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// The Sub-Assemblies screen's Dependents tab (through SubAssembliesViewModel.Dependents): the products linking the
+/// The Sub-Assemblies screen's Dependents tab (through SubAssembliesState.Dependents): the products linking the
 /// sub-assembly the form shows and the made ingredients made from it, one tile each, which opens it, and what linking means
 /// for editing it. The screen says what to show as each sub-assembly is loaded.
 /// </summary>

@@ -5,7 +5,7 @@ using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
-/// <summary>CommandButton: a button bound to a ViewModel's command, enabled while the command can run.</summary>
+/// <summary>CommandButton: a button bound to a screen state's command, enabled while the command can run.</summary>
 public class CommandButtonTests
 {
     [Test]

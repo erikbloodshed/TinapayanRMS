@@ -4,7 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 namespace TinapayanRMS.Presentation.Tests.Fixtures;
 
 /// <summary>
-/// IViewStateStore kept in memory, for a ViewModel under test: it starts with what it's given, and keeps what's written
+/// IViewStateStore kept in memory, for a screen state under test: it starts with what it's given, and keeps what's written
 /// for the test to read back. Safe to write from the thread pool, as the Products list's throttled writer does.
 /// </summary>
 public sealed class InMemoryViewStateStore(IReadOnlyDictionary<string, IReadOnlyList<string>>? values = null) : IViewStateStore

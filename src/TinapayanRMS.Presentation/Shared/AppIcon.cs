@@ -1,7 +1,7 @@
 namespace TinapayanRMS.Presentation.Shared;
 
 /// <summary>
-/// The app's icons, by what each stands for. A ViewModel names one (a menu item's, a tree row's, a tab's); the screens
+/// The app's icons, by what each stands for. A screen state names one (a menu item's, a tree row's, a tab's); the screens
 /// draw it from Syncfusion's own icons (TinapayanRMS.Components' AppIcons, which picks the icon for each), so an action
 /// shows the same icon wherever it's offered.
 /// </summary>

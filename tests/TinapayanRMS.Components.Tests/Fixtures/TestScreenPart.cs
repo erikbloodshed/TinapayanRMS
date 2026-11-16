@@ -2,7 +2,7 @@
 // from one for a part, and watches its properties, lists and commands too.
 namespace TinapayanRMS.Presentation.Shared;
 
-/// <summary>A part of a test screen's ViewModel, as the Products screen's Packaging tab is: a command of its own.</summary>
+/// <summary>A part of a test screen's state, as the Products screen's Packaging tab is: a command of its own.</summary>
 public sealed class TestScreenPart : ObservableState
 {
     public TestScreenPart()

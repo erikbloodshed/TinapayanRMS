@@ -5,8 +5,8 @@
 
 @* The screen on show, kept apart from the rest of the window. An exception a screen didn't catch (in drawing it, in one
    of its events, in a component's call to the page) used to bring up Blazor's error bar, whose only way on was to load
-   the page again, which builds every screen's ViewModel afresh and loses the form's unsaved changes. Now the screen
-   alone gives way to this panel, the title bar, the tabs and the other screens still working. The ViewModel stays (it's
+   the page again, which builds every screen's state afresh and loses the form's unsaved changes. Now the screen
+   alone gives way to this panel, the title bar, the tabs and the other screens still working. The screen state stays (it's
    the page's), so opening the screen again, here or by going to it, shows it as it was, unsaved changes and all. The log
    has what happened. *@
 @if (CurrentException is null)

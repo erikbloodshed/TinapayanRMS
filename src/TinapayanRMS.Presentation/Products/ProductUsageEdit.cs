@@ -133,7 +133,7 @@ public sealed class ProductUsageEdit : ObservableRow
     private bool _isRoleRepeated;
     /// <summary>
     /// Whether the recipe has other sections in its role, so this one is called by its name as well. The screen sets it
-    /// as the recipe changes (ProductsViewModel.MarkRepeatedRoles).
+    /// as the recipe changes (ProductsState.MarkRepeatedRoles).
     /// </summary>
     public bool IsRoleRepeated
     {

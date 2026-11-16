@@ -80,7 +80,7 @@ public class SignInTests
         var settings = new InMemoryAccessSettings();
         await settings.CreatePasswordAsync("pandesal 6am", CancellationToken.None);
         await using var context = NewContext(settings);
-        var signIn = context.Services.GetRequiredService<SignInViewModel>();
+        var signIn = context.Services.GetRequiredService<SignInState>();
         var panel = context.Render<SignInScreen>();
         panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().ContainSingle());
         await panel.Find("#sign-in-password").InputAsync(new ChangeEventArgs { Value = "pandesal 7am" });
@@ -131,7 +131,7 @@ public class SignInTests
     }
 
     [Test]
-    public async Task The_panel_left_is_let_go_though_its_ViewModel_and_the_lock_live_on()
+    public async Task The_panel_left_is_let_go_though_its_state_and_the_lock_live_on()
     {
         var settings = new InMemoryAccessSettings();
         await using var context = NewContext(settings);
@@ -142,7 +142,7 @@ public class SignInTests
         var left = context.ShowAndLeave<SignInScreen>(
             whileShown: panel => panel.FindAll("input[type=password]").Should().HaveCount(2));
 
-        left.IsCollected().Should().BeTrue("the sign-in ViewModel lives as long as the page, and must hold on to none of the panels drawn over it");
+        left.IsCollected().Should().BeTrue("the sign-in panel's state lives as long as the page, and must hold on to none of the panels drawn over it");
     }
 
     [Test]

@@ -6,7 +6,7 @@ namespace TinapayanRMS.Presentation.App;
 /// <summary>
 /// The database made ready once per start, before anything reads it (IDatabaseUpdater: a restore cut short put back, then
 /// the database made if it isn't there, backed up and updated if it's behind, refused if a newer copy updated it). The
-/// sign-in panel waits for it before it reads the password (SignInViewModel), and StartupTasks before the day's backup;
+/// sign-in panel waits for it before it reads the password (SignInState), and StartupTasks before the day's backup;
 /// both share the one run. A run that failed is run again by the next ask (the panel's Try Again). One for the process.
 /// </summary>
 public sealed class DatabaseReadiness(IDatabaseUpdater updater, ILogger logger)

@@ -22,7 +22,7 @@ public interface IRecordScreen
 
 /// <summary>
 /// A screen of records with an address each (products/42): what its page (RecordScreenBase) opens the record in the address
-/// through. The three record screens, through RecordFormViewModel.
+/// through. The three record screens, through RecordScreenState.
 /// </summary>
 public interface IRecordOpener
 {

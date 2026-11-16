@@ -1,8 +1,8 @@
 @typeparam TItem where TItem : class
 
 @* A list of records to pick one from: single row selection, kept in step
-   with a ViewModel's Selected… property both ways. A pick in the grid sets it; the ViewModel clearing it (New, Save,
-   Delete) clears the grid's highlight, and the ViewModel pointing it at a record (after a load, or a refresh) highlights
+   with a screen state's Selected… property both ways. A pick in the grid sets it; the screen state clearing it (New, Save,
+   Delete) clears the grid's highlight, and the screen state pointing it at a record (after a load, or a refresh) highlights
    that row. Columns must include the item's key with IsPrimaryKey, so a refresh keeps the right row picked. *@
 <SfGrid @ref="_grid" TValue="TItem" DataSource="DataSource" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24" EnableHover="true">
     <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Single" EnableToggle="false" />
@@ -15,7 +15,7 @@
 @code {
     private SfGrid<TItem>? _grid;
 
-    // What the grid last showed as picked, so a change coming from the ViewModel can be told from one the grid made.
+    // What the grid last showed as picked, so a change coming from the screen state can be told from one the grid made.
     private TItem? _shown;
     private bool _syncPending;
 

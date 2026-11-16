@@ -1,54 +1,54 @@
 @page "/products"
 @page "/products/{Id:int}"
-@inherits RecordScreenBase<ProductsViewModel>
+@inherits RecordScreenBase<ProductsState>
 @inject Prompts Prompts
 
-<PageTitle>@(ViewModel!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
+<PageTitle>@(State!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
 
-<UndoKeys Screen="ViewModel!" Redraw="RedrawNowAsync" />
+<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
 
 @* The Products screen: the list beside the picked product's header and its tabs along the bottom.
    Every tab but Clone and History is part of the one form Save writes. Clone and History only apply to a saved
    product. Between
    picking a product and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each product has its own
    address, so the browser's Back and Forward step between the products opened. *@
-<CascadingValue Value="(IUndoRecorder)ViewModel!" IsFixed="true">
+<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
     <div class="record-screen">
-        <ProductList List="ViewModel!.List" />
+        <ProductList List="State!.List" />
 
         <div class="record-details">
-            <ProductHeader ViewModel="ViewModel!" />
+            <ProductHeader State="State!" />
 
-            <section class="card tabs-card @(ViewModel!.AreDetailsReady ? "" : "details-pending")">
-                <SfTab @bind-SelectedItem="ViewModel!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+            <section class="card tabs-card @(State!.AreDetailsReady ? "" : "details-pending")">
+                <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
                     <TabItems>
                         <TabItem>
                             <ChildContent><TabHeader Text="Recipe" /></ChildContent>
-                            <ContentTemplate><RecipeStructure ViewModel="ViewModel!" /></ContentTemplate>
+                            <ContentTemplate><RecipeStructure State="State!" /></ContentTemplate>
                         </TabItem>
                         <TabItem>
                             <ChildContent><TabHeader Text="Costing" /></ChildContent>
-                            <ContentTemplate><Costing ViewModel="ViewModel!" /></ContentTemplate>
+                            <ContentTemplate><Costing State="State!" /></ContentTemplate>
                         </TabItem>
-                        <TabItem Visible="ViewModel!.ShowLinks">
+                        <TabItem Visible="State!.ShowLinks">
                             <ChildContent><TabHeader Text="Clone" /></ChildContent>
                             <ContentTemplate>
                                 <div class="tab-card narrow-card">
                                     <h2 class="panel-header">Clone This Product</h2>
                                     <FormRow Label="New Product Name" For="clone-name">
-                                        <TextField ID="clone-name" @bind-Value="ViewModel!.EditingCloneName" />
+                                        <TextField ID="clone-name" @bind-Value="State!.EditingCloneName" />
                                     </FormRow>
                                     <div class="button-row">
-                                        <CommandButton Command="ViewModel!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
-                                        <CommandButton Command="ViewModel!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
+                                        <CommandButton Command="State!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
+                                        <CommandButton Command="State!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
                                     </div>
                                     <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Innovation.</p>
                                 </div>
                             </ContentTemplate>
                         </TabItem>
-                        <TabItem Visible="ViewModel!.ShowLinks">
+                        <TabItem Visible="State!.ShowLinks">
                             <ChildContent><TabHeader Text="History" /></ChildContent>
-                            <ContentTemplate><History ViewModel="ViewModel!" /></ContentTemplate>
+                            <ContentTemplate><History State="State!" /></ContentTemplate>
                         </TabItem>
                     </TabItems>
                 </SfTab>
@@ -58,31 +58,31 @@
 </CascadingValue>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var viewModel = ViewModel!;
+        var state = State!;
 
         // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
-        AddSubscription(viewModel.PromptForNewCategory.RegisterHandler(async interaction =>
+        AddSubscription(state.PromptForNewCategory.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
 
         // A name asked for by the list's menu: a clone's or a variant's. The list names everything else in place.
-        AddSubscription(viewModel.List.PromptForName.RegisterHandler(async interaction =>
+        AddSubscription(state.List.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
 
         // Move to In-House: the made ingredient's name and the Made category it goes in.
-        AddSubscription(viewModel.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
+        AddSubscription(state.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
     }
 
     protected override string AddressRoot => "products";
 
-    protected override int? ShownId => ViewModel!.SelectedProduct?.Id;
+    protected override int? ShownId => State!.SelectedProduct?.Id;
 
-    protected override string ShownProperty => nameof(ProductsViewModel.SelectedProduct);
+    protected override string ShownProperty => nameof(ProductsState.SelectedProduct);
 
     // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
     protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);

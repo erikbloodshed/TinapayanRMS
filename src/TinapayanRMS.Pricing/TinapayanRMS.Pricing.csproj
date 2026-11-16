@@ -2,7 +2,7 @@
 
   <!-- What a saved product costs, read and worked out the one way the screens, the Recipe API and the MCP server all read it:
        SavedProductReader and what it builds. It knows repository interfaces and rules, and nothing of Blazor, MAUI, Syncfusion or
-       the screens' ViewModels, so the two servers can price without a UI. -->
+       the screens' state classes, so the two servers can price without a UI. -->
 
   <ItemGroup>
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />

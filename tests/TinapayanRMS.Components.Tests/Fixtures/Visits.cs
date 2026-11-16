@@ -6,8 +6,8 @@ namespace TinapayanRMS.Components.Tests.Fixtures;
 
 /// <summary>
 /// A visit to a screen, as the router makes one: the component is shown, then left for another address, which disposes
-/// it. What it was shown over (its ViewModel, a scoped service that lives as long as the window's page, or the folders
-/// and lines that ViewModel holds) goes on, and must not keep hold of it.
+/// it. What it was shown over (its state, a scoped service that lives as long as the window's page, or the folders
+/// and lines that screen state holds) goes on, and must not keep hold of it.
 /// </summary>
 public static class Visits
 {

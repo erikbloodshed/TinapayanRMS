@@ -25,14 +25,14 @@
     without .Tests).
 
 .PARAMETER Class
-    Only classes whose name matches, with * for any characters: "*ProductsViewModelRefreshTests".
+    Only classes whose name matches, with * for any characters: "*ProductsStateRefreshTests".
 
 .PARAMETER Method
     Only tests whose name matches: "*keeps_the_selection*". With -Class too, only those tests of those classes. Both go
     into one --treenode-filter.
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -Class "*ProductsViewModelRefreshTests"
+    powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -Class "*ProductsStateRefreshTests"
 #>
 [CmdletBinding()]
 param(

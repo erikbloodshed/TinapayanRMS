@@ -1,7 +1,7 @@
 @page "/price-simulator"
 @using TinapayanRMS.Pricing
 @using TinapayanRMS.Components.Printing
-@inherits ScreenBase<PriceSimulatorViewModel>
+@inherits ScreenBase<PriceSimulatorState>
 @inject PrintPreviews Previews
 @inject IFileDialogs Dialogs
 @inject NavigationManager Navigation
@@ -21,9 +21,9 @@
             <div class="report-heading">
                 <h2 class="section-header">Scenarios</h2>
                 <div class="button-row">
-                    <CommandButton Command="ViewModel!.SaveScenarioCommand" Icon="AppIcon.Save" Label="Save Scenario"
+                    <CommandButton Command="State!.SaveScenarioCommand" Icon="AppIcon.Save" Label="Save Scenario"
                                    Tooltip="Saves the price changes in the table under a name. Keep the open scenario's name to update it." />
-                    <CommandButton Command="ViewModel!.DeleteScenarioCommand" Icon="AppIcon.Delete" Label="Delete Scenario"
+                    <CommandButton Command="State!.DeleteScenarioCommand" Icon="AppIcon.Delete" Label="Delete Scenario"
                                    Tooltip="Deletes the open scenario, after asking. Its changes stay in the table." />
                 </div>
             </div>
@@ -32,15 +32,15 @@
                 <table class="line-table scenario-table">
                     <thead><tr><th class="col-date">Saved</th><th>Name</th></tr></thead>
                     <tbody>
-                        @foreach (var scenario in ViewModel!.Scenarios)
+                        @foreach (var scenario in State!.Scenarios)
                         {
-                            <tr @key="scenario.Id" class="@(ReferenceEquals(scenario, ViewModel.SelectedScenario) ? "selected" : "")"
-                                @onclick="() => ViewModel.SelectedScenario = scenario">
+                            <tr @key="scenario.Id" class="@(ReferenceEquals(scenario, State.SelectedScenario) ? "selected" : "")"
+                                @onclick="() => State.SelectedScenario = scenario">
                                 <td class="cell-text">@scenario.SavedAt.ToString("MMM d, yyyy  h:mm tt")</td>
                                 <td class="cell-text">@scenario.Name</td>
                             </tr>
                         }
-                        @if (ViewModel.Scenarios.Count == 0)
+                        @if (State.Scenarios.Count == 0)
                         {
                             <tr><td colspan="2" class="cell-text muted">No scenarios saved yet.</td></tr>
                         }
@@ -53,14 +53,14 @@
             <div class="report-heading">
                 <h2 class="section-header">Price Changes</h2>
                 <div class="button-row">
-                    <CommandButton Command="ViewModel!.RemoveChangeCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
-                    <CommandButton Command="ViewModel!.ClearCommand" Icon="AppIcon.Cancel" Label="Clear All"
+                    <CommandButton Command="State!.RemoveChangeCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                    <CommandButton Command="State!.ClearCommand" Icon="AppIcon.Cancel" Label="Clear All"
                                    Tooltip="Takes every price change away, so the figures are today's again, and closes the open scenario." />
                 </div>
             </div>
             <p class="caption">Pick a raw material and type how much its price changes, in percent, or its new price; the other is worked out. Prices are per the unit it's bought in, from the brand it's costed at. No real price changes here: the changes last until you close the tab, unless you save them as a scenario.</p>
             <div class="scroll-box">
-                <LineGrid TRow="SimulatedPriceChange" Items="ViewModel!.Changes" NewItem="ViewModel!.NewChange" @bind-SelectedItem="ViewModel!.SelectedChange">
+                <LineGrid TRow="SimulatedPriceChange" Items="State!.Changes" NewItem="State!.NewChange" @bind-SelectedItem="State!.SelectedChange">
                     <Header>
                         <th>Raw Material</th>
                         <th class="col-unit">Per</th>
@@ -70,7 +70,7 @@
                     </Header>
                     <Row Context="row">
                         <td>
-                            <PickField TItem="RawMaterial" Items="ViewModel!.Materials" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
+                            <PickField TItem="RawMaterial" Items="State!.Materials" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
                                        Value="row.Material" ValueChanged="m => row.MaterialId = m?.Id">
                                 <ItemTemplate Context="material"><span class="pick-columns"><span>@material.Name</span><span class="muted">@material.Category?.Name</span></span></ItemTemplate>
                             </PickField>
@@ -89,17 +89,17 @@
         <div class="report-heading">
             <h2 class="section-header">
                 Products
-                @if (ViewModel!.IsUnbuffered)
+                @if (State!.IsUnbuffered)
                 {
                     <span class="badge badge-warning" title="Every figure is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
                 }
             </h2>
             <div class="button-row">
-                <SfCheckBox Label="Only affected products" @bind-Checked="ViewModel!.OnlyAffected" />
-                <CommandButton Command="ViewModel!.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@ViewModel!.CostBasisButtonLabel" Tooltip="@ViewModel!.CostBasisButtonTooltip" />
-                <CommandButton Command="ViewModel!.PrintCommand" Icon="AppIcon.Print" Label="Print Report"
+                <SfCheckBox Label="Only affected products" @bind-Checked="State!.OnlyAffected" />
+                <CommandButton Command="State!.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@State!.CostBasisButtonLabel" Tooltip="@State!.CostBasisButtonTooltip" />
+                <CommandButton Command="State!.PrintCommand" Icon="AppIcon.Print" Label="Print Report"
                                Tooltip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows." />
-                <CommandButton Command="ViewModel!.ExportCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
+                <CommandButton Command="State!.ExportCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                Tooltip="Saves the products as shown, and the price changes, to an Excel workbook." />
             </div>
         </div>
@@ -107,7 +107,7 @@
         @* In a SelfDrawn, as Reports' grids are: it draws itself as its rows change, which they do in one change
            (TableRows), so the page drawing again for a change typed or a button's state doesn't draw it again. *@
         <SelfDrawn>
-            <SfGrid @ref="_products" TValue="PriceSimulatorProductRow" DataSource="ViewModel!.Products" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
+            <SfGrid @ref="_products" TValue="PriceSimulatorProductRow" DataSource="State!.Products" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
                     AllowSorting="true" AllowFiltering="true" AllowTextWrap="true" AllowResizing="true">
                 <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
                 <GridSelectionSettings Mode="SelectionMode.Row" Type="SelectionType.Multiple" />
@@ -142,23 +142,23 @@
     /// <summary>The products as the table last showed them, in its sort and with its filters; null until it has.</summary>
     private IReadOnlyList<PriceSimulatorProductRow>? _shown;
 
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var viewModel = ViewModel!;
+        var state = State!;
 
         // What Print Report's All products shown prints, and the order it prints them in: the table's, lent to the
-        // ViewModel while the screen shows it and taken back as it goes, since the ViewModel outlives every visit.
-        AddSubscription(viewModel.ShowProductsFrom(() => _shown is { } shown && shown.All(viewModel.Products.Contains) ? shown : viewModel.Products));
+        // screen state while the screen shows it and taken back as it goes, since the screen state outlives every visit.
+        AddSubscription(state.ShowProductsFrom(() => _shown is { } shown && shown.All(state.Products.Contains) ? shown : state.Products));
 
         // Save Scenario's name, the open scenario's to start with.
-        AddSubscription(viewModel.PromptForName.RegisterHandler(async interaction =>
+        AddSubscription(state.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
 
-        // Print Report: the preview page, with the choices the ViewModel made (the products picked, and all shown).
-        AddSubscription(viewModel.ShowPrint.RegisterHandler(interaction =>
+        // Print Report: the preview page, with the choices the screen state made (the products picked, and all shown).
+        AddSubscription(state.ShowPrint.RegisterHandler(interaction =>
         {
             Previews.Show(interaction.Input, "price-simulator");
             Navigation.NavigateTo("print/preview");
@@ -166,11 +166,11 @@
         }));
 
         // Export to Excel: the products as shown and the price changes, a sheet each.
-        AddSubscription(viewModel.ExportToExcel.RegisterHandler(async interaction =>
+        AddSubscription(state.ExportToExcel.RegisterHandler(async interaction =>
         {
             var fileName = $"{interaction.Input} {DateTime.Today:yyyy-MM-dd}.xlsx";
             var workbook = ExcelWorkbook.Build(
-                ExcelSheet.Of(viewModel.IsUnbuffered ? "Products (Unbuffered)" : "Products", viewModel.ShownProducts(),
+                ExcelSheet.Of(state.IsUnbuffered ? "Products (Unbuffered)" : "Products", state.ShownProducts(),
                     new ExcelColumn<PriceSimulatorProductRow>("Product", r => r.ProductName),
                     new("Category", r => r.Category),
                     new("Raw Material Cost", r => r.RawMaterialCost, ExcelWorkbook.Money),
@@ -185,7 +185,7 @@
                     new("Markup %", r => r.MarkupPercent, ExcelWorkbook.Money),
                     new("Simulated Markup %", r => r.SimulatedMarkupPercent, ExcelWorkbook.Money),
                     new("Price to Keep Markup", r => r.PriceToKeepMarkup, ExcelWorkbook.Money)),
-                ExcelSheet.Of("Price Changes", viewModel.Changes.Where(c => c.Material is not null),
+                ExcelSheet.Of("Price Changes", state.Changes.Where(c => c.Material is not null),
                     new ExcelColumn<SimulatedPriceChange>("Raw Material", c => c.Material?.Name),
                     new("Per", c => c.UnitName),
                     new("Current Price", c => c.CurrentPrice, ExcelWorkbook.Money),
@@ -196,7 +196,7 @@
     }
 
     private Task OpenProductAsync(RecordDoubleClickEventArgs<PriceSimulatorProductRow> args) =>
-        args.RowData is { } row ? Commands.Run(ViewModel!.OpenProductCommand, row.ProductId) : Task.CompletedTask;
+        args.RowData is { } row ? Commands.Run(State!.OpenProductCommand, row.ProductId) : Task.CompletedTask;
 
     // The table without paging shows every row its filters leave, in its sort: what "the products shown" are.
     private async Task RememberShownAsync(object args)
@@ -216,10 +216,10 @@
         }
 
         var picked = await _products.GetSelectedRecordsAsync();
-        ViewModel!.SelectedProducts.Clear();
+        State!.SelectedProducts.Clear();
         foreach (var row in picked)
         {
-            ViewModel.SelectedProducts.Add(row);
+            State.SelectedProducts.Add(row);
         }
     }
 }

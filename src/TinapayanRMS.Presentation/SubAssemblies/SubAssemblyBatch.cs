@@ -8,7 +8,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// A recipe's lines on the Sub-Assemblies screen (through SubAssembliesViewModel.Batch): its ingredients in grams, typed
+/// A recipe's lines on the Sub-Assemblies screen (through SubAssembliesState.Batch): its ingredients in grams, typed
 /// straight into the table, the formula's base and the batch's totals that follow them, and Scale. It shows the lines as
 /// saved, keeps and puts them back for an undo step, and prices them; Save reads them as typed. The screen keeps the undo
 /// history, the Remove Line its two tables share, and says when the ingredients were read again.
@@ -153,14 +153,14 @@ public sealed class SubAssemblyBatch : ObservableState
     }
 
     /// <summary>The lines as an undo step keeps them: each ingredient by id, so a refresh's fresh copies aren't an edit.</summary>
-    public IReadOnlyList<IngredientLineState> Capture() =>
-        [.. Lines.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+    public IReadOnlyList<IngredientLineSnapshot> Capture() =>
+        [.. Lines.Select(l => new IngredientLineSnapshot(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
     /// <summary>
     /// The lines an undo step kept, in place of those showing, at the formula base they were read against. They're rebuilt
     /// rather than written into: IngredientLineRow's setters drop a typed percentage.
     /// </summary>
-    public void Restore(IEnumerable<IngredientLineState> lines, decimal formulaBase)
+    public void Restore(IEnumerable<IngredientLineSnapshot> lines, decimal formulaBase)
     {
         FormulaBase = formulaBase;
         Lines.Clear();

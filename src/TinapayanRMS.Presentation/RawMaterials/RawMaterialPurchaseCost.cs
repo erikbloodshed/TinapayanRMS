@@ -39,7 +39,7 @@ public interface IRawMaterialPurchaseCostHost : IFormPartHost
 }
 
 /// <summary>
-/// A purchased material's cost on the Raw Materials screen (through RawMaterialsViewModel.PurchaseCost; PurchaseCostSetup
+/// A purchased material's cost on the Raw Materials screen (through RawMaterialsState.PurchaseCost; PurchaseCostSetup
 /// draws it): a price per brand, typed straight into the table, which brand the cost comes from (the dearest, or one picked
 /// in Basis), the fixed buffered cost on top of it and the Cost Buffer % it comes to, with the target buffer it was typed
 /// at; and the header's saved costs, in the unit picked to show them in (Per). The brand rows' units are the form's
@@ -359,10 +359,10 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
     }
 
     /// <summary>The brand rows as an undo step keeps them.</summary>
-    public IReadOnlyList<BrandPriceState> CaptureBrandPrices() => [.. BrandPriceRows.Select(r => new BrandPriceState(r.Brand, r.UnitKey, r.Price))];
+    public IReadOnlyList<BrandPriceSnapshot> CaptureBrandPrices() => [.. BrandPriceRows.Select(r => new BrandPriceSnapshot(r.Brand, r.UnitKey, r.Price))];
 
     /// <summary>The brand rows an undo step kept, in place of the table's.</summary>
-    public void RestoreBrandPrices(IEnumerable<BrandPriceState> prices)
+    public void RestoreBrandPrices(IEnumerable<BrandPriceSnapshot> prices)
     {
         BrandPriceRows.Clear();
         foreach (var price in prices)

@@ -10,65 +10,65 @@
     <div class="section-heading">
         <div class="usage-badges">
             <span class="group-heading">Packaging per Piece</span>
-            @if (ViewModel.Packaging.IsPackagingLinkedToProduct)
+            @if (State.Packaging.IsPackagingLinkedToProduct)
             {
-                <span class="badge badge-warning">@ViewModel.Packaging.PackagingLinkedToText</span>
+                <span class="badge badge-warning">@State.Packaging.PackagingLinkedToText</span>
             }
-            @if (ViewModel.Packaging.IsPackagingLinkedToSet && ViewModel.Packaging.PackagingLinkedSetId is { } setId)
+            @if (State.Packaging.IsPackagingLinkedToSet && State.Packaging.PackagingLinkedSetId is { } setId)
             {
-                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(ViewModel.OpenSubAssemblyCommand, setId)" title="Open the packaging set on the Sub-Assemblies screen">
-                    @ViewModel.Packaging.PackagingLinkedToText
+                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, setId)" title="Open the packaging set on the Sub-Assemblies screen">
+                    @State.Packaging.PackagingLinkedToText
                 </button>
             }
-            @if (ViewModel.Packaging.IsPackagingMoving)
+            @if (State.Packaging.IsPackagingMoving)
             {
                 <span class="badge badge-warning" title="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own.">Moves to Sub-Assemblies on Save</span>
             }
-            @if (ViewModel.Packaging.IsPickingSource)
+            @if (State.Packaging.IsPickingSource)
             {
-                <PickField ID="packaging-source" TItem="LinkableSubAssemblyOption" Items="ViewModel.Packaging.SourceOptions" TextField="PackagingSourceName"
-                           @bind-Value="ViewModel.Packaging.PickedSource" Placeholder="@ViewModel.Packaging.SourcePlaceholder" CssClass="packaging-source"
+                <PickField ID="packaging-source" TItem="LinkableSubAssemblyOption" Items="State.Packaging.SourceOptions" TextField="PackagingSourceName"
+                           @bind-Value="State.Packaging.PickedSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
                            OpenOnShow="true" PopupWidth="420px"
-                           Tooltip="@(ViewModel.Packaging.SourceMode == PackagingSourceMode.Copy
+                           Tooltip="@(State.Packaging.SourceMode == PackagingSourceMode.Copy
                                ? "Its lines become this product's own, in place of the ones here, to change as you like."
                                : "Its lines show here, read-only, in place of the ones here, and follow every change made to the set.")" />
-                <CommandButton Command="ViewModel.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
+                <CommandButton Command="State.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
             }
         </div>
         <div class="lines-footer-right">
-            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@ViewModel.Costing.CostUnitCaption · @ViewModel.Packaging.LinesCost.ToString("N2")</span>
-            @if (!ViewModel.Packaging.IsPickingSource)
+            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@State.Costing.CostUnitCaption · @State.Packaging.LinesCost.ToString("N2")</span>
+            @if (!State.Packaging.IsPickingSource)
             {
-                <CommandButton Command="ViewModel.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
+                <CommandButton Command="State.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
                                Tooltip="Use a packaging set from the Sub-Assemblies screen instead of the lines here. Its lines show read-only, and follow every change made to the set." />
-                <CommandButton Command="ViewModel.Packaging.StartCopyingCommand" Icon="AppIcon.Copy" Label="Copy"
+                <CommandButton Command="State.Packaging.StartCopyingCommand" Icon="AppIcon.Copy" Label="Copy"
                                Tooltip="Copy the lines of a packaging set, or of another product's packaging, in place of the ones here. They're this product's own, to change as you like." />
             }
-            @if (ViewModel.Packaging.CanMovePackaging && ViewModel.Packaging.LineEdits.Count > 0)
+            @if (State.Packaging.CanMovePackaging && State.Packaging.LineEdits.Count > 0)
             {
-                <CommandButton Command="ViewModel.Packaging.MoveToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
+                <CommandButton Command="State.Packaging.MoveToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
                                Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
             }
         </div>
     </div>
 
-    <PackagingLinesGrid @ref="_lines" Items="ViewModel.Packaging.LineEdits" NewItem="@(ViewModel.Packaging.IsPackagingEditable ? ViewModel.Packaging.NewLineEdit : null)" Materials="ViewModel.PackagingMaterials"
-                        @bind-SelectedItem="ViewModel.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!ViewModel.Packaging.IsPackagingEditable" Basis="ViewModel.Costing.CostBasis" />
+    <PackagingLinesGrid @ref="_lines" Items="State.Packaging.LineEdits" NewItem="@(State.Packaging.IsPackagingEditable ? State.Packaging.NewLineEdit : null)" Materials="State.PackagingMaterials"
+                        @bind-SelectedItem="State.Packaging.SelectedLineEdit" CostHeader="Cost per Unit" ReadOnly="!State.Packaging.IsPackagingEditable" Basis="State.Costing.CostBasis" />
 
     <div class="lines-footer">
-        @if (ViewModel.Packaging.IsPackagingLinked)
+        @if (State.Packaging.IsPackagingLinked)
         {
             <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
             <div class="button-row">
-                <CommandButton Command="ViewModel.Packaging.MakeCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
+                <CommandButton Command="State.Packaging.MakeCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
                                Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
-                <CommandButton Command="ViewModel.Packaging.RemoveLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
+                <CommandButton Command="State.Packaging.RemoveLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
                                Tooltip="Take the link out, and its lines with it, leaving no packaging per piece. The packaging set stays on the Sub-Assemblies screen." />
             </div>
         }
         else
         {
-            if (ViewModel.Packaging.LineEdits.Count == 0)
+            if (State.Packaging.LineEdits.Count == 0)
             {
                 <p class="caption">No packaging per piece. Add what one piece takes, such as its bag and label, or Link a packaging set.</p>
             }
@@ -79,7 +79,7 @@
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                <CommandButton Command="ViewModel.Packaging.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                <CommandButton Command="State.Packaging.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
             </div>
         }
     </div>
@@ -89,25 +89,25 @@
             <span class="group-heading">Bulk Packaging</span>
             <div class="bulk-quantity">
                 <label class="form-label" for="bulk-quantity">Products per pack</label>
-                <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="ViewModel.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
+                <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="State.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
                              Tooltip="How many products one bulk pack holds: the pack's cost is shared out among them." />
             </div>
         </div>
-        <PackagingLinesGrid @ref="_bulk" Items="ViewModel.Packaging.BulkEdits" NewItem="ViewModel.Packaging.NewBulkEdit" Materials="ViewModel.PackagingMaterials"
-                            @bind-SelectedItem="ViewModel.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="ViewModel.Costing.CostBasis" />
+        <PackagingLinesGrid @ref="_bulk" Items="State.Packaging.BulkEdits" NewItem="State.Packaging.NewBulkEdit" Materials="State.PackagingMaterials"
+                            @bind-SelectedItem="State.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="State.Costing.CostBasis" />
         <div class="lines-footer">
-            <p class="caption">@ViewModel.Packaging.BulkCostText</p>
+            <p class="caption">@State.Packaging.BulkCostText</p>
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
                               Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                <CommandButton Command="ViewModel.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                <CommandButton Command="State.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
             </div>
         </div>
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public ProductsState State { get; set; } = null!;
 
     private PackagingLinesGrid? _lines;
     private PackagingLinesGrid? _bulk;

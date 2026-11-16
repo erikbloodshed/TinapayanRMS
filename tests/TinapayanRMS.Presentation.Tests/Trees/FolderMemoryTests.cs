@@ -7,7 +7,7 @@ namespace TinapayanRMS.Presentation.Tests.Trees;
 
 /// <summary>
 /// Which of a list's folders start open, on its own, with folders of a test's own. The trees' use of it is in their
-/// *TreeTests, and the screens' in their *ViewModelTreeTests.
+/// *TreeTests, and the screens' in their *StateTreeTests.
 /// </summary>
 public class FolderMemoryTests
 {

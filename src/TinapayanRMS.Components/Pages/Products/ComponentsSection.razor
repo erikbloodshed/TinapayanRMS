@@ -2,16 +2,16 @@
    bringing its recipe cost and, when ticked, its own packaging's too. *@
 <div class="section-view">
     <div class="section-heading">
-        <p class="caption">@ViewModel.ComponentsTable.Caption</p>
-        <span class="caption">@ViewModel.Costing.CostUnitCaption · @ViewModel.ComponentsTable.ComponentsCost.ToString("N2")</span>
+        <p class="caption">@State.ComponentsTable.Caption</p>
+        <span class="caption">@State.Costing.CostUnitCaption · @State.ComponentsTable.ComponentsCost.ToString("N2")</span>
     </div>
 
-    <LineGrid TRow="ProductComponentRow" Items="ViewModel.ComponentsTable.ComponentEdits" NewItem="ViewModel.ComponentsTable.NewComponentRow" IsBlank="r => r.IsBlank" @bind-SelectedItem="ViewModel.ComponentsTable.SelectedComponentEdit" Reorderable="true">
+    <LineGrid TRow="ProductComponentRow" Items="State.ComponentsTable.ComponentEdits" NewItem="State.ComponentsTable.NewComponentRow" IsBlank="r => r.IsBlank" @bind-SelectedItem="State.ComponentsTable.SelectedComponentEdit" Reorderable="true">
         <Header>
             <th>Product</th>
             <th class="col-number col-qty">Qty</th>
             <th class="col-number">Recipe Cost</th>
-            @if (ViewModel.ComponentsTable.IncludesPackaging)
+            @if (State.ComponentsTable.IncludesPackaging)
             {
                 <th class="col-number">Packaging Cost</th>
             }
@@ -19,14 +19,14 @@
         </Header>
         <Row Context="row">
             <td>
-                <PickField TItem="Product" Items="ViewModel.ComponentsTable.ComponentProductOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
+                <PickField TItem="Product" Items="State.ComponentsTable.ComponentProductOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="420px"
                            Value="row.Product" ValueChanged="p => row.ComponentProductId = p?.Id">
                     <ItemTemplate Context="product"><span class="pick-columns"><span>@product.Name</span><span class="muted">@product.Category?.Name</span></span></ItemTemplate>
                 </PickField>
             </td>
             <td><NumberField TValue="int?" Value="row.Quantity" ValueChanged="v => row.Quantity = v" Format="N0" Min="0" CssClass="cell-field" /></td>
             <td class="cell-number">@row.RecipeCost?.ToString("N2")</td>
-            @if (ViewModel.ComponentsTable.IncludesPackaging)
+            @if (State.ComponentsTable.IncludesPackaging)
             {
                 <td class="cell-number">@row.PackagingCost?.ToString("N2")</td>
             }
@@ -35,12 +35,12 @@
     </LineGrid>
 
     <div class="lines-footer">
-        <SfCheckBox Label="Include each product's packaging" @bind-Checked="ViewModel.ComponentsTable.IsPackagingTicked"
+        <SfCheckBox Label="Include each product's packaging" @bind-Checked="State.ComponentsTable.IsPackagingTicked"
                     title="Each product's own packaging, times how many of it go in, joins this product's Packaging on the Costing tab. Labor, overhead and administrative aren't charged on it." />
-        <CommandButton Command="ViewModel.ComponentsTable.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+        <CommandButton Command="State.ComponentsTable.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public ProductsState State { get; set; } = null!;
 }

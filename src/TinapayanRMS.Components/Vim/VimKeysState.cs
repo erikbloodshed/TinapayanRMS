@@ -15,16 +15,16 @@ public sealed record VimCommandResult(string? Message = null, string? Url = null
 /// <c>:e name</c> and <c>:revert</c> run on: each screen says it's
 /// showing (ScreenBase) and that it's gone.
 /// </summary>
-public sealed class VimKeysState(IViewStateStore viewState, ProductsViewModel products)
+public sealed class VimKeysState(IViewStateStore viewState, ProductsState products)
 {
     private bool? _isOn;
 
     /// <summary>Raised when the keys are turned on or off in Settings.</summary>
     public event Action? Changed;
 
-    public bool IsOn => _isOn ??= KeyboardSettingsViewModel.IsVimKeysSaved(viewState);
+    public bool IsOn => _isOn ??= KeyboardSettingsState.IsVimKeysSaved(viewState);
 
-    /// <summary>The ViewModel of the screen on show, or null between screens.</summary>
+    /// <summary>The state of the screen on show, or null between screens.</summary>
     public object? Screen { get; private set; }
 
     public void Set(bool isOn)

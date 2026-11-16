@@ -74,7 +74,7 @@ public sealed class CostingTools(
                 throw new McpException("Give at least one price change.");
             }
 
-            // What the Price Simulator screen reads (PriceSimulatorViewModel.ReadAsync), one read after another.
+            // What the Price Simulator screen reads (PriceSimulatorState.ReadAsync), one read after another.
             var products = await productRepository.GetAllAsync(cancellationToken);
             var materials = (await rawMaterialRepository.GetAllAsync(cancellationToken)).ToDictionary(m => m.Id);
             var bomLines = await bomLineRepository.GetAllAsync(cancellationToken);

@@ -5,7 +5,7 @@ namespace TinapayanRMS.Presentation.Tests.Shared;
 
 /// <summary>
 /// The undo and redo stacks on their own, with a string standing in for a screen's form: no database and no
-/// ViewModel, so what's tested here is the stack's own contract rather than any screen's use of it.
+/// screen state, so what's tested here is the stack's own contract rather than any screen's use of it.
 /// </summary>
 public class UndoHistoryTests
 {

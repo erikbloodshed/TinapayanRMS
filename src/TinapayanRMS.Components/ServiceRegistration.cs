@@ -25,7 +25,7 @@ using TinapayanRMS.Components.Vim;
 namespace TinapayanRMS.Components;
 
 /// <summary>
-/// The app's services. The ViewModels are scoped: in Blazor Hybrid a scope is a page the window's web view loads, so a
+/// The app's services. The screen states are scoped: in Blazor Hybrid a scope is a page the window's web view loads, so a
 /// reload (after a restore) builds every screen afresh. The repositories and services hold nothing but the context
 /// factory, so they're singletons. What only the window can do (its file dialogs, its title bar's buttons) the MAUI app
 /// adds: IFileDialogs and IAppWindow.
@@ -70,45 +70,45 @@ public static class ServiceRegistration
         services.AddSingleton<IValidator<CostingParameters>, CostingParametersValidator>();
         services.AddSingleton<IValidator<RawMaterialBrandPrice>, RawMaterialBrandPriceValidator>();
 
-        services.AddScoped<MainWindowViewModel>();
-        services.AddScoped<RawMaterialsViewModel>();
-        services.AddScoped<SubAssembliesViewModel>();
-        services.AddScoped<ProductsViewModel>();
-        services.AddScoped<ReportsViewModel>();
-        services.AddScoped<QuickFindViewModel>();
-        services.AddScoped<PriceSimulatorViewModel>();
-        services.AddScoped<PrintTabViewModel>();
-        services.AddScoped<UnitsOfMeasureViewModel>();
-        services.AddScoped<CategoriesViewModel>();
-        services.AddScoped<ProductCategoriesViewModel>();
-        services.AddScoped<SubAssemblyRolesViewModel>();
-        services.AddScoped<CostingDefaultsViewModel>();
-        services.AddScoped<SecuritySettingsViewModel>();
+        services.AddScoped<MainWindowState>();
+        services.AddScoped<RawMaterialsState>();
+        services.AddScoped<SubAssembliesState>();
+        services.AddScoped<ProductsState>();
+        services.AddScoped<ReportsState>();
+        services.AddScoped<QuickFindState>();
+        services.AddScoped<PriceSimulatorState>();
+        services.AddScoped<PrintTabState>();
+        services.AddScoped<UnitsOfMeasureState>();
+        services.AddScoped<CategoriesState>();
+        services.AddScoped<ProductCategoriesState>();
+        services.AddScoped<SubAssemblyRolesState>();
+        services.AddScoped<CostingDefaultsState>();
+        services.AddScoped<SecuritySettingsState>();
 
         // Whether the window is locked, one for the process, so the page loading again after a restore keeps it; the
-        // sign-in panel's ViewModel is the page's.
+        // sign-in panel's state is the page's.
         services.AddSingleton(new AppLock(TimeProvider.System));
-        services.AddScoped<SignInViewModel>();
+        services.AddScoped<SignInState>();
 
         // The Vim keys, for this page: ticking the box in Settings → Keyboard turns them on or off at once.
         services.AddScoped<VimKeysState>();
-        services.AddScoped(provider => new KeyboardSettingsViewModel(
+        services.AddScoped(provider => new KeyboardSettingsState(
             provider.GetRequiredService<IViewStateStore>(), provider.GetRequiredService<VimKeysState>().Set));
 
         // A restore replaces everything every screen holds, so the window starts again (AppStatus.Restored): a forced load
-        // of its page opens a new scope, which builds every ViewModel afresh.
+        // of its page opens a new scope, which builds every screen state afresh.
         services.AddSingleton<AppStatus>();
 
         // The day's automatic backup and its copy to a second folder, checked every hour (StartupTasks). The second folder
         // and the last problems are kept in the view state.
         services.AddSingleton<AutomaticBackups>();
-        services.AddScoped(provider => new DatabaseBackupsViewModel(
+        services.AddScoped(provider => new DatabaseBackupsState(
             provider.GetRequiredService<IDatabaseBackups>(),
             message => provider.GetRequiredService<AppStatus>().AnnounceRestore(message),
             provider.GetRequiredService<Serilog.ILogger>(),
             provider.GetRequiredService<AutomaticBackups>()));
         // A backup or restore running there keeps the window open (UnsavedChangesGuard): closing ends the process.
-        services.AddScoped<IBusyWork>(provider => provider.GetRequiredService<DatabaseBackupsViewModel>());
+        services.AddScoped<IBusyWork>(provider => provider.GetRequiredService<DatabaseBackupsState>());
         // Started by the MAUI app once it's built, as a web host starts its hosted services.
         services.AddHostedService<StartupTasks>();
 

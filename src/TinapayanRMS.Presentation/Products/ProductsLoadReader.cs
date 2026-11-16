@@ -6,7 +6,7 @@ namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
 /// Everything the Products screen's LoadCommand reads, as <see cref="ProductsLoadReader.ReadAsync"/> reads it, for the
-/// screen to merge in (ProductsViewModel.LoadAsync).
+/// screen to merge in (ProductsState.LoadAsync).
 /// </summary>
 /// <param name="PackagingSets">The packaging sets: the standalone sub-assemblies whose role is a packaging one.</param>
 /// <param name="LinkedSubAssemblies">The sub-assemblies the form's saved sections are, as they're saved now.</param>
@@ -33,7 +33,7 @@ public sealed record ProductsLoad(
 /// <summary>
 /// The Products screen's reads for its LoadCommand, apart from the merge into the screen that follows them: the lists the
 /// form and its parts pick from, the products and their folders, Settings' defaults, and what the form shows from elsewhere
-/// (its linked sections, its packaging link, a composite's products' costs). It touches no ViewModel state, as
+/// (its linked sections, its packaging link, a composite's products' costs). It touches no screen state, as
 /// SavedProductReader doesn't for a product's detail.
 /// </summary>
 internal sealed class ProductsLoadReader(

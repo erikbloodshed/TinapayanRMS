@@ -9,31 +9,31 @@
             <MenuButton CssClass="e-outline" Tooltip="Make a new sub-assembly, or link or copy an existing one, in a tab of its own">
                 <Face><Icon Of="AppIcon.Add" /> <span class="command-label">Add Sub-Assembly</span></Face>
                 <ChildContent>
-                    <ActionButton Icon="AppIcon.Add" Label="New sub-assembly" Flat="true" OnClick="() => Commands.Run(ViewModel.Recipe.AddUsageCommand, UsageFormMode.New)"
+                    <ActionButton Icon="AppIcon.Add" Label="New sub-assembly" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.New)"
                                   Tooltip="Type its lines in here. In a product-owned role (Settings → Roles) Save keeps it as this product's own; in any other, on the Sub-Assemblies screen, named after this product and its role, and linked." />
-                    <ActionButton Icon="AppIcon.Link" Label="Link an existing one" Flat="true" OnClick="() => Commands.Run(ViewModel.Recipe.AddUsageCommand, UsageFormMode.Link)"
+                    <ActionButton Icon="AppIcon.Link" Label="Link an existing one" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.Link)"
                                   Tooltip="One from the Sub-Assemblies screen. Its lines stay where they're kept, and it follows every change made to them. Another product's own can only be copied. Packaging is linked on the Packaging tab." />
-                    <ActionButton Icon="AppIcon.Copy" Label="Copy an existing one" Flat="true" OnClick="() => Commands.Run(ViewModel.Recipe.AddUsageCommand, UsageFormMode.Copy)"
+                    <ActionButton Icon="AppIcon.Copy" Label="Copy an existing one" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.Copy)"
                                   Tooltip="Starts from an existing one's lines and role, another product's own included. Save keeps it as a new one named after this product: its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
                 </ChildContent>
             </MenuButton>
-            <CommandButton Command="ViewModel.Recipe.RemoveUsageCommand" Icon="AppIcon.Delete" Label="Delete Sub-Assembly"
+            <CommandButton Command="State.Recipe.RemoveUsageCommand" Icon="AppIcon.Delete" Label="Delete Sub-Assembly"
                            Tooltip="Take the sub-assembly showing out of the recipe, with Save. One of this product's own is deleted; a linked one stays on the Sub-Assemblies screen." />
         </div>
     </div>
 
-    @if (!ViewModel.Recipe.HasRecipeSections)
+    @if (!State.Recipe.HasRecipeSections)
     {
         <p class="caption">Nothing in the recipe yet. Add Sub-Assembly adds a section — a new one, or one linked or copied. Packaging is typed, linked or copied on the Packaging tab.</p>
     }
 
     <div class="recipe-tabs" role="tablist">
-        @foreach (var tab in ViewModel.Recipe.RecipeTabs)
+        @foreach (var tab in State.Recipe.RecipeTabs)
         {
             var recipeTab = tab;
-            <button type="button" role="tab" class="recipe-tab @(ReferenceEquals(recipeTab, ViewModel.Recipe.SelectedRecipeTab) ? "active" : "")"
-                    aria-selected="@(ReferenceEquals(recipeTab, ViewModel.Recipe.SelectedRecipeTab) ? "true" : "false")"
-                    @onclick="() => ViewModel.Recipe.SelectedRecipeTab = recipeTab">
+            <button type="button" role="tab" class="recipe-tab @(ReferenceEquals(recipeTab, State.Recipe.SelectedRecipeTab) ? "active" : "")"
+                    aria-selected="@(ReferenceEquals(recipeTab, State.Recipe.SelectedRecipeTab) ? "true" : "false")"
+                    @onclick="() => State.Recipe.SelectedRecipeTab = recipeTab">
                 <Icon Of="recipeTab.Icon" />
                 <span>@recipeTab.Header</span>
             </button>
@@ -41,21 +41,21 @@
     </div>
 
     <div class="recipe-form">
-        @if (ViewModel.Recipe.IsUsageFormShowing)
+        @if (State.Recipe.IsUsageFormShowing)
         {
-            <UsageForm ViewModel="ViewModel" />
+            <UsageForm State="State" />
         }
-        @if (ViewModel.Recipe.IsPackagingShowing)
+        @if (State.Recipe.IsPackagingShowing)
         {
-            <PackagingSection ViewModel="ViewModel" />
+            <PackagingSection State="State" />
         }
-        @if (ViewModel.Recipe.IsComponentsShowing)
+        @if (State.Recipe.IsComponentsShowing)
         {
-            <ComponentsSection ViewModel="ViewModel" />
+            <ComponentsSection State="State" />
         }
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ProductsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public ProductsState State { get; set; } = null!;
 }

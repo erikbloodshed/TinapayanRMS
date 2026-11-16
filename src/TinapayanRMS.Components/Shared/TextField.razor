@@ -1,5 +1,5 @@
-@* A text box bound to a ViewModel's string:
-   each keystroke reaches the ViewModel, so whatever follows the text follows it as it's typed. Within an undo screen
+@* A text box bound to a screen state's string:
+   each keystroke reaches the screen state, so whatever follows the text follows it as it's typed. Within an undo screen
    (a cascading IUndoRecorder) the whole edit, from taking the cursor to leaving, is one undo step.
    While the box has the cursor the server never writes its text back: keystrokes reach the server one by one, and a
    redraw for an earlier one would otherwise overwrite those typed since, dropping them. A change from elsewhere (an

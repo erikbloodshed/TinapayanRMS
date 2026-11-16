@@ -1,0 +1,242 @@
+using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Validators;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.Tests.Common.Fixtures;
+using TinapayanRMS.Presentation.Tests.Fixtures;
+using TinapayanRMS.Presentation.Printing;
+using TinapayanRMS.Presentation.Products;
+using TinapayanRMS.Presentation.Shared;
+
+namespace TinapayanRMS.Presentation.Tests.Products;
+
+/// <summary>
+/// The Products screen's Unbuffered button, on real repositories: every figure moves between the materials' buffered
+/// costs and their true ones, the rows, sections, packaging, a composite's products and the printout alike. It's no
+/// edit, so there's nothing to undo or save, and it stays put from one product to the next.
+/// </summary>
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+{
+    [Test]
+    public Task Unbuffered_prices_the_whole_screen_at_the_true_costs_and_changes_nothing_about_the_product() => UiThread.RunAsync(async () =>
+    {
+        var productId = await AddEnsaymadaAsync();
+        var state = await OpenAsync(productId);
+        state.Costing.CostBasis.Should().Be(CostBasis.Buffered, "the screen starts on the buffered costs");
+        state.Costing.CostBasisButtonLabel.Should().Be("Unbuffered");
+        (state.Costing.Costs.SubAssemblies, state.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
+        state.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
+        state.UsageForm.UsageFormBatchCostText.Should().Be($"{50m:N2}");
+
+        await state.ToggleCostBasisCommand.ExecuteAsync();
+
+        state.Costing.IsUnbuffered.Should().BeTrue();
+        state.Costing.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
+        (state.Costing.Costs.SubAssemblies, state.Costing.Costs.Packaging).Should().Be((2.00m, 25m), "50 g of 1,000 g of flour at 0.04, and a box at 25");
+        state.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.04m);
+        state.Packaging.LineEdits.Single().UnitCost.Should().Be(25m);
+        state.UsageForm.UsageFormBatchCostText.Should().Be($"{40m:N2}");
+        state.UsageForm.NewFormLine().CostBasis.Should().Be(CostBasis.Unbuffered, "a row started in the add row is priced the same");
+        state.Packaging.NewLineEdit().CostBasis.Should().Be(CostBasis.Unbuffered);
+        state.History.IsDirty.Should().BeFalse("the switch isn't an edit");
+        state.History.CanUndo.Should().BeFalse();
+
+        var printout = state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;
+        printout.CostBasis.Should().Be(CostBasis.Unbuffered);
+        printout.Sections.Single().CostPerPiece.Should().Be(2.00m);
+        printout.Sections.Single().Lines.Single().CostPerGram.Should().Be(0.04m);
+        printout.Packaging!.Total.Should().Be(25m);
+
+        await state.ToggleCostBasisCommand.ExecuteAsync();
+
+        state.Costing.IsUnbuffered.Should().BeFalse();
+        state.Costing.CostBasisButtonLabel.Should().Be("Unbuffered");
+        (state.Costing.Costs.SubAssemblies, state.Costing.Costs.Packaging).Should().Be((2.50m, 30m));
+        state.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
+        state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.CostBasis.Should().Be(CostBasis.Buffered);
+    });
+
+    [Test]
+    public Task Rows_an_undo_puts_back_are_priced_unbuffered_too() => UiThread.RunAsync(async () =>
+    {
+        var productId = await AddEnsaymadaAsync();
+        var state = await OpenAsync(productId);
+        await state.ToggleCostBasisCommand.ExecuteAsync();
+
+        Edit(state, () => state.UsageForm.FormLines.Single().Grams = 500m);
+        state.TryUndo().Should().BeTrue();
+
+        state.UsageForm.FormLines.Single().Should().Match<IngredientLineRow>(r => r.Grams == 1000m && r.CostBasis == CostBasis.Unbuffered);
+        state.UsageForm.FormLines.Single().Cost.Should().Be(40m);
+        state.Costing.Costs.SubAssemblies.Should().Be(2.00m);
+    });
+
+    [Test]
+    public Task Unbuffered_stays_on_for_the_next_product_picked() => UiThread.RunAsync(async () =>
+    {
+        var productId = await AddEnsaymadaAsync();
+        var doughRoleId = await RoleIdAsync("Dough");
+        var flourId = await IngredientIdAsync("Flour");
+        var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(flourId, 1000m)], weightPerPiece: 100m);
+        var state = await OpenAsync(productId);
+        await state.ToggleCostBasisCommand.ExecuteAsync();
+
+        state.SelectedProduct = state.Products.Single(p => p.Id == cheeseRollId);
+        await Settle.UntilAsync(state,
+            () => state.AreDetailsReady && state.SelectedProduct?.Id == cheeseRollId && state.UsageForm.FormLines.Count == 1,
+            () => $"selected={state.SelectedProduct?.Id}, lines={state.UsageForm.FormLines.Count}");
+
+        state.Costing.IsUnbuffered.Should().BeTrue();
+        state.UsageForm.FormLines.Single().CostBasis.Should().Be(CostBasis.Unbuffered);
+        state.Costing.Costs.SubAssemblies.Should().Be(4.00m, "100 g of 1,000 g of flour at 0.04");
+    });
+
+    [Test]
+    public Task A_composites_products_bring_their_unbuffered_recipe_costs() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+        var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(flourId, 1000m)], weightPerPiece: 100m);
+        var boxId = await new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Name = "Pasalubong Box", IsComposite = true },
+            new RecipeDraft([], []) { Components = [(ensaymadaId, 6), (cheeseRollId, 4)] },
+            null,
+            null,
+            null,
+            Cancellation);
+        var state = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
+        state.Costing.Costs.SubAssemblies.Should().Be(35m, "6 × 2.50 + 4 × 5.00");
+
+        await state.ToggleCostBasisCommand.ExecuteAsync();
+
+        state.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
+        state.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
+        state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Which.Components!.Select(c => c.Cost).Should().Equal(12m, 16m);
+        state.History.IsDirty.Should().BeFalse();
+    });
+
+    /// <summary>
+    /// Ensaymada: a Dough of 1,000 g of flour, 0.05 a gram buffered and 0.04 true, 50 g a piece (2.50 buffered, 2.00
+    /// true), and a gift box a piece, 30 buffered and 25 true.
+    /// </summary>
+    // Every cost on the screen is at buffered costs, and a purchased material's is a fixed amount that rising prices can
+    // pass: the product is then priced under what it costs, which the screen has to say.
+    [Test]
+    public Task The_header_says_when_prices_have_risen_past_a_materials_buffered_cost() => UiThread.RunAsync(async () =>
+    {
+        var productId = await AddEnsaymadaAsync();
+        var state = await OpenAsync(productId);
+        state.Costing.BelowCostText.Should().BeNull("the flour and the box are costed above what they cost");
+
+        // The flour's price goes past its buffered cost, as a new brand price leaves it; then the box's too.
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Name == "Flour").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 0.06m), Cancellation);
+        }
+
+        (await OpenAsync(productId)).Costing.BelowCostText.Should().Be(
+            "Prices have risen past the buffered cost of Flour, so this product is priced under what it costs. "
+            + "Re-apply its target buffer on Raw Materials, or in Reports' Cost Buffers.");
+
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Name == "Gift Box").ExecuteUpdateAsync(set => set.SetProperty(m => m.CostPerBaseUnit, 36m), Cancellation);
+        }
+
+        (await OpenAsync(productId)).Costing.BelowCostText.Should().Be(
+            "Prices have risen past the buffered costs of Flour and Gift Box, so this product is priced under what they cost. "
+            + "Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.");
+    });
+
+    private async Task<int> AddEnsaymadaAsync()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.04m, bufferedCostPerGram: 0.05m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(flourId, 1000m)], weightPerPiece: 50m);
+
+        await using var dbContext = CreateDbContext();
+        var box = new RawMaterial
+        {
+            Name = "Gift Box", Type = RawMaterialType.Packaging, Category = new RawMaterialCategory { Name = "Boxes" },
+            BaseUnit = new UnitOfMeasure { Name = "piece", Abbreviation = "pc" },
+            CostPerBaseUnit = 25m, BufferedCostPerBaseUnit = 30m,
+        };
+        dbContext.RawMaterials.Add(box);
+        await dbContext.SaveChangesAsync(Cancellation);
+        dbContext.PackagingLines.Add(new PackagingLine
+        {
+            ProductId = productId, PackagingMaterialId = box.Id, AuthoredField = PackagingLineAuthoredField.QtyPerUnit, QtyPerUnit = 1m,
+        });
+        await dbContext.SaveChangesAsync(Cancellation);
+        return productId;
+    }
+
+    private async Task<int> RoleIdAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.SubAssemblyRoles.Where(r => r.Name == name).Select(r => r.Id).SingleAsync(Cancellation);
+    }
+
+    private async Task<int> IngredientIdAsync(string name)
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.RawMaterials.Where(m => m.Name == name).Select(m => m.Id).SingleAsync(Cancellation);
+    }
+
+    private static void Edit(ProductsState state, Action change)
+    {
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        change();
+        recorder.EndUndoStep();
+    }
+
+    /// <summary>The Products screen, loaded, with the product open and its first section's form showing.</summary>
+    private async Task<ProductsState> OpenAsync(int productId, Func<ProductsState, bool>? ready = null)
+    {
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        await Settle.UntilAsync(state,
+            () => state.AreDetailsReady && (ready?.Invoke(state) ?? (state.UsageForm.FormLines.Count == 1 && state.Packaging.LineEdits.Count > 0)),
+            () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}, lines={state.UsageForm.FormLines.Count}");
+        return state;
+    }
+
+    private ProductsState CreateState()
+    {
+        var factory = CreateDbContextFactory();
+        var packagingLineRepository = new PackagingLineRepository(factory);
+
+        return new ProductsState(
+            new ProductRepository(factory),
+            new ProductSubAssemblyUsageRepository(factory),
+            packagingLineRepository,
+            new CostingParametersRepository(factory),
+            new CostingDefaultsRepository(factory),
+            new PackagingLinkRepository(factory),
+            new ProductCloner(factory),
+            CreateUnitOfWork(),
+            new SubAssemblyRepository(factory),
+            new SubAssemblyLineRepository(factory),
+            new SubAssemblyRoleRepository(factory),
+            new RawMaterialRepository(factory),
+            new RawMaterialCategoryRepository(factory),
+            new ProductCategoryRepository(factory),
+            new ProductFolderRepository(factory),
+            new ProductVersionRepository(factory),
+            new ProductValidator(),
+            new CostingParametersValidator(),
+            new ProductCategoryValidator(),
+            new InMemoryViewStateStore(),
+            new LoggerConfiguration().CreateLogger());
+    }
+}

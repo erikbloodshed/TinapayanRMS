@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
 
-  <!-- The app's screens and what they share: Blazor components over the ViewModels (TinapayanRMS.Presentation), with
+  <!-- The app's screens and what they share: Blazor components over the screens' state (TinapayanRMS.Presentation), with
        Syncfusion's where one fits. A Razor class library on net11.0, so the MAUI app (TinapayanRMS.Maui) draws them in its
        window and the tests render them with bUnit, without MAUI. Its wwwroot holds the screens' styles and scripts, served
        at _content/TinapayanRMS.Components/ to whichever app hosts the screens: the host's page (the MAUI app's index.html)

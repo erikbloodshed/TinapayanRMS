@@ -60,7 +60,7 @@ public interface IRawMaterialsListHost : IRecordListHost
 }
 
 /// <summary>
-/// The Raw Materials list (through RawMaterialsViewModel.List; MaterialList draws it): the materials, searched by name and
+/// The Raw Materials list (through RawMaterialsState.List; MaterialList draws it): the materials, searched by name and
 /// filed in a folder for their type, then their category; the rows picked, its menus and keys, moves and their Undo, naming
 /// in place, and the categories as its folders. The materials and categories are the screen's, which its form's pickers
 /// read too; what the list's actions do to the material the form shows, it asks of the screen

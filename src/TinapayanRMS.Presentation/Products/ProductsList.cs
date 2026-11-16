@@ -78,7 +78,7 @@ public interface IProductsListHost : IRecordListHost
 }
 
 /// <summary>
-/// The Products list (through ProductsViewModel.List; ProductList draws it): every product, filed in its stage and the
+/// The Products list (through ProductsState.List; ProductList draws it): every product, filed in its stage and the
 /// user's folders, with the Deleted folder last; searched by name and filtered by category; the rows picked, their menus and
 /// keys, moves to other folders and the other stage and their Undo, Cut and Paste, the folders themselves, and names typed in
 /// place. The products, folders and categories are the screen's, which loads them; what the list's actions do to the

@@ -2,7 +2,7 @@ namespace TinapayanRMS.Presentation.App;
 
 /// <summary>
 /// Whether the window is locked, one for the process, so the page loading again after a restore keeps it. It starts
-/// locked: nothing of the screens is drawn until the password is given (SignInViewModel). Once signed in, the title bar's
+/// locked: nothing of the screens is drawn until the password is given (SignInState). Once signed in, the title bar's
 /// Lock, or no key, click or scroll in the window for the auto-lock's minutes (<see cref="CheckIdle"/>), locks it again,
 /// and the screens stay as they were under the sign-in panel, unsaved edits and all. Five wrong passwords in a row make
 /// the next try wait half a minute. Its changes come on whichever thread made them (<see cref="Changed"/>).

@@ -41,7 +41,7 @@ public interface IProductRecipeHost : IFormPartHost
 }
 
 /// <summary>
-/// The Products screen's recipe (through ProductsViewModel.Recipe; RecipeStructure draws it): the sub-assemblies it holds,
+/// The Products screen's recipe (through ProductsState.Recipe; RecipeStructure draws it): the sub-assemblies it holds,
 /// its sections, each with a tab of its own, in recipe order (RecipeOrder), between a composite's Products tab and the
 /// Packaging tab, which every product has; and the section form (ProductUsageForm) that adds, links, copies and edits them,
 /// opened by its tab and applied as the tab is left. It keeps what Save compares the recipe against, and works out the
@@ -1397,7 +1397,7 @@ public sealed class ProductRecipe : ObservableState
         },
     };
 
-    private static IngredientLineState CaptureIngredientLine(IngredientLineRow row) =>
+    private static IngredientLineSnapshot CaptureIngredientLine(IngredientLineRow row) =>
         new(row.IngredientId, row.Grams, row.IsFormulaBase, row.AuthoredBakersPercent);
 
     /// <summary>
@@ -1450,7 +1450,7 @@ public sealed class ProductRecipe : ObservableState
     }
 
     private void RestoreIngredientLines(
-        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineState> states, decimal baseWeight)
+        ObservableCollection<IngredientLineRow> rows, IReadOnlyList<IngredientLineSnapshot> states, decimal baseWeight)
     {
         rows.Clear();
         foreach (var state in states)

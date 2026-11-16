@@ -7,7 +7,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// A packaging set's lines on the Sub-Assemblies screen (through SubAssembliesViewModel.PackagingSet): how much of each
+/// A packaging set's lines on the Sub-Assemblies screen (through SubAssembliesState.PackagingSet): how much of each
 /// packaging material one set takes, typed straight into its table, and what the set costs, which follows them. It shows
 /// them as saved, keeps and puts them back for an undo step, prices them, and reads them as Save writes them. The screen
 /// keeps the undo history, the Remove Line its recipe's table shares, and says when their materials were read again.
@@ -78,10 +78,10 @@ public sealed class SubAssemblyPackagingSet : ObservableState
     }
 
     /// <summary>The lines as an undo step keeps them.</summary>
-    public IReadOnlyList<PackagingLineState> Capture() => [.. Lines.Select(PackagingLineState.Of)];
+    public IReadOnlyList<PackagingLineSnapshot> Capture() => [.. Lines.Select(PackagingLineSnapshot.Of)];
 
     /// <summary>The lines an undo step kept, in place of those showing.</summary>
-    public void Restore(IEnumerable<PackagingLineState> lines)
+    public void Restore(IEnumerable<PackagingLineSnapshot> lines)
     {
         Lines.Clear();
         foreach (var line in lines)

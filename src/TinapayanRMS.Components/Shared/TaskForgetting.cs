@@ -4,7 +4,7 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// Work a component starts and doesn't wait for: a toast shown from a ViewModel's change, a redraw asked for from a
+/// Work a component starts and doesn't wait for: a toast shown from a screen state's change, a redraw asked for from a
 /// service's event, the Vim keys turned on. Left as a bare discard (<c>_ = ...</c>), what it threw only reached
 /// TaskScheduler.UnobservedTaskException when the task was collected, if ever, long after and with nothing saying what it
 /// was. Given to <see cref="Forget"/>, it's logged as it fails.

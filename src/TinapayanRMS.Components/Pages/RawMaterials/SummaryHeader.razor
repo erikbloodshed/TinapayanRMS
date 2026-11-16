@@ -6,13 +6,13 @@
    purchased, so it has no Source and picks its Base Unit there instead; only a made ingredient has Weight Loss %. *@
 <section class="card header-card">
     <div class="header-title-row">
-        <h1 class="header-title">@ViewModel.HeaderTitle</h1>
+        <h1 class="header-title">@State.HeaderTitle</h1>
         <div class="button-row">
-            <CommandButton Command="ViewModel.NewCommand" Icon="AppIcon.Add" Label="New" />
-            <CommandButton Command="ViewModel.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the details, alternative units, price and bill of materials together." />
-            <CommandButton Command="ViewModel.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
-            <CommandButton Command="ViewModel.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
-            <CommandButton Command="ViewModel.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            <CommandButton Command="State.NewCommand" Icon="AppIcon.Add" Label="New" />
+            <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the details, alternative units, price and bill of materials together." />
+            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
+            <CommandButton Command="State.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+            <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </div>
 
@@ -21,81 +21,81 @@
     <div class="figure-tiles">
         <div class="figure-tile tile-rosewater">
             <div class="figure-label">Base Unit</div>
-            <div class="figure-value">@ViewModel.SavedBaseUnitText</div>
+            <div class="figure-value">@State.SavedBaseUnitText</div>
         </div>
         <div class="figure-tile tile-peach">
-            <div class="figure-label">Current Cost per @ViewModel.PurchaseCost.HeaderCostUnitText</div>
-            <div class="figure-value">@ViewModel.PurchaseCost.CurrentCostText</div>
+            <div class="figure-label">Current Cost per @State.PurchaseCost.HeaderCostUnitText</div>
+            <div class="figure-value">@State.PurchaseCost.CurrentCostText</div>
         </div>
         <div class="figure-tile tile-yellow">
-            <div class="figure-label">Buffered Cost per @ViewModel.PurchaseCost.HeaderCostUnitText</div>
-            <div class="figure-value">@ViewModel.PurchaseCost.BufferedCostText</div>
+            <div class="figure-label">Buffered Cost per @State.PurchaseCost.HeaderCostUnitText</div>
+            <div class="figure-value">@State.PurchaseCost.BufferedCostText</div>
         </div>
-        @if (ViewModel.IsEditingMade)
+        @if (State.IsEditingMade)
         {
             <div class="figure-tile tile-teal" title="What the batch yields as the BOM stands: its grams less the weight loss.">
                 <div class="figure-label">Total Weight</div>
-                <div class="figure-value">@ViewModel.Recipe.BomTotalWeight.ToString("#,0.##") g</div>
+                <div class="figure-value">@State.Recipe.BomTotalWeight.ToString("#,0.##") g</div>
             </div>
             <div class="figure-tile tile-flamingo" title="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram.">
                 <div class="figure-label">Total Cost</div>
-                <div class="figure-value">@ViewModel.Recipe.BomTotalCost.ToString("N2")</div>
+                <div class="figure-value">@State.Recipe.BomTotalCost.ToString("N2")</div>
             </div>
         }
         <div class="figure-tile tile-mauve" title="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component.">
             <div class="figure-label">Last Updated</div>
-            <div class="figure-value">@ViewModel.LastUpdatedText</div>
+            <div class="figure-value">@State.LastUpdatedText</div>
         </div>
     </div>
 
     <div class="header-fields">
         <label class="form-label" for="rm-name">Name</label>
-        <TextField ID="rm-name" @bind-Value="ViewModel.EditingName" OnLeave="ViewModel.CheckNameAvailability" CssClass="field-roomy" />
+        <TextField ID="rm-name" @bind-Value="State.EditingName" OnLeave="State.CheckNameAvailability" CssClass="field-roomy" />
 
         <label class="form-label" for="rm-type">Type</label>
-        <PickField ID="rm-type" TItem="RawMaterialType" Items="ViewModel.Types" @bind-Value="ViewModel.EditingType" Disabled="!ViewModel.CanChangeTypeAndSource"
+        <PickField ID="rm-type" TItem="RawMaterialType" Items="State.Types" @bind-Value="State.EditingType" Disabled="!State.CanChangeTypeAndSource"
                    Tooltip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
 
         <label class="form-label" for="rm-category">Category</label>
-        <PickField ID="rm-category" TItem="RawMaterialCategory" Items="ViewModel.CategoryOptions" TextField="Name"
-                   Value="ViewModel.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true" CssClass="field-roomy"
-                   OnArrive="ArriveAtCategory" OnTyped="t => ViewModel.CategorySearchText = t" OnLeave="ViewModel.CommitCategoryTextAsync"
+        <PickField ID="rm-category" TItem="RawMaterialCategory" Items="State.CategoryOptions" TextField="Name"
+                   Value="State.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true" CssClass="field-roomy"
+                   OnArrive="ArriveAtCategory" OnTyped="t => State.CategorySearchText = t" OnLeave="State.CommitCategoryTextAsync"
                    Tooltip="Pick a category, or type a new one's name to add it." />
 
-        @if (ViewModel.IsEditingIngredient)
+        @if (State.IsEditingIngredient)
         {
             <label class="form-label" for="rm-source">Source</label>
-            <PickField ID="rm-source" TItem="RawMaterialSource" Items="ViewModel.Sources" @bind-Value="ViewModel.EditingSource" Disabled="!ViewModel.CanChangeTypeAndSource" />
+            <PickField ID="rm-source" TItem="RawMaterialSource" Items="State.Sources" @bind-Value="State.EditingSource" Disabled="!State.CanChangeTypeAndSource" />
         }
-        @if (ViewModel.IsEditingPackaging)
+        @if (State.IsEditingPackaging)
         {
             <label class="form-label" for="rm-base-unit">Base Unit</label>
-            <PickField ID="rm-base-unit" TItem="UnitOfMeasure" Items="ViewModel.UnitsOfMeasure" TextField="Name" @bind-Value="ViewModel.EditingBaseUnit" Disabled="!ViewModel.CanChangeBaseUnit"
+            <PickField ID="rm-base-unit" TItem="UnitOfMeasure" Items="State.UnitsOfMeasure" TextField="Name" @bind-Value="State.EditingBaseUnit" Disabled="!State.CanChangeBaseUnit"
                        Tooltip="Fixed once the material has alternative units, prices or packaging lines." />
         }
-        @if (ViewModel.IsEditingMade)
+        @if (State.IsEditingMade)
         {
             <label class="form-label" for="rm-weight-loss">Weight Loss %</label>
-            <NumberField ID="rm-weight-loss" TValue="decimal?" @bind-Value="ViewModel.EditingWeightLossPercent" Min="0" Max="99.99m" CssClass="field-narrow"
+            <NumberField ID="rm-weight-loss" TValue="decimal?" @bind-Value="State.EditingWeightLossPercent" Min="0" Max="99.99m" CssClass="field-narrow"
                          Tooltip="How much of the batch's weight is lost while making it: the cost is spread over what's left. A new made ingredient starts at 3%." />
         }
     </div>
 </section>
 
 @code {
-    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public RawMaterialsState State { get; set; } = null!;
 
     // The picker's text: the category's name as it takes the cursor, or what's typed since. Once the picker is left it's
     // settled (CommitCategoryTextAsync): a listed category is picked, and a new name offers to add it.
     private void ArriveAtCategory()
     {
-        ViewModel.CategorySearchText = ViewModel.EditingCategory?.Name ?? "";
-        ViewModel.BeginCategoryEdit();
+        State.CategorySearchText = State.EditingCategory?.Name ?? "";
+        State.BeginCategoryEdit();
     }
 
     private void PickCategory(RawMaterialCategory? category)
     {
-        ViewModel.EditingCategory = category;
-        ViewModel.CategorySearchText = category?.Name ?? "";
+        State.EditingCategory = category;
+        State.CategorySearchText = category?.Name ?? "";
     }
 }

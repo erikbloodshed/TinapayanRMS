@@ -30,7 +30,7 @@ public class SubAssemblyTreeTests
     {
         var tree = new SubAssemblyTree();
 
-        // In the order the list shows them, which is by name (SubAssembliesViewModel.VisibleRows).
+        // In the order the list shows them, which is by name (SubAssembliesState.VisibleRows).
         tree.Refresh(
             Roles,
             [RowOf(2, "Ensaymada Dough", Dough), RowOf(1, "Pandesal Dough", Dough), RowOf(3, "Bread Bag Set", Packaging)],

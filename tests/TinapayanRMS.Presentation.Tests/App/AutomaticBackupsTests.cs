@@ -179,12 +179,12 @@ public sealed class AutomaticBackupsTests : IDisposable
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
         var logger = new LoggerConfiguration().CreateLogger();
         var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), logger);
-        var viewModel = new DatabaseBackupsViewModel(backups, _ => { }, logger, automatic);
-        viewModel.BackupProblemText.Should().BeNull();
+        var state = new DatabaseBackupsState(backups, _ => { }, logger, automatic);
+        state.BackupProblemText.Should().BeNull();
 
         await automatic.RunAsync(Today, Cancellation);
 
-        viewModel.BackupProblemText.Should().Contain("no password supplied");
+        state.BackupProblemText.Should().Contain("no password supplied");
     });
 
     private string BackupsFolder() => Directory.CreateDirectory(Path.Combine(_root, "backups")).FullName;

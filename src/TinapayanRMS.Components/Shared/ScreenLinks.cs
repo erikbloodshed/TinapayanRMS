@@ -23,12 +23,12 @@ public sealed class ScreenLinks : IDisposable
 
     public ScreenLinks(
         NavigationManager navigation,
-        RawMaterialsViewModel rawMaterials,
-        SubAssembliesViewModel subAssemblies,
-        ProductsViewModel products,
-        ReportsViewModel reports,
-        PriceSimulatorViewModel priceSimulator,
-        PrintTabViewModel print)
+        RawMaterialsState rawMaterials,
+        SubAssembliesState subAssemblies,
+        ProductsState products,
+        ReportsState reports,
+        PriceSimulatorState priceSimulator,
+        PrintTabState print)
     {
         _subscriptions.Add(subAssemblies.Dependents.ProductOpenRequests
             .Merge(rawMaterials.Dependents.ProductOpenRequests)

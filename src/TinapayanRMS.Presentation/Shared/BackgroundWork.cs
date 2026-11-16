@@ -1,8 +1,8 @@
 namespace TinapayanRMS.Presentation.Shared;
 
 /// <summary>
-/// The work a screen starts that nothing awaits: the load a pick starts (ViewModelBase.LoadLatest), an action started
-/// from a tree's selection or a note typed into a table (ViewModelBase.RunSafelyAsync), a cost a table reads for a line.
+/// The work a screen starts that nothing awaits: the load a pick starts (ScreenState.LoadLatest), an action started
+/// from a tree's selection or a note typed into a table (ScreenState.RunSafelyAsync), a cost a table reads for a line.
 /// Each is counted while it runs, so whoever drives the screen can wait for it to settle (<see cref="WhenIdleAsync"/>):
 /// the tests do, where in the app the user just watches the screen fill in. A screen owns one, and hands it to the parts
 /// that start work of their own.

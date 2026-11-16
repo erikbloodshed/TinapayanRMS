@@ -10,11 +10,11 @@ namespace TinapayanRMS.Components.Tests.Shared;
 
 /// <summary>
 /// ScreenErrorBoundary: a screen that fails gives way to a panel saying so, rather than taking the window's page with it,
-/// and opens again as it was, since what it shows is the page's (its ViewModel), not the screen's.
+/// and opens again as it was, since what it shows is the page's (its state), not the screen's.
 /// </summary>
 public class ScreenErrorBoundaryTests
 {
-    /// <summary>What the screen shows, the page's for as long as it lasts, as a screen's ViewModel is.</summary>
+    /// <summary>What the screen shows, the page's for as long as it lasts, as a screen's state is.</summary>
     public sealed class Shown
     {
         public bool Fails { get; set; }

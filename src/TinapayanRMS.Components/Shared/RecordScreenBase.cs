@@ -7,10 +7,10 @@ namespace TinapayanRMS.Components.Shared;
 /// A record screen with an address per record (products/42, raw-materials/7, sub-assemblies/3), so the browser's Back and
 /// Forward step between the records opened: the record in the address opens as picking it in the list would, and the
 /// record picked goes into the address. Products, Raw Materials and Sub-Assemblies; each names its address and record, and
-/// its ViewModel opens one (IRecordOpener).
+/// its state opens one (IRecordOpener).
 /// </summary>
-public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
-    where TViewModel : ViewModelBase, IRecordOpener
+public abstract class RecordScreenBase<TState> : ScreenBase<TState>
+    where TState : ScreenState, IRecordOpener
 {
     /// <summary>The address last acted on: its record is opened once, not each time the screen is given it again.</summary>
     private int? _addressOpened;
@@ -24,7 +24,7 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
     /// <summary>The id of the record the form shows, or null for none; a new one's is 0.</summary>
     protected abstract int? ShownId { get; }
 
-    /// <summary>The name of the ViewModel's property for the record shown (SelectedProduct and the like).</summary>
+    /// <summary>The name of the screen state's property for the record shown (SelectedProduct and the like).</summary>
     protected abstract string ShownProperty { get; }
 
     // The record in the address is the load's to open, at its end. New clicked meanwhile is the later word.
@@ -34,7 +34,7 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
         _addressOpened = Id;
         if (Id is { } id && ShownId != id)
         {
-            ViewModel!.OpenRecordOnLoad(id);
+            State!.OpenRecordOnLoad(id);
         }
     }
 
@@ -50,12 +50,12 @@ public abstract class RecordScreenBase<TViewModel> : ScreenBase<TViewModel>
         _addressOpened = Id;
         if (Id is { } id && ShownId != id)
         {
-            ViewModel!.OpenRecord(id);
+            State!.OpenRecord(id);
         }
     }
 
     // The record picked goes into the address, so Back returns to the one before. Called on whichever thread changed it.
-    protected override void OnViewModelChanged(string? propertyName)
+    protected override void OnStateChanged(string? propertyName)
     {
         if (propertyName == ShownProperty && ShownId is { } id and > 0 && id != Id)
         {

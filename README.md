@@ -8,7 +8,7 @@ Read the **[User Manual](docs/user-manual.md)**. It explains every screen, how t
 
 ## Developing
 
-TinapayanRMS is a Windows desktop app on .NET 11: a .NET MAUI Blazor Hybrid window whose screens are Blazor components with Syncfusion Blazor, over ViewModels of the app's own, with PostgreSQL through EF Core. Building it needs the `maui-windows` workload.
+TinapayanRMS is a Windows desktop app on .NET 11: a .NET MAUI Blazor Hybrid window whose screens are Blazor components with Syncfusion Blazor, over state classes of the app's own, with PostgreSQL through EF Core. Building it needs the `maui-windows` workload.
 
 Read the **[Developer Manual](docs/developer-manual.md)**. It covers what you need to know and install, how to set up and run the app, the architecture and the patterns the code follows, and how to test and make common changes.
 

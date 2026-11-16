@@ -55,7 +55,7 @@ public class VimKeysStateTests
         var keys = context.Services.GetRequiredService<VimKeysState>();
 
         // Reports has no records to save or open: it's on show, and the commands say so.
-        keys.Show(context.Services.GetRequiredService<ReportsViewModel>());
+        keys.Show(context.Services.GetRequiredService<ReportsState>());
 
         keys.Run(line).Message.Should().Be(message);
     }
@@ -65,7 +65,7 @@ public class VimKeysStateTests
     {
         await using var context = AppServices.NewContext();
         var keys = context.Services.GetRequiredService<VimKeysState>();
-        var products = context.Services.GetRequiredService<ProductsViewModel>();
+        var products = context.Services.GetRequiredService<ProductsState>();
         keys.Show(products);
 
         // Nothing is open and nothing has been typed: Save and Delete have nothing to act on, and no name matches.
@@ -79,8 +79,8 @@ public class VimKeysStateTests
     {
         await using var context = AppServices.NewContext();
         var keys = context.Services.GetRequiredService<VimKeysState>();
-        var products = context.Services.GetRequiredService<ProductsViewModel>();
-        var reports = context.Services.GetRequiredService<ReportsViewModel>();
+        var products = context.Services.GetRequiredService<ProductsState>();
+        var reports = context.Services.GetRequiredService<ReportsState>();
 
         // Going from Products to Reports: the new screen shows before the old one is taken down.
         keys.Show(products);

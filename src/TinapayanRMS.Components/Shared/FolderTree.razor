@@ -4,7 +4,7 @@
 @inject IJSRuntime JS
 
 @* A list of records filed in folders: the Raw Materials, Sub-Assemblies and Products lists (docs/plan/maui-app.md,
-   "How it's built"). The ViewModel owns everything: the folders and their rows (each tree's Roots and
+   "How it's built"). The screen state owns everything: the folders and their rows (each tree's Roots and
    Children), whether each folder is open (IsExpanded, kept through a refresh and between visits), and the rows picked
    (SelectedTreeNodes, which this changes as rows are clicked: alone, or with Ctrl or Shift). Clicking a folder opens or
    closes it. Rows that can be dragged are dragged onto a folder (or a row in one) to move them there, which the screen
@@ -92,7 +92,7 @@
 
     [Parameter, EditorRequired] public Action<TNode, bool> SetExpanded { get; set; } = null!;
 
-    /// <summary>The ViewModel's SelectedTreeNodes.</summary>
+    /// <summary>The screen state's SelectedTreeNodes.</summary>
     [Parameter, EditorRequired] public IList<object> Selected { get; set; } = null!;
 
     /// <summary>What a row shows: its glyph, title and count.</summary>

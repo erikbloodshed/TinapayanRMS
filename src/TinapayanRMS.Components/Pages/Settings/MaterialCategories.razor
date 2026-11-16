@@ -1,6 +1,6 @@
 @page "/settings/material-categories"
 @using TinapayanRMS.Domain.Enums
-@inherits ScreenBase<CategoriesViewModel>
+@inherits ScreenBase<CategoriesState>
 
 <PageTitle>Material Categories · TinapayanRMS</PageTitle>
 
@@ -9,7 +9,7 @@
 <div class="list-and-form">
     <section class="card list-card">
         <h2 class="section-header">Categories</h2>
-        <PickGrid TItem="RawMaterialCategory" DataSource="ViewModel!.Categories" @bind-SelectedItem="ViewModel!.SelectedCategory">
+        <PickGrid TItem="RawMaterialCategory" DataSource="State!.Categories" @bind-SelectedItem="State!.SelectedCategory">
             <Columns>
                 <GridColumn Field="@nameof(RawMaterialCategory.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(RawMaterialCategory.Name)" HeaderText="Name" />
@@ -19,23 +19,23 @@
     </section>
 
     <section class="card form-card">
-        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <h2 class="section-header">@State!.FormTitle</h2>
         <FormRow Label="Name" For="category-name">
-            <TextField ID="category-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="category-name" @bind-Value="State!.EditingName" />
         </FormRow>
         <FormRow Label="Type" For="category-type">
-            <PickField ID="category-type" TItem="RawMaterialCategoryType" Items="ViewModel!.Types" @bind-Value="ViewModel!.EditingType"
+            <PickField ID="category-type" TItem="RawMaterialCategoryType" Items="State!.Types" @bind-Value="State!.EditingType"
                        Tooltip="Ingredient: purchased and linked ingredients. Made: made ingredients, and only them. Packaging: packaging materials." />
         </FormRow>
         <p class="caption form-extra">Every material goes in a category of its own type: a made ingredient only in a Made one, and a Made one takes nothing else. A category's type can change only when everything in it fits the new one.</p>
         <div class="button-row">
-            <CommandButton Command="ViewModel!.NewCommand" Icon="AppIcon.Add" Label="New" />
-            <CommandButton Command="ViewModel!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
-            <CommandButton Command="ViewModel!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+            <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </section>
 </div>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 }

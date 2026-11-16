@@ -1,6 +1,6 @@
 namespace TinapayanRMS.Presentation.Shared;
 
-/// <summary>What the user answers when a form with unsaved changes is about to be left (ViewModelBase.ConfirmUnsavedChanges).</summary>
+/// <summary>What the user answers when a form with unsaved changes is about to be left (ScreenState.ConfirmUnsavedChanges).</summary>
 public enum UnsavedChangesAnswer
 {
     /// <summary>Save the changes, then go on.</summary>

@@ -51,7 +51,7 @@ public class UnsavedChangesGuardTests
     }
 
     // A screen that failed gives way to its error panel, which takes the screen away without the question leaving it
-    // would have asked: what the form held is still its ViewModel's, so the window still asks about it as it closes.
+    // would have asked: what the form held is still its state's, so the window still asks about it as it closes.
     [Test]
     public async Task A_form_whose_screen_went_with_unsaved_changes_is_still_asked_about_as_the_window_closes()
     {
@@ -102,7 +102,7 @@ public class UnsavedChangesGuardTests
     {
         await using var context = AppServices.NewContext();
 
-        context.Services.GetServices<IBusyWork>().Should().ContainSingle().Which.Should().BeOfType<DatabaseBackupsViewModel>()
+        context.Services.GetServices<IBusyWork>().Should().ContainSingle().Which.Should().BeOfType<DatabaseBackupsState>()
             .Which.KeepsWindowOpen.Should().BeNull("it isn't backing up or restoring");
         (await context.Services.GetRequiredService<UnsavedChangesGuard>().ResolveBeforeClosingAsync()).Should().BeTrue();
     }

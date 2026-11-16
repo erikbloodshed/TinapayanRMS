@@ -1,5 +1,5 @@
 @page "/settings/units-of-measure"
-@inherits ScreenBase<UnitsOfMeasureViewModel>
+@inherits ScreenBase<UnitsOfMeasureState>
 
 <PageTitle>Units of Measure · TinapayanRMS</PageTitle>
 
@@ -8,7 +8,7 @@
 <div class="list-and-form">
     <section class="card list-card">
         <h2 class="section-header">Units of Measure</h2>
-        <PickGrid TItem="UnitOfMeasure" DataSource="ViewModel!.Units" @bind-SelectedItem="ViewModel!.SelectedUnit">
+        <PickGrid TItem="UnitOfMeasure" DataSource="State!.Units" @bind-SelectedItem="State!.SelectedUnit">
             <Columns>
                 <GridColumn Field="@nameof(UnitOfMeasure.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(UnitOfMeasure.Name)" HeaderText="Name" />
@@ -18,21 +18,21 @@
     </section>
 
     <section class="card form-card">
-        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <h2 class="section-header">@State!.FormTitle</h2>
         <FormRow Label="Name" For="unit-name">
-            <TextField ID="unit-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="unit-name" @bind-Value="State!.EditingName" />
         </FormRow>
         <FormRow Label="Abbreviation" For="unit-abbreviation">
-            <TextField ID="unit-abbreviation" @bind-Value="ViewModel!.EditingAbbreviation" />
+            <TextField ID="unit-abbreviation" @bind-Value="State!.EditingAbbreviation" />
         </FormRow>
         <div class="button-row">
-            <CommandButton Command="ViewModel!.NewCommand" Icon="AppIcon.Add" Label="New" />
-            <CommandButton Command="ViewModel!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
-            <CommandButton Command="ViewModel!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+            <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </section>
 </div>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 }

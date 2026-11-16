@@ -93,7 +93,7 @@ public sealed record ProductPrintout(
 }
 
 /// <summary>
-/// What Print gets from the Products screen (ProductsViewModel.PreparePrintout): the pages of the product it has open, or
+/// What Print gets from the Products screen (ProductsState.PreparePrintout): the pages of the product it has open, or
 /// why the sub-assembly form left open there can't give them (<see cref="PrintProblem"/>). Empty (<c>default</c>) while
 /// there's nothing to print yet: the details are still arriving, or the History tab has no version picked.
 /// </summary>
@@ -161,7 +161,7 @@ public sealed record PrintedSection(
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
     public static PrintedSection From(PricedSection section, CostBasis basis)
     {
-        // Read as the recipe form reads them (ProductsViewModel.RecomputeUsageForm): against the formula's base while a
+        // Read as the recipe form reads them (ProductsState.RecomputeUsageForm): against the formula's base while a
         // line is ticked, add-ins included, since an add-in is read against the recipe's base; with nothing ticked, every
         // line of both tables against the whole batch, add-ins included, so they come to 100 between them.
         var formulaBase = SubAssemblyRules.FormulaBaseWeight([.. section.Lines.Select(l => (l.Grams, l.IsFormulaBase))]);

@@ -1,13 +1,13 @@
 @page "/settings/database"
 @using TinapayanRMS.ApplicationCore.Rules
-@inherits ScreenBase<DatabaseBackupsViewModel>
+@inherits ScreenBase<DatabaseBackupsState>
 
 <PageTitle>Database · TinapayanRMS</PageTitle>
 
 <SettingsTabs />
 
 @* Settings → Database, with the computer's own dialogs: Open Folder shows the backups folder in File Explorer, Copy
-   To… saves the picked backup where the Save dialog says, and Restore from File… opens one, which the ViewModel copies
+   To… saves the picked backup where the Save dialog says, and Restore from File… opens one, which the screen state copies
    into the backups folder and restores. Also Copy To is a folder each automatic backup is copied to as well (a USB stick
    left in, or a synced cloud folder). What went wrong with the last automatic backup, or its copy, shows in amber. *@
 <section class="card list-card">
@@ -15,38 +15,38 @@
     <p class="caption">Copies of all of the app's data. One is taken automatically each day: as the app starts, and within the hour after midnight while it runs. The newest 14 of those are kept. Set Also Copy To, or copy one to a USB stick now and then, so a broken computer doesn't take every copy with it.</p>
 
     <FormRow Label="Folder">
-        <span class="read-only-text" title="@ViewModel!.Folder">@ViewModel!.Folder</span>
-        <CommandButton Command="ViewModel!.OpenFolderCommand" Icon="AppIcon.FolderOpen" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
+        <span class="read-only-text" title="@State!.Folder">@State!.Folder</span>
+        <CommandButton Command="State!.OpenFolderCommand" Icon="AppIcon.FolderOpen" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
     </FormRow>
-    @if (ViewModel!.BackupProblemText is { } backupProblem)
+    @if (State!.BackupProblemText is { } backupProblem)
     {
         <p class="warning-text">@backupProblem The app tries again within the hour.</p>
     }
     <FormRow Label="Also Copy To">
-        <span class="read-only-text" title="Each automatic backup is copied here as well, and the newest 14 are kept here too. Nothing else in the folder is touched.">@ViewModel!.CopyFolderText</span>
-        <CommandButton Command="ViewModel!.ChooseCopyFolderCommand" Icon="AppIcon.FolderOpen" Label="Choose…"
+        <span class="read-only-text" title="Each automatic backup is copied here as well, and the newest 14 are kept here too. Nothing else in the folder is touched.">@State!.CopyFolderText</span>
+        <CommandButton Command="State!.ChooseCopyFolderCommand" Icon="AppIcon.FolderOpen" Label="Choose…"
                        Tooltip="A folder on this computer each automatic backup is copied to as well: a USB stick that stays plugged in, or a OneDrive folder. The newest automatic backup is copied there straight away." />
-        <CommandButton Command="ViewModel!.ClearCopyFolderCommand" Icon="AppIcon.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
+        <CommandButton Command="State!.ClearCopyFolderCommand" Icon="AppIcon.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
     </FormRow>
-    @if (ViewModel!.CopyProblemText is { } copyProblem)
+    @if (State!.CopyProblemText is { } copyProblem)
     {
         <p class="warning-text">@copyProblem</p>
     }
 
     <div class="button-row form-extra">
-        <CommandButton Command="ViewModel!.BackUpNowCommand" Icon="AppIcon.Save" Label="Back Up Now" Primary="true" />
-        <CommandButton Command="ViewModel!.CopyToCommand" Icon="AppIcon.Download" Label="Copy To…"
+        <CommandButton Command="State!.BackUpNowCommand" Icon="AppIcon.Save" Label="Back Up Now" Primary="true" />
+        <CommandButton Command="State!.CopyToCommand" Icon="AppIcon.Download" Label="Copy To…"
                        Tooltip="Saves a copy of the picked backup where you choose, such as a USB stick." />
-        <CommandButton Command="ViewModel!.RestoreCommand" Icon="AppIcon.Restore" Label="Restore" />
-        <CommandButton Command="ViewModel!.RestoreFromFileCommand" Icon="AppIcon.Upload" Label="Restore from File…"
+        <CommandButton Command="State!.RestoreCommand" Icon="AppIcon.Restore" Label="Restore" />
+        <CommandButton Command="State!.RestoreFromFileCommand" Icon="AppIcon.Upload" Label="Restore from File…"
                        Tooltip="Restores a backup file from elsewhere, such as one copied to a USB stick." />
-        @if (ViewModel!.BusyText is { } busy)
+        @if (State!.BusyText is { } busy)
         {
             <span class="busy-text"><span class="busy-spinner" aria-hidden="true"></span>@busy</span>
         }
     </div>
 
-    <PickGrid TItem="DatabaseBackupRow" DataSource="ViewModel!.Backups" @bind-SelectedItem="ViewModel!.SelectedBackup">
+    <PickGrid TItem="DatabaseBackupRow" DataSource="State!.Backups" @bind-SelectedItem="State!.SelectedBackup">
         <Columns>
             <GridColumn Field="Backup.Path" IsPrimaryKey="true" Visible="false" />
             <GridColumn Field="@nameof(DatabaseBackupRow.TakenAt)" HeaderText="Taken" Width="240" Format="MMM d, yyyy  h:mm tt" Type="ColumnType.DateTime" />
@@ -61,7 +61,7 @@
 
     [Inject] private IFileDialogs Dialogs { get; set; } = null!;
 
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
     protected override void OnInitialized()
     {
@@ -69,16 +69,16 @@
 
         // Copy To…, Restore from File… and Also Copy To's Choose…: the computer's Save, Open and folder dialogs. Open
         // Folder: File Explorer.
-        AddSubscription(ViewModel!.ShowFolder.RegisterHandler(interaction =>
+        AddSubscription(State!.ShowFolder.RegisterHandler(interaction =>
         {
             Dialogs.ShowFolder(interaction.Input);
             interaction.SetOutput(System.Reactive.Unit.Default);
         }));
-        AddSubscription(ViewModel!.ChooseCopyDestination.RegisterHandler(async interaction =>
+        AddSubscription(State!.ChooseCopyDestination.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseSaveFileAsync(interaction.Input, BackupKind))));
-        AddSubscription(ViewModel!.ChooseBackupFile.RegisterHandler(async interaction =>
+        AddSubscription(State!.ChooseBackupFile.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseFileToOpenAsync(BackupRules.Extension, BackupKind))));
-        AddSubscription(ViewModel!.ChooseCopyFolder.RegisterHandler(async interaction =>
+        AddSubscription(State!.ChooseCopyFolder.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseFolderAsync())));
     }
 }

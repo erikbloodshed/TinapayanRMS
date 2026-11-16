@@ -9,7 +9,7 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Components.Tests.Shared;
 
 /// <summary>
-/// FolderTree: the Raw Materials, Sub-Assemblies and Products lists. The screen's ViewModel owns the folders, which are
+/// FolderTree: the Raw Materials, Sub-Assemblies and Products lists. The screen's state owns the folders, which are
 /// open and the rows picked; the tree draws them and changes them as rows are clicked and keys pressed.
 /// </summary>
 public class FolderTreeTests
@@ -243,7 +243,7 @@ public class FolderTreeTests
     {
         await using var context = AppServices.NewContext();
 
-        // The ViewModel's folders and rows, which outlive every list drawn from them.
+        // The screen state's folders and rows, which outlive every list drawn from them.
         var folder = new WatchedNode("Breads", isFolder: true);
         folder.Children!.Add(new WatchedNode("Pandesal"));
 

@@ -2,13 +2,13 @@
 
 Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen and the roles it files sub-assemblies under, as they are now. When each part came in, who asked for it and what it replaced are in the [build plan](build-plan.md)'s dated log. "The app's notes" means [maui-app.md](maui-app.md); a section named without a file (Domain Model, Application Architecture, Reactive Costing Cascade) is PLAN.md's.
 
-**The screen is the Blazor page `Components/Pages/SubAssemblies`** (since 2026-11-07), over its ViewModel. Its list is a `FolderTree`, its tables typed into `LineGrid`s, its pickers `PickField`s and its boxes `NumberField`s and `TextField`s ([maui-app.md](maui-app.md), "How it's built").
+**The screen is the Blazor page `Components/Pages/SubAssemblies`** (since 2026-11-07), over its state. Its list is a `FolderTree`, its tables typed into `LineGrid`s, its pickers `PickField`s and its boxes `NumberField`s and `TextField`s ([maui-app.md](maui-app.md), "How it's built").
 
 ## What it keeps
 
-- **The standalone sub-assemblies, recipes and packaging sets, which no product owns** (`SubAssemblies`/`SubAssembliesViewModel`, a tab and drawer item between Raw Materials and Products). Products link them, and follow every change saved here, or copy them, from their recipe (Domain Model). A sub-assembly in a product-owned role is that product's own, edited in its recipe and never listed here; one a product saved in any other role is listed here, named after the product and the role (`SubAssemblyRules.StandaloneNameFor`).
+- **The standalone sub-assemblies, recipes and packaging sets, which no product owns** (`SubAssemblies`/`SubAssembliesState`, a tab and drawer item between Raw Materials and Products). Products link them, and follow every change saved here, or copy them, from their recipe (Domain Model). A sub-assembly in a product-owned role is that product's own, edited in its recipe and never listed here; one a product saved in any other role is listed here, named after the product and the role (`SubAssemblyRules.StandaloneNameFor`).
 - **The roles are the list's folders**, ordered and marked product-owned in Settings → Roles (below). The list can add, rename and delete a role too.
-- **The ViewModel is one class over four parts** (PLAN.md's Conventions, "A screen's part owns its tab"), each a property of it: `List` (`SubAssembliesList`: the tree, the search, the menus, the moves, the naming in place and Make In-House Ingredient), `Batch` (`SubAssemblyBatch`: a recipe's lines, the Base and its caption, the batch's figures and Scale), `PackagingSet` (`SubAssemblyPackagingSet`, below) and `Dependents` (`SubAssemblyDependents`). The screen keeps the form's own fields, which sub-assembly it shows, loading, Save, the Remove Line both tables share, and the undo history over all of them. The list asks the screen what it needs through `ISubAssembliesListHost`, which the screen implements explicitly, and the batch through `IFormPartHost`, what any part of a record screen's form asks (its runners and messages, its undo recorder, whether a load or an undo is writing the form). The subscriptions that reach from one part to another are the screen's.
+- **The screen state is one class over four parts** (PLAN.md's Conventions, "A screen's part owns its tab"), each a property of it: `List` (`SubAssembliesList`: the tree, the search, the menus, the moves, the naming in place and Make In-House Ingredient), `Batch` (`SubAssemblyBatch`: a recipe's lines, the Base and its caption, the batch's figures and Scale), `PackagingSet` (`SubAssemblyPackagingSet`, below) and `Dependents` (`SubAssemblyDependents`). The screen keeps the form's own fields, which sub-assembly it shows, loading, Save, the Remove Line both tables share, and the undo history over all of them. The list asks the screen what it needs through `ISubAssembliesListHost`, which the screen implements explicitly, and the batch through `IFormPartHost`, what any part of a record screen's form asks (its runners and messages, its undo recorder, whether a load or an undo is writing the form). The subscriptions that reach from one part to another are the screen's.
 
 ## The layout
 
@@ -31,23 +31,23 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 - **What new lines do to the linking products' costs is asked first.** Before a saved recipe's new lines are written, `SharedRecipeImpact` prices each product linking it (`GetStandaloneLinkedByAsync`, deleted ones left out), per sellable unit at buffered costs, as saved and again with the new lines in place of the sub-assembly's (`SavedProductReader.Build` over the detail with its `SubAssemblyLines` swapped).
   - When any base cost moves at 2 places, Save asks (`ConfirmDelete`), naming the first eight, biggest move first ("Pandesal x 8: 2.58 → 2.32 (-0.26)"), and saying when made ingredients made from it change too, without pricing those. No leaves the form unsaved.
   - A packaging set, a new sub-assembly and a change of name or role alone ask nothing. The screen takes the service as an optional last constructor parameter.
-  - Test: `SubAssembliesViewModelVersionTests.Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost`.
+  - Test: `SubAssembliesStateVersionTests.Saving_new_lines_asks_first_with_what_they_do_to_each_linking_products_base_cost`.
 - **Delete** asks first. It's refused, naming them, while a product links the sub-assembly or a made ingredient is made from it (`SubAssemblyRules.EnsureNoMadeIngredientMadeFrom`), and it clears the form only if the form showed that one (`DeleteSubAssemblyAsync`, which the list's Delete calls too).
 - **Copy**, enabled while one is picked, turns the form into a new, unsaved sub-assembly holding what it shows, unsaved edits included.
   - It keeps the same role and lines (or a set's materials), is named "<name> Copy" (`SubAssemblyRules.UniqueStandaloneName`, so "Copy 2" and on when that's taken) and titled "Copy of <name>", with nothing selected in the list and Dependents empty.
   - Like New it starts a fresh history measured against a blank form, so Save is offered at once and adds it beside the original (`CopyForm`, over `CaptureSnapshot`/`RestoreSnapshot`).
 - **New Product**, enabled while a recipe is picked (never a packaging set), opens Products on a new, unsaved product named after the sub-assembly that **links** it.
-  - It refuses while the form has unsaved changes, since the product links the sub-assembly as saved. Otherwise it raises the id on `NewProductRequests`, and `ScreenLinks` records it on Products (`ProductsViewModel.StartNewProductFrom`, `_subAssemblyToStartFrom`) and goes there. Products holds no unsaved changes then, since leaving it asked about them.
+  - It refuses while the form has unsaved changes, since the product links the sub-assembly as saved. Otherwise it raises the id on `NewProductRequests`, and `ScreenLinks` records it on Products (`ProductsState.StartNewProductFrom`, `_subAssemblyToStartFrom`) and goes there. Products holds no unsaved changes then, since leaving it asked about them.
   - The end of the next `LoadCommand`, which showing the tab runs, calls `StartNewProductLinking`, so the sub-assembly is found in a fresh `_linkable` even when it was just made or renamed. It runs New, sets the name, then does what Add Sub-Assembly's Link an existing one does (the add tab, `UsageFormMode.Link`, the sub-assembly as the source, its lines loaded), with no undo step. Save is offered, and the user types the piece size.
-  - Tests: two `SubAssembliesViewModelRefreshTests` cases and `ProductsViewModelRefreshTests.StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link`.
-- **Undo and Redo** step through the form's history (`History`, an `UndoHistory<SubAssemblyFormSnapshot>`, made by the record screens' base class, `RecordFormViewModel`, as Products' and Raw Materials' are).
+  - Tests: two `SubAssembliesStateRefreshTests` cases and `ProductsStateRefreshTests.StartNewProductFrom_starts_a_new_product_linking_the_sub_assembly_on_the_next_load_and_Save_writes_the_link`.
+- **Undo and Redo** step through the form's history (`History`, an `UndoHistory<SubAssemblyFormSnapshot>`, made by the record screens' base class, `RecordScreenState`, as Products' and Raw Materials' are).
   - A step is one finished change: a cell committed, a line added or removed, a field typed and left. The history is cleared when the form stops being the one it recorded: another sub-assembly picked, New, Copy, or a Save.
   - Ctrl+Z and Ctrl+Y reach it from anywhere on the screen (`UndoKeys`). Unlike Products', an undo doesn't rebase the form onto a settled snapshot.
 - **Scale**, a row under the Recipe tab's lines (not for a packaging set), resizes the recipe to a weight.
   - Its picker says what's to weigh the grams typed (`Batch.ScaleOptions`: the whole batch, or the base, the ticked lines' total). `ScaleCommand` multiplies every line typed in grams by to ÷ from (`SubAssemblyRules.ScaledGrams`, rounded to the 4 stored decimals), as one undo step. A line typed as a baker's percentage keeps it and follows the scaled base (`RecomputeFormulaBase`).
   - Scaling the base with nothing ticked says so and changes nothing. The grams typed aren't part of the sub-assembly, so they're no edit, and they stay from one sub-assembly to the next.
   - A product's own sections, edited in its recipe, don't have it.
-  - Tests: `SubAssemblyRulesTests.ScaledGrams_…` and two in `SubAssembliesViewModelUndoTests`.
+  - Tests: `SubAssemblyRulesTests.ScaledGrams_…` and two in `SubAssembliesStateUndoTests`.
 
 ## Packaging sets
 
@@ -55,7 +55,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
   - The ingredient table, its percentage caption, Scale and the batch figures give way to a packaging table with the Products Packaging tab's columns (Material, Qty, Unit, Unit Cost and Cost per Set) and a Set Cost figure.
   - Its rows are the same `PackagingLineRow`s, held with the Set Cost by the screen's part for them, `SubAssemblyPackagingSet` (`PackagingSet`: `Lines`, `NewLine`, `SelectedLine`, `Cost`), which shows them as saved, keeps and puts them back for an undo step, and reads them as Save writes them with `SaveStandalonePackagingAsync`; the screen keeps the Remove Line both tables share. A form loads whichever kind of lines its role says.
 - **A product whose packaging links a set takes one whole set per sellable unit.** A saved sub-assembly can't move between a recipe role and the Packaging role.
-- Tests: `PackagingSetPersistenceTests` and a `SubAssembliesViewModelRefreshTests` round trip.
+- Tests: `PackagingSetPersistenceTests` and a `SubAssembliesStateRefreshTests` round trip.
 
 ## The list
 
@@ -67,7 +67,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
   - A toolbar under the search box holds the empty space's commands.
 - **The roles come in before the rows on a load**, so `Refresh` announces each folder shown and each that gets its first rows (`AnnounceExpanded`), top-level ones included. Unlike Raw Materials' type folders, none of its folders exists when the tree binds.
 - **Every folder starts open, and the ones left closed are remembered** (`SubAssemblies.ClosedFolders`, by role id, through `FolderMemory`), so a role added since opens too. `SubAssemblyTree.ClosedFolderKeys` gives back the keys it was given until the first `Refresh` makes the folders, so disposing a screen never shown doesn't write the list away.
-- **The ViewModel follows `Roles` through its `PropertyChanged`**, not `CollectionChanged`, for the re-entrancy reason `WatchForSave` gives.
+- **The screen state follows `Roles` through its `PropertyChanged`**, not `CollectionChanged`, for the re-entrancy reason `WatchForSave` gives.
 - **A sub-assembly's menu**: Move to (the recipe roles), Rename (F2), Make In-House Ingredient… and Delete (Del). A packaging set has no Move to and no Make In-House Ingredient…, and several picked offer only Move N Sub-Assemblies to, which a set among them takes away.
   - **Dragging, or Move to, gives a role, saved at once** (`MoveSubAssembliesCommand`, `ISubAssemblyRepository.MoveAsync`). Only recipes move, among the recipe roles; a packaging set stays in the Packaging role (`SubAssemblyTree.MoveTo`/`MovesTo`, `IsPackagingSet`).
   - `MoveAsync` runs each move through `StageStandaloneAsync`, the checks Save makes on a new role (the kind kept, `EnsureDistinctWhereLinkedAsync`, and a composite that links it allowing only product-owned roles). **It saves each move before checking the next, in one transaction**, so two that a product links, moved into the same role, are checked against each other. The first refusal moves none.
@@ -81,19 +81,19 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
   - **New and New … Here add the new sub-assembly's row** (`SubAssembliesList.NewInList`, `SubAssemblyTree.PendingSubAssembly`, `SubAssemblyLeafNode.IsNew`): "New sub-assembly" or "New packaging set", last in its role's folder (from the header, the first role's). **The name typed goes into the form, not the database**, as an undo step that Save is offered for (`NameNewSubAssembly`): a sub-assembly needs a line before it can be saved. The row keeps the name until Save files it, or until the form leaves it (`ClearForm` ends it: New again, Copy, Don't Save, Delete). It has no menu, isn't dragged, isn't counted and loads nothing when picked. The prompts (`PromptForName`) are gone from this screen; Make In-House Ingredient keeps its own.
   - **Delete Role** reads "Delete Role (holds 2)" and is greyed while a sub-assembly in the list is in it, counting every one, not a search's matches. It isn't offered on the Packaging role, which can't be deleted. A role only products' own sub-assemblies are in is refused by the database, as on the Roles tab.
 - **The empty space**: New Sub-Assembly, New Folder, Expand All and Collapse All. The roles' order and Product-owned are changed on the Roles tab.
-- Tests: `SubAssemblyTreeTests`, `SubAssembliesViewModelTreeTests` (every menu, each item run as the menu runs it, a refused move, the closed folders, each name typed in place) and `SubAssemblyMovePersistenceTests`.
+- Tests: `SubAssemblyTreeTests`, `SubAssembliesStateTreeTests` (every menu, each item run as the menu runs it, a refused move, the closed folders, each name typed in place) and `SubAssemblyMovePersistenceTests`.
 
 ## Loading
 
 - **Rows are `StandaloneSubAssemblyRow`s.** The products linking a sub-assembly and the made ingredients made from it are text properties (`DependentsText`, `MadeIngredientsText`), with the lists behind methods (`GetDependents`, `GetMadeIngredients`), because `CollectionMerge.HasSameValues` compares a row's scalar properties only: a changed list shows as a changed row through its text.
 - **`LoadCommand` merges** roles, ingredients, packaging materials and rows (Application Architecture's fetch-then-merge), keeps unsaved lines (`IngredientLineRow.Resolve` reprices them), and re-points the selection by id.
-  - A sub-assembly asked for before the list held it (`OpenRecord`, from a linked badge on Products or a made ingredient's Recipe card on Raw Materials) is opened by the load that brings it in (`OpenRecordAskedFor`, the record screens' base's, `RecordFormViewModel`).
+  - A sub-assembly asked for before the list held it (`OpenRecord`, from a linked badge on Products or a made ingredient's Recipe card on Raw Materials) is opened by the load that brings it in (`OpenRecordAskedFor`, the record screens' base's, `RecordScreenState`).
   - A form load counts itself (`_formLoadVersion`), so one overtaken by another pick or New drops its lines rather than adding them twice.
-- Tests: `StandaloneSubAssemblyPersistenceTests`, `SubAssembliesViewModelRefreshTests` and a `ProductsViewModelRefreshTests` test that links one.
+- Tests: `StandaloneSubAssemblyPersistenceTests`, `SubAssembliesStateRefreshTests` and a `ProductsStateRefreshTests` test that links one.
 
 ## Settings → Roles
 
-- **The Roles tab** (`Pages/Settings/Roles` over `SubAssemblyRolesViewModel`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, Settings).
+- **The Roles tab** (`Pages/Settings/Roles` over `SubAssemblyRolesState`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, Settings).
 - **The order has no box: Move Up and Move Down** in the list card's header (`MoveUpCommand`/`MoveDownCommand`, off for the first and last row and with nothing picked) call `SubAssemblyRoleRepository.MoveAsync`, which swaps the role with its neighbour.
   - `AddAsync` numbers a new role one past the last, whatever it's given, and `UpdateAsync` leaves the order alone.
   - `MoveAsync` and `DeleteAsync` number every role 1…n again (ties by name, the order the tab lists them in), so the order never has a gap.

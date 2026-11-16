@@ -5,7 +5,7 @@
 
 @* A table of lines typed straight into (Purchase Cost Setup, Alternative Units, a BOM, a recipe's sections): every cell
    a field bound to its row, grid lines both ways, and a row header showing the line picked (the one Remove takes).
-   Under the lines, the add row: a draft made by the ViewModel's factory (NewItem), which joins the lines the moment
+   Under the lines, the add row: a draft made by the screen state's factory (NewItem), which joins the lines the moment
    anything is typed into it, and a new draft takes its place. A draft left untouched is never added. Where the order
    matters, a line is dragged by its row header to its new place, as one undo step: with the pointer, by app.js's
    watchLineDrag, since the Windows web view never hands the page the browser's own drag and drop. Insert Line, or the
@@ -106,7 +106,7 @@
 
     [Parameter, EditorRequired] public ObservableCollection<TRow> Items { get; set; } = null!;
 
-    /// <summary>The ViewModel's factory for the add row's draft (NewBrandPriceRow, NewUnitRow, NewBomLine); none for no add row.</summary>
+    /// <summary>The screen state's factory for the add row's draft (NewBrandPriceRow, NewUnitRow, NewBomLine); none for no add row.</summary>
     [Parameter] public Func<TRow>? NewItem { get; set; }
 
     /// <summary>

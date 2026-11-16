@@ -1,5 +1,5 @@
 @page "/settings/roles"
-@inherits ScreenBase<SubAssemblyRolesViewModel>
+@inherits ScreenBase<SubAssemblyRolesState>
 
 <PageTitle>Roles · TinapayanRMS</PageTitle>
 
@@ -10,11 +10,11 @@
         <div class="card-header-row">
             <h2 class="section-header">Roles</h2>
             <div class="button-row">
-                <CommandButton Command="ViewModel!.MoveUpCommand" Icon="AppIcon.MoveUp" Label="Move Up" />
-                <CommandButton Command="ViewModel!.MoveDownCommand" Icon="AppIcon.MoveDown" Label="Move Down" />
+                <CommandButton Command="State!.MoveUpCommand" Icon="AppIcon.MoveUp" Label="Move Up" />
+                <CommandButton Command="State!.MoveDownCommand" Icon="AppIcon.MoveDown" Label="Move Down" />
             </div>
         </div>
-        <PickGrid TItem="SubAssemblyRole" DataSource="ViewModel!.Roles" @bind-SelectedItem="ViewModel!.SelectedRole">
+        <PickGrid TItem="SubAssemblyRole" DataSource="State!.Roles" @bind-SelectedItem="State!.SelectedRole">
             <Columns>
                 <GridColumn Field="@nameof(SubAssemblyRole.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(SubAssemblyRole.Name)" HeaderText="Name" />
@@ -25,22 +25,22 @@
     </section>
 
     <section class="card form-card">
-        <h2 class="section-header">@ViewModel!.FormTitle</h2>
+        <h2 class="section-header">@State!.FormTitle</h2>
         <FormRow Label="Name" For="role-name">
-            <TextField ID="role-name" @bind-Value="ViewModel!.EditingName" />
+            <TextField ID="role-name" @bind-Value="State!.EditingName" />
         </FormRow>
         <FormRow Label="">
-            <SfCheckBox Label="Product-owned" @bind-Checked="ViewModel!.EditingIsProductOwned" Disabled="!ViewModel!.CanEditProductOwned"
+            <SfCheckBox Label="Product-owned" @bind-Checked="State!.EditingIsProductOwned" Disabled="!State!.CanEditProductOwned"
                         title="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role." />
         </FormRow>
         <div class="button-row">
-            <CommandButton Command="ViewModel!.NewCommand" Icon="AppIcon.Add" Label="New" />
-            <CommandButton Command="ViewModel!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
-            <CommandButton Command="ViewModel!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+            <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>
     </section>
 </div>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 }

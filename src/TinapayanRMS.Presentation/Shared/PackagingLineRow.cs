@@ -59,12 +59,12 @@ public sealed class PackagingLineRow : ObservableRow
     }
 
     /// <summary>
-    /// A line an undo step kept (<see cref="PackagingLineState"/>), as a row again, half filled in if that's how it stood:
+    /// A line an undo step kept (<see cref="PackagingLineSnapshot"/>), as a row again, half filled in if that's how it stood:
     /// the Products screen's packaging and a Sub-Assemblies packaging set both put theirs back through here. The material
     /// goes on first: it brings the units the row can be in, and a key it doesn't offer falls back to the base unit, which
     /// would drop a restored unit set the other way round.
     /// </summary>
-    public static PackagingLineRow Restore(PackagingLineState state, Func<int, RawMaterial?> findMaterial) =>
+    public static PackagingLineRow Restore(PackagingLineSnapshot state, Func<int, RawMaterial?> findMaterial) =>
         new(findMaterial)
         {
             PackagingMaterialId = state.PackagingMaterialId,
@@ -268,11 +268,11 @@ public sealed class PackagingLineRow : ObservableRow
 }
 
 /// <summary>
-/// One packaging line, by material id rather than the object for the reason <see cref="IngredientLineState"/> gives,
+/// One packaging line, by material id rather than the object for the reason <see cref="IngredientLineSnapshot"/> gives,
 /// and by unit id for the unit it's entered in.
 /// </summary>
-public readonly record struct PackagingLineState(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit)
+public readonly record struct PackagingLineSnapshot(int? PackagingMaterialId, int? UnitId, decimal? QtyPerUnit)
 {
     /// <summary>A packaging table's row as an undo step, or a version restored, keeps it.</summary>
-    public static PackagingLineState Of(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
+    public static PackagingLineSnapshot Of(PackagingLineRow row) => new(row.PackagingMaterialId, row.UnitId, row.QtyPerUnit);
 }

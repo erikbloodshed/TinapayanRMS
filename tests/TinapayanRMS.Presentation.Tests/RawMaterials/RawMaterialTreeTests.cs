@@ -39,7 +39,7 @@ public class RawMaterialTreeTests
     {
         var tree = new RawMaterialTree();
 
-        // In the order the list shows them, which is by name (RawMaterialsViewModel.VisibleRawMaterials).
+        // In the order the list shows them, which is by name (RawMaterialsState.VisibleRawMaterials).
         tree.Refresh(
             Categories,
             [

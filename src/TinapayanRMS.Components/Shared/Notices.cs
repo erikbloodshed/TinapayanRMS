@@ -3,12 +3,12 @@ namespace TinapayanRMS.Components.Shared;
 /// <summary>
 /// The open screen's ErrorMessage and SuccessMessage, for <see cref="NoticeHost"/> to show as toasts in the page's
 /// bottom-right corner. One per page the window loads; the screen that's open passes
-/// on its ViewModel's messages as they change (<see cref="ScreenBase{TViewModel}"/>). A null message hides its toast:
+/// on its state's messages as they change (<see cref="ScreenBase{TState}"/>). A null message hides its toast:
 /// RunSafelyAsync clears both before every action, so the same error twice still shows twice.
 /// </summary>
 public sealed class Notices
 {
-    /// <summary>Raised with the toast to show or hide, on whichever thread the ViewModel changed on.</summary>
+    /// <summary>Raised with the toast to show or hide, on whichever thread the screen state changed on.</summary>
     public event Action<NoticeKind, string?>? Changed;
 
     public void ShowError(string? message) => Changed?.Invoke(NoticeKind.Error, message);

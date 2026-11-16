@@ -1,7 +1,7 @@
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// Merges the redraws a component is asked for into one. A ViewModel's load sets hundreds of properties, list rows and
+/// Merges the redraws a component is asked for into one. A screen state's load sets hundreds of properties, list rows and
 /// commands in a row, and a redraw asked for on the web view's dispatcher is drawn, and sent to the web view, there and
 /// then: a product took some 445 redraws of its whole screen to open (2026-10-11). The first request since the last
 /// redraw queues one behind whatever the dispatcher is running, the rest find it queued, and it draws what they all

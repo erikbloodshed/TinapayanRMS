@@ -4,7 +4,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// A tab of the Products screen's Recipe Structure (ProductsViewModel.RecipeTabs): one per sub-assembly, in
+/// A tab of the Products screen's Recipe Structure (ProductsState.RecipeTabs): one per sub-assembly, in
 /// recipe order (after a composite's Products), then New Sub-Assembly while one is being added, then Packaging while
 /// the product has any.
 /// </summary>
@@ -17,7 +17,7 @@ public closed class RecipeTab : ObservableState
 }
 
 /// <summary>
-/// A sub-assembly's tab, which shows the form that edits it (ProductsViewModel.EditingUsage). When its section
+/// A sub-assembly's tab, which shows the form that edits it (ProductsState.EditingUsage). When its section
 /// is replaced (applied, copied, or refreshed with new costs) the tab is kept and shows the replacement, so it
 /// stays the tab showing.
 /// </summary>

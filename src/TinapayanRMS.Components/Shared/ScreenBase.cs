@@ -12,13 +12,13 @@ using TinapayanRMS.Components.Vim;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// What every screen does with its ViewModel: shows its ErrorMessage and
+/// What every screen does with its state: shows its ErrorMessage and
 /// SuccessMessage as toasts (<see cref="Notices"/>), answers its ConfirmDelete and ConfirmUnsavedChanges with a dialog
 /// (<see cref="Confirmations"/>), runs its load each time the screen is opened, and draws
-/// itself again whenever the ViewModel, one of its parts (the Products screen's Costing, say), one of their lists or one
-/// of their commands changes. The ViewModel is injected, the page's own (they're scoped). The lists and commands are
+/// itself again whenever the screen state, one of its parts (the Products screen's Costing, say), one of their lists or one
+/// of their commands changes. The screen state is injected, the page's own (they're scoped). The lists and commands are
 /// watched as well as the properties, since a grid's rows or a button's enabled state change without a property of the
-/// ViewModel changing. However many of them change together, the screen is drawn once for them all
+/// screen state changing. However many of them change together, the screen is drawn once for them all
 /// (<see cref="RedrawGate"/>).
 /// <para>
 /// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them: a
@@ -27,8 +27,8 @@ namespace TinapayanRMS.Components.Shared;
 /// reloading its page has the web view ask.
 /// </para>
 /// </summary>
-public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
-    where TViewModel : ViewModelBase
+public abstract class ScreenBase<TState> : ComponentBase, IDisposable
+    where TState : ScreenState
 {
     private readonly List<IDisposable> _subscriptions = [];
     private readonly RedrawGate _redraws;
@@ -43,8 +43,8 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
         _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
     }
 
-    /// <summary>The screen's ViewModel: the page's own, as they're scoped.</summary>
-    [Inject] public TViewModel? ViewModel { get; set; }
+    /// <summary>The screen's state: the page's own, as they're scoped.</summary>
+    [Inject] public TState? State { get; set; }
 
     [Inject] private Notices Notices { get; set; } = null!;
 
@@ -66,25 +66,25 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var viewModel = ViewModel!;
+        var state = State!;
 
-        _subscriptions.Add(viewModel.ConfirmDelete.RegisterHandler(async interaction =>
+        _subscriptions.Add(state.ConfirmDelete.RegisterHandler(async interaction =>
             interaction.SetOutput(await Confirmations.AskAsync(interaction.Input))));
-        _subscriptions.Add(viewModel.ConfirmUnsavedChanges.RegisterHandler(async interaction =>
+        _subscriptions.Add(state.ConfirmUnsavedChanges.RegisterHandler(async interaction =>
             interaction.SetOutput(await Confirmations.AskAboutUnsavedChangesAsync(interaction.Input))));
 
         // The screen on show is the one the Vim command line's :w, :new, :delete and :e run on.
-        VimKeys.Show(viewModel);
-        _subscriptions.Add(new Unsubscriber(() => VimKeys.Hide(viewModel)));
+        VimKeys.Show(state);
+        _subscriptions.Add(new Unsubscriber(() => VimKeys.Hide(state)));
 
-        viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _subscriptions.Add(new Unsubscriber(() => viewModel.PropertyChanged -= OnViewModelPropertyChanged));
-        WatchListsAndCommands(viewModel);
+        state.PropertyChanged += OnStatePropertyChanged;
+        _subscriptions.Add(new Unsubscriber(() => state.PropertyChanged -= OnStatePropertyChanged));
+        WatchListsAndCommands(state);
 
-        // Its parts: the ViewModels it holds for good (get-only), whose own changes the screen shows too.
-        foreach (var property in WatchedOf(typeof(TViewModel)).Parts)
+        // Its parts: the screen states it holds for good (get-only), whose own changes the screen shows too.
+        foreach (var property in WatchedOf(typeof(TState)).Parts)
         {
-            if (property.GetValue(viewModel) is INotifyPropertyChanged part and not ViewModelBase and not INotifyCollectionChanged)
+            if (property.GetValue(state) is INotifyPropertyChanged part and not ScreenState and not INotifyCollectionChanged)
             {
                 part.PropertyChanged += OnPartPropertyChanged;
                 _subscriptions.Add(new Unsubscriber(() => part.PropertyChanged -= OnPartPropertyChanged));
@@ -120,12 +120,12 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     /// <summary>Keeps <paramref name="subscription"/> (an Interaction handler, say) until the screen goes.</summary>
     protected void AddSubscription(IDisposable subscription) => _subscriptions.Add(subscription);
 
-    /// <summary>The page's toasts, for a failure the screen meets outside its ViewModel.</summary>
+    /// <summary>The page's toasts, for a failure the screen meets outside its state.</summary>
     protected Notices ScreenNotices => Notices;
 
     /// <summary>
     /// Moves the screen's address to <paramref name="path"/>, as its form shows another record: no question about the
-    /// form's changes, which the ViewModel has already asked about if there was one to ask.
+    /// form's changes, which the screen state has already asked about if there was one to ask.
     /// </summary>
     protected void MoveAddressTo(string path)
     {
@@ -134,10 +134,10 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     }
 
     /// <summary>
-    /// The form this screen keeps from being left with unsaved changes: its own ViewModel's, when it has one; Print's is
+    /// The form this screen keeps from being left with unsaved changes: its own state's, when it has one; Print's is
     /// Products', which it prints as Products shows it.
     /// </summary>
-    protected virtual IUnsavedChangesScreen? UnsavedChangesForm => ViewModel as IUnsavedChangesScreen;
+    protected virtual IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
 
     /// <summary>
     /// Whether a move to <paramref name="path"/> (an address within the app, products/42) keeps the form showing, so its
@@ -173,10 +173,10 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     });
 
     /// <summary>
-    /// A property of the ViewModel changed. Called on whichever thread changed it, so anything that touches a component
+    /// A property of the screen state changed. Called on whichever thread changed it, so anything that touches a component
     /// goes through InvokeAsync.
     /// </summary>
-    protected virtual void OnViewModelChanged(string? propertyName)
+    protected virtual void OnStateChanged(string? propertyName)
     {
     }
 
@@ -203,10 +203,10 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
     }
 
     /// <summary>
-    /// What a screen watches on a ViewModel or one of its parts, worked out once a type: the properties declared as a list
+    /// What a screen watches on a screen state or one of its parts, worked out once a type: the properties declared as a list
     /// (INotifyCollectionChanged) or a command (ICommand), and the parts, get-only properties of a type from the
     /// Presentation project's namespaces that tells of its changes and is neither a list (TableRows is watched as one) nor
-    /// a screen's ViewModel.
+    /// a screen's state.
     /// Chosen by the type a property is declared as, so a worked-out property (a caption, a filtered list) is never read for
     /// it: a list or command the screen should redraw for is declared as one.
     /// </summary>
@@ -221,12 +221,12 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
                 .. properties.Where(p => !p.CanWrite
                     && p.PropertyType.Namespace?.StartsWith(PresentationNamespaces, StringComparison.Ordinal) == true
                     && Is<INotifyPropertyChanged>(p)
-                    && !Is<ViewModelBase>(p)
+                    && !Is<ScreenState>(p)
                     && !Is<INotifyCollectionChanged>(p)),
             ]);
     });
 
-    // Every ViewModel, part and row is in one of these, the namespace of its folder (TinapayanRMS.Presentation.Products).
+    // Every screen state, part and row is in one of these, the namespace of its folder (TinapayanRMS.Presentation.Products).
     private const string PresentationNamespaces = "TinapayanRMS.Presentation.";
 
     private static readonly ConcurrentDictionary<Type, Watched> WatchedTypes = new();
@@ -281,19 +281,19 @@ public abstract class ScreenBase<TViewModel> : ComponentBase, IDisposable
         }
     }
 
-    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    private void OnStatePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
         {
-            case nameof(ViewModelBase.ErrorMessage):
-                Notices.ShowError(ViewModel!.ErrorMessage);
+            case nameof(ScreenState.ErrorMessage):
+                Notices.ShowError(State!.ErrorMessage);
                 break;
-            case nameof(ViewModelBase.SuccessMessage):
-                Notices.ShowSuccess(ViewModel!.SuccessMessage);
+            case nameof(ScreenState.SuccessMessage):
+                Notices.ShowSuccess(State!.SuccessMessage);
                 break;
         }
 
-        OnViewModelChanged(e.PropertyName);
+        OnStateChanged(e.PropertyName);
         _redraws.Request();
     }
 

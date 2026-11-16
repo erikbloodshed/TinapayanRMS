@@ -1,9 +1,9 @@
 namespace TinapayanRMS.Presentation.Shared;
 
 /// <summary>
-/// A question a ViewModel asks whoever shows it, and waits for the answer to: "Delete Cake Flour?", where to save a
+/// A question a screen state asks whoever shows it, and waits for the answer to: "Delete Cake Flour?", where to save a
 /// workbook, what to name a folder. The screen answers it (a dialog, a file picker) by registering a handler, and the
-/// tests answer it the same way, so the ViewModel never touches a window. The handler registered last is asked first, one
+/// tests answer it the same way, so the screen state never touches a window. The handler registered last is asked first, one
 /// that leaves the answer unset passes the question to the one before it, and a question nobody answers is a bug, thrown
 /// as one.
 /// </summary>

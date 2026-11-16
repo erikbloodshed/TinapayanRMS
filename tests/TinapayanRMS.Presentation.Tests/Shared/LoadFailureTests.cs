@@ -39,22 +39,22 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         }
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
+        var state = CreateProductsState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        Product Named(string name) => state.Products.Single(p => p.Name == name);
 
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Almond Bread"), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
 
         factory.Fail = true;
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Banana Bread"), () => viewModel.ErrorMessage is not null);
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
-        viewModel.Recipe.UsageEdits.Should().BeEmpty("nothing of Banana Bread's came, and Almond Bread's mustn't show under its name");
+        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Banana Bread"), () => state.ErrorMessage is not null);
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.Recipe.UsageEdits.Should().BeEmpty("nothing of Banana Bread's came, and Almond Bread's mustn't show under its name");
 
         factory.Fail = false;
-        await Settle.PickAsync(viewModel,
-            () => viewModel.SelectedProduct = Named("Cheese Bread"),
-            () => viewModel.AreDetailsReady && viewModel.EditingName == "Cheese Bread" && viewModel.Recipe.UsageEdits.Count == 1);
-        viewModel.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
+        await Settle.PickAsync(state,
+            () => state.SelectedProduct = Named("Cheese Bread"),
+            () => state.AreDetailsReady && state.EditingName == "Cheese Bread" && state.Recipe.UsageEdits.Count == 1);
+        state.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
     });
 
     // While a picked product's details are on their way the form still holds the product before's, which a Save would
@@ -71,23 +71,23 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         }
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
+        var state = CreateProductsState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        Product Named(string name) => state.Products.Single(p => p.Name == name);
+        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Almond Bread"), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
 
         var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         factory.Hold = hold;
-        viewModel.SelectedProduct = Named("Banana Bread");
-        viewModel.AreDetailsReady.Should().BeFalse("Banana Bread's details are still on their way");
-        viewModel.EditingName = "Banana Loaf";
+        state.SelectedProduct = Named("Banana Bread");
+        state.AreDetailsReady.Should().BeFalse("Banana Bread's details are still on their way");
+        state.EditingName = "Banana Loaf";
 
-        viewModel.History.IsDirty.Should().BeFalse("the history records nothing until the details come");
-        viewModel.SaveCommand.CanExecute().Should().BeFalse("what the form holds isn't Banana Bread's to save");
+        state.History.IsDirty.Should().BeFalse("the history records nothing until the details come");
+        state.SaveCommand.CanExecute().Should().BeFalse("what the form holds isn't Banana Bread's to save");
 
         factory.Hold = null;
         hold.SetResult();
-        await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => { }, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
     });
 
     [Test]
@@ -102,19 +102,19 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         }
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        RawMaterial WithId(int id) => viewModel.RawMaterials.Single(m => m.Id == id);
+        var state = CreateRawMaterialsState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        RawMaterial WithId(int id) => state.RawMaterials.Single(m => m.Id == id);
 
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[0]), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[0]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
 
         factory.Fail = true;
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[1]), () => viewModel.ErrorMessage is not null);
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[1]), () => state.ErrorMessage is not null);
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = WithId(ids[2]), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
-        viewModel.ErrorMessage.Should().BeNull();
+        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[2]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        state.ErrorMessage.Should().BeNull();
     });
 
     [Test]
@@ -128,25 +128,25 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         }
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateSubAssembliesViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        StandaloneSubAssemblyRow Named(string name) => viewModel.List.Rows.Single(r => r.Name == name);
+        var state = CreateSubAssembliesState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        StandaloneSubAssemblyRow Named(string name) => state.List.Rows.Single(r => r.Name == name);
 
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Almond Dough"), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1,
-            () => $"name={viewModel.EditingName} lines={viewModel.Batch.Lines.Count} error={viewModel.ErrorMessage}");
+        await Settle.PickAsync(state, () => state.SelectedRow = Named("Almond Dough"), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1,
+            () => $"name={state.EditingName} lines={state.Batch.Lines.Count} error={state.ErrorMessage}");
 
         // The failure clears the pick, and the pick of nothing that follows mustn't take the error away.
         factory.Fail = true;
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Banana Dough"), () => viewModel.ErrorMessage is not null,
-            () => $"name={viewModel.EditingName} lines={viewModel.Batch.Lines.Count} row={viewModel.SelectedRow?.Name}");
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
-        viewModel.SelectedRow.Should().BeNull("the form went blank rather than show Almond Dough under Banana Dough's row");
-        viewModel.Batch.Lines.Should().BeEmpty();
+        await Settle.PickAsync(state, () => state.SelectedRow = Named("Banana Dough"), () => state.ErrorMessage is not null,
+            () => $"name={state.EditingName} lines={state.Batch.Lines.Count} row={state.SelectedRow?.Name}");
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.SelectedRow.Should().BeNull("the form went blank rather than show Almond Dough under Banana Dough's row");
+        state.Batch.Lines.Should().BeEmpty();
 
         factory.Fail = false;
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Cheese Dough"), () => viewModel.EditingName == "Cheese Dough" && viewModel.Batch.Lines.Count == 1,
-            () => $"name={viewModel.EditingName} lines={viewModel.Batch.Lines.Count} row={viewModel.SelectedRow?.Name} error={viewModel.ErrorMessage}");
-        viewModel.ErrorMessage.Should().BeNull();
+        await Settle.PickAsync(state, () => state.SelectedRow = Named("Cheese Dough"), () => state.EditingName == "Cheese Dough" && state.Batch.Lines.Count == 1,
+            () => $"name={state.EditingName} lines={state.Batch.Lines.Count} row={state.SelectedRow?.Name} error={state.ErrorMessage}");
+        state.ErrorMessage.Should().BeNull();
     });
 
     [Test]
@@ -154,38 +154,38 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     {
         await AddProductAsync("Pandesal");
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateReportsViewModel(factory);
+        var state = CreateReportsState(factory);
 
         factory.Fail = true;
-        await viewModel.LoadCommand.ExecuteAsync();
+        await state.LoadCommand.ExecuteAsync();
 
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText, "the load said why, and didn't throw");
+        state.ErrorMessage.Should().Be(Failure.TimedOutText, "the load said why, and didn't throw");
 
         factory.Fail = false;
-        await viewModel.LoadCommand.ExecuteAsync();
+        await state.LoadCommand.ExecuteAsync();
 
-        viewModel.ErrorMessage.Should().BeNull();
-        viewModel.ProductCosts.Should().ContainSingle().Which.ProductName.Should().Be("Pandesal");
+        state.ErrorMessage.Should().BeNull();
+        state.ProductCosts.Should().ContainSingle().Which.ProductName.Should().Be("Pandesal");
     });
 
     [Test]
     public Task A_save_that_fails_says_why_and_doesnt_throw() => UiThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = new CategoriesViewModel(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
-        await viewModel.LoadCommand.ExecuteAsync();
-        viewModel.EditingName = "Breads";
+        var state = new CategoriesState(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
+        await state.LoadCommand.ExecuteAsync();
+        state.EditingName = "Breads";
 
         factory.Fail = true;
-        await viewModel.SaveCommand.ExecuteAsync();
+        await state.SaveCommand.ExecuteAsync();
 
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await viewModel.SaveCommand.ExecuteAsync();
+        await state.SaveCommand.ExecuteAsync();
 
-        viewModel.ErrorMessage.Should().BeNull();
-        viewModel.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
+        state.ErrorMessage.Should().BeNull();
+        state.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
     });
 
     // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaits the move
@@ -197,22 +197,22 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         await AddProductWithSubAssemblyAsync("Almond Bread", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
-        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
-        viewModel.EditingName = "Almond Loaf";
+        var state = CreateProductsState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.PickAsync(state, () => state.SelectedProduct = state.Products.Single(), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
+        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        state.EditingName = "Almond Loaf";
 
         factory.Fail = true;
-        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+        var mayLeave = await state.ResolveUnsavedChangesAsync(revert: true);
 
         mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady);
-        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.PickAsync(state, () => { }, () => state.AreDetailsReady);
+        (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
     [Test]
@@ -221,22 +221,22 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var flourId = await AddIngredientAsync("Flour");
         await SetPriceAsync(flourId, unitId: null, price: 0.05m);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateRawMaterialsViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
-        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
-        viewModel.EditingName = "Strong Flour";
+        var state = CreateRawMaterialsState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        state.EditingName = "Strong Flour";
 
         factory.Fail = true;
-        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+        var mayLeave = await state.ResolveUnsavedChangesAsync(revert: true);
 
         mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
-        viewModel.EditingName.Should().Be("Strong Flour", "the changes are still there");
-        viewModel.History.IsDirty.Should().BeTrue();
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.EditingName.Should().Be("Strong Flour", "the changes are still there");
+        state.History.IsDirty.Should().BeTrue();
 
         factory.Fail = false;
-        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+        (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
     [Test]
@@ -246,20 +246,20 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         await AddProductWithSubAssemblyAsync("Almond", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var viewModel = CreateSubAssembliesViewModel(factory);
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.List.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1);
-        viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
-        viewModel.EditingName = "Almond Loaf Dough";
+        var state = CreateSubAssembliesState(factory);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.PickAsync(state, () => state.SelectedRow = state.List.Rows.Single(), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
+        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        state.EditingName = "Almond Loaf Dough";
 
         factory.Fail = true;
-        var mayLeave = await viewModel.ResolveUnsavedChangesAsync(revert: true);
+        var mayLeave = await state.ResolveUnsavedChangesAsync(revert: true);
 
         mayLeave.Should().BeFalse("the form couldn't be put back, so it isn't left");
-        viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
+        state.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
+        (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });
 
     // A record opened by the Vim command line's :e name, which nothing awaits.
@@ -274,24 +274,24 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             ids.Add(id);
         }
 
-        var viewModel = CreateRawMaterialsViewModel(new FailingDbContextFactory(CreateDbContextFactory()));
-        await viewModel.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(viewModel, () => viewModel.SelectedRawMaterial = viewModel.RawMaterials.Single(m => m.Id == ids[0]), () => viewModel.AreDetailsReady && viewModel.PurchaseCost.BrandPriceRows.Count == 1);
-        viewModel.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
-        viewModel.EditingName = "Salted Butter";
+        var state = CreateRawMaterialsState(new FailingDbContextFactory(CreateDbContextFactory()));
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == ids[0]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        state.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
+        state.EditingName = "Salted Butter";
 
-        viewModel.OpenByName("Flour").Should().BeTrue();
+        state.OpenByName("Flour").Should().BeTrue();
 
-        await Settle.PickAsync(viewModel, () => { }, () => viewModel.ErrorMessage is not null);
-        viewModel.ErrorMessage.Should().Contain("The question couldn't be asked.");
-        viewModel.SelectedRawMaterial!.Id.Should().Be(ids[0], "it stays on the form it was asked to leave");
-        viewModel.EditingName.Should().Be("Salted Butter");
+        await Settle.PickAsync(state, () => { }, () => state.ErrorMessage is not null);
+        state.ErrorMessage.Should().Contain("The question couldn't be asked.");
+        state.SelectedRawMaterial!.Id.Should().Be(ids[0], "it stays on the form it was asked to leave");
+        state.EditingName.Should().Be("Salted Butter");
     });
 
-    private ProductsViewModel CreateProductsViewModel(FailingDbContextFactory factory)
+    private ProductsState CreateProductsState(FailingDbContextFactory factory)
     {
         var packagingLineRepository = new PackagingLineRepository(factory);
-        return new ProductsViewModel(
+        return new ProductsState(
             new ProductRepository(factory),
             new ProductSubAssemblyUsageRepository(factory),
             packagingLineRepository,
@@ -315,9 +315,9 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private static RawMaterialsViewModel CreateRawMaterialsViewModel(FailingDbContextFactory factory)
+    private static RawMaterialsState CreateRawMaterialsState(FailingDbContextFactory factory)
     {
-        return new RawMaterialsViewModel(
+        return new RawMaterialsState(
             new RawMaterialRepository(factory),
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialBrandPriceRepository(factory),
@@ -335,9 +335,9 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private SubAssembliesViewModel CreateSubAssembliesViewModel(FailingDbContextFactory factory)
+    private SubAssembliesState CreateSubAssembliesState(FailingDbContextFactory factory)
     {
-        return new SubAssembliesViewModel(
+        return new SubAssembliesState(
             new SubAssemblyRepository(factory),
             new SubAssemblyLineRepository(factory),
             new SubAssemblyRoleRepository(factory),
@@ -350,10 +350,10 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private ReportsViewModel CreateReportsViewModel(FailingDbContextFactory factory)
+    private ReportsState CreateReportsState(FailingDbContextFactory factory)
     {
         var productRepository = new ProductRepository(factory);
-        return new ReportsViewModel(
+        return new ReportsState(
             new RawMaterialPriceHistoryRepository(factory),
             new RawMaterialRepository(factory),
             productRepository,

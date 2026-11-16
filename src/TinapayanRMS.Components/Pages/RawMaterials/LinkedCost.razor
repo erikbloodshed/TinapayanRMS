@@ -5,28 +5,28 @@
 
     <div class="field-stack">
         <label class="field-label" for="rm-linked-to">Linked To</label>
-        <PickField ID="rm-linked-to" TItem="RawMaterial" Items="ViewModel.LinkTargets" TextField="Name" @bind-Value="ViewModel.EditingLinkedTo" />
+        <PickField ID="rm-linked-to" TItem="RawMaterial" Items="State.LinkTargets" TextField="Name" @bind-Value="State.EditingLinkedTo" />
     </div>
 
     <div class="buffer-row">
         <div class="field-stack">
             <label class="field-label" for="rm-weight-share">Weight Share %</label>
-            <NumberField ID="rm-weight-share" TValue="decimal?" @bind-Value="ViewModel.EditingWeightSharePercent" Min="0" Max="100" />
+            <NumberField ID="rm-weight-share" TValue="decimal?" @bind-Value="State.EditingWeightSharePercent" Min="0" Max="100" />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-cost-share">Cost Share %</label>
-            <NumberField ID="rm-cost-share" TValue="decimal?" @bind-Value="ViewModel.EditingCostSharePercent" Min="0" Max="100" />
+            <NumberField ID="rm-cost-share" TValue="decimal?" @bind-Value="State.EditingCostSharePercent" Min="0" Max="100" />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-linked-buffer">Cost Buffer %</label>
-            <NumberField ID="rm-linked-buffer" TValue="decimal?" Value="ViewModel.EditingLinkedTo?.CostBufferPercent" ReadOnly="true" />
+            <NumberField ID="rm-linked-buffer" TValue="decimal?" Value="State.EditingLinkedTo?.CostBufferPercent" ReadOnly="true" />
         </div>
     </div>
 
-    <p class="info-text">@ViewModel.LinkedCostPreviewText</p>
-    <p class="caption">@ViewModel.LinkedPartsText</p>
+    <p class="info-text">@State.LinkedCostPreviewText</p>
+    <p class="caption">@State.LinkedPartsText</p>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public RawMaterialsState State { get; set; } = null!;
 }

@@ -9,7 +9,7 @@ public sealed class App(IServiceProvider services) : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         // The window's title, which the taskbar and Alt+Tab show; the page's title bar shows its heading instead.
-        var window = new Window(new MainPage()) { Title = new MainWindowViewModel().Title };
+        var window = new Window(new MainPage()) { Title = new MainWindowState().Title };
 
         // The window closing ends the app: the hourly backups stop and the log is flushed (BackgroundWork.Stop), then
         // the process ends there and then. Left to end by itself, it stayed for another 17 to 22 seconds after the window

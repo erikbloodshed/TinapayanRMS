@@ -21,7 +21,7 @@
     The commit to compare with: HEAD, what isn't committed yet, or main, everything this branch has changed.
 
 .PARAMETER Class
-    Only test classes whose name matches, with * for any characters: "*ProductsViewModel*". Several are joined into one
+    Only test classes whose name matches, with * for any characters: "*ProductsState*". Several are joined into one
     --treenode-filter. A project with none passes with "Zero tests ran". It goes by names, so it can miss the tests of
     something else that uses the class.
 

@@ -21,10 +21,10 @@ public closed record RecipeTabChoice
 }
 
 /// <summary>
-/// One line of a composite's Products table, by product id rather than the product, as <see cref="IngredientLineState"/>
+/// One line of a composite's Products table, by product id rather than the product, as <see cref="IngredientLineSnapshot"/>
 /// keeps its ingredient: a refresh swaps in fresh products and recipe costs, which a repriced line isn't an edit of.
 /// </summary>
-public readonly record struct ComponentLineState(int? ProductId, int? Quantity);
+public readonly record struct ComponentLineSnapshot(int? ProductId, int? Quantity);
 
 /// <summary>
 /// The Products screen's editable state at one instant: everything one undo step puts back, and nothing else. The
@@ -63,7 +63,7 @@ public sealed record ProductFormSnapshot : IFormSnapshot<ProductFormSnapshot>
     public required PackagingSnapshot Packaging { get; init; }
 
     /// <summary>A composite's Products table; empty for a product made of sub-assemblies, which has no such table.</summary>
-    public required IReadOnlyList<ComponentLineState> Components { get; init; }
+    public required IReadOnlyList<ComponentLineSnapshot> Components { get; init; }
 
     /// <summary>
     /// True when two snapshots would look the same to the user, so nothing is worth recording. Written out
@@ -206,8 +206,8 @@ public sealed record SectionFormSnapshot
     /// <summary>Null when the section goes by its role alone, which is the usual case.</summary>
     public required string? Name { get; init; }
     public required int? SourceKey { get; init; }
-    public required IReadOnlyList<IngredientLineState> Lines { get; init; }
-    public required IReadOnlyList<IngredientLineState> AddIns { get; init; }
+    public required IReadOnlyList<IngredientLineSnapshot> Lines { get; init; }
+    public required IReadOnlyList<IngredientLineSnapshot> AddIns { get; init; }
     public required decimal FormulaBase { get; init; }
     public required UsageAuthoredField AuthoredField { get; init; }
     public required decimal WeightPerPiece { get; init; }
@@ -243,10 +243,10 @@ public sealed record PackagingSnapshot
 
     /// <summary>Move to Sub-Assemblies was pressed on the Packaging tab: Save makes its lines a packaging set, and links it.</summary>
     public required bool IsMoving { get; init; }
-    public required IReadOnlyList<PackagingLineState> Lines { get; init; }
+    public required IReadOnlyList<PackagingLineSnapshot> Lines { get; init; }
 
     /// <summary>The bulk packaging's lines, each for one bulk pack.</summary>
-    public required IReadOnlyList<PackagingLineState> BulkLines { get; init; }
+    public required IReadOnlyList<PackagingLineSnapshot> BulkLines { get; init; }
 
     /// <summary>How many products one bulk pack holds, as typed; null while nothing is.</summary>
     public required int? BulkQuantity { get; init; }

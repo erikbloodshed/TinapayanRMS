@@ -6,7 +6,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.RawMaterials;
 
 /// <summary>
-/// The Raw Materials screen's Dependents tab (through RawMaterialsViewModel.Dependents): the products the material showing
+/// The Raw Materials screen's Dependents tab (through RawMaterialsState.Dependents): the products the material showing
 /// goes into, one tile each, which opens it, with what the material makes up of each one's material cost once the tab shows.
 /// The screen says what to show as each material is loaded, and when to work the shares out.
 /// </summary>

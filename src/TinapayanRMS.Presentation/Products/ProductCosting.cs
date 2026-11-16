@@ -8,7 +8,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// The Products screen's costing and costs (through ProductsViewModel.Costing; the Costing tab and the header draw them):
+/// The Products screen's costing and costs (through ProductsState.Costing; the Costing tab and the header draw them):
 /// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
 /// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
 /// materials have risen past their buffered cost. The screen supplies the recipe's figures and says when
@@ -137,7 +137,7 @@ public sealed class ProductCosting : ObservableState
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
-    /// button (ProductsViewModel.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
+    /// button (ProductsState.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
     /// isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the
     /// next until the app closes. Print prints at it too. Only the screen switches it, as it prices its tables' rows again.
     /// </summary>

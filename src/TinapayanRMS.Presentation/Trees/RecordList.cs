@@ -6,7 +6,7 @@ namespace TinapayanRMS.Presentation.Trees;
 /// <summary>
 /// What a record screen's list asks of the screen, whichever screen it is: what any part of its form asks
 /// (<see cref="IFormPartHost"/>), and what the list's own actions need of the form. Every record screen is one
-/// (RecordFormViewModel); each list asks for the record it shows, and what its actions do to it, through an interface of its
+/// (RecordScreenState); each list asks for the record it shows, and what its actions do to it, through an interface of its
 /// own on top of this one (ISubAssembliesListHost).
 /// </summary>
 public interface IRecordListHost : IFormPartHost
@@ -22,7 +22,7 @@ public interface IRecordListHost : IFormPartHost
 }
 
 /// <summary>
-/// A record screen's list, a part of the screen (SubAssembliesViewModel.List): what the lists of Products, Raw Materials and
+/// A record screen's list, a part of the screen (SubAssembliesState.List): what the lists of Products, Raw Materials and
 /// Sub-Assemblies work the same way. The rows picked, shared with the tree, and what picking one does; the row whose name is
 /// being typed in place; and the notice of the last move. Each screen's list says which row shows the form's record
 /// (<see cref="ShowingRow"/>), what picking a row does (<see cref="PickRowFromList"/>), what a name typed does
@@ -111,7 +111,7 @@ public abstract class RecordList : ObservableState
 
     /// <summary>
     /// The user picked <paramref name="row"/> first in the list, by a click or a key: a saved record's row other than the one
-    /// shown picks its record (RecordFormViewModel.PickFromList); any other row (a folder's, the new record's) leaves the form
+    /// shown picks its record (RecordScreenState.PickFromList); any other row (a folder's, the new record's) leaves the form
     /// as it is.
     /// </summary>
     protected abstract void PickRowFromList(object row);

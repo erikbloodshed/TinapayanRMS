@@ -5,7 +5,7 @@ namespace TinapayanRMS.Presentation.Tests.Fixtures;
 
 /// <summary>
 /// Waits for a screen in a test to finish what it started in the background (a pick's load, a table's cost reads),
-/// as the app's user just watches it fill in. It awaits the screen's own count of that work (ViewModelBase.WhenIdleAsync)
+/// as the app's user just watches it fill in. It awaits the screen's own count of that work (ScreenState.WhenIdleAsync)
 /// rather than polling for a condition to hold for a while, so a test waits exactly as long as the work takes, and a
 /// condition that's still false then fails at once, since nothing left running could make it true.
 /// </summary>
@@ -16,7 +16,7 @@ public static class Settle
 
     /// <summary>Waits for <paramref name="screen"/> to settle, then requires <paramref name="condition"/>.</summary>
     /// <param name="describe">What the screen shows instead, for the failure's message.</param>
-    public static async Task UntilAsync(ViewModelBase screen, Func<bool> condition, Func<string>? describe = null)
+    public static async Task UntilAsync(ScreenState screen, Func<bool> condition, Func<string>? describe = null)
     {
         try
         {
@@ -50,7 +50,7 @@ public static class Settle
     }
 
     /// <summary>Does <paramref name="pick"/> (a record picked, as a click would), then waits as <see cref="UntilAsync"/> does.</summary>
-    public static Task PickAsync(ViewModelBase screen, Action pick, Func<bool> settled, Func<string>? describe = null)
+    public static Task PickAsync(ScreenState screen, Action pick, Func<bool> settled, Func<string>? describe = null)
     {
         pick();
         return UntilAsync(screen, settled, describe);

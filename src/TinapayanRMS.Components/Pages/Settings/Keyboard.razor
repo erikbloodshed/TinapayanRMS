@@ -1,5 +1,5 @@
 @page "/settings/keyboard"
-@inject KeyboardSettingsViewModel ViewModel
+@inject KeyboardSettingsState State
 
 <PageTitle>Keyboard · TinapayanRMS</PageTitle>
 
@@ -8,7 +8,7 @@
 <div class="card-wrap">
     <section class="card fixed-card">
         <h2 class="section-header">Keyboard</h2>
-        <SfCheckBox Label="Vim keys" @bind-Checked="ViewModel.IsVimKeysOn" />
+        <SfCheckBox Label="Vim keys" @bind-Checked="State.IsVimKeysOn" />
         <p class="caption form-extra">Letters move and act instead of typing, until you start typing in a field or cell (i, or a click) and Esc stops it again: j and k go down and up, f labels what can be clicked, : runs a command such as :w to save, and ? lists every key. The header shows which mode the keys are in. Kept for your account.</p>
     </section>
 </div>

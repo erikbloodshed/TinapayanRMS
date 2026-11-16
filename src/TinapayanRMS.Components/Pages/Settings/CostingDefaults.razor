@@ -1,6 +1,6 @@
 @page "/settings/costing-defaults"
 @using TinapayanRMS.Domain.Enums
-@inherits ScreenBase<CostingDefaultsViewModel>
+@inherits ScreenBase<CostingDefaultsState>
 
 <PageTitle>Costing Defaults · TinapayanRMS</PageTitle>
 
@@ -13,49 +13,49 @@
         <p class="caption">Where a new product goes, what its costing starts with, and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. VAT % and Wastage % are different: every product is priced with them (Wastage % unless its category sets its own, in Product Categories), so changing either reprices them all.</p>
 
         <FormRow Label="New Products In" For="new-products-in">
-            <PickField ID="new-products-in" TItem="KeyValuePair<ProductStage, string>" Items="ViewModel!.Stages" TextOf="s => s.Value"
-                       Value="ViewModel!.Stages.FirstOrDefault(s => s.Key == ViewModel!.EditingNewProductStage)" ValueChanged="s => ViewModel!.EditingNewProductStage = s.Key"
+            <PickField ID="new-products-in" TItem="KeyValuePair<ProductStage, string>" Items="State!.Stages" TextOf="s => s.Value"
+                       Value="State!.Stages.FirstOrDefault(s => s.Key == State!.EditingNewProductStage)" ValueChanged="s => State!.EditingNewProductStage = s.Key"
                        Tooltip="The folder New on the Products screen files a product in. New Product Here keeps its folder's, and a clone or variant goes in Innovation." />
         </FormRow>
         <FormRow Label="Labor %" For="labor-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="labor-percent" @bind-Value="ViewModel!.EditingLaborPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="labor-percent" @bind-Value="State!.EditingLaborPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
         </FormRow>
         <FormRow Label="Overhead %" For="overhead-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="overhead-percent" @bind-Value="ViewModel!.EditingOverheadPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="overhead-percent" @bind-Value="State!.EditingOverheadPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
         </FormRow>
         <FormRow Label="Administrative %" For="administrative-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="administrative-percent" @bind-Value="ViewModel!.EditingAdministrativePercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="administrative-percent" @bind-Value="State!.EditingAdministrativePercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
         </FormRow>
         <FormRow Label="Markup %" For="markup-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="ViewModel!.EditingMarginPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarginPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
         </FormRow>
         <FormRow Label="VAT %" For="vat-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="ViewModel!.EditingVatPercent" Tooltip="Every product's, not just new ones: the shop's VAT, on top of the marked-up price. Changing it reprices every product." />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="State!.EditingVatPercent" Tooltip="Every product's, not just new ones: the shop's VAT, on top of the marked-up price. Changing it reprices every product." />
         </FormRow>
         <FormRow Label="Wastage %" For="wastage-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="wastage-percent" @bind-Value="ViewModel!.EditingWastagePercent" Max="100m" Tooltip="Every product's, not just new ones, unless its category sets its own (Product Categories): what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="wastage-percent" @bind-Value="State!.EditingWastagePercent" Max="100m" Tooltip="Every product's, not just new ones, unless its category sets its own (Product Categories): what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
         </FormRow>
         <FormRow Label="Cost Buffer %" For="cost-buffer-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="cost-buffer-percent" @bind-Value="ViewModel!.EditingCostBufferPercent" Max="100m" Tooltip="What a new raw material's Cost Buffer % starts at: a cushion on top of its cost for price swings and waste" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="cost-buffer-percent" @bind-Value="State!.EditingCostBufferPercent" Max="100m" Tooltip="What a new raw material's Cost Buffer % starts at: a cushion on top of its cost for price swings and waste" />
         </FormRow>
         <FormRow Label="Price Rounding" For="price-rounding">
-            <PickField ID="price-rounding" TItem="PriceRoundingOption" Items="ViewModel!.PriceRoundingOptions" TextOf="o => o.Label"
-                       Value="ViewModel!.EditingPriceRounding" ValueChanged="o => { if (o is not null) ViewModel!.EditingPriceRounding = o; }"
+            <PickField ID="price-rounding" TItem="PriceRoundingOption" Items="State!.PriceRoundingOptions" TextOf="o => o.Label"
+                       Value="State!.EditingPriceRounding" ValueChanged="o => { if (o is not null) State!.EditingPriceRounding = o; }"
                        Tooltip="A suggested price rounded up to a price you'd charge, shown beside the exact one on the Costing tab, in Reports and in the Price Simulator. The exact figures don't change." />
         </FormRow>
 
         <div class="button-row form-extra">
-            <CommandButton Command="ViewModel!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
         </div>
     </section>
 
     <section class="card fixed-card">
         <h2 class="section-header">Stored Costs</h2>
         <p class="caption">Each Save keeps made and linked ingredients' costs, and sub-assemblies' totals, up to date. If the database was changed outside the app, work them all out again from what they're made of.</p>
-        <CommandButton Command="ViewModel!.RecalculateCostsCommand" Icon="AppIcon.Calculate" Label="Recalculate Costs" />
+        <CommandButton Command="State!.RecalculateCostsCommand" Icon="AppIcon.Calculate" Label="Recalculate Costs" />
     </section>
 </div>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 }

@@ -9,14 +9,14 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// <paramref name="Id"/> has to survive for the same reason a pack's does: a unit that lost its id would be saved
 /// as a new one and the stored one deleted.
 /// </summary>
-public readonly record struct UnitRowState(int Id, int RawMaterialId, int? UnitOfMeasureId, decimal BaseUnitsPerUnit, string BaseUnitAbbreviation);
+public readonly record struct UnitRowSnapshot(int Id, int RawMaterialId, int? UnitOfMeasureId, decimal BaseUnitsPerUnit, string BaseUnitAbbreviation);
 
 /// <summary>
 /// One brand price, by what the user typed. Its Quantity isn't carried: the row has no field of its own for it and
 /// reads it back through the unit it names, which <see cref="RawMaterialFormSnapshot.UnitRows"/> already holds — so
 /// capturing it here would record the same figure twice and restore it twice.
 /// </summary>
-public readonly record struct BrandPriceState(string? Brand, int? UnitKey, decimal? Price);
+public readonly record struct BrandPriceSnapshot(string? Brand, int? UnitKey, decimal? Price);
 
 /// <summary>
 /// The Raw Materials screen's editable state at one instant: everything one undo step puts back.
@@ -49,10 +49,10 @@ public sealed record RawMaterialFormSnapshot : IFormSnapshot<RawMaterialFormSnap
     public required decimal? BufferedCost { get; init; }
     public required int? BufferedCostUnitKey { get; init; }
 
-    public required IReadOnlyList<UnitRowState> UnitRows { get; init; }
-    public required IReadOnlyList<BrandPriceState> BrandPrices { get; init; }
+    public required IReadOnlyList<UnitRowSnapshot> UnitRows { get; init; }
+    public required IReadOnlyList<BrandPriceSnapshot> BrandPrices { get; init; }
     /// <summary>A made ingredient's add-ins. Its sub-assembly's lines aren't the form's: they follow <see cref="SubAssemblyId"/>.</summary>
-    public required IReadOnlyList<IngredientLineState> AddIns { get; init; }
+    public required IReadOnlyList<IngredientLineSnapshot> AddIns { get; init; }
 
     /// <summary>
     /// True when two snapshots would look the same to the user. Written out rather than left to the record's own

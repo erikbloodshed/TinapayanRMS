@@ -153,10 +153,10 @@ public sealed record RestoredVersion(
     bool IsComposite,
     IReadOnlyList<ProductUsageEdit> Sections,
     PackagingLinkTarget? PackagingLink,
-    IReadOnlyList<PackagingLineState> PackagingLines,
-    IReadOnlyList<PackagingLineState> BulkLines,
+    IReadOnlyList<PackagingLineSnapshot> PackagingLines,
+    IReadOnlyList<PackagingLineSnapshot> BulkLines,
     int? BulkQuantity,
-    IReadOnlyList<ComponentLineState> Components,
+    IReadOnlyList<ComponentLineSnapshot> Components,
     (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Costing,
     int QuantityRequired,
     decimal? CurrentPrice,
@@ -642,25 +642,25 @@ public sealed class ProductVersionHistory : ObservableState
 
         // The lines a link shows: those showing already when it's the link the form has, else as it has them now. The bulk
         // packaging is the version's own, whatever it linked.
-        IReadOnlyList<PackagingLineState> packagingLines;
-        IReadOnlyList<PackagingLineState> bulkLines = [.. content.PackagingLines.Where(l => l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
+        IReadOnlyList<PackagingLineSnapshot> packagingLines;
+        IReadOnlyList<PackagingLineSnapshot> bulkLines = [.. content.PackagingLines.Where(l => l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
         if (link is null)
         {
             packagingLines = [.. content.PackagingLines.Where(l => !l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
         }
         else if (link.Key == _host.Packaging.LinkTarget?.Key)
         {
-            packagingLines = [.. _host.Packaging.LineEdits.Select(PackagingLineState.Of)];
+            packagingLines = [.. _host.Packaging.LineEdits.Select(PackagingLineSnapshot.Of)];
         }
         else
         {
             packagingLines = link switch
             {
                 PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
-                    .Select(l => new PackagingLineState(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
+                    .Select(l => new PackagingLineSnapshot(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
                 PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(linkedProductId, CancellationToken.None)))
                     .Select(l => PackagingLineRow.FromSaved(l))
-                    .Select(PackagingLineState.Of)],
+                    .Select(PackagingLineSnapshot.Of)],
             };
         }
 
@@ -725,7 +725,7 @@ public sealed class ProductVersionHistory : ObservableState
             packagingLines,
             bulkLines,
             bulkLines.Count > 0 ? content.BulkPackagingQuantity : null,
-            [.. content.Components.Select(c => new ComponentLineState(c.ProductId, c.Quantity))],
+            [.. content.Components.Select(c => new ComponentLineSnapshot(c.ProductId, c.Quantity))],
             (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
             content.QuantityRequired,
             content.CurrentPrice,
@@ -749,16 +749,16 @@ public sealed class ProductVersionHistory : ObservableState
     /// A version's packaging line as the product's own: in the unit it was in, or in base units when the material has lost
     /// that unit since.
     /// </summary>
-    private static PackagingLineState OwnPackagingLineOf(
+    private static PackagingLineSnapshot OwnPackagingLineOf(
         VersionPackagingLine line, ProductVersionContent content, Dictionary<int, RawMaterial> packagingById)
     {
         if (line.UnitId is { } unitId && packagingById[line.MaterialId].Units.All(u => u.Id != unitId))
         {
             var baseUnitsPerUnit = content.Materials.FirstOrDefault(m => m.Id == line.MaterialId)?.Units.FirstOrDefault(u => u.Id == unitId)?.BaseUnitsPerUnit ?? 1m;
-            return new PackagingLineState(line.MaterialId, null, UnitConversionRules.ToBaseQuantity(line.QtyPerUnit, baseUnitsPerUnit));
+            return new PackagingLineSnapshot(line.MaterialId, null, UnitConversionRules.ToBaseQuantity(line.QtyPerUnit, baseUnitsPerUnit));
         }
 
-        return new PackagingLineState(line.MaterialId, line.UnitId, line.QtyPerUnit);
+        return new PackagingLineSnapshot(line.MaterialId, line.UnitId, line.QtyPerUnit);
     }
 
     /// <summary>Whether a sub-assembly's lines now are the ones a version saw: the same ingredients, grams and base ticks, in order.</summary>

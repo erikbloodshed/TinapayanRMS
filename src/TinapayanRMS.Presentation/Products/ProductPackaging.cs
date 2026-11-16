@@ -38,7 +38,7 @@ public interface IProductPackagingHost : IScreenPartHost, IUndoRecorder
 
 /// <summary>
 /// The Products screen's Packaging tab, always the Recipe Structure's last (PackagingSection, through
-/// ProductsViewModel.Packaging): the per-piece packaging lines, typed straight into its table, or what they link (a set
+/// ProductsState.Packaging): the per-piece packaging lines, typed straight into its table, or what they link (a set
 /// on the Sub-Assemblies screen, or another product's packaging), the picker its Link and Copy open, its bulk packaging
 /// (a box several units share, with how many it holds), a Move to Sub-Assemblies waiting for Save, and what was last
 /// loaded, which Save compares against. Its commands are its own, each change one undo step of the screen's form
@@ -539,8 +539,8 @@ public sealed class ProductPackaging : ObservableState, IDisposable
     {
         Link = LinkTarget,
         IsMoving = IsPackagingMoving,
-        Lines = [.. LineEdits.Select(PackagingLineState.Of)],
-        BulkLines = [.. BulkEdits.Select(PackagingLineState.Of)],
+        Lines = [.. LineEdits.Select(PackagingLineSnapshot.Of)],
+        BulkLines = [.. BulkEdits.Select(PackagingLineSnapshot.Of)],
         BulkQuantity = BulkQuantity,
     };
 

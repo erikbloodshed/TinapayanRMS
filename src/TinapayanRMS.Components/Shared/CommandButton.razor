@@ -1,4 +1,4 @@
-@* A button bound to a ViewModel's command: enabled while the command can run, and running it on a click. The screen
+@* A button bound to a screen state's command: enabled while the command can run, and running it on a click. The screen
    redraws it when the command's CanExecute changes (ScreenBase). *@
 <SfButton CssClass="@Css" Disabled="@(!Command.CanExecute())" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
     @if (Icon is { } icon)

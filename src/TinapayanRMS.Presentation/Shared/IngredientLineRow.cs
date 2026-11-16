@@ -42,7 +42,7 @@ public sealed class IngredientLineRow : ObservableRow
     }
 
     /// <summary>
-    /// A row put back exactly as it stood, which is what an undo needs (ProductsViewModel's history). The
+    /// A row put back exactly as it stood, which is what an undo needs (ProductsState's history). The
     /// public setters can't do it: typing grams or ticking the base lets a typed percentage go, and
     /// <see cref="Percent"/> refuses to take one while there's no base to read it against — a state a row is
     /// allowed to be in, and the one case where restoring through the setters would lose the figure silently.
@@ -362,4 +362,4 @@ public sealed class IngredientLineRow : ObservableRow
 /// an id rather than the object: a LoadCommand landing mid-gesture swaps in freshly priced RawMaterials, and
 /// comparing those by reference would read as an edit the user never made.
 /// </summary>
-public readonly record struct IngredientLineState(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent);
+public readonly record struct IngredientLineSnapshot(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent);

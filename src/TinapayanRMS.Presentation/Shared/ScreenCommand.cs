@@ -5,11 +5,11 @@ namespace TinapayanRMS.Presentation.Shared;
 /// <summary>
 /// A screen's action for a button, a menu or a key to run: a body, and whether it can run now. Whether it can run is asked
 /// when it's wanted (a button being drawn, a key pressed) rather than pushed as it changes: a screen is drawn again whenever its
-/// ViewModel or a part of it changes (ScreenBase), which is what a can-run test reads. It can't run while it's running,
+/// screen state or a part of it changes (ScreenBase), which is what a can-run test reads. It can't run while it's running,
 /// and says so as it starts and ends (<see cref="ICommand.CanExecuteChanged"/>).
 /// <para>
 /// <see cref="ScreenCommand.ExecuteAsync"/> runs the body whatever CanExecute says: a button, a menu or a key asks first
-/// (Commands.Run in the screens). The body is the screen's to keep from throwing (ViewModelBase.RunSafelyAsync); one run
+/// (Commands.Run in the screens). The body is the screen's to keep from throwing (ScreenState.RunSafelyAsync); one run
 /// through <see cref="ICommand.Execute"/>, which nothing awaits, that throws anyway goes to <see cref="UnawaitedRunFailed"/>.
 /// </para>
 /// </summary>

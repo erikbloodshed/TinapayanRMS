@@ -21,7 +21,7 @@ public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 
 /// <summary>
 /// A composite's Products table, in the Products screen's Recipe Structure (ComponentsSection, through
-/// ProductsViewModel.ComponentsTable): its lines, each a product and how many of it go in, the add row, what the product
+/// ProductsState.ComponentsTable): its lines, each a product and how many of it go in, the add row, what the product
 /// cell offers, what each product brings, read off the UI thread once per product, whether the composite takes its
 /// products' packaging too (the checkbox beside Remove Line), and Remove Line itself, each change one undo step of the
 /// screen's form (<see cref="IProductComponentsHost"/>). The screen keeps the undo history these lines are part of, and
@@ -189,14 +189,14 @@ public sealed class ProductComponents : ObservableState
     }
 
     /// <summary>The lines as an undo step keeps them.</summary>
-    public IReadOnlyList<ComponentLineState> Capture() =>
-        [.. ComponentEdits.Select(r => new ComponentLineState(r.ComponentProductId, r.Quantity))];
+    public IReadOnlyList<ComponentLineSnapshot> Capture() =>
+        [.. ComponentEdits.Select(r => new ComponentLineSnapshot(r.ComponentProductId, r.Quantity))];
 
     /// <summary>
     /// The lines an undo step kept, each finding its product and the recipe cost read for it again (a cost not read yet is
     /// read now, and prices the line when it arrives).
     /// </summary>
-    public void Restore(IEnumerable<ComponentLineState> lines)
+    public void Restore(IEnumerable<ComponentLineSnapshot> lines)
     {
         ComponentEdits.Clear();
         foreach (var line in lines)

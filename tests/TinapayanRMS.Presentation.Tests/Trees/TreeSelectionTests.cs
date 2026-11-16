@@ -5,7 +5,7 @@ namespace TinapayanRMS.Presentation.Tests.Trees;
 
 /// <summary>
 /// The rows picked in a screen's list on their own, with strings standing in for the tree's rows: the contract the three
-/// screens' trees share, rather than any screen's use of it (their *ViewModelTreeTests).
+/// screens' trees share, rather than any screen's use of it (their *StateTreeTests).
 /// </summary>
 public class TreeSelectionTests
 {

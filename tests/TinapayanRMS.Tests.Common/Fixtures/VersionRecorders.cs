@@ -8,7 +8,7 @@ using TinapayanRMS.Pricing.Versions;
 namespace TinapayanRMS.Tests.Common.Fixtures;
 
 /// <summary>
-/// A ProductVersionRecorder over real repositories, and the VersionedSaves over one, for a ViewModel under test, as
+/// A ProductVersionRecorder over real repositories, and the VersionedSaves over one, for a screen state under test, as
 /// the app registers them (ServiceRegistration).
 /// </summary>
 public static class VersionRecorders

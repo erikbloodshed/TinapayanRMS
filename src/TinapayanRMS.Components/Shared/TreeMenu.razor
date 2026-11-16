@@ -1,6 +1,6 @@
 @using System.Windows.Input
 
-@* The menu a right-click opens on a folder tree, built from the ViewModel's TreeMenuItems (TreeMenuFor): each item's
+@* The menu a right-click opens on a folder tree, built from the screen state's TreeMenuItems (TreeMenuFor): each item's
    icon, its header, the key that does the same at its right,
    a submenu in place of a command, and the lines between groups. Picking one runs its command with its parameter. *@
 <SfContextMenu @ref="_menu" TValue="MenuItem" Items="_items" CssClass="tree-menu">

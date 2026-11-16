@@ -32,7 +32,7 @@ public static class DatabaseHost
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration value.");
 
-        // A factory, not AddDbContext: ViewModels outlive any one operation (one set for each
+        // A factory, not AddDbContext: screen states outlive any one operation (one set for each
         // page the app's web view loads), so there's no natural request scope to hand a single DbContext to.
         // Each repository call creates and disposes its own short-lived context instead,
         // which also makes concurrent calls from different screens safe. The factory is also the

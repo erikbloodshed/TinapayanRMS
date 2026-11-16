@@ -56,7 +56,7 @@ public interface ISubAssembliesListHost : IRecordListHost
 }
 
 /// <summary>
-/// The Sub-Assemblies list (through SubAssembliesViewModel.List; SubAssemblyList draws it): the standalone sub-assemblies,
+/// The Sub-Assemblies list (through SubAssembliesState.List; SubAssemblyList draws it): the standalone sub-assemblies,
 /// searched by name and filed in a folder for each role, the rows picked, its menus and keys, moves and their Undo, naming in
 /// place, the roles as its folders, and Make In-House. What its actions do to the sub-assembly the form shows, it asks of the
 /// screen (<see cref="ISubAssembliesListHost"/>).
@@ -139,7 +139,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             .Subscribe(_ => RefreshTree());
 
         // Through PropertyChanged, which a role added, removed or replaced raises too, for the reason
-        // RecordFormViewModel.WatchForSave gives.
+        // RecordScreenState.WatchForSave gives.
         ((INotifyPropertyChanged)roles).PropertyChanged += (_, _) => RefreshTree();
 
         // The search decides whether empty folders show, even when it leaves the same sub-assemblies showing (SearchText).

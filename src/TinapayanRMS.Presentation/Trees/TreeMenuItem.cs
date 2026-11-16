@@ -4,8 +4,8 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Trees;
 
 /// <summary>
-/// One item of the menu a right-click opens on a folder tree (the Products list's, ProductsViewModel.TreeMenuFor, the Raw
-/// Materials list's, RawMaterialsViewModel.TreeMenuFor, and the Sub-Assemblies list's, SubAssembliesViewModel.TreeMenuFor),
+/// One item of the menu a right-click opens on a folder tree (the Products list's, ProductsState.TreeMenuFor, the Raw
+/// Materials list's, RawMaterialsState.TreeMenuFor, and the Sub-Assemblies list's, SubAssembliesState.TreeMenuFor),
 /// which the list's TreeMenu (TinapayanRMS.Components) draws as an item: what it reads, the command it runs and what with, the key that
 /// runs it too, and a submenu in place of a command.
 /// </summary>

@@ -10,12 +10,12 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Components.Tests.Shared;
 
 /// <summary>
-/// ScreenBase: a screen draws itself again when its ViewModel, one of its lists or one of its commands changes, and
+/// ScreenBase: a screen draws itself again when its state, one of its lists or one of its commands changes, and
 /// once for however many of them change together, as they do in a load.
 /// </summary>
 public class ScreenBaseTests
 {
-    private sealed class Lines : ViewModelBase
+    private sealed class Lines : ScreenState
     {
         private string _name = "";
 
@@ -58,7 +58,7 @@ public class ScreenBaseTests
     }
 
     /// <summary>
-    /// A screen that shows its ViewModel's name, rows, table and whether Save can run, and whether its part's command can,
+    /// A screen that shows its state's name, rows, table and whether Save can run, and whether its part's command can,
     /// and counts its drawings.
     /// </summary>
     private sealed class LinesScreen : ScreenBase<Lines>
@@ -73,22 +73,22 @@ public class ScreenBaseTests
         {
             Drawings++;
             builder.OpenElement(0, "p");
-            builder.AddContent(1, $"{ViewModel!.Name}|{ViewModel.Rows.Count}|{ViewModel.SaveCommand.CanExecute()}");
+            builder.AddContent(1, $"{State!.Name}|{State.Rows.Count}|{State.SaveCommand.CanExecute()}");
             builder.CloseElement();
             builder.OpenElement(2, "span");
-            builder.AddContent(3, string.Join(",", ViewModel.Table));
+            builder.AddContent(3, string.Join(",", State.Table));
             builder.CloseElement();
             builder.OpenElement(4, "em");
-            builder.AddContent(5, ViewModel.Part.RemoveCommand.CanExecute());
+            builder.AddContent(5, State.Part.RemoveCommand.CanExecute());
             builder.CloseElement();
             builder.OpenElement(6, "b");
-            builder.AddContent(7, ViewModel.PrintCommand.CanExecute());
+            builder.AddContent(7, State.PrintCommand.CanExecute());
             builder.CloseElement();
         }
     }
 
-    /// <summary>A ViewModel with worked-out properties, which count how often they're read.</summary>
-    private sealed class WorkedOut(ILogger logger) : ViewModelBase(logger)
+    /// <summary>A screen state with worked-out properties, which count how often they're read.</summary>
+    private sealed class WorkedOut(ILogger logger) : ScreenState(logger)
     {
         public int Reads { get; private set; }
 
@@ -99,7 +99,7 @@ public class ScreenBaseTests
         public IReadOnlyList<int> Picked => [.. Rows.Where(_ => ++Reads > 0)];
     }
 
-    /// <summary>A screen that shows only its ViewModel's rows.</summary>
+    /// <summary>A screen that shows only its state's rows.</summary>
     private sealed class WorkedOutScreen : ScreenBase<WorkedOut>
     {
         protected override ScreenCommand? LoadCommand => null;
@@ -107,7 +107,7 @@ public class ScreenBaseTests
         protected override void BuildRenderTree(RenderTreeBuilder builder)
         {
             builder.OpenElement(0, "p");
-            builder.AddContent(1, ViewModel!.Rows.Count);
+            builder.AddContent(1, State!.Rows.Count);
             builder.CloseElement();
         }
     }
@@ -118,15 +118,15 @@ public class ScreenBaseTests
         await using var context = AppServices.NewContext();
         context.Services.AddScoped<WorkedOut>();
         var screen = context.Render<WorkedOutScreen>();
-        var viewModel = context.Services.GetRequiredService<WorkedOut>();
+        var state = context.Services.GetRequiredService<WorkedOut>();
 
-        await screen.InvokeAsync(() => viewModel.Rows.Add(1));
+        await screen.InvokeAsync(() => state.Rows.Add(1));
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("1"));
-        viewModel.Reads.Should().Be(0);
+        state.Reads.Should().Be(0);
     }
 
-    private static (IRenderedComponent<LinesScreen> Screen, Lines ViewModel) Render(BunitContext context)
+    private static (IRenderedComponent<LinesScreen> Screen, Lines State) Render(BunitContext context)
     {
         context.Services.AddScoped<Lines>();
         var screen = context.Render<LinesScreen>();
@@ -140,15 +140,15 @@ public class ScreenBaseTests
     public async Task A_load_that_changes_hundreds_of_things_is_drawn_once()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
         var before = screen.Instance.Drawings;
 
         await screen.InvokeAsync(() =>
         {
             for (var i = 1; i <= 200; i++)
             {
-                viewModel.Name = $"Product {i}";
-                viewModel.Rows.Add(i);
+                state.Name = $"Product {i}";
+                state.Rows.Add(i);
             }
         });
 
@@ -160,9 +160,9 @@ public class ScreenBaseTests
     public async Task A_list_changing_alone_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
 
-        await screen.InvokeAsync(() => viewModel.Rows.Add(1));
+        await screen.InvokeAsync(() => state.Rows.Add(1));
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|1|False"));
     }
@@ -171,10 +171,10 @@ public class ScreenBaseTests
     public async Task A_table_replaced_in_one_go_redraws_the_screen_once()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
         var before = screen.Instance.Drawings;
 
-        await screen.InvokeAsync(() => viewModel.Table.ReplaceWith([3, 1, 2]));
+        await screen.InvokeAsync(() => state.Table.ReplaceWith([3, 1, 2]));
 
         screen.WaitForAssertion(() => screen.Find("span").TextContent.Should().Be("3,1,2"));
         (screen.Instance.Drawings - before).Should().Be(1);
@@ -184,9 +184,9 @@ public class ScreenBaseTests
     public async Task A_command_becoming_able_to_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
 
-        await screen.InvokeAsync(viewModel.AllowSave);
+        await screen.InvokeAsync(state.AllowSave);
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|True"));
     }
@@ -195,27 +195,27 @@ public class ScreenBaseTests
     public async Task A_screen_command_starting_and_ending_a_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
         screen.Find("b").TextContent.Should().Be("True");
 
         var printing = Task.CompletedTask;
-        await screen.InvokeAsync(() => { printing = viewModel.PrintCommand.ExecuteAsync(); });
+        await screen.InvokeAsync(() => { printing = state.PrintCommand.ExecuteAsync(); });
         screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("False"));
 
-        await screen.InvokeAsync(viewModel.PrintDone.SetResult);
+        await screen.InvokeAsync(state.PrintDone.SetResult);
         await printing;
         screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("True"));
     }
 
     // A part's commands are its own (the Products screen's Packaging tab's Remove Line, say), so the screen watches them
-    // as it watches its ViewModel's: a button bound to one goes on and off with nothing on the ViewModel itself changing.
+    // as it watches its state's: a button bound to one goes on and off with nothing on the screen state itself changing.
     [Test]
     public async Task A_command_of_a_part_becoming_able_to_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
 
-        await screen.InvokeAsync(viewModel.Part.AllowRemove);
+        await screen.InvokeAsync(state.Part.AllowRemove);
 
         screen.WaitForAssertion(() => screen.Find("em").TextContent.Should().Be("True"));
     }
@@ -224,9 +224,9 @@ public class ScreenBaseTests
     public async Task A_change_from_another_thread_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
 
-        await Task.Run(() => viewModel.Name = "Cheese Roll");
+        await Task.Run(() => state.Name = "Cheese Roll");
 
         screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("Cheese Roll|0|False"));
     }
@@ -235,15 +235,15 @@ public class ScreenBaseTests
     public async Task A_screen_drawn_at_once_isnt_drawn_again_for_the_same_changes()
     {
         await using var context = AppServices.NewContext();
-        var (screen, viewModel) = Render(context);
+        var (screen, state) = Render(context);
         var before = screen.Instance.Drawings;
 
         // What undo does: the changes, then the drawing, before the browser is told it's done.
         var drawnAtOnce = 0;
         await screen.InvokeAsync(async () =>
         {
-            viewModel.Name = "Cheese Roll";
-            viewModel.Rows.Add(1);
+            state.Name = "Cheese Roll";
+            state.Rows.Add(1);
             await screen.Instance.DrawNowAsync();
             drawnAtOnce = screen.Instance.Drawings - before;
         });
@@ -261,23 +261,23 @@ public class ScreenBaseTests
     {
         await using var context = AppServices.NewContext();
         context.Services.AddScoped<Lines>();
-        var viewModel = context.Services.GetRequiredService<Lines>();
+        var state = context.Services.GetRequiredService<Lines>();
 
         // Checked as drawn, not waited for: bUnit's waits hold on to the component they wait on.
         var left = context.ShowAndLeave<LinesScreen>(whileShown: screen =>
             screen.Find("p").TextContent.Should().Be("|0|False"));
 
-        // The ViewModel goes on changing once its screen has gone, as a load the screen started does.
+        // The screen state goes on changing once its screen has gone, as a load the screen started does.
         await context.Renderer.Dispatcher.InvokeAsync(() =>
         {
-            viewModel.Name = "Cheese Roll";
-            viewModel.Rows.Add(1);
-            viewModel.Table.ReplaceWith([1]);
-            viewModel.AllowSave();
-            viewModel.Part.AllowRemove();
+            state.Name = "Cheese Roll";
+            state.Rows.Add(1);
+            state.Table.ReplaceWith([1]);
+            state.AllowSave();
+            state.Part.AllowRemove();
         });
 
-        left.IsCollected().Should().BeTrue("the ViewModel outlives every visit to its screen, and must hold on to none of them");
-        GC.KeepAlive(viewModel);
+        left.IsCollected().Should().BeTrue("the screen state outlives every visit to its screen, and must hold on to none of them");
+        GC.KeepAlive(state);
     }
 }

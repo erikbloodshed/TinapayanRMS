@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// What Promote to Production, Send Back to Innovation and a folder's Promote All ask for (ProductsViewModel.MoveToStageCommand):
+/// What Promote to Production, Send Back to Innovation and a folder's Promote All ask for (ProductsState.MoveToStageCommand):
 /// the products, and the stage they go to.
 /// </summary>
 public sealed record StageMoveRequest(IReadOnlyList<Product> Products, ProductStage Stage);

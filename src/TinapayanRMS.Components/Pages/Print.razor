@@ -1,7 +1,7 @@
 @page "/print"
 @using TinapayanRMS.Components.Printing
-@inherits ScreenBase<PrintTabViewModel>
-@inject ProductsViewModel Products
+@inherits ScreenBase<PrintTabState>
+@inject ProductsState Products
 
 <PageTitle>Print · TinapayanRMS</PageTitle>
 
@@ -10,17 +10,17 @@
    Print, a folder's and Print All Products open it with that choice made. It shows Products' form, so going back there
    asks nothing about its unsaved changes, and going anywhere else asks about them, as leaving Products would. *@
 <section class="card print-card">
-    <PrintPane Set="ViewModel!.PrintSet" Status="@(ViewModel!.Progress ?? ViewModel!.Note)" Empty="Nothing to print yet. Open a product on the Products screen, or pick All products.">
+    <PrintPane Set="State!.PrintSet" Status="@(State!.Progress ?? State!.Note)" Empty="Nothing to print yet. Open a product on the Products screen, or pick All products.">
         <Options>
             <label class="form-label" for="print-scope">Print</label>
-            <PickField ID="print-scope" TItem="PrintScope" Items="ViewModel!.Scopes" TextField="Label" @bind-Value="ViewModel!.SelectedScope" CssClass="print-scope"
+            <PickField ID="print-scope" TItem="PrintScope" Items="State!.Scopes" TextField="Label" @bind-Value="State!.SelectedScope" CssClass="print-scope"
                        Tooltip="This product prints the product Products has open, unsaved edits included. A folder or all products print as they're saved, each on pages of its own after a contents page." />
         </Options>
     </PrintPane>
 </section>
 
 @code {
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
     protected override IUnsavedChangesScreen? UnsavedChangesForm => Products;
 

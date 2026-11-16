@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The screens' ViewModels, with no UI framework: the app's Blazor screens (TinapayanRMS.Components) draw them.
+  <!-- The screens' state classes, with no UI framework: the app's Blazor screens (TinapayanRMS.Components) draw them.
        Keep MAUI, Blazor and Syncfusion out of it, so they're tested without a window (Presentation.Tests). -->
 
   <ItemGroup>

@@ -26,7 +26,7 @@ public interface IRawMaterialUnitsHost : IFormPartHost
 }
 
 /// <summary>
-/// A material's alternative units on the Raw Materials screen (through RawMaterialsViewModel.Units; AlternativeUnits draws
+/// A material's alternative units on the Raw Materials screen (through RawMaterialsState.Units; AlternativeUnits draws
 /// them): each a unit of measure and how many base units it holds, typed straight into the table, saved with the material.
 /// A unit picked on a brand row that the material didn't have is added here too, with its multiplier typed as the row's
 /// quantity, and goes again once no row is in it (the Cost Setup tab, RawMaterialPurchaseCost, asks for both).
@@ -244,9 +244,9 @@ public sealed class RawMaterialUnits : ObservableState
     }
 
     /// <summary>The rows as an undo step keeps them: each unit by its id, as well as its unit of measure and multiplier.</summary>
-    public IReadOnlyList<UnitRowState> Capture() =>
+    public IReadOnlyList<UnitRowSnapshot> Capture() =>
     [
-        .. Rows.Select(r => new UnitRowState(r.Unit.Id, r.Unit.RawMaterialId, r.UnitOfMeasureId, r.BaseUnitsPerUnit, r.BaseUnitAbbreviation)),
+        .. Rows.Select(r => new UnitRowSnapshot(r.Unit.Id, r.Unit.RawMaterialId, r.UnitOfMeasureId, r.BaseUnitsPerUnit, r.BaseUnitAbbreviation)),
     ];
 
     /// <summary>
@@ -254,7 +254,7 @@ public sealed class RawMaterialUnits : ObservableState
     /// that Save hands the repository, so each unit comes back as a fresh entity carrying its own Id: one that lost it would be
     /// saved as a new unit and the stored one deleted.
     /// </summary>
-    public void Restore(IEnumerable<UnitRowState> units) =>
+    public void Restore(IEnumerable<UnitRowSnapshot> units) =>
         Sync(() =>
         {
             Rows.Clear();

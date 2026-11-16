@@ -11,7 +11,7 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// <summary>What a made ingredient's recipe asks of its screen, on top of what any part of its form asks.</summary>
 public interface IRawMaterialRecipeHost : IFormPartHost
 {
-    /// <summary>The details showing are the picked material's (RawMaterialsViewModel.AreDetailsReady): the totals wait until they are.</summary>
+    /// <summary>The details showing are the picked material's (RawMaterialsState.AreDetailsReady): the totals wait until they are.</summary>
     bool AreDetailsReady { get; }
 
     /// <summary>The form's Weight Loss %, which the batch's yield is less.</summary>
@@ -25,7 +25,7 @@ public interface IRawMaterialRecipeHost : IFormPartHost
 }
 
 /// <summary>
-/// A made ingredient's recipe on the Raw Materials screen (through RawMaterialsViewModel.Recipe; BillOfMaterials draws it):
+/// A made ingredient's recipe on the Raw Materials screen (through RawMaterialsState.Recipe; BillOfMaterials draws it):
 /// the sub-assembly it's made from, shown as a badge with Edit once picked, that recipe's lines as it's saved on the
 /// Sub-Assemblies screen, for show, the made ingredient's own add-ins on top, typed straight into their table, and the
 /// batch's totals. The screen keeps the Weight Loss % and says when the recipe's lines are read again.
@@ -241,11 +241,11 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     }
 
     /// <summary>The add-ins as an undo step keeps them: each ingredient by id, so a refresh's fresh copies aren't an edit.</summary>
-    public IReadOnlyList<IngredientLineState> CaptureAddIns() =>
-        [.. AddIns.Select(l => new IngredientLineState(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+    public IReadOnlyList<IngredientLineSnapshot> CaptureAddIns() =>
+        [.. AddIns.Select(l => new IngredientLineSnapshot(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
 
     /// <summary>The add-ins an undo step kept, in place of the table's: rebuilt, since IngredientLineRow's setters drop a typed percentage.</summary>
-    public void RestoreAddIns(IEnumerable<IngredientLineState> lines)
+    public void RestoreAddIns(IEnumerable<IngredientLineSnapshot> lines)
     {
         AddIns.Clear();
         foreach (var line in lines)

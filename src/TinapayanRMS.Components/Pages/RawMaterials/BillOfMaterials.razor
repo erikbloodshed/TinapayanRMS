@@ -7,27 +7,27 @@
 
     <div class="made-from">
         <label class="form-label" for="made-from">Made from</label>
-        @if (ViewModel.Recipe.IsPickingSubAssembly)
+        @if (State.Recipe.IsPickingSubAssembly)
         {
-            <PickField ID="made-from" TItem="SubAssembly" Items="ViewModel.Recipe.SubAssemblyOptions" TextField="Name" AllowEmpty="true"
-                       Value="ViewModel.Recipe.SubAssembly" ValueChanged="s => ViewModel.Recipe.SubAssembly = s" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
+            <PickField ID="made-from" TItem="SubAssembly" Items="State.Recipe.SubAssemblyOptions" TextField="Name" AllowEmpty="true"
+                       Value="State.Recipe.SubAssembly" ValueChanged="s => State.Recipe.SubAssembly = s" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
                        Tooltip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top." />
         }
-        @if (ViewModel.Recipe.IsShowingSubAssemblyBadge)
+        @if (State.Recipe.IsShowingSubAssemblyBadge)
         {
-            <button type="button" class="badge badge-link" @onclick="() => Commands.Run(ViewModel.Recipe.OpenSubAssemblyCommand)"
+            <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.Recipe.OpenSubAssemblyCommand)"
                     title="Open it on the Sub-Assemblies screen, where its lines are changed. Every made ingredient and product using it follows.">
-                @ViewModel.Recipe.SubAssemblyBadgeText
+                @State.Recipe.SubAssemblyBadgeText
             </button>
-            <CommandButton Command="ViewModel.Recipe.StartChangingSubAssemblyCommand" Icon="AppIcon.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
+            <CommandButton Command="State.Recipe.StartChangingSubAssemblyCommand" Icon="AppIcon.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
         }
-        @if (ViewModel.Recipe.IsChangingSubAssembly)
+        @if (State.Recipe.IsChangingSubAssembly)
         {
-            <CommandButton Command="ViewModel.Recipe.CancelChangingSubAssemblyCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the sub-assembly as it is" />
+            <CommandButton Command="State.Recipe.CancelChangingSubAssemblyCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the sub-assembly as it is" />
         }
     </div>
 
-    <LineGrid TRow="IngredientLineRow" Items="ViewModel.Recipe.Lines" ReadOnly="true" EmptyText="Pick the sub-assembly it's made from to see its lines.">
+    <LineGrid TRow="IngredientLineRow" Items="State.Recipe.Lines" ReadOnly="true" EmptyText="Pick the sub-assembly it's made from to see its lines.">
         <Header>
             <th>Ingredient</th>
             <th class="col-number">Grams</th>
@@ -44,7 +44,7 @@
 
     <h2 class="section-header add-ins-header">Add-Ins</h2>
     <p class="caption">This ingredient's own extras on top of the recipe, such as a colouring or a flavouring. The recipe itself stays as it is.</p>
-    <LineGrid @ref="_addIns" TRow="IngredientLineRow" Items="ViewModel.Recipe.AddIns" NewItem="ViewModel.Recipe.NewAddIn" @bind-SelectedItem="ViewModel.Recipe.SelectedAddIn" Reorderable="true" InsertKey="true">
+    <LineGrid @ref="_addIns" TRow="IngredientLineRow" Items="State.Recipe.AddIns" NewItem="State.Recipe.NewAddIn" @bind-SelectedItem="State.Recipe.SelectedAddIn" Reorderable="true" InsertKey="true">
         <Header>
             <th>Ingredient</th>
             <th class="col-number">Grams</th>
@@ -54,7 +54,7 @@
         <Row Context="row">
             <td>
                 @* Names alone, as a recipe line's picker lists them (IngredientLinesGrid). *@
-                <PickField TItem="RawMaterial" Items="ViewModel.AddInOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="320px"
+                <PickField TItem="RawMaterial" Items="State.AddInOptions" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="320px"
                            Value="row.Ingredient" ValueChanged="m => row.IngredientId = m?.Id" />
             </td>
             <td><NumberField TValue="decimal?" Value="row.Grams" ValueChanged="v => row.Grams = v" Format="#,0.0###" Min="0" CssClass="cell-field" /></td>
@@ -65,12 +65,12 @@
     <div class="button-row align-right form-extra">
         <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
                       Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
-        <CommandButton Command="ViewModel.Recipe.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
+        <CommandButton Command="State.Recipe.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
     </div>
 </div>
 
 @code {
-    [Parameter, EditorRequired] public RawMaterialsViewModel ViewModel { get; set; } = null!;
+    [Parameter, EditorRequired] public RawMaterialsState State { get; set; } = null!;
 
     private LineGrid<IngredientLineRow>? _addIns;
 }

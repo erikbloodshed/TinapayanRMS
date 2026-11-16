@@ -31,7 +31,7 @@ public interface IProductUsageFormHost : IScreenPartHost, IUndoRecorder
 }
 
 /// <summary>
-/// The Products screen's add/edit sub-assembly form (UsageForm, through ProductsViewModel.UsageForm):
+/// The Products screen's add/edit sub-assembly form (UsageForm, through ProductsState.UsageForm):
 /// the section it edits or the one it adds, its fields and tables, and what it shows worked out from them. Its own
 /// controls are its own: the Remove Line under each table, a linked section's Edit and Cancel, and the piece size an add
 /// starts at. The screen keeps what the form does to the recipe (opening it, Apply, a link changed, a move), since that

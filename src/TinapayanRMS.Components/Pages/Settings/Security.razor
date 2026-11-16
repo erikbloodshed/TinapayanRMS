@@ -1,7 +1,7 @@
 @page "/settings/security"
 @using System.Reactive.Linq
 @using TinapayanRMS.ApplicationCore.Rules
-@inherits ScreenBase<SecuritySettingsViewModel>
+@inherits ScreenBase<SecuritySettingsState>
 
 <PageTitle>Security · TinapayanRMS</PageTitle>
 
@@ -14,7 +14,7 @@
 <div class="card-wrap">
     <section class="card fixed-card">
         <h2 class="section-header">Password</h2>
-        @if (ViewModel!.HasPassword)
+        @if (State!.HasPassword)
         {
             <p class="caption">The app asks for it as it opens and whenever the window is locked. To change it, type the current one, then the new one twice. Forgotten, it can be cleared on this computer with scripts\Reset-Password.ps1, and the app then asks for a new one.</p>
         }
@@ -24,24 +24,24 @@
         }
 
         <div @key="_attempt">
-            @if (ViewModel!.HasPassword)
+            @if (State!.HasPassword)
             {
                 <FormRow Label="Current Password" For="current-password">
-                    <TextField ID="current-password" Password="true" Value="@ViewModel!.CurrentPassword" ValueChanged="v => Typed(() => ViewModel!.CurrentPassword = v)" />
+                    <TextField ID="current-password" Password="true" Value="@State!.CurrentPassword" ValueChanged="v => Typed(() => State!.CurrentPassword = v)" />
                 </FormRow>
             }
             <FormRow Label="New Password" For="new-password">
-                <TextField ID="new-password" Password="true" Value="@ViewModel!.NewPassword" ValueChanged="v => Typed(() => ViewModel!.NewPassword = v)"
+                <TextField ID="new-password" Password="true" Value="@State!.NewPassword" ValueChanged="v => Typed(() => State!.NewPassword = v)"
                            Tooltip="@($"At least {PasswordRules.MinLength} characters")" />
             </FormRow>
             <FormRow Label="Type It Again" For="password-confirmation">
-                <TextField ID="password-confirmation" Password="true" Value="@ViewModel!.Confirmation" ValueChanged="v => Typed(() => ViewModel!.Confirmation = v)"
+                <TextField ID="password-confirmation" Password="true" Value="@State!.Confirmation" ValueChanged="v => Typed(() => State!.Confirmation = v)"
                            OnEnter="ChangePasswordAsync" />
             </FormRow>
         </div>
 
         <div class="button-row form-extra">
-            <ActionButton Label="@(ViewModel!.HasPassword ? "Change Password" : "Set Password")" Icon="AppIcon.Lock" Primary="true" OnClick="ChangePasswordAsync" Disabled="_busy" />
+            <ActionButton Label="@(State!.HasPassword ? "Change Password" : "Set Password")" Icon="AppIcon.Lock" Primary="true" OnClick="ChangePasswordAsync" Disabled="_busy" />
         </div>
     </section>
 
@@ -50,11 +50,11 @@
         <p class="caption">The window locks itself after this many minutes without a key, a click or a scroll in it, and the password opens it again where you left off. 0 locks it only when you click Lock in the title bar.</p>
         <FormRow Label="Lock After (Minutes)" For="auto-lock-minutes">
             <NumberField ID="auto-lock-minutes" TValue="int" Format="N0" Min="0" Max="PasswordRules.MaxAutoLockMinutes"
-                         @bind-Value="ViewModel!.EditingAutoLockMinutes" CssClass="field-narrow"
+                         @bind-Value="State!.EditingAutoLockMinutes" CssClass="field-narrow"
                          Tooltip="@($"0 for never, up to {PasswordRules.MaxAutoLockMinutes} (four hours)")" />
         </FormRow>
         <div class="button-row form-extra">
-            <CommandButton Command="ViewModel!.SaveAutoLockCommand" Icon="AppIcon.Save" Label="Save" />
+            <CommandButton Command="State!.SaveAutoLockCommand" Icon="AppIcon.Save" Label="Save" />
         </div>
     </section>
 </div>
@@ -65,7 +65,7 @@
     // Bumped after every try: the password boxes are drawn afresh, empty.
     private int _attempt;
 
-    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
     // A box's text, unless a try is running: see the note at the top.
     private void Typed(Action set)
@@ -86,7 +86,7 @@
         _busy = true;
         try
         {
-            await ViewModel!.ChangePasswordCommand.ExecuteAsync();
+            await State!.ChangePasswordCommand.ExecuteAsync();
         }
         finally
         {

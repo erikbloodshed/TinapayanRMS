@@ -1,7 +1,7 @@
 @typeparam TItem
 @inject IJSRuntime JS
 
-@* A picker bound to a ViewModel's choice: every picker filters as it's typed
+@* A picker bound to a screen state's choice: every picker filters as it's typed
    into, and picks only what it lists. The choice is
    the item itself (an entity, an enum, a unit), shown by its TextField, or as itself without one. The combo box holds
    each item's place in the list rather than the item, since it reads an enum's first value as no value at all. Within
@@ -138,9 +138,9 @@ else
     private int? IndexOf(TItem? item) =>
         item is null ? null : _choices.FindIndex(c => EqualityComparer<TItem>.Default.Equals(c.Item, item)) is >= 0 and var i ? i : null;
 
-    // While the box has the cursor it's given what the typing last picked, not the ViewModel's pick drawn over it: a pick
+    // While the box has the cursor it's given what the typing last picked, not the screen state's pick drawn over it: a pick
     // refused there (text rubbed out, or matching nothing, where one is needed) wrote the old one back into the box under
-    // the cursor, so Backspace seemed to do nothing. The ViewModel's pick shows again once the box is left. The typed pick
+    // the cursor, so Backspace seemed to do nothing. The screen state's pick shows again once the box is left. The typed pick
     // is kept as the item, not its place: a list rebuilt under the cursor would put another item at that place.
     private bool _hasCursor;
 
@@ -334,7 +334,7 @@ else
         // before: a Raw Materials pick shows the base unit in the Buffered Cost "Per" list until the material's details
         // put its purchase unit there, and the combo box's late answer put the base unit back under a form already
         // settled, which then had changes to save. It's no pick: left out, the box is drawn again (as after any of its
-        // events) with the ViewModel's pick.
+        // events) with the screen state's pick.
         if (!_hasCursor)
         {
             return;

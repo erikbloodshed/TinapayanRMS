@@ -4,8 +4,8 @@ using System.Runtime.CompilerServices;
 namespace TinapayanRMS.Presentation.Shared;
 
 /// <summary>
-/// Something a screen shows that says when it changes: a screen's ViewModel (ViewModelBase), a part of one (Raw Materials'
-/// Cost Setup tab, say), or an editable row. A screen draws itself again whenever its ViewModel or one of its parts says
+/// Something a screen shows that says when it changes: a screen's state (ScreenState), a part of one (Raw Materials'
+/// Cost Setup tab, say), or an editable row. A screen draws itself again whenever its state or one of its parts says
 /// anything changed (ScreenBase), and reads every value then, so a value worked out from others is a plain getter, and what
 /// follows from a change is called by the setter that made it, in the order it has to run. A worked-out value is said to
 /// have changed only where something follows it by name (a row's table, a tree's row, a test) or where nothing stored

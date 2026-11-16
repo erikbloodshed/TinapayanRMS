@@ -9,7 +9,7 @@ using TinapayanRMS.Components.Tests.Fixtures;
 namespace TinapayanRMS.Components.Tests.Shared;
 
 /// <summary>
-/// TextField, NumberField and PickField: what's typed reaches the ViewModel as it's typed, and the server never writes
+/// TextField, NumberField and PickField: what's typed reaches the screen state as it's typed, and the server never writes
 /// into a box that has the cursor, since a redraw for an earlier keystroke would drop the ones typed since.
 /// </summary>
 public class FieldTests
@@ -530,7 +530,7 @@ public class FieldTests
         await field.InvokeAsync(() => box.Instance.ValueChanged.InvokeAsync(0));
 
         picked.Should().BeEmpty("the box didn't have the cursor");
-        box.Instance.Value.Should().Be(1, "the box shows the ViewModel's pick");
+        box.Instance.Value.Should().Be(1, "the box shows the screen state's pick");
     }
 
     [Test]
