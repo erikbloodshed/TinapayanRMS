@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
@@ -11,7 +10,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// (<see cref="Resolve"/>), which prices it. A row can be half filled in: <see cref="CompleteLines"/> checks them all
 /// before they're saved.
 /// </summary>
-public sealed class ProductComponentRow : ReactiveObject
+public sealed class ProductComponentRow : ObservableRow
 {
     /// <summary>Looks up a product by id as the screen has it.</summary>
     private readonly Func<int, Product?>? _findProduct;
@@ -43,7 +42,7 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _componentProductId;
         set
         {
-            this.RaiseAndSetIfChanged(ref _componentProductId, value);
+            RaiseAndSetIfChanged(ref _componentProductId, value);
             if (_findProduct is not null)
             {
                 Product = value is { } id ? _findProduct(id) : null;
@@ -59,8 +58,8 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _product;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _product, value);
-            this.RaisePropertyChanged(nameof(LineName));
+            RaiseAndSetIfChanged(ref _product, value);
+            RaisePropertyChanged(nameof(LineName));
         }
     }
 
@@ -74,9 +73,9 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _quantity;
         set
         {
-            this.RaiseAndSetIfChanged(ref _quantity, value);
+            RaiseAndSetIfChanged(ref _quantity, value);
             RaiseCostsChanged();
-            this.RaisePropertyChanged(nameof(LineName));
+            RaisePropertyChanged(nameof(LineName));
         }
     }
 
@@ -90,7 +89,7 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _recipeCost;
         set
         {
-            this.RaiseAndSetIfChanged(ref _recipeCost, value);
+            RaiseAndSetIfChanged(ref _recipeCost, value);
             RaiseCostsChanged();
         }
     }
@@ -105,7 +104,7 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _packagingCost;
         set
         {
-            this.RaiseAndSetIfChanged(ref _packagingCost, value);
+            RaiseAndSetIfChanged(ref _packagingCost, value);
             RaiseCostsChanged();
         }
     }
@@ -117,8 +116,8 @@ public sealed class ProductComponentRow : ReactiveObject
         get => _includesPackaging;
         set
         {
-            this.RaiseAndSetIfChanged(ref _includesPackaging, value);
-            this.RaisePropertyChanged(nameof(Cost));
+            RaiseAndSetIfChanged(ref _includesPackaging, value);
+            RaisePropertyChanged(nameof(Cost));
         }
     }
 
@@ -142,9 +141,9 @@ public sealed class ProductComponentRow : ReactiveObject
 
     private void RaiseCostsChanged()
     {
-        this.RaisePropertyChanged(nameof(RecipeCostTotal));
-        this.RaisePropertyChanged(nameof(PackagingCostTotal));
-        this.RaisePropertyChanged(nameof(Cost));
+        RaisePropertyChanged(nameof(RecipeCostTotal));
+        RaisePropertyChanged(nameof(PackagingCostTotal));
+        RaisePropertyChanged(nameof(Cost));
     }
 
     /// <summary>What the Costing tab and the printout call the line: "Ensaymada × 6".</summary>

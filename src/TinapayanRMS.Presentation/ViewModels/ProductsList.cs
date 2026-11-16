@@ -8,7 +8,6 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -110,13 +109,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <summary>Where what the last move took was before it: what Undo on the notice puts back. Null with nothing to undo.</summary>
     private MoveUndo? _moveUndo;
 
-    /// <summary>
-    /// False while a move of the list's, of products or a folder or to the other stage, or its Undo, is still saving or
-    /// reading the list again, and every one of them is off till it's done, from a menu, a key, a drop or a paste: each reads
-    /// the list as it stands and takes the notice's Undo, so a second started meanwhile would be judged against the list as
-    /// it was, and the two would take each other's Undo. Each command alone was off only while it ran itself.
-    /// </summary>
-    private readonly BehaviorSubject<bool> _noMoveRunning = new(true);
+    /// <summary>Each change to the search or the category filter, what the list's filter follows (SearchText, CategoryFilter).</summary>
+    private readonly BehaviorSubject<System.Reactive.Unit> _filterChanges = new(System.Reactive.Unit.Default);
 
     /// <param name="host">The screen, which the list asks for the product its form shows, the lists it loaded, and what to do to them.</param>
     /// <param name="productCache">The screen's products, which the list searches, filters and moves.</param>
@@ -146,7 +140,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, ProductTree.ExpansionChanged, ProductTree.ClosedFolderKeys);
 
         // A product shows when its name has what's searched for and the category filter takes it.
-        var listFilter = this.WhenAnyValue(x => x.SearchText, x => x.CategoryFilter, (text, category) => (Text: text.Trim(), Category: category))
+        var listFilter = _filterChanges
+            .Select(_ => (Text: SearchText.Trim(), Category: CategoryFilter))
             .DistinctUntilChanged()
             .Select(f => (Func<Product, bool>)(p => Matches(p, f.Text, f.Category)));
 
@@ -166,58 +161,45 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             .Subscribe(_ => RefreshTree());
 
         // The search and the category filter decide whether empty folders show, even when they leave the same products
-        // showing. A name being typed into a row is given up first: either may hide the row.
-        this.WhenAnyValue(x => x.SearchText, x => x.CategoryFilter)
-            .Skip(1)
-            .Subscribe(_ => CancelTreeName());
-        this.WhenAnyValue(x => x.SearchText, x => x.CategoryFilter)
-            .Subscribe(_ => RefreshTree());
+        // showing (FilterChanged).
+        RefreshTree();
 
         // The list's commands, each run on the folder or product its menu was opened on (TreeMenuFor). The moves and their
-        // Undo run one at a time, whichever kind (_noMoveRunning).
-        MoveProductsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<ProductMove>>(
-            moves => host.RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)), _noMoveRunning);
-        MoveToStageCommand = ReactiveCommand.CreateFromTask<StageMoveRequest>(request => host.RunSafelyAsync(() => MoveToStageAsync(request)), _noMoveRunning);
-        MoveFolderCommand = ReactiveCommand.CreateFromTask<ProductFolderMove>(move => host.RunSafelyAsync(() => MoveFolderAsync(move, isUndo: false)), _noMoveRunning);
-        CutCommand = ReactiveCommand.Create<IReadOnlyList<ProductTreeNode>>(nodes => CutNodes = CanDrag(nodes) && nodes.Count > 0 ? [.. nodes] : []);
-        PasteCommand = ReactiveCommand.CreateFromTask<ProductTreeNode>(PasteAsync);
-        ClearCutCommand = ReactiveCommand.Create(() => { CutNodes = []; });
-        ApplyCostingDefaultsCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<Product>>(host.ApplyCostingDefaultsAsync);
-        var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(
-            () => host.RunSafelyAsync(UndoMoveAsync), Observable.CombineLatest(hasMoveNotice, _noMoveRunning, (hasNotice, free) => hasNotice && free));
-        Observable.CombineLatest(
-                MoveProductsCommand.IsExecuting,
-                MoveToStageCommand.IsExecuting,
-                MoveFolderCommand.IsExecuting,
-                UndoMoveCommand.IsExecuting,
-                (products, toStage, folder, undo) => !(products || toStage || folder || undo))
-            .Subscribe(_noMoveRunning);
+        // Undo run one at a time, whichever kind (IsMoving).
+        MoveProductsCommand = new ScreenCommand<IReadOnlyList<ProductMove>>(
+            moves => host.RunSafelyAsync(() => MoveProductsAsync(moves, isUndo: false)), _ => !IsMoving);
+        MoveToStageCommand = new ScreenCommand<StageMoveRequest>(request => host.RunSafelyAsync(() => MoveToStageAsync(request)), _ => !IsMoving);
+        MoveFolderCommand = new ScreenCommand<ProductFolderMove>(move => host.RunSafelyAsync(() => MoveFolderAsync(move, isUndo: false)), _ => !IsMoving);
+        CutCommand = ScreenCommand.Of<IReadOnlyList<ProductTreeNode>>(nodes => CutNodes = CanDrag(nodes) && nodes.Count > 0 ? [.. nodes] : []);
+        PasteCommand = new ScreenCommand<ProductTreeNode>(PasteAsync);
+        ClearCutCommand = ScreenCommand.Of(() => CutNodes = []);
+        ApplyCostingDefaultsCommand = new ScreenCommand<IReadOnlyList<Product>>(host.ApplyCostingDefaultsAsync);
+        UndoMoveCommand = new ScreenCommand(() => host.RunSafelyAsync(UndoMoveAsync), () => MoveNotice is not null && !IsMoving);
 
         // A new product replaces the one showing, so its unsaved changes are asked about first.
-        NewProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
+        NewProductInCommand = new ScreenCommand<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
             () => NewInList(folder?.Stage, folder?.FolderId)));
-        NewCompositeProductInCommand = ReactiveCommand.CreateFromTask<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
+        NewCompositeProductInCommand = new ScreenCommand<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
             () => NewInList(folder?.Stage, folder?.FolderId, isComposite: true)));
-        RenameProductCommand = ReactiveCommand.Create<ProductLeafNode>(BeginRenameProduct);
-        CloneProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
+        RenameProductCommand = ScreenCommand.Of<ProductLeafNode>(BeginRenameProduct);
+        CloneProductCommand = new ScreenCommand<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
             new TextPromptRequest("Clone Product", "Name", $"{leaf.Product.Name} Copy", $"A copy of {leaf.Product.Name} as last saved, filed in Innovation, in a folder like its own."),
             host.CloneAsync));
-        CreateVariantOfCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
+        CreateVariantOfCommand = new ScreenCommand<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
             new TextPromptRequest("Create Variant", "Name", $"{leaf.Product.Name} Copy", $"A new product that links {leaf.Product.Name}'s recipe and packaging, filed in Innovation, in a folder like its own."),
             host.CreateVariantAsync));
-        DeleteProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => host.DeleteAsync(leaf.Product));
-        RestoreProductCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => host.RestoreAsync(leaf.Product));
-        DeletePermanentlyCommand = ReactiveCommand.CreateFromTask<ProductLeafNode>(leaf => host.DeletePermanentlyAsync(leaf.Product));
-        NewFolderCommand = ReactiveCommand.Create<ProductFolderNode?>(BeginNewFolder);
-        RenameFolderCommand = ReactiveCommand.Create<ProductFolderNode>(BeginRenameFolder);
-        DeleteFolderCommand = ReactiveCommand.CreateFromTask<ProductFolderNode>(DeleteFolderAsync);
-        ExpandAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.ExpandAll);
-        PrintFolderCommand = ReactiveCommand.Create<ProductFolderNode>(folder => host.Print(PrintScope.Folder.Of(folder)));
-        PrintAllCommand = ReactiveCommand.Create(() => host.Print(new PrintScope.AllProducts()));
-        CollapseAllCommand = ReactiveCommand.Create<ProductFolderNode?>(ProductTree.CollapseAll);
+        DeleteProductCommand = new ScreenCommand<ProductLeafNode>(leaf => host.DeleteAsync(leaf.Product));
+        RestoreProductCommand = new ScreenCommand<ProductLeafNode>(leaf => host.RestoreAsync(leaf.Product));
+        DeletePermanentlyCommand = new ScreenCommand<ProductLeafNode>(leaf => host.DeletePermanentlyAsync(leaf.Product));
+        NewFolderCommand = ScreenCommand.Of<ProductFolderNode?>(BeginNewFolder);
+        RenameFolderCommand = ScreenCommand.Of<ProductFolderNode>(BeginRenameFolder);
+        DeleteFolderCommand = new ScreenCommand<ProductFolderNode>(DeleteFolderAsync);
+        ExpandAllCommand = ScreenCommand.Of<ProductFolderNode?>(ProductTree.ExpandAll);
+        PrintFolderCommand = ScreenCommand.Of<ProductFolderNode>(folder => host.Print(PrintScope.Folder.Of(folder)));
+        PrintAllCommand = ScreenCommand.Of(() => host.Print(new PrintScope.AllProducts()));
+        CollapseAllCommand = ScreenCommand.Of<ProductFolderNode?>(ProductTree.CollapseAll);
     }
 
     /// <summary>The Products list (ProductList): VisibleProducts filed in their stage, in the user's folders.</summary>
@@ -230,10 +212,20 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     public IReadOnlyList<ProductLeafNode> SelectedTreeProducts => [.. SelectedTreeNodes.OfType<ProductLeafNode>().Where(l => !l.IsDeleted && !l.IsNew)];
 
     private string _searchText = string.Empty;
+    /// <summary>What's typed into the list's search: the products whose name holds it show (FilterChanged).</summary>
     public string SearchText
     {
         get => _searchText;
-        set => this.RaiseAndSetIfChanged(ref _searchText, value);
+        set
+        {
+            if (_searchText == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _searchText, value);
+            FilterChanged();
+        }
     }
 
     private ProductCategoryFilter _categoryFilter = new ProductCategoryFilter.All();
@@ -244,7 +236,29 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     public ProductCategoryFilter CategoryFilter
     {
         get => _categoryFilter;
-        set => this.RaiseAndSetIfChanged(ref _categoryFilter, value ?? new ProductCategoryFilter.All());
+        set
+        {
+            var filter = value ?? new ProductCategoryFilter.All();
+            if (EqualityComparer<ProductCategoryFilter>.Default.Equals(_categoryFilter, filter))
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _categoryFilter, filter);
+            FilterChanged();
+        }
+    }
+
+    /// <summary>
+    /// The search or the category filter changed: the list shows what they take, and they decide whether empty folders
+    /// show, even when they leave the same products showing. A name being typed into a row is given up first: either may
+    /// hide the row.
+    /// </summary>
+    private void FilterChanged()
+    {
+        _filterChanges.OnNext(System.Reactive.Unit.Default);
+        CancelTreeName();
+        RefreshTree();
     }
 
     /// <summary>The category filter's choices: All categories, each category by name, then Uncategorized.</summary>
@@ -270,101 +284,101 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// category stays as it is. The form's Save never writes a saved product's stage or folder, so whatever is typed into
     /// the form stays as it is.
     /// </summary>
-    public ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> MoveProductsCommand { get; }
+    public ScreenCommand<IReadOnlyList<ProductMove>> MoveProductsCommand { get; }
 
     /// <summary>
     /// Promote to Production, Send Back to Innovation, and a folder's Promote All: files the products in the other stage,
     /// each in the folder at the same path as its own there, made if it isn't (IProductRepository.MoveToStageAsync), with
     /// the notice bar's Undo, which takes away again the folders it made while they're still empty.
     /// </summary>
-    public ReactiveCommand<StageMoveRequest, RxVoid> MoveToStageCommand { get; }
+    public ScreenCommand<StageMoveRequest> MoveToStageCommand { get; }
 
     /// <summary>
     /// A folder of the user's dragged, or moved by its Move to: puts it, with all it holds, in another folder or at the top
     /// of a stage, straight away (IProductFolderRepository.MoveAsync), with the notice bar's Undo. Moved to the other stage,
     /// the folders and products in it go too.
     /// </summary>
-    public ReactiveCommand<ProductFolderMove, RxVoid> MoveFolderCommand { get; }
+    public ScreenCommand<ProductFolderMove> MoveFolderCommand { get; }
 
     /// <summary>Cut on the list: the products picked (or the one the menu was opened on), or one folder, wait to be pasted.</summary>
-    public ReactiveCommand<IReadOnlyList<ProductTreeNode>, RxVoid> CutCommand { get; }
+    public ScreenCommand<IReadOnlyList<ProductTreeNode>> CutCommand { get; }
 
     /// <summary>
     /// Paste on the list: what was cut moves into the folder it was asked on (a stage's, one of the user's, or the folder of
     /// the product it was asked on), as a drop there does, with the notice bar's Undo.
     /// </summary>
-    public ReactiveCommand<ProductTreeNode, RxVoid> PasteCommand { get; }
+    public ScreenCommand<ProductTreeNode> PasteCommand { get; }
 
     /// <summary>Esc on the list: what was cut is forgotten, and stays where it is.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ClearCutCommand { get; }
+    public ScreenCommand ClearCutCommand { get; }
 
     /// <summary>
     /// Sets the costing of the products picked in the list (or the one its menu was opened on) to Settings' costing
     /// defaults, once it's confirmed, recording a version of each one it changes (VersionedSaves.ApplyCostingAsync).
     /// </summary>
-    public ReactiveCommand<IReadOnlyList<Product>, RxVoid> ApplyCostingDefaultsCommand { get; }
+    public ScreenCommand<IReadOnlyList<Product>> ApplyCostingDefaultsCommand { get; }
 
     /// <summary>Undo on the list's notice bar: puts the products the last move took back where they were.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+    public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
     /// New Product Here on a folder of the list: a new product, as New starts one, filed in that folder's stage and
     /// category. Null, from the list's empty space, is New itself. Like New, it adds the product's row to the list for its
     /// name to be typed into (TreeNameEdit), and the name typed saves it.
     /// </summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewProductInCommand { get; }
+    public ScreenCommand<ProductFolderNode?> NewProductInCommand { get; }
 
     /// <summary>New Composite Product Here on a folder of the list, as New Product Here; null, from the list's empty space, is New composite product itself.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewCompositeProductInCommand { get; }
+    public ScreenCommand<ProductFolderNode?> NewCompositeProductInCommand { get; }
 
     /// <summary>
     /// Rename on a product of the list: its name becomes a box to type into, in place (TreeNameEdit), and the name typed is
     /// saved at once, like a move (IProductRepository.RenameAsync).
     /// </summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> RenameProductCommand { get; }
+    public ScreenCommand<ProductLeafNode> RenameProductCommand { get; }
 
     /// <summary>Clone on a product of the list: asks for the new product's name, then clones it as saved, as the Clone tab does.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> CloneProductCommand { get; }
+    public ScreenCommand<ProductLeafNode> CloneProductCommand { get; }
 
     /// <summary>Create Variant on a product of the list: asks for the variant's name, then makes it, as the Clone tab does.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> CreateVariantOfCommand { get; }
+    public ScreenCommand<ProductLeafNode> CreateVariantOfCommand { get; }
 
     /// <summary>Delete on a product of the list: Delete for that product, asking first.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> DeleteProductCommand { get; }
+    public ScreenCommand<ProductLeafNode> DeleteProductCommand { get; }
 
     /// <summary>Restore on a product in the Deleted folder: puts it back in its folder, and picks it.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> RestoreProductCommand { get; }
+    public ScreenCommand<ProductLeafNode> RestoreProductCommand { get; }
 
     /// <summary>Delete Permanently on a product in the Deleted folder: asks first, then deletes it for good.</summary>
-    public ReactiveCommand<ProductLeafNode, RxVoid> DeletePermanentlyCommand { get; }
+    public ScreenCommand<ProductLeafNode> DeletePermanentlyCommand { get; }
 
     /// <summary>
     /// New Folder on the list: adds a "New folder" row inside the folder it was asked on (a stage's or one of the user's)
     /// for its name to be typed into (TreeNameEdit), and the name typed adds the folder there. From the list's empty space
     /// or its toolbar, it goes in the folder picked, or the folder of the product picked, or at the top of Production.
     /// </summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> NewFolderCommand { get; }
+    public ScreenCommand<ProductFolderNode?> NewFolderCommand { get; }
 
     /// <summary>Rename on one of the user's folders: its name becomes a box to type into, in place, and the name typed renames it.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> RenameFolderCommand { get; }
+    public ScreenCommand<ProductFolderNode> RenameFolderCommand { get; }
 
     /// <summary>
     /// Delete on one of the user's folders: asks first, then deletes it, and nothing in it: its products and folders go up
     /// into the folder it was in.
     /// </summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> DeleteFolderCommand { get; }
+    public ScreenCommand<ProductFolderNode> DeleteFolderCommand { get; }
 
     /// <summary>Expand All: opens every folder in the folder given (a stage's or one of the user's), or in both stages.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> ExpandAllCommand { get; }
+    public ScreenCommand<ProductFolderNode?> ExpandAllCommand { get; }
 
     /// <summary>Collapse All: closes every folder in the folder given, or in both stages, leaving the one given and the stages open.</summary>
-    public ReactiveCommand<ProductFolderNode?, RxVoid> CollapseAllCommand { get; }
+    public ScreenCommand<ProductFolderNode?> CollapseAllCommand { get; }
 
     /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, on the Print tab.</summary>
-    public ReactiveCommand<ProductFolderNode, RxVoid> PrintFolderCommand { get; }
+    public ScreenCommand<ProductFolderNode> PrintFolderCommand { get; }
 
     /// <summary>Print All Products on the list's empty space: every product, as saved, on the Print tab.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> PrintAllCommand { get; }
+    public ScreenCommand PrintAllCommand { get; }
 
     /// <summary>
     /// Input: what the prompt is for, its box's label, the name it starts with, and a line saying more. Output: the name
@@ -689,10 +703,10 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         switch (drop)
         {
             case TreeDrop.Products(var moves):
-                await MoveProductsCommand.Execute(moves);
+                await MoveProductsCommand.ExecuteAsync(moves);
                 break;
             case TreeDrop.Folder(var move):
-                await MoveFolderCommand.Execute(move);
+                await MoveFolderCommand.ExecuteAsync(move);
                 break;
         }
 
@@ -700,7 +714,14 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>A move of the list's, or its Undo, is still saving or reading the list again.</summary>
-    private bool IsMoving => !_noMoveRunning.Value;
+    /// <summary>
+    /// True while a move of the list's, of products or a folder or to the other stage, or its Undo, is still saving or
+    /// reading the list again, and every one of them is off till it's done, from a menu, a key, a drop or a paste: each reads
+    /// the list as it stands and takes the notice's Undo, so a second started meanwhile would be judged against the list as
+    /// it was, and the two would take each other's Undo. Each command alone was off only while it ran itself.
+    /// </summary>
+    private bool IsMoving =>
+        MoveProductsCommand.IsRunning || MoveToStageCommand.IsRunning || MoveFolderCommand.IsRunning || UndoMoveCommand.IsRunning;
 
     private List<TreeMenuItem> ProductsMenu(IReadOnlyList<ProductLeafNode> leaves)
     {
@@ -1171,6 +1192,6 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         // A change still settling when the app closes is written now, rather than lost.
         _closedFoldersWriter.Dispose();
         ProductTree.Dispose();
-        _noMoveRunning.Dispose();
+        _filterChanges.Dispose();
     }
 }

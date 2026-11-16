@@ -1,6 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
@@ -13,7 +12,6 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -184,56 +182,49 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, Ingredients, Roles, subAssemblyLineRepository, rawMaterialCategoryRepository);
         List = new ProductsList(this, _productCache, _categoryCache, Categories, NewProductPlace, productRepository, folderRepository, viewStateStore);
 
-        // The subscriptions, in this order: two following one property run in the order they were made, and some count on it
-        // (WireDetailsTabs). Several run as they're made, WirePicks' included, so each comes after what it reads.
+        // What follows the form's fields as they change is called by their setters (SelectionChanged and the rest), and what
+        // follows a part's by the part's events, subscribed below. What follows here runs in this order: several run as
+        // they're made, WirePicks' included, so each comes after what it reads.
 
-        // A product opened, by its Save included, ends the new product's row: the form no longer shows the new one.
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is not null)
-            .Subscribe(_ => List.EndNewRow());
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Subscribe(_ => List.SyncTreeSelection());
+        // The list's row follows the product picked (SelectionChanged), from the start.
+        List.SyncTreeSelection();
 
         // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
         LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
 
-        WireHeader();
         WireDetailsTabs();
         WirePicks();
         WireUsageForm();
         WireCosts();
         WireUnsavedChanges();
 
-        // The commands. Making one runs nothing but its can-execute flag, so they can come in any order.
+        // The commands. Making one runs nothing, so they can come in any order.
 
         // Runs each time the page opens (ScreenBase) and after this screen's own saves. It merges
         // rather than replaces, so the screen keeps its selection, pickers and unsaved edits while
         // picking up what changed elsewhere: a repriced ingredient, or a linked sub-assembly its owner
         // changed.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(LoadAsync));
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
 
         // A new product replaces the one showing, so its unsaved changes are asked about first.
         // Each adds the new product's row to the list, for its name to be typed into.
-        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList()));
-        NewCompositeCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList(isComposite: true)));
+        NewCommand = new ScreenCommand(() => AfterUnsavedChangesAsync(() => List.NewInList()));
+        NewCompositeCommand = new ScreenCommand(() => AfterUnsavedChangesAsync(() => List.NewInList(isComposite: true)));
 
-        DeleteCommand = ReactiveCommand.CreateFromTask(
-            () => DeleteProductAsync(SelectedProduct!),
-            this.WhenAnyValue(x => x.SelectedProduct).Select(product => product is not null));
+        DeleteCommand = new ScreenCommand(() => DeleteProductAsync(SelectedProduct!), () => SelectedProduct is not null);
 
         // A clone copies the product as saved, and a variant links it as saved: unsaved edits stay with this one.
-        var canMakeFromSelected = this.WhenAnyValue(
-            x => x.SelectedProduct, x => x.EditingCloneName, (product, name) => product is not null && !string.IsNullOrWhiteSpace(name));
-        CloneCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CloneAsync, ClonedFrom), canMakeFromSelected);
-        CreateVariantCommand = ReactiveCommand.CreateFromTask(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CreateVariantAsync, VariantOf), canMakeFromSelected);
+        bool CanMakeFromSelected() => SelectedProduct is not null && !string.IsNullOrWhiteSpace(EditingCloneName);
+        CloneCommand = new ScreenCommand(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CloneAsync, ClonedFrom), CanMakeFromSelected);
+        CreateVariantCommand = new ScreenCommand(() => MakeFromAsync(SelectedProduct!.Id, EditingCloneName, _productCloner.CreateVariantAsync, VariantOf), CanMakeFromSelected);
 
         // A linked standalone sub-assembly's badge, the Packaging tab's for a packaging set.
-        OpenSubAssemblyCommand = ReactiveCommand.Create<int>(_subAssemblyOpenRequests.OnNext);
+        OpenSubAssemblyCommand = ScreenCommand.Of<int>(_subAssemblyOpenRequests.OnNext);
 
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(SaveAsync), History.WhenAnyValue(h => h.IsDirty));
+        SaveCommand = new ScreenCommand(() => RunSaveAsync(SaveAsync), () => History.IsDirty);
 
         // Revert puts the form back as the product was last saved (RevertToSavedAsync), once it's confirmed.
-        RevertCommand = ReactiveCommand.CreateFromTask(() => RunWithConfirmationAsync(
+        RevertCommand = new ScreenCommand(() => RunWithConfirmationAsync(
             "Undo every change made since this product was last saved?",
             async () =>
             {
@@ -249,7 +240,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
         // and does nothing if clicked then: disabled for that moment, it flickered on every pick. (Save is off then
         // anyway, with nothing unsaved, so it doesn't flicker.)
-        PrintCommand = ReactiveCommand.CreateFromTask(
+        PrintCommand = new ScreenCommand(
             () => RunSafelyAsync(() =>
             {
                 if (!AreDetailsReady)
@@ -275,7 +266,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
                 _printRequests.OnNext(new PrintScope.ThisProduct());
             }));
 
-        ToggleCostBasisCommand = ReactiveCommand.Create(ToggleCostBasis);
+        ToggleCostBasisCommand = ScreenCommand.Of(ToggleCostBasis);
     }
 
     /// <summary>The list: every product in its stage and the user's folders, searched, filtered, its menus, moves and folders.</summary>
@@ -353,11 +344,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public bool IsEditingComposite
     {
         get => _isEditingComposite;
-        private set
-        {
-            this.RaiseAndSetIfChanged(ref _isEditingComposite, value);
-            this.RaisePropertyChanged(nameof(IsEditingSingle));
-        }
+        private set => this.RaiseAndSetIfChanged(ref _isEditingComposite, value);
     }
 
     /// <summary>The product showing is made of sub-assemblies, as every product that isn't a composite is.</summary>
@@ -380,8 +367,31 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             }
 
             this.RaiseAndSetIfChanged(ref _selectedProduct, value);
+            SelectionChanged();
             _picks.OnNext(value);
         }
+    }
+
+    /// <summary>
+    /// What follows the product showing, a pick's or a load's fresh copy: one opened, by its Save included, ends the new
+    /// product's row, since the form no longer shows the new one; the list's row follows it; a hidden tab can't stay the one
+    /// showing, so leaving a saved product while on Clone or History goes back to Recipe; and the History tab reads its
+    /// versions.
+    /// </summary>
+    private void SelectionChanged()
+    {
+        if (SelectedProduct is not null)
+        {
+            List.EndNewRow();
+        }
+
+        List.SyncTreeSelection();
+        if (SelectedProduct is null && SelectedDetailsTab is LinksTab or HistoryTab)
+        {
+            SelectedDetailsTab = RecipeTab;
+        }
+
+        RequestVersions();
     }
 
     private bool _areDetailsReady = true;
@@ -394,7 +404,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public bool AreDetailsReady
     {
         get => _areDetailsReady;
-        private set => this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
+        private set
+        {
+            if (_areDetailsReady != value)
+            {
+                this.RaiseAndSetIfChanged(ref _areDetailsReady, value);
+                RequestVersions();
+            }
+        }
     }
 
     private string _editingName = string.Empty;
@@ -420,7 +437,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public int EditingQuantityRequired
     {
         get => _editingQuantityRequired;
-        set => this.RaiseAndSetIfChanged(ref _editingQuantityRequired, value);
+        set
+        {
+            if (_editingQuantityRequired != value)
+            {
+                this.RaiseAndSetIfChanged(ref _editingQuantityRequired, value);
+                _updates.Run(RecomputeCosts);
+            }
+        }
     }
 
     private decimal? _editingCurrentPrice;
@@ -428,7 +452,14 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public decimal? EditingCurrentPrice
     {
         get => _editingCurrentPrice;
-        set => this.RaiseAndSetIfChanged(ref _editingCurrentPrice, value);
+        set
+        {
+            if (_editingCurrentPrice != value)
+            {
+                this.RaiseAndSetIfChanged(ref _editingCurrentPrice, value);
+                _updates.Run(RecomputeCosts);
+            }
+        }
     }
 
     private string _categorySearchText = string.Empty;
@@ -443,23 +474,31 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     }
 
     private ProductCategory? _editingCategory;
-    /// <summary>The product's category, or null for none: a product doesn't need one.</summary>
+    /// <summary>The product's category, or null for none: a product doesn't need one. It can set the Wastage % the product is priced with.</summary>
     public ProductCategory? EditingCategory
     {
         get => _editingCategory;
-        set => this.RaiseAndSetIfChanged(ref _editingCategory, value);
+        set
+        {
+            if (!EqualityComparer<ProductCategory?>.Default.Equals(_editingCategory, value))
+            {
+                this.RaiseAndSetIfChanged(ref _editingCategory, value);
+                _updates.Run(RecomputeCosts);
+            }
+        }
     }
 
-    private ObservableAsPropertyHelper<string> _headerTitle;
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
-    public string HeaderTitle => _headerTitle.Value;
+    public string HeaderTitle =>
+        SelectedProduct is null && string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName;
 
-    private ObservableAsPropertyHelper<string?> _newProductTag;
     /// <summary>
     /// The tag beside the header's title while the form holds a product not saved yet: where Save will file it, "Goes in
-    /// Production" or "Goes in Innovation". Null while a saved product is showing.
+    /// Production" or "Goes in Innovation", its folder's path as it is now (renamed or moved since New Product Here, it says
+    /// so). Null while a saved product is showing.
     /// </summary>
-    public string? NewProductTag => _newProductTag.Value;
+    public string? NewProductTag =>
+        SelectedProduct is null ? $"Goes in {ProductFolderRules.PathTitle(Folders, NewProductPlace.Stage, NewProductPlace.FolderId)}" : null;
 
     /// <summary>When the product was last saved, e.g. "Sep 14, 2026, 6:27 PM", or "—".</summary>
     private string _lastUpdatedText = "—";
@@ -469,17 +508,26 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         private set => this.RaiseAndSetIfChanged(ref _lastUpdatedText, value);
     }
 
-    /// <summary>The details tab showing. Moves to Recipe when Clone is about to hide (ShowLinks).</summary>
+    /// <summary>
+    /// The details tab showing. Moves to Recipe when Clone is about to hide (SelectionChanged); the History tab reads the
+    /// product's versions as it shows.
+    /// </summary>
     private int _selectedDetailsTab;
     public int SelectedDetailsTab
     {
         get => _selectedDetailsTab;
-        set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+        set
+        {
+            if (_selectedDetailsTab != value)
+            {
+                this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
+                RequestVersions();
+            }
+        }
     }
 
-    private ObservableAsPropertyHelper<bool> _showLinks;
     /// <summary>A saved product: links and clones need one, so the tab only shows then.</summary>
-    public bool ShowLinks => _showLinks.Value;
+    public bool ShowLinks => SelectedProduct is not null;
 
     private string _editingCloneName = string.Empty;
     public string EditingCloneName
@@ -488,31 +536,31 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         set => this.RaiseAndSetIfChanged(ref _editingCloneName, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+    public ScreenCommand NewCommand { get; }
 
     /// <summary>New's New composite product: a new product made of other products, with its own packaging and toppings or fillings.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> NewCompositeCommand { get; }
+    public ScreenCommand NewCompositeCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+    public ScreenCommand SaveCommand { get; }
 
     /// <summary>
     /// Revert: reads the product back as it was last saved, throwing away everything staged since — the details, the
     /// recipe's sections and their lines, the packaging, the packs and the costing. The sub-assembly form has no
     /// discard of its own, so this is what abandons a section being added or edited, along with the rest.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> RevertCommand { get; }
+    public ScreenCommand RevertCommand { get; }
 
     /// <summary>
     /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
     /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
     /// refusing it shows its message here and the tab doesn't open.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> PrintCommand { get; }
+    public ScreenCommand PrintCommand { get; }
 
     /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (ProductCosting.CostBasis).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> ToggleCostBasisCommand { get; }
+    public ScreenCommand ToggleCostBasisCommand { get; }
 
     /// <summary>
     /// What a Print here asks to print: the header's, This product; a folder's menu, the folder; the list's, all products.
@@ -525,7 +573,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// A linked standalone sub-assembly's badge clicked (a recipe section's, or linked packaging's for a packaging set):
     /// asks for the sub-assembly with this id to be opened, through <see cref="SubAssemblyOpenRequests"/>.
     /// </summary>
-    public ReactiveCommand<int, RxVoid> OpenSubAssemblyCommand { get; }
+    public ScreenCommand<int> OpenSubAssemblyCommand { get; }
 
     /// <summary>
     /// The sub-assemblies linked badges ask to open, by id. ScreenLinks subscribes and opens each on the Sub-Assemblies
@@ -533,7 +581,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     /// </summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
 
@@ -543,10 +591,10 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
     System.Windows.Input.ICommand IRevertScreen.RevertCommand => RevertCommand;
 
-    public ReactiveCommand<RxVoid, RxVoid> CloneCommand { get; }
+    public ScreenCommand CloneCommand { get; }
 
     /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CreateVariantCommand { get; }
+    public ScreenCommand CreateVariantCommand { get; }
 
     /// <summary>
     /// Input: the name typed into the Category picker that isn't a category yet, which the prompt starts with.
@@ -555,7 +603,16 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
     public Interaction<string, string?> PromptForNewCategory { get; } = new();
 
     /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
-    private void RepointSelection(Product? fresh) => this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
+    private void RepointSelection(Product? fresh)
+    {
+        if (EqualityComparer<Product?>.Default.Equals(_selectedProduct, fresh))
+        {
+            return;
+        }
+
+        this.RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct));
+        SelectionChanged();
+    }
 
     /// <summary>
     /// Flags each product in the list whose current price earns less than its target markup: every product
@@ -583,41 +640,15 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             .Select(p => p.Name)
             .Order(StringComparer.CurrentCultureIgnoreCase)];
 
-    /// <summary>The header's title, and where a new product goes.</summary>
-    [MemberNotNull(nameof(_headerTitle), nameof(_newProductTag))]
-    private void WireHeader()
-    {
-        _headerTitle = this.WhenAnyValue(x => x.SelectedProduct, x => x.EditingName, x => x.IsEditingComposite, (product, name, isComposite) =>
-                product is null && string.IsNullOrWhiteSpace(name) ? (isComposite ? "New composite product" : "New product") : name)
-            .ToProperty(this, x => x.HeaderTitle, "New product");
-
-        // Its folder's path as it is now: renamed or moved since New Product Here, it says so (Folders).
-        _newProductTag = this.WhenAnyValue(
-                x => x.SelectedProduct, x => x.NewProductPlace.Stage, x => x.NewProductPlace.FolderId, x => x.Folders,
-                (product, stage, folderId, folders) => product is null ? $"Goes in {ProductFolderRules.PathTitle(folders, stage, folderId)}" : null)
-            .ToProperty(this, x => x.NewProductTag);
-    }
-
-    /// <summary>The Clone and History tabs, a saved product's only, and the versions History reads.</summary>
-    [MemberNotNull(nameof(_showLinks))]
+    /// <summary>The versions the History tab reads.</summary>
     private void WireDetailsTabs()
     {
-        // A hidden tab can't stay the one showing: leaving a saved product while on Clone or History goes
-        // back to Recipe. Subscribed before ShowLinks, so the details tabs move to Recipe before those two hide.
-        this.WhenAnyValue(x => x.SelectedProduct)
-            .Where(product => product is null && SelectedDetailsTab is LinksTab or HistoryTab)
-            .Subscribe(_ => SelectedDetailsTab = RecipeTab);
-
         // The History tab reads the product's versions while it shows, once per product: as it's picked, and as another
-        // product's details arrive under it. A Save reads them again (RequestVersions(force: true)).
-        this.WhenAnyValue(x => x.SelectedDetailsTab, x => x.AreDetailsReady, x => x.SelectedProduct)
-            .Subscribe(_ => RequestVersions());
+        // product's details arrive under it (SelectedDetailsTab, AreDetailsReady, SelectionChanged). A Save reads them
+        // again (RequestVersions(force: true)).
+        RequestVersions();
         LoadLatest(_versionReads, (productId, cancellationToken) => VersionHistory.ReadAsync(
             productId, () => SelectedProduct?.Id == productId, cancellationToken));
-
-        _showLinks = this.WhenAnyValue(x => x.SelectedProduct)
-            .Select(product => product is not null)
-            .ToProperty(this, x => x.ShowLinks);
     }
 
     /// <summary>A product picked in the list loads into the form.</summary>
@@ -677,8 +708,8 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             .Subscribe(_ => _updates.Run(Recipe.FormAddInsEdited));
 
         // The preview, and whether Save moves a new one to the Sub-Assemblies screen, follow the form's mode, role and source.
-        UsageForm.WhenAnyValue(f => f.IsAddingUsage, f => f.EditingUsageMode, f => f.EditingUsageRole, f => f.EditingUsageSource)
-            .Subscribe(_ => _updates.Run(Recipe.FormKindChanged));
+        UsageForm.KindChanged += () => _updates.Run(Recipe.FormKindChanged);
+        _updates.Run(Recipe.FormKindChanged);
 
         LoadLatest(
             UsageForm.SourcePicks.Where(_ => UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage),
@@ -705,7 +736,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             .Subscribe(_ => _updates.Run(PackagingLinesEdited));
 
         // The same for a bulk packaging line, and the products a bulk pack holds.
-        Packaging.WhenAnyValue(p => p.BulkQuantity).Skip(1).Subscribe(_ => _updates.Run(PackagingLinesEdited));
+        Packaging.BulkQuantityChanged += () => _updates.Run(PackagingLinesEdited);
         Packaging.BulkEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
@@ -726,21 +757,13 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
                 nameof(ProductComponentRow.PackagingCost)))
             .Subscribe(_ => _updates.Run(ComponentsEdited));
 
-        Costing.WhenAnyValue(
-                c => c.EditingLaborPercent,
-                c => c.EditingOverheadPercent,
-                c => c.EditingAdministrativePercent,
-                c => c.EditingMarginPercent)
-            .Subscribe(_ => _updates.Run(RecomputeCosts));
+        // The costing percentages, and a composite's products' packaging joining its own or leaving it. The form's price,
+        // quantity and category too, through their setters.
+        Costing.PercentEdited += () => _updates.Run(RecomputeCosts);
+        ComponentsTable.IncludesPackagingChanged += () => _updates.Run(RecomputeCosts);
 
-        // The category too: it can set the Wastage % the product is priced with.
-        this.WhenAnyValue(x => x.EditingCurrentPrice, x => x.EditingQuantityRequired, x => x.EditingCategory)
-            .Subscribe(_ => _updates.Run(RecomputeCosts));
-
-        // A composite's products' packaging joining its own, or leaving it: the header's Material Cost tooltip says so too,
-        // as the Costing part works the captions out again with the costs (ProductCosting.Recompute).
-        ComponentsTable.WhenAnyValue(c => c.IncludesPackaging)
-            .Subscribe(_ => _updates.Run(RecomputeCosts));
+        // Once now, from the blank form, as everything above it follows.
+        _updates.Run(RecomputeCosts);
     }
 
     /// <summary>Save offers itself whenever the form holds something the saved product doesn't.</summary>
@@ -749,12 +772,12 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         // Save offers itself only when the form holds something the saved product doesn't. Re-read on every
         // change rather than only when an undo step settles: a step closes on the way out of a field, and a Save
         // button still disabled under the cursor would swallow the very click that enabled it.
-        this.Changed.Subscribe(_ => History.RefreshDirty());
-        Recipe.Changed.Subscribe(_ => History.RefreshDirty());
-        Costing.Changed.Subscribe(_ => History.RefreshDirty());
-        Packaging.Changed.Subscribe(_ => History.RefreshDirty());
-        ComponentsTable.Changed.Subscribe(_ => History.RefreshDirty());
-        UsageForm.Changed.Subscribe(_ => History.RefreshDirty());
+        PropertyChanged += (_, _) => History.RefreshDirty();
+        Recipe.PropertyChanged += (_, _) => History.RefreshDirty();
+        Costing.PropertyChanged += (_, _) => History.RefreshDirty();
+        Packaging.PropertyChanged += (_, _) => History.RefreshDirty();
+        ComponentsTable.PropertyChanged += (_, _) => History.RefreshDirty();
+        UsageForm.PropertyChanged += (_, _) => History.RefreshDirty();
         WatchForSave(Recipe.UsageEdits);
         WatchForSave(Packaging.LineEdits);
         WatchForSave(Packaging.BulkEdits);
@@ -900,7 +923,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
                 sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
 
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
             SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
         });
     }
@@ -920,7 +943,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
                     StartNewProduct();
                 }
 
-                await LoadCommand.Execute();
+                await LoadCommand.ExecuteAsync();
             });
 
     /// <summary>
@@ -937,7 +960,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         await RunSafelyAsync(async () =>
         {
             await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
             TrySelectRecord(product.Id);
         });
     }
@@ -951,7 +974,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             async () =>
             {
                 await _productRepository.DeletePermanentlyAsync(product.Id, CancellationToken.None);
-                await LoadCommand.Execute();
+                await LoadCommand.ExecuteAsync();
             });
 
     /// <summary>The Last Updated figure: the day and the time; "—" for a product never saved since it was added.</summary>
@@ -1326,7 +1349,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
 
         // The list picks up the new name; then the form shows what was saved, which is what the next Save compares
         // against.
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
         ShowSavedProduct(saved.Product, saved.Detail);
 
         // Read again now if the History tab shows; otherwise the versions it holds are out of date, and go, so showing it
@@ -1453,7 +1476,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             };
             var changed = await Task.Run(() => _versionedSaves.ApplyCostingAsync(
                 [.. products.Select(p => p.Id)], costing, DateTime.Now, CancellationToken.None));
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
 
             // The product the form shows reads its new costing, as after its own Save.
             if (_detailProductId is { } openId && products.Any(p => p.Id == openId)
@@ -1700,7 +1723,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim()
             : SelectedProduct?.Name ?? (IsEditingComposite ? "the new composite product" : "the new product");
 
-    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
+    protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
     /// <summary>
     /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
@@ -1776,6 +1799,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
             EditingCloneName = snapshot.CloneName;
             _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
             this.RaisePropertyChanged(nameof(EditingCategory));
+            _updates.Run(RecomputeCosts);
 
             // 3. Costing.
             Costing.Percentages = snapshot.Costing;
@@ -1820,7 +1844,7 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         set => Folders = value;
     }
 
-    async Task IProductsListHost.LoadAsync() => await LoadCommand.Execute();
+    Task IProductsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IProductsListHost.Pick(Product product) =>
         PickFromList(product.Id, () => SelectedProduct = product, List.SyncTreeSelection);
@@ -2002,5 +2026,6 @@ public sealed class ProductsViewModel : RecordFormViewModel<ProductFormSnapshot>
         _markupChecks.Dispose();
         _picks.Dispose();
         UsageForm.Dispose();
+        Packaging.Dispose();
     }
 }

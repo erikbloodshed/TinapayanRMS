@@ -1,5 +1,3 @@
-using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -30,12 +28,12 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         await AddProductWithSubAssemblyAsync("Almond Bread", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Almond Loaf";
 
-        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.Execute().ToTask());
+        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.ExecuteAsync());
 
         mayLeave.Should().BeTrue("the Save went through, so there's nothing left to ask about");
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", viewModel.ErrorMessage);
@@ -50,15 +48,15 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
-        await viewModel.NewCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
+        await viewModel.NewCommand.ExecuteAsync();
 
         // What New starts on its own (the list's row for the new product) settles first, as it does before anyone types.
         await Settle.UntilAsync(viewModel, () => !viewModel.History.IsDirty, () => $"dirty={viewModel.History.IsDirty}");
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Pandesal";
 
-        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.Execute().ToTask());
+        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.ExecuteAsync());
 
         mayLeave.Should().BeTrue("the Save went through, so there's nothing left to ask about");
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", viewModel.ErrorMessage);

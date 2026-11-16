@@ -1,9 +1,6 @@
-using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
 using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using ReactiveUI;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
@@ -14,7 +11,6 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -100,7 +96,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         production.Folders.Should().Contain(cakes);
         cakes.Stage.Should().Be(ProductStage.Production);
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
@@ -118,9 +114,8 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         // Breads to Production: it saves, then reads the list again. A drop meanwhile would be judged against the list as
         // it was, and the two would take each other's Undo.
-        var folderMove = viewModel.List.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
-        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
-        await viewModel.List.MoveProductsCommand.CanExecute.FirstAsync(offered => !offered);
+        var folderMove = viewModel.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
+        viewModel.List.MoveProductsCommand.CanExecute([]).Should().BeFalse("the folder's move is under way, as a drop would find it");
         (await screen.DropAsync([viewModel.List.ProductTree.Find(mamonId)!], viewModel.List.ProductTree.Folder(cakesId))).Should().BeNull("a move is still saving");
         await folderMove;
 
@@ -148,7 +143,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         made.Products.Should().ContainSingle();
         viewModel.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads › Holiday");
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, holidayId));
@@ -156,7 +151,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.List.ProductTree.Folder(made.FolderId!.Value).Should().BeNull("the folder the Promote made goes, empty again");
         viewModel.List.ProductTree.Folder(productionBreadsId).Should().NotBeNull("one it found there stays");
         viewModel.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        (await viewModel.List.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -176,7 +171,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads");
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
         (await PlaceOfAsync(pandesalId)).Stage.Should().Be(ProductStage.Production, "Undo puts back only what this Promote moved");
 
@@ -225,7 +220,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.List.MoveNotice.Should().Be("Moved 2 products to Production › Cakes");
         viewModel.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse();
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
         await MovesOfferedAgainAsync(viewModel);
 
@@ -377,14 +372,14 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var cakesId = await AddFolderAsync("Cakes");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var viewModel = await LoadedViewModelAsync();
-        await viewModel.List.MoveProductsCommand.Execute([new ProductMove(mamonId, ProductStage.Innovation, cakesId)]);
+        await viewModel.List.MoveProductsCommand.ExecuteAsync([new ProductMove(mamonId, ProductStage.Innovation, cakesId)]);
         viewModel.List.MoveNotice.Should().NotBeNull("there's a move to undo");
         static bool CanRun(ICommand command) => command.CanExecute(null);
 
         // Breads to Production: it saves, then reads the list again. Meanwhile a menu's Promote, Send Back or Move to, a
         // folder's own move, and the notice's Undo are all off, as each would be judged against the list as it was.
-        var folderMove = viewModel.List.MoveFolderCommand.Execute(new ProductFolderMove(breadsId, ProductStage.Production, null)).ToTask();
-        await viewModel.List.MoveFolderCommand.CanExecute.FirstAsync(offered => !offered);
+        var folderMove = viewModel.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
+        viewModel.List.MoveFolderCommand.CanExecute(new ProductFolderMove(breadsId, ProductStage.Production, null)).Should().BeFalse();
         CanRun(viewModel.List.MoveToStageCommand).Should().BeFalse();
         CanRun(viewModel.List.MoveProductsCommand).Should().BeFalse();
         CanRun(viewModel.List.MoveFolderCommand).Should().BeFalse();
@@ -393,8 +388,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await folderMove;
         viewModel.ErrorMessage.Should().BeNull();
 
-        // ReactiveCommand says a command has ended just after its task has: the moves are free again then.
-        await Settle.UntilAsync(viewModel, () => CanRun(viewModel.List.MoveToStageCommand), () => "a move still running");
+        // The moves are free again once the folder's move has ended.
         CanRun(viewModel.List.MoveToStageCommand).Should().BeTrue();
         CanRun(viewModel.List.MoveProductsCommand).Should().BeTrue();
         CanRun(viewModel.List.MoveFolderCommand).Should().BeTrue();
@@ -414,12 +408,12 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var folders = new ProductFolderRepository(CreateDbContextFactory());
         await folders.RenameAsync(breadsId, "Bread Rolls", Cancellation);
         await folders.MoveAsync(new ProductFolderMove(breadsId, ProductStage.Production, null), Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.NewProductTag.Should().Be("Goes in Production › Bread Rolls", "the header says where Save will file it now");
         viewModel.NewProductPlace.Stage.Should().Be(ProductStage.Production);
         TypeName(viewModel, "Pan de Coco");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
         var saved = await ProductNamedAsync("Pan de Coco");
         (saved.Stage, saved.FolderId).Should().Be((ProductStage.Production, breadsId));
@@ -444,12 +438,12 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         // Revert keeps the folder it was started from.
         viewModel.List.CancelTreeName();
         TypeName(viewModel, "Something Else");
-        await viewModel.RevertCommand.Execute();
+        await viewModel.RevertCommand.ExecuteAsync();
         viewModel.EditingName.Should().BeEmpty();
         viewModel.NewProductTag.Should().Be("Goes in Innovation › Breads");
 
         TypeName(viewModel, "Pan de Coco");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         var saved = await ProductNamedAsync("Pan de Coco");
@@ -458,11 +452,11 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.NewProductTag.Should().BeNull("a saved product shows no tag");
 
         // New, from the header, starts one in the stage Settings gives a new product: Production, to start with.
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.NewProductTag.Should().Be("Goes in Production");
         viewModel.List.CancelTreeName();
         TypeName(viewModel, "Test Loaf");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         var plain = await ProductNamedAsync("Test Loaf");
         (plain.Stage, plain.FolderId).Should().Be((ProductStage.Production, (int?)null));
@@ -478,24 +472,24 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         viewModel.NewProductTag.Should().Be("Goes in Innovation");
         TypeName(viewModel, "Test Loaf");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
         (await ProductNamedAsync("Test Loaf")).Stage.Should().Be(ProductStage.Innovation);
 
         // Changed in Settings while a new product is being typed: its stage was never picked, so it follows. Revert keeps it.
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         TypeName(viewModel, "Pan de Coco");
         await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.NewProductTag.Should().Be("Goes in Production");
         viewModel.EditingName.Should().Be("Pan de Coco", "only the stage follows the setting");
-        await viewModel.RevertCommand.Execute();
+        await viewModel.RevertCommand.ExecuteAsync();
         viewModel.NewProductTag.Should().Be("Goes in Production");
 
         // A product started from a folder keeps that folder's stage whatever the setting says.
         await RunAsync(viewModel.List.TreeMenuFor(viewModel.List.ProductTree.StageFolder(ProductStage.Innovation)).Single(i => i.Header == "New Product Here"));
         await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.NewProductTag.Should().Be("Goes in Innovation");
     });
 
@@ -577,7 +571,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await LoadedViewModelAsync();
 
         // A new product named as another is.
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         var row = viewModel.List.ProductTree.PendingProduct!;
         await viewModel.List.CommitTreeNameAsync("Mamon");
 
@@ -659,7 +653,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.List.TreeNameEdit.Hint.Should().Contain("isn't a category");
         viewModel.List.TreeMenuFor(folder).Should().BeEmpty();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         TitlesIn(breads).Should().Equal(["New folder", "Pandesal"], "a load keeps it");
 
         await viewModel.List.CommitTreeNameAsync("Holiday");
@@ -733,7 +727,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedProduct.Should().BeNull();
         viewModel.History.IsDirty.Should().BeFalse();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         breads.Children.Should().Equal([row], "a load keeps it");
         viewModel.List.SelectedTreeNode.Should().BeSameAs(row);
 
@@ -762,7 +756,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var viewModel = await LoadedViewModelAsync();
         var production = viewModel.List.ProductTree.StageFolder(ProductStage.Production);
 
-        await viewModel.NewCompositeCommand.Execute();
+        await viewModel.NewCompositeCommand.ExecuteAsync();
 
         var row = viewModel.List.ProductTree.PendingProduct!;
         production.Children.Should().Equal(row);
@@ -783,7 +777,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.History.IsDirty.Should().BeTrue("Save is offered for it");
 
         viewModel.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
-        await viewModel.RevertCommand.Execute();
+        await viewModel.RevertCommand.ExecuteAsync();
 
         viewModel.List.ProductTree.PendingProduct.Should().BeNull("put back blank, it has no row");
         production.Children.Should().BeEmpty();
@@ -913,7 +907,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.SelectedProduct!.Id.Should().Be(mamonId, "a restored product is opened");
 
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         string? question = null;
         viewModel.ConfirmDelete.RegisterHandler(interaction =>
         {
@@ -995,12 +989,12 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         // Renamed in Settings, the category keeps its place picked; deleted, the filter goes back to All categories.
         viewModel.List.CategoryFilter = viewModel.List.CategoryFilters.Single(f => f.Label == "Cakes");
         await new ProductCategoryRepository(CreateDbContextFactory()).UpdateAsync(new ProductCategory { Id = cakesCategory, Name = "Cakes & Tortes" }, Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.List.CategoryFilter.Should().Be(new ProductCategoryFilter.Category(cakesCategory, "Cakes & Tortes"));
         viewModel.List.VisibleProducts.Select(p => p.Id).Should().Equal(bibingkaId);
 
         await new ProductCategoryRepository(CreateDbContextFactory()).DeleteAsync(cakesCategory, Cancellation);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
         viewModel.List.CategoryFilters.Select(f => f.Label).Should().Equal("All categories", "Breads", "Uncategorized");
 
@@ -1064,7 +1058,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         await RunAsync(moveTo.Items.Single(i => i.Header == "Innovation").Items.Single(i => i.Header == "Cakes"));
         await new ProductFolderRepository(CreateDbContextFactory()).DeleteAsync(breadsId, Cancellation);
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Be("The folder to move it to no longer exists.");
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
@@ -1225,7 +1219,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
         viewModel.EditingName = "Mamon Tostado";
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
 
         asked.Should().ContainSingle();
         viewModel.SelectedProduct!.Id.Should().Be(mamonId);
@@ -1244,7 +1238,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
         viewModel.EditingName = "Mamon Tostado";
         viewModel.EditingCloneName = "Mamon Ube";
 
-        await viewModel.CloneCommand.Execute();
+        await viewModel.CloneCommand.ExecuteAsync();
 
         asked.Should().ContainSingle();
         viewModel.Products.Should().NotContain(p => p.Name == "Mamon Ube");
@@ -1323,45 +1317,47 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     /// <summary>
-    /// Waits for the moves to be offered again after a move or its Undo, before a drop or a paste. ReactiveUI marks a move
-    /// finished on its scheduler, after Execute has returned, and a drop or paste before then is refused as a move still
-    /// saving. No hand is that quick, and the window's scheduler marks it at once, but a loaded test run is: on GitHub's
-    /// runner a paste after an Undo, and a drop after a drop, did nothing.
+    /// The moves are offered again once a move or its Undo is done, before a drop or a paste: a command's run is over as
+    /// its ExecuteAsync ends. (Under ReactiveUI it was marked over on its scheduler a moment later, and on GitHub's runner
+    /// a paste after an Undo, and a drop after a drop, did nothing.)
     /// </summary>
-    private static Task MovesOfferedAgainAsync(ProductsViewModel viewModel) =>
-        Settle.UntilOfferedAsync(viewModel.List.MoveFolderCommand.CanExecute, "Move");
+    private static Task MovesOfferedAgainAsync(ProductsViewModel viewModel)
+    {
+        ((System.Windows.Input.ICommand)viewModel.List.MoveFolderCommand).CanExecute(null).Should().BeTrue("the move is done");
+        return Task.CompletedTask;
+    }
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     private static async Task RunAsync(TreeMenuItem item)
     {
         switch (item.Command)
         {
-            case ReactiveCommand<IReadOnlyList<ProductMove>, RxVoid> move:
-                await move.Execute((IReadOnlyList<ProductMove>)item.Parameter!);
+            case ScreenCommand<IReadOnlyList<ProductMove>> move:
+                await move.ExecuteAsync((IReadOnlyList<ProductMove>)item.Parameter!);
                 break;
-            case ReactiveCommand<StageMoveRequest, RxVoid> toStage:
-                await toStage.Execute((StageMoveRequest)item.Parameter!);
+            case ScreenCommand<StageMoveRequest> toStage:
+                await toStage.ExecuteAsync((StageMoveRequest)item.Parameter!);
                 break;
-            case ReactiveCommand<ProductFolderMove, RxVoid> moveFolder:
-                await moveFolder.Execute((ProductFolderMove)item.Parameter!);
+            case ScreenCommand<ProductFolderMove> moveFolder:
+                await moveFolder.ExecuteAsync((ProductFolderMove)item.Parameter!);
                 break;
-            case ReactiveCommand<IReadOnlyList<ProductTreeNode>, RxVoid> onRows:
-                await onRows.Execute((IReadOnlyList<ProductTreeNode>)item.Parameter!);
+            case ScreenCommand<IReadOnlyList<ProductTreeNode>> onRows:
+                await onRows.ExecuteAsync((IReadOnlyList<ProductTreeNode>)item.Parameter!);
                 break;
-            case ReactiveCommand<ProductTreeNode, RxVoid> onRow:
-                await onRow.Execute((ProductTreeNode)item.Parameter!);
+            case ScreenCommand<ProductTreeNode> onRow:
+                await onRow.ExecuteAsync((ProductTreeNode)item.Parameter!);
                 break;
-            case ReactiveCommand<RxVoid, RxVoid> plain:
-                await plain.Execute();
+            case ScreenCommand plain:
+                await plain.ExecuteAsync();
                 break;
-            case ReactiveCommand<IReadOnlyList<Product>, RxVoid> onProducts:
-                await onProducts.Execute((IReadOnlyList<Product>)item.Parameter!);
+            case ScreenCommand<IReadOnlyList<Product>> onProducts:
+                await onProducts.ExecuteAsync((IReadOnlyList<Product>)item.Parameter!);
                 break;
-            case ReactiveCommand<ProductLeafNode, RxVoid> onProduct:
-                await onProduct.Execute((ProductLeafNode)item.Parameter!);
+            case ScreenCommand<ProductLeafNode> onProduct:
+                await onProduct.ExecuteAsync((ProductLeafNode)item.Parameter!);
                 break;
-            case ReactiveCommand<ProductFolderNode, RxVoid> onFolder:
-                await onFolder.Execute((ProductFolderNode?)item.Parameter!);
+            case ScreenCommand<ProductFolderNode?> onFolder:
+                await onFolder.ExecuteAsync((ProductFolderNode?)item.Parameter);
                 break;
             default:
                 throw new InvalidOperationException($"'{item.Header}' runs nothing a test knows how to wait for.");
@@ -1438,7 +1434,7 @@ public class ProductsViewModelTreeTests(DatabaseFixture fixture) : PersistenceTe
     private async Task<ProductsViewModel> LoadedViewModelAsync(IViewStateStore? viewStateStore = null)
     {
         var viewModel = CreateViewModel(viewStateStore);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         return viewModel;
     }
 

@@ -1,12 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -29,7 +26,7 @@ public interface IProductComponentsHost : IScreenPartHost, IUndoRecorder
 /// screen's form (<see cref="IProductComponentsHost"/>). The screen keeps the undo history these lines are part of, and
 /// the costs they add up to.
 /// </summary>
-public sealed class ProductComponents : ReactiveObject
+public sealed class ProductComponents : ObservableState
 {
     private readonly IProductComponentsHost _host;
     private readonly IReadOnlyList<Product> _products;
@@ -57,13 +54,13 @@ public sealed class ProductComponents : ReactiveObject
         _products = products;
         _savedProducts = savedProducts;
 
-        RemoveLineCommand = ReactiveCommand.Create(
+        RemoveLineCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
-            this.WhenAnyValue(c => c.SelectedComponentEdit).Select(row => row is not null));
+            () => SelectedComponentEdit is not null);
     }
 
     /// <summary>The Products table's Remove Line: takes out the line picked, as one undo step.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+    public ScreenCommand RemoveLineCommand { get; }
 
     /// <summary>A composite's lines, typed straight into its Products table: each a product and how many of it go in.</summary>
     public ObservableCollection<ProductComponentRow> ComponentEdits { get; } = [];
@@ -78,7 +75,7 @@ public sealed class ProductComponents : ReactiveObject
     public ProductComponentRow? SelectedComponentEdit
     {
         get => _selectedComponentEdit;
-        set => this.RaiseAndSetIfChanged(ref _selectedComponentEdit, value);
+        set => RaiseAndSetIfChanged(ref _selectedComponentEdit, value);
     }
 
     private bool _includesPackaging;
@@ -98,11 +95,21 @@ public sealed class ProductComponents : ReactiveObject
                 row.IncludesPackaging = value;
             }
 
-            this.RaiseAndSetIfChanged(ref _includesPackaging, value);
-            this.RaisePropertyChanged(nameof(IsPackagingTicked));
-            this.RaisePropertyChanged(nameof(Caption));
+            if (RaiseAndSetIfChanged(ref _includesPackaging, value))
+            {
+                IncludesPackagingChanged?.Invoke();
+            }
+
+            RaisePropertyChanged(nameof(IsPackagingTicked));
+            RaisePropertyChanged(nameof(Caption));
         }
     }
+
+    /// <summary>
+    /// The products' packaging joined the composite's own, or left it: its costs follow, and the header's Material Cost
+    /// tooltip says so too, as the Costing part works the captions out again with the costs (ProductCosting.Recompute).
+    /// </summary>
+    public event Action? IncludesPackagingChanged;
 
     /// <summary>
     /// The Include each product's packaging checkbox's side of <see cref="IncludesPackaging"/>: a tick or an untick from the
@@ -141,7 +148,7 @@ public sealed class ProductComponents : ReactiveObject
     public decimal ComponentsCost
     {
         get => _componentsCost;
-        internal set => this.RaiseAndSetIfChanged(ref _componentsCost, value);
+        internal set => RaiseAndSetIfChanged(ref _componentsCost, value);
     }
 
     /// <summary>The products the lines hold, each once.</summary>

@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -34,7 +33,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         viewModel.UsageForm.FormLines.Single().CostPerGram.Should().Be(0.05m);
         viewModel.UsageForm.UsageFormBatchCostText.Should().Be($"{50m:N2}");
 
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         viewModel.Costing.IsUnbuffered.Should().BeTrue();
         viewModel.Costing.CostBasisButtonLabel.Should().Be("Buffered", "the button names the costs a click switches to");
@@ -53,7 +52,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         printout.Sections.Single().Lines.Single().CostPerGram.Should().Be(0.04m);
         printout.Packaging!.Total.Should().Be(25m);
 
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         viewModel.Costing.IsUnbuffered.Should().BeFalse();
         viewModel.Costing.CostBasisButtonLabel.Should().Be("Unbuffered");
@@ -67,7 +66,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     {
         var productId = await AddEnsaymadaAsync();
         var viewModel = await OpenAsync(productId);
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         Edit(viewModel, () => viewModel.UsageForm.FormLines.Single().Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
@@ -85,7 +84,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         var flourId = await IngredientIdAsync("Flour");
         var (cheeseRollId, _) = await AddProductWithSubAssemblyAsync("Cheese Roll", doughRoleId, [(flourId, 1000m)], weightPerPiece: 100m);
         var viewModel = await OpenAsync(productId);
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == cheeseRollId);
         await Settle.UntilAsync(viewModel,
@@ -114,7 +113,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
         var viewModel = await OpenAsync(boxId, vm => vm.ComponentsTable.ComponentEdits.Count == 2 && vm.ComponentsTable.ComponentEdits.All(r => r.RecipeCost is not null));
         viewModel.Costing.Costs.SubAssemblies.Should().Be(35m, "6 × 2.50 + 4 × 5.00");
 
-        await viewModel.ToggleCostBasisCommand.Execute();
+        await viewModel.ToggleCostBasisCommand.ExecuteAsync();
 
         viewModel.ComponentsTable.ComponentEdits.Select(r => r.RecipeCost).Should().Equal(2.00m, 4.00m);
         viewModel.Costing.Costs.SubAssemblies.Should().Be(28m, "6 × 2.00 + 4 × 4.00");
@@ -202,7 +201,7 @@ public class ProductsViewModelCostBasisTests(DatabaseFixture fixture) : Persiste
     private async Task<ProductsViewModel> OpenAsync(int productId, Func<ProductsViewModel, bool>? ready = null)
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && (ready?.Invoke(viewModel) ?? (viewModel.UsageForm.FormLines.Count == 1 && viewModel.Packaging.LineEdits.Count > 0)),

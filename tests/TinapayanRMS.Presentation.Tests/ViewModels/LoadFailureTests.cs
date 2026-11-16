@@ -36,7 +36,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
 
         await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
@@ -68,7 +68,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         Product Named(string name) => viewModel.Products.Single(p => p.Name == name);
         await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = Named("Almond Bread"), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
 
@@ -79,7 +79,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.EditingName = "Banana Loaf";
 
         viewModel.History.IsDirty.Should().BeFalse("the history records nothing until the details come");
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("what the form holds isn't Banana Bread's to save");
+        viewModel.SaveCommand.CanExecute().Should().BeFalse("what the form holds isn't Banana Bread's to save");
 
         factory.Hold = null;
         hold.SetResult();
@@ -194,7 +194,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await AddProductWithSubAssemblyAsync("Almond Bread", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateProductsViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedProduct = viewModel.Products.Single(), () => viewModel.AreDetailsReady && viewModel.Recipe.UsageEdits.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Almond Loaf";
@@ -206,7 +206,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         viewModel.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => { }, () => viewModel.AreDetailsReady);
         (await viewModel.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("it can be left once the database answers again");
     });

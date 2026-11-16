@@ -14,8 +14,20 @@ public abstract class ObservableState : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Says <paramref name="propertyName"/> changed: one worked out from another that did.</summary>
-    protected void RaisePropertyChanged([CallerMemberName] string? propertyName = null) =>
+    protected void RaisePropertyChanged([CallerMemberName] string? propertyName = null)
+    {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        OnPropertyChanged(propertyName);
+    }
+
+    /// <summary>
+    /// What follows any change said of <paramref name="propertyName"/>, however it was said: for a part whose properties are
+    /// set from several places, the quiet ones too (a load's, an undo's), each of which has to set the same thing off.
+    /// Nothing, unless a part says otherwise.
+    /// </summary>
+    protected virtual void OnPropertyChanged(string? propertyName)
+    {
+    }
 
     /// <summary>
     /// Sets <paramref name="field"/> to <paramref name="value"/>, and says so, unless it holds that already. True when it

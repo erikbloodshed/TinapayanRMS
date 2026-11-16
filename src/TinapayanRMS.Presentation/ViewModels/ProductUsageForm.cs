@@ -37,7 +37,7 @@ public interface IProductUsageFormHost : IScreenPartHost, IUndoRecorder
 /// changes the recipe's sections, its tabs and the undo history these fields are part of, and says when the lines or what
 /// the form adds have changed. The form works out its own piece size and figures from its tables (<see cref="Recompute"/>).
 /// </summary>
-public sealed class ProductUsageForm : ReactiveObject, IDisposable
+public sealed class ProductUsageForm : ObservableState, IDisposable
 {
     private readonly IProductUsageFormHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
@@ -60,29 +60,23 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
             .Where(pick => IsUsageFormOpen && IsAddingUsage && IsPieceSizeAsStarted(pick.Before))
             .Subscribe(_ => StartPieceSize());
 
-        StartChangingLinkCommand = ReactiveCommand.Create(StartChangingLink, this.WhenAnyValue(f => f.IsEditingLinkedUsage));
-        CancelChangingLinkCommand = ReactiveCommand.Create(() => { IsChangingLink = false; });
-
-        RemoveLineCommand = ReactiveCommand.Create(
-            () => host.AsUndoStep(() => FormLines.Remove(SelectedFormLine!)),
-            this.WhenAnyValue(f => f.SelectedFormLine).Select(line => line is not null));
-
-        RemoveAddInCommand = ReactiveCommand.Create(
-            () => host.AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)),
-            this.WhenAnyValue(f => f.SelectedFormAddIn).Select(line => line is not null));
+        StartChangingLinkCommand = ScreenCommand.Of(StartChangingLink, () => IsEditingLinkedUsage);
+        CancelChangingLinkCommand = ScreenCommand.Of(() => IsChangingLink = false);
+        RemoveLineCommand = ScreenCommand.Of(() => host.AsUndoStep(() => FormLines.Remove(SelectedFormLine!)), () => SelectedFormLine is not null);
+        RemoveAddInCommand = ScreenCommand.Of(() => host.AsUndoStep(() => FormAddIns.Remove(SelectedFormAddIn!)), () => SelectedFormAddIn is not null);
     }
 
     /// <summary>The linked badge's Edit: shows the picker of what the section could link instead (IsChangingLink).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> StartChangingLinkCommand { get; }
+    public ScreenCommand StartChangingLinkCommand { get; }
 
     /// <summary>Puts the badge back without changing the link.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CancelChangingLinkCommand { get; }
+    public ScreenCommand CancelChangingLinkCommand { get; }
 
     /// <summary>Removes the line picked in the form's lines table, as one undo step.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+    public ScreenCommand RemoveLineCommand { get; }
 
     /// <summary>Removes the add-in picked in the form's add-ins table, as one undo step.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveAddInCommand { get; }
+    public ScreenCommand RemoveAddInCommand { get; }
 
     /// <summary>An ingredient as the screen last loaded it, for a row that prices itself.</summary>
     private RawMaterial? FindIngredient(int id) => _ingredients.FirstOrDefault(m => m.Id == id);
@@ -135,15 +129,15 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         get => _editingUsage;
         internal set
         {
-            this.RaiseAndSetIfChanged(ref _editingUsage, value);
-            this.RaisePropertyChanged(nameof(IsEditingLinkedUsage));
-            this.RaisePropertyChanged(nameof(IsEditingOwnedUsage));
-            this.RaisePropertyChanged(nameof(CanMoveEditingUsageToInHouse));
-            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
+            RaiseAndSetIfChanged(ref _editingUsage, value);
+            RaisePropertyChanged(nameof(IsEditingLinkedUsage));
+            RaisePropertyChanged(nameof(IsEditingOwnedUsage));
+            RaisePropertyChanged(nameof(CanMoveEditingUsageToInHouse));
+            RaisePropertyChanged(nameof(IsFormLinesEditable));
 
             // A link being changed belongs to the section it was started on.
             IsChangingLink = false;
-            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
+            RaisePropertyChanged(nameof(IsShowingLinkBadge));
         }
     }
 
@@ -164,8 +158,8 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         get => _isChangingLink;
         internal set
         {
-            this.RaiseAndSetIfChanged(ref _isChangingLink, value);
-            this.RaisePropertyChanged(nameof(IsShowingLinkBadge));
+            RaiseAndSetIfChanged(ref _isChangingLink, value);
+            RaisePropertyChanged(nameof(IsShowingLinkBadge));
         }
     }
 
@@ -187,7 +181,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         {
             if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_changeLinkTarget, value))
             {
-                this.RaiseAndSetIfChanged(ref _changeLinkTarget, value);
+                RaiseAndSetIfChanged(ref _changeLinkTarget, value);
                 _linkTargetPicks.OnNext(value);
             }
         }
@@ -226,14 +220,14 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public bool IsUsageFormOpen
     {
         get => _isUsageFormOpen;
-        internal set => this.RaiseAndSetIfChanged(ref _isUsageFormOpen, value);
+        internal set => RaiseAndSetIfChanged(ref _isUsageFormOpen, value);
     }
 
     private string _usageFormTitle = string.Empty;
     public string UsageFormTitle
     {
         get => _usageFormTitle;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormTitle, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormTitle, value);
     }
 
     private bool _isAddingUsage = true;
@@ -241,7 +235,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public bool IsAddingUsage
     {
         get => _isAddingUsage;
-        internal set => this.RaiseAndSetIfChanged(ref _isAddingUsage, value);
+        internal set => RaiseAndSetIfChanged(ref _isAddingUsage, value);
     }
 
     private UsageFormMode _editingUsageMode;
@@ -253,7 +247,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         {
             if (_editingUsageMode != value)
             {
-                this.RaiseAndSetIfChanged(ref _editingUsageMode, value);
+                RaiseAndSetIfChanged(ref _editingUsageMode, value);
                 _modePicks.OnNext(value);
             }
         }
@@ -266,12 +260,12 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         get => _isFormEditingLines;
         internal set
         {
-            this.RaiseAndSetIfChanged(ref _isFormEditingLines, value);
-            this.RaisePropertyChanged(nameof(IsFormLinesEditable));
-            this.RaisePropertyChanged(nameof(IsFormShowingLines));
-            this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-            this.RaisePropertyChanged(nameof(HasFormAddIns));
-            this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
+            RaiseAndSetIfChanged(ref _isFormEditingLines, value);
+            RaisePropertyChanged(nameof(IsFormLinesEditable));
+            RaisePropertyChanged(nameof(IsFormShowingLines));
+            RaisePropertyChanged(nameof(IsFormShowingAddIns));
+            RaisePropertyChanged(nameof(HasFormAddIns));
+            RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
         }
     }
 
@@ -318,7 +312,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public bool IsFormPickingSource
     {
         get => _isFormPickingSource;
-        internal set => this.RaiseAndSetIfChanged(ref _isFormPickingSource, value);
+        internal set => RaiseAndSetIfChanged(ref _isFormPickingSource, value);
     }
 
     private SubAssemblyRole? _editingUsageRole;
@@ -331,7 +325,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
             var before = _editingUsageRole;
             if (!EqualityComparer<SubAssemblyRole?>.Default.Equals(before, value))
             {
-                this.RaiseAndSetIfChanged(ref _editingUsageRole, value);
+                RaiseAndSetIfChanged(ref _editingUsageRole, value);
                 _rolePicks.OnNext((before, value));
             }
         }
@@ -345,7 +339,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string? EditingUsageName
     {
         get => _editingUsageName;
-        set => this.RaiseAndSetIfChanged(ref _editingUsageName, value);
+        set => RaiseAndSetIfChanged(ref _editingUsageName, value);
     }
 
     private LinkableSubAssemblyOption? _editingUsageSource;
@@ -357,9 +351,24 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
         {
             if (!EqualityComparer<LinkableSubAssemblyOption?>.Default.Equals(_editingUsageSource, value))
             {
-                this.RaiseAndSetIfChanged(ref _editingUsageSource, value);
+                RaiseAndSetIfChanged(ref _editingUsageSource, value);
                 _sourcePicks.OnNext(value);
             }
+        }
+    }
+
+    /// <summary>
+    /// The form's kind changed: adding or editing, and an add's way in, role or source, however each was set (a pick, an
+    /// undo, the form opened on a section). The preview, and whether Save moves a new section to the Sub-Assemblies screen,
+    /// follow it (the screen's ProductRecipe.FormKindChanged).
+    /// </summary>
+    public event Action? KindChanged;
+
+    protected override void OnPropertyChanged(string? propertyName)
+    {
+        if (propertyName is nameof(IsAddingUsage) or nameof(EditingUsageMode) or nameof(EditingUsageRole) or nameof(EditingUsageSource))
+        {
+            KindChanged?.Invoke();
         }
     }
 
@@ -367,14 +376,14 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public IngredientLineRow? SelectedFormLine
     {
         get => _selectedFormLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormLine, value);
+        set => RaiseAndSetIfChanged(ref _selectedFormLine, value);
     }
 
     private IngredientLineRow? _selectedFormAddIn;
     public IngredientLineRow? SelectedFormAddIn
     {
         get => _selectedFormAddIn;
-        set => this.RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
+        set => RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
     }
 
     // The piece size: the user types either figure into its box, and the other follows from the batch weight. Only the one
@@ -444,11 +453,11 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     {
         if (field == UsageAuthoredField.WeightPerPiece)
         {
-            this.RaiseAndSetIfChanged(ref _editingUsageWeightPerPiece, value, nameof(EditingUsageWeightPerPiece));
+            RaiseAndSetIfChanged(ref _editingUsageWeightPerPiece, value, nameof(EditingUsageWeightPerPiece));
         }
         else
         {
-            this.RaiseAndSetIfChanged(ref _editingUsageYield, value, nameof(EditingUsageYield));
+            RaiseAndSetIfChanged(ref _editingUsageYield, value, nameof(EditingUsageYield));
         }
     }
 
@@ -465,7 +474,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormTotalWeightText
     {
         get => _usageFormTotalWeightText;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormTotalWeightText, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormTotalWeightText, value);
     }
 
     private string _usageFormPieceSizeCaption = string.Empty;
@@ -473,7 +482,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormPieceSizeCaption
     {
         get => _usageFormPieceSizeCaption;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormPieceSizeCaption, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormPieceSizeCaption, value);
     }
 
     private string _usageFormBaseCaption = string.Empty;
@@ -484,7 +493,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormBaseCaption
     {
         get => _usageFormBaseCaption;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
     }
 
     private string _usageFormPercentHeader = IngredientLineRow.PercentHeader(0m);
@@ -492,7 +501,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormPercentHeader
     {
         get => _usageFormPercentHeader;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormPercentHeader, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormPercentHeader, value);
     }
 
     private string _usageFormAddInsCaption = string.Empty;
@@ -500,7 +509,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormAddInsCaption
     {
         get => _usageFormAddInsCaption;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormAddInsCaption, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormAddInsCaption, value);
     }
 
     private string _usageFormCostPerPieceText = "—";
@@ -511,7 +520,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormCostPerPieceText
     {
         get => _usageFormCostPerPieceText;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
     }
 
     private string _usageFormBatchCostText = "—";
@@ -519,7 +528,7 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     public string UsageFormBatchCostText
     {
         get => _usageFormBatchCostText;
-        internal set => this.RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
+        internal set => RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
     }
 
     /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
@@ -576,25 +585,25 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     internal void RestoreMode(UsageFormMode mode)
     {
         _editingUsageMode = mode;
-        this.RaisePropertyChanged(nameof(EditingUsageMode));
+        RaisePropertyChanged(nameof(EditingUsageMode));
     }
 
     /// <summary>The role picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so nothing follows.</summary>
-    internal void ShowRole(SubAssemblyRole? role) => this.RaiseAndSetIfChanged(ref _editingUsageRole, role, nameof(EditingUsageRole));
+    internal void ShowRole(SubAssemblyRole? role) => RaiseAndSetIfChanged(ref _editingUsageRole, role, nameof(EditingUsageRole));
 
     /// <summary>The source picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so the form keeps its lines.</summary>
     internal void ShowSource(LinkableSubAssemblyOption? source) =>
-        this.RaiseAndSetIfChanged(ref _editingUsageSource, source, nameof(EditingUsageSource));
+        RaiseAndSetIfChanged(ref _editingUsageSource, source, nameof(EditingUsageSource));
 
     /// <summary>Puts the role, source and name back, once the option lists they come from are rebuilt.</summary>
     internal void RestorePicks(SubAssemblyRole? role, LinkableSubAssemblyOption? source, string? name)
     {
         _editingUsageRole = role;
-        this.RaisePropertyChanged(nameof(EditingUsageRole));
+        RaisePropertyChanged(nameof(EditingUsageRole));
         _editingUsageSource = source;
-        this.RaisePropertyChanged(nameof(EditingUsageSource));
+        RaisePropertyChanged(nameof(EditingUsageSource));
         _editingUsageName = name;
-        this.RaisePropertyChanged(nameof(EditingUsageName));
+        RaisePropertyChanged(nameof(EditingUsageName));
     }
 
     /// <summary>Puts the piece size back as it stood: which figure was typed, and both figures.</summary>
@@ -602,23 +611,23 @@ public sealed class ProductUsageForm : ReactiveObject, IDisposable
     {
         AuthoredField = authoredField;
         _editingUsageWeightPerPiece = weightPerPiece;
-        this.RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
+        RaisePropertyChanged(nameof(EditingUsageWeightPerPiece));
         _editingUsageYield = yield;
-        this.RaisePropertyChanged(nameof(EditingUsageYield));
+        RaisePropertyChanged(nameof(EditingUsageYield));
     }
 
     /// <summary>The form's mode, role or source changed: whether Save moves a new one to the Sub-Assemblies screen follows.</summary>
-    internal void RaiseKindChanged() => this.RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
+    internal void RaiseKindChanged() => RaisePropertyChanged(nameof(IsFormNewMovingToSubAssemblies));
 
     /// <summary>The form's lines or add-ins changed: what its tables and the add-ins badge show follows.</summary>
     internal void RaiseLinesChanged()
     {
-        this.RaisePropertyChanged(nameof(IsFormShowingLines));
-        this.RaisePropertyChanged(nameof(IsFormShowingAddIns));
-        this.RaisePropertyChanged(nameof(FormAddInCount));
-        this.RaisePropertyChanged(nameof(HasFormAddIns));
-        this.RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
-        this.RaisePropertyChanged(nameof(FormAddInsBadgeText));
+        RaisePropertyChanged(nameof(IsFormShowingLines));
+        RaisePropertyChanged(nameof(IsFormShowingAddIns));
+        RaisePropertyChanged(nameof(FormAddInCount));
+        RaisePropertyChanged(nameof(HasFormAddIns));
+        RaisePropertyChanged(nameof(IsFormShowingNoAddIns));
+        RaisePropertyChanged(nameof(FormAddInsBadgeText));
     }
 
     /// <summary>The badge's Edit: the picker, holding what the section could link instead, in the badge's place.</summary>

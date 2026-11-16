@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -64,7 +63,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         viewModel.Packaging.LineEdits.Add(new PackagingLineRow { PackagingMaterialId = boxId, QtyPerUnit = 1m });
         await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 30m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -88,7 +87,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         foreach (var mode in new[] { UsageFormMode.New, UsageFormMode.Link, UsageFormMode.Copy })
         {
-            await viewModel.Recipe.AddUsageCommand.Execute(mode);
+            await viewModel.Recipe.AddUsageCommand.ExecuteAsync(mode);
             viewModel.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal("Dough");
             viewModel.UsageForm.LinkableSubAssemblies.Should().BeEmpty("neither the packaging set nor Cream Loaf's packaging is a recipe section");
         }
@@ -110,7 +109,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
 
         // Link offers only the Sub-Assemblies screen's packaging sets, never another product's packaging.
-        await viewModel.Packaging.StartLinkingCommand.Execute();
+        await viewModel.Packaging.StartLinkingCommand.ExecuteAsync();
         viewModel.Packaging.IsPickingSource.Should().BeTrue();
         viewModel.Packaging.SourceOptions.Select(o => o.PackagingSourceName).Should().Equal("Gift Box Set — packaging set");
         await PickAsync(viewModel, "Gift Box Set — packaging set");
@@ -122,7 +121,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.PackagingLinkedToText.Should().Be("Linked to Gift Box Set (Sub-Assemblies)");
         viewModel.Costing.Costs.Packaging.Should().Be(31.5m, "one set per piece: a ₱30 box and 30 cm of ribbon at ₱0.05");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
@@ -136,7 +135,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue("the reload shows the saved link");
 
         // The set linked now isn't offered again.
-        await viewModel.Packaging.StartLinkingCommand.Execute();
+        await viewModel.Packaging.StartLinkingCommand.ExecuteAsync();
         viewModel.Packaging.IsPickingSource.Should().BeFalse();
         viewModel.ErrorMessage.Should().Be("This product links the only packaging set there is.");
     });
@@ -155,7 +154,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await OpenWithOwnPackagingAsync(bagId);
 
         // Copy offers the packaging sets, then every other product, never this one.
-        await viewModel.Packaging.StartCopyingCommand.Execute();
+        await viewModel.Packaging.StartCopyingCommand.ExecuteAsync();
         viewModel.Packaging.SourceOptions.Select(o => o.PackagingSourceName).Should().Equal("Gift Box Set — packaging set", "Cream Loaf — product");
         await PickAsync(viewModel, "Cream Loaf — product");
 
@@ -171,7 +170,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.TryRedo().Should().BeTrue();
 
         viewModel.Packaging.LineEdits.Single().QtyPerUnit = 3m;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -189,7 +188,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await AddProductAsync("Plain Roll");
         var viewModel = await OpenWithOwnPackagingAsync(bagId);
 
-        await viewModel.Packaging.StartCopyingCommand.Execute();
+        await viewModel.Packaging.StartCopyingCommand.ExecuteAsync();
         viewModel.Packaging.PickedSource = viewModel.Packaging.SourceOptions.Single(o => o.PackagingSourceName == "Plain Roll — product");
         await Settle.UntilAsync(viewModel, () => viewModel.ErrorMessage is not null, () => $"error={viewModel.ErrorMessage}");
 
@@ -197,9 +196,9 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.IsPickingSource.Should().BeTrue();
         viewModel.Packaging.LineEdits.Should().ContainSingle().Which.PackagingMaterialId.Should().Be(bagId, "nothing changed");
 
-        await viewModel.Packaging.CancelPickingCommand.Execute();
+        await viewModel.Packaging.CancelPickingCommand.ExecuteAsync();
         viewModel.Packaging.IsPickingSource.Should().BeFalse();
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse("opening and closing the picker changes nothing");
+        viewModel.SaveCommand.CanExecute().Should().BeFalse("opening and closing the picker changes nothing");
     });
 
     [Test]
@@ -207,7 +206,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     {
         var viewModel = await CreateLoadedViewModelAsync();
 
-        await viewModel.Packaging.StartLinkingCommand.Execute();
+        await viewModel.Packaging.StartLinkingCommand.ExecuteAsync();
 
         viewModel.Packaging.IsPickingSource.Should().BeFalse();
         viewModel.ErrorMessage.Should().StartWith("There's no packaging set to link yet.");
@@ -228,13 +227,13 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
         viewModel.Packaging.IsPackagingLinked.Should().BeTrue();
 
-        await viewModel.Packaging.MakeCopyCommand.Execute();
+        await viewModel.Packaging.MakeCopyCommand.ExecuteAsync();
 
         viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
         viewModel.Packaging.IsPackagingEditable.Should().BeTrue();
         viewModel.Packaging.LineEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(1m);
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -252,17 +251,17 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var viewModel = await OpenWithOwnPackagingAsync(boxId);
         viewModel.Packaging.CanMovePackaging.Should().BeTrue("the lines are the product's own");
 
-        await viewModel.Packaging.MoveToSubAssembliesCommand.Execute();
+        await viewModel.Packaging.MoveToSubAssembliesCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Packaging.IsPackagingMoving.Should().BeTrue("the badge says Save moves it");
         viewModel.Packaging.CanMovePackaging.Should().BeFalse("it's on its way already");
         viewModel.Packaging.IsPackagingEditable.Should().BeTrue("its lines are still typed into here until Save");
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        viewModel.SaveCommand.CanExecute().Should().BeTrue();
 
         // Typed after the press: the set takes it along.
         viewModel.Packaging.LineEdits.Single().QtyPerUnit = 2m;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await Settle.UntilAsync(viewModel, () => viewModel.Packaging.IsPackagingLinked && viewModel.Packaging.LineEdits.Count == 1, () => $"linked={viewModel.Packaging.IsPackagingLinked}");
@@ -288,17 +287,17 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await OpenWithOwnPackagingAsync(boxId);
 
-        await viewModel.Packaging.MoveToSubAssembliesCommand.Execute();
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        await viewModel.Packaging.MoveToSubAssembliesCommand.ExecuteAsync();
+        viewModel.SaveCommand.CanExecute().Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
         viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
         viewModel.Packaging.CanMovePackaging.Should().BeTrue();
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.SaveCommand.CanExecute().Should().BeFalse();
 
         viewModel.TryRedo().Should().BeTrue();
         viewModel.Packaging.IsPackagingMoving.Should().BeTrue();
-        (await viewModel.SaveCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        viewModel.SaveCommand.CanExecute().Should().BeTrue();
     });
 
     [Test]
@@ -308,9 +307,9 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         var boxId = await AddPackagingAsync("Gift Box", 30m);
         var viewModel = await OpenWithOwnPackagingAsync(boxId);
         viewModel.Packaging.SelectedLineEdit = viewModel.Packaging.LineEdits.Single();
-        await viewModel.Packaging.RemoveLineCommand.Execute();
+        await viewModel.Packaging.RemoveLineCommand.ExecuteAsync();
 
-        await viewModel.Packaging.MoveToSubAssembliesCommand.Execute();
+        await viewModel.Packaging.MoveToSubAssembliesCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Contain("at least one");
         viewModel.Packaging.IsPackagingMoving.Should().BeFalse();
@@ -325,10 +324,10 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await SaveBulkAsync(productId, boxId, productsPerPack: 6);
         var viewModel = await OpenLinkedAsync();
         viewModel.Costing.Costs.Packaging.Should().Be(4m, "a ₱2 wrapper a piece, and a ₱12 box shared by 6");
-        (await viewModel.Recipe.RemoveUsageCommand.CanExecute.FirstAsync()).Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
-        (await viewModel.Packaging.RemoveLinkCommand.CanExecute.FirstAsync()).Should().BeTrue();
+        viewModel.Recipe.RemoveUsageCommand.CanExecute().Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
+        viewModel.Packaging.RemoveLinkCommand.CanExecute().Should().BeTrue();
 
-        await viewModel.Packaging.RemoveLinkCommand.Execute();
+        await viewModel.Packaging.RemoveLinkCommand.ExecuteAsync();
 
         viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.PackagingTab);
         viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
@@ -336,9 +335,9 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.LineEdits.Should().BeEmpty();
         viewModel.Packaging.BulkEdits.Should().ContainSingle();
         viewModel.Costing.Costs.Packaging.Should().Be(2m);
-        (await viewModel.Packaging.RemoveLinkCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.Packaging.RemoveLinkCommand.CanExecute().Should().BeFalse();
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -352,7 +351,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
     {
         var cartonId = await AddPackagingAsync("Carton", 12m);
         var viewModel = await CreateLoadedViewModelAsync();
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.Recipe.RecipeTabs.Should().Equal(viewModel.Recipe.PackagingTab);
         viewModel.Recipe.SelectedRecipeTab.Should().BeSameAs(viewModel.Recipe.PackagingTab);
         viewModel.Recipe.HasRecipeSections.Should().BeFalse();
@@ -361,7 +360,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName = "Pandesal";
         viewModel.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = cartonId, QtyPerUnit = 1m });
         viewModel.Packaging.BulkQuantity = 12;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -388,7 +387,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.BulkEdits.Single().QtyPerUnit.Should().Be(1m);
         viewModel.Packaging.BulkCostText.Should().Be("Pack cost 12.00 ÷ 6 products = 2.00 per unit");
         viewModel.Packaging.LinesCost.Should().Be(2m, "the Packaging per Piece heading's figure is its lines alone: the bulk share has its own caption");
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
 
         await using (var dbContext = CreateDbContext())
@@ -407,7 +406,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
 
         // Remove Line is one undo step.
         reopened.Packaging.SelectedBulkEdit = reopened.Packaging.BulkEdits.Single();
-        await reopened.Packaging.RemoveBulkLineCommand.Execute();
+        await reopened.Packaging.RemoveBulkLineCommand.ExecuteAsync();
         reopened.Packaging.BulkEdits.Should().BeEmpty();
         reopened.Costing.Costs.Packaging.Should().Be(2m);
         reopened.TryUndo().Should().BeTrue();
@@ -423,7 +422,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         await Settle.UntilAsync(viewModel, () => viewModel.Packaging.BulkPackCost == 12m, () => $"pack={viewModel.Packaging.BulkPackCost}");
         viewModel.Costing.Costs.Packaging.Should().Be(2m, "with no quantity the pack is shared among none yet");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().StartWith("Enter how many products one bulk pack holds");
         await using var dbContext = CreateDbContext();
@@ -439,14 +438,14 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
         viewModel.Packaging.BulkQuantity = 6;
         await Settle.UntilAsync(viewModel, () => viewModel.Costing.Costs.Packaging == 4m, () => $"packaging={viewModel.Costing.Costs.Packaging}");
 
-        await viewModel.Packaging.MakeCopyCommand.Execute();
+        await viewModel.Packaging.MakeCopyCommand.ExecuteAsync();
 
         viewModel.Packaging.IsPackagingLinked.Should().BeFalse();
         viewModel.Packaging.LineEdits.Select(l => l.PackagingMaterialId).Should().Equal(wrapperId);
         viewModel.Packaging.BulkEdits.Select(l => l.PackagingMaterialId).Should().Equal(boxId);
         viewModel.Costing.Costs.Packaging.Should().Be(4m);
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
@@ -575,7 +574,7 @@ public class ProductsViewModelPackagingTests(DatabaseFixture fixture) : Persiste
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         return viewModel;
     }
 }

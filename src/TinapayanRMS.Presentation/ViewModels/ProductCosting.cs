@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -15,7 +14,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// against, the costing as loaded, a new product's defaults, and the shop's wastage, VAT and price rounding every product is
 /// priced with are here.
 /// </summary>
-public sealed class ProductCosting : ReactiveObject
+public sealed class ProductCosting : ObservableState
 {
     // What the captions name, as the last Recompute was given it: the quantity a sellable unit holds, whether it's a
     // composite, and whether a composite takes its products' packaging too.
@@ -45,28 +44,39 @@ public sealed class ProductCosting : ReactiveObject
     public decimal EditingLaborPercent
     {
         get => _editingLaborPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingLaborPercent, value);
+        set => SetPercent(ref _editingLaborPercent, value);
     }
 
     private decimal _editingOverheadPercent;
     public decimal EditingOverheadPercent
     {
         get => _editingOverheadPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingOverheadPercent, value);
+        set => SetPercent(ref _editingOverheadPercent, value);
     }
 
     private decimal _editingAdministrativePercent;
     public decimal EditingAdministrativePercent
     {
         get => _editingAdministrativePercent;
-        set => this.RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
+        set => SetPercent(ref _editingAdministrativePercent, value);
     }
 
     private decimal _editingMarginPercent;
     public decimal EditingMarginPercent
     {
         get => _editingMarginPercent;
-        set => this.RaiseAndSetIfChanged(ref _editingMarginPercent, value);
+        set => SetPercent(ref _editingMarginPercent, value);
+    }
+
+    /// <summary>A costing percentage changed: the product is costed again (the screen's RecomputeCosts).</summary>
+    public event Action? PercentEdited;
+
+    private void SetPercent(ref decimal field, decimal value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
+    {
+        if (RaiseAndSetIfChanged(ref field, value, propertyName))
+        {
+            PercentEdited?.Invoke();
+        }
     }
 
     // Each metric's value box: its percentage as pesos for one sellable unit. Typing an amount sets the percentage that
@@ -112,13 +122,13 @@ public sealed class ProductCosting : ReactiveObject
         get => _costs;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _costs, value);
+            RaiseAndSetIfChanged(ref _costs, value);
 
             // The metrics' value boxes read the amounts from here: a percentage, the recipe or another metric changed.
-            this.RaisePropertyChanged(nameof(EditingLaborAmount));
-            this.RaisePropertyChanged(nameof(EditingOverheadAmount));
-            this.RaisePropertyChanged(nameof(EditingAdministrativeAmount));
-            this.RaisePropertyChanged(nameof(EditingMarkupAmount));
+            RaisePropertyChanged(nameof(EditingLaborAmount));
+            RaisePropertyChanged(nameof(EditingOverheadAmount));
+            RaisePropertyChanged(nameof(EditingAdministrativeAmount));
+            RaisePropertyChanged(nameof(EditingMarkupAmount));
         }
     }
 
@@ -134,11 +144,11 @@ public sealed class ProductCosting : ReactiveObject
         get => _costBasis;
         internal set
         {
-            this.RaiseAndSetIfChanged(ref _costBasis, value);
-            this.RaisePropertyChanged(nameof(IsUnbuffered));
-            this.RaisePropertyChanged(nameof(CostBasisButtonLabel));
-            this.RaisePropertyChanged(nameof(CostBasisButtonTooltip));
-            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
+            RaiseAndSetIfChanged(ref _costBasis, value);
+            RaisePropertyChanged(nameof(IsUnbuffered));
+            RaisePropertyChanged(nameof(CostBasisButtonLabel));
+            RaisePropertyChanged(nameof(CostBasisButtonTooltip));
+            RaisePropertyChanged(nameof(MaterialCostTooltip));
         }
     }
 
@@ -166,7 +176,7 @@ public sealed class ProductCosting : ReactiveObject
     public string? BelowCostText
     {
         get => _belowCostText;
-        private set => this.RaiseAndSetIfChanged(ref _belowCostText, value);
+        private set => RaiseAndSetIfChanged(ref _belowCostText, value);
     }
 
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
@@ -291,10 +301,10 @@ public sealed class ProductCosting : ReactiveObject
 
         if (captionsChange)
         {
-            this.RaisePropertyChanged(nameof(CostUnitCaption));
-            this.RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
-            this.RaisePropertyChanged(nameof(MaterialCostTooltip));
-            this.RaisePropertyChanged(nameof(MetricBaseTooltip));
+            RaisePropertyChanged(nameof(CostUnitCaption));
+            RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
+            RaisePropertyChanged(nameof(MaterialCostTooltip));
+            RaisePropertyChanged(nameof(MetricBaseTooltip));
         }
     }
 }

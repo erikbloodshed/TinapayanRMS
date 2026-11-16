@@ -119,7 +119,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        await products.LoadCommand.Execute();
+        await products.LoadCommand.ExecuteAsync();
         await tab.LoadCommand.Execute();
 
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Bibingka", "Cheese Roll", "Pan de Coco");
@@ -226,7 +226,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
         await AddBoxAsync(productId, unbufferedCost: 25m);
         await SetCostingAsync(productId);
         var products = await OpenProductsAsync("Ensaymada", vm => vm.Recipe.UsageEdits.Count == 1 && vm.Packaging.LineEdits.Count > 0);
-        await products.ToggleCostBasisCommand.Execute();
+        await products.ToggleCostBasisCommand.ExecuteAsync();
         var tab = CreatePrintTab(products);
 
         tab.Pick(new PrintScope.ThisProduct());
@@ -358,7 +358,7 @@ public class PrintTabViewModelTests(DatabaseFixture fixture) : PersistenceTestBa
     private async Task<ProductsViewModel> OpenProductsAsync(string? productName = null, Func<ProductsViewModel, bool>? ready = null)
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         if (productName is not null)
         {
             viewModel.SelectedProduct = viewModel.Products.Single(p => p.Name == productName);

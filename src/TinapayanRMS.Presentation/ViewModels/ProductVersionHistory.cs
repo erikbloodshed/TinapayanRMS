@@ -1,14 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Reactive.Linq;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -16,7 +13,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// One version on the Products screen's History tab: when it was saved, its note, and its figures as they were then and
 /// at today's prices, at the screen's cost basis.
 /// </summary>
-public sealed class ProductVersionRow : ReactiveObject
+public sealed class ProductVersionRow : ObservableRow
 {
     private readonly Action<ProductVersionRow, string?> _noteTyped;
 
@@ -53,7 +50,7 @@ public sealed class ProductVersionRow : ReactiveObject
         set
         {
             var previous = _note;
-            this.RaiseAndSetIfChanged(ref _note, value);
+            RaiseAndSetIfChanged(ref _note, value);
             if (!string.Equals(previous ?? string.Empty, value ?? string.Empty, StringComparison.Ordinal))
             {
                 _noteTyped(this, previous);
@@ -65,7 +62,7 @@ public sealed class ProductVersionRow : ReactiveObject
     public void RevertNote(string? note)
     {
         _note = note;
-        this.RaisePropertyChanged(nameof(Note));
+        RaisePropertyChanged(nameof(Note));
     }
 
     private ProductCostSummary _then = ProductCostSummary.Empty;
@@ -75,9 +72,9 @@ public sealed class ProductVersionRow : ReactiveObject
         get => _then;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _then, value);
-            this.RaisePropertyChanged(nameof(BaseCostThen));
-            this.RaisePropertyChanged(nameof(SuggestedPriceThen));
+            RaiseAndSetIfChanged(ref _then, value);
+            RaisePropertyChanged(nameof(BaseCostThen));
+            RaisePropertyChanged(nameof(SuggestedPriceThen));
         }
     }
 
@@ -88,9 +85,9 @@ public sealed class ProductVersionRow : ReactiveObject
         get => _today;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _today, value);
-            this.RaisePropertyChanged(nameof(BaseCostToday));
-            this.RaisePropertyChanged(nameof(SuggestedPriceToday));
+            RaiseAndSetIfChanged(ref _today, value);
+            RaisePropertyChanged(nameof(BaseCostToday));
+            RaisePropertyChanged(nameof(SuggestedPriceToday));
         }
     }
 
@@ -196,7 +193,7 @@ public interface IProductVersionHistoryHost : IScreenPartHost
 /// what Restore puts into the form, which the screen puts there (<see cref="IProductVersionHistoryHost.ApplyVersion"/>),
 /// and puts the version picked on paper (<see cref="PrintoutOf"/>).
 /// </summary>
-public sealed class ProductVersionHistory : ReactiveObject
+public sealed class ProductVersionHistory : ObservableState
 {
     private static readonly IReadOnlyList<VersionComparison> FixedChoices = [VersionComparison.Previous, VersionComparison.Current];
 
@@ -256,16 +253,16 @@ public sealed class ProductVersionHistory : ReactiveObject
 
         // Restore puts the picked version into the form, as Revert puts the saved product there, but as an undo step of
         // unsaved edits rather than by reloading: Save keeps it, and Undo takes it back.
-        RestoreCommand = ReactiveCommand.CreateFromTask(
+        RestoreCommand = new ScreenCommand(
             () => host.RunSafelyAsync(() => SelectedRow is { } row ? RestoreAsync(row) : Task.CompletedTask),
-            this.WhenAnyValue(h => h.SelectedRow).Select(row => row is not null));
+            () => SelectedRow is not null);
     }
 
     /// <summary>
     /// Restore: the picked version's recipe, packaging, costing and price into the form, as unsaved edits in one undo step
     /// (<see cref="RestoreAsync"/>).
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> RestoreCommand { get; }
+    public ScreenCommand RestoreCommand { get; }
 
     public ObservableCollection<ProductVersionRow> Rows { get; } = [];
 
@@ -278,7 +275,7 @@ public sealed class ProductVersionHistory : ReactiveObject
         get => _selectedRow;
         set
         {
-            this.RaiseAndSetIfChanged(ref _selectedRow, value);
+            RaiseAndSetIfChanged(ref _selectedRow, value);
             RefreshChanges();
         }
     }
@@ -288,7 +285,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     public IReadOnlyList<VersionComparison> CompareChoices
     {
         get => _compareChoices;
-        private set => this.RaiseAndSetIfChanged(ref _compareChoices, value);
+        private set => RaiseAndSetIfChanged(ref _compareChoices, value);
     }
 
     private VersionComparison _compareWith = VersionComparison.Previous;
@@ -306,7 +303,7 @@ public sealed class ProductVersionHistory : ReactiveObject
                 return;
             }
 
-            this.RaiseAndSetIfChanged(ref _compareWith, value);
+            RaiseAndSetIfChanged(ref _compareWith, value);
             RefreshChanges();
         }
     }
@@ -319,7 +316,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     public IReadOnlyList<string> Changes
     {
         get => _changes;
-        private set => this.RaiseAndSetIfChanged(ref _changes, value);
+        private set => RaiseAndSetIfChanged(ref _changes, value);
     }
 
     private static IReadOnlyList<string> ChangesBetween(ProductVersionContent older, ProductVersionContent newer) =>
@@ -330,7 +327,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     public string ChangesCaption
     {
         get => _changesCaption;
-        private set => this.RaiseAndSetIfChanged(ref _changesCaption, value);
+        private set => RaiseAndSetIfChanged(ref _changesCaption, value);
     }
 
     private IReadOnlyList<VersionTrendPoint> _trend = [];
@@ -340,9 +337,9 @@ public sealed class ProductVersionHistory : ReactiveObject
         get => _trend;
         private set
         {
-            this.RaiseAndSetIfChanged(ref _trend, value);
-            this.RaisePropertyChanged(nameof(IsTrendShown));
-            this.RaisePropertyChanged(nameof(IsTrendHintShown));
+            RaiseAndSetIfChanged(ref _trend, value);
+            RaisePropertyChanged(nameof(IsTrendShown));
+            RaisePropertyChanged(nameof(IsTrendHintShown));
         }
     }
 
@@ -357,7 +354,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     public bool IsEmpty
     {
         get => _isEmpty;
-        private set => this.RaiseAndSetIfChanged(ref _isEmpty, value);
+        private set => RaiseAndSetIfChanged(ref _isEmpty, value);
     }
 
     /// <summary>
@@ -509,7 +506,7 @@ public sealed class ProductVersionHistory : ReactiveObject
     {
         CompareChoices = [.. FixedChoices, .. Rows.Select(VersionComparison.With)];
         _compareWith = CompareChoices.Contains(_compareWith) ? _compareWith : VersionComparison.Previous;
-        this.RaisePropertyChanged(nameof(CompareWith));
+        RaisePropertyChanged(nameof(CompareWith));
     }
 
     private void RefreshChanges()

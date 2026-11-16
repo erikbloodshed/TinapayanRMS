@@ -1,4 +1,3 @@
-using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
@@ -10,7 +9,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// moved to the other stage or deleted since. The list's new row starts there, and the header's tag names it
 /// (ProductsViewModel.NewProductTag). Revert keeps it.
 /// </summary>
-public sealed class NewProductPlace : ReactiveObject
+public sealed class NewProductPlace : ObservableState
 {
     /// <summary>
     /// Whether the new product goes in Settings' stage rather than a folder's: started by New, not New Product Here. Such a
@@ -29,7 +28,7 @@ public sealed class NewProductPlace : ReactiveObject
     public ProductStage Stage
     {
         get => _stage;
-        private set => this.RaiseAndSetIfChanged(ref _stage, value);
+        private set => RaiseAndSetIfChanged(ref _stage, value);
     }
 
     private int? _folderId;
@@ -40,7 +39,7 @@ public sealed class NewProductPlace : ReactiveObject
     public int? FolderId
     {
         get => _folderId;
-        private set => this.RaiseAndSetIfChanged(ref _folderId, value);
+        private set => RaiseAndSetIfChanged(ref _folderId, value);
     }
 
     /// <summary>

@@ -1,13 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
-using System.Reactive.Linq;
 using DynamicData;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Pricing;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -50,7 +48,7 @@ public interface IProductRecipeHost : IFormPartHost
 /// recipe Save writes. What spans the form (the undo history, the costs, the lists loaded) it asks of the screen
 /// (<see cref="IProductRecipeHost"/>); the screen wires the section form's picks and lines to it.
 /// </summary>
-public sealed class ProductRecipe : ReactiveObject
+public sealed class ProductRecipe : ObservableState
 {
     private readonly IProductRecipeHost _host;
     private readonly ProductUsageForm _usageForm;
@@ -112,40 +110,25 @@ public sealed class ProductRecipe : ReactiveObject
         // The recipe's tabs follow its sections as they're added, taken out and moved. The Packaging tab is always there,
         // last: the packaging per piece is typed, linked and copied on the tab itself, and the bulk packaging typed there,
         // never through Add Sub-Assembly, which is for recipe sections.
-        RecipeTabs.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(HasRecipeSections));
+        RecipeTabs.CollectionChanged += (_, _) => RaisePropertyChanged(nameof(HasRecipeSections));
         RecipeTabs.Add(PackagingTab);
 
-        // The blank form shows it from the start, so its tables are there to type into before anything else happens.
-        SelectedRecipeTab = PackagingTab;
+        // The blank form shows it from the start, so its tables are there to type into before anything else happens. Picked
+        // below, once the form's own tabs are wired up.
+        _selectedRecipeTab = PackagingTab;
         UsageEdits.CollectionChanged += (_, e) =>
         {
             MirrorUsageTabs(e);
             MarkRepeatedRoles();
         };
 
-        // Which of the recipe's tables shows: the section form, the packaging, or a composite's products.
-        _isUsageFormShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
-            .CombineLatest(
-                usageForm.WhenAnyValue(f => f.IsUsageFormOpen),
-                (tab, isFormOpen) => tab is SubAssemblyRecipeTab || (tab is AddSubAssemblyRecipeTab && isFormOpen))
-            .ToProperty(this, x => x.IsUsageFormShowing);
-
-        _isPackagingShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
-            .Select(tab => tab is PackagingRecipeTab)
-            .ToProperty(this, x => x.IsPackagingShowing);
-
-        _isComponentsShowing = this.WhenAnyValue(x => x.SelectedRecipeTab)
-            .Select(tab => tab is ComponentsRecipeTab)
-            .ToProperty(this, x => x.IsComponentsShowing);
-
-        // A recipe tab picked: leaving one applies its form, and showing one opens its form. After the flags above, which
-        // follow the same tab.
-        this.WhenAnyValue(x => x.SelectedRecipeTab)
-            .Subscribe(RecipeTabPicked);
+        // A recipe tab picked: leaving one applies its form, and showing one opens its form (SelectedRecipeTab). The
+        // Packaging tab the blank form starts on, now.
+        RecipeTabPicked(SelectedRecipeTab);
 
         // The sections' commands. The packaging's are the Packaging tab's own, and a composite's products' the Products
         // table's.
-        OpenLinkedSourceCommand = ReactiveCommand.Create<ProductUsageEdit>(usage =>
+        OpenLinkedSourceCommand = ScreenCommand.Of<ProductUsageEdit>(usage =>
         {
             if (usage.LinkedOwner is { } owner)
             {
@@ -170,7 +153,7 @@ public sealed class ProductRecipe : ReactiveObject
         // that the form has no picker of its own. An item picked over an add form nothing was entered in only changes
         // its way, keeping the tab; over one already typed into it does what a second Add Sub-Assembly always did —
         // applies what's there and starts another, in the way picked.
-        AddUsageCommand = ReactiveCommand.Create<UsageFormMode>(
+        AddUsageCommand = ScreenCommand.Of<UsageFormMode>(
             mode =>
             {
                 if (SelectedRecipeTab is AddSubAssemblyRecipeTab && IsUsageFormUntouched())
@@ -193,20 +176,20 @@ public sealed class ProductRecipe : ReactiveObject
             });
 
         // A sub-assembly's tab is its form, so editing one is just showing its tab (RecipeTabShown opens the form).
-        EditUsageCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
+        EditUsageCommand = ScreenCommand.Of<ProductUsageEdit>(usage => SelectRecipeTab(TabFor(usage)));
 
         // A linked sub-assembly becomes a new section in the same role and at the same piece size, whose lines the form
         // edits; Save makes it the product's own in a product-owned role, and otherwise keeps it on the Sub-Assemblies
         // screen as a sub-assembly of its own, and links that instead.
-        MakeCopyCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: false))));
+        MakeCopyCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: false))));
 
         // The same copy, but the product's own whatever its role: Save keeps it with the product, off the
         // Sub-Assemblies screen, and the one it was linked to stays there as it is.
-        UnlinkCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
+        UnlinkCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
 
         // Anything typed into its form goes in first, so what moves is what shows; a form a rule refuses stays as it
         // is, with the message. It's still edited here until Save, which moves it and links it.
-        MoveToSubAssembliesCommand = ReactiveCommand.Create<ProductUsageEdit>(usage => host.AsUndoStep(() =>
+        MoveToSubAssembliesCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() =>
         {
             var wasEditing = ReferenceEquals(usage, usageForm.EditingUsage);
             var applied = usage;
@@ -233,12 +216,12 @@ public sealed class ProductRecipe : ReactiveObject
             }
         }));
 
-        MoveToInHouseCommand = ReactiveCommand.CreateFromTask<ProductUsageEdit>(usage => host.RunSafelyAsync(() => MoveToInHouseAsync(usage)));
+        MoveToInHouseCommand = new ScreenCommand<ProductUsageEdit>(usage => host.RunSafelyAsync(() => MoveToInHouseAsync(usage)));
 
         // Delete Sub-Assembly takes out the one whose tab is showing. Nothing to confirm: it only leaves the recipe,
         // with Save, and the sub-assembly stays on the Sub-Assemblies screen. The Packaging tab isn't a sub-assembly: its
         // lines are taken out with Remove Line, and a link with Remove Link.
-        RemoveUsageCommand = ReactiveCommand.CreateFromTask(
+        RemoveUsageCommand = new ScreenCommand(
             () => host.RunSafelyAsync(() =>
             {
                 var usage = ((SubAssemblyRecipeTab)SelectedRecipeTab!).Usage;
@@ -262,7 +245,7 @@ public sealed class ProductRecipe : ReactiveObject
                 });
                 return Task.CompletedTask;
             }),
-            this.WhenAnyValue(x => x.SelectedRecipeTab).Select(tab => tab is SubAssemblyRecipeTab));
+            () => SelectedRecipeTab is SubAssemblyRecipeTab);
     }
 
     /// <summary>Every sub-assembly, saved or not, its own and linked, in recipe order (ProductUsageEdit.RecipeOrder).</summary>
@@ -293,54 +276,58 @@ public sealed class ProductRecipe : ReactiveObject
     public RecipeTab? SelectedRecipeTab
     {
         get => _selectedRecipeTab;
-        set => this.RaiseAndSetIfChanged(ref _selectedRecipeTab, value);
+        set
+        {
+            if (RaiseAndSetIfChanged(ref _selectedRecipeTab, value))
+            {
+                RecipeTabPicked(value);
+            }
+        }
     }
 
-    private readonly ObservableAsPropertyHelper<bool> _isUsageFormShowing;
     /// <summary>
     /// The sub-assembly form shows under the Recipe Structure's tabs: on a sub-assembly's tab, and on New
     /// Sub-Assembly's while its form is open. There's one form for them all (RecipeStructure).
     /// </summary>
-    public bool IsUsageFormShowing => _isUsageFormShowing.Value;
+    public bool IsUsageFormShowing =>
+        SelectedRecipeTab is SubAssemblyRecipeTab || (SelectedRecipeTab is AddSubAssemblyRecipeTab && _usageForm.IsUsageFormOpen);
 
-    private readonly ObservableAsPropertyHelper<bool> _isPackagingShowing;
     /// <summary>The packaging shows under the Recipe Structure's tabs: on the Packaging tab.</summary>
-    public bool IsPackagingShowing => _isPackagingShowing.Value;
+    public bool IsPackagingShowing => SelectedRecipeTab is PackagingRecipeTab;
 
-    private readonly ObservableAsPropertyHelper<bool> _isComponentsShowing;
     /// <summary>A composite's Products table shows under the Recipe Structure's tabs: on its Products tab.</summary>
-    public bool IsComponentsShowing => _isComponentsShowing.Value;
+    public bool IsComponentsShowing => SelectedRecipeTab is ComponentsRecipeTab;
 
     /// <summary>Adds a sub-assembly the way the parameter says: Add Sub-Assembly's drop-down carries one item per way.</summary>
-    public ReactiveCommand<UsageFormMode, RxVoid> AddUsageCommand { get; }
+    public ScreenCommand<UsageFormMode> AddUsageCommand { get; }
 
-    public ReactiveCommand<ProductUsageEdit, RxVoid> EditUsageCommand { get; }
+    public ScreenCommand<ProductUsageEdit> EditUsageCommand { get; }
 
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MakeCopyCommand { get; }
+    public ScreenCommand<ProductUsageEdit> MakeCopyCommand { get; }
 
     /// <summary>Unlink on a linked section: it becomes a copy of the product's own, in whatever role, and the link goes with Save.</summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> UnlinkCommand { get; }
+    public ScreenCommand<ProductUsageEdit> UnlinkCommand { get; }
 
     /// <summary>
     /// Move to Sub-Assemblies on one of the product's own: Save puts it on the Sub-Assemblies screen, keeping its name and
     /// lines, and links it. Unlink the other way round.
     /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MoveToSubAssembliesCommand { get; }
+    public ScreenCommand<ProductUsageEdit> MoveToSubAssembliesCommand { get; }
 
     /// <summary>
     /// Move to In-House on one of the product's own: asks for the made ingredient's name and Made category, then Save moves
     /// the section to the Sub-Assemblies screen, links it there, and adds that ingredient, made from it.
     /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> MoveToInHouseCommand { get; }
+    public ScreenCommand<ProductUsageEdit> MoveToInHouseCommand { get; }
 
     /// <summary>Delete Sub-Assembly: takes the sub-assembly whose tab is showing out of the recipe.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveUsageCommand { get; }
+    public ScreenCommand RemoveUsageCommand { get; }
 
     /// <summary>
     /// A linked recipe section's badge clicked: opens where it's kept, the product whose own it is for a variant's link
     /// (IProductRecipeHost.OpenProduct), and otherwise the Sub-Assemblies screen, as the screen's OpenSubAssemblyCommand does.
     /// </summary>
-    public ReactiveCommand<ProductUsageEdit, RxVoid> OpenLinkedSourceCommand { get; }
+    public ScreenCommand<ProductUsageEdit> OpenLinkedSourceCommand { get; }
 
     /// <summary>
     /// Input: Move to In-House's prompt, its name box starting with the section's saved name and its picker on a Made

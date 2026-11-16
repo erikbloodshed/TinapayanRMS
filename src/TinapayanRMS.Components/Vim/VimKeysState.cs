@@ -87,9 +87,9 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsViewModel pr
     // nothing open there, just the Print screen.
     private VimCommandResult Print()
     {
-        if (((ICommand)products.PrintCommand).CanExecute(null))
+        if (products.PrintCommand.CanExecute())
         {
-            products.PrintCommand.Execute().Subscribe();
+            ((ICommand)products.PrintCommand).Execute(null);
             return new VimCommandResult();
         }
 

@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -97,7 +96,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         var requests = 0;
         using var subscription = viewModel.PrintRequests.Subscribe(_ => requests++);
 
-        await viewModel.PrintCommand.Execute();
+        await viewModel.PrintCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().Contain("Sugar", "a line with no grams can't go into the recipe");
         requests.Should().Be(0, "the Print tab doesn't open");
@@ -136,7 +135,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     public Task A_new_product_prints_as_not_saved_yet() => UiThread.RunAsync(async () =>
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.EditingName = "Pandesal";
 
         var printout = await PrintAsync(viewModel);
@@ -153,7 +152,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
         var requests = 0;
         using (viewModel.PrintRequests.Subscribe(_ => requests++))
         {
-            await viewModel.PrintCommand.Execute();
+            await viewModel.PrintCommand.ExecuteAsync();
         }
 
         viewModel.ErrorMessage.Should().BeNull();
@@ -197,7 +196,7 @@ public class ProductsViewModelPrintTests(DatabaseFixture fixture) : PersistenceT
     private async Task<ProductsViewModel> OpenAsync(int productId, Func<ProductsViewModel, bool> ready)
     {
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedProduct = viewModel.Products.Single(p => p.Id == productId);
         await Settle.UntilAsync(viewModel,
             () => viewModel.AreDetailsReady && ready(viewModel),
