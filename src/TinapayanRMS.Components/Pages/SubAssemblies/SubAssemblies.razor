@@ -140,7 +140,7 @@
     private Task InsertLineAsync() =>
         (ViewModel!.IsPackaging ? _packagingLines?.InsertLineAsync() : _lines?.InsertLineAsync()) ?? Task.CompletedTask;
 
-    protected override ReactiveCommand<RxVoid, RxVoid> LoadCommand => ViewModel!.LoadCommand;
+    protected override ScreenCommand LoadCommand => ViewModel!.LoadCommand;
 
     protected override void OnInitialized()
     {

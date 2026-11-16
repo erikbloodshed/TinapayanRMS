@@ -1,7 +1,5 @@
 using System.Reactive.Subjects;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -10,7 +8,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// sub-assembly the form shows and the made ingredients made from it, one tile each, which opens it, and what linking means
 /// for editing it. The screen says what to show as each sub-assembly is loaded.
 /// </summary>
-public sealed class SubAssemblyDependents : ReactiveObject, IDisposable
+public sealed class SubAssemblyDependents : ObservableState, IDisposable
 {
     private const string NotUsedText = "No product uses it yet. Link or copy it from a product's recipe on the Products screen.";
 
@@ -25,8 +23,8 @@ public sealed class SubAssemblyDependents : ReactiveObject, IDisposable
 
     public SubAssemblyDependents()
     {
-        OpenProductCommand = ReactiveCommand.Create<int>(_productOpenRequests.OnNext);
-        OpenRawMaterialCommand = ReactiveCommand.Create<int>(_rawMaterialOpenRequests.OnNext);
+        OpenProductCommand = ScreenCommand.Of<int>(_productOpenRequests.OnNext);
+        OpenRawMaterialCommand = ScreenCommand.Of<int>(_rawMaterialOpenRequests.OnNext);
     }
 
     private IReadOnlyList<LinkingProduct> _products = [];
@@ -34,7 +32,7 @@ public sealed class SubAssemblyDependents : ReactiveObject, IDisposable
     public IReadOnlyList<LinkingProduct> Products
     {
         get => _products;
-        private set => this.RaiseAndSetIfChanged(ref _products, value);
+        private set => RaiseAndSetIfChanged(ref _products, value);
     }
 
     private IReadOnlyList<MadeIngredientUse> _madeIngredients = [];
@@ -45,7 +43,7 @@ public sealed class SubAssemblyDependents : ReactiveObject, IDisposable
     public IReadOnlyList<MadeIngredientUse> MadeIngredients
     {
         get => _madeIngredients;
-        private set => this.RaiseAndSetIfChanged(ref _madeIngredients, value);
+        private set => RaiseAndSetIfChanged(ref _madeIngredients, value);
     }
 
     private string _text = NotUsedText;
@@ -53,14 +51,14 @@ public sealed class SubAssemblyDependents : ReactiveObject, IDisposable
     public string Text
     {
         get => _text;
-        private set => this.RaiseAndSetIfChanged(ref _text, value);
+        private set => RaiseAndSetIfChanged(ref _text, value);
     }
 
     /// <summary>A product's tile: asks for it to be opened, through <see cref="ProductOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenProductCommand { get; }
+    public ScreenCommand<int> OpenProductCommand { get; }
 
     /// <summary>A made ingredient's tile: asks for it to be opened on Raw Materials, through <see cref="RawMaterialOpenRequests"/>.</summary>
-    public ReactiveCommand<int, RxVoid> OpenRawMaterialCommand { get; }
+    public ScreenCommand<int> OpenRawMaterialCommand { get; }
 
     /// <summary>
     /// The products the tiles ask to open, by id. ScreenLinks subscribes and opens each on the Products screen. Raised as the

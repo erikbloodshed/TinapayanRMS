@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using DynamicData;
 using DynamicData.Binding;
-using ReactiveUI;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -12,7 +11,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// them as saved, keeps and puts them back for an undo step, prices them, and reads them as Save writes them. The screen
 /// keeps the undo history, the Remove Line its recipe's table shares, and says when their materials were read again.
 /// </summary>
-public sealed class SubAssemblyPackagingSet : ReactiveObject
+public sealed class SubAssemblyPackagingSet : ObservableState
 {
     private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
 
@@ -41,7 +40,7 @@ public sealed class SubAssemblyPackagingSet : ReactiveObject
     public PackagingLineRow? SelectedLine
     {
         get => _selectedLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedLine, value);
+        set => RaiseAndSetIfChanged(ref _selectedLine, value);
     }
 
     private decimal _cost;
@@ -49,7 +48,7 @@ public sealed class SubAssemblyPackagingSet : ReactiveObject
     public decimal Cost
     {
         get => _cost;
-        private set => this.RaiseAndSetIfChanged(ref _cost, value);
+        private set => RaiseAndSetIfChanged(ref _cost, value);
     }
 
     /// <summary>A packaging material as the screen last loaded it, for a line that prices itself.</summary>

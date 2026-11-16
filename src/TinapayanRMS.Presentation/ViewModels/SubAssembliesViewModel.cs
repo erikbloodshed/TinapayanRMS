@@ -1,5 +1,4 @@
 ﻿using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using FluentValidation;
 using ReactiveUI;
@@ -8,7 +7,6 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing.Versions;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.ViewModels;
@@ -82,56 +80,48 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         List = new SubAssembliesList(
             this, Roles, Ingredients, PackagingMaterials, subAssemblyRepository, roleRepository, rawMaterialCategoryRepository, roleValidator, viewStateStore);
         PackagingSet = new SubAssemblyPackagingSet(PackagingMaterials, _updates);
-        Batch = new SubAssemblyBatch(this, Ingredients, _updates, this.WhenAnyValue(x => x.IsPackaging).Select(isPackaging => !isPackaging));
+        Batch = new SubAssemblyBatch(this, Ingredients, _updates, () => !IsPackaging);
         Dependents = new SubAssemblyDependents();
 
-        // The subscriptions, in this order: two following one property run in the order they were made, and the last runs as
-        // it's made (_picks starts with nothing picked, which clears the form), so each comes after what it reads.
+        // What follows the form's fields as they change is called by their setters (SelectionChanged). What follows here
+        // runs in this order: the last runs as it's made (_picks starts with nothing picked, which clears the form), so it
+        // comes after what it reads.
 
         // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every change
         // rather than only when an undo step settles: a step closes on the way out of a field, and a Save button still
         // disabled under the cursor would swallow the very click that enabled it. The parts' own changes too: grams typed
         // into a recipe's line, or a quantity into a packaging set's, change the batch's or the set's figures, which are
         // what move while the line's cell still has the cursor.
-        this.Changed.Subscribe(_ => History.RefreshDirty());
-        Batch.Changed.Subscribe(_ => History.RefreshDirty());
-        PackagingSet.Changed.Subscribe(_ => History.RefreshDirty());
+        PropertyChanged += (_, _) => History.RefreshDirty();
+        Batch.PropertyChanged += (_, _) => History.RefreshDirty();
+        PackagingSet.PropertyChanged += (_, _) => History.RefreshDirty();
         WatchForSave(Batch.Lines);
         WatchForSave(PackagingSet.Lines);
 
-        // A sub-assembly opened, by its Save included, ends the new one's row: the form no longer shows the new one. And the
-        // list's row follows the sub-assembly picked.
-        this.WhenAnyValue(x => x.SelectedRow)
-            .Where(row => row is not null)
-            .Subscribe(_ => List.EndNewRow());
-        this.WhenAnyValue(x => x.SelectedRow)
-            .Subscribe(_ => List.SyncTreeSelection());
+        // The list's row follows the sub-assembly picked (SelectionChanged), from the start.
+        List.SyncTreeSelection();
 
         // Picking a sub-assembly loads it into the form. Only a pick does (_picks): a refresh re-points the selection at its
         // refreshed copy quietly (RepointSelection), so it leaves the form and its unsaved edits alone.
         LoadLatest(_picks, (row, _) => LoadIntoFormAsync(row));
 
-        // The commands. Making one runs nothing but its can-execute flag.
+        // The commands. Making one runs nothing.
 
         // Runs each time the page opens (ScreenBase) and after this screen's own saves. It merges rather than replaces, so
         // the screen keeps its selection and unsaved lines while picking up what changed elsewhere: a repriced ingredient,
         // a renamed role, a product that links one.
-        LoadCommand = ReactiveCommand.CreateFromTask(() => LoadSafelyAsync(LoadAsync));
+        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
 
         // A new sub-assembly replaces the one showing, so its unsaved changes are asked about first. Copy doesn't ask: the
         // copy holds them.
-        NewCommand = ReactiveCommand.CreateFromTask(() => AfterUnsavedChangesAsync(() => List.NewInList()));
-        CopyCommand = ReactiveCommand.Create(CopyForm, this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
-        NewProductCommand = ReactiveCommand.Create(
-            AskForNewProduct,
-            this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null && row.SubAssembly.Role?.IsPackaging != true));
-        DeleteCommand = ReactiveCommand.CreateFromTask(
-            () => DeleteSubAssemblyAsync(SelectedRow!),
-            this.WhenAnyValue(x => x.SelectedRow).Select(row => row is not null));
-        SaveCommand = ReactiveCommand.CreateFromTask(() => RunSaveAsync(SaveAsync), History.WhenAnyValue(h => h.IsDirty));
+        NewCommand = new ScreenCommand(() => AfterUnsavedChangesAsync(() => List.NewInList()));
+        CopyCommand = ScreenCommand.Of(CopyForm, () => SelectedRow is not null);
+        NewProductCommand = ScreenCommand.Of(AskForNewProduct, () => SelectedRow is { } row && row.SubAssembly.Role?.IsPackaging != true);
+        DeleteCommand = new ScreenCommand(() => DeleteSubAssemblyAsync(SelectedRow!), () => SelectedRow is not null);
+        SaveCommand = new ScreenCommand(() => RunSaveAsync(SaveAsync), () => History.IsDirty);
 
         // The line selected in whichever table is showing.
-        RemoveLineCommand = ReactiveCommand.Create(
+        RemoveLineCommand = ScreenCommand.Of(
             () => AsUndoStep(() =>
             {
                 if (IsPackaging)
@@ -143,11 +133,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
                     Batch.Lines.Remove(Batch.SelectedLine!);
                 }
             }),
-            this.WhenAnyValue(
-                x => x.Batch.SelectedLine,
-                x => x.PackagingSet.SelectedLine,
-                x => x.IsPackaging,
-                (line, packagingLine, isPackaging) => isPackaging ? packagingLine is not null : line is not null));
+            () => IsPackaging ? PackagingSet.SelectedLine is not null : Batch.SelectedLine is not null);
     }
 
     /// <summary>The list: the sub-assemblies by role, searched, the rows picked, their menus, moves and naming in place.</summary>
@@ -188,8 +174,23 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
             }
 
             this.RaiseAndSetIfChanged(ref _selectedRow, value);
+            SelectionChanged();
             _picks.OnNext(value);
         }
+    }
+
+    /// <summary>
+    /// What follows the sub-assembly showing, a pick's or a load's fresh copy: one opened, by its Save included, ends the new
+    /// one's row, since the form no longer shows the new one; and the list's row follows it.
+    /// </summary>
+    private void SelectionChanged()
+    {
+        if (SelectedRow is not null)
+        {
+            List.EndNewRow();
+        }
+
+        List.SyncTreeSelection();
     }
 
     private string _editingName = string.Empty;
@@ -203,11 +204,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     public SubAssemblyRole? EditingRole
     {
         get => _editingRole;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _editingRole, value);
-            this.RaisePropertyChanged(nameof(IsPackaging));
-        }
+        set => this.RaiseAndSetIfChanged(ref _editingRole, value);
     }
 
     private string _headerTitle = "New sub-assembly";
@@ -229,16 +226,16 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         set => this.RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
     }
 
-    public ReactiveCommand<RxVoid, RxVoid> LoadCommand { get; }
+    public ScreenCommand LoadCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> NewCommand { get; }
+    public ScreenCommand NewCommand { get; }
 
     /// <summary>Starts a new sub-assembly from the one the form shows (<see cref="CopyForm"/>), saved by Save.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> CopyCommand { get; }
+    public ScreenCommand CopyCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> SaveCommand { get; }
+    public ScreenCommand SaveCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> DeleteCommand { get; }
+    public ScreenCommand DeleteCommand { get; }
 
     System.Windows.Input.ICommand IRecordScreen.NewCommand => NewCommand;
 
@@ -247,13 +244,13 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     System.Windows.Input.ICommand IRecordScreen.DeleteCommand => DeleteCommand;
 
     /// <summary>Remove Line on whichever table shows: the recipe's lines, or a packaging set's.</summary>
-    public ReactiveCommand<RxVoid, RxVoid> RemoveLineCommand { get; }
+    public ScreenCommand RemoveLineCommand { get; }
 
     /// <summary>
     /// Starts a new product that links the picked sub-assembly, through <see cref="NewProductRequests"/>. Not for a packaging
     /// set, which isn't a recipe, and not while the form has changes not saved: the product links it as it's saved.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> NewProductCommand { get; }
+    public ScreenCommand NewProductCommand { get; }
 
     /// <summary>
     /// The sub-assemblies New Product asks a new product to link, by id. ScreenLinks subscribes and starts the new product on
@@ -263,7 +260,16 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
 
     /// <summary>The selection pointed at <paramref name="row"/> without it being a pick: a load's fresh copy of the one picked, Save's
     /// reload (which loads the form itself), New's empty selection. The list follows; the form isn't loaded.</summary>
-    private void RepointSelection(StandaloneSubAssemblyRow? row) => this.RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow));
+    private void RepointSelection(StandaloneSubAssemblyRow? row)
+    {
+        if (EqualityComparer<StandaloneSubAssemblyRow?>.Default.Equals(_selectedRow, row))
+        {
+            return;
+        }
+
+        this.RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow));
+        SelectionChanged();
+    }
 
     /// <summary>The roles, materials and sub-assemblies read again and merged, the form and its selection kept.</summary>
     private async Task LoadAsync()
@@ -397,7 +403,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
         var saved = await Task.Run(() => _versionedSaves.SaveSubAssemblyAsync(subAssembly.Id, name, save, DateTime.Now, CancellationToken.None));
 
         // The list picks up the new totals; then the form reloads what was saved.
-        await LoadCommand.Execute();
+        await LoadCommand.ExecuteAsync();
         var row = List.Rows.FirstOrDefault(r => r.Id == saved.Id);
         RepointSelection(row);
         await LoadIntoFormAsync(row);
@@ -546,7 +552,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
                 ClearForm();
             }
 
-            await LoadCommand.Execute();
+            await LoadCommand.ExecuteAsync();
         });
 
     protected override SubAssemblyFormSnapshot CaptureSnapshot() => new()
@@ -595,7 +601,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     protected override string UnsavedChangesName =>
         !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly";
 
-    protected override async Task SaveFormAsync() => await SaveCommand.Execute();
+    protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
@@ -607,7 +613,7 @@ public sealed class SubAssembliesViewModel : RecordFormViewModel<SubAssemblyForm
     // do to it.
     int ISubAssembliesListHost.EditingId => _editingId;
 
-    async Task ISubAssembliesListHost.LoadAsync() => await LoadCommand.Execute();
+    Task ISubAssembliesListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
         PickFromList(row.Id, () => SelectedRow = row, List.SyncTreeSelection);

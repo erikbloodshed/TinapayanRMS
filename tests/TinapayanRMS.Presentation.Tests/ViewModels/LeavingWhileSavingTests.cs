@@ -96,12 +96,12 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         await AddProductWithSubAssemblyAsync("Almond", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateSubAssembliesViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.List.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1);
         var asked = CountQuestions(viewModel);
         viewModel.EditingName = "Almond Loaf Dough";
 
-        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.Execute().ToTask());
+        var (waited, mayLeave) = await LeaveWhileSavingAsync(factory, viewModel, () => viewModel.SaveCommand.ExecuteAsync());
 
         mayLeave.Should().BeTrue("the Save went through, so there's nothing left to ask about");
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", viewModel.ErrorMessage);

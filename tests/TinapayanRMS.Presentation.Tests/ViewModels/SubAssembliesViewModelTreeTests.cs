@@ -1,10 +1,7 @@
 using System.Globalization;
-using System.Reactive.Linq;
-using System.Reactive.Threading.Tasks;
 using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using ReactiveUI;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
@@ -14,7 +11,6 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.ViewModels;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.Tests.ViewModels;
 
@@ -99,9 +95,8 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         var viewModel = await LoadedViewModelAsync();
         IListTreeScreen screen = viewModel.List;
 
-        var firstMove = viewModel.List.MoveSubAssembliesCommand.Execute([new SubAssemblyMove(halayaId, fillingRoleId)]).ToTask();
-        // As a drop would find it: the move under way (ReactiveCommand says so on its scheduler, a moment after Execute).
-        await viewModel.List.MoveSubAssembliesCommand.CanExecute.FirstAsync(offered => !offered);
+        var firstMove = viewModel.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(halayaId, fillingRoleId)]);
+        viewModel.List.MoveSubAssembliesCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
         (await screen.DropAsync([viewModel.List.SubAssemblyTree.Find(yemaId)!], viewModel.List.SubAssemblyTree.Folder(fillingRoleId)))
             .Should().BeNull("a move is still saving");
         await firstMove;
@@ -125,13 +120,13 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Should().ContainSingle();
         viewModel.List.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
 
-        await viewModel.List.UndoMoveCommand.Execute();
+        await viewModel.List.UndoMoveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         (await RoleOfAsync(halayaId)).Should().Be(doughRoleId);
         viewModel.List.SubAssemblyTree.Folder(doughRoleId)!.SubAssemblies.Should().ContainSingle();
         viewModel.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        (await viewModel.List.UndoMoveCommand.CanExecute.FirstAsync()).Should().BeFalse();
+        viewModel.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -309,11 +304,11 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.EditingName.Should().Be("Ube Halaya");
         viewModel.History.IsDirty.Should().BeTrue("Save is offered for it");
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         filling.Children.Should().Equal([row], "a load keeps it");
 
         Edit(viewModel, () => viewModel.Batch.Lines.Add(new IngredientLineRow(viewModel.Ingredients.Single(i => i.Id == ubeId), 100m)));
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.List.SubAssemblyTree.PendingSubAssembly.Should().BeNull();
@@ -337,7 +332,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.DontSave);
         var dough = viewModel.List.SubAssemblyTree.Folder(doughRoleId)!;
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         await viewModel.List.CommitTreeNameAsync("Sweet Dough");
 
         dough.Children.Select(c => c.Title).Should().Equal("Sweet Dough");
@@ -368,7 +363,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         Edit(viewModel, () => viewModel.EditingName = "Ube Halaya");
         Edit(viewModel, () => viewModel.Batch.Lines.Add(new IngredientLineRow(viewModel.Ingredients.Single(i => i.Id == ubeId), 100m)));
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Select(l => l.Title).Should().Equal("Ube Halaya");
@@ -412,7 +407,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         viewModel.List.TreeNameEdit.Hint.Should().Contain("a section in the recipes that use it");
         viewModel.List.TreeMenuFor(folder).Should().BeEmpty();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal(["Dough", "New folder"], "a load keeps it");
 
         await viewModel.List.CommitTreeNameAsync("Glaze");
@@ -552,7 +547,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
 
         var opened = new List<int>();
         using var subscription = viewModel.Dependents.RawMaterialOpenRequests.Subscribe(opened.Add);
-        await viewModel.Dependents.OpenRawMaterialCommand.Execute(made.Id);
+        await viewModel.Dependents.OpenRawMaterialCommand.ExecuteAsync(made.Id);
         opened.Should().Equal(made.Id);
     });
 
@@ -750,7 +745,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
         var asked = AnswerUnsavedChanges(viewModel, UnsavedChangesAnswer.Cancel);
         viewModel.EditingName = "Sweeter Dough";
 
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
 
         asked.Should().ContainSingle();
         viewModel.SelectedRow!.Id.Should().Be(sweetId);
@@ -820,18 +815,18 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     {
         switch (item.Command)
         {
-            case ReactiveCommand<IReadOnlyList<SubAssemblyMove>, RxVoid> move:
-                await move.Execute((IReadOnlyList<SubAssemblyMove>)item.Parameter!);
+            case ScreenCommand<IReadOnlyList<SubAssemblyMove>> move:
+                await move.ExecuteAsync((IReadOnlyList<SubAssemblyMove>)item.Parameter!);
                 break;
-            case ReactiveCommand<SubAssemblyLeafNode, RxVoid> onSubAssembly:
-                await onSubAssembly.Execute((SubAssemblyLeafNode)item.Parameter!);
+            case ScreenCommand<SubAssemblyLeafNode> onSubAssembly:
+                await onSubAssembly.ExecuteAsync((SubAssemblyLeafNode)item.Parameter!);
                 break;
-            case ReactiveCommand<SubAssemblyFolderNode, RxVoid> onFolder:
+            case ScreenCommand<SubAssemblyFolderNode?> onFolder:
                 // New Sub-Assembly, on the list's empty space, has no folder.
-                await onFolder.Execute((SubAssemblyFolderNode)item.Parameter!);
+                await onFolder.ExecuteAsync((SubAssemblyFolderNode?)item.Parameter);
                 break;
-            case ReactiveCommand<RxVoid, RxVoid> plain:
-                await plain.Execute();
+            case ScreenCommand plain:
+                await plain.ExecuteAsync();
                 break;
             default:
                 throw new InvalidOperationException($"'{item.Header}' runs nothing a test knows how to wait for.");
@@ -887,7 +882,7 @@ public class SubAssembliesViewModelTreeTests(DatabaseFixture fixture) : Persiste
     private async Task<SubAssembliesViewModel> LoadedViewModelAsync(IViewStateStore? viewStateStore = null)
     {
         var viewModel = CreateViewModel(viewStateStore);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         return viewModel;
     }
 

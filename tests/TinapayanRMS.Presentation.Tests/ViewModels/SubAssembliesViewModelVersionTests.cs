@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -41,7 +40,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
 
         var viewModel = await OpenAsync(doughId);
         viewModel.Batch.Lines.Single().Grams = 450m;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("Pandesal Dough was saved. A version was recorded for Pandesal and Pandesal x 8.");
@@ -74,7 +73,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
         var viewModel = await OpenAsync(doughId, asksAboutCosts: true);
         viewModel.ConfirmDelete.RegisterHandler(context => { asked.Add(context.Input); context.SetOutput(false); });
         viewModel.Batch.Lines.Single().Grams = 450m;
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         asked.Should().ContainSingle().Which.Should().Be(
             "Saving Pandesal Dough changes the base cost of 1 product, for one sellable unit:\n\nPandesal x 8: 2.58 → 2.32 (-0.26)\n\nSave it?");
@@ -93,7 +92,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
 
         var viewModel = await OpenAsync(doughId);
         viewModel.EditingName = "House Dough";
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.SuccessMessage.Should().Be("House Dough was saved.");
@@ -168,7 +167,7 @@ public class SubAssembliesViewModelVersionTests(DatabaseFixture fixture) : Persi
     private async Task<SubAssembliesViewModel> OpenAsync(int subAssemblyId, bool asksAboutCosts = false)
     {
         var viewModel = CreateViewModel(asksAboutCosts);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRow = viewModel.List.Rows.Single(r => r.Id == subAssemblyId);
         await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 1, () => $"lines={viewModel.Batch.Lines.Count}, error={viewModel.ErrorMessage}");
         return viewModel;

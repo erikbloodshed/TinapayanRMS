@@ -1,4 +1,3 @@
-using System.Reactive.Linq;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -69,7 +68,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
         viewModel.Batch.SelectedLine = viewModel.Batch.Lines[1];
 
-        await viewModel.RemoveLineCommand.Execute();
+        await viewModel.RemoveLineCommand.ExecuteAsync();
         viewModel.Batch.Lines.Should().ContainSingle();
 
         viewModel.TryUndo().Should().BeTrue();
@@ -85,7 +84,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 500m);
         viewModel.TryUndo().Should().BeTrue();
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
 
         await using var dbContext = CreateDbContext();
@@ -120,7 +119,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.History.CanUndo.Should().BeTrue();
 
         // A Save reloads what was saved into the form, which is where the history goes.
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.History.CanUndo.Should().BeFalse("what's saved is the new starting point");
 
@@ -129,7 +128,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
-        await viewModel.NewCommand.Execute();
+        await viewModel.NewCommand.ExecuteAsync();
         viewModel.History.CanUndo.Should().BeFalse("a new sub-assembly has no history of its own");
     });
 
@@ -140,7 +139,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
 
         // 1,000 g of flour and 200 g of sugar, 1,200 g, made 2,400 g: twice each.
         viewModel.Batch.ScaleTo = 2400m;
-        await viewModel.Batch.ScaleCommand.Execute();
+        await viewModel.Batch.ScaleCommand.ExecuteAsync();
 
         viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(2000m, 400m);
         viewModel.Batch.BatchWeight.Should().Be(2400m);
@@ -158,13 +157,13 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         viewModel.Batch.ScaleOption = viewModel.Batch.ScaleOptions.Single(o => o.Basis == BatchScaleBasis.Base);
         viewModel.Batch.ScaleTo = 500m;
 
-        await viewModel.Batch.ScaleCommand.Execute();
+        await viewModel.Batch.ScaleCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().Contain("Nothing is ticked as the base");
         viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(1000m, 200m);
 
         // The flour ticked as the base: 500 g of it, so the sugar is halved too, still 20% of the flour.
         Edit(viewModel, () => viewModel.Batch.Lines[0].IsFormulaBase = true);
-        await viewModel.Batch.ScaleCommand.Execute();
+        await viewModel.Batch.ScaleCommand.ExecuteAsync();
 
         viewModel.ErrorMessage.Should().BeNull();
         viewModel.Batch.Lines.Select(l => l.Grams).Should().Equal(500m, 100m);
@@ -177,12 +176,12 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
 
         viewModel.History.IsDirty.Should().BeFalse("the load itself isn't a change");
-        (await CanSave(viewModel)).Should().BeFalse();
+        CanSave(viewModel).Should().BeFalse();
 
         Edit(viewModel, () => viewModel.Batch.Lines[0].Grams = 500m);
 
         viewModel.History.IsDirty.Should().BeTrue();
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
     });
 
     [Test]
@@ -190,11 +189,11 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
 
         viewModel.TryUndo().Should().BeTrue();
 
-        (await CanSave(viewModel)).Should().BeFalse("the form shows what was saved again");
+        CanSave(viewModel).Should().BeFalse("the form shows what was saved again");
     });
 
     [Test]
@@ -203,10 +202,10 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
         Edit(viewModel, () => viewModel.EditingName = "Renamed");
 
-        await viewModel.SaveCommand.Execute();
+        await viewModel.SaveCommand.ExecuteAsync();
         viewModel.ErrorMessage.Should().BeNull();
 
-        (await CanSave(viewModel)).Should().BeFalse("what was written is the new starting point");
+        CanSave(viewModel).Should().BeFalse("what was written is the new starting point");
     });
 
     [Test]
@@ -214,11 +213,11 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
     {
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
 
-        await viewModel.NewCommand.Execute();
-        (await CanSave(viewModel)).Should().BeFalse("an empty form has nothing to write");
+        await viewModel.NewCommand.ExecuteAsync();
+        CanSave(viewModel).Should().BeFalse("an empty form has nothing to write");
 
         Edit(viewModel, () => viewModel.EditingName = "Sweet Dough II");
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
     });
 
     [Test]
@@ -230,10 +229,10 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         var recorder = (IUndoRecorder)viewModel;
 
         recorder.IsEditPending = true;
-        (await CanSave(viewModel)).Should().BeTrue();
+        CanSave(viewModel).Should().BeTrue();
 
         recorder.IsEditPending = false;
-        (await CanSave(viewModel)).Should().BeFalse("the cell closed with nothing typed");
+        CanSave(viewModel).Should().BeFalse("the cell closed with nothing typed");
     });
 
     [Test]
@@ -244,10 +243,10 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         await AddRoleAsync("Dough", sortOrder: 1);
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
         viewModel.EditingRole.Should().NotBeNull("a new form takes the first role once they've loaded");
-        (await CanSave(viewModel)).Should().BeFalse();
+        CanSave(viewModel).Should().BeFalse();
     });
 
     [Test]
@@ -256,14 +255,13 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
         // LoadCommand runs every time the tab is shown; it only merges in fresh data and re-points the pickers.
         var (viewModel, _) = await OpenSavedSubAssemblyAsync();
 
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
 
-        (await CanSave(viewModel)).Should().BeFalse("a refresh isn't an edit");
+        CanSave(viewModel).Should().BeFalse("a refresh isn't an edit");
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static async Task<bool> CanSave(SubAssembliesViewModel viewModel) =>
-        await viewModel.SaveCommand.CanExecute.FirstAsync();
+    private static bool CanSave(SubAssembliesViewModel viewModel) => viewModel.SaveCommand.CanExecute();
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
     private static void Edit(SubAssembliesViewModel viewModel, Action change)
@@ -286,7 +284,7 @@ public class SubAssembliesViewModelUndoTests(DatabaseFixture fixture) : Persiste
             Cancellation);
 
         var viewModel = CreateViewModel();
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         viewModel.SelectedRow = viewModel.List.Rows.Single(r => r.Id == subAssemblyId);
         await Settle.UntilAsync(viewModel, () => viewModel.Batch.Lines.Count == 2, () => $"lines={viewModel.Batch.Lines.Count}");
 

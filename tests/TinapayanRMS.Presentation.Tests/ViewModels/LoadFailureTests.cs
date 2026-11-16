@@ -125,7 +125,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateSubAssembliesViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         StandaloneSubAssemblyRow Named(string name) => viewModel.List.Rows.Single(r => r.Name == name);
 
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = Named("Almond Dough"), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1,
@@ -243,7 +243,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await AddProductWithSubAssemblyAsync("Almond", roleId, [new RecipeLine(flourId, 1000m)]);
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var viewModel = CreateSubAssembliesViewModel(factory);
-        await viewModel.LoadCommand.Execute();
+        await viewModel.LoadCommand.ExecuteAsync();
         await Settle.PickAsync(viewModel, () => viewModel.SelectedRow = viewModel.List.Rows.Single(), () => viewModel.EditingName == "Almond Dough" && viewModel.Batch.Lines.Count == 1);
         viewModel.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         viewModel.EditingName = "Almond Loaf Dough";

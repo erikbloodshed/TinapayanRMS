@@ -1,11 +1,8 @@
 using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using DynamicData;
 using DynamicData.Binding;
-using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -15,7 +12,7 @@ namespace TinapayanRMS.Presentation.ViewModels;
 /// saved, keeps and puts them back for an undo step, and prices them; Save reads them as typed. The screen keeps the undo
 /// history, the Remove Line its two tables share, and says when the ingredients were read again.
 /// </summary>
-public sealed class SubAssemblyBatch : ReactiveObject
+public sealed class SubAssemblyBatch : ObservableState
 {
     /// <summary>With nothing ticked as the base, the percentages are absolute: each line's share of the batch.</summary>
     internal const string NoBaseCaption = "Absolute %: each line's share of the batch. Tick the base — usually the flour — for baker's %.";
@@ -27,7 +24,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
     /// <param name="updates">The screen's derived updates, so an undo putting the lines back works the totals out once.</param>
     /// <param name="isShowing">Whether the recipe's table shows: not for a packaging set, which Scale has nothing to do with.</param>
-    public SubAssemblyBatch(IFormPartHost host, IReadOnlyList<RawMaterial> ingredients, DerivedUpdates updates, IObservable<bool> isShowing)
+    public SubAssemblyBatch(IFormPartHost host, IReadOnlyList<RawMaterial> ingredients, DerivedUpdates updates, Func<bool> isShowing)
     {
         _host = host;
         _ingredients = ingredients;
@@ -49,10 +46,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
             .Subscribe(_ => updates.Run(RecomputeFormulaBase));
 
         _scaleOption = ScaleOptions[0];
-        ScaleCommand = ReactiveCommand.Create(
-            Scale,
-            this.WhenAnyValue(x => x.ScaleTo, x => x.BatchWeight, (to, weight) => to is > 0m && weight > 0m)
-                .CombineLatest(isShowing, (canScale, showing) => canScale && showing));
+        ScaleCommand = ScreenCommand.Of(Scale, () => ScaleTo is > 0m && BatchWeight > 0m && isShowing());
     }
 
     /// <summary>The recipe's lines, typed straight into the table, in grams.</summary>
@@ -65,7 +59,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public IngredientLineRow? SelectedLine
     {
         get => _selectedLine;
-        set => this.RaiseAndSetIfChanged(ref _selectedLine, value);
+        set => RaiseAndSetIfChanged(ref _selectedLine, value);
     }
 
     /// <summary>The formula base as last worked out, for a line started in the add row, and for an undo step to keep.</summary>
@@ -79,7 +73,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public string FormulaBaseCaption
     {
         get => _formulaBaseCaption;
-        private set => this.RaiseAndSetIfChanged(ref _formulaBaseCaption, value);
+        private set => RaiseAndSetIfChanged(ref _formulaBaseCaption, value);
     }
 
     private string _percentHeader = IngredientLineRow.PercentHeader(0m);
@@ -87,7 +81,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public string PercentHeader
     {
         get => _percentHeader;
-        private set => this.RaiseAndSetIfChanged(ref _percentHeader, value);
+        private set => RaiseAndSetIfChanged(ref _percentHeader, value);
     }
 
     private decimal _batchWeight;
@@ -95,7 +89,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public decimal BatchWeight
     {
         get => _batchWeight;
-        private set => this.RaiseAndSetIfChanged(ref _batchWeight, value);
+        private set => RaiseAndSetIfChanged(ref _batchWeight, value);
     }
 
     private decimal _batchCost;
@@ -103,14 +97,14 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public decimal BatchCost
     {
         get => _batchCost;
-        private set => this.RaiseAndSetIfChanged(ref _batchCost, value);
+        private set => RaiseAndSetIfChanged(ref _batchCost, value);
     }
 
     private decimal _costPerGram;
     public decimal CostPerGram
     {
         get => _costPerGram;
-        private set => this.RaiseAndSetIfChanged(ref _costPerGram, value);
+        private set => RaiseAndSetIfChanged(ref _costPerGram, value);
     }
 
     private decimal? _scaleTo;
@@ -118,7 +112,7 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public decimal? ScaleTo
     {
         get => _scaleTo;
-        set => this.RaiseAndSetIfChanged(ref _scaleTo, value);
+        set => RaiseAndSetIfChanged(ref _scaleTo, value);
     }
 
     /// <summary>What Scale can make weigh <see cref="ScaleTo"/>: the whole batch, or the lines ticked as its base.</summary>
@@ -132,14 +126,14 @@ public sealed class SubAssemblyBatch : ReactiveObject
     public BatchScaleOption ScaleOption
     {
         get => _scaleOption;
-        set => this.RaiseAndSetIfChanged(ref _scaleOption, value);
+        set => RaiseAndSetIfChanged(ref _scaleOption, value);
     }
 
     /// <summary>
     /// Every line's grams by the factor that makes the batch, or its base, weigh <see cref="ScaleTo"/>, as one undo step
     /// ("make it 5 kg"). A line typed as a baker's percentage keeps it and follows the base.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> ScaleCommand { get; }
+    public ScreenCommand ScaleCommand { get; }
 
     /// <summary>No lines, and none picked: a new sub-assembly's form.</summary>
     public void Clear()

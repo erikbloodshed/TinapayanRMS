@@ -1,14 +1,13 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reactive.Linq;
-using System.Windows.Input;
+using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using ReactiveUI;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
-using RxVoid = ReactiveUI.Primitives.RxVoid;
 
 namespace TinapayanRMS.Presentation.ViewModels;
 
@@ -83,6 +82,9 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
     private readonly FolderStateWriter _closedFoldersWriter;
 
+    /// <summary>Each search typed, what the list's filter follows: the sub-assemblies whose name holds it.</summary>
+    private readonly BehaviorSubject<string> _searches = new(string.Empty);
+
     /// <summary>The roles the sub-assemblies the last move took were in before it: what Undo on the notice puts back.</summary>
     private IReadOnlyList<SubAssemblyMove> _moveUndo = [];
 
@@ -123,7 +125,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             .Subscribe();
 
         // The list's own filter, as Raw Materials and Products filter theirs: by name, ignoring case.
-        var nameFilter = this.WhenAnyValue(x => x.SearchText)
+        var nameFilter = _searches
             .Select(text => text.Trim())
             .DistinctUntilChanged()
             .Select(text => (Func<StandaloneSubAssemblyRow, bool>)(r => text.Length == 0 || r.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)));
@@ -139,28 +141,22 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         // RecordFormViewModel.WatchForSave gives.
         ((INotifyPropertyChanged)roles).PropertyChanged += (_, _) => RefreshTree();
 
-        // The search decides whether empty folders show, even when it leaves the same sub-assemblies showing. A name being
-        // typed into a row is given up first: the search may hide the row.
-        this.WhenAnyValue(x => x.SearchText)
-            .Skip(1)
-            .Subscribe(_ => CancelTreeName());
-        this.WhenAnyValue(x => x.SearchText)
-            .Subscribe(_ => RefreshTree());
+        // The search decides whether empty folders show, even when it leaves the same sub-assemblies showing (SearchText).
+        RefreshTree();
 
-        MoveSubAssembliesCommand = ReactiveCommand.CreateFromTask<IReadOnlyList<SubAssemblyMove>>(
+        MoveSubAssembliesCommand = new ScreenCommand<IReadOnlyList<SubAssemblyMove>>(
             moves => host.RunSafelyAsync(() => MoveSubAssembliesAsync(moves, isUndo: false)));
-        var hasMoveNotice = this.WhenAnyValue(x => x.MoveNotice).Select(notice => notice is not null);
-        UndoMoveCommand = ReactiveCommand.CreateFromTask(() => host.RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), hasMoveNotice);
-        NewSubAssemblyInCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
+        UndoMoveCommand = new ScreenCommand(() => host.RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), () => MoveNotice is not null);
+        NewSubAssemblyInCommand = new ScreenCommand<SubAssemblyFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
             folder is null ? null : _roles.FirstOrDefault(r => r.Id == folder.RoleId))));
-        RenameSubAssemblyCommand = ReactiveCommand.Create<SubAssemblyLeafNode>(BeginRenameSubAssembly);
-        DeleteSubAssemblyCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => host.DeleteAsync(leaf.Row));
-        MakeInHouseIngredientCommand = ReactiveCommand.CreateFromTask<SubAssemblyLeafNode>(leaf => host.RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
-        NewRoleCommand = ReactiveCommand.Create(BeginNewFolder);
-        RenameRoleCommand = ReactiveCommand.Create<SubAssemblyFolderNode>(BeginRenameRole);
-        DeleteRoleCommand = ReactiveCommand.CreateFromTask<SubAssemblyFolderNode>(DeleteRoleAsync);
-        ExpandAllCommand = ReactiveCommand.Create(SubAssemblyTree.ExpandAll);
-        CollapseAllCommand = ReactiveCommand.Create(SubAssemblyTree.CollapseAll);
+        RenameSubAssemblyCommand = ScreenCommand.Of<SubAssemblyLeafNode>(BeginRenameSubAssembly);
+        DeleteSubAssemblyCommand = new ScreenCommand<SubAssemblyLeafNode>(leaf => host.DeleteAsync(leaf.Row));
+        MakeInHouseIngredientCommand = new ScreenCommand<SubAssemblyLeafNode>(leaf => host.RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
+        NewRoleCommand = ScreenCommand.Of(BeginNewFolder);
+        RenameRoleCommand = ScreenCommand.Of<SubAssemblyFolderNode>(BeginRenameRole);
+        DeleteRoleCommand = new ScreenCommand<SubAssemblyFolderNode>(DeleteRoleAsync);
+        ExpandAllCommand = ScreenCommand.Of(SubAssemblyTree.ExpandAll);
+        CollapseAllCommand = ScreenCommand.Of(SubAssemblyTree.CollapseAll);
     }
 
     /// <summary>Every standalone sub-assembly, whatever the list is filtered to.</summary>
@@ -173,38 +169,54 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     public SubAssemblyTree SubAssemblyTree { get; }
 
     private string _searchText = string.Empty;
+    /// <summary>
+    /// What's typed into the list's search: the sub-assemblies whose name holds it show. It decides whether empty folders
+    /// show too, even when it leaves the same sub-assemblies showing, and a name being typed into a row is given up first,
+    /// since the search may hide the row.
+    /// </summary>
     public string SearchText
     {
         get => _searchText;
-        set => this.RaiseAndSetIfChanged(ref _searchText, value);
+        set
+        {
+            if (_searchText == value)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref _searchText, value);
+            _searches.OnNext(value);
+            CancelTreeName();
+            RefreshTree();
+        }
     }
 
     /// <summary>The sub-assemblies picked in the list, in the order they were picked.</summary>
     public IReadOnlyList<SubAssemblyLeafNode> SelectedTreeSubAssemblies => [.. SelectedTreeNodes.OfType<SubAssemblyLeafNode>().Where(l => !l.IsNew)];
 
     /// <summary>Gives sub-assemblies another role, saved at once: a drag in the list, or its menu's Move To.</summary>
-    public ReactiveCommand<IReadOnlyList<SubAssemblyMove>, RxVoid> MoveSubAssembliesCommand { get; }
+    public ScreenCommand<IReadOnlyList<SubAssemblyMove>> MoveSubAssembliesCommand { get; }
 
     /// <summary>Puts back the roles the last move took the sub-assemblies from (the notice bar's Undo).</summary>
-    public ReactiveCommand<RxVoid, RxVoid> UndoMoveCommand { get; }
+    public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
     /// The list's New … Here: a new sub-assembly in the folder's role. With no folder (the list's empty space), as New
     /// starts one. Like New, it adds the sub-assembly's row to the list for its name to be typed into (TreeNameEdit).
     /// </summary>
-    public ReactiveCommand<SubAssemblyFolderNode?, RxVoid> NewSubAssemblyInCommand { get; }
+    public ScreenCommand<SubAssemblyFolderNode?> NewSubAssemblyInCommand { get; }
 
     /// <summary>The list's Rename: the sub-assembly's name becomes a box to type into, in place, and the name typed is saved at once.</summary>
-    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> RenameSubAssemblyCommand { get; }
+    public ScreenCommand<SubAssemblyLeafNode> RenameSubAssemblyCommand { get; }
 
     /// <summary>The list's Delete, as the header's: asks first.</summary>
-    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> DeleteSubAssemblyCommand { get; }
+    public ScreenCommand<SubAssemblyLeafNode> DeleteSubAssemblyCommand { get; }
 
     /// <summary>
     /// Make In-House Ingredient on a recipe of the list: asks for the made ingredient's name and Made category, then adds
     /// that ingredient, made from the recipe, at once. The recipe stays as it is.
     /// </summary>
-    public ReactiveCommand<SubAssemblyLeafNode, RxVoid> MakeInHouseIngredientCommand { get; }
+    public ScreenCommand<SubAssemblyLeafNode> MakeInHouseIngredientCommand { get; }
 
     /// <summary>
     /// Input: Make In-House Ingredient's prompt (MadeIngredientPrompt), its name box starting with the sub-assembly's name. Output:
@@ -217,17 +229,17 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// The list's New Folder: a "New folder" row for its name to be typed into (TreeNameEdit), and the name typed adds a
     /// role after the others, as Settings → Roles adds one.
     /// </summary>
-    public ReactiveCommand<RxVoid, RxVoid> NewRoleCommand { get; }
+    public ScreenCommand NewRoleCommand { get; }
 
     /// <summary>The list's Rename Role, typed in place, which keeps the role's place and whether products own it.</summary>
-    public ReactiveCommand<SubAssemblyFolderNode, RxVoid> RenameRoleCommand { get; }
+    public ScreenCommand<SubAssemblyFolderNode> RenameRoleCommand { get; }
 
     /// <summary>The list's Delete Role, offered only for a role no sub-assembly in the list is in, and never the Packaging role.</summary>
-    public ReactiveCommand<SubAssemblyFolderNode, RxVoid> DeleteRoleCommand { get; }
+    public ScreenCommand<SubAssemblyFolderNode> DeleteRoleCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> ExpandAllCommand { get; }
+    public ScreenCommand ExpandAllCommand { get; }
 
-    public ReactiveCommand<RxVoid, RxVoid> CollapseAllCommand { get; }
+    public ScreenCommand CollapseAllCommand { get; }
 
     /// <summary>The sub-assemblies as a load read them, merged into the list: rows whose values haven't changed stay as they are.</summary>
     public void TakeRows(IEnumerable<StandaloneSubAssemblyRow> rows) => _rowCache.MergeFrom(rows);
@@ -340,12 +352,12 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     async Task<object?> IListTreeScreen.DropAsync(IEnumerable<object> nodes, object? target)
     {
         var moves = DropMoves(nodes, target);
-        if (moves.Count == 0 || !((ICommand)MoveSubAssembliesCommand).CanExecute(moves))
+        if (moves.Count == 0 || !MoveSubAssembliesCommand.CanExecute(moves))
         {
             return null;
         }
 
-        await MoveSubAssembliesCommand.Execute(moves);
+        await MoveSubAssembliesCommand.ExecuteAsync(moves);
         return SubAssemblyTree.Find(moves[0].SubAssemblyId);
     }
 
@@ -742,5 +754,6 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         _closedFoldersWriter.Dispose();
         SubAssemblyTree.Dispose();
         _rowCache.Dispose();
+        _searches.Dispose();
     }
 }
