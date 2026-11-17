@@ -199,10 +199,12 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
         await Settle.UntilAsync(tab, () => tab.PrintSet?.Products.Count == 4, () => $"pages: {tab.PrintSet?.Products.Count}");
         tab.PrintSet!.Title.Should().Be("Baked, No category");
 
-        // Every category unticked offers every product again, and keeps those ticked.
+        // Every category unticked offers every product again, and keeps those ticked. With products ticked it prepares the
+        // pages again (for their title), so the test waits for that: a read left running would hold up the next test's reset.
         tab.ChosenCategoryIds = [];
-        tab.ProductChoices.Should().HaveCount(5);
-        tab.ChosenProductIds.Should().HaveCount(4);
+        await Settle.UntilAsync(tab, () => tab.ProductChoices.Count == 5 && tab.ChosenProductIds.Length == 4,
+            () => $"offered: {tab.ProductChoices.Count}, ticked: {tab.ChosenProductIds.Length}");
+        tab.PrintSet!.Title.Should().Be("Selected Products", "four of the five products are ticked");
     });
 
     [Test]
