@@ -48,7 +48,10 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
 
     /// <summary>
     /// The day's automatic backup starts in the background at startup, while Settings may already be taking one or
-    /// restoring, so backups and restores take turns.
+    /// restoring, so backups and restores take turns. So do copies out (<see cref="CopyToAsync"/>): the day's backup is
+    /// copied to the second folder from the background while Settings may be copying one there, and two copies to one
+    /// file at once fought over its partial file, the loser saying the copy hadn't gone through though the other's had. A
+    /// copy in needs no turn: its name says it was copied in (BackupKind.CopiedIn), so nothing else writes that file.
     /// </summary>
     private readonly SemaphoreSlim _turn = new(1, 1);
 
@@ -101,10 +104,24 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
         return Describe(new FileInfo(path));
     }
 
-    public Task CopyToAsync(DatabaseBackup backup, string destinationPath, CancellationToken cancellationToken) =>
-        string.Equals(Path.GetFullPath(destinationPath), Path.GetFullPath(backup.Path), StringComparison.OrdinalIgnoreCase)
-            ? Task.CompletedTask   // onto itself: opening it to write would empty it before it was read
-            : CopyAsync(backup.Path, destinationPath, cancellationToken);
+    public async Task CopyToAsync(DatabaseBackup backup, string destinationPath, CancellationToken cancellationToken)
+    {
+        // Onto itself: opening it to write would empty it before it was read.
+        if (string.Equals(Path.GetFullPath(destinationPath), Path.GetFullPath(backup.Path), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await _turn.WaitAsync(cancellationToken);
+        try
+        {
+            await CopyAsync(backup.Path, destinationPath, cancellationToken);
+        }
+        finally
+        {
+            _turn.Release();
+        }
+    }
 
     public async Task<BackupHeader> InspectAsync(DatabaseBackup backup, CancellationToken cancellationToken) =>
         await ReadHeaderAsync(await TargetAsync(cancellationToken), backup.Path, cancellationToken);

@@ -34,7 +34,10 @@ public interface IDatabaseBackups
     /// <summary>Copies a backup file from elsewhere (a USB stick, another computer) into <see cref="Folder"/>, to restore it from there.</summary>
     Task<DatabaseBackup> CopyInAsync(string sourcePath, CancellationToken cancellationToken);
 
-    /// <summary>Copies a backup out of <see cref="Folder"/> to <paramref name="destinationPath"/>, replacing a file there.</summary>
+    /// <summary>
+    /// Copies a backup out of <see cref="Folder"/> to <paramref name="destinationPath"/>, replacing a file there, once a
+    /// backup, restore or other copy out under way has finished.
+    /// </summary>
     Task CopyToAsync(DatabaseBackup backup, string destinationPath, CancellationToken cancellationToken);
 
     /// <summary>What a file holds, read from the file itself; a BusinessRuleException when it isn't a full database backup.</summary>

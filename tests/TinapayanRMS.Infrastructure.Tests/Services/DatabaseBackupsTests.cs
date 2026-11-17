@@ -162,6 +162,7 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
     }
 
     [Test]
+    [SupportedOSPlatform("windows")]
     public async Task A_copy_that_doesnt_finish_leaves_the_file_it_would_replace_as_it_was()
     {
         var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
@@ -171,16 +172,67 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
             var destination = Path.Combine(stick, Path.GetFileName(backup.Path));
             await File.WriteAllTextAsync(destination, "yesterday's", Cancellation);
 
-            var cutShort = () => _backups.CopyToAsync(backup, destination, new CancellationToken(canceled: true));
+            // Cut short once it has started writing: another program has locked the backup, so the copy opens it, and its
+            // partial file beside the destination, but can't read it.
+            await using (var locked = new FileStream(backup.Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                locked.Lock(0, locked.Length);
+                var cutShort = () => _backups.CopyToAsync(backup, destination, Cancellation);
 
-            await cutShort.Should().ThrowAsync<OperationCanceledException>();
+                await cutShort.Should().ThrowAsync<IOException>();
+                locked.Unlock(0, locked.Length);
+            }
+
             (await File.ReadAllTextAsync(destination, Cancellation)).Should().Be("yesterday's");
             Directory.GetFiles(stick).Should().ContainSingle("nothing of the copy is left behind");
+
+            // Cancelled as it waits for its turn, it writes nothing at all.
+            var cancelled = () => _backups.CopyToAsync(backup, destination, new CancellationToken(canceled: true));
+
+            await cancelled.Should().ThrowAsync<OperationCanceledException>();
+            (await File.ReadAllTextAsync(destination, Cancellation)).Should().Be("yesterday's");
 
             await _backups.CopyToAsync(backup, destination, Cancellation);
 
             new FileInfo(destination).Length.Should().Be(backup.SizeBytes, "a copy that finishes replaces it");
             Directory.GetFiles(stick).Should().ContainSingle();
+        }
+        finally
+        {
+            Directory.Delete(stick, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// The day's backup is copied to the second folder from the background while Settings may be copying one there, and two
+    /// copies to one file at once fought over its partial file: so a copy takes its turn, as backups and restores do. The
+    /// backup under way here is held up by a lock until the tools' timeout stops it, so a copy that didn't wait would be
+    /// done long before it.
+    /// </summary>
+    [Test]
+    public async Task A_copy_waits_its_turn_behind_a_backup_under_way()
+    {
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+        using var backups = new DatabaseBackups(_database.CreateDbContextFactory(), _folder, toolTimeout: TimeSpan.FromSeconds(3));
+        var stick = Directory.CreateTempSubdirectory("backup-stick-").FullName;
+        try
+        {
+            var destination = Path.Combine(stick, Path.GetFileName(backup.Path));
+            await using (var holder = _database.CreateDbContext())
+            {
+                await using var holding = await holder.Database.BeginTransactionAsync(Cancellation);
+                await holder.Database.ExecuteSqlRawAsync("LOCK TABLE raw_material_categories IN ACCESS EXCLUSIVE MODE", Cancellation);
+                var heldUp = backups.BackUpAsync(BackupKind.Manual, Cancellation);
+                await UntilABackupWaitsForALockAsync(heldUp);
+
+                await backups.CopyToAsync(backup, destination, Cancellation);
+
+                heldUp.IsCompleted.Should().BeTrue("the copy waited for the backup under way to let go of its turn");
+                var stopped = () => heldUp;
+                await stopped.Should().ThrowAsync<TimeoutException>();
+            }
+
+            new FileInfo(destination).Length.Should().Be(backup.SizeBytes, "the copy went through once it had its turn");
         }
         finally
         {
@@ -462,6 +514,24 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
         }
 
         (await _backups.RecoverInterruptedRestoreAsync(Cancellation)).Should().BeFalse("with none set aside there's nothing to put back");
+    }
+
+    /// <summary>
+    /// Waits until a backup's pg_dump is held up by a lock on this test's database, its turn taken, or until
+    /// <paramref name="backUp"/> has ended without that.
+    /// </summary>
+    private async Task UntilABackupWaitsForALockAsync(Task backUp)
+    {
+        var settings = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Database = "postgres", Pooling = false };
+        await using var connection = new NpgsqlConnection(settings.ConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var command = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT FROM pg_stat_activity WHERE datname = @database AND wait_event_type = 'Lock')", connection);
+        command.Parameters.AddWithValue("database", _database.Name);
+        while (!backUp.IsCompleted && !(bool)(await command.ExecuteScalarAsync(Cancellation))!)
+        {
+            await Task.Delay(25, Cancellation);
+        }
     }
 
     /// <summary>A statement on the server's maintenance database, unpooled, as the app's own run there.</summary>
