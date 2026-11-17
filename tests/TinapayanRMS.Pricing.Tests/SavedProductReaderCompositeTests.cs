@@ -3,20 +3,19 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Pricing;
+using TinapayanRMS.Pricing.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
-using TinapayanRMS.Presentation.Tests.Fixtures;
-using TinapayanRMS.Presentation.Printing;
 
-namespace TinapayanRMS.Presentation.Tests.Products;
+namespace TinapayanRMS.Pricing.Tests;
 
 /// <summary>
 /// A saved composite read and priced (SavedProductReader), as Reports, Print and the Products screen price it: each
 /// product it holds brings its recipe cost, as its own Costing tab's Sub-assemblies figure, times its quantity; its
-/// packaging stays out; a composite inside another brings its products'.
+/// packaging stays out; a composite inside another brings its products'. How Print puts one on paper is
+/// Presentation's (SavedProductPrintoutTests there).
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.Name)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.Name)]
 public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static CostingParameters Costing() => new()
@@ -84,7 +83,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
     }
 
     [Test]
-    public Task A_composite_at_its_products_percentages_prices_at_exactly_what_they_do() => UiThread.RunAsync(async () =>
+    public async Task A_composite_at_its_products_percentages_prices_at_exactly_what_they_do()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 1), (cheeseRoll.Id, 2));
@@ -106,10 +105,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         composite.Costs.Wastage.Should().Be(single.Costs.Wastage + 2 * roll.Costs.Wastage);
         composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
         composite.Costs.SellingPrice.Should().Be(26.026m);
-    });
+    }
 
     [Test]
-    public Task A_products_packaging_stays_out_of_a_composite_and_a_composite_inside_another_brings_its_products() => UiThread.RunAsync(async () =>
+    public async Task A_products_packaging_stays_out_of_a_composite_and_a_composite_inside_another_brings_its_products()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -127,18 +126,11 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         boxed.Costs.Packaging.Should().Be(12m, "the composite's own box only");
         partied.Costs.SubAssemblies.Should().Be(22.50m, "2 boxes of 10.00 in recipe, and 2.50");
         partied.Costs.Packaging.Should().Be(0m, "the boxes' own packaging stays out too");
-
-        var printout = partied.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
-        printout.CostUnitCaption.Should().Be("Per unit");
-        printout.Sections.Should().BeEmpty();
-        printout.Components.Should().Equal(
-            new PrintedComponent("Pasalubong Box", 2, 10m, 20m),
-            new PrintedComponent("Ensaymada", 1, 2.50m, 2.50m));
-        printout.Costs.PartsTitle.Should().Be("Products (ingredients)");
-    });
+        partied.Costs.PartsTitle.Should().Be("Products (ingredients)");
+    }
 
     [Test]
-    public Task A_composites_topping_adds_to_its_recipe_cost_and_comes_with_it_into_another_composite() => UiThread.RunAsync(async () =>
+    public async Task A_composites_topping_adds_to_its_recipe_cost_and_comes_with_it_into_another_composite()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 3, isProductOwned: true);
@@ -161,14 +153,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         boxed.Costs.PartsTitle.Should().Be("Products and sub-assemblies (ingredients)");
         partied.Costs.SubAssemblies.Should().Be(42.50m, "2 boxes of 20.00 in recipe, their toppings included, and 2.50");
         partied.Costs.PartsTitle.Should().Be("Products (ingredients)");
-
-        var printout = boxed.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
-        printout.Components.Should().HaveCount(2);
-        printout.Sections.Select(s => s.Name).Should().Equal("Topping");
-    });
+    }
 
     [Test]
-    public Task What_a_product_brings_is_read_by_id_and_a_product_thats_gone_is_left_out() => UiThread.RunAsync(async () =>
+    public async Task What_a_product_brings_is_read_by_id_and_a_product_thats_gone_is_left_out()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 2), (cheeseRoll.Id, 1));
@@ -182,10 +170,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
             [ensaymada.Id] = new(2.50m, 2.00m, 0m, 0m),
             [box.Id] = new(10m, 8m, 12m, 12m),
         });
-    });
+    }
 
     [Test]
-    public Task A_composite_including_its_products_packaging_adds_it_to_its_own_and_to_a_composite_holding_it() => UiThread.RunAsync(async () =>
+    public async Task A_composite_including_its_products_packaging_adds_it_to_its_own_and_to_a_composite_holding_it()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -204,22 +192,17 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         boxed.Costs.PackagingTitle.Should().Be("Packaging (own and products')");
         boxed.Components.Select(c => c.PackagingCostAt(CostBasis.Buffered)).Should().Equal(3m, 0m);
 
-        // Printed as the Products tab shows it: a Packaging Cost column, and each line's Cost with its packaging in.
-        boxed.ToPrintout(new DateTime(2026, 9, 30, 9, 0, 0)).Components.Should().Equal(
-            new PrintedComponent("Ensaymada", 2, 2.50m, 8m, 1.50m),
-            new PrintedComponent("Cheese Roll", 1, 5m, 5m, 0m));
-
         // Labor, overhead and administrative stay percentages of the recipe alone.
         boxed.Costs.Labor.Should().Be(2.50m, "25% of 10.00, the packaging left out");
 
         // A box brings all of its packaging, its own and its products', and the loose Ensaymada its bag.
         partied.Costs.ComponentPackaging.Should().Be(31.50m, "2 boxes of 15.00, and 1.50");
         partied.Costs.OwnPackaging.Should().Be(0m);
-        partied.ToPrintout(new DateTime(2026, 9, 30, 9, 0, 0)).Costs.Packaging.Should().Be(31.50m);
-    });
+        partied.Costs.Packaging.Should().Be(31.50m);
+    }
 
     [Test]
-    public Task A_composite_including_its_products_packaging_at_their_percentages_prices_at_exactly_what_they_do() => UiThread.RunAsync(async () =>
+    public async Task A_composite_including_its_products_packaging_at_their_percentages_prices_at_exactly_what_they_do()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         await AddPackagingAsync(ensaymada.Id, "Ensaymada Bag", 1.50m);
@@ -233,10 +216,10 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         // Packaging passes straight through in both, so the products' prices, bag and all, add up to the composite's.
         composite.Costs.SellingPrice.Should().Be(single.Costs.SellingPrice + 2 * roll.Costs.SellingPrice);
         composite.Costs.Packaging.Should().Be(1.50m);
-    });
+    }
 
     [Test]
-    public Task A_composite_read_unbuffered_brings_its_products_at_their_true_costs_and_its_printout_says_so() => UiThread.RunAsync(async () =>
+    public async Task A_composite_read_unbuffered_brings_its_products_at_their_true_costs()
     {
         var (ensaymada, cheeseRoll) = await AddTwoProductsAsync();
         var box = await AddCompositeAsync("Pasalubong Box", (ensaymada.Id, 1), (cheeseRoll.Id, 2));
@@ -246,14 +229,11 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
         composite.Components.Select(c => (c.LineName, c.RecipeCostAt(CostBasis.Unbuffered), c.CostAt(CostBasis.Unbuffered))).Should().Equal(
             ("Ensaymada × 1", 2.00m, 2.00m), ("Cheese Roll × 2", 4m, 8m));
         composite.Costs.SubAssemblies.Should().Be(10m, "2.00 + 2 × 4.00, the flour at 0.04 a gram");
-
-        var printout = composite.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0));
-        printout.CostBasis.Should().Be(CostBasis.Unbuffered);
-        printout.Components!.Select(c => c.Cost).Should().Equal(2.00m, 8m);
-    });
+        composite.CostBasis.Should().Be(CostBasis.Unbuffered);
+    }
 
     [Test]
-    public Task A_product_read_unbuffered_prices_its_sections_at_their_true_costs() => UiThread.RunAsync(async () =>
+    public async Task A_product_read_unbuffered_prices_its_sections_at_their_true_costs()
     {
         var (ensaymada, _) = await AddTwoProductsAsync();
 
@@ -262,8 +242,7 @@ public class SavedProductReaderCompositeTests(DatabaseFixture fixture) : Persist
 
         buffered.Costs.SubAssemblies.Should().Be(2.50m);
         unbuffered.Costs.SubAssemblies.Should().Be(2.00m, "50 g of a 1,000 g batch of flour at 0.04 a gram");
-        unbuffered.ToPrintout(new DateTime(2026, 9, 29, 9, 0, 0)).Sections.Single().CostPerPiece.Should().Be(2.00m);
-    });
+    }
 
     private SavedProductReader CreateReader()
     {
