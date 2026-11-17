@@ -25,6 +25,45 @@ document.addEventListener("focusin", e => {
     }
 });
 
+// The pane a drag scrolls: the nearest element from `from` up that scrolls up and down and has more than it shows.
+const scrollingPane = from => {
+    for (let at = from; at && at !== document.body; at = at.parentElement) {
+        const overflow = getComputedStyle(at).overflowY;
+        if ((overflow === "auto" || overflow === "scroll") && at.scrollHeight > at.clientHeight) {
+            return at;
+        }
+    }
+    return null;
+};
+
+// A drag's scrolling, one animation frame at a time, for watchLineDrag and watchTreeDrag: with the pointer within 32
+// pixels of its pane's top or bottom (drag.pane, drag.y), the pane scrolls that way, faster the nearer the edge, and while
+// it moves, moved() tells what's under the pointer now and the next frame is asked for (drag.frame, 0 when none is).
+// currentDrag() is the drag going on.
+const dragScrolling = (currentDrag, moved) => {
+    const edge = 32;
+    const scroll = () => {
+        const drag = currentDrag();
+        drag.frame = 0;
+        const pane = drag.pane;
+        if (!pane) {
+            return;
+        }
+        const box = pane.getBoundingClientRect();
+        const step = drag.y < box.top + edge ? -Math.ceil((box.top + edge - drag.y) / 4)
+            : drag.y > box.bottom - edge ? Math.ceil((drag.y - box.bottom + edge) / 4) : 0;
+        if (step !== 0) {
+            const before = pane.scrollTop;
+            pane.scrollTop += step;
+            if (pane.scrollTop !== before) {
+                moved();
+                drag.frame = requestAnimationFrame(scroll);
+            }
+        }
+    };
+    return scroll;
+};
+
 window.tinapayan = {
     // Scrolls an element into view only if it isn't already.
     scrollIntoView(id) {
@@ -135,19 +174,10 @@ window.tinapayan = {
             return { dispose() { } };
         }
         const threshold = 4;
-        const edge = 32;
         let drag = null;
 
         const lines = () => [...table.tBodies[0].rows].filter(row => row.querySelector(":scope > td.row-header[data-drag]"));
-        const scroller = () => {
-            for (let at = table.parentElement; at && at !== document.body; at = at.parentElement) {
-                const overflow = getComputedStyle(at).overflowY;
-                if ((overflow === "auto" || overflow === "scroll") && at.scrollHeight > at.clientHeight) {
-                    return at;
-                }
-            }
-            return null;
-        };
+        const scroller = () => scrollingPane(table.parentElement);
         const unmark = () => table.querySelectorAll("tr.drop-above, tr.drop-below, tr.dragging-line")
             .forEach(row => row.classList.remove("drop-above", "drop-below", "dragging-line"));
 
@@ -181,24 +211,7 @@ window.tinapayan = {
             }
         };
 
-        const scroll = () => {
-            drag.frame = 0;
-            const pane = drag.pane;
-            if (!pane) {
-                return;
-            }
-            const box = pane.getBoundingClientRect();
-            const step = drag.y < box.top + edge ? -Math.ceil((box.top + edge - drag.y) / 4)
-                : drag.y > box.bottom - edge ? Math.ceil((drag.y - box.bottom + edge) / 4) : 0;
-            if (step !== 0) {
-                const before = pane.scrollTop;
-                pane.scrollTop += step;
-                if (pane.scrollTop !== before) {
-                    mark();
-                    drag.frame = requestAnimationFrame(scroll);
-                }
-            }
-        };
+        const scroll = dragScrolling(() => drag, mark);
 
         const end = drop => {
             if (!drag) {
@@ -324,18 +337,9 @@ window.tinapayan = {
             return { dispose() { } };
         }
         const threshold = 4;
-        const edge = 32;
         let drag = null;
 
-        const scroller = () => {
-            for (let at = tree; at && at !== document.body; at = at.parentElement) {
-                const overflow = getComputedStyle(at).overflowY;
-                if ((overflow === "auto" || overflow === "scroll") && at.scrollHeight > at.clientHeight) {
-                    return at;
-                }
-            }
-            return null;
-        };
+        const scroller = () => scrollingPane(tree);
 
         const isInside = (x, y) => {
             const box = tree.getBoundingClientRect();
@@ -407,24 +411,7 @@ window.tinapayan = {
             }
         };
 
-        const scroll = () => {
-            drag.frame = 0;
-            const pane = drag.pane;
-            if (!pane) {
-                return;
-            }
-            const box = pane.getBoundingClientRect();
-            const step = drag.y < box.top + edge ? -Math.ceil((box.top + edge - drag.y) / 4)
-                : drag.y > box.bottom - edge ? Math.ceil((drag.y - box.bottom + edge) / 4) : 0;
-            if (step !== 0) {
-                const before = pane.scrollTop;
-                pane.scrollTop += step;
-                if (pane.scrollTop !== before) {
-                    tell();
-                    drag.frame = requestAnimationFrame(scroll);
-                }
-            }
-        };
+        const scroll = dragScrolling(() => drag, tell);
 
         // The click the release makes, on the row the drag started from: swallowed before the page's own handlers see it.
         const swallowClick = () => {
