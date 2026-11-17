@@ -227,7 +227,7 @@ public class RawMaterialTreeTests
         var folder = tree.BeginNewFolder(RawMaterialCategoryType.Made);
 
         tree.PendingFolder.Should().BeSameAs(folder);
-        folder.Should().Match<RawMaterialFolderNode>(f => f.IsNewFolder && !f.IsTypeFolder && !f.IsCategory && f.Type == RawMaterialType.Ingredient);
+        folder.Should().Match<RawMaterialFolderNode>(f => f.IsNewFolder && !f.IsTypeFolder && f.CategoryId == null && f.Type == RawMaterialType.Ingredient);
         folder.Key.Should().Be("Ingredient/New");
         TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New folder");
 

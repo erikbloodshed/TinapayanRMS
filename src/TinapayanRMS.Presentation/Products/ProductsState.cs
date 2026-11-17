@@ -1033,18 +1033,6 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         _subAssemblyToStartFrom = subAssemblyId;
     }
 
-    /// <summary><see cref="StartNewProductFrom"/>, asking first about the unsaved changes of the product showing. False when the user stays on it.</summary>
-    public async Task<bool> StartNewProductFromAsync(int subAssemblyId)
-    {
-        if (!await ResolveUnsavedChangesAsync(revert: false))
-        {
-            return false;
-        }
-
-        StartNewProductFrom(subAssemblyId);
-        return true;
-    }
-
     /// <summary>
     /// A new product named after the sub-assembly, with the Link form open on it, as Add Sub-Assembly's Link an existing
     /// one would have it: its lines load, and the piece size is left to type. Like New, it replaces whatever the form

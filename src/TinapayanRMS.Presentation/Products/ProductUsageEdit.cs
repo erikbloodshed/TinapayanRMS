@@ -223,13 +223,11 @@ public sealed class ProductUsageEdit : ObservableRow
 
     public bool IsLinked => LinkedName is not null;
 
-    private readonly IReadOnlyList<SectionLine> _savedLines;
-
     /// <summary>
     /// A linked one's lines as the Sub-Assemblies screen has them, which Save compares against: the same as
     /// <see cref="Lines"/> until they're changed here.
     /// </summary>
-    public IReadOnlyList<SectionLine> SavedLines => _savedLines;
+    private readonly IReadOnlyList<SectionLine> _savedLines;
 
     /// <summary>
     /// A linked one's lines were changed in this product: Save writes them to the sub-assembly where it's kept, and every
@@ -266,21 +264,8 @@ public sealed class ProductUsageEdit : ObservableRow
     /// <summary>Pieces one batch makes. Expected to differ across a product's sub-assemblies.</summary>
     public decimal Yield => Figures.Yield;
 
-    public bool IsYieldAuthored => AuthoredField == UsageAuthoredField.Yield;
-
-    public bool IsWeightAuthored => AuthoredField == UsageAuthoredField.WeightPerPiece;
-
     /// <summary>What one piece costs at <paramref name="basis"/>; 0 while the batch weighs nothing or has no piece size.</summary>
     public decimal CostPerPieceAt(CostBasis basis) => Figures.CostPerPieceAt(basis);
-
-    /// <summary>E.g. "1,700 g batch".</summary>
-    public string BatchText => $"{TotalWeight:#,0.##} g batch";
-
-    /// <summary>E.g. "28.33 pcs".</summary>
-    public string YieldText => $"{Yield:#,0.##} pcs";
-
-    /// <summary>E.g. "60 g per piece".</summary>
-    public string WeightText => $"{WeightPerPiece:#,0.##} g per piece";
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SectionLine> lines) =>

@@ -271,9 +271,6 @@
         StateHasChanged();
     }
 
-    /// <summary>Whether Insert Line can put a line in: the table takes typing.</summary>
-    public bool CanInsertLine => !ReadOnly && NewItem is not null;
-
     private async Task OnKeyDownAsync(KeyboardEventArgs e)
     {
         if (InsertKey && e.Key == "Insert" && !e.CtrlKey && !e.AltKey && !e.ShiftKey && !e.MetaKey)

@@ -30,12 +30,10 @@ public class DerivedUpdatesTests
             _updates.Run(Batch);
             _updates.Run(Costs);
             _updates.Run(Batch);
-            _updates.IsBatching.Should().BeTrue();
             _ran.Should().BeEmpty("nothing runs from a half-written form");
         });
 
         _ran.Should().Equal("batch", "costs");
-        _updates.IsBatching.Should().BeFalse();
     }
 
     [Test]

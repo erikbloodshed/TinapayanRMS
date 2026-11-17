@@ -76,9 +76,6 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
 
     public override bool IsTypeFolder => CategoryId is null && !IsNewFolder;
 
-    /// <summary>A category's folder, which can be renamed or deleted (the category with it), as a type's can't.</summary>
-    public bool IsCategory => CategoryId is not null;
-
     /// <summary>
     /// What names the folder from one run to the next, for remembering whether it was left closed: "Ingredient",
     /// "Packaging", and "Ingredient/12" for category 12.

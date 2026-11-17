@@ -11,9 +11,6 @@ public sealed class DerivedUpdates
     private readonly List<Action> _pending = [];
     private int _openBatches;
 
-    /// <summary>Whether a batch is open, its updates waiting for it to end.</summary>
-    public bool IsBatching => _openBatches > 0;
-
     /// <summary>
     /// Runs <paramref name="update"/> now, or once when the open batch ends. The same update asked for again in a batch
     /// runs once: give it as the same method each time, so the two compare equal.

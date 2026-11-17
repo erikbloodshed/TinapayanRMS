@@ -11,7 +11,4 @@ public interface ICostRecalculator
 }
 
 /// <summary>How many made or linked ingredients had a stored cost that was wrong and was put right.</summary>
-public sealed record CostRecalculation(int IngredientsCorrected)
-{
-    public bool CorrectedAny => IngredientsCorrected > 0;
-}
+public sealed record CostRecalculation(int IngredientsCorrected);
