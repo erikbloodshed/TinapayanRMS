@@ -12,9 +12,9 @@
     Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
     about 3 minutes for Presentation.Tests.
 
-    Hot reload runs the tests again in the same test session, which TUnit 1.81.16 doesn't expect: without
-    tests/HotReloadReruns.cs, every run after the first also reported a failure of TUnit's own ("ChannelClosedException:
-    The channel has been closed."). If that comes back after a TUnit upgrade, see that file.
+    Hot reload runs the tests again in the same test session, which TUnit (1.81.16 to 1.86.0 so far) doesn't expect:
+    without tests/HotReloadReruns.cs, every run after the first also reported a failure of TUnit's own
+    ("ChannelClosedException: The channel has been closed."). If that comes back after a TUnit upgrade, see that file.
 
     While it runs it holds the project's build and uses its test databases, so stop it before building or testing that
     project another way: a second run would reset the databases under this one's tests. Test-Changed.ps1 refuses to run
