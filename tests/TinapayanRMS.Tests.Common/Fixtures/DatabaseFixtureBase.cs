@@ -59,19 +59,34 @@ public abstract class DatabaseFixtureBase : IAsyncInitializer, IAsyncDisposable
     {
         await using (var dbContext = new TinapayanRMSDbContext(TinapayanRMSDbContext.CreateOptions(ConnectionString)))
         {
+            // A database an earlier run left is emptied before it's migrated. The reset between tests empties data_upgrades
+            // with the rest (the upgrade tests need it empty), so migrating makes every data upgrade again, and on the rows
+            // the last run's last test left one can fail: a folder already named as one ProductFoldersUpgrade files a
+            // category's products in breaks its unique index, and every test of the collection with it (2026-11-18). On empty
+            // tables they make nothing, as on CI's new databases.
+            if (await dbContext.Database.CanConnectAsync() && (await dbContext.Database.GetAppliedMigrationsAsync()).Any())
+            {
+                await using var leftover = new NpgsqlConnection(ConnectionString);
+                await leftover.OpenAsync();
+                await (await CreateRespawnerAsync(leftover)).ResetAsync(leftover);
+            }
+
             await dbContext.Database.MigrateAsync();
         }
 
         await using var connection = new NpgsqlConnection(ConnectionString);
         await connection.OpenAsync();
+        _respawner = await CreateRespawnerAsync(connection);
+    }
 
-        _respawner = await Respawner.CreateAsync(connection, new RespawnerOptions
+    /// <summary>What empties every table of the database as it now is, but the migrations' history.</summary>
+    private static Task<Respawner> CreateRespawnerAsync(NpgsqlConnection connection) =>
+        Respawner.CreateAsync(connection, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = ["public"],
             TablesToIgnore = [.. TablesExcludedFromReset.Select(t => new Respawn.Graph.Table(t))],
         });
-    }
 
     /// <summary>
     /// Empties every table. Respawn truncates them, which waits for the locks any read still running holds, such as a
