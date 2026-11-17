@@ -11,18 +11,22 @@ namespace TinapayanRMS.Presentation.Products;
 /// The Products screen's costing and costs (through ProductsState.Costing; the Costing tab and the header draw them):
 /// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
 /// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
-/// materials have risen past their buffered cost. The screen supplies the recipe's figures and says when
-/// (<see cref="Recompute"/>); it also keeps the undo history, which these percentages are part of. What Save compares
-/// against, the costing as loaded, a new product's defaults, and the shop's wastage, VAT and price rounding every product is
-/// priced with are here.
+/// materials have risen past their buffered cost. The figures are worked out as they're read, from what the screen gathers
+/// (<see cref="ProductCostingInputs"/>), and again once anything they come from changed: the percentages and the cost basis
+/// here say so themselves, and the screen says so for the rest (<see cref="InputsChanged"/>). The screen also keeps the undo
+/// history, which these percentages are part of. What Save compares against, the costing as loaded, a new product's
+/// defaults, and the shop's wastage, VAT and price rounding every product is priced with are here.
 /// </summary>
 public sealed class ProductCosting : ObservableState
 {
-    // What the captions name, as the last Recompute was given it: the quantity a sellable unit holds, whether it's a
-    // composite, and whether a composite takes its products' packaging too.
-    private int _quantityRequired = 1;
-    private bool _isComposite;
-    private bool _includesComponentPackaging;
+    /// <summary>The costs and what goes with them, worked out when read (<see cref="Figures"/>).</summary>
+    private readonly Derived<CostingFigures> _figures;
+
+    /// <param name="inputs">What the screen has for the costs now: its recipe, packaging, fields and materials.</param>
+    public ProductCosting(Func<ProductCostingInputs> inputs)
+    {
+        _figures = new Derived<CostingFigures>(() => Figures(inputs()), RaiseFiguresChanged);
+    }
 
     /// <summary>What a new product's costing starts with (Settings → Costing Defaults), as of the screen's last load.</summary>
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _defaults;
@@ -70,14 +74,12 @@ public sealed class ProductCosting : ObservableState
         set => SetPercent(ref _editingMarginPercent, value);
     }
 
-    /// <summary>A costing percentage changed: the product is costed again (the screen's RecomputeCosts).</summary>
-    public event Action? PercentEdited;
-
+    /// <summary>A costing percentage set: the product is costed again as it's next read.</summary>
     private void SetPercent(ref decimal field, decimal value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
         if (RaiseAndSetIfChanged(ref field, value, propertyName))
         {
-            PercentEdited?.Invoke();
+            _figures.Invalidate();
         }
     }
 
@@ -117,22 +119,29 @@ public sealed class ProductCosting : ObservableState
         set => EditingMarginPercent = TypedAmount.PercentFor(ref _typedMarkupAmount, value, Costs.BaseCost, EditingMarginPercent);
     }
 
-    private ProductCostSummary _costs = ProductCostSummary.Empty;
-    /// <summary>The cost summary, as <see cref="Recompute"/> last worked it out.</summary>
-    public ProductCostSummary Costs
-    {
-        get => _costs;
-        private set
-        {
-            RaiseAndSetIfChanged(ref _costs, value);
+    /// <summary>The cost summary, worked out from the screen's recipe and fields and the percentages here as they stand.</summary>
+    public ProductCostSummary Costs => _figures.Value.Costs;
 
-            // The metrics' value boxes read the amounts from here: a percentage, the recipe or another metric changed.
-            RaisePropertyChanged(nameof(EditingLaborAmount));
-            RaisePropertyChanged(nameof(EditingOverheadAmount));
-            RaisePropertyChanged(nameof(EditingAdministrativeAmount));
-            RaisePropertyChanged(nameof(EditingMarkupAmount));
-        }
+    /// <summary>
+    /// The figures may have changed: whatever shows them reads them again. The metrics' value boxes read their amounts from
+    /// the costs, and the captions the quantity and kind they're for.
+    /// </summary>
+    private void RaiseFiguresChanged()
+    {
+        RaisePropertyChanged(nameof(Costs));
+        RaisePropertyChanged(nameof(EditingLaborAmount));
+        RaisePropertyChanged(nameof(EditingOverheadAmount));
+        RaisePropertyChanged(nameof(EditingAdministrativeAmount));
+        RaisePropertyChanged(nameof(EditingMarkupAmount));
+        RaisePropertyChanged(nameof(BelowCostText));
+        RaisePropertyChanged(nameof(CostUnitCaption));
+        RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
+        RaisePropertyChanged(nameof(MaterialCostTooltip));
+        RaisePropertyChanged(nameof(MetricBaseTooltip));
     }
+
+    /// <summary>Something the costs are worked out from changed (the recipe, the packaging, the product's fields): they're worked out again when next read.</summary>
+    internal void InputsChanged() => _figures.Invalidate();
 
     private CostBasis _costBasis;
     /// <summary>
@@ -146,7 +155,11 @@ public sealed class ProductCosting : ObservableState
         get => _costBasis;
         internal set
         {
-            RaiseAndSetIfChanged(ref _costBasis, value);
+            if (RaiseAndSetIfChanged(ref _costBasis, value))
+            {
+                _figures.Invalidate();
+            }
+
             RaisePropertyChanged(nameof(IsUnbuffered));
             RaisePropertyChanged(nameof(CostBasisButtonLabel));
             RaisePropertyChanged(nameof(CostBasisButtonTooltip));
@@ -168,34 +181,29 @@ public sealed class ProductCosting : ObservableState
         ? "Shows every cost on this screen, and prints it, at the materials' buffered costs again. Nothing is saved."
         : "Shows every cost on this screen, and prints it, at the materials' true costs, without their cost buffers. Nothing is saved.";
 
-    private string? _belowCostText;
     /// <summary>
     /// The header's "Priced below cost" badge's tooltip, naming the purchased materials in the recipe and packaging that
     /// prices have risen past their fixed buffered cost (RawMaterialRules.IsBufferedBelowCost): the product is priced at the
     /// buffered costs, so under what those cost. Null, and no badge, while none is. A composite's products' materials aren't
     /// in the form, so they aren't counted; each says so when it's opened.
     /// </summary>
-    public string? BelowCostText
-    {
-        get => _belowCostText;
-        private set => RaiseAndSetIfChanged(ref _belowCostText, value);
-    }
+    public string? BelowCostText => _figures.Value.BelowCostText;
 
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
-    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(_quantityRequired, _isComposite);
+    public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(_figures.Value.QuantityRequired, _figures.Value.IsComposite);
 
     /// <summary>The Costing Summary's price row: "Suggested Selling Price per Piece", or "… per Unit of 8 Pieces".</summary>
     public string SuggestedSellingPriceLabel => ProductPrintout.SuggestedSellingPriceLabelFor(CostUnitCaption);
 
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
-    public string MaterialCostTooltip => (_isComposite
+    public string MaterialCostTooltip => (_figures.Value.IsComposite
         ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
-            + (_includesComponentPackaging ? " and theirs" : string.Empty)
+            + (_figures.Value.IncludesComponentPackaging ? " and theirs" : string.Empty)
         : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
         + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
 
     /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
-    public string MetricBaseTooltip => _isComposite
+    public string MetricBaseTooltip => _figures.Value.IsComposite
         ? $"Of the recipe (ingredients) cost of the products it holds and its own sub-assemblies, packaging not included. {CostUnitCaption}."
         : $"Of the sub-assemblies (ingredients) cost, packaging not included. {CostUnitCaption}.";
 
@@ -240,42 +248,35 @@ public sealed class ProductCosting : ObservableState
 
     /// <summary>
     /// Takes up the defaults as the screen's load read them: the percentages for the next new product, and the shop's
-    /// wastage, VAT and price rounding, which every product is priced with. True when those shop figures changed, so the
-    /// product showing is priced again.
+    /// wastage, VAT and price rounding, which every product is priced with: when those change, the product showing is
+    /// priced again, as it's next read.
     /// </summary>
-    public bool SetDefaults(CostingDefaults defaults)
+    public void SetDefaults(CostingDefaults defaults)
     {
         _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent);
         if (_wastagePercent == defaults.WastagePercent && _vatPercent == defaults.VatPercent && _priceRoundingStep == defaults.PriceRoundingStep)
         {
-            return false;
+            return;
         }
 
         _wastagePercent = defaults.WastagePercent;
         _vatPercent = defaults.VatPercent;
         _priceRoundingStep = defaults.PriceRoundingStep;
-        return true;
+        _figures.Invalidate();
     }
 
     /// <summary>
-    /// The cost summary from <paramref name="recipe"/>, the recipe and product figures as the screen has them now, with
-    /// the shop's VAT and price rounding and <paramref name="categoryWastagePercent"/>, the product's category's own
-    /// wastage, or the shop's when it sets none, at the percentages as typed here; the captions follow the quantity and
-    /// kind the figures are for (in <paramref name="recipe"/>), and the below-cost warning <paramref name="materials"/>,
-    /// every material the recipe and packaging use.
+    /// The cost summary from the screen's recipe and product figures as they are now (<see cref="ProductCostingInputs.Recipe"/>),
+    /// with the shop's VAT and price rounding and the product's category's own wastage, or the shop's when it sets none, at
+    /// the percentages as typed here; the captions follow the quantity and kind the figures are for, and the below-cost
+    /// warning every material the recipe and packaging use.
     /// </summary>
-    public void Recompute(ProductCostInputs recipe, decimal? categoryWastagePercent, IEnumerable<RawMaterial> materials)
+    private CostingFigures Figures(ProductCostingInputs inputs)
     {
-        var captionsChange = recipe.QuantityRequired != _quantityRequired
-            || recipe.IsComposite != _isComposite
-            || (recipe.ComponentPackaging is not null) != _includesComponentPackaging;
-        _quantityRequired = recipe.QuantityRequired;
-        _isComposite = recipe.IsComposite;
-        _includesComponentPackaging = recipe.ComponentPackaging is not null;
-
-        Costs = new ProductCostSummary(recipe with
+        var recipe = inputs.Recipe;
+        var costs = new ProductCostSummary(recipe with
         {
-            WastagePercent = categoryWastagePercent ?? _wastagePercent,
+            WastagePercent = inputs.CategoryWastagePercent ?? _wastagePercent,
             VatPercent = _vatPercent,
             PriceRoundingStep = _priceRoundingStep,
             LaborPercent = EditingLaborPercent,
@@ -286,13 +287,13 @@ public sealed class ProductCosting : ObservableState
 
         List<string> belowCost =
         [
-            .. materials
+            .. inputs.Materials
                 .Where(RawMaterialRules.IsBufferedBelowCost)
                 .Select(m => m.Name)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .Order(StringComparer.CurrentCultureIgnoreCase),
         ];
-        BelowCostText = belowCost.Count switch
+        var belowCostText = belowCost.Count switch
         {
             0 => null,
             1 => $"Prices have risen past the buffered cost of {belowCost[0]}, so this product is priced under what it costs. "
@@ -301,12 +302,19 @@ public sealed class ProductCosting : ObservableState
                 + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
         };
 
-        if (captionsChange)
-        {
-            RaisePropertyChanged(nameof(CostUnitCaption));
-            RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
-            RaisePropertyChanged(nameof(MaterialCostTooltip));
-            RaisePropertyChanged(nameof(MetricBaseTooltip));
-        }
+        return new CostingFigures(costs, belowCostText, recipe.QuantityRequired, recipe.IsComposite, recipe.ComponentPackaging is not null);
     }
+
+    /// <summary>
+    /// The costs worked out together, with what the captions name: the quantity a sellable unit holds, whether it's a
+    /// composite, and whether a composite takes its products' packaging too.
+    /// </summary>
+    private sealed record CostingFigures(
+        ProductCostSummary Costs, string? BelowCostText, int QuantityRequired, bool IsComposite, bool IncludesComponentPackaging);
 }
+
+/// <summary>
+/// What the screen has for a product's costs as they stand (ProductsState.CostingInputs): the recipe's and product's
+/// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
+/// </summary>
+public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials);

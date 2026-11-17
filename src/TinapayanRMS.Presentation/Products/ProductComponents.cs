@@ -108,7 +108,7 @@ public sealed class ProductComponents : ObservableState
 
     /// <summary>
     /// The products' packaging joined the composite's own, or left it: its costs follow, and the header's Material Cost
-    /// tooltip says so too, as the Costing part works the captions out again with the costs (ProductCosting.Recompute).
+    /// tooltip says so too, as the Costing part works the captions out with the costs (ProductCosting.Costs).
     /// </summary>
     public event Action? IncludesPackagingChanged;
 
@@ -140,17 +140,15 @@ public sealed class ProductComponents : ObservableState
     /// </summary>
     public ObservableCollection<Product> ComponentProductOptions { get; } = [];
 
-    private decimal _componentsCost;
     /// <summary>
     /// What the products bring together, for the Products tab: the sum of its Cost column, so the composite's recipe cost
-    /// less its own sections, and its products' packaging too while it includes theirs. The screen sets it as it works out
-    /// the costs.
+    /// less its own sections, and its products' packaging too while it includes theirs. A line still being filled in
+    /// brings nothing yet.
     /// </summary>
-    public decimal ComponentsCost
-    {
-        get => _componentsCost;
-        internal set => RaiseAndSetIfChanged(ref _componentsCost, value);
-    }
+    public decimal ComponentsCost => CostedLines.Sum(r => r.Cost);
+
+    /// <summary>The lines that bring a cost: a product picked, and a quantity of it.</summary>
+    internal IEnumerable<ProductComponentRow> CostedLines => ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0);
 
     /// <summary>The products the lines hold, each once.</summary>
     public IReadOnlyList<int> ProductIds => [.. ComponentEdits.Select(r => r.ComponentProductId).OfType<int>().Distinct()];

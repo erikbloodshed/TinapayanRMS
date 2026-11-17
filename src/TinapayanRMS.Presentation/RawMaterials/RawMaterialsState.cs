@@ -176,12 +176,11 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         PurchaseCost.PropertyChanged += (_, _) => History.RefreshDirty();
         Units.PropertyChanged += (_, _) => History.RefreshDirty();
         Recipe.PropertyChanged += (_, _) => History.RefreshDirty();
-        WatchForSave(Units.Rows);
-        WatchForSave(PurchaseCost.BrandPriceRows);
-        WatchForSave(Recipe.AddIns);
-
-        // The header's saved costs; a new Per unit, or a unit's multiplier, updates them through UpdatePurchaseCostTexts.
-        PurchaseCost.UpdateHeaderCostTexts();
+        RowChanges.OnAnyChange(Units.Rows, History.RefreshDirty);
+        RowChanges.OnAnyChange(PurchaseCost.BrandPriceRows, History.RefreshDirty);
+        // The add-ins on the rows themselves, any change to one: grams typed while the cell has the cursor. Not through the
+        // totals they move, which are only worked out as they're read.
+        RowChanges.OnAnyChange(Recipe.AddIns, History.RefreshDirty);
 
         // The summary follows the brand table as it's typed into: the dearest brand, as Save will cost the material.
         PurchaseCost.BrandPriceRows.ToObservableChangeSet()
@@ -190,10 +189,9 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             .AutoRefresh(r => r.Brand)
             .Subscribe(_ => _updates.Run(PurchaseCost.UpdatePurchaseCostTexts));
 
-        // Each brand's buffered price follows the fixed buffered cost (the Cost Setup's BufferEdited), and a made
-        // ingredient's totals the Weight Loss % box, which moves the yield the cost is spread over.
+        // Each brand's buffered price follows the fixed buffered cost (the Cost Setup's BufferEdited). A made ingredient's
+        // totals are worked out as they're read (Recipe.BomTotalWeight).
         _updates.Run(PurchaseCost.BufferedCostChanged);
-        _updates.Run(Recipe.RecomputeBomTotals);
 
         // The Recipe card shows the picked sub-assembly's lines as it's saved: read again on every pick, an undo's included,
         // and on every load, which re-points the pick at the refreshed copy, so a change made on the Sub-Assemblies screen
@@ -229,15 +227,11 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             .Where(_ => !Units.IsSyncing && !IsBusyApplying)
             .Subscribe(_ => RepriceBrands());
 
-        // An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name; and the header's
-        // Total Weight and Total Cost follow the add-ins as they're typed into: Cost covers both an ingredient picked and
-        // grams typed, as the sub-assembly form's batch totals do.
+        // An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name. The header's Total
+        // Weight and Total Cost follow the add-ins themselves, as they're read.
         Recipe.AddIns.ToObservableChangeSet()
             .AutoRefresh(l => l.IngredientId)
             .Subscribe(_ => _updates.Run(Recipe.ResolveAddIns));
-        Recipe.AddIns.ToObservableChangeSet()
-            .AutoRefresh(l => l.Cost)
-            .Subscribe(_ => _updates.Run(Recipe.RecomputeBomTotals));
 
         // The commands. Making one runs nothing.
 
@@ -367,7 +361,6 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             SelectedDetailsTab = 0;
         }
 
-        PurchaseCost.UpdateHeaderCostTexts();
         History.RefreshDirty();
     }
 
@@ -502,7 +495,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         {
             if (RaiseAndSetIfChanged(ref _editingWeightLossPercent, value))
             {
-                _updates.Run(Recipe.RecomputeBomTotals);
+                Recipe.BomInputsChanged();
             }
         }
     }
@@ -746,9 +739,8 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
             Recipe.ResolveAddIns();
 
-            // Resolve points each row at the refreshed component, so this is what carries a component repriced
-            // elsewhere into the header's totals: the change set above is suppressed while a refresh applies.
-            Recipe.RecomputeBomTotals();
+            // Resolve points each row at the refreshed component; the totals are worked out again from them as they're read.
+            Recipe.BomInputsChanged();
 
             SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
 
@@ -1116,7 +1108,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         PurchaseCost.BufferedCostUnit = PurchaseCost.DearestBrandUnit();
         _detailMaterialId = material?.Id;
         AreDetailsReady = true;
-        Recipe.RecomputeBomTotals();
+        Recipe.BomInputsChanged();
 
         // Everything the form holds is now the material's own, so this is what Save's dirty check measures
         // against. Taken here rather than where the form is filled in: the units, brand prices and BOM land a
@@ -1366,7 +1358,6 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         // as it was doesn't, and without this the box would keep the percent from before the undo (undoing a
         // Basis pick, say).
         PurchaseCost.RaiseTypedCostBufferPercent();
-        Recipe.RecomputeBomTotals();
     }
 
     /// <summary>
@@ -1439,8 +1430,6 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     decimal IRawMaterialPurchaseCostHost.BomTotalCost => Recipe.BomTotalCost;
 
     decimal? IRawMaterialRecipeHost.WeightLossPercent => EditingWeightLossPercent;
-
-    void IRawMaterialRecipeHost.BomTotalsChanged() => PurchaseCost.UpdateHeaderCostTexts();
 
     void IRawMaterialPriceLogHost.PricesDeleted() => UpdateCanChangeBaseUnit();
 

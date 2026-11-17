@@ -364,17 +364,22 @@ public class UndoHistoryTests
     [Test]
     public void IsDirty_tells_the_Save_button_when_it_changes()
     {
+        // The button reads IsDirty each time it's drawn, and is told when what it read may be out of date: IsDirty is
+        // worked out as it's read (a Derived), so it has nothing to tell before its first read.
         var form = new Form();
         form.History.MarkClean();
         List<string> raised = [];
         form.History.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
 
+        form.History.IsDirty.Should().BeFalse();
         form.Change("one");
         raised.Should().Contain(nameof(UndoHistory<string>.IsDirty));
+        form.History.IsDirty.Should().BeTrue();
 
         raised.Clear();
         form.Change("");
         raised.Should().Contain(nameof(UndoHistory<string>.IsDirty));
+        form.History.IsDirty.Should().BeFalse();
     }
 
     [Test]

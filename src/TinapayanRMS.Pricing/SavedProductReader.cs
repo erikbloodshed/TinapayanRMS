@@ -349,8 +349,8 @@ public sealed class SavedProductReader(
 
     /// <summary>
     /// <paramref name="detail"/> as the screen shows it: each section with the ingredients and role it was read with,
-    /// and the costing from the saved costing, the product's quantity per unit and its current price, as RecomputeCosts
-    /// works it out from the form. A composite's recipe cost is its products', then its own sections'; its packaging is its
+    /// and the costing from the saved costing, the product's quantity per unit and its current price, as the Products
+    /// screen works it out from the form (ProductsState.CostingInputs). A composite's recipe cost is its products', then its own sections'; its packaging is its
     /// own, and its products' too when it includes theirs.
     /// </summary>
     public static SavedProduct Build(Product product, ProductDetail detail) => Build(product, detail, CostBasis.Buffered);

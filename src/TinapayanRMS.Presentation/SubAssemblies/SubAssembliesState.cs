@@ -89,14 +89,14 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
         // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every change
         // rather than only when an undo step settles: a step closes on the way out of a field, and a Save button still
-        // disabled under the cursor would swallow the very click that enabled it. The parts' own changes too: grams typed
-        // into a recipe's line, or a quantity into a packaging set's, change the batch's or the set's figures, which are
-        // what move while the line's cell still has the cursor.
+        // disabled under the cursor would swallow the very click that enabled it. The lines too, any change to one: grams
+        // typed into a recipe's line, or a quantity into a packaging set's, while the line's cell still has the cursor.
+        // Watched on the rows themselves, not through the figures they move: those are only worked out as they're read.
         PropertyChanged += (_, _) => History.RefreshDirty();
         Batch.PropertyChanged += (_, _) => History.RefreshDirty();
         PackagingSet.PropertyChanged += (_, _) => History.RefreshDirty();
-        WatchForSave(Batch.Lines);
-        WatchForSave(PackagingSet.Lines);
+        RowChanges.OnAnyChange(Batch.Lines, History.RefreshDirty);
+        RowChanges.OnAnyChange(PackagingSet.Lines, History.RefreshDirty);
 
         // The list's row follows the sub-assembly picked (SelectionChanged), from the start.
         List.SyncTreeSelection();
@@ -301,8 +301,6 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
             Batch.ResolveLines();
             PackagingSet.ResolveRows();
-            Batch.RecomputeTotals();
-            PackagingSet.RecomputeCost();
 
             SelectedRow = List.Rows.FirstOrDefault(r => r.Id == selectedId);
             if (_editingId > 0)
@@ -559,8 +557,8 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     /// <summary>
     /// Puts the form back as <paramref name="snapshot"/> had it. The lines are rebuilt rather than written into —
-    /// IngredientLineRow's setters drop a typed percentage — and the one recompute runs at the end, outside the
-    /// guard, so the totals and the formula base are worked out once from the form that was put back.
+    /// IngredientLineRow's setters drop a typed percentage — and the lines are pointed at their ingredients and the formula
+    /// base applied once, at the end, from the form that was put back.
     /// </summary>
     protected override void RestoreSnapshot(SubAssemblyFormSnapshot snapshot, SubAssemblyFormSnapshot? settledThen)
     {
@@ -583,11 +581,10 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         }));
 
         // Once more, in this order, from the form put back: an undo that leaves a table as it was asks for none of these.
+        // The figures need nothing: they're worked out from the lines as they're next read.
         Batch.ResolveLines();
         PackagingSet.ResolveRows();
         Batch.RecomputeFormulaBase();
-        Batch.RecomputeTotals();
-        PackagingSet.RecomputeCost();
     }
 
     protected override string UnsavedChangesName =>

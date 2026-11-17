@@ -134,6 +134,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         ILogger logger)
         : base(logger)
     {
+        // First, as the parts below read its cost basis. Its costs are worked out from the parts only as they're read.
+        Costing = new ProductCosting(CostingInputs);
         _categoryPicker = new CategoryPicker<ProductCategory>(
             () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
@@ -277,7 +279,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     public ProductRecipe Recipe { get; }
 
     /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
-    public ProductCosting Costing { get; } = new();
+    public ProductCosting Costing { get; }
 
     /// <summary>
     /// The Recipe Structure's Packaging tab, which every product has: the packaging lines for each piece, typed in or what
@@ -449,7 +451,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         {
             if (RaiseAndSetIfChanged(ref _editingQuantityRequired, value))
             {
-                _updates.Run(RecomputeCosts);
+                InvalidateCosts();
             }
         }
     }
@@ -463,7 +465,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         {
             if (RaiseAndSetIfChanged(ref _editingCurrentPrice, value))
             {
-                _updates.Run(RecomputeCosts);
+                InvalidateCosts();
             }
         }
     }
@@ -488,7 +490,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         {
             if (RaiseAndSetIfChanged(ref _editingCategory, value))
             {
-                _updates.Run(RecomputeCosts);
+                InvalidateCosts();
             }
         }
     }
@@ -741,13 +743,14 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
                 nameof(ProductComponentRow.PackagingCost)))
             .Subscribe(_ => _updates.Run(ComponentsEdited));
 
-        // The costing percentages, and a composite's products' packaging joining its own or leaving it. The form's price,
-        // quantity and category too, through their setters.
-        Costing.PercentEdited += () => _updates.Run(RecomputeCosts);
-        ComponentsTable.IncludesPackagingChanged += () => _updates.Run(RecomputeCosts);
+        // A composite's products' packaging joining its own or leaving it. The costing percentages say so themselves, and
+        // the form's price, quantity and category through their setters.
+        ComponentsTable.IncludesPackagingChanged += InvalidateCosts;
 
-        // Once now, from the blank form, as everything above it follows.
-        _updates.Run(RecomputeCosts);
+        // Broadly besides: any change to a packaging or a composite's table is something the costs may be worked out from.
+        RowChanges.OnAnyChange(Packaging.LineEdits, InvalidateCosts);
+        RowChanges.OnAnyChange(Packaging.BulkEdits, InvalidateCosts);
+        RowChanges.OnAnyChange(ComponentsTable.ComponentEdits, InvalidateCosts);
     }
 
     /// <summary>Save offers itself whenever the form holds something the saved product doesn't.</summary>
@@ -763,11 +766,15 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         ComponentsTable.PropertyChanged += (_, _) => History.RefreshDirty();
         UsageForm.PropertyChanged += (_, _) => History.RefreshDirty();
         WatchForSave(Recipe.UsageEdits);
-        WatchForSave(Packaging.LineEdits);
-        WatchForSave(Packaging.BulkEdits);
-        WatchForSave(ComponentsTable.ComponentEdits);
-        WatchForSave(UsageForm.FormLines);
-        WatchForSave(UsageForm.FormAddIns);
+
+        // The tables typed into, on their rows themselves: a quantity or grams typed while the cell has the cursor. Not
+        // through the figures they move (the costs, the section form's), which raise nothing until they've been read.
+        // Marking the dirty check stale is cheap, so a pass through every row costs one comparison, when Save is drawn.
+        RowChanges.OnAnyChange(Packaging.LineEdits, History.RefreshDirty);
+        RowChanges.OnAnyChange(Packaging.BulkEdits, History.RefreshDirty);
+        RowChanges.OnAnyChange(ComponentsTable.ComponentEdits, History.RefreshDirty);
+        RowChanges.OnAnyChange(UsageForm.FormLines, History.RefreshDirty);
+        RowChanges.OnAnyChange(UsageForm.FormAddIns, History.RefreshDirty);
         ((INotifyPropertyChanged)Recipe.RecipeTabs).PropertyChanged += (_, _) => Recipe.RebaseSettledForm();
     }
 
@@ -860,7 +867,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
 
             UsageForm.Recompute();
-            RecomputeCosts();
+            InvalidateCosts();
         });
 
         if (reloadDetails && SelectedProduct is { } reloaded && reloaded.Id == detailProductId)
@@ -1169,7 +1176,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         ComponentsTable.Clear();
         Costing.Load(null);
         Recipe.RefreshLinkableOptions();
-        RecomputeCosts();
+        InvalidateCosts();
 
         // A picked product's sub-assemblies are on their way, and pick the tab when they arrive; a blank form opens on its
         // first tab, a composite's on its Products, whatever showed before.
@@ -1232,7 +1239,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         Costing.Load(detail.Costing);
         Recipe.RefreshLinkableOptions();
         RefreshComponentOptions();
-        RecomputeCosts();
+        InvalidateCosts();
         History.MarkClean();
 
         // Read and priced all the same, so it can be put right here; Save refuses it until one product is taken out of another.
@@ -1402,7 +1409,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     {
         Packaging.ResolveRows();
         Packaging.RaiseCostsChanged();
-        RecomputeCosts();
+        InvalidateCosts();
     }
 
     /// <summary>
@@ -1413,7 +1420,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     {
         ComponentsTable.ResolveRows();
         ComponentsTable.ReadMissingCosts();
-        RecomputeCosts();
+        InvalidateCosts();
     }
 
     /// <summary>
@@ -1492,13 +1499,10 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     private void RefreshCostingDefaults(CostingDefaults defaults)
     {
         var untouchedNewProduct = _editingId == 0 && Costing.ShowsDefaults;
-        var shopFiguresChanged = Costing.SetDefaults(defaults);
-        if (shopFiguresChanged)
-        {
-            // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing
-            // tab follows at once.
-            RecomputeCosts();
-        }
+
+        // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing tab
+        // follows them (SetDefaults).
+        Costing.SetDefaults(defaults);
         NewProductPlace.TakeDefault(defaults.NewProductStage, formIsNew: _editingId == 0);
         if (untouchedNewProduct)
         {
@@ -1523,26 +1527,27 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         Packaging.Reprice();
         ComponentsTable.Reprice();
 
-        RecomputeCosts();
+        InvalidateCosts();
         UsageForm.Recompute();
         VersionHistory.Reprice(Costing.CostBasis);
     }
 
     /// <summary>
-    /// The cost summary, its captions and the below-cost warning (ProductCosting.Recompute), from the recipe and packaging
-    /// as they are now, the product's fields and the costing.
+    /// Something the costs are worked out from changed (the recipe, the packaging, a composite's products, the product's
+    /// price, quantity or category): the Costing tab and the header work them out again as they're next read.
     /// </summary>
-    private void RecomputeCosts()
+    private void InvalidateCosts() => Costing.InputsChanged();
+
+    /// <summary>
+    /// What the costs are worked out from, as the form has it now (ProductCosting.Costs reads it): the recipe and packaging,
+    /// the product's fields, and every material they use, for the below-cost warning.
+    /// </summary>
+    private ProductCostingInputs CostingInputs()
     {
         // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
         // line still being filled in brings nothing yet), then its own sections, each per whole composite.
-        List<ProductComponentRow> lines = IsEditingComposite
-            ? [.. ComponentsTable.ComponentEdits.Where(r => r.Product is not null && r.Quantity > 0)]
-            : [];
+        List<ProductComponentRow> lines = IsEditingComposite ? [.. ComponentsTable.CostedLines] : [];
         List<(string Name, decimal Cost)> components = [.. lines.Select(r => (r.LineName, r.RecipeCostTotal))];
-
-        // The Products table's figure adds up its Cost column: the products' packaging is in it while the box is ticked.
-        ComponentsTable.ComponentsCost = lines.Sum(r => r.Cost);
 
         // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
         // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
@@ -1550,7 +1555,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
         var usages = Recipe.UsageEdits;
-        Costing.Recompute(
+        return new ProductCostingInputs(
             new ProductCostInputs
             {
                 Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(Costing.CostBasis)))],
@@ -1562,8 +1567,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
                 HasOwnSections = IsEditingComposite && usages.Count > 0,
             },
             EditingCategory?.WastagePercent,
-            usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>()));
+            [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
+                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())]);
     }
 
     /// <summary>
@@ -1771,7 +1776,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             EditingCloneName = snapshot.CloneName;
             _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
             RaisePropertyChanged(nameof(EditingCategory));
-            _updates.Run(RecomputeCosts);
+            InvalidateCosts();
 
             // 3. Costing.
             Costing.Percentages = snapshot.Costing;
@@ -1794,7 +1799,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         //    back its BaseWeight and BatchWeight.
         UsageForm.RaiseKindChanged();
         Recipe.FormLinesChanged();
-        RecomputeCosts();
+        InvalidateCosts();
 
         // 9. What Save measures the form against goes back to where it was when the step was taken, for the form and
         //    tabs only (WithFormOf): the step being undone may have opened another section's form (Make a Copy, Unlink),
@@ -1898,7 +1903,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     int? IProductRecipeHost.DetailProductId => _detailProductId;
 
-    void IProductRecipeHost.RecomputeCosts() => RecomputeCosts();
+    void IProductRecipeHost.InvalidateCosts() => InvalidateCosts();
 
     void IProductRecipeHost.OpenProduct(int productId) => OpenRecord(productId);
 
@@ -1909,7 +1914,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
-    void IProductPackagingHost.RecomputeCosts() => RecomputeCosts();
+    void IProductPackagingHost.InvalidateCosts() => InvalidateCosts();
 
     // What the composite's Products table asks of the screen (IProductComponentsHost): its cost basis, the Costing part's.
     CostBasis IProductComponentsHost.CostBasis => Costing.CostBasis;

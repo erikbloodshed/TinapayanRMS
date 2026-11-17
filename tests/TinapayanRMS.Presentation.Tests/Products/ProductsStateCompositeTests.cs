@@ -281,6 +281,27 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
     });
 
     [Test]
+    public Task A_quantity_typed_offers_Save_while_its_cell_has_the_cursor_and_typed_back_it_doesnt() => UiThread.RunAsync(async () =>
+    {
+        var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
+        var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
+        var state = await CreateLoadedStateAsync();
+        state.Pick(state.Products.Single(p => p.Id == boxId));
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
+        CanSave(state).Should().BeFalse();
+
+        // Save follows the row itself, not the costs it moves: those are only worked out as they're read, and nothing
+        // here reads them, as nothing does between two keys typed before the screen is drawn again.
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        state.ComponentsTable.ComponentEdits[0].Quantity = 7;
+        CanSave(state).Should().BeTrue("the quantity is still being typed, and Save's click is what ends it");
+        state.ComponentsTable.ComponentEdits[0].Quantity = 6;
+        CanSave(state).Should().BeFalse("typed back, the lines are as saved");
+        recorder.EndUndoStep();
+    });
+
+    [Test]
     public Task A_lines_edit_is_one_undo_step_and_Save_is_offered_only_while_the_lines_differ() => UiThread.RunAsync(async () =>
     {
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();

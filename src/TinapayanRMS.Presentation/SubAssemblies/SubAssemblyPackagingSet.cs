@@ -16,19 +16,21 @@ public sealed class SubAssemblyPackagingSet : ObservableState
 {
     private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
 
+    /// <summary>What one set costs, worked out from the lines when read.</summary>
+    private readonly Derived<decimal> _cost;
+
     /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a line prices itself from.</param>
-    /// <param name="updates">The screen's derived updates, so an undo putting the lines back works the cost out once.</param>
+    /// <param name="updates">The screen's derived updates, so an undo putting the lines back points them at their materials once.</param>
     public SubAssemblyPackagingSet(IReadOnlyList<RawMaterial> packagingMaterials, DerivedUpdates updates)
     {
         _packagingMaterials = packagingMaterials;
 
-        // A line prices itself as its material is picked, and the set's cost follows.
+        // A line prices itself as its material is picked, and the set's cost follows any change to the lines.
         Lines.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .Subscribe(_ => updates.Run(ResolveRows));
-        Lines.ToObservableChangeSet()
-            .AutoRefresh(l => l.CostPerUnit)
-            .Subscribe(_ => updates.Run(RecomputeCost));
+        _cost = new Derived<decimal>(() => Lines.Sum(l => l.CostPerUnit), () => RaisePropertyChanged(nameof(Cost)));
+        RowChanges.OnAnyChange(Lines, _cost.Invalidate);
     }
 
     /// <summary>The set's lines, typed straight into the table: how much of each material one set takes.</summary>
@@ -44,22 +46,14 @@ public sealed class SubAssemblyPackagingSet : ObservableState
         set => RaiseAndSetIfChanged(ref _selectedLine, value);
     }
 
-    private decimal _cost;
     /// <summary>What one packaging set costs, at its materials' buffered costs: a linking product's packaging per piece.</summary>
-    public decimal Cost
-    {
-        get => _cost;
-        private set => RaiseAndSetIfChanged(ref _cost, value);
-    }
+    public decimal Cost => _cost.Value;
 
     /// <summary>A packaging material as the screen last loaded it, for a line that prices itself.</summary>
     private RawMaterial? FindMaterial(int id) => _packagingMaterials.FirstOrDefault(m => m.Id == id);
 
     /// <summary>The lines price themselves as their material is picked, at the materials as the screen last read them.</summary>
     public void ResolveRows() => PackagingLineRow.Resolve(Lines, _packagingMaterials.ToDictionary(m => m.Id));
-
-    /// <summary>The set's cost follows its lines.</summary>
-    public void RecomputeCost() => Cost = Lines.Sum(l => l.CostPerUnit);
 
     /// <summary>No lines, and none picked: a new sub-assembly's form.</summary>
     public void Clear()

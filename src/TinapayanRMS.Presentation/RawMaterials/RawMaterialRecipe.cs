@@ -19,9 +19,6 @@ public interface IRawMaterialRecipeHost : IFormPartHost
 
     /// <summary>The form's name, which a half-filled add-in's message names.</summary>
     string EditingName { get; }
-
-    /// <summary>The batch's totals changed: the header's costs, which a made ingredient's buffered cost is worked out from, follow.</summary>
-    void BomTotalsChanged();
 }
 
 /// <summary>
@@ -43,6 +40,12 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     /// <summary>The add-ins as last loaded, so Save only sends them when they were changed.</summary>
     private List<(int IngredientId, decimal Grams)> _savedAddIns = [];
 
+    /// <summary>The batch's totals, worked out from the form when read (<see cref="BomTotals"/>).</summary>
+    private readonly Derived<(decimal Weight, decimal Cost)> _bomTotals;
+
+    /// <summary>The totals as last worked out from the material's own details, which show while another's are on their way.</summary>
+    private (decimal Weight, decimal Cost) _heldBomTotals;
+
     /// <param name="host">The screen, whose Weight Loss % the totals are less, and whose header follows them.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
     public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients, ISubAssemblyLineRepository subAssemblyLineRepository)
@@ -55,6 +58,15 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
         CancelChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = false);
         OpenSubAssemblyCommand = ScreenCommand.Of(() => _subAssemblyOpenRequests.OnNext(SubAssembly!.Id), () => SubAssembly is not null);
         RemoveAddInCommand = ScreenCommand.Of(() => host.AsUndoStep(() => AddIns.Remove(SelectedAddIn!)), () => SelectedAddIn is not null);
+
+        // The totals follow any change to either table; the screen says when the Weight Loss % or the details change.
+        _bomTotals = new Derived<(decimal Weight, decimal Cost)>(BomTotals, () =>
+        {
+            RaisePropertyChanged(nameof(BomTotalWeight));
+            RaisePropertyChanged(nameof(BomTotalCost));
+        });
+        RowChanges.OnAnyChange(Lines, _bomTotals.Invalidate);
+        RowChanges.OnAnyChange(AddIns, _bomTotals.Invalidate);
     }
 
     /// <summary>
@@ -164,22 +176,14 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     /// The batch's yield as the form has it, the sub-assembly's grams and the add-ins' less the weight loss, so it follows the
     /// pick, the Add-Ins table and the Weight Loss % box as they change. 0 with no sub-assembly picked.
     /// </summary>
-    public decimal BomTotalWeight
-    {
-        get;
-        private set => RaiseAndSetIfChanged(ref field, value);
-    }
+    public decimal BomTotalWeight => _bomTotals.Value.Weight;
 
     /// <summary>
     /// What the batch costs at its components' buffered costs: the sum of both tables' Cost columns, the recipe's and the
     /// add-ins'. BomTotalCost ÷ BomTotalWeight is the buffered cost per gram Save stores, since a made ingredient adds no
     /// buffer of its own, which is why the header shows the two beside Buffered Cost per g.
     /// </summary>
-    public decimal BomTotalCost
-    {
-        get;
-        private set => RaiseAndSetIfChanged(ref field, value);
-    }
+    public decimal BomTotalCost => _bomTotals.Value.Cost;
 
     /// <summary>The sub-assemblies as a load read them, packaging sets left out, merged into the picker's list.</summary>
     public void TakeOptions(IEnumerable<SubAssembly> subAssemblies) =>
@@ -198,24 +202,29 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
 
         Lines.Clear();
         Lines.AddRange(lines.Select(l => new IngredientLineRow(_ingredients.FirstOrDefault(m => m.Id == l.IngredientId) ?? l.Ingredient!, l.Grams)));
-        RecomputeBomTotals();
     }
 
     /// <summary>An ingredient picked in the Add-Ins table is pointed at the screen's copy of it, for its name.</summary>
     public void ResolveAddIns() => IngredientLineRow.Resolve(AddIns, _ingredients.ToDictionary(m => m.Id));
 
     /// <summary>
+    /// Something the totals are worked out from changed that isn't a row (the Weight Loss %, the details arriving, a load's
+    /// fresh ingredients): they're worked out again as they're next read. The rows' own changes say so themselves.
+    /// </summary>
+    public void BomInputsChanged() => _bomTotals.Invalidate();
+
+    /// <summary>
     /// The batch's totals, worked out from the FORM: the picked sub-assembly's lines, the Add-Ins rows and the Weight Loss %
     /// box. The yield comes from IngredientBomRules.CalculateCost, the same formula IngredientCostPropagator saves with, so the
     /// totals and the stored cost can't drift apart, and the cost is the sum of the rows' own Cost — both tables' Cost
-    /// columns, at the ingredients' buffered costs. A row with no ingredient picked counts for neither. Left alone until the
-    /// details are the material's (AreDetailsReady), since a pick loads the form before the grids.
+    /// columns, at the ingredients' buffered costs. A row with no ingredient picked counts for neither. Held at what they last
+    /// were until the details are the material's (AreDetailsReady), since a pick loads the form before the grids.
     /// </summary>
-    public void RecomputeBomTotals()
+    private (decimal Weight, decimal Cost) BomTotals()
     {
         if (!_host.AreDetailsReady)
         {
-            return;
+            return _heldBomTotals;
         }
 
         List<IngredientLineRow> rows = [.. Lines, .. AddIns];
@@ -225,9 +234,8 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
                 .Select(l => (Grams: l.Grams ?? 0m, ComponentCostPerGram: l.Ingredient!.BufferedCostPerBaseUnit))],
             _host.WeightLossPercent ?? 0m);
 
-        BomTotalWeight = outputGrams;
-        BomTotalCost = rows.Sum(l => l.Cost);
-        _host.BomTotalsChanged();
+        _heldBomTotals = (outputGrams, rows.Sum(l => l.Cost));
+        return _heldBomTotals;
     }
 
     /// <summary>The material's add-ins as saved (a BOM's add-in lines), in place of the table's, and what Save compares them against.</summary>

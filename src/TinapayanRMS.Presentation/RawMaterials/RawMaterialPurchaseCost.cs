@@ -313,27 +313,25 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
 
     /// <summary>
     /// The header's saved cost in the Per unit (BufferedCostUnit): "0.0372" a gram, to 4 decimals, or "930.00" a bag, to 2;
-    /// "—" for a material not saved yet.
+    /// "—" for a material not saved yet. The header's costs are worked out as they're read, in the Per unit: to 4 decimals
+    /// on the base unit, whose costs are fractions of a centavo, and to the centavo on any other.
     /// </summary>
-    public string CurrentCostText
-    {
-        get;
-        private set => RaiseAndSetIfChanged(ref field, value);
-    } = "—";
+    public string CurrentCostText =>
+        _host.SelectedRawMaterial is { } material ? FormatInBufferedCostUnit(material.CostPerBaseUnit) : "—";
 
-    /// <summary>The header's saved buffered cost, as CurrentCostText: "0.0391" a gram, "976.50" a bag, or "—" for a material not saved yet.</summary>
-    public string BufferedCostText
-    {
-        get;
-        private set => RaiseAndSetIfChanged(ref field, value);
-    } = "—";
+    /// <summary>
+    /// The header's buffered cost, as CurrentCostText: "0.0391" a gram, "976.50" a bag, or "—" for a material not saved
+    /// yet. A made ingredient's follows the form's BOM instead of the saved row, so the Total Cost and Total Weight tiles
+    /// beside it always divide out to it as the table is typed into; Save then stores the same figure. Every other material
+    /// shows what was last saved.
+    /// </summary>
+    public string BufferedCostText =>
+        _host.IsEditingMade
+            ? FormatInBufferedCostUnit(_host.BomTotalWeight > 0 ? _host.BomTotalCost / _host.BomTotalWeight : 0m)
+            : _host.SelectedRawMaterial is { } saved ? FormatInBufferedCostUnit(saved.BufferedCostPerBaseUnit) : "—";
 
     /// <summary>The unit the header's costs are in, for their labels: the Per unit's abbreviation, e.g. "g" or "bag".</summary>
-    public string HeaderCostUnitText
-    {
-        get;
-        private set => RaiseAndSetIfChanged(ref field, value);
-    } = "g";
+    public string HeaderCostUnitText => BufferedCostUnit?.Abbreviation ?? _host.BaseUnitAbbreviation;
 
     /// <summary>How many base units BufferedCostUnit holds: 1 for the base unit.</summary>
     private decimal BufferedCostUnitSize() =>
@@ -389,23 +387,6 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
         {
             row.Refresh();
         }
-    }
-
-    /// <summary>
-    /// The header's saved costs in the Per unit: to 4 decimals on the base unit, whose costs are fractions of a centavo,
-    /// and to the centavo on any other.
-    /// </summary>
-    public void UpdateHeaderCostTexts()
-    {
-        HeaderCostUnitText = BufferedCostUnit?.Abbreviation ?? _host.BaseUnitAbbreviation;
-        CurrentCostText = _host.SelectedRawMaterial is { } material ? FormatInBufferedCostUnit(material.CostPerBaseUnit) : "—";
-
-        // A made ingredient's buffered cost follows the form's BOM instead of the saved row, so
-        // the Total Cost and Total Weight tiles beside it always divide out to it as the table
-        // is typed into; Save then stores the same figure. Every other material shows what was last saved.
-        BufferedCostText = _host.IsEditingMade
-            ? FormatInBufferedCostUnit(_host.BomTotalWeight > 0 ? _host.BomTotalCost / _host.BomTotalWeight : 0m)
-            : _host.SelectedRawMaterial is { } saved ? FormatInBufferedCostUnit(saved.BufferedCostPerBaseUnit) : "—";
     }
 
     /// <summary>
@@ -545,7 +526,6 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
         RebuildBufferedCostUnitOptions();
         RebuildCostFromOptions();
         RaisePropertyChanged(nameof(EditingBufferedCostInUnit));
-        UpdateHeaderCostTexts();
 
         var priced = BrandPriceRows.Where(r => r.CostPerBaseUnit is not null).ToList();
         if (CostBrandIndex(priced) is not { } dearest)

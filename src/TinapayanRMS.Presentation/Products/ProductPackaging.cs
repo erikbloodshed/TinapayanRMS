@@ -32,8 +32,8 @@ public interface IProductPackagingHost : IScreenPartHost, IUndoRecorder
     /// <summary>Every product but the one showing, whose packaging Copy offers.</summary>
     IEnumerable<Product> OtherProducts { get; }
 
-    /// <summary>The product's costs worked out again, after a change to the packaging made in one go.</summary>
-    void RecomputeCosts();
+    /// <summary>The packaging changed in one go: the product's costs are worked out again as they're next read.</summary>
+    void InvalidateCosts();
 }
 
 /// <summary>
@@ -97,7 +97,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
                 SelectedLineEdit = null;
                 LineEdits.Clear();
                 ShowLink(null);
-                host.RecomputeCosts();
+                host.InvalidateCosts();
             }),
             () => IsPackagingLinked);
 
@@ -446,7 +446,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
             EndPickingSource();
             ShowLines(rows);
             ShowLink(linking ? target : null);
-            _host.RecomputeCosts();
+            _host.InvalidateCosts();
         });
     }
 

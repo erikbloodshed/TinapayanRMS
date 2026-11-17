@@ -29,8 +29,8 @@ public interface IProductRecipeHost : IFormPartHost
     /// <summary>The product's name as typed, which a section saved from it is named after.</summary>
     string EditingName { get; }
 
-    /// <summary>The product's costs worked out again, from the recipe as it now is.</summary>
-    void RecomputeCosts();
+    /// <summary>The recipe changed: the product's costs are worked out again, from it as it now is, as they're next read.</summary>
+    void InvalidateCosts();
 
     /// <summary>Opens a product on this screen, as another screen's link would (a variant's linked section's owner).</summary>
     void OpenProduct(int productId);
@@ -193,7 +193,7 @@ public sealed class ProductRecipe : ObservableState
 
             var moving = applied.Released();
             ReplaceInRecipeOrder(applied, moving);
-            host.RecomputeCosts();
+            host.InvalidateCosts();
             if (wasEditing)
             {
                 OpenUsageForm(moving);
@@ -225,7 +225,7 @@ public sealed class ProductRecipe : ObservableState
 
                     UsageEdits.Remove(usage);
                     RefreshLinkableOptions();
-                    host.RecomputeCosts();
+                    host.InvalidateCosts();
                 });
                 return Task.CompletedTask;
             }),
@@ -947,7 +947,7 @@ public sealed class ProductRecipe : ObservableState
 
             var moving = applied.MovedToInHouse(made);
             ReplaceInRecipeOrder(applied, moving);
-            _host.RecomputeCosts();
+            _host.InvalidateCosts();
             if (wasEditing)
             {
                 OpenUsageForm(moving);
@@ -1047,7 +1047,7 @@ public sealed class ProductRecipe : ObservableState
 
         CloseUsageForm();
         RefreshLinkableOptions();
-        _host.RecomputeCosts();
+        _host.InvalidateCosts();
         return usage;
     }
 
@@ -1302,7 +1302,7 @@ public sealed class ProductRecipe : ObservableState
 
         ReplaceInRecipeOrder(old, replacement);
         RefreshLinkableOptions();
-        _host.RecomputeCosts();
+        _host.InvalidateCosts();
 
         // Its tab is its form, so the form opens again on what took its place.
         if (wasEditing)

@@ -87,19 +87,26 @@ public sealed class UndoHistory<TSnapshot>(
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
-    private bool _isDirty;
+    /// <summary>
+    /// The answer to <see cref="IsDirty"/>, worked out when read (a <see cref="Derived{T}"/>): the form captured and
+    /// compared with the settled one once per read after a change, however many changes came in between. Made on first
+    /// use, as a field's initializer can't reach this class's own members.
+    /// </summary>
+    private Derived<bool>? _dirty;
+
+    private Derived<bool> Dirty => _dirty ??= new Derived<bool>(
+        () => _isEditPending || (_baseline is { } baseline && !(savesSame ?? showsSame)(baseline, capture())),
+        () => RaisePropertyChanged(nameof(IsDirty)));
 
     /// <summary>
     /// Whether the form holds anything a Save would write. It's what the Save button is enabled by, so it has to
     /// follow the form as it's typed into rather than only as each field is left: a button still disabled under
     /// the cursor swallows the very click that would have enabled it. The screen calls <see cref="RefreshDirty()"/>
-    /// for every change it can see; this class calls it for the ones it settles itself.
+    /// for every change it can see; this class calls it for the ones it settles itself. Worked out as it's read, so a
+    /// change of every row of a table costs one comparison, at the Save button's next drawing; its change is said once a
+    /// value that was read may be out of date, which is when the button reads it again.
     /// </summary>
-    public bool IsDirty
-    {
-        get => _isDirty;
-        private set => RaiseAndSetIfChanged(ref _isDirty, value);
-    }
+    public bool IsDirty => Dirty.Value;
 
     private bool _isEditPending;
 
@@ -128,12 +135,11 @@ public sealed class UndoHistory<TSnapshot>(
         RefreshDirty();
     }
 
-    /// <summary>Re-reads whether the form still shows what it was settled with. Cheap enough for every keystroke.</summary>
-    public void RefreshDirty() =>
-        IsDirty = _isEditPending || (_baseline is not null && !(savesSame ?? showsSame)(_baseline, capture()));
-
-    private void RefreshDirty(TSnapshot now) =>
-        IsDirty = _isEditPending || (_baseline is { } baseline && !(savesSame ?? showsSame)(baseline, now));
+    /// <summary>
+    /// Something in the form may have changed: whether it still shows what it was settled with is worked out again when
+    /// <see cref="IsDirty"/> is next read. Cheap enough for every change of every row.
+    /// </summary>
+    public void RefreshDirty() => Dirty.Invalidate();
 
     /// <summary>
     /// Moves part of the settled form on to what the form holds now, for a change that isn't the user's: a
@@ -214,7 +220,7 @@ public sealed class UndoHistory<TSnapshot>(
         }
 
         var now = capture();
-        RefreshDirty(now);
+        RefreshDirty();
         if (showsSame(rebase is null ? before : rebase(before, now), now))
         {
             return;

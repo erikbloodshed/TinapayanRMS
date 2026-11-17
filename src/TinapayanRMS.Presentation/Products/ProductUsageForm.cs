@@ -43,12 +43,20 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     private readonly IProductUsageFormHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
 
+    /// <summary>The form's batch weight, piece cost and captions, worked out when read (<see cref="Figures"/>).</summary>
+    private readonly Derived<FormFigures> _figures;
+
     /// <param name="host">The Products screen: its cost basis, what can be linked, its messages and its undo steps.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a row prices itself from.</param>
     public ProductUsageForm(IProductUsageFormHost host, IReadOnlyList<RawMaterial> ingredients)
     {
         _host = host;
         _ingredients = ingredients;
+
+        // The form's figures follow any change to its tables, and to the form itself (OnPropertyChanged).
+        _figures = new Derived<FormFigures>(Figures, RaiseFiguresChanged);
+        RowChanges.OnAnyChange(FormLines, _figures.Invalidate);
+        RowChanges.OnAnyChange(FormAddIns, _figures.Invalidate);
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -117,8 +125,19 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// <summary>The add-in the form table's add row edits, priced as its ingredient is picked.</summary>
     public Func<IngredientLineRow> NewFormAddIn => () => new IngredientLineRow(FindIngredient, FormFormulaBase) { CostBasis = _host.CostBasis };
 
-    /// <summary>The form's formula base as last worked out, for a line started in either table's add row.</summary>
-    internal decimal FormFormulaBase { get; set; }
+    /// <summary>The form's formula base as last applied to its rows (<see cref="Recompute"/>), for a line started in either table's add row.</summary>
+    internal decimal FormFormulaBase
+    {
+        get;
+        set
+        {
+            if (value != field)
+            {
+                field = value;
+                _figures.Invalidate();
+            }
+        }
+    }
 
     private ProductUsageEdit? _editingUsage;
     /// <summary>
@@ -384,6 +403,10 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         {
             KindChanged?.Invoke();
         }
+
+        // Broadly: the figures read the piece size, the section edited and the source picked, and anything else of the
+        // form's is only one more computation when they're next read.
+        _figures.Invalidate();
     }
 
     private IngredientLineRow? _selectedFormLine;
@@ -481,82 +504,63 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     internal IReadOnlyList<(decimal Grams, decimal CostPerGram)> Batch() =>
         [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
 
-    private string _usageFormTotalWeightText = "0 g";
     /// <summary>The batch that goes in, e.g. "1,700 g".</summary>
-    public string UsageFormTotalWeightText
-    {
-        get => _usageFormTotalWeightText;
-        internal set => RaiseAndSetIfChanged(ref _usageFormTotalWeightText, value);
-    }
+    public string UsageFormTotalWeightText => _figures.Value.TotalWeightText;
 
-    private string _usageFormPieceSizeCaption = string.Empty;
     /// <summary>Which figure stays put when the batch changes, e.g. "Weight per piece stays at 60 g if the batch changes".</summary>
-    public string UsageFormPieceSizeCaption
-    {
-        get => _usageFormPieceSizeCaption;
-        internal set => RaiseAndSetIfChanged(ref _usageFormPieceSizeCaption, value);
-    }
+    public string UsageFormPieceSizeCaption => _figures.Value.PieceSizeCaption;
 
-    private string _usageFormBaseCaption = string.Empty;
     /// <summary>
     /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
     /// with nothing ticked, what the absolute percentages are read against.
     /// </summary>
-    public string UsageFormBaseCaption
-    {
-        get => _usageFormBaseCaption;
-        internal set => RaiseAndSetIfChanged(ref _usageFormBaseCaption, value);
-    }
+    public string UsageFormBaseCaption => _figures.Value.BaseCaption;
 
-    private string _usageFormPercentHeader = IngredientLineRow.PercentHeader(0m);
     /// <summary>Both form tables' percentage header: "Baker's %" while the recipe has a base, "Absolute %" while it has none.</summary>
-    public string UsageFormPercentHeader
-    {
-        get => _usageFormPercentHeader;
-        internal set => RaiseAndSetIfChanged(ref _usageFormPercentHeader, value);
-    }
+    public string UsageFormPercentHeader => IngredientLineRow.PercentHeader(FormFormulaBase);
 
-    private string _usageFormAddInsCaption = string.Empty;
     /// <summary>The batch the two tables come to, e.g. "1,700 g from Sweet Dough + 20 g of add-ins = a 1,720 g batch."</summary>
-    public string UsageFormAddInsCaption
-    {
-        get => _usageFormAddInsCaption;
-        internal set => RaiseAndSetIfChanged(ref _usageFormAddInsCaption, value);
-    }
+    public string UsageFormAddInsCaption => _figures.Value.AddInsCaption;
 
-    private string _usageFormCostPerPieceText = "—";
     /// <summary>
     /// What a piece of the form's sub-assembly or packaging costs: the piece-size column's first tile, to two decimals
     /// ("0.50"), and the packaging table's footer, to four ("0.5000").
     /// </summary>
-    public string UsageFormCostPerPieceText
-    {
-        get => _usageFormCostPerPieceText;
-        internal set => RaiseAndSetIfChanged(ref _usageFormCostPerPieceText, value);
-    }
+    public string UsageFormCostPerPieceText => _figures.Value.CostPerPieceText;
 
-    private string _usageFormBatchCostText = "—";
     /// <summary>What the form's whole batch costs, its lines and add-ins together, e.g. "73.98": the piece-size column's second tile.</summary>
-    public string UsageFormBatchCostText
+    public string UsageFormBatchCostText => _figures.Value.BatchCostText;
+
+    /// <summary>
+    /// The formula's base, given to both tables: an add-in is read against the recipe's base, never its own, and with no
+    /// base every line of both is read against the whole batch, add-ins included, so they come to 100%. A write into the
+    /// rows (each one's percentage, and the grams of a line typed as a percentage), so it's pushed, where the figures that
+    /// read the form are worked out as they're read.
+    /// </summary>
+    internal void Recompute()
     {
-        get => _usageFormBatchCostText;
-        internal set => RaiseAndSetIfChanged(ref _usageFormBatchCostText, value);
+        var (totalWeight, _) = SubAssemblyRules.CalculateTotals(Batch());
+        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
+        FormFormulaBase = formulaBase;
+        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
     }
 
-    /// <summary>The form's batch weight, which figure stays put, and what a piece costs.</summary>
-    internal void Recompute()
+    /// <summary>The form's figures, worked out together from the form as it stands.</summary>
+    private sealed record FormFigures(
+        string TotalWeightText, string PieceSizeCaption, string BaseCaption, string AddInsCaption, string CostPerPieceText, string BatchCostText);
+
+    /// <summary>The form's batch weight, which figure stays put, what a piece costs, and the tables' captions.</summary>
+    private FormFigures Figures()
     {
         var batch = Batch();
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
-        UsageFormBatchCostText = batch.Count > 0 ? $"{totalCost:N2}" : "—";
         var authoredValue = AuthoredValue;
         var (weightPerPiece, _) = ProductRules.ResolvePieceSize(AuthoredField, authoredValue, totalWeight);
 
-        UsageFormTotalWeightText = $"{totalWeight:#,0.##} g";
         // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
         // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
         // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
-        UsageFormPieceSizeCaption = authoredValue <= 0
+        var pieceSizeCaption = authoredValue <= 0
             ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
             : AuthoredField == UsageAuthoredField.Yield && authoredValue == 1
                 ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
@@ -567,16 +571,9 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         var costPerPiece = totalWeight > 0 && weightPerPiece > 0
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
             : (decimal?)null;
-        // Two decimals, as Batch cost beside it; packaging's, above, keeps four.
-        UsageFormCostPerPieceText = costPerPiece is { } figure ? $"{figure:N2}" : "—";
 
-        // The formula's base and the batch, given to both tables: an add-in is read against the recipe's base, never its own,
-        // and with no base every line of both is read against the whole batch, add-ins included, so they come to 100%.
-        var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
-        FormFormulaBase = formulaBase;
-        IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
-        UsageFormPercentHeader = IngredientLineRow.PercentHeader(formulaBase);
-        UsageFormBaseCaption = formulaBase > 0
+        var formulaBase = FormFormulaBase;
+        var baseCaption = formulaBase > 0
             ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
             : SubAssemblyBatch.NoBaseCaption;
 
@@ -585,9 +582,29 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
             ?? EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
         var addInWeight = FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
         var baseWeight = totalWeight - addInWeight;
-        UsageFormAddInsCaption = addInWeight > 0
+        var addInsCaption = addInWeight > 0
             ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
             : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
+
+        return new FormFigures(
+            $"{totalWeight:#,0.##} g",
+            pieceSizeCaption,
+            baseCaption,
+            addInsCaption,
+            // Two decimals, as Batch cost beside it; packaging's, above, keeps four.
+            costPerPiece is { } figure ? $"{figure:N2}" : "—",
+            batch.Count > 0 ? $"{totalCost:N2}" : "—");
+    }
+
+    private void RaiseFiguresChanged()
+    {
+        RaisePropertyChanged(nameof(UsageFormTotalWeightText));
+        RaisePropertyChanged(nameof(UsageFormPieceSizeCaption));
+        RaisePropertyChanged(nameof(UsageFormBaseCaption));
+        RaisePropertyChanged(nameof(UsageFormPercentHeader));
+        RaisePropertyChanged(nameof(UsageFormAddInsCaption));
+        RaisePropertyChanged(nameof(UsageFormCostPerPieceText));
+        RaisePropertyChanged(nameof(UsageFormBatchCostText));
     }
 
     /// <summary>Puts the piece size back as it stood, for an undo: which figure was typed, and both figures.</summary>

@@ -21,9 +21,15 @@ public sealed class SubAssemblyBatch : ObservableState
     private readonly IFormPartHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
 
+    /// <summary>The batch's figures, worked out from the lines when read (<see cref="BatchFigures"/>).</summary>
+    private readonly Derived<BatchFigures> _figures;
+
     /// <param name="host">The screen, which shows Scale's message and records it as an undo step.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
-    /// <param name="updates">The screen's derived updates, so an undo putting the lines back works the totals out once.</param>
+    /// <param name="updates">
+    /// The screen's derived updates, so an undo putting the lines back points them at their ingredients and applies the
+    /// formula base once, from the whole form.
+    /// </param>
     /// <param name="isShowing">Whether the recipe's table shows: not for a packaging set, which Scale has nothing to do with.</param>
     public SubAssemblyBatch(IFormPartHost host, IReadOnlyList<RawMaterial> ingredients, DerivedUpdates updates, Func<bool> isShowing)
     {
@@ -35,10 +41,9 @@ public sealed class SubAssemblyBatch : ObservableState
             .AutoRefresh(l => l.IngredientId)
             .Subscribe(_ => updates.Run(ResolveLines));
 
-        // Cost follows both an ingredient picked and grams typed.
-        Lines.ToObservableChangeSet()
-            .AutoRefresh(l => l.Cost)
-            .Subscribe(_ => updates.Run(RecomputeTotals));
+        // The figures follow any change to the lines, and are worked out as they're next read.
+        _figures = new Derived<BatchFigures>(Figures, RaiseFiguresChanged);
+        RowChanges.OnAnyChange(Lines, _figures.Invalidate);
 
         // The formula's base: what's ticked, and how much of it there is.
         Lines.ToObservableChangeSet()
@@ -63,49 +68,62 @@ public sealed class SubAssemblyBatch : ObservableState
         set => RaiseAndSetIfChanged(ref _selectedLine, value);
     }
 
-    /// <summary>The formula base as last worked out, for a line started in the add row, and for an undo step to keep.</summary>
-    internal decimal FormulaBase { get; private set; }
+    private decimal _formulaBase;
+    /// <summary>
+    /// The formula base as last applied to the lines (<see cref="RecomputeFormulaBase"/>), or as an undo step kept it: for a
+    /// line started in the add row, for the step to keep, and for the caption.
+    /// </summary>
+    internal decimal FormulaBase
+    {
+        get => _formulaBase;
+        private set
+        {
+            if (value != _formulaBase)
+            {
+                _formulaBase = value;
+                _figures.Invalidate();
+            }
+        }
+    }
 
-    private string _formulaBaseCaption = NoBaseCaption;
     /// <summary>
     /// The formula in baker's terms, e.g. "Base 1,000 g · whole formula 167.7%" — the figure a batch is scaled by — or,
     /// with nothing ticked, what the absolute percentages are read against.
     /// </summary>
-    public string FormulaBaseCaption
-    {
-        get => _formulaBaseCaption;
-        private set => RaiseAndSetIfChanged(ref _formulaBaseCaption, value);
-    }
+    public string FormulaBaseCaption => _figures.Value.FormulaBaseCaption;
 
-    private string _percentHeader = IngredientLineRow.PercentHeader(0m);
     /// <summary>The lines table's percentage header: "Baker's %" while a base is ticked, "Absolute %" while none is.</summary>
-    public string PercentHeader
-    {
-        get => _percentHeader;
-        private set => RaiseAndSetIfChanged(ref _percentHeader, value);
-    }
+    public string PercentHeader => IngredientLineRow.PercentHeader(FormulaBase);
 
-    private decimal _batchWeight;
-    /// <summary>The batch: the sum of its lines' grams.</summary>
-    public decimal BatchWeight
-    {
-        get => _batchWeight;
-        private set => RaiseAndSetIfChanged(ref _batchWeight, value);
-    }
+    /// <summary>The batch: the sum of the grams of its lines with an ingredient picked.</summary>
+    public decimal BatchWeight => _figures.Value.Weight;
 
-    private decimal _batchCost;
     /// <summary>What the batch costs, at its ingredients' buffered costs.</summary>
-    public decimal BatchCost
+    public decimal BatchCost => _figures.Value.Cost;
+
+    public decimal CostPerGram => _figures.Value.CostPerGram;
+
+    /// <summary>The batch's figures, worked out together from the lines as they stand.</summary>
+    private sealed record BatchFigures(decimal Weight, decimal Cost, decimal CostPerGram, string FormulaBaseCaption);
+
+    private BatchFigures Figures()
     {
-        get => _batchCost;
-        private set => RaiseAndSetIfChanged(ref _batchCost, value);
+        var weight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams ?? 0m);
+        var cost = Lines.Sum(l => l.Cost);
+        var formulaWeight = IngredientLineRow.BatchWeightOf(Lines);
+        var caption = FormulaBase > 0
+            ? $"Base {FormulaBase:#,0.##} g · whole formula {formulaWeight / FormulaBase * 100m:#,0.#}%"
+            : NoBaseCaption;
+        return new BatchFigures(weight, cost, weight > 0 ? cost / weight : 0m, caption);
     }
 
-    private decimal _costPerGram;
-    public decimal CostPerGram
+    private void RaiseFiguresChanged()
     {
-        get => _costPerGram;
-        private set => RaiseAndSetIfChanged(ref _costPerGram, value);
+        RaisePropertyChanged(nameof(BatchWeight));
+        RaisePropertyChanged(nameof(BatchCost));
+        RaisePropertyChanged(nameof(CostPerGram));
+        RaisePropertyChanged(nameof(FormulaBaseCaption));
+        RaisePropertyChanged(nameof(PercentHeader));
     }
 
     private decimal? _scaleTo;
@@ -179,25 +197,12 @@ public sealed class SubAssemblyBatch : ObservableState
     /// <summary>An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.</summary>
     public void ResolveLines() => IngredientLineRow.Resolve(Lines, _ingredients.ToDictionary(m => m.Id));
 
-    /// <summary>The formula's base, given to every row so each reads its own percentage, and said in the caption.</summary>
-    public void RecomputeFormulaBase()
-    {
-        var totalWeight = IngredientLineRow.BatchWeightOf(Lines);
-        var baseWeight = IngredientLineRow.ApplyFormulaBase([.. Lines], totalWeight);
-        FormulaBase = baseWeight;
-        PercentHeader = IngredientLineRow.PercentHeader(baseWeight);
-        FormulaBaseCaption = baseWeight > 0
-            ? $"Base {baseWeight:#,0.##} g · whole formula {totalWeight / baseWeight * 100m:#,0.#}%"
-            : NoBaseCaption;
-    }
-
-    /// <summary>The batch's weight and cost, and its cost a gram, from the lines as they are.</summary>
-    public void RecomputeTotals()
-    {
-        BatchWeight = Lines.Where(l => l.Ingredient is not null).Sum(l => l.Grams ?? 0m);
-        BatchCost = Lines.Sum(l => l.Cost);
-        CostPerGram = BatchWeight > 0 ? BatchCost / BatchWeight : 0m;
-    }
+    /// <summary>
+    /// The formula's base, given to every row so each reads its own percentage (and a line typed as a percentage its
+    /// grams): a write into the rows, so it's pushed, where the figures are only worked out as they're read.
+    /// </summary>
+    public void RecomputeFormulaBase() =>
+        FormulaBase = IngredientLineRow.ApplyFormulaBase([.. Lines], IngredientLineRow.BatchWeightOf(Lines));
 
     private void Scale()
     {
@@ -218,7 +223,6 @@ public sealed class SubAssemblyBatch : ObservableState
             }
 
             RecomputeFormulaBase();
-            RecomputeTotals();
         });
     }
 }
