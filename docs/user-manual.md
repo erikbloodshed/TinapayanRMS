@@ -915,14 +915,14 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
-- **Print** (the picker at the top left) chooses **This product**, the folder last asked for, the products ticked under **Products**, or **All products**.
-- **Products** (the list beside it) prints the products you tick, from any folders. Open it, type part of a name in **Search products** to find them, and tick each one; a folder's box ticks every product in it, and **Select All** every product listed. When the list closes, **Print** reads **Selected products (3)** and the pages show them, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
+- **Print** (the list at the top left) chooses the products to print. With none ticked it reads **This product** and prints the product open on the Products screen, as described above. Open it, type part of a name in **Search products** to find a product, and tick it; tick as many as you like, from any folders, or **Select All** for every product the list shows. When the list closes, the pages show the products ticked, as saved, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
+- **Categories** (the list beside it) narrows **Print** to the products of the categories you tick, such as **Breads**; **No category** is the products without one. A product ticked under **Print** that isn't in them is unticked. To print every bread, tick **Breads** here, then **Select All** under **Print**. With no category ticked (**All categories**), **Print** lists every product.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
 - The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup (the amount, then its percentage in brackets, lighter), VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup prints amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
 - **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
-To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**), which ticks them under **Products** on the Print tab.
+To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**). Each opens the Print tab with those products ticked under **Print**, in place of any ticked before, and every category offered. A folder's pages keep its name as their title while its products are the ones ticked. **Print** in the Products header unticks them all, back to **This product**.
 
 A set prints each product **as saved**, with a contents list first and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen and prints on two pages or more. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
@@ -1305,8 +1305,8 @@ Right-click the folder in the Products list and choose **Print Folder**: it prin
 ### Print a few products together
 
 1. Open the **Print** tab (press **Print** in the Products header).
-2. Open the **Products** list beside the **Print** picker, type part of a name to find a product, and tick it. Do the same for each product you want; they can be in different folders.
-3. Close the list (click elsewhere, or press **Esc**). **Print** reads **Selected products (3)** and the pages show them. Press **Print** at the top right.
+2. Open the **Print** list at the top left, type part of a name to find a product, and tick it. Do the same for each product you want; they can be in different folders. To choose among one kind only, tick its category under **Categories** first.
+3. Close the list (click elsewhere, or press **Esc**). The pages show the products ticked. Press **Print** at the top right.
 
 ### Make a composite product, such as a gift box of several products
 
