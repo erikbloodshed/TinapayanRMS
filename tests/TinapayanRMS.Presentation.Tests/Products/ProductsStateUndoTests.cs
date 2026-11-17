@@ -167,11 +167,11 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        state.Recipe.SelectedRecipeTab = dough;
-        state.UsageForm.EditingUsageWeightPerPiece = 75m;
+        state.Recipe.PickRecipeTab(dough);
+        state.UsageForm.TypeWeightPerPiece(75m);
 
         // Leaving the tab applies the form, which is one step.
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(filling);
         state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
 
         state.TryUndo().Should().BeTrue();
@@ -190,9 +190,9 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        state.Recipe.SelectedRecipeTab = filling;
-        state.Recipe.SelectedRecipeTab = dough;
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(filling);
+        state.Recipe.PickRecipeTab(dough);
+        state.Recipe.PickRecipeTab(filling);
 
         state.History.CanUndo.Should().BeFalse("clicking through the sections changes nothing");
     });
@@ -205,17 +205,17 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var (state, _) = await OpenTwoSectionProductAsync(withPackaging: true);
         var recorder = (IUndoRecorder)state;
 
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
         recorder.BeginUndoStep();
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough"));
         recorder.EndUndoStep();
 
         state.History.CanUndo.Should().BeFalse("the form opening on the tab picked isn't an edit");
 
         // And a field still holding the cursor after the change records what's typed into it next.
         recorder.BeginUndoStep();
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
-        state.UsageForm.EditingUsageWeightPerPiece = 12m;
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling"));
+        state.UsageForm.TypeWeightPerPiece(12m);
         recorder.EndUndoStep();
 
         state.History.CanUndo.Should().BeTrue();
@@ -233,16 +233,16 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        state.Recipe.SelectedRecipeTab = dough;
-        state.UsageForm.EditingUsageWeightPerPiece = 75m;
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(dough);
+        state.UsageForm.TypeWeightPerPiece(75m);
+        state.Recipe.PickRecipeTab(filling);
         state.TryUndo().Should().BeTrue();
 
         // Back to Dough's tab by hand, then type and leave: the apply must still happen, which it wouldn't if
         // the restore had left behind a stale note of which tab's form was open.
-        state.Recipe.SelectedRecipeTab = dough;
-        state.UsageForm.EditingUsageWeightPerPiece = 80m;
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(dough);
+        state.UsageForm.TypeWeightPerPiece(80m);
+        state.Recipe.PickRecipeTab(filling);
 
         state.ErrorMessage.Should().BeNull();
         state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(80m);
@@ -270,7 +270,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     public Task Undoing_a_removed_section_puts_it_back_with_its_tab() => UiThread.RunAsync(async () =>
     {
         var (state, _) = await OpenTwoSectionProductAsync();
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling"));
 
         await state.Recipe.RemoveUsageCommand.ExecuteAsync();
         state.Recipe.UsageEdits.Should().ContainSingle();
@@ -286,7 +286,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     public Task The_tabs_stay_in_step_with_the_sections_across_an_undo() => UiThread.RunAsync(async () =>
     {
         var (state, _) = await OpenTwoSectionProductAsync();
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First());
 
         await state.Recipe.RemoveUsageCommand.ExecuteAsync();
         state.TryUndo().Should().BeTrue();
@@ -326,12 +326,12 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var (state, seeded) = await OpenOneSubAssemblyProductAsync();
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.First(r => r.Name == "Dough");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.First(r => r.Name == "Dough"));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = seeded.Ingredients.SugarId, Grams = 500m });
-        state.UsageForm.EditingUsageWeightPerPiece = 20m;
+        state.UsageForm.TypeWeightPerPiece(20m);
 
         var stepsBefore = state.History.CanUndo;
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First());
 
         state.ErrorMessage.Should().StartWith("This recipe has more than one Dough without a name");
         state.History.CanUndo.Should().Be(stepsBefore, "a refusal changed nothing to take back");
@@ -464,13 +464,13 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
-        state.Recipe.SelectedRecipeTab = dough;
+        state.Recipe.PickRecipeTab(dough);
         CanSave(state).Should().BeFalse();
 
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(filling);
         CanSave(state).Should().BeFalse();
 
-        state.Recipe.SelectedRecipeTab = dough;
+        state.Recipe.PickRecipeTab(dough);
         CanSave(state).Should().BeFalse("clicking through the sections writes nothing");
 
         // And the form is still live: typing in the one now showing does offer Save.
@@ -504,7 +504,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         CanSave(state).Should().BeFalse("the form is still empty");
 
         // Picking what to link or copy is an entry, though.
-        Edit(state, () => state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.First());
+        Edit(state, () => state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.First()));
         CanSave(state).Should().BeTrue();
     });
 
@@ -672,7 +672,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         // The other half of taking the settled form back from when the step was taken: it's the form as the
         // section showed, not as it was typed into, so typing an undo puts back still counts as a change.
         var (state, _) = await OpenOneSubAssemblyProductAsync();
-        state.UsageForm.EditingUsageWeightPerPiece = 70m;
+        state.UsageForm.TypeWeightPerPiece(70m);
 
         Edit(state, () => state.EditingName = "Renamed");
         state.TryUndo().Should().BeTrue();
@@ -793,7 +793,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && ready(state),
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}, lines={state.UsageForm.FormLines.Count}");

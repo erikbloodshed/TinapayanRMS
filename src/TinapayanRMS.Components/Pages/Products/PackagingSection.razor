@@ -27,7 +27,7 @@
             @if (State.Packaging.IsPickingSource)
             {
                 <PickField ID="packaging-source" TItem="LinkableSubAssemblyOption" Items="State.Packaging.SourceOptions" TextField="PackagingSourceName"
-                           @bind-Value="State.Packaging.PickedSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
+                           Value="State.Packaging.PickedSource" ValueChanged="State.Packaging.PickSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
                            OpenOnShow="true" PopupWidth="420px"
                            Tooltip="@(State.Packaging.SourceMode == PackagingSourceMode.Copy
                                ? "Its lines become this product's own, in place of the ones here, to change as you like."

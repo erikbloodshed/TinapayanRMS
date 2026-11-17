@@ -14,7 +14,7 @@
                 <CommandButton Command="State!.MoveDownCommand" Icon="AppIcon.MoveDown" Label="Move Down" />
             </div>
         </div>
-        <PickGrid TItem="SubAssemblyRole" DataSource="State!.Items" @bind-SelectedItem="State!.SelectedItem">
+        <PickGrid TItem="SubAssemblyRole" DataSource="State!.Items" SelectedItem="State!.SelectedItem" SelectedItemChanged="State!.Pick">
             <Columns>
                 <GridColumn Field="@nameof(SubAssemblyRole.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(SubAssemblyRole.Name)" HeaderText="Name" />

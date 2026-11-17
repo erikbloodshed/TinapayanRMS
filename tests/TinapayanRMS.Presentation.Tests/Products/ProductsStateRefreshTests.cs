@@ -37,7 +37,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state,
             () => state.Recipe.UsageEdits.Count == 1,
             () => $"usage rows={state.Recipe.UsageEdits.Count}, roles={state.Roles.Count}");
@@ -82,12 +82,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Name == "Ube pandesal");
+        state.Pick(state.Products.Single(p => p.Name == "Ube pandesal"));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.Recipe.UsageEdits.SingleOrDefault()?.SubAssemblyId == ubeFillingId,
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}");
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == cheeseRollId);
+        state.Pick(state.Products.Single(p => p.Id == cheeseRollId));
 
         // Its details are still on their way (read off the UI thread): the ube pandesal's show until they
         // arrive, not an empty recipe, and a Save now would write that recipe under the cheese roll's name.
@@ -126,7 +126,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Filling", "the add form starts on the first role the recipe doesn't have yet");
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = state.Ingredients.Single().Id, Grams = 100m });
         state.UsageForm.UsageFormTotalWeightText.Should().Be("100 g");
-        state.UsageForm.EditingUsageWeightPerPiece = 10m;
+        state.UsageForm.TypeWeightPerPiece(10m);
         state.UsageForm.EditingUsageYield.Should().Be(10m, "typing the weight per piece works out the yield");
         state.Costing.EditingLaborPercent = 50m;
         state.Costing.EditingAdministrativePercent = 12.5m;
@@ -284,7 +284,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Packaging.LineEdits.Count == 1, () => $"lines={state.Packaging.LineEdits.Count}");
 
         var line = state.Packaging.LineEdits.Single();
@@ -304,12 +304,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Pandesal");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == roleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == roleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1000m });
-        state.UsageForm.EditingUsageWeightPerPiece = 50m;
+        state.UsageForm.TypeWeightPerPiece(50m);
 
         // The second Save lands before the first one's reload, while the form still shows the section as new.
         await state.SaveCommand.ExecuteAsync();
@@ -330,7 +330,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (productId, doughId) = await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1000m)], weightPerPiece: 50m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single().Header.Should().Be("Dough");
 
@@ -362,16 +362,16 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Ube Roll");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Copy);
-        state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.Single();
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
         await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
 
         state.UsageForm.EditingUsageRole!.Id.Should().Be(fillingRoleId);
         state.UsageForm.EditingUsageName.Should().BeNull("\"Cheese Roll Filling: Cheese\" is another product's name; Save names the copy after this one");
-        state.UsageForm.EditingUsageWeightPerPiece = 10m;
+        state.UsageForm.TypeWeightPerPiece(10m);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -396,7 +396,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [new LinkedUsageDraft(ubeBunFillingId, UsageAuthoredField.WeightPerPiece, 5m)]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 3, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // "Cheese Roll Filling" goes by its role alone, "Cheese Roll Filling: Ube" by Ube, and Ube Bun's by its whole name.
@@ -416,7 +416,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var fillingId = await SubAssemblyIdAsync(productId, fillingRoleId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1 && state.UsageForm.EditingUsage is not null, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         var usage = state.Recipe.UsageEdits.Single();
@@ -446,7 +446,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [new NewSubAssemblyDraft(fillingRoleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1 && state.UsageForm.EditingUsage is not null, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = milkId, Grams = 50m });
 
@@ -473,12 +473,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Cheese Roll");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == fillingRoleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = cheeseId, Grams = 100m });
-        state.UsageForm.EditingUsageWeightPerPiece = 10m;
+        state.UsageForm.TypeWeightPerPiece(10m);
 
         await state.SaveCommand.ExecuteAsync();
 
@@ -502,7 +502,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Cheese Bun");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
@@ -521,7 +521,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (_, fillingId) = await AddProductWithSubAssemblyAsync("Cheese Roll", fillingRoleId, [(cheeseId, 100m)]);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1 && state.UsageForm.EditingUsage is not null, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Recipe.UsageEdits.Single().IsLinked.Should().BeTrue();
         state.UsageForm.IsFormEditingLines.Should().BeFalse();
@@ -549,15 +549,15 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Pandesal");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == roleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == roleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1200m });
-        state.UsageForm.EditingUsageWeightPerPiece = 50m;
+        state.UsageForm.TypeWeightPerPiece(50m);
         state.UsageForm.EditingUsageYield.Should().Be(24m, "1,200 g at 50 g a piece");
-        state.UsageForm.EditingUsageYield = 30m;
+        state.UsageForm.TypeYield(30m);
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(40m, "typing the yield works out the weight per piece");
 
         // The batch grows while the form is open, typed over the line's grams: the typed yield stays.
@@ -583,7 +583,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
@@ -609,7 +609,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await AddProductWithSubAssemblyAsync("Pandesal", roleId, [(flourId, 1700m)], weightPerPiece: 60m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Costing.Costs.Wastage.Should().Be(0.09m);
 
@@ -633,7 +633,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await categories.AddAsync(new ProductCategory { Name = "Cakes" }, Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Costing.Costs.WastagePercent.Should().Be(3m, "no category: the shop-wide one");
 
@@ -660,14 +660,14 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Cheese Roll");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough");
         state.UsageForm.EditingUsageYield.Should().Be(0m, "a Dough is a batch of many pieces, sized by hand");
 
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Id == toppingRoleId);
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Id == toppingRoleId));
         state.UsageForm.EditingUsageYield.Should().Be(1m, "a Topping is the product's own");
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(0m, "there's no batch yet");
 
@@ -702,7 +702,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Cheese Roll");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}");
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
@@ -726,15 +726,15 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageYield.Should().Be(1m);
-        state.UsageForm.EditingUsageRole =state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough"));
         state.UsageForm.EditingUsageYield.Should().Be(0m, "a Dough starts with no size");
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Name == "Topping");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Topping"));
         state.UsageForm.EditingUsageYield.Should().Be(1m);
 
-        state.UsageForm.EditingUsageWeightPerPiece = 15m;
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough");
+        state.UsageForm.TypeWeightPerPiece(15m);
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough"));
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(15m, "the typed figure stays put");
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Name == "Topping");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Topping"));
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(15m);
         state.UsageForm.EditingUsageYield.Should().Be(0m, "the weight is the figure kept, and there's no batch to work a yield out from");
     });
@@ -754,7 +754,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var miniId = await AddProductAsync("Cream Loaf Mini");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == miniId);
+        state.Pick(state.Products.Single(p => p.Id == miniId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == miniId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
 
         // Link: the tab opens with the form already linking, and its title says so in place of the picker that used to.
@@ -782,9 +782,9 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.IsFormPickingSource.Should().BeFalse();
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough", "the first role the recipe doesn't have yet");
         state.UsageForm.IsFormNewMovingToSubAssemblies.Should().BeTrue("a Dough isn't product-owned, so Save moves it to Sub-Assemblies");
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Name == "Filling");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Filling"));
         state.UsageForm.IsFormNewMovingToSubAssemblies.Should().BeFalse("a Filling is product-owned, so it stays the product's own");
-        state.UsageForm.EditingUsageRole = state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough");
+        state.UsageForm.PickRole(state.UsageForm.FormRoleOptions.Single(r => r.Name == "Dough"));
 
         // Each pick is its own undo step, back to the add that opened the tab, and then the tab itself.
         state.TryUndo().Should().BeTrue();
@@ -809,16 +809,16 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await state.LoadCommand.ExecuteAsync();
 
         // Link Cream Loaf's dough into the mini, at its own weight.
-        state.SelectedProduct = state.Products.Single(p => p.Id == miniId);
+        state.Pick(state.Products.Single(p => p.Id == miniId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == miniId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
         state.UsageForm.IsFormEditingLines.Should().BeFalse("a link's lines are the Sub-Assemblies screen's");
-        state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.Single();
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
         state.UsageForm.EditingUsageSource!.DisplayName.Should().Be("Cream Loaf Dough — Sub-Assemblies (Dough)");
         await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
         state.UsageForm.IsFormShowingLines.Should().BeTrue("the sub-assembly picked to link shows the lines it brings, read-only");
         state.UsageForm.FormLines.Single().Grams.Should().Be(1000m);
-        state.UsageForm.EditingUsageWeightPerPiece = 30m;
+        state.UsageForm.TypeWeightPerPiece(30m);
         await state.SaveCommand.ExecuteAsync();
         state.ErrorMessage.Should().BeNull();
 
@@ -878,7 +878,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             context.SetOutput(confirm);
         });
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == miniId);
+        state.Pick(state.Products.Single(p => p.Id == miniId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Its form types into its lines as it would a section of the product's own.
@@ -939,7 +939,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)] }]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
 
@@ -949,7 +949,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.IsShowingLinkBadge.Should().BeFalse("the picker takes the badge's place");
         state.UsageForm.ChangeLinkOptions.Select(o => o.SubAssembly!.Id).Should().Equal([richId], "House Dough is the one linked already");
 
-        state.UsageForm.ChangeLinkTarget = state.UsageForm.ChangeLinkOptions.Single();
+        state.UsageForm.PickLinkTarget(state.UsageForm.ChangeLinkOptions.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Single().SubAssemblyId == richId, () => $"linked={state.Recipe.UsageEdits.Single().SubAssemblyId}");
 
         var relinked = state.Recipe.UsageEdits.Single();
@@ -990,7 +990,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m)]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
         await state.UsageForm.StartChangingLinkCommand.ExecuteAsync();
@@ -1018,7 +1018,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [], [new LinkedUsageDraft(houseId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 100m), (ubeId, 50m)] }]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
         var form = state.UsageForm;
@@ -1046,7 +1046,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m) { AddIns = [(butterId, 250m)] }]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.UsageForm.IsEditingLinkedUsage.Should().BeTrue("Unlink shows on a linked section");
 
@@ -1092,7 +1092,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var fillingId = await SubAssemblyIdAsync(productId, roleId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
         state.UsageForm.EditingUsage!.IsOwned.Should().BeTrue();
@@ -1138,7 +1138,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var fillingId = await SubAssemblyIdAsync(productId, roleId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.UsageForm.FormLines.Count == 2, () => $"form lines={state.UsageForm.FormLines.Count}");
         state.UsageForm.CanMoveEditingUsageToInHouse.Should().BeTrue("Move to In-House shows on the product's own");
@@ -1190,7 +1190,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [new NewSubAssemblyDraft(roleId, [(cheeseId, 100m)], UsageAuthoredField.WeightPerPiece, 10m)], []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
         var asked = 0;
@@ -1224,7 +1224,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await SaveRecipeAsync(miniId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 30m)]));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == creamLoafId);
+        state.Pick(state.Products.Single(p => p.Id == creamLoafId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         await state.Recipe.RemoveUsageCommand.ExecuteAsync();
@@ -1257,7 +1257,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(state.Recipe.PackagingTab, "its tables are there to type into from the start");
         state.UsageForm.IsUsageFormOpen.Should().BeFalse("nothing is being added until Add Sub-Assembly is pressed");
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Packaging");
@@ -1281,7 +1281,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Sold in twos: each sub-assembly's cost is per unit of two pieces, as the Sub-assemblies row is.
@@ -1311,7 +1311,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Packaging");
 
@@ -1342,16 +1342,16 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         // Filling (role order 2) typed first, then Dough (role order 1) — the reverse of role order.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == fillingRoleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 100m });
-        state.UsageForm.EditingUsageWeightPerPiece = 10m;
+        state.UsageForm.TypeWeightPerPiece(10m);
 
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.FormRoleOptions.Select(r => r.Name).Should().Equal(["Dough", "Filling"], "a recipe can have more than one in a role");
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough", "the first role the recipe doesn't have yet");
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == doughRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == doughRoleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1000m });
-        state.UsageForm.EditingUsageWeightPerPiece = 50m;
+        state.UsageForm.TypeWeightPerPiece(50m);
         await state.SaveCommand.ExecuteAsync();
 
         // Dough sorts before Filling regardless of which was typed in first, and it's the tab showing.
@@ -1414,7 +1414,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.History.IsDirty.Should().BeTrue("Save is offered straight away");
 
         state.EditingName = "Pandesal";
-        state.UsageForm.EditingUsageWeightPerPiece = 30m;
+        state.UsageForm.TypeWeightPerPiece(30m);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -1456,7 +1456,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Packaging");
         var doughId = await SubAssemblyIdAsync(productId, doughRoleId);
@@ -1484,12 +1484,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var productId = await AddProductAsync("Pan de Sal");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
 
         // A section with its lines but neither figure of its piece size: it applies, with nothing refused.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == roleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == roleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 1000m });
         state.UsageForm.UsageFormCostPerPieceText.Should().Be("\u2014", "a piece takes none of it yet");
         state.UsageForm.UsageFormBatchCostText.Should().Be("50.00", "the batch costs its lines, sized or not: 1,000 g at 0.05");
@@ -1509,8 +1509,8 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         }
 
         // Sized later, from its own tab: it prices at once, and saves over the unsized one.
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
-        state.UsageForm.EditingUsageWeightPerPiece = 50m;
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single());
+        state.UsageForm.TypeWeightPerPiece(50m);
         state.UsageForm.EditingUsageYield.Should().Be(20m, "1,000 g at 50 g a piece");
         state.UsageForm.UsageFormCostPerPieceText.Should().Be("2.50", "the batch's 50.00 over 20 pieces, to two decimals like the tile beside it");
         await state.SaveCommand.ExecuteAsync();
@@ -1533,7 +1533,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             [new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m)], []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Linking: Cream Loaf's Dough is offered too, though the recipe has a Dough; it would go by its name. The recipe's
@@ -1546,9 +1546,9 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         // Another way picked on the add tab changes the form open there, rather than opening a second one.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.Recipe.RecipeTabs.OfType<AddSubAssemblyRecipeTab>().Should().ContainSingle();
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == doughRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == doughRoleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 500m });
-        state.UsageForm.EditingUsageWeightPerPiece = 20m;
+        state.UsageForm.TypeWeightPerPiece(20m);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().StartWith("This recipe has more than one Dough without a name");
@@ -1567,12 +1567,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.ErrorMessage.Should().BeNull();
         var reloaded = CreateState();
         await reloaded.LoadCommand.ExecuteAsync();
-        reloaded.SelectedProduct = reloaded.Products.Single(p => p.Id == productId);
+        reloaded.Pick(reloaded.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(reloaded, () => reloaded.Recipe.UsageEdits.Count == 2, () => $"usage rows={reloaded.Recipe.UsageEdits.Count}");
         reloaded.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough", "Dough: Ube");
 
         // Taking the other one out leaves the named one alone in its role: it's plain "Dough" again.
-        reloaded.Recipe.SelectedRecipeTab = reloaded.Recipe.RecipeTabs[0];
+        reloaded.Recipe.PickRecipeTab(reloaded.Recipe.RecipeTabs[0]);
         await reloaded.Recipe.RemoveUsageCommand.ExecuteAsync();
         reloaded.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Select(t => t.Header).Should().Equal("Dough");
         reloaded.Recipe.UsageEdits.Single().Name.Should().Be("Ube", "it keeps its name, for when another joins it");
@@ -1618,17 +1618,17 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var state = CreateState();
         state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Rename it, retype the Dough's piece size, then start a Filling that is left sitting in the form.
         state.EditingName = "Ube Roll Mini";
         await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
-        state.UsageForm.EditingUsageWeightPerPiece = 60m;
+        state.UsageForm.TypeWeightPerPiece(60m);
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Filling");
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = ubeId, Grams = 100m });
-        state.UsageForm.EditingUsageWeightPerPiece = 10m;
+        state.UsageForm.TypeWeightPerPiece(10m);
         state.Recipe.UsageEdits.Should().ContainSingle("the Dough went in when its tab was left; the Filling is still in the form");
 
         await state.RevertCommand.ExecuteAsync();
@@ -1665,7 +1665,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await GivePackagingAsync(productId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
 
         // The load fills the sections, then shows the first one's tab: Delete Sub-Assembly follows the tab.
         await Settle.UntilAsync(state,
@@ -1688,17 +1688,17 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.Recipe.RemoveUsageCommand.CanExecute().Should().BeFalse();
 
         // Left with nothing entered, as a click on another tab leaves it: the form closes and the tab goes.
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Packaging");
         state.UsageForm.IsUsageFormOpen.Should().BeFalse();
         state.Recipe.RemoveUsageCommand.CanExecute().Should().BeFalse("the Packaging tab isn't a sub-assembly to delete");
 
         // Left with a sub-assembly typed in: it's applied, in role order, and its tab goes.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == toppingRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == toppingRoleId));
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = cheeseId, Grams = 200m });
-        state.UsageForm.EditingUsageWeightPerPiece = 20m;
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.UsageForm.TypeWeightPerPiece(20m);
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
 
         state.ErrorMessage.Should().BeNull();
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Filling", "Topping", "Packaging");
@@ -1708,20 +1708,20 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough", "the only role the recipe doesn't have yet");
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = flourId, Grams = 800m });
-        state.UsageForm.EditingUsageWeightPerPiece = 40m;
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.UsageForm.TypeWeightPerPiece(40m);
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
 
         state.ErrorMessage.Should().BeNull();
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping", "Packaging");
 
         // Its own tab opens its form again.
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs[0];
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs[0]);
         state.UsageForm.EditingUsage!.RoleName.Should().Be("Dough");
 
         // Opened from a sub-assembly's tab and left with nothing typed in: the form closes and the New Sub-Assembly tab goes.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough", "the recipe has one in every role, so the first is picked");
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First());
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Topping", "Packaging");
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(state.Recipe.RecipeTabs[0]);
     });
@@ -1734,13 +1734,13 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         var tab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
 
         await state.Recipe.EditUsageCommand.ExecuteAsync(tab.Usage);
         state.UsageForm.EditingUsage.Should().BeSameAs(tab.Usage);
-        state.UsageForm.EditingUsageWeightPerPiece = 15m;
+        state.UsageForm.TypeWeightPerPiece(15m);
 
         // As another tab would, while the form is open: ube's price goes up, and the refresh swaps in a repriced copy.
         await using (var dbContext = CreateDbContext())
@@ -1787,23 +1787,23 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await GivePackagingAsync(productId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // From Packaging, Add Sub-Assembly then back to Packaging: nothing was typed in, so the form closes
         // with nothing applied and the add's tab goes.
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(state.Recipe.AddSubAssemblyTab);
         state.UsageForm.IsUsageFormOpen.Should().BeTrue();
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(state.Recipe.PackagingTab);
         state.UsageForm.IsUsageFormOpen.Should().BeFalse();
         state.Recipe.RecipeTabs.Should().NotContain(state.Recipe.AddSubAssemblyTab);
 
         // Deleting the first sub-assembly while it shows: the next one's tab shows.
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First();
-        state.Recipe.SelectedRecipeTab = dough;
+        state.Recipe.PickRecipeTab(dough);
         await state.Recipe.RemoveUsageCommand.ExecuteAsync();
         state.Recipe.UsageEdits.Select(u => u.RoleName).Should().Equal("Filling");
         state.Recipe.SelectedRecipeTab.Should().BeOfType<SubAssemblyRecipeTab>().Which.Header.Should().Be("Filling");
@@ -1828,17 +1828,17 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await state.LoadCommand.ExecuteAsync();
 
         // A new product, not saved yet, is offered it too.
-        state.UsageForm.EditingUsageMode = UsageFormMode.Link;
+        state.UsageForm.PickMode(UsageFormMode.Link);
         state.UsageForm.LinkableSubAssemblies.Should().ContainSingle().Which.DisplayName.Should().Be("Chocolate Glaze — Sub-Assemblies (Glaze)");
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state,
             () => state.SelectedProduct?.Id == productId && state.AreDetailsReady && !state.Recipe.HasRecipeSections,
             () => $"selected={state.SelectedProduct?.Id}, tabs={state.Recipe.RecipeTabs.Count}");
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
-        state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.Single();
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
         await Settle.UntilAsync(state, () => state.UsageForm.UsageFormTotalWeightText == "100 g", () => $"batch={state.UsageForm.UsageFormTotalWeightText}");
-        state.UsageForm.EditingUsageWeightPerPiece = 5m;
+        state.UsageForm.TypeWeightPerPiece(5m);
         await state.SaveCommand.ExecuteAsync();
 
         var usage = state.Recipe.UsageEdits.Should().ContainSingle().Subject;
@@ -1893,7 +1893,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await state.NewCommand.ExecuteAsync();
         state.EditingCategory.Should().BeNull("a new product starts uncategorized");
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         state.EditingCategory!.Name.Should().Be("Cakes");
     });
 
@@ -1923,7 +1923,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Costing.EditingLaborPercent = 100m;
         state.Costing.Costs.BaseCost.Should().Be(5m, "₱2.50 of filling and as much again in labor");
@@ -1949,7 +1949,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.EditingCurrentPrice.Should().BeNull("a new product has no current price");
         state.Costing.Costs.CurrentMarkupPercent.Should().BeNull();
 
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         state.EditingCurrentPrice.Should().Be(7m);
     });
 
@@ -1962,7 +1962,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
         state.Costing.Costs.SubAssemblies.Should().Be(2m, "10 g of ube at ₱0.20 a gram");
         List<string> changed = [];
@@ -2224,7 +2224,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await GivePackagingAsync(sourceId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1,
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}");
@@ -2302,7 +2302,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.Costing.EditingLaborPercent.Should().Be(7m);
 
         // A saved product without costing of its own shows none: the defaults are only where a new product starts.
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
         state.Costing.EditingLaborPercent.Should().Be(0m);
 
@@ -2451,7 +2451,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Their saved lines are edited on the Sub-Assemblies screen; Make a Copy gives the product sections to type into.
@@ -2464,10 +2464,10 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         // Typed into the Dough's form, then away to the Filling's tab: the typing is applied on the way out.
-        state.Recipe.SelectedRecipeTab = dough;
+        state.Recipe.PickRecipeTab(dough);
         state.UsageForm.EditingUsage.Should().BeSameAs(dough.Usage, "showing a sub-assembly's tab opens its form");
         state.UsageForm.FormLines.Single().Grams = 1500m;
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(filling);
 
         state.ErrorMessage.Should().BeNull();
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(filling);
@@ -2475,18 +2475,18 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         dough.Usage.TotalWeight.Should().Be(1500m, "leaving its tab applied what was typed");
 
         // A form a rule refuses keeps its own tab, with the message shown: here, the other one's role, where neither has a name.
-        state.Recipe.SelectedRecipeTab = dough;
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == fillingRoleId);
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(dough);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == fillingRoleId));
+        state.Recipe.PickRecipeTab(filling);
 
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(dough, "the form has to be put right before another tab can show");
         state.ErrorMessage.Should().StartWith("This recipe has more than one Filling without a name");
         state.UsageForm.EditingUsage.Should().BeSameAs(dough.Usage);
 
         // The form has no discard of its own: it's put right where it stands, and then the tab can be left.
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == doughRoleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == doughRoleId));
         state.UsageForm.EditingUsageRole!.Name.Should().Be("Dough");
-        state.Recipe.SelectedRecipeTab = filling;
+        state.Recipe.PickRecipeTab(filling);
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(filling);
         state.ErrorMessage.Should().BeNull();
     });
@@ -2499,15 +2499,15 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await AddProductWithSubAssemblyAsync("Ube pandesal", roleId, [(ubeId, 100m)], weightPerPiece: 10m);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         var tab = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().Single();
         var usage = tab.Usage;
 
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
-        state.Recipe.SelectedRecipeTab = tab;
-        state.Recipe.SelectedRecipeTab = state.Recipe.PackagingTab;
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+        state.Recipe.PickRecipeTab(tab);
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
 
         state.ErrorMessage.Should().BeNull();
         tab.Usage.Should().BeSameAs(usage, "a form nothing was typed into is applied to nothing");
@@ -2532,10 +2532,10 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
     private static async Task LinkWithUbeAsync(ProductsState state, int ubeId, decimal addInGrams, decimal weightPerPiece)
     {
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
-        state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.Single();
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
         await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
         state.UsageForm.FormAddIns.Add(new IngredientLineRow(state.Ingredients.Single(m => m.Id == ubeId), addInGrams));
-        state.UsageForm.EditingUsageWeightPerPiece = weightPerPiece;
+        state.UsageForm.TypeWeightPerPiece(weightPerPiece);
         await state.SaveCommand.ExecuteAsync();
     }
 
@@ -2546,7 +2546,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
 
         await LinkWithUbeAsync(state, ubeId, addInGrams: 20m, weightPerPiece: 30m);
@@ -2578,12 +2578,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
 
         // A picked recipe to link: its add-ins table shows under it, empty, and the badge says so.
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
-        state.UsageForm.EditingUsageSource = state.UsageForm.LinkableSubAssemblies.Single();
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
         await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
         state.UsageForm.IsFormShowingAddIns.Should().BeTrue("the add-ins table shows for every linked recipe, empty or not");
         state.UsageForm.HasFormAddIns.Should().BeFalse();
@@ -2601,7 +2601,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.FormAddInsBadgeText.Should().Be("1 add-in");
         state.UsageForm.UsageFormTotalWeightText.Should().Be("1,020 g");
 
-        state.UsageForm.EditingUsageWeightPerPiece = 30m;
+        state.UsageForm.TypeWeightPerPiece(30m);
         await state.SaveCommand.ExecuteAsync();
 
         // Its tab reopens with the badge counting them. Save reloads the product, so the form reopens on the
@@ -2638,10 +2638,10 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Name == "Cream Loaf");
+        state.Pick(state.Products.Single(p => p.Name == "Cream Loaf"));
         await Settle.UntilAsync(state, () => state.Recipe.SelectedRecipeTab?.Header == "Filling", () => $"tab={state.Recipe.SelectedRecipeTab?.Header}");
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == cheeseRollId);
+        state.Pick(state.Products.Single(p => p.Id == cheeseRollId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         state.Recipe.RecipeTabs.Select(t => t.Header).Should().Equal("Dough", "Filling", "Packaging");
@@ -2675,12 +2675,12 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == ubeBreadId);
+        state.Pick(state.Products.Single(p => p.Id == ubeBreadId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs[1];
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs[1]);
         List<RecipeTab> ubeBreadTabs = [.. state.Recipe.RecipeTabs];
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == cheeseBreadId);
+        state.Pick(state.Products.Single(p => p.Id == cheeseBreadId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 3, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // The strip keeps its tabs, which show the cheese bread's sections; only its Topping gets a tab of its own.
@@ -2695,7 +2695,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(40m);
 
         // Back to the ube bread: the Topping's tab goes, and the first two show its sections again.
-        state.SelectedProduct = state.Products.Single(p => p.Id == ubeBreadId);
+        state.Pick(state.Products.Single(p => p.Id == ubeBreadId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 2, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         state.Recipe.RecipeTabs.Should().Equal(ubeBreadTabs);
@@ -2709,7 +2709,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, _, flourId) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
 
         await LinkWithUbeAsync(state, flourId, addInGrams: 100m, weightPerPiece: 30m);
@@ -2726,7 +2726,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, ubeId, flourId) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
         await LinkWithUbeAsync(state, ubeId, addInGrams: 20m, weightPerPiece: 30m);
 
@@ -2746,7 +2746,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
         await LinkWithUbeAsync(state, ubeId, addInGrams: 20m, weightPerPiece: 30m);
         await state.SaveCommand.ExecuteAsync();
@@ -2773,7 +2773,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var (linkerId, _, ubeId, _) = await SeedLinkableDoughAsync();
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == linkerId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
         await LinkWithUbeAsync(state, ubeId, addInGrams: 20m, weightPerPiece: 30m);
         await state.SaveCommand.ExecuteAsync();
@@ -2809,7 +2809,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Its saved lines are edited on the Sub-Assemblies screen; Make a Copy gives the product a section to type into.
@@ -2862,7 +2862,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // The link shows the owner's base, read-only, and the percentages that follow from it.
@@ -2898,7 +2898,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // 20 g of ube on the recipe's 1,000 g of flour is 2% — not 100% of its own 20 g.
@@ -2923,7 +2923,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == linkerId);
+        state.Pick(state.Products.Single(p => p.Id == linkerId));
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // The batch is the recipe's 900 g and the 100 g add-in: 90% and 10%, together 100%.
@@ -2950,7 +2950,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             []));
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1, () => $"usage rows={state.Recipe.UsageEdits.Count}");
 
         // Its saved lines are edited on the Sub-Assemblies screen; Make a Copy gives the product a section to type into.
@@ -3084,16 +3084,16 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await state.LoadCommand.ExecuteAsync();
         await state.NewCommand.ExecuteAsync();
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
-        state.UsageForm.EditingUsageRole = state.Roles.Single(r => r.Id == roleId);
+        state.UsageForm.PickRole(state.Roles.Single(r => r.Id == roleId));
 
         // NumberField.Largest: the most a held key leaves in a box. Longer numbers (21 digits) took the cost per piece
         // past what a decimal holds, from the lines' own change subscription, which nothing catches.
         const decimal largest = 999_999_999.9999m;
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = saffronId, Grams = largest });
-        state.UsageForm.EditingUsageYield = 24m;
+        state.UsageForm.TypeYield(24m);
         state.UsageForm.FormLines.Single().Grams = 1m;
         state.UsageForm.FormLines.Single().Grams = largest;
-        state.UsageForm.EditingUsageWeightPerPiece = largest;
+        state.UsageForm.TypeWeightPerPiece(largest);
         state.EditingQuantityRequired = (int)largest;
 
         state.ErrorMessage.Should().BeNull();

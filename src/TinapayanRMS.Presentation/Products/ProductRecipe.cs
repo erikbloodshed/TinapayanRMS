@@ -60,21 +60,6 @@ public sealed class ProductRecipe : ObservableState
     /// <summary>The tab whose form is open: the one a change of tab is leaving, whose form is applied on the way out.</summary>
     private RecipeTab? _shownRecipeTab;
 
-    /// <summary>Set while a refused form puts the tab showing back, so the tab it puts back doesn't apply its own form again.</summary>
-    private bool _revertingRecipeTab;
-
-    /// <summary>
-    /// Set while an undo puts the sections and their tabs back (RestoreSections), so the tab it shows again doesn't apply
-    /// the form of the tab it moves off (RecipeTabShown): that form is the very change being undone.
-    /// </summary>
-    private bool _arrangingRecipeTabs;
-
-    /// <summary>
-    /// Set while SelectRecipeTab makes its pick, so the pick is part of the undo step making it rather than a step of its
-    /// own (RecipeTabPicked).
-    /// </summary>
-    private bool _selectingRecipeTab;
-
     /// <summary>
     /// The recipe showing was cleared for another product's, which opens on its first tab once it arrives
     /// (ShowSaved). What the tab strip was left on as the tabs went says nothing: that's always Packaging.
@@ -121,9 +106,9 @@ public sealed class ProductRecipe : ObservableState
             MarkRepeatedRoles();
         };
 
-        // A recipe tab picked: leaving one applies its form, and showing one opens its form (SelectedRecipeTab). The
-        // Packaging tab the blank form starts on, now.
-        RecipeTabPicked(SelectedRecipeTab);
+        // A recipe tab shown: leaving one applies its form, and showing one opens its form (RecipeTabShown). The Packaging
+        // tab the blank form starts on, now.
+        RecipeTabShown(SelectedRecipeTab);
 
         // The sections' commands. The packaging's are the Packaging tab's own, and a composite's products' the Products
         // table's.
@@ -157,7 +142,7 @@ public sealed class ProductRecipe : ObservableState
             {
                 if (SelectedRecipeTab is AddSubAssemblyRecipeTab && IsUsageFormUntouched())
                 {
-                    host.AsUndoStep(() => usageForm.EditingUsageMode = mode);
+                    host.AsUndoStep(() => usageForm.PickMode(mode));
                     return;
                 }
 
@@ -170,7 +155,7 @@ public sealed class ProductRecipe : ObservableState
                 {
                     InsertAddSubAssemblyTab();
                     SelectRecipeTab(AddSubAssemblyTab);
-                    usageForm.EditingUsageMode = mode;
+                    usageForm.PickMode(mode);
                 });
             });
 
@@ -271,17 +256,14 @@ public sealed class ProductRecipe : ObservableState
     public ComponentsRecipeTab ComponentsTab { get; } = new();
 
     private RecipeTab? _selectedRecipeTab;
-    /// <summary>The Recipe Structure tab showing. Showing New Sub-Assembly opens the form that adds one.</summary>
+    /// <summary>
+    /// The Recipe Structure tab showing: picked in the strip (<see cref="PickRecipeTab"/>), shown by the screen
+    /// (SelectRecipeTab), or put back by an undo. Showing New Sub-Assembly opens the form that adds one.
+    /// </summary>
     public RecipeTab? SelectedRecipeTab
     {
         get => _selectedRecipeTab;
-        set
-        {
-            if (RaiseAndSetIfChanged(ref _selectedRecipeTab, value))
-            {
-                RecipeTabPicked(value);
-            }
-        }
+        private set => RaiseAndSetIfChanged(ref _selectedRecipeTab, value);
     }
 
     /// <summary>
@@ -525,35 +507,31 @@ public sealed class ProductRecipe : ObservableState
         RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => ReferenceEquals(t.Usage, usage));
 
     /// <summary>
-    /// Shows <paramref name="tab"/>, and does what showing it does even when it was already showing: setting
-    /// SelectedRecipeTab to the tab it already holds raises nothing.
+    /// The screen shows <paramref name="tab"/>, as part of whatever undo step it's taking, and does what showing it does
+    /// even when it was already showing.
     /// </summary>
     private void SelectRecipeTab(RecipeTab? tab)
     {
-        _selectingRecipeTab = true;
-        try
-        {
-            SelectedRecipeTab = tab;
-        }
-        finally
-        {
-            _selectingRecipeTab = false;
-        }
-
+        SelectedRecipeTab = tab;
         RecipeTabShown(tab);
     }
 
     /// <summary>
-    /// A tab was picked in the strip, or SelectedRecipeTab set. A pick the screen makes itself (SelectRecipeTab, or an
-    /// undo putting the tabs back) belongs to whatever step it's part of. The user's own runs between steps: should a
-    /// step still be open as a tab is picked (a field that hasn't yet heard it lost the cursor), it closes on the tab
+    /// The user picks <paramref name="tab"/> in the strip; picking the one showing does nothing. The pick runs between
+    /// undo steps: should a step still be open (a field that hasn't yet heard it lost the cursor), it closes on the tab
     /// being left, keeping what was typed there, and another opens on the tab arrived at, for the field to close. Left
     /// open over the change of tab, the step would record the form changing over to the other tab's section as an edit.
     /// </summary>
-    private void RecipeTabPicked(RecipeTab? tab)
+    public void PickRecipeTab(RecipeTab? tab)
     {
+        if (Equals(tab, SelectedRecipeTab))
+        {
+            return;
+        }
+
+        SelectedRecipeTab = tab;
         var history = _host.History;
-        if (_selectingRecipeTab || _arrangingRecipeTabs || _revertingRecipeTab || _host.IsBusyApplying || !history.IsStepOpen)
+        if (!history.IsStepOpen)
         {
             RecipeTabShown(tab);
             return;
@@ -579,23 +557,9 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     private void RecipeTabShown(RecipeTab? tab)
     {
-        if (_arrangingRecipeTabs || _revertingRecipeTab)
-        {
-            return;
-        }
-
         if (!ReferenceEquals(_shownRecipeTab, tab) && !CommitUsageFormOnLeave())
         {
-            _revertingRecipeTab = true;
-            try
-            {
-                SelectedRecipeTab = _shownRecipeTab;
-            }
-            finally
-            {
-                _revertingRecipeTab = false;
-            }
-
+            SelectedRecipeTab = _shownRecipeTab;
             return;
         }
 
@@ -691,7 +655,7 @@ public sealed class ProductRecipe : ObservableState
 
         if (_usageForm.EditingUsageSource is { } picked && !_usageForm.LinkableSubAssemblies.Contains(picked))
         {
-            _usageForm.ShowSource(null);
+            _usageForm.EditingUsageSource = null;
         }
 
         RefreshFormRoleOptions();
@@ -711,7 +675,7 @@ public sealed class ProductRecipe : ObservableState
         _usageForm.FormRoleOptions.MergeFrom(
             [.. _roles.Where(r => !r.IsPackaging && (!isComposite || r.IsProductOwned))],
             r => r.Id);
-        _usageForm.ShowRole(_usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId));
+        _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
     }
 
     /// <summary>
@@ -826,9 +790,9 @@ public sealed class ProductRecipe : ObservableState
 
         // The first role the recipe doesn't have yet, so sections can be added in role order without picking.
         var takenRoleIds = UsageEdits.Select(u => u.RoleId).ToHashSet();
-        _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? _usageForm.FormRoleOptions.FirstOrDefault();
+        _usageForm.PickRole(_usageForm.FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? _usageForm.FormRoleOptions.FirstOrDefault());
         _usageForm.EditingUsageName = null;
-        _usageForm.EditingUsageSource = null;
+        _usageForm.PickSource(null);
         _usageForm.StartPieceSize();
     }
 
@@ -920,7 +884,7 @@ public sealed class ProductRecipe : ObservableState
         // Cheese"): Save names the copy after this product.
         if (_usageForm.EditingUsageMode == UsageFormMode.Copy && source is not null)
         {
-            _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == source.SubAssembly!.RoleId) ?? _usageForm.EditingUsageRole;
+            _usageForm.PickRole(_usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == source.SubAssembly!.RoleId) ?? _usageForm.EditingUsageRole);
             _usageForm.EditingUsageName = null;
         }
 
@@ -1245,6 +1209,8 @@ public sealed class ProductRecipe : ObservableState
         _usageForm.UsageFormTitle = usage.IsEditable ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
         _usageForm.IsFormEditingLines = usage.IsEditable;
         _usageForm.IsFormPickingSource = false;
+
+        // Shown, not picked: the form edits a section now, not adding one, so nothing a pick sets off has anything to do.
         _usageForm.EditingUsageSource = null;
         RefreshFormRoleOptions();
         _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
@@ -1269,7 +1235,7 @@ public sealed class ProductRecipe : ObservableState
     {
         _usageForm.EditingUsage = null;
         _usageForm.IsAddingUsage = true;
-        _usageForm.EditingUsageMode = UsageFormMode.New;
+        _usageForm.PickMode(UsageFormMode.New);
         _usageForm.IsUsageFormOpen = true;
         StartUsageFormMode();
         RebaseSettledForm();
@@ -1415,8 +1381,8 @@ public sealed class ProductRecipe : ObservableState
     /// Puts the recipe back as <paramref name="snapshot"/> had it, for an undo, once the screen has put back the product's
     /// fields, the costing, the packaging and a composite's products: the sections and their tabs first
     /// (<see cref="RestoreSections"/>), then the form itself, last. The option lists are rebuilt before the pickers are put
-    /// back, as a load does, and RefreshLinkableOptions runs inside the screen's guard (IsBusyApplying): outside it, the
-    /// source it can null would start a load that clears the very lines being restored.
+    /// back, as a load does. Everything is written, never picked, so nothing a pick sets off (a source's lines loading over
+    /// the very lines being restored, the piece size a role starts at) runs.
     /// </summary>
     internal void Restore(RecipeSnapshot snapshot)
     {
@@ -1425,17 +1391,16 @@ public sealed class ProductRecipe : ObservableState
         var form = snapshot.Form;
         _usageForm.IsAddingUsage = form.IsAdding;
         _usageForm.UsageFormTitle = form.Title;
-        _usageForm.RestoreMode(form.Mode);
+        _usageForm.EditingUsageMode = form.Mode;
         _usageForm.IsFormEditingLines = form.IsEditingLines;
         _usageForm.IsFormPickingSource = form.IsPickingSource;
 
         RefreshLinkableOptions();
         RefreshFormRoleOptions();
 
-        _usageForm.RestorePicks(
-            form.RoleId is { } roleId ? _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null,
-            form.SourceKey is { } sourceKey ? _usageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null,
-            form.Name);
+        _usageForm.EditingUsageRole = form.RoleId is { } roleId ? _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == roleId) : null;
+        _usageForm.EditingUsageSource = form.SourceKey is { } sourceKey ? _usageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == sourceKey) : null;
+        _usageForm.EditingUsageName = form.Name;
 
         _usageForm.FormFormulaBase = form.FormulaBase;
         RestoreIngredientLines(_usageForm.FormLines, form.Lines, form.FormulaBase);
@@ -1475,38 +1440,30 @@ public sealed class ProductRecipe : ObservableState
     };
 
     /// <summary>
-    /// An undo's sections and their tabs, put back, under _arrangingRecipeTabs so RecipeTabShown short-circuits: without
-    /// it, moving the tab back would apply the form the tab is being moved off, which is the very change being undone.
+    /// An undo's sections and their tabs, put back. The tab is written, not shown (RecipeTabShown): showing it would apply
+    /// the form of the tab being moved off, which is the very change being undone.
     /// </summary>
     private void RestoreSections(IReadOnlyList<ProductUsageEdit> usages, bool hasAddSubAssemblyTab, RecipeTabChoice? tab)
     {
-        _arrangingRecipeTabs = true;
-        try
-        {
-            ReplaceUsageItems(usages);
+        ReplaceUsageItems(usages);
 
-            if (hasAddSubAssemblyTab)
-            {
-                InsertAddSubAssemblyTab();
-            }
-            else
-            {
-                RecipeTabs.Remove(AddSubAssemblyTab);
-            }
-
-            SelectedRecipeTab = tab switch
-            {
-                RecipeTabChoice.Usage(var index) => RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
-                RecipeTabChoice.AddSubAssembly => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
-                RecipeTabChoice.Packaging => PackagingTab,
-                RecipeTabChoice.Components => ComponentsTabIfShown,
-                null => null,
-            };
-        }
-        finally
+        if (hasAddSubAssemblyTab)
         {
-            _arrangingRecipeTabs = false;
+            InsertAddSubAssemblyTab();
         }
+        else
+        {
+            RecipeTabs.Remove(AddSubAssemblyTab);
+        }
+
+        SelectedRecipeTab = tab switch
+        {
+            RecipeTabChoice.Usage(var index) => RecipeTabs.OfType<SubAssemblyRecipeTab>().ElementAtOrDefault(index),
+            RecipeTabChoice.AddSubAssembly => RecipeTabs.Contains(AddSubAssemblyTab) ? AddSubAssemblyTab : null,
+            RecipeTabChoice.Packaging => PackagingTab,
+            RecipeTabChoice.Components => ComponentsTabIfShown,
+            null => null,
+        };
 
         // RecipeTabShown never ran, and it's the only other thing that writes this. Left stale, the next real
         // change of tab would think it was leaving a tab that's gone, and apply the wrong form on the way out.

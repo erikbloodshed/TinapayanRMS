@@ -508,7 +508,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         state.History.IsDirty.Should().BeFalse("nothing is typed yet");
 
         // Made purchased instead, it's no longer one In-House can hold.
-        Edit(state, () => state.EditingSource = RawMaterialSource.Purchased);
+        Edit(state, () => state.ChangeSource(RawMaterialSource.Purchased));
 
         state.EditingCategory.Should().BeNull();
         state.CategoryOptions.Select(c => c.Name).Should().Equal("Flour");

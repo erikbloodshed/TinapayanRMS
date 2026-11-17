@@ -174,22 +174,27 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     public ObservableCollection<LinkableSubAssemblyOption> ChangeLinkOptions { get; } = [];
 
     private LinkableSubAssemblyOption? _changeLinkTarget;
-    /// <summary>The sub-assembly picked to link instead: picking it relinks the section (the screen's ChangeLinkAsync).</summary>
+    /// <summary>The sub-assembly picked to link instead (<see cref="PickLinkTarget"/>), or none while the picker opens.</summary>
     public LinkableSubAssemblyOption? ChangeLinkTarget
     {
         get => _changeLinkTarget;
-        set
+        private set => RaiseAndSetIfChanged(ref _changeLinkTarget, value);
+    }
+
+    /// <summary>The user picks the sub-assembly to link instead: the section relinks to it (the screen's ChangeLinkAsync).</summary>
+    public void PickLinkTarget(LinkableSubAssemblyOption? target)
+    {
+        if (target != ChangeLinkTarget)
         {
-            if (RaiseAndSetIfChanged(ref _changeLinkTarget, value))
-            {
-                _linkTargetPicks.OnNext(value);
-            }
+            ChangeLinkTarget = target;
+            _linkTargetPicks.OnNext(target);
         }
     }
 
     // Each pick the form's pickers make, or the screen makes for the user (opening a form, Open from Sub-Assemblies):
-    // what the screen reacts to. Fed by the setters alone, so an undo putting the form back (RestoreMode, RestorePicks)
-    // and the option lists being rebuilt (ShowRole, ShowSource) change what shows without anything reacting.
+    // what the screen reacts to. Fed by the Pick methods alone (PickMode, PickRole, PickSource, PickLinkTarget): an undo
+    // putting the form back, or the option lists being rebuilt, writes the properties, which shows them without anything
+    // reacting.
     private readonly Subject<UsageFormMode> _modePicks = new();
     private readonly Subject<(SubAssemblyRole? Before, SubAssemblyRole? After)> _rolePicks = new();
     private readonly Subject<LinkableSubAssemblyOption?> _sourcePicks = new();
@@ -239,16 +244,20 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     }
 
     private UsageFormMode _editingUsageMode;
-    /// <summary>Which way the add form takes its sub-assembly: what Add Sub-Assembly's drop-down picked.</summary>
+    /// <summary>Which way the add form takes its sub-assembly: what Add Sub-Assembly's drop-down picked (<see cref="PickMode"/>).</summary>
     public UsageFormMode EditingUsageMode
     {
         get => _editingUsageMode;
-        set
+        internal set => RaiseAndSetIfChanged(ref _editingUsageMode, value);
+    }
+
+    /// <summary>The way in picked for the add form: it starts again empty in it (<see cref="ModePicks"/>).</summary>
+    public void PickMode(UsageFormMode mode)
+    {
+        if (mode != EditingUsageMode)
         {
-            if (RaiseAndSetIfChanged(ref _editingUsageMode, value))
-            {
-                _modePicks.OnNext(value);
-            }
+            EditingUsageMode = mode;
+            _modePicks.OnNext(mode);
         }
     }
 
@@ -315,17 +324,21 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     }
 
     private SubAssemblyRole? _editingUsageRole;
-    /// <summary>The role of the new section the form edits, which is what it's called. Picked from FormRoleOptions.</summary>
+    /// <summary>The role of the new section the form edits, which is what it's called. Picked from FormRoleOptions (<see cref="PickRole"/>).</summary>
     public SubAssemblyRole? EditingUsageRole
     {
         get => _editingUsageRole;
-        set
+        internal set => RaiseAndSetIfChanged(ref _editingUsageRole, value);
+    }
+
+    /// <summary>A role picked for the section: the piece size may follow it (<see cref="RolePicks"/>).</summary>
+    public void PickRole(SubAssemblyRole? role)
+    {
+        var before = EditingUsageRole;
+        if (role != before)
         {
-            var before = _editingUsageRole;
-            if (RaiseAndSetIfChanged(ref _editingUsageRole, value))
-            {
-                _rolePicks.OnNext((before, value));
-            }
+            EditingUsageRole = role;
+            _rolePicks.OnNext((before, role));
         }
     }
 
@@ -341,16 +354,20 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     }
 
     private LinkableSubAssemblyOption? _editingUsageSource;
-    /// <summary>The existing sub-assembly to link or copy.</summary>
+    /// <summary>The existing sub-assembly to link or copy (<see cref="PickSource"/>).</summary>
     public LinkableSubAssemblyOption? EditingUsageSource
     {
         get => _editingUsageSource;
-        set
+        internal set => RaiseAndSetIfChanged(ref _editingUsageSource, value);
+    }
+
+    /// <summary>A sub-assembly or packaging picked to link or copy: its lines load into the form (<see cref="SourcePicks"/>).</summary>
+    public void PickSource(LinkableSubAssemblyOption? source)
+    {
+        if (source != EditingUsageSource)
         {
-            if (RaiseAndSetIfChanged(ref _editingUsageSource, value))
-            {
-                _sourcePicks.OnNext(value);
-            }
+            EditingUsageSource = source;
+            _sourcePicks.OnNext(source);
         }
     }
 
@@ -383,9 +400,9 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         set => RaiseAndSetIfChanged(ref _selectedFormAddIn, value);
     }
 
-    // The piece size: the user types either figure into its box, and the other follows from the batch weight. Only the one
-    // typed is kept (AuthoredField). A box's setter is the typing; the screen shows a size (ShowPieceSize) or puts one back
-    // (RestorePieceSize) through methods of their own, so nothing has to tell the two apart.
+    // The piece size: the user types either figure into its box (TypeWeightPerPiece, TypeYield), and the other follows from
+    // the batch weight. Only the one typed is kept (AuthoredField). The screen shows a size (ShowPieceSize) or puts one back
+    // (RestorePieceSize).
 
     /// <summary>Which piece-size figure was typed, and so stays put when the batch changes.</summary>
     internal UsageAuthoredField AuthoredField { get; private set; } = UsageAuthoredField.WeightPerPiece;
@@ -394,20 +411,18 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     internal decimal AuthoredValue => AuthoredField == UsageAuthoredField.WeightPerPiece ? _editingUsageWeightPerPiece : _editingUsageYield;
 
     private decimal _editingUsageWeightPerPiece;
-    /// <summary>Grams of the batch in a piece. Typed, it's the figure kept, and the yield follows.</summary>
-    public decimal EditingUsageWeightPerPiece
-    {
-        get => _editingUsageWeightPerPiece;
-        set => PieceSizeTyped(UsageAuthoredField.WeightPerPiece, value);
-    }
+    /// <summary>Grams of the batch in a piece. Typed (<see cref="TypeWeightPerPiece"/>), it's the figure kept, and the yield follows.</summary>
+    public decimal EditingUsageWeightPerPiece => _editingUsageWeightPerPiece;
 
     private decimal _editingUsageYield;
-    /// <summary>Pieces a batch makes. Typed, it's the figure kept, and the weight per piece follows.</summary>
-    public decimal EditingUsageYield
-    {
-        get => _editingUsageYield;
-        set => PieceSizeTyped(UsageAuthoredField.Yield, value);
-    }
+    /// <summary>Pieces a batch makes. Typed (<see cref="TypeYield"/>), it's the figure kept, and the weight per piece follows.</summary>
+    public decimal EditingUsageYield => _editingUsageYield;
+
+    /// <summary>The user types the weight per piece: it's the figure kept, and the yield follows.</summary>
+    public void TypeWeightPerPiece(decimal value) => PieceSizeTyped(UsageAuthoredField.WeightPerPiece, value);
+
+    /// <summary>The user types the yield: it's the figure kept, and the weight per piece follows.</summary>
+    public void TypeYield(decimal value) => PieceSizeTyped(UsageAuthoredField.Yield, value);
 
     /// <summary>
     /// Shows a piece size, the other figure worked out from the batch, and the form's figures with it: a section opened, or
@@ -575,35 +590,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
             : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
     }
 
-    // An undo step putting the form back (the screen's RestoreSnapshot): each field is set and said to have changed even
-    // when it's the same, so a picker bound to it shows it again, and without the setters' own follow-ups.
-
-    /// <summary>Puts the add form's mode back, before the screen rebuilds the option lists it filters.</summary>
-    internal void RestoreMode(UsageFormMode mode)
-    {
-        _editingUsageMode = mode;
-        RaisePropertyChanged(nameof(EditingUsageMode));
-    }
-
-    /// <summary>The role picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so nothing follows.</summary>
-    internal void ShowRole(SubAssemblyRole? role) => RaiseAndSetIfChanged(ref _editingUsageRole, role, nameof(EditingUsageRole));
-
-    /// <summary>The source picked, re-pointed at the rebuilt options' copy of it, or dropped when it's gone: no pick, so the form keeps its lines.</summary>
-    internal void ShowSource(LinkableSubAssemblyOption? source) =>
-        RaiseAndSetIfChanged(ref _editingUsageSource, source, nameof(EditingUsageSource));
-
-    /// <summary>Puts the role, source and name back, once the option lists they come from are rebuilt.</summary>
-    internal void RestorePicks(SubAssemblyRole? role, LinkableSubAssemblyOption? source, string? name)
-    {
-        _editingUsageRole = role;
-        RaisePropertyChanged(nameof(EditingUsageRole));
-        _editingUsageSource = source;
-        RaisePropertyChanged(nameof(EditingUsageSource));
-        _editingUsageName = name;
-        RaisePropertyChanged(nameof(EditingUsageName));
-    }
-
-    /// <summary>Puts the piece size back as it stood: which figure was typed, and both figures.</summary>
+    /// <summary>Puts the piece size back as it stood, for an undo: which figure was typed, and both figures.</summary>
     internal void RestorePieceSize(UsageAuthoredField authoredField, decimal weightPerPiece, decimal yield)
     {
         AuthoredField = authoredField;

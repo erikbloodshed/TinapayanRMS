@@ -14,27 +14,27 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// </summary>
 public sealed class RawMaterialUsageExample : ObservableState
 {
-    private readonly IFormPartHost _host;
-
-    /// <param name="host">The screen, whose loads re-point the material picked without it being the user's pick.</param>
-    public RawMaterialUsageExample(IFormPartHost host)
+    public RawMaterialUsageExample()
     {
-        _host = host;
         ReplaceUnitOptions(null, kept: null);
         CalculateCommand = ScreenCommand.Of(Calculate, () => Material is not null && Unit is not null && Quantity > 0);
     }
 
-    /// <summary>The material costed: another one picked brings its own units, and the example goes.</summary>
+    /// <summary>The material costed: picked (<see cref="Pick"/>), or a load's fresh copy of it (<see cref="Refresh"/>).</summary>
     public RawMaterial? Material
     {
         get;
-        set
+        private set => RaiseAndSetIfChanged(ref field, value);
+    }
+
+    /// <summary>Another material picked: it brings its own units, and the example goes.</summary>
+    public void Pick(RawMaterial? material)
+    {
+        if (material != Material)
         {
-            if (RaiseAndSetIfChanged(ref field, value) && !_host.IsRefreshing)
-            {
-                ReplaceUnitOptions(value, kept: null);
-                InputsEdited();
-            }
+            Material = material;
+            ReplaceUnitOptions(material, kept: null);
+            InputsEdited();
         }
     }
 
@@ -74,13 +74,7 @@ public sealed class RawMaterialUsageExample : ObservableState
     public ScreenCommand CalculateCommand { get; }
 
     /// <summary>A worked-out example belongs to the inputs it was worked out from, so it goes as they're changed.</summary>
-    private void InputsEdited()
-    {
-        if (!_host.IsRefreshing)
-        {
-            Result = null;
-        }
-    }
+    private void InputsEdited() => Result = null;
 
     /// <summary>
     /// A load's fresh copy of the material picked (<paramref name="material"/>): another material means other units, so they're

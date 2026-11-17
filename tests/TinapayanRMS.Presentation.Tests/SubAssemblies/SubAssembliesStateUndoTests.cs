@@ -286,7 +286,7 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRow = state.List.Rows.Single(r => r.Id == subAssemblyId);
+        state.Pick(state.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
 
         state.History.CanUndo.Should().BeFalse("the load itself isn't a change");

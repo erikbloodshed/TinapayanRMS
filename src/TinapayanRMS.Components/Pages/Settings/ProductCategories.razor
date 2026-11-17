@@ -8,7 +8,7 @@
 <div class="list-and-form">
     <section class="card list-card">
         <h2 class="section-header">Product Categories</h2>
-        <PickGrid TItem="ProductCategory" DataSource="State!.Items" @bind-SelectedItem="State!.SelectedItem">
+        <PickGrid TItem="ProductCategory" DataSource="State!.Items" SelectedItem="State!.SelectedItem" SelectedItemChanged="State!.Pick">
             <Columns>
                 <GridColumn Field="@nameof(ProductCategory.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(ProductCategory.Name)" HeaderText="Name" />

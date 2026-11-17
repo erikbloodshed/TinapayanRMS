@@ -353,20 +353,31 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     private Product? _selectedProduct;
     /// <summary>
-    /// The product the form is about. Setting it is a pick, which loads that product into the form (_picks); a load that
-    /// only finds a fresh copy of it re-points it quietly (<see cref="RepointSelection"/>), leaving the form and whatever's
-    /// typed into it alone.
+    /// The product the form is about. Only <see cref="Pick"/> loads it into the form (_picks): a load points it at its fresh
+    /// copy, leaving the form and whatever's typed into it alone.
     /// </summary>
     public Product? SelectedProduct
     {
         get => _selectedProduct;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _selectedProduct, value))
             {
                 SelectionChanged();
-                _picks.OnNext(value);
             }
+        }
+    }
+
+    /// <summary>
+    /// The user picks <paramref name="product"/> (a list's row, Open), or nothing, as New does: it's loaded into the form,
+    /// unless it's the one showing.
+    /// </summary>
+    public void Pick(Product? product)
+    {
+        if (product != SelectedProduct)
+        {
+            SelectedProduct = product;
+            _picks.OnNext(product);
         }
     }
 
@@ -587,15 +598,6 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     /// </summary>
     public Interaction<string, string?> PromptForNewCategory { get; } = new();
 
-    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the product picked: shown, not picked again.</summary>
-    private void RepointSelection(Product? fresh)
-    {
-        if (RaiseAndSetIfChanged(ref _selectedProduct, fresh, nameof(SelectedProduct)))
-        {
-            SelectionChanged();
-        }
-    }
-
     /// <summary>
     /// Flags each product in the list whose current price earns less than its target markup: every product
     /// priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a dozen or so queries however many there are),
@@ -636,8 +638,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     /// <summary>A product picked in the list loads into the form.</summary>
     private void WirePicks()
     {
-        // A pick loads the product into the form, in these three steps, in this order. Only a pick does (_picks): a load
-        // re-points the selection at its fresh copy quietly, so nothing here has to tell the two apart.
+        // A pick loads the product into the form, in these three steps, in this order. Only a pick does (Pick, through
+        // _picks): a load points the selection at its fresh copy, so nothing here has to tell the two apart.
         // Another product's name and price land in the form ahead of its details, so its history goes first, as
         // ClearDetailsForAnother would take it anyway: measured against the previous product's saved form, they read
         // as unsaved changes, and Save lit up until the details arrived — a flicker on every pick.
@@ -832,7 +834,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             ComponentsTable.TakeFresh(load.ComponentCosts, load.ComponentLinks);
             RefreshComponentOptions();
 
-            RepointSelection(Products.FirstOrDefault(p => p.Id == selectedId));
+            SelectedProduct = Products.FirstOrDefault(p => p.Id == selectedId);
             if (SelectedProduct is not null)
             {
                 ShowUpdatedAt(SelectedProduct.UpdatedAt);
@@ -853,9 +855,9 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             Recipe.RefreshLinkableOptions();
 
             // An add form opened before the roles were loaded takes the first role it can have, as it would have.
-            UsageForm.ShowRole(UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
-                ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null));
-            UsageForm.ShowSource(UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey));
+            UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usageRoleId)
+                ?? (usageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null);
+            UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == usageSourceKey);
 
             UsageForm.Recompute();
             RecomputeCosts();
@@ -866,7 +868,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             await LoadProductDetailAsync(reloaded, CancellationToken.None);
         }
 
-        // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the product's form.
+        // After the merge, which only points the selection at its fresh copy: this one has to load the product's form.
         OpenRecordAskedFor();
 
         if (_subAssemblyToStartFrom is { } subAssemblyId)
@@ -906,7 +908,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
                 sourceProductId, name, make, madeAs, DateTime.Now, CancellationToken.None));
 
             await LoadCommand.ExecuteAsync();
-            SelectedProduct = Products.FirstOrDefault(p => p.Id == newId);
+            Pick(Products.FirstOrDefault(p => p.Id == newId));
         });
     }
 
@@ -1049,8 +1051,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         StartNewProduct();
         EditingName = subAssembly.Name;
         Recipe.OpenAddSubAssemblyTab();
-        UsageForm.EditingUsageMode = UsageFormMode.Link;
-        UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId);
+        UsageForm.PickMode(UsageFormMode.Link);
+        UsageForm.PickSource(UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.SubAssembly?.Id == subAssemblyId));
         History.RefreshDirty();
     }
 
@@ -1084,7 +1086,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             List.ClearListFilters();
         }
 
-        SelectedProduct = product;
+        Pick(product);
         return true;
     }
 
@@ -1109,7 +1111,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     private void StartNewProduct(ProductStage? stage = null, int? folderId = null, bool isComposite = false)
     {
         NewProductPlace.StartNew(stage, folderId);
-        SelectedProduct = null;
+        Pick(null);
         FormVersion++;
         _editingId = 0;
         EditingName = string.Empty;
@@ -1387,7 +1389,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         _preloadedDetail = (saved.Id, detail);
         try
         {
-            SelectedProduct = saved;
+            Pick(saved);
         }
         finally
         {
@@ -1817,7 +1819,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     Task IProductsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IProductsListHost.Pick(Product product) =>
-        PickFromList(product.Id, () => SelectedProduct = product, List.SyncTreeSelection);
+        PickFromList(product.Id, () => Pick(product), List.SyncTreeSelection);
 
     void IProductsListHost.StartNew(ProductStage? stage, int? folderId, bool isComposite) => NewProduct(stage, folderId, isComposite);
 
@@ -1828,8 +1830,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     /// </summary>
     async Task IProductsListHost.SaveNewAsync(string name)
     {
-        // Not an edit of the user's: there's no undo step for it, and nothing unsaved to ask about if the save is refused.
-        ApplyRefresh(() => EditingName = name);
+        // Written, not typed: there's no undo step for it, and nothing unsaved to ask about if the save is refused.
+        EditingName = name;
         await RunSafelyAsync(SaveAsync);
         if (_editingId == 0 && ErrorMessage is null)
         {
@@ -1840,7 +1842,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     void IProductsListHost.NameNew(string name) => AsUndoStep(() => EditingName = name);
 
-    void IProductsListHost.ClearNewName() => ApplyRefresh(() => EditingName = string.Empty);
+    void IProductsListHost.ClearNewName() => EditingName = string.Empty;
 
     void IProductsListHost.RenamedOnForm(Product product, string name)
     {
@@ -1852,14 +1854,11 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         // The Clone tab's name follows too, while it's still the one it started with.
         var oldCloneName = $"{product.Name} Copy";
         var newCloneName = $"{name} Copy";
-        ApplyRefresh(() =>
+        EditingName = name;
+        if (EditingCloneName == oldCloneName)
         {
-            EditingName = name;
-            if (EditingCloneName == oldCloneName)
-            {
-                EditingCloneName = newCloneName;
-            }
-        });
+            EditingCloneName = newCloneName;
+        }
         History.RewriteAll(snapshot => snapshot with
         {
             Name = name,
@@ -1871,7 +1870,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     {
         if (SelectedProduct is { } selected && moved.FirstOrDefault(p => p.Id == selected.Id) is { } fresh)
         {
-            RepointSelection(fresh);
+            SelectedProduct = fresh;
         }
 
         if (moved.FirstOrDefault(p => p.Id == _editingId) is { } onForm)

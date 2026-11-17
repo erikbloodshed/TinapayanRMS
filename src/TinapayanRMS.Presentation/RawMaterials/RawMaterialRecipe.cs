@@ -65,22 +65,35 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     public ObservableCollection<SubAssembly> SubAssemblyOptions { get; } = [];
 
     private SubAssembly? _subAssembly;
-    /// <summary>The sub-assembly it's made from, the recipe its add-ins go on top of. Picked from <see cref="SubAssemblyOptions"/>.</summary>
+    /// <summary>
+    /// The sub-assembly it's made from, the recipe its add-ins go on top of: as the screen loads or puts it back, or as the
+    /// user picks it from <see cref="SubAssemblyOptions"/> (<see cref="PickSubAssembly"/>). Its lines are read again when
+    /// it's another.
+    /// </summary>
     public SubAssembly? SubAssembly
     {
         get => _subAssembly;
-        set
+        internal set
         {
-            if (!SetSubAssembly(value))
+            if (RaiseAndSetIfChanged(ref _subAssembly, value))
             {
-                return;
+                _subAssemblies.OnNext(value);
             }
+        }
+    }
 
-            // Another sub-assembly picked after Edit settles it, and the badge comes back.
-            if (value is not null && IsChangingSubAssembly)
-            {
-                IsChangingSubAssembly = false;
-            }
+    /// <summary>The user picks <paramref name="subAssembly"/> in the Made from picker: one picked after Edit settles it, and the badge comes back.</summary>
+    public void PickSubAssembly(SubAssembly? subAssembly)
+    {
+        if (subAssembly == SubAssembly)
+        {
+            return;
+        }
+
+        SubAssembly = subAssembly;
+        if (subAssembly is not null && IsChangingSubAssembly)
+        {
+            IsChangingSubAssembly = false;
         }
     }
 
@@ -166,21 +179,6 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     {
         get;
         private set => RaiseAndSetIfChanged(ref field, value);
-    }
-
-    /// <summary>The sub-assembly picked, said to have changed without the edit that picking it is (the badge's Edit stays as it was).</summary>
-    public void ShowSubAssembly(SubAssembly? subAssembly) => SetSubAssembly(subAssembly);
-
-    /// <summary>The sub-assembly set, and its lines read again, when it's another; false when it was that one already.</summary>
-    private bool SetSubAssembly(SubAssembly? subAssembly)
-    {
-        if (!RaiseAndSetIfChanged(ref _subAssembly, subAssembly, nameof(SubAssembly)))
-        {
-            return false;
-        }
-
-        _subAssemblies.OnNext(subAssembly);
-        return true;
     }
 
     /// <summary>The sub-assemblies as a load read them, packaging sets left out, merged into the picker's list.</summary>

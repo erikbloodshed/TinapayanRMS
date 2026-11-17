@@ -168,7 +168,7 @@ public class SubAssembliesStateVersionTests(DatabaseFixture fixture) : Persisten
     {
         var state = CreateState(asksAboutCosts);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRow = state.List.Rows.Single(r => r.Id == subAssemblyId);
+        state.Pick(state.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 1, () => $"lines={state.Batch.Lines.Count}, error={state.ErrorMessage}");
         return state;
     }

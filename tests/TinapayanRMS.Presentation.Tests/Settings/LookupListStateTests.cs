@@ -61,7 +61,7 @@ public class LookupListStateTests(DatabaseFixture fixture) : PersistenceTestBase
         await state.LoadCommand.ExecuteAsync();
         await AddAsync(state, "kilogram", "kg");
 
-        state.SelectedItem = state.Items.Single();
+        state.Pick(state.Items.Single());
         state.FormTitle.Should().Be("Edit Unit");
         state.EditingName.Should().Be("kilogram");
         state.EditingAbbreviation.Should().Be("kg");
@@ -79,12 +79,27 @@ public class LookupListStateTests(DatabaseFixture fixture) : PersistenceTestBase
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
         await AddAsync(state, "kilogram", "kg");
-        state.SelectedItem = state.Items.Single();
+        state.Pick(state.Items.Single());
         state.EditingName = "kilo";
 
         await state.LoadCommand.ExecuteAsync();
 
         state.SelectedItem.Should().BeSameAs(state.Items.Single());
+        state.EditingName.Should().Be("kilo");
+    });
+
+    [Test]
+    public Task The_item_showing_picked_again_keeps_what_was_typed() => UiThread.RunAsync(async () =>
+    {
+        // As a grid telling of the row it already has picked does.
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        await AddAsync(state, "kilogram", "kg");
+        state.Pick(state.Items.Single());
+        state.EditingName = "kilo";
+
+        state.Pick(state.Items.Single());
+
         state.EditingName.Should().Be("kilo");
     });
 
@@ -108,7 +123,7 @@ public class LookupListStateTests(DatabaseFixture fixture) : PersistenceTestBase
         await state.LoadCommand.ExecuteAsync();
         await AddAsync(state, "kilogram", "kg");
         state.DeleteCommand.CanExecute().Should().BeFalse("nothing's picked");
-        state.SelectedItem = state.Items.Single();
+        state.Pick(state.Items.Single());
 
         await state.DeleteCommand.ExecuteAsync();
 
@@ -122,7 +137,7 @@ public class LookupListStateTests(DatabaseFixture fixture) : PersistenceTestBase
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
         await AddAsync(state, "kilogram", "kg");
-        state.SelectedItem = state.Items.Single();
+        state.Pick(state.Items.Single());
 
         await state.DeleteCommand.ExecuteAsync();
 

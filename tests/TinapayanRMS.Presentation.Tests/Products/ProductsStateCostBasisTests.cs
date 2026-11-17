@@ -88,7 +88,7 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
         var state = await OpenAsync(productId);
         await state.ToggleCostBasisCommand.ExecuteAsync();
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == cheeseRollId);
+        state.Pick(state.Products.Single(p => p.Id == cheeseRollId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.SelectedProduct?.Id == cheeseRollId && state.UsageForm.FormLines.Count == 1,
             () => $"selected={state.SelectedProduct?.Id}, lines={state.UsageForm.FormLines.Count}");
@@ -204,7 +204,7 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && (ready?.Invoke(state) ?? (state.UsageForm.FormLines.Count == 1 && state.Packaging.LineEdits.Count > 0)),
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}, lines={state.UsageForm.FormLines.Count}");

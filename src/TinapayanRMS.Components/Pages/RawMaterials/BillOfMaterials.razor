@@ -10,7 +10,7 @@
         @if (State.Recipe.IsPickingSubAssembly)
         {
             <PickField ID="made-from" TItem="SubAssembly" Items="State.Recipe.SubAssemblyOptions" TextField="Name" AllowEmpty="true"
-                       Value="State.Recipe.SubAssembly" ValueChanged="s => State.Recipe.SubAssembly = s" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
+                       Value="State.Recipe.SubAssembly" ValueChanged="State.Recipe.PickSubAssembly" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
                        Tooltip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top." />
         }
         @if (State.Recipe.IsShowingSubAssemblyBadge)

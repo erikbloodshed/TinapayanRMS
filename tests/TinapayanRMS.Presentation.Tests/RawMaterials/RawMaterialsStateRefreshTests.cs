@@ -132,8 +132,8 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.LoadCommand.ExecuteAsync();
 
         // Sugar picked before Flour's details can arrive, as a quick second click or an arrow key held down in the list does.
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == flourId);
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == sugarId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == flourId));
+        state.Pick(state.RawMaterials.Single(m => m.Id == sugarId));
 
         await Settle.UntilAsync(state, () => state.PurchaseCost.BrandPriceRows.Count > 0 && state.PriceLog.Entries.Count > 0,
             () => $"brands={state.PurchaseCost.BrandPriceRows.Count}, prices={state.PriceLog.Entries.Count}");
@@ -141,8 +141,8 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.PriceLog.Entries.Should().ContainSingle().Which.Entry.RawMaterialId.Should().Be(sugarId);
 
         // The same for the recipe a made ingredient is made from.
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Name == "Butter Icing");
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Name == "Syrup");
+        state.Pick(state.RawMaterials.Single(m => m.Name == "Butter Icing"));
+        state.Pick(state.RawMaterials.Single(m => m.Name == "Syrup"));
 
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.Lines.Count == 1, () => $"lines={state.Recipe.Lines.Count}");
         state.Recipe.Lines.Select(l => (l.Ingredient!.Name, l.Grams)).Should().Equal([("Sugar", 100m)], "Butter Icing's lines never join Syrup's");
@@ -162,7 +162,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.LoadCommand.ExecuteAsync();
         await SelectAsync(state, state.RawMaterials.Single(m => m.Id == flourId));
 
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == sugarId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == sugarId));
 
         // Its details are still on their way (read off the UI thread): Flour's show until they arrive, not an empty grid,
         // and a Save now would write Flour's brand prices under Sugar.
@@ -640,7 +640,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent = 20m;
         state.ShowPurchaseSetup.Should().BeFalse("a made ingredient is made from a sub-assembly instead of priced");
@@ -673,7 +673,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         await state.SaveCommand.ExecuteAsync();
 
@@ -700,7 +700,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var opened = new List<int>();
         using var subscription = state.Recipe.SubAssemblyOpenRequests.Subscribe(opened.Add);
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         await PickRecipeAsync(state, "Syrup Base");
         await state.Recipe.OpenSubAssemblyCommand.ExecuteAsync();
 
@@ -718,7 +718,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.LoadCommand.ExecuteAsync();
 
         await state.NewCommand.ExecuteAsync();
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         state.Recipe.IsPickingSubAssembly.Should().BeTrue("nothing is picked yet");
         await PickRecipeAsync(state, "Syrup Base");
         (state.Recipe.IsPickingSubAssembly, state.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true), "a pick settles it");
@@ -731,12 +731,12 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.Recipe.SubAssembly!.Name.Should().Be("Syrup Base", "Cancel keeps it as it was");
 
         await state.Recipe.StartChangingSubAssemblyCommand.ExecuteAsync();
-        state.Recipe.SubAssembly = state.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base");
+        state.Recipe.PickSubAssembly(state.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
         (state.Recipe.IsChangingSubAssembly, state.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true), "another pick settles it again");
 
         // A saved one opens with its badge, even after Edit was left open on the form before.
         await state.Recipe.StartChangingSubAssemblyCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == syrupId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == syrupId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.Lines.Count == 1, () => $"lines={state.Recipe.Lines.Count}");
         (state.Recipe.IsChangingSubAssembly, state.Recipe.IsShowingSubAssemblyBadge).Should().Be((false, true));
         state.Recipe.SubAssemblyBadgeText.Should().Be("Simple Syrup Base, from Sub-Assemblies");
@@ -753,7 +753,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent = 20m;
         await PickRecipeAsync(state, "Syrup Base");
@@ -778,7 +778,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent = 20m;
         await PickRecipeAsync(state, "Syrup Base");
@@ -813,7 +813,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
         state.EditingWeightLossPercent.Should().BeNull("a purchased material has no weight loss");
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent.Should().Be(3m, "a made ingredient starts at 3%");
         await PickRecipeAsync(state, "Syrup Base");
@@ -837,7 +837,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent.Should().Be(3m);
         state.Recipe.BomTotalWeight.Should().Be(0m, "no sub-assembly picked yet");
@@ -880,7 +880,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == flourId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == flourId));
 
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => "details never arrived");
         state.PurchaseCost.CurrentCostText.Should().Be("0.0500");
@@ -897,7 +897,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == syrupId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == syrupId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.Lines.Count == 1, () => $"lines={state.Recipe.Lines.Count}");
         state.Recipe.BomTotalCost.Should().Be(110m);
 
@@ -932,7 +932,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == syrupId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == syrupId));
 
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => "details never arrived");
         state.LastUpdatedText.Should().Be("Sep 21, 2026", "the tile is one date, the day its cost changed, with no time");
@@ -944,7 +944,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         var flourId = await SeedPurchasedIngredientAsync("Flour");
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == flourId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == flourId));
 
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => "details never arrived");
         state.LastUpdatedText.Should().Be("—", "it was seeded straight into the database and has never been priced");
@@ -961,7 +961,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Simple Syrup";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         await PickRecipeAsync(state, "Syrup Base");
         state.EditingWeightLossPercent = null; // the box shows 0.00 when it's empty
@@ -985,7 +985,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.NewCommand.ExecuteAsync();
         await AddUnitAsync(state, bagId, 25000m);
         AddBrandPrice(state, null, "bag", 90m);
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         state.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = state.Ingredients.Single().Id, Grams = 100m });
 
         // New over unsaved changes asks about them first: not saving them is how they're left behind.
@@ -1010,7 +1010,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.UsageExample.Material = state.RawMaterials.Single();
+        state.UsageExample.Pick(state.RawMaterials.Single());
         state.UsageExample.Quantity = 2m;
         state.UsageExample.Unit = state.UsageExample.UnitOptions.Single(o => o.Name == "bag");
 
@@ -1148,9 +1148,9 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Scotch Tape";
-        state.EditingType = RawMaterialType.Packaging;
+        state.ChangeType(RawMaterialType.Packaging);
         state.EditingCategory = state.CategoryOptions.Single(c => c.Id == tapesId);
-        state.EditingBaseUnit = state.UnitsOfMeasure.Single(u => u.Id == millimeterId);
+        state.ChangeBaseUnit(state.UnitsOfMeasure.Single(u => u.Id == millimeterId));
 
         // In the Alternative Units grid's add row: metric to metric, and English to metric.
         var meter = state.Units.NewRow();
@@ -1342,7 +1342,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single();
+        state.Pick(state.RawMaterials.Single());
 
         await Settle.UntilAsync(state, () => state.PurchaseCost.BrandPriceRows.Count == 1,
             () => $"brands={state.PurchaseCost.BrandPriceRows.Count}");
@@ -1385,7 +1385,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.UsageExample.Material = state.RawMaterials.Single();
+        state.UsageExample.Pick(state.RawMaterials.Single());
         state.UsageExample.Quantity = 200m;
         state.UsageExample.Unit = state.UsageExample.UnitOptions.Single(o => o.Name == "gram");
 
@@ -1411,11 +1411,11 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.SavedBaseUnitText.Should().Be("gram (g)", "an ingredient's base unit is always the gram");
         state.CategoryOptions.Where(c => c.Id > 0).Should().NotContain(c => c.Id == boxesId, "an ingredient is offered ingredient categories only");
         state.EditingName = "Cake Box";
-        state.EditingSource = RawMaterialSource.Made;
+        state.ChangeSource(RawMaterialSource.Made);
         PickCategory(state);
         state.EditingWeightLossPercent = 5m;
 
-        state.EditingType = RawMaterialType.Packaging;
+        state.ChangeType(RawMaterialType.Packaging);
         state.IsEditingPackaging.Should().BeTrue();
         state.EditingSource.Should().Be(RawMaterialSource.Purchased, "packaging is always purchased");
         state.EditingWeightLossPercent.Should().BeNull();
@@ -1425,7 +1425,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.CategoryOptions.Where(c => c.Id > 0).Select(c => c.Id).Should().Equal([boxesId], "packaging is offered packaging categories only");
         state.EditingCategory = state.CategoryOptions.Single(c => c.Id == boxesId);
 
-        state.EditingBaseUnit = state.UnitsOfMeasure.Single(u => u.Id == pieceId);
+        state.ChangeBaseUnit(state.UnitsOfMeasure.Single(u => u.Id == pieceId));
         state.BaseUnitAbbreviation.Should().Be("pc", "the form names the base unit before the material is saved");
         state.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("piece");
         state.SavedBaseUnitText.Should().Be("—", "the Base Unit tile shows the unit only once it's saved");
@@ -1924,7 +1924,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.LoadCommand.ExecuteAsync();
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Cake Box";
-        state.EditingType = RawMaterialType.Packaging;
+        state.ChangeType(RawMaterialType.Packaging);
         PickCategory(state);
 
         // Priced by the piece before the base unit is picked: the piece is added as an alternative unit.
@@ -1932,7 +1932,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         brand.Quantity = 1m;
         state.Units.Rows.Select(r => r.UnitName).Should().Equal("piece");
 
-        state.EditingBaseUnit = state.UnitsOfMeasure.Single(u => u.Id == pieceId);
+        state.ChangeBaseUnit(state.UnitsOfMeasure.Single(u => u.Id == pieceId));
 
         (brand.UnitKey, brand.Quantity, brand.CanTypeQuantity).Should().Be((PurchaseUnitChoice.BaseUnitKey, 1m, false));
         state.Units.Rows.Should().BeEmpty("the piece is the base unit now, which can't be an alternative unit too");
@@ -2039,7 +2039,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     /// <summary>Picks the sub-assembly named <paramref name="name"/> on the Recipe card, and waits for its lines to show.</summary>
     private static async Task PickRecipeAsync(RawMaterialsState state, string name)
     {
-        state.Recipe.SubAssembly = state.Recipe.SubAssemblyOptions.Single(s => s.Name == name);
+        state.Recipe.PickSubAssembly(state.Recipe.SubAssemblyOptions.Single(s => s.Name == name));
         await Settle.UntilAsync(state, () => state.Recipe.Lines.Count > 0, () => $"recipe lines={state.Recipe.Lines.Count}");
     }
 
@@ -2064,7 +2064,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     /// </summary>
     private static async Task SelectAsync(RawMaterialsState state, RawMaterial material)
     {
-        state.SelectedRawMaterial = material;
+        state.Pick(material);
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"{material.Name}'s details never arrived");
     }
 

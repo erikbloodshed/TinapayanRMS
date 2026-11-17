@@ -42,16 +42,16 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await state.LoadCommand.ExecuteAsync();
         Product Named(string name) => state.Products.Single(p => p.Name == name);
 
-        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Almond Bread"), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(Named("Almond Bread")), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
 
         factory.Fail = true;
-        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Banana Bread"), () => state.ErrorMessage is not null);
+        await Settle.PickAsync(state, () => state.Pick(Named("Banana Bread")), () => state.ErrorMessage is not null);
         state.ErrorMessage.Should().Be(Failure.TimedOutText);
         state.Recipe.UsageEdits.Should().BeEmpty("nothing of Banana Bread's came, and Almond Bread's mustn't show under its name");
 
         factory.Fail = false;
         await Settle.PickAsync(state,
-            () => state.SelectedProduct = Named("Cheese Bread"),
+            () => state.Pick(Named("Cheese Bread")),
             () => state.AreDetailsReady && state.EditingName == "Cheese Bread" && state.Recipe.UsageEdits.Count == 1);
         state.ErrorMessage.Should().BeNull("a load that works takes away the error a failed one left");
     });
@@ -73,11 +73,11 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var state = CreateProductsState(factory);
         await state.LoadCommand.ExecuteAsync();
         Product Named(string name) => state.Products.Single(p => p.Name == name);
-        await Settle.PickAsync(state, () => state.SelectedProduct = Named("Almond Bread"), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(Named("Almond Bread")), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
 
         var hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         factory.Hold = hold;
-        state.SelectedProduct = Named("Banana Bread");
+        state.Pick(Named("Banana Bread"));
         state.AreDetailsReady.Should().BeFalse("Banana Bread's details are still on their way");
         state.EditingName = "Banana Loaf";
 
@@ -105,14 +105,14 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await state.LoadCommand.ExecuteAsync();
         RawMaterial WithId(int id) => state.RawMaterials.Single(m => m.Id == id);
 
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[0]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(WithId(ids[0])), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
 
         factory.Fail = true;
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[1]), () => state.ErrorMessage is not null);
+        await Settle.PickAsync(state, () => state.Pick(WithId(ids[1])), () => state.ErrorMessage is not null);
         state.ErrorMessage.Should().Be(Failure.TimedOutText);
 
         factory.Fail = false;
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = WithId(ids[2]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(WithId(ids[2])), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
         state.ErrorMessage.Should().BeNull();
     });
 
@@ -131,19 +131,19 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await state.LoadCommand.ExecuteAsync();
         StandaloneSubAssemblyRow Named(string name) => state.List.Rows.Single(r => r.Name == name);
 
-        await Settle.PickAsync(state, () => state.SelectedRow = Named("Almond Dough"), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1,
+        await Settle.PickAsync(state, () => state.Pick(Named("Almond Dough")), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1,
             () => $"name={state.EditingName} lines={state.Batch.Lines.Count} error={state.ErrorMessage}");
 
         // The failure clears the pick, and the pick of nothing that follows mustn't take the error away.
         factory.Fail = true;
-        await Settle.PickAsync(state, () => state.SelectedRow = Named("Banana Dough"), () => state.ErrorMessage is not null,
+        await Settle.PickAsync(state, () => state.Pick(Named("Banana Dough")), () => state.ErrorMessage is not null,
             () => $"name={state.EditingName} lines={state.Batch.Lines.Count} row={state.SelectedRow?.Name}");
         state.ErrorMessage.Should().Be(Failure.TimedOutText);
         state.SelectedRow.Should().BeNull("the form went blank rather than show Almond Dough under Banana Dough's row");
         state.Batch.Lines.Should().BeEmpty();
 
         factory.Fail = false;
-        await Settle.PickAsync(state, () => state.SelectedRow = Named("Cheese Dough"), () => state.EditingName == "Cheese Dough" && state.Batch.Lines.Count == 1,
+        await Settle.PickAsync(state, () => state.Pick(Named("Cheese Dough")), () => state.EditingName == "Cheese Dough" && state.Batch.Lines.Count == 1,
             () => $"name={state.EditingName} lines={state.Batch.Lines.Count} row={state.SelectedRow?.Name} error={state.ErrorMessage}");
         state.ErrorMessage.Should().BeNull();
     });
@@ -198,7 +198,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateProductsState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedProduct = state.Products.Single(), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.Products.Single()), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
         state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         state.EditingName = "Almond Loaf";
 
@@ -222,7 +222,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateRawMaterialsState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.RawMaterials.Single()), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
         state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         state.EditingName = "Strong Flour";
 
@@ -247,7 +247,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateSubAssembliesState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRow = state.List.Rows.Single(), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
         state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         state.EditingName = "Almond Loaf Dough";
 
@@ -275,7 +275,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
         var state = CreateRawMaterialsState(new FailingDbContextFactory(CreateDbContextFactory()));
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == ids[0]), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.RawMaterials.Single(m => m.Id == ids[0])), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
         state.ConfirmUnsavedChanges.RegisterHandler(_ => throw new InvalidOperationException("The question couldn't be asked."));
         state.EditingName = "Salted Butter";
 

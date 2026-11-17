@@ -164,7 +164,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == materialId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == materialId));
         state.AreDetailsReady.Should().BeFalse("the details are still on their way");
         Edit(state, () => state.EditingName = "Renamed");
 
@@ -202,7 +202,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
     {
         var (state, _) = await OpenMadeIngredientAsync();
 
-        Edit(state, () => state.Recipe.SubAssembly = state.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base"));
+        Edit(state, () => state.Recipe.PickSubAssembly(state.Recipe.SubAssemblyOptions.Single(s => s.Name == "Thin Syrup Base")));
         await Settle.UntilAsync(state, () => state.Recipe.Lines.Count == 2, () => $"recipe lines={state.Recipe.Lines.Count}");
         state.Recipe.BomTotalWeight.Should().Be(1455m, "1,000 g of the thinner recipe and the 500 g add-in, less 3%");
 
@@ -417,7 +417,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == materialId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == materialId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.Units.Rows.Count == 1,
             () => $"ready={state.AreDetailsReady}, units={state.Units.Rows.Count}");
@@ -470,7 +470,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRawMaterial = state.RawMaterials.Single(m => m.Id == materialId);
+        state.Pick(state.RawMaterials.Single(m => m.Id == materialId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.Recipe.AddIns.Count == 1 && state.Recipe.Lines.Count == 1,
             () => $"ready={state.AreDetailsReady}, add-ins={state.Recipe.AddIns.Count}, recipe lines={state.Recipe.Lines.Count}");

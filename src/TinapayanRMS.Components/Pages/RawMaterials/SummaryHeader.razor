@@ -53,7 +53,7 @@
         <TextField ID="rm-name" @bind-Value="State.EditingName" OnLeave="State.CheckNameAvailability" CssClass="field-roomy" />
 
         <label class="form-label" for="rm-type">Type</label>
-        <PickField ID="rm-type" TItem="RawMaterialType" Items="State.Types" @bind-Value="State.EditingType" Disabled="!State.CanChangeTypeAndSource"
+        <PickField ID="rm-type" TItem="RawMaterialType" Items="State.Types" Value="State.EditingType" ValueChanged="State.ChangeType" Disabled="!State.CanChangeTypeAndSource"
                    Tooltip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
 
         <label class="form-label" for="rm-category">Category</label>
@@ -65,12 +65,12 @@
         @if (State.IsEditingIngredient)
         {
             <label class="form-label" for="rm-source">Source</label>
-            <PickField ID="rm-source" TItem="RawMaterialSource" Items="State.Sources" @bind-Value="State.EditingSource" Disabled="!State.CanChangeTypeAndSource" />
+            <PickField ID="rm-source" TItem="RawMaterialSource" Items="State.Sources" Value="State.EditingSource" ValueChanged="State.ChangeSource" Disabled="!State.CanChangeTypeAndSource" />
         }
         @if (State.IsEditingPackaging)
         {
             <label class="form-label" for="rm-base-unit">Base Unit</label>
-            <PickField ID="rm-base-unit" TItem="UnitOfMeasure" Items="State.UnitsOfMeasure" TextField="Name" @bind-Value="State.EditingBaseUnit" Disabled="!State.CanChangeBaseUnit"
+            <PickField ID="rm-base-unit" TItem="UnitOfMeasure" Items="State.UnitsOfMeasure" TextField="Name" Value="State.EditingBaseUnit" ValueChanged="State.ChangeBaseUnit" Disabled="!State.CanChangeBaseUnit"
                        Tooltip="Fixed once the material has alternative units, prices or packaging lines." />
         }
         @if (State.IsEditingMade)

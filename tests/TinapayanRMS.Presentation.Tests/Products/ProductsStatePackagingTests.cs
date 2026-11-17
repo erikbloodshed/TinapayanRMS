@@ -40,7 +40,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         }
 
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == bigId);
+        state.Pick(state.Products.Single(p => p.Id == bigId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.ErrorMessage is not null,
             () => $"ready={state.AreDetailsReady}, error={state.ErrorMessage}");
@@ -104,7 +104,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         var productId = await AddProductAsync("Ensaymada");
         await AddProductAsync("Cream Loaf");
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
         state.Recipe.RecipeTabs.Should().Equal(state.Recipe.PackagingTab);
 
@@ -189,7 +189,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         var state = await OpenWithOwnPackagingAsync(bagId);
 
         await state.Packaging.StartCopyingCommand.ExecuteAsync();
-        state.Packaging.PickedSource = state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == "Plain Roll — product");
+        state.Packaging.PickSource(state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == "Plain Roll — product"));
         await Settle.UntilAsync(state, () => state.ErrorMessage is not null, () => $"error={state.ErrorMessage}");
 
         state.ErrorMessage.Should().Be("Plain Roll has no packaging for each piece to copy. Pick another.");
@@ -222,7 +222,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         var productId = await AddProductAsync("Ensaymada");
         await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single();
+        state.Pick(state.Products.Single());
         await Settle.UntilAsync(state, () => state.Packaging.LineEdits.Count == 1, () => $"lines={state.Packaging.LineEdits.Count}");
         state.Recipe.RecipeTabs.Should().Equal(state.Recipe.PackagingTab);
         state.Packaging.IsPackagingLinked.Should().BeTrue();
@@ -471,7 +471,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     private async Task<ProductsState> OpenLinkedAsync()
     {
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Name == "Ensaymada");
+        state.Pick(state.Products.Single(p => p.Name == "Ensaymada"));
         await Settle.UntilAsync(state,
             () => state.Recipe.SelectedRecipeTab is PackagingRecipeTab && state.Packaging.LineEdits.Count == 1, () => $"tab={state.Recipe.SelectedRecipeTab?.Header}");
         return state;
@@ -484,7 +484,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         await new PackagingLineRepository(CreateDbContextFactory())
             .SetLinesAsync(productId, [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.Recipe.SelectedRecipeTab is PackagingRecipeTab && state.Packaging.LineEdits.Count == 1, () => $"tab={state.Recipe.SelectedRecipeTab?.Header}");
         return state;
@@ -495,7 +495,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     /// <summary>Picks <paramref name="name"/> in the Packaging tab's open Link or Copy picker, and waits for its lines to go in.</summary>
     private static async Task PickAsync(ProductsState state, string name)
     {
-        state.Packaging.PickedSource = state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == name);
+        state.Packaging.PickSource(state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == name));
         await Settle.UntilAsync(state,
             () => !state.Packaging.IsPickingSource || state.ErrorMessage is not null,
             () => $"picking={state.Packaging.IsPickingSource}, error={state.ErrorMessage}");

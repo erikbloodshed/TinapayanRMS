@@ -38,9 +38,6 @@ public interface IScreenPartHost
 /// </summary>
 public interface IFormPartHost : IScreenPartHost, IUndoRecorder
 {
-    /// <summary>A load is merging fresh data into the screen (ScreenState.IsRefreshing): what changes meanwhile isn't the user's.</summary>
-    bool IsRefreshing { get; }
-
     /// <summary>A load or an undo is writing the screen wholesale (ScreenState.IsBusyApplying): what changes meanwhile isn't the user's.</summary>
     bool IsBusyApplying { get; }
 

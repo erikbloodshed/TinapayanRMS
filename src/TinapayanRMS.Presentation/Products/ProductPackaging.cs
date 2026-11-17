@@ -343,16 +343,20 @@ public sealed class ProductPackaging : ObservableState, IDisposable
     public ObservableCollection<LinkableSubAssemblyOption> SourceOptions { get; } = [];
 
     private LinkableSubAssemblyOption? _pickedSource;
-    /// <summary>The packaging picked to link or copy: its lines load, and then fill the table (ApplySourceAsync).</summary>
+    /// <summary>The packaging picked to link or copy (<see cref="PickSource"/>), or none while the picker opens or closes.</summary>
     public LinkableSubAssemblyOption? PickedSource
     {
         get => _pickedSource;
-        set
+        private set => RaiseAndSetIfChanged(ref _pickedSource, value);
+    }
+
+    /// <summary>The user picks the packaging to link or copy: its lines load, and then fill the table (ApplySourceAsync).</summary>
+    public void PickSource(LinkableSubAssemblyOption? source)
+    {
+        if (source != PickedSource)
         {
-            if (RaiseAndSetIfChanged(ref _pickedSource, value))
-            {
-                _pickedSources.OnNext(value);
-            }
+            PickedSource = source;
+            _pickedSources.OnNext(source);
         }
     }
 

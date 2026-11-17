@@ -32,7 +32,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateProductsState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedProduct = state.Products.Single(), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.Products.Single()), () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1);
         var asked = CountQuestions(state);
         state.EditingName = "Almond Loaf";
 
@@ -76,7 +76,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateRawMaterialsState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.RawMaterials.Single()), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
         var asked = CountQuestions(state);
         state.EditingName = "Strong Flour";
 
@@ -98,7 +98,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateSubAssembliesState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRow = state.List.Rows.Single(), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
         var asked = CountQuestions(state);
         state.EditingName = "Almond Loaf Dough";
 
@@ -120,7 +120,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateRawMaterialsState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.SelectedRawMaterial = state.RawMaterials.Single(), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.RawMaterials.Single()), () => state.AreDetailsReady && state.PurchaseCost.BrandPriceRows.Count == 1);
         var answers = 0;
         state.ConfirmUnsavedChanges.RegisterHandler(context =>
         {

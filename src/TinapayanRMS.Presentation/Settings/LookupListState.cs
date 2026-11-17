@@ -47,11 +47,9 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
             var items = await ReadAllAsync();
             var selectedId = SelectedItem is { } selected ? _idOf(selected) : (int?)null;
 
-            ApplyRefresh(() =>
-            {
-                _cache.MergeFrom(items);
-                SelectedItem = Items.FirstOrDefault(i => _idOf(i) == selectedId);
-            });
+            // The selection is pointed at its refreshed copy, which leaves the form and its unsaved edits as they are.
+            _cache.MergeFrom(items);
+            SelectedItem = Items.FirstOrDefault(i => _idOf(i) == selectedId);
         }));
 
         NewCommand = ScreenCommand.Of(ClearForm);
@@ -84,18 +82,32 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
 
     private TItem? _selectedItem;
 
-    /// <summary>The item picked in the list, which the form shows for editing; null while the form is a new one's.</summary>
+    /// <summary>
+    /// The item picked in the list, which the form shows for editing; null while the form is a new one's. Only
+    /// <see cref="Pick"/> fills the form from it: a load points it at its refreshed copy, and New clears it.
+    /// </summary>
     public TItem? SelectedItem
     {
         get => _selectedItem;
-        set
+        private set => RaiseAndSetIfChanged(ref _selectedItem, value);
+    }
+
+    /// <summary>
+    /// The user picks <paramref name="item"/> in the list: the form shows it for editing, unless it's the one showing,
+    /// whose unsaved edits the form keeps (a grid telling of the row it already has picked).
+    /// </summary>
+    public void Pick(TItem? item)
+    {
+        if (item == SelectedItem)
         {
-            // Not while LoadCommand merges, which only re-points the selection at its refreshed copy.
-            if (RaiseAndSetIfChanged(ref _selectedItem, value) && value is { } item && !IsRefreshing)
-            {
-                EditingId = _idOf(item);
-                LoadIntoForm(item);
-            }
+            return;
+        }
+
+        SelectedItem = item;
+        if (item is not null)
+        {
+            EditingId = _idOf(item);
+            LoadIntoForm(item);
         }
     }
 

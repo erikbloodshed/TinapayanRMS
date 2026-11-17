@@ -264,7 +264,7 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     }
 
     /// <summary>
-    /// The end of a LoadCommand, outside its ApplyRefresh, whose selection changes only re-point: a record asked for before
+    /// The end of a LoadCommand, after its merge, which only points the selection at fresh copies: a record asked for before
     /// the list held it, or the one in the address, opens now, its form loading.
     /// </summary>
     protected void OpenRecordAskedFor()
@@ -283,8 +283,6 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     protected void ForgetRecordToOpen() => _recordToOpen = null;
 
     // What any part of the screen's form, and its list, asks of it (IFormPartHost, IRecordListHost).
-    bool IFormPartHost.IsRefreshing => IsRefreshing;
-
     bool IFormPartHost.IsBusyApplying => IsBusyApplying;
 
     Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => RunWithConfirmationAsync(question, action);

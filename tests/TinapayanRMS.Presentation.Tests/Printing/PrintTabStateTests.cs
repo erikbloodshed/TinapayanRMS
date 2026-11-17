@@ -506,7 +506,7 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
         await state.LoadCommand.ExecuteAsync();
         if (productName is not null)
         {
-            state.SelectedProduct = state.Products.Single(p => p.Name == productName);
+            state.Pick(state.Products.Single(p => p.Name == productName));
             await Settle.UntilAsync(state,
                 () => state.AreDetailsReady && (ready?.Invoke(state) ?? true),
                 () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}");

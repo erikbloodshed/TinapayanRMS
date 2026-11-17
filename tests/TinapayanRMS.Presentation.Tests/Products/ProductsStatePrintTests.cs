@@ -199,7 +199,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && ready(state),
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}, lines={state.UsageForm.FormLines.Count}");

@@ -21,7 +21,7 @@
     {
         <div class="usage-row">
             <label class="form-label" for="usage-source">Existing Sub-Assembly</label>
-            <PickField ID="usage-source" TItem="LinkableSubAssemblyOption" Items="State.UsageForm.LinkableSubAssemblies" TextField="DisplayName" @bind-Value="State.UsageForm.EditingUsageSource"
+            <PickField ID="usage-source" TItem="LinkableSubAssemblyOption" Items="State.UsageForm.LinkableSubAssemblies" TextField="DisplayName" Value="State.UsageForm.EditingUsageSource" ValueChanged="State.UsageForm.PickSource"
                        Tooltip="One from the Sub-Assemblies screen, or to copy, another product's own. A link follows every change made to it where it's kept; a copy is saved as a new one, named after this product. Packaging is linked or copied on the Packaging tab." />
         </div>
     }
@@ -47,7 +47,7 @@
             }
             @if (State.UsageForm.IsChangingLink)
             {
-                <PickField TItem="LinkableSubAssemblyOption" Items="State.UsageForm.ChangeLinkOptions" TextField="DisplayName" @bind-Value="State.UsageForm.ChangeLinkTarget"
+                <PickField TItem="LinkableSubAssemblyOption" Items="State.UsageForm.ChangeLinkOptions" TextField="DisplayName" Value="State.UsageForm.ChangeLinkTarget" ValueChanged="State.UsageForm.PickLinkTarget"
                            Placeholder="Link instead…" CssClass="change-link" Tooltip="A sub-assembly from the Sub-Assemblies screen to link in this one's place" />
                 <CommandButton Command="State.UsageForm.CancelChangingLinkCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the link as it is" />
             }
@@ -57,7 +57,7 @@
         {
             <div class="usage-role">
                 <label class="form-label" for="usage-role">Role</label>
-                <PickField ID="usage-role" TItem="SubAssemblyRole" Items="State.UsageForm.FormRoleOptions" TextField="Name" @bind-Value="State.UsageForm.EditingUsageRole" CssClass="role-picker"
+                <PickField ID="usage-role" TItem="SubAssemblyRole" Items="State.UsageForm.FormRoleOptions" TextField="Name" Value="State.UsageForm.EditingUsageRole" ValueChanged="State.UsageForm.PickRole" CssClass="role-picker"
                            Tooltip="What it's called in the recipe. Roles are added in Settings → Roles." />
                 <label class="form-label" for="usage-name">Name (optional)</label>
                 <TextField ID="usage-name" @bind-Value="State.UsageForm.EditingUsageName" Placeholder="e.g. Ube" CssClass="usage-name"
@@ -156,12 +156,12 @@
             <div class="group-heading">Batch parameters</div>
             <div class="param-row">
                 <label for="usage-weight">Weight/piece (g)</label>
-                <NumberField ID="usage-weight" TValue="decimal" @bind-Value="State.UsageForm.EditingUsageWeightPerPiece" Min="0" CssClass="param-field"
+                <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
                              Tooltip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
             </div>
             <div class="param-row">
                 <label for="usage-yield">Yield (pcs)</label>
-                <NumberField ID="usage-yield" TValue="decimal" @bind-Value="State.UsageForm.EditingUsageYield" Min="0" CssClass="param-field"
+                <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
                              Tooltip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
             </div>
 

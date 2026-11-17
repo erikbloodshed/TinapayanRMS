@@ -33,7 +33,7 @@
             var recipeTab = tab;
             <button type="button" role="tab" class="recipe-tab @(ReferenceEquals(recipeTab, State.Recipe.SelectedRecipeTab) ? "active" : "")"
                     aria-selected="@(ReferenceEquals(recipeTab, State.Recipe.SelectedRecipeTab) ? "true" : "false")"
-                    @onclick="() => State.Recipe.SelectedRecipeTab = recipeTab">
+                    @onclick="() => State.Recipe.PickRecipeTab(recipeTab)">
                 <Icon Of="recipeTab.Icon" />
                 <span>@recipeTab.Header</span>
             </button>

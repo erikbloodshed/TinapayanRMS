@@ -244,7 +244,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)]));
         var state = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 1);
 
-        Edit(state, () => state.UsageForm.EditingUsageWeightPerPiece = 40m);
+        Edit(state, () => state.UsageForm.TypeWeightPerPiece(40m));
         await state.SaveCommand.ExecuteAsync();
         await subAssemblies.SaveStandaloneAsync(
             new SubAssembly { Id = doughId, Name = "House Dough", RoleId = doughRoleId }, [(flourId, 800m)], Cancellation);
@@ -344,7 +344,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         // A product with no versions has no number to give.
         var plainId = await AddProductAsync("Pan de Coco");
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == plainId);
+        state.Pick(state.Products.Single(p => p.Id == plainId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedProduct?.Id == plainId, () => $"ready={state.AreDetailsReady}");
         state.EditingCloneName = "Pan de Coco Variant";
         await state.CreateVariantCommand.ExecuteAsync();
@@ -352,7 +352,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         (await VersionsAsync(state.SelectedProduct!.Id)).Single().Note.Should().Be("Variant of Pan de Coco");
 
         // The clone's first Save adds only what it changed: its history began when it was made.
-        state.SelectedProduct = state.Products.Single(p => p.Id == cloneId);
+        state.Pick(state.Products.Single(p => p.Id == cloneId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.UsageForm.FormLines.Count == 1, () => $"lines={state.UsageForm.FormLines.Count}");
         Edit(state, () => state.EditingCurrentPrice = 28m);
         await state.SaveCommand.ExecuteAsync();
@@ -370,13 +370,13 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         await OpenHistoryAsync(state, rows: 2);
 
         // The tab stays on History through both picks, and isn't empty coming back.
-        state.SelectedProduct = state.Products.Single(p => p.Id == otherId);
+        state.Pick(state.Products.Single(p => p.Id == otherId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && state.VersionHistory.ProductId == otherId,
             () => $"ready={state.AreDetailsReady}, showing={state.VersionHistory.ProductId}, error={state.ErrorMessage}");
         state.VersionHistory.IsEmpty.Should().BeTrue("Pan de Sal hasn't been saved since versions began to be kept");
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == seeded.ProductId);
+        state.Pick(state.Products.Single(p => p.Id == seeded.ProductId));
         await Settle.UntilAsync(state,
             () => state.VersionHistory.ProductId == seeded.ProductId && state.VersionHistory.Rows.Count == 2,
             () => $"showing={state.VersionHistory.ProductId}, rows={state.VersionHistory.Rows.Count}, error={state.ErrorMessage}");
@@ -534,7 +534,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == productId);
+        state.Pick(state.Products.Single(p => p.Id == productId));
         await Settle.UntilAsync(state,
             () => state.AreDetailsReady && ready(state),
             () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}, lines={state.UsageForm.FormLines.Count}");

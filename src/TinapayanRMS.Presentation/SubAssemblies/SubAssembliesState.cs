@@ -41,7 +41,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     /// <summary>
     /// Each sub-assembly picked, by the user or for them (Open, a list pick), nothing picked included: what loads one into
-    /// the form. Fed by <see cref="SelectedRow"/>'s setter alone, starting with nothing picked.
+    /// the form. Fed by <see cref="Pick"/> alone, starting with nothing picked.
     /// </summary>
     private readonly BehaviorSubject<StandaloneSubAssemblyRow?> _picks = new(null);
 
@@ -101,8 +101,8 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         // The list's row follows the sub-assembly picked (SelectionChanged), from the start.
         List.SyncTreeSelection();
 
-        // Picking a sub-assembly loads it into the form. Only a pick does (_picks): a refresh re-points the selection at its
-        // refreshed copy quietly (RepointSelection), so it leaves the form and its unsaved edits alone.
+        // Picking a sub-assembly loads it into the form. Only a pick does (Pick, through _picks): a refresh points the
+        // selection at its refreshed copy, which leaves the form and its unsaved edits alone.
         LoadLatest(_picks, (row, _) => LoadIntoFormAsync(row));
 
         // The commands. Making one runs nothing.
@@ -163,16 +163,30 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     public bool IsPackaging => EditingRole?.IsPackaging == true;
 
     private StandaloneSubAssemblyRow? _selectedRow;
+
+    /// <summary>
+    /// The sub-assembly the form is for. Only <see cref="Pick"/> loads it into the form: a load points it at its fresh copy,
+    /// Save at the row it saved, and New clears it, each leaving the form as it is.
+    /// </summary>
     public StandaloneSubAssemblyRow? SelectedRow
     {
         get => _selectedRow;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _selectedRow, value))
             {
                 SelectionChanged();
-                _picks.OnNext(value);
             }
+        }
+    }
+
+    /// <summary>The user picks <paramref name="row"/> (a list's row, Open): it's loaded into the form, unless it's the one showing.</summary>
+    public void Pick(StandaloneSubAssemblyRow? row)
+    {
+        if (row != SelectedRow)
+        {
+            SelectedRow = row;
+            _picks.OnNext(row);
         }
     }
 
@@ -249,16 +263,6 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     /// </summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
-    /// <summary>The selection pointed at <paramref name="row"/> without it being a pick: a load's fresh copy of the one picked, Save's
-    /// reload (which loads the form itself), New's empty selection. The list follows; the form isn't loaded.</summary>
-    private void RepointSelection(StandaloneSubAssemblyRow? row)
-    {
-        if (RaiseAndSetIfChanged(ref _selectedRow, row, nameof(SelectedRow)))
-        {
-            SelectionChanged();
-        }
-    }
-
     /// <summary>The roles, materials and sub-assemblies read again and merged, the form and its selection kept.</summary>
     private async Task LoadAsync()
     {
@@ -300,7 +304,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             Batch.RecomputeTotals();
             PackagingSet.RecomputeCost();
 
-            RepointSelection(List.Rows.FirstOrDefault(r => r.Id == selectedId));
+            SelectedRow = List.Rows.FirstOrDefault(r => r.Id == selectedId);
             if (_editingId > 0)
             {
                 Dependents.Show(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? [], IsPackaging);
@@ -314,7 +318,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             History.Rebase((settled, now) => settled with { RoleId = now.RoleId });
         }
 
-        // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the sub-assembly's form.
+        // After the merge, which only points the selection at its fresh copy: this one has to load the sub-assembly's form.
         OpenRecordAskedFor();
     }
 
@@ -393,7 +397,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         // The list picks up the new totals; then the form reloads what was saved.
         await LoadCommand.ExecuteAsync();
         var row = List.Rows.FirstOrDefault(r => r.Id == saved.Id);
-        RepointSelection(row);
+        SelectedRow = row;
         await LoadIntoFormAsync(row);
         SuccessMessage = ProductVersionRecorder.RecordedMessage(saved.ProductsVersioned) is { } recorded
             ? $"{name} was saved. {recorded}"
@@ -417,7 +421,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         List.EndNewRow();
         History.Clear();
         _formLoadVersion++;
-        RepointSelection(null);
+        SelectedRow = null;
         FormVersion++;
         _editingId = 0;
         HeaderTitle = "New sub-assembly";
@@ -523,7 +527,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             List.SearchText = string.Empty;
         }
 
-        SelectedRow = row;
+        Pick(row);
         return true;
     }
 
@@ -604,7 +608,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     Task ISubAssembliesListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
-        PickFromList(row.Id, () => SelectedRow = row, List.SyncTreeSelection);
+        PickFromList(row.Id, () => Pick(row), List.SyncTreeSelection);
 
     void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => StartNewSubAssembly(role);
 
@@ -612,18 +616,18 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     void ISubAssembliesListHost.NameNew(string name) => AsUndoStep(() => EditingName = name);
 
-    void ISubAssembliesListHost.ClearNewName() => ApplyRefresh(() => EditingName = string.Empty);
+    void ISubAssembliesListHost.ClearNewName() => EditingName = string.Empty;
 
     void ISubAssembliesListHost.RenamedOnForm(string name)
     {
         HeaderTitle = name;
-        ApplyRefresh(() => EditingName = name);
+        EditingName = name;
         History.RewriteAll(snapshot => snapshot with { Name = name });
     }
 
     void ISubAssembliesListHost.MovedOnForm(int roleId)
     {
-        ApplyRefresh(() => EditingRole = Roles.FirstOrDefault(r => r.Id == roleId));
+        EditingRole = Roles.FirstOrDefault(r => r.Id == roleId);
         History.RewriteAll(snapshot => snapshot with { RoleId = roleId });
     }
 

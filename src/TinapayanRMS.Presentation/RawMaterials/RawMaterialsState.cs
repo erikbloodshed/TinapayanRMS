@@ -137,7 +137,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         Units = new RawMaterialUnits(this, UnitsOfMeasure, unitValidator);
         PurchaseCost = new RawMaterialPurchaseCost(this, Units, UnitsOfMeasure, brandPriceValidator, _updates);
         Recipe = new RawMaterialRecipe(this, Ingredients, subAssemblyLineRepository);
-        UsageExample = new RawMaterialUsageExample(this);
+        UsageExample = new RawMaterialUsageExample();
         PriceLog = new RawMaterialPriceLog(this, priceHistoryRepository);
         Dependents = new RawMaterialDependents(costShares);
 
@@ -316,19 +316,31 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
     private RawMaterial? _selectedRawMaterial;
     /// <summary>
-    /// The material the form is about. Setting it is a pick, which loads that material into the form (_picks); a load that
-    /// only finds a fresh copy of it re-points it quietly (<see cref="RepointSelection"/>), leaving what's typed alone.
+    /// The material the form is about. Only <see cref="Pick"/> loads it into the form (_picks): a load points it at its
+    /// fresh copy, leaving what's typed alone.
     /// </summary>
     public RawMaterial? SelectedRawMaterial
     {
         get => _selectedRawMaterial;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _selectedRawMaterial, value))
             {
                 SelectionChanged();
-                _picks.OnNext(value);
             }
+        }
+    }
+
+    /// <summary>
+    /// The user picks <paramref name="material"/> (a list's row, Open), or nothing, as New does: it's loaded into the form,
+    /// unless it's the one showing.
+    /// </summary>
+    public void Pick(RawMaterial? material)
+    {
+        if (material != SelectedRawMaterial)
+        {
+            SelectedRawMaterial = material;
+            _picks.OnNext(material);
         }
     }
 
@@ -379,17 +391,28 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     }
 
     private RawMaterialType _editingType = RawMaterialType.Ingredient;
+
+    /// <summary>The form's type, as loaded, put back or picked (<see cref="ChangeType"/>).</summary>
     public RawMaterialType EditingType
     {
         get => _editingType;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _editingType, value))
             {
                 TypeChanged();
-                TypeEdited(value);
-                BaseUnitEdited();
             }
+        }
+    }
+
+    /// <summary>The user picks the type, on a new material: what the other type had filled in goes (TypeEdited).</summary>
+    public void ChangeType(RawMaterialType type)
+    {
+        if (type != EditingType)
+        {
+            EditingType = type;
+            TypeEdited(type);
+            BaseUnitEdited();
         }
     }
 
@@ -427,23 +450,36 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     }
 
     private RawMaterialSource _editingSource = RawMaterialSource.Purchased;
+
+    /// <summary>The form's source, as loaded, put back or picked (<see cref="ChangeSource"/>).</summary>
     public RawMaterialSource EditingSource
     {
         get => _editingSource;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _editingSource, value))
             {
                 SourceChanged();
-
-                // A made ingredient starts at 3% weight loss, since a small shrink is the normal
-                // case in the shop, and the box stays freely editable — typing 0 is a legitimate custom value. Only when the
-                // box is empty, so a saved material keeps what it was saved with.
-                if (value == RawMaterialSource.Made)
-                {
-                    EditingWeightLossPercent ??= 3m;
-                }
             }
+        }
+    }
+
+    /// <summary>The user picks the source, on a new material.</summary>
+    public void ChangeSource(RawMaterialSource source)
+    {
+        if (source == EditingSource)
+        {
+            return;
+        }
+
+        EditingSource = source;
+
+        // A made ingredient starts at 3% weight loss, since a small shrink is the normal case in the shop, and the box stays
+        // freely editable — typing 0 is a legitimate custom value. Only when the box is empty, so one that holds a figure
+        // keeps it.
+        if (source == RawMaterialSource.Made)
+        {
+            EditingWeightLossPercent ??= 3m;
         }
     }
 
@@ -496,17 +532,30 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     }
 
     private UnitOfMeasure? _editingBaseUnit;
-    /// <summary>Packaging only; an ingredient's base unit is always the gram.</summary>
+
+    /// <summary>
+    /// Packaging only; an ingredient's base unit is always the gram. As loaded, put back or picked
+    /// (<see cref="ChangeBaseUnit"/>).
+    /// </summary>
     public UnitOfMeasure? EditingBaseUnit
     {
         get => _editingBaseUnit;
-        set
+        private set
         {
             if (RaiseAndSetIfChanged(ref _editingBaseUnit, value))
             {
                 BaseUnitChanged();
-                BaseUnitEdited();
             }
+        }
+    }
+
+    /// <summary>The user picks the base unit, on a new packaging material: the brand rows priced in it move onto it (BaseUnitEdited).</summary>
+    public void ChangeBaseUnit(UnitOfMeasure? unit)
+    {
+        if (unit != EditingBaseUnit)
+        {
+            EditingBaseUnit = unit;
+            BaseUnitEdited();
         }
     }
 
@@ -648,15 +697,6 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     /// </summary>
     public Task CommitCategoryTextAsync() => _categoryPicker.CommitAsync();
 
-    /// <summary>The selection pointed at <paramref name="fresh"/>, a load's copy of the material picked: shown, not picked again.</summary>
-    private void RepointSelection(RawMaterial? fresh)
-    {
-        if (RaiseAndSetIfChanged(ref _selectedRawMaterial, fresh, nameof(SelectedRawMaterial)))
-        {
-            SelectionChanged();
-        }
-    }
-
     /// <summary>Load: everything the screen shows is read again, and merged in.</summary>
     private async Task LoadAsync()
     {
@@ -700,9 +740,9 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
             // A packaging set is never a recipe to make an ingredient from.
             Recipe.TakeOptions(subAssemblies);
-            Recipe.ShowSubAssembly(Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId));
+            Recipe.SubAssembly = Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId);
             var previousBaseUnit = EditingBaseUnit;
-            ShowBaseUnit(UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId));
+            EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId);
 
             Recipe.ResolveAddIns();
 
@@ -710,7 +750,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             // elsewhere into the header's totals: the change set above is suppressed while a refresh applies.
             Recipe.RecomputeBomTotals();
 
-            RepointSelection(RawMaterials.FirstOrDefault(m => m.Id == selectedId));
+            SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
 
             // The form's alternative units may not be saved yet, so they stay rather than being reloaded from the refreshed
             // material. Each points at its refreshed unit of measure, so one renamed in Settings shows its new name.
@@ -729,8 +769,8 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             UsageExample.Refresh(RawMaterials.FirstOrDefault(m => m.Id == exampleMaterialId), exampleUnit);
         });
 
-        // The Sub-Assemblies screen may have changed the recipe's lines. Re-pointing the pick reads them only when the
-        // sub-assembly's own row changed, so they're read here every time.
+        // The Sub-Assemblies screen may have changed the recipe's lines. Pointing the recipe at its fresh copy reads them only
+        // when the sub-assembly's own row changed, so they're read here every time.
         if (Recipe.SubAssembly is { } recipe)
         {
             await Recipe.LoadLinesAsync(recipe, CancellationToken.None);
@@ -742,7 +782,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             Dependents.Show(await dependentsRead);
         }
 
-        // Outside ApplyRefresh, whose selection changes only re-point: this one has to load the material's form.
+        // After the merge, which only points the selection at its fresh copy: this one has to load the material's form.
         OpenRecordAskedFor();
     }
 
@@ -839,7 +879,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         EditingName = CopyNameFor(material.Name);
         if (material.Type == RawMaterialType.Packaging)
         {
-            EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
+            ChangeBaseUnit(UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId));
         }
     }
 
@@ -870,13 +910,15 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         History.Clear();
         FormVersion++;
         _editingId = 0;
-        SelectedRawMaterial = null;
+        Pick(null);
         CanChangeTypeAndSource = true;
         EditingName = string.Empty;
-        EditingType = type;
+
+        // Set as the user sets them, so the form is a new material of that kind, with nothing of another kind's left in it.
+        ChangeType(type);
         // Emptied before the source is set, which gives a made one its starting weight loss.
         EditingWeightLossPercent = null;
-        EditingSource = source;
+        ChangeSource(source);
         EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId && c.Type == RawMaterialRules.CategoryTypeFor(type, source));
 
         Recipe.IsChangingSubAssembly = false;
@@ -888,8 +930,8 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         PurchaseCost.EditingTargetCostBufferPercent = _defaultCostBufferPercent;
         PurchaseCost.EditingPreferredBrand = null;
         PurchaseCost.EditingBufferedCost = null;
-        EditingBaseUnit = null;
-        UsageExample.Material = null;
+        ChangeBaseUnit(null);
+        UsageExample.Pick(null);
         ClearDetails();
     }
 
@@ -906,12 +948,12 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         _editingId = material.Id;
         CanChangeTypeAndSource = false;
         EditingName = material.Name;
-        ShowType(material.Type);
+        EditingType = material.Type;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == material.CategoryId);
-        ShowSource(material.Source);
+        EditingSource = material.Source;
         EditingWeightLossPercent = material.WeightLossPercent;
         Recipe.IsChangingSubAssembly = false;
-        Recipe.ShowSubAssembly(Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId));
+        Recipe.SubAssembly = Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == material.SubAssemblyId);
         EditingLinkedTo = Ingredients.FirstOrDefault(m => m.Id == material.LinkedToId);
         EditingWeightSharePercent = material.WeightSharePercent;
         EditingCostSharePercent = material.CostSharePercent;
@@ -919,34 +961,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         PurchaseCost.EditingTargetCostBufferPercent = RawMaterialRules.TargetBufferPercentOf(material);
         PurchaseCost.EditingPreferredBrand = material.PreferredBrand;
         PurchaseCost.EditingBufferedCost = material.BufferedCostPerBaseUnit;
-        ShowBaseUnit(UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId));
-    }
-
-    // A material loaded, an undo putting the form back, or a load's fresh copy: each field written and said to have changed
-    // without the edit that setting it is (TypeEdited, the made ingredient's starting weight loss, BaseUnitEdited), so
-    // nothing follows from it but what's worked out from it.
-    private void ShowType(RawMaterialType type)
-    {
-        if (RaiseAndSetIfChanged(ref _editingType, type, nameof(EditingType)))
-        {
-            TypeChanged();
-        }
-    }
-
-    private void ShowSource(RawMaterialSource source)
-    {
-        if (RaiseAndSetIfChanged(ref _editingSource, source, nameof(EditingSource)))
-        {
-            SourceChanged();
-        }
-    }
-
-    private void ShowBaseUnit(UnitOfMeasure? unit)
-    {
-        if (RaiseAndSetIfChanged(ref _editingBaseUnit, unit, nameof(EditingBaseUnit)))
-        {
-            BaseUnitChanged();
-        }
+        EditingBaseUnit = UnitsOfMeasure.FirstOrDefault(u => u.Id == material.BaseUnitId);
     }
 
     /// <summary>
@@ -957,7 +972,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     {
         if (type == RawMaterialType.Packaging)
         {
-            EditingSource = RawMaterialSource.Purchased;
+            ChangeSource(RawMaterialSource.Purchased);
             EditingWeightLossPercent = null;
             EditingLinkedTo = null;
             EditingWeightSharePercent = null;
@@ -965,7 +980,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         }
         else
         {
-            EditingBaseUnit = null;
+            ChangeBaseUnit(null);
         }
     }
 
@@ -1010,7 +1025,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         UpdateCanChangeBaseUnit();
         if (material is not null)
         {
-            UsageExample.Material = material;
+            UsageExample.Pick(material);
         }
     }
 
@@ -1147,7 +1162,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         {
             _rawMaterialCache.AddOrUpdate(saved);
             _detailMaterialId = id;
-            SelectedRawMaterial = saved;
+            Pick(saved);
         }
     }
 
@@ -1187,7 +1202,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             List.SearchText = string.Empty;
         }
 
-        SelectedRawMaterial = material;
+        Pick(material);
         return true;
     }
 
@@ -1316,13 +1331,13 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             _editingId = snapshot.EditingId;
             CanChangeTypeAndSource = snapshot.CanChangeTypeAndSource;
             EditingName = snapshot.Name;
-            ShowType(snapshot.Type);
+            EditingType = snapshot.Type;
             EditingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
-            ShowSource(snapshot.Source);
-            ShowBaseUnit(snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null);
+            EditingSource = snapshot.Source;
+            EditingBaseUnit = snapshot.BaseUnitId is { } baseUnitId ? UnitsOfMeasure.FirstOrDefault(u => u.Id == baseUnitId) : null;
             EditingWeightLossPercent = snapshot.WeightLossPercent;
             Recipe.IsChangingSubAssembly = false;
-            Recipe.ShowSubAssembly(snapshot.SubAssemblyId is { } subAssemblyId ? Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null);
+            Recipe.SubAssembly = snapshot.SubAssemblyId is { } subAssemblyId ? Recipe.SubAssemblyOptions.FirstOrDefault(s => s.Id == subAssemblyId) : null;
             EditingLinkedTo = snapshot.LinkedToId is { } linkedToId ? Ingredients.FirstOrDefault(m => m.Id == linkedToId) : null;
             EditingWeightSharePercent = snapshot.WeightSharePercent;
             EditingCostSharePercent = snapshot.CostSharePercent;
@@ -1389,7 +1404,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     Task IRawMaterialsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IRawMaterialsListHost.Pick(RawMaterial material) =>
-        PickFromList(material.Id, () => SelectedRawMaterial = material, List.SyncTreeSelection);
+        PickFromList(material.Id, () => Pick(material), List.SyncTreeSelection);
 
     void IRawMaterialsListHost.StartNew(RawMaterialType type, int? categoryId, RawMaterialSource source) => StartNewMaterial(type, categoryId, source);
 
@@ -1399,17 +1414,17 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
     void IRawMaterialsListHost.NameNew(string name) => AsUndoStep(() => EditingName = name);
 
-    void IRawMaterialsListHost.ClearNewName() => ApplyRefresh(() => EditingName = string.Empty);
+    void IRawMaterialsListHost.ClearNewName() => EditingName = string.Empty;
 
     void IRawMaterialsListHost.RenamedOnForm(string name)
     {
-        ApplyRefresh(() => EditingName = name);
+        EditingName = name;
         History.RewriteAll(snapshot => snapshot with { Name = name });
     }
 
     void IRawMaterialsListHost.MovedOnForm(int categoryId)
     {
-        ApplyRefresh(() => EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId));
+        EditingCategory = Categories.FirstOrDefault(c => c.Id == categoryId);
         History.RewriteAll(snapshot => snapshot with { CategoryId = categoryId });
     }
 

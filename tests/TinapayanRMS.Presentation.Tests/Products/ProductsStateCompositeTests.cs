@@ -162,7 +162,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.New);
         state.UsageForm.EditingUsageRole!.Id.Should().Be(toppingRoleId);
         state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = icingId, Grams = 500m });
-        state.UsageForm.EditingUsageWeightPerPiece = 100m;
+        state.UsageForm.TypeWeightPerPiece(100m);
 
         await state.SaveCommand.ExecuteAsync();
         await Settle.UntilAsync(state,
@@ -187,7 +187,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         }
 
         // Delete Sub-Assembly on its tab takes it out again, back to the Products tab.
-        state.Recipe.SelectedRecipeTab = state.Recipe.RecipeTabs[1];
+        state.Recipe.PickRecipeTab(state.Recipe.RecipeTabs[1]);
         await state.Recipe.RemoveUsageCommand.ExecuteAsync();
 
         state.Recipe.UsageEdits.Should().BeEmpty();
@@ -237,7 +237,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         var state = await CreateLoadedStateAsync();
         state.Products.Select(p => p.Name).Should().Contain(["Pasalubong Box", "Party Tray"]);
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 3, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
 
         state.ErrorMessage.Should().Be(CompositeProductRules.HoldsItselfText("Pasalubong Box"));
@@ -257,14 +257,14 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         await AddCompositeAsync("Office Tray", (cakeId, 1), (ensaymadaId, 12));
         var state = await CreateLoadedStateAsync();
 
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
 
         state.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal(
             ["Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray"],
             "the Party Package holds the box, and the box can't hold itself; the Office Tray doesn't hold it");
 
-        state.SelectedProduct = state.Products.Single(p => p.Name == "Party Package");
+        state.Pick(state.Products.Single(p => p.Name == "Party Package"));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2 && state.ComponentsTable.ComponentEdits[0].ComponentProductId == boxId, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
         state.ComponentsTable.ComponentProductOptions.Select(p => p.Name).Should().Equal("Cheese Roll", "Chocolate Cake", "Ensaymada", "Office Tray", "Pasalubong Box");
 
@@ -272,7 +272,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         state.Costing.Costs.SubAssemblyLines.Select(l => (l.Name, l.Cost)).Should().Equal(("Pasalubong Box × 2", 70m), ("Chocolate Cake × 1", 0m));
 
         // A product of sub-assemblies has no Products tab.
-        state.SelectedProduct = state.Products.Single(p => p.Id == ensaymadaId);
+        state.Pick(state.Products.Single(p => p.Id == ensaymadaId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"sections={state.Recipe.UsageEdits.Count}");
         state.IsEditingComposite.Should().BeFalse();
         state.Recipe.RecipeTabs.Should().NotContain(state.Recipe.ComponentsTab);
@@ -286,7 +286,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
         CanSave(state).Should().BeFalse();
 
@@ -325,7 +325,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         await AddOwnPackagingAsync(ensaymadaId, "Ensaymada Bag", 1.50m);
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
 
         state.ComponentsTable.IncludesPackaging.Should().BeFalse();
@@ -415,7 +415,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         var (ensaymadaId, cheeseRollId, doughRoleId) = await AddTwoProductsAsync();
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
 
         // Ensaymada's pieces are made twice the size elsewhere: each now takes 5.00 of recipe.
@@ -436,7 +436,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var state = await CreateLoadedStateAsync();
         state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
-        state.SelectedProduct = state.Products.Single(p => p.Id == ensaymadaId);
+        state.Pick(state.Products.Single(p => p.Id == ensaymadaId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"sections={state.Recipe.UsageEdits.Count}");
 
         await state.DeleteCommand.ExecuteAsync();
@@ -451,7 +451,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
         var (ensaymadaId, cheeseRollId, _) = await AddTwoProductsAsync();
         var boxId = await AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 4));
         var state = await CreateLoadedStateAsync();
-        state.SelectedProduct = state.Products.Single(p => p.Id == boxId);
+        state.Pick(state.Products.Single(p => p.Id == boxId));
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.ComponentsTable.ComponentEdits.Count == 2, () => $"lines={state.ComponentsTable.ComponentEdits.Count}");
 
         var printout = state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>().Subject;

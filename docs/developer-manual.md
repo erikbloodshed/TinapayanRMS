@@ -942,7 +942,7 @@ A large screen is split into components in a folder named after it (`Pages/RawMa
 - **`Work`** ([BackgroundWork](../src/TinapayanRMS.Presentation/Shared/BackgroundWork.cs)) and **`WhenIdleAsync()`**. The three runners above count each piece of work while it runs, so `WhenIdleAsync` completes once the screen has settled: nothing it started is still running, and the dispatcher has run what the work queued. A part of a screen that starts work of its own takes the screen's `Work` and runs it through `Work.RunAsync` (`ProductComponents`'s cost reads). Start nothing in the background any other way, or a test waiting for the screen won't wait for it.
 - **`RunWithConfirmationAsync(message, action)`**, which asks through the `ConfirmDelete` interaction first.
 - **`ExportToExcelAsync(title)`**, which asks the view to write its grids to a workbook through the `ExportToExcel` interaction, and says where the file went. See [Exporting to Excel](#exporting-to-excel).
-- **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back. Code that reacts to user edits skips while either is set (`IsBusyApplying`). The three main screens need that less (2026-11-05): on each, a pick is the selection's setter alone (`_picks`), and a load, Save's reselection and New point the selection quietly (`RepointSelection`), so nothing that reacts to a pick has to tell it from a load. On Raw Materials, besides, a pick is `SelectedRawMaterial`'s setter (`_picks`), an edit that changes other fields reacts in its own setter (the type, the source, the base unit), and the form load and the undo write those fields quietly (`ShowType` and the rest). On Products, a pick is its setter's (`SelectedProduct` feeds `_picks`; the section form's setters feed `ModePicks`, `RolePicks`, `SourcePicks` and `LinkTargetPicks`), and a load or restore writes the picks quietly (`RepointSelection`, `ShowRole`, `ShowSource`, `RestorePicks`), so what reacts to a pick never sees them and needs no guard. Write a new pick reaction in the setter, or against those streams. A reaction that only works figures out again from the form (costs, a batch's weight, a table's rows priced) goes through [DerivedUpdates](../src/TinapayanRMS.Presentation/Shared/DerivedUpdates.cs) (`_updates.Run(SomeMethod)`): it runs at once, or once at the end of a restore, which writes the form inside `_updates.Batch`, so it never works from a half-restored form and needs no `IsRestoring` check.
+- **`ApplyRefresh`/`IsRefreshing`** and **`ApplyRestore`/`IsRestoring`**, which mark a load merging data in and an undo putting a form back (`IsBusyApplying` for either), so that nothing written meanwhile is taken for the user's: the undo history records no step (`CanRecordUndo`), Products' section form doesn't move what Save measures against (`ProductRecipe.RebaseSettledForm`), and Raw Materials' unit rows don't reprice the brands. A setter never asks: what only the user's edit sets off isn't in a setter (below), so a load or an undo writes the properties as they are. A reaction that only works figures out again from the form (costs, a batch's weight, a table's rows priced) goes through [DerivedUpdates](../src/TinapayanRMS.Presentation/Shared/DerivedUpdates.cs) (`_updates.Run(SomeMethod)`): it runs at once, or once at the end of a restore, which writes the form inside `_updates.Batch`, so it never works from a half-restored form and needs no `IsRestoring` check.
 - A logger for the concrete class (`logger.ForContext(GetType())`).
 
 A command that deletes, or does anything else that can't be undone, goes through `RunWithConfirmationAsync`. A command that saves runs inside `RunSafelyAsync`, and runs its validator first. A command that only changes the form in memory isn't wrapped.
@@ -968,11 +968,8 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
         {
             var items = await ReadAllAsync();                                          // 1. fetch
             var selectedId = SelectedItem is { } selected ? idOf(selected) : (int?)null; // 2. remember picks by id
-            ApplyRefresh(() =>                                                         // 3. merge, and pick again by id
-            {
-                _cache.MergeFrom(items);
-                SelectedItem = Items.FirstOrDefault(i => idOf(i) == selectedId);
-            });
+            _cache.MergeFrom(items);                                                   // 3. merge, and point the
+            SelectedItem = Items.FirstOrDefault(i => idOf(i) == selectedId);           //    selection at its fresh copy
         }));
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
@@ -999,17 +996,21 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
 
     public ReadOnlyObservableCollection<TItem> Items => _items;
 
+    // What the form is for. A load points it at its fresh copy (above), which leaves the form as it is.
     public TItem? SelectedItem
     {
         get => _selectedItem;
-        set
+        private set => RaiseAndSetIfChanged(ref _selectedItem, value);
+    }
+
+    // The user's pick, which the list calls (SelectedItemChanged="State!.Pick"): the form shows the item.
+    public void Pick(TItem? item)
+    {
+        SelectedItem = item;
+        if (item is not null)
         {
-            // Fills the form from the selection, but not while a load is only pointing the selection at its fresh copy.
-            if (RaiseAndSetIfChanged(ref _selectedItem, value) && value is { } item && !IsRefreshing)
-            {
-                EditingId = idOf(item);
-                LoadIntoForm(item);
-            }
+            EditingId = idOf(item);
+            LoadIntoForm(item);
         }
     }
 
@@ -1054,8 +1055,9 @@ The rules for screen states:
 
 - **There's no MVVM library** (ReactiveUI went on 2026-11-16, the build plan's log): a screen's state (through `ScreenState`), a part of one and a row derive from [ObservableState](../src/TinapayanRMS.Presentation/Shared/ObservableState.cs), a plain `INotifyPropertyChanged`, and their commands are [ScreenCommand](../src/TinapayanRMS.Presentation/Shared/ScreenCommand.cs)s. A screen draws itself again whenever its state or one of its parts says anything changed (`ScreenBase`) and reads every value then, so:
   - **a stored property** sets its field with `RaiseAndSetIfChanged`, which says whether it changed: a setter with more to do then writes `if (RaiseAndSetIfChanged(ref _field, value)) { … }`, with no guard of its own;
+  - **a setter only does what follows any write** (what's worked out from the field: `SelectionChanged`, `TypeChanged`, a cost recompute), never what only the user's edit sets off. **The user's edit is a method the page calls** in place of a two-way binding (`Value="State.EditingType" ValueChanged="State.ChangeType"`, a list's `SelectedItemChanged="State!.Pick"`, a tab's `@onclick="() => State.Recipe.PickRecipeTab(tab)"`), named for what the user does: `Pick` (the record screens' and Settings' selection), `ChangeType`, `ChangeSource`, `ChangeBaseUnit`, `PickSubAssembly`, `PickMode`, `PickRole`, `PickSource`, `PickLinkTarget`, `PickRecipeTab`, `TypeWeightPerPiece`, `TypeYield`. It writes the property, then does what the edit adds (`TypeEdited`, a made ingredient's starting weight loss) or feeds a stream of picks (`_picks`, `ModePicks`, `RolePicks`, `SourcePicks`, `LinkTargetPicks`, a packaging source's). Such a property's setter is private, or internal on a part the screen writes, so the compiler keeps a load or an undo off the edit's path: they write the property, and New or a screen's own pick for the user calls the method. A property whose setter only stores, or that only the user ever writes (a search box, a switch), stays bound with `@bind-Value` (since 2026-11-17, the build plan's log);
   - **a derived value is a plain getter** (`IsEditingMade => …`, `FormTitle`). It's said to have changed only where something follows it by name (a row's table, a tree's row, a test) or where nothing stored changed with it (`UndoHistory.CanUndo`);
-  - **what follows a change is called by the setter that made it**, in the order it has to run (`SelectionChanged`, `TypeChanged`), never a subscription to the screen state's own properties; a field a load or an undo writes quietly (`ShowType`) calls the same, and skips only what the user's edit adds (`TypeEdited`);
+  - **what follows a change is called by the setter or the method that made it**, in the order it has to run (`SelectionChanged`, `TypeChanged`), never a subscription to the screen state's own properties;
   - **a part tells its screen of a change with a plain event** the screen subscribes to where it wires the part up (`ProductCosting.PercentEdited`, `ProductPackaging.BulkQuantityChanged`), and a part whose property is set from several places, quiet ones included, says so once by overriding `ObservableState.OnPropertyChanged` (`ProductUsageForm.KindChanged`);
   - **a `ScreenCommand` asks whether it can run when it's wanted** (a `Func<bool>`, read as its button is drawn) and can't run while it runs, saying so as a run starts and ends (`CanExecuteChanged`); `ExecuteAsync` runs it whatever `CanExecute` says, so a button or key asks first (`Commands.Run`). One without a parameter is a `ScreenCommand` (`new ScreenCommand(asyncBody, canRun)`, or `ScreenCommand.Of(body, canRun)` for a body that's done when it returns), one with a parameter a `ScreenCommand<T>`;
   - **Rx stays where it does real work**: a load that a newer value cancels (`LoadLatest`, which switches to each value's load in turn, fed by a `BehaviorSubject` the setter pushes to), what one screen asks of another (below), DynamicData's lists and their filters, and `AutoRefresh` on a table's rows. Rx's unit is `System.Reactive.Unit`.
@@ -1072,7 +1074,7 @@ The rules for screen states:
 - **There's one load trigger: opening the page.** `ScreenBase` runs the page's `LoadCommand` as it initialises, so going to a screen reloads it, and coming back to it reloads it again with whatever another screen changed. A page never loads data anywhere else.
 - **Every `LoadCommand` is a fetch-then-merge, never a clear-and-reload.** It awaits all its reads first, then records the ids of the selected row and of every picker's choice, then merges inside `ApplyRefresh` and picks everything again by id.
 - **[CollectionMerge](../src/TinapayanRMS.Presentation/Shared/CollectionMerge.cs)** (`MergeFrom`) keeps the existing object for every row whose values haven't changed, because that object is what a list's selection, a row's `@key` and a picker's choice are tied to. An `ObservableCollection` merge takes a key of any type, and rows that share a key are matched in order. `HasSameValues` compares scalar properties, plus those of referenced entities one level deep. A collection that a row owns (a material's `Units`) counts as part of the row.
-- **Pointing a selection at its refreshed copy must not reload the form or throw away unsaved edits.** On Products, Raw Materials and Sub-Assemblies the merge re-points it quietly (`RepointSelection`), and only a pick, the selection's setter, loads the form (`_picks`). Elsewhere, subscriptions driven by a selection skip while `IsRefreshing` is set.
+- **Pointing a selection at its refreshed copy must not reload the form or throw away unsaved edits.** The merge writes the selection (`SelectedProduct = fresh`), whose setter only does what follows any change of it (the list's row, the tabs it hides), and only a pick, the `Pick` method the list calls, loads the form (`_picks` on the record screens, `LookupListState.Pick` on Settings' lists).
 - Save and Delete call the same `LoadCommand` afterwards, so the record you saved stays selected.
 - **A load that fails says so, and the screen keeps working.** `LoadSafelyAsync` and `LoadLatest` show the failure in a red toast, and the next visit or pick tries again. A selection's load that fails clears what it would have replaced rather than leave another record's details under the new pick.
 - **Between a pick and its details arriving**, a record screen's tabs ignore the mouse (`AreDetailsReady`, the `details-pending` class), so nothing is typed into the record that's on its way out.

@@ -36,9 +36,9 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     }
 
     /// <summary>
-    /// True while a LoadCommand merges freshly loaded data into the screen (PLAN.md, tab state).
-    /// Selection-driven subscriptions skip while it's set, so pointing a selection or picker at
-    /// its refreshed copy doesn't reload the form or throw away unsaved edits.
+    /// True while a LoadCommand merges freshly loaded data into the screen. Nothing it writes is an edit of the user's, so
+    /// the undo history records nothing meanwhile (IsBusyApplying). A setter needn't ask: what only a user's edit sets off
+    /// is in the method the page calls for it (Pick, ChangeType), which a load never calls.
     /// </summary>
     protected bool IsRefreshing { get; private set; }
 
@@ -57,10 +57,9 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     }
 
     /// <summary>
-    /// True while a screen puts a whole form back, which is what an undo or a redo does. Subscriptions
-    /// that would otherwise recompute from half-restored state, or apply the form a tab is being moved
-    /// off, skip while it's set. It's kept apart from IsRefreshing because that one also means "this
-    /// data came from a load, so merge it rather than replace it", which a restore doesn't.
+    /// True while a screen puts a whole form back, which is what an undo or a redo does: nothing it writes is a new step,
+    /// or moves what Save measures against (IsBusyApplying). What's worked out from the form waits for it to be whole
+    /// through the screen's DerivedUpdates, not this.
     /// </summary>
     protected bool IsRestoring { get; private set; }
 
@@ -79,8 +78,9 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     }
 
     /// <summary>
-    /// The screen is being written to wholesale — a load merging in fresh data, or an undo putting a
-    /// form back. Either way the change isn't the user's, so nothing should react to it as an edit.
+    /// The screen is being written to wholesale — a load merging in fresh data, or an undo putting a form back — so a
+    /// change now isn't the user's: the undo history records no step, and a change watched on a table's rows (Raw
+    /// Materials' units) isn't taken for an edit.
     /// </summary>
     protected bool IsBusyApplying => IsRefreshing || IsRestoring;
 

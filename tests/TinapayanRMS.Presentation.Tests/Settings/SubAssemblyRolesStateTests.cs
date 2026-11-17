@@ -41,7 +41,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         List<string> asked = [];
         var state = CreateState(confirm: true, asked);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
+        state.Pick(state.Items.Single(r => r.Id == fillingRoleId));
         state.EditingIsProductOwned.Should().BeFalse();
         state.CanEditProductOwned.Should().BeTrue();
 
@@ -61,7 +61,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var state = CreateState(confirm: false);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
+        state.Pick(state.Items.Single(r => r.Id == fillingRoleId));
         state.EditingIsProductOwned.Should().BeTrue();
 
         state.EditingIsProductOwned = false;
@@ -77,7 +77,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         List<string> asked = [];
         var state = CreateState(confirm: false, asked);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
+        state.Pick(state.Items.Single(r => r.Id == fillingRoleId));
 
         state.EditingName = "Stuffing";
         await state.SaveCommand.ExecuteAsync();
@@ -94,7 +94,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         var state = CreateState(confirm: true);
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedItem = state.Items.Single(r => r.Id == packagingRoleId);
+        state.Pick(state.Items.Single(r => r.Id == packagingRoleId));
         state.CanEditProductOwned.Should().BeFalse();
 
         await state.NewCommand.ExecuteAsync();
@@ -131,7 +131,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         await AddRoleAsync("Topping", sortOrder: 3);
         var state = CreateState(confirm: true);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedItem = state.Items.Single(r => r.Id == fillingId);
+        state.Pick(state.Items.Single(r => r.Id == fillingId));
         state.EditingName = "Stuffing";
 
         await state.MoveUpCommand.ExecuteAsync();
