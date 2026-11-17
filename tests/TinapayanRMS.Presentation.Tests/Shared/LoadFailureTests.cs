@@ -184,7 +184,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.Categories.Should().ContainSingle().Which.Name.Should().Be("Breads");
+        state.Items.Should().ContainSingle().Which.Name.Should().Be("Breads");
     });
 
     // No to "Save the changes?" on leaving a screen reads the record again to put the form back. Nothing awaits the move

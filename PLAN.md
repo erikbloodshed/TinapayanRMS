@@ -86,7 +86,7 @@ TinapayanRMS.slnx
 │   │   ├── RawMaterials/             — the Raw Materials screen: its state, list, parts, rows, tree and form snapshot
 │   │   ├── SubAssemblies/            — the Sub-Assemblies screen, the same way
 │   │   ├── Products/                 — the Products screen, the same way
-│   │   ├── Settings/                 — one screen state per Settings tab
+│   │   ├── Settings/                 — one screen state per Settings tab; the list tabs' share LookupListState
 │   │   ├── Reports/, PriceSimulator/ — those screens' states and what they work out
 │   │   ├── Printing/                 — the Print screen's state, and ProductPrintout: what's printed, for Products and the
 │   │   │                               Price Simulator too

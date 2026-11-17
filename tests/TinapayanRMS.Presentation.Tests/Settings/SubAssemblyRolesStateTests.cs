@@ -41,7 +41,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         List<string> asked = [];
         var state = CreateState(confirm: true, asked);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
         state.EditingIsProductOwned.Should().BeFalse();
         state.CanEditProductOwned.Should().BeTrue();
 
@@ -51,7 +51,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         state.ErrorMessage.Should().BeNull();
         asked.Should().ContainSingle().Which.Should().StartWith("Make Filling product-owned? 1 sub-assembly on the Sub-Assemblies screen used by just one product");
         (await RoleAsync(fillingRoleId)).IsProductOwned.Should().BeTrue();
-        state.Roles.Single(r => r.Id == fillingRoleId).IsProductOwned.Should().BeTrue("the grid shows it");
+        state.Items.Single(r => r.Id == fillingRoleId).IsProductOwned.Should().BeTrue("the grid shows it");
         (await new SubAssemblyRepository(CreateDbContextFactory()).GetByIdsAsync([fillingId], Cancellation)).Single().OwnerProductId.Should().Be(productId);
     });
 
@@ -61,7 +61,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var state = CreateState(confirm: false);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
         state.EditingIsProductOwned.Should().BeTrue();
 
         state.EditingIsProductOwned = false;
@@ -77,7 +77,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         List<string> asked = [];
         var state = CreateState(confirm: false, asked);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
 
         state.EditingName = "Stuffing";
         await state.SaveCommand.ExecuteAsync();
@@ -94,7 +94,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         var state = CreateState(confirm: true);
         await state.LoadCommand.ExecuteAsync();
 
-        state.SelectedRole = state.Roles.Single(r => r.Id == packagingRoleId);
+        state.SelectedItem = state.Items.Single(r => r.Id == packagingRoleId);
         state.CanEditProductOwned.Should().BeFalse();
 
         await state.NewCommand.ExecuteAsync();
@@ -104,7 +104,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.Roles.Single(r => r.Name == "Glaze").IsProductOwned.Should().BeTrue();
+        state.Items.Single(r => r.Name == "Glaze").IsProductOwned.Should().BeTrue();
     });
 
     [Test]
@@ -120,7 +120,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 2), ("Glaze", 3));
+        state.Items.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Filling", 2), ("Glaze", 3));
     });
 
     [Test]
@@ -131,13 +131,13 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         await AddRoleAsync("Topping", sortOrder: 3);
         var state = CreateState(confirm: true);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedRole = state.Roles.Single(r => r.Id == fillingId);
+        state.SelectedItem = state.Items.Single(r => r.Id == fillingId);
         state.EditingName = "Stuffing";
 
         await state.MoveUpCommand.ExecuteAsync();
 
-        state.Roles.Select(r => r.Name).Should().Equal("Filling", "Dough", "Topping");
-        state.SelectedRole!.Id.Should().Be(fillingId);
+        state.Items.Select(r => r.Name).Should().Equal("Filling", "Dough", "Topping");
+        state.SelectedItem!.Id.Should().Be(fillingId);
         state.EditingName.Should().Be("Stuffing", "a move leaves the form's unsaved edits alone");
         state.MoveUpCommand.CanExecute().Should().BeFalse("it's first now");
 
@@ -146,7 +146,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         await state.MoveDownCommand.ExecuteAsync();
         await state.MoveDownCommand.ExecuteAsync();
 
-        state.Roles.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
+        state.Items.Select(r => (r.Name, r.SortOrder)).Should().Equal(("Dough", 1), ("Topping", 2), ("Filling", 3));
         state.MoveDownCommand.CanExecute().Should().BeFalse("it's last now");
         state.MoveUpCommand.CanExecute().Should().BeTrue();
     });

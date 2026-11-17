@@ -1,54 +1,19 @@
-using System.Collections.ObjectModel;
-using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
-using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Settings;
 
 /// <summary>
 /// Settings' Material Categories tab: the raw material categories, each for ingredients, made ingredients or packaging.
-/// Picking a category loads it for renaming or retyping; New, or finishing a Save or Delete, clears the form, so
-/// the next Save always adds a category rather than renaming the last one touched.
+/// Picking a category loads it for renaming or retyping.
 /// </summary>
-public sealed class RawMaterialCategoriesState : ScreenState, IDisposable
+public sealed class RawMaterialCategoriesState(IRawMaterialCategoryRepository repository, IValidator<RawMaterialCategory> validator, ILogger logger)
+    : LookupListState<RawMaterialCategory>("Category", c => c.Id, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name), validator, logger)
 {
-    private readonly IRawMaterialCategoryRepository _categoryRepository;
-    private readonly IValidator<RawMaterialCategory> _categoryValidator;
-    private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
-    private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
-
-    public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
-
-    private RawMaterialCategory? _selectedCategory;
-    public RawMaterialCategory? SelectedCategory
-    {
-        get => _selectedCategory;
-        set
-        {
-            // Not while LoadCommand merges, which only re-points the selection at its refreshed copy.
-            if (RaiseAndSetIfChanged(ref _selectedCategory, value) && value is { } category && !IsRefreshing)
-            {
-                _editingId = category.Id;
-                EditingName = category.Name;
-                EditingType = category.Type;
-            }
-        }
-    }
-
-    private int _editingId;
-
-    private string _editingName = string.Empty;
-    public string EditingName
-    {
-        get => _editingName;
-        set => RaiseAndSetIfChanged(ref _editingName, value);
-    }
-
     private RawMaterialCategoryType _editingType;
     /// <summary>Whether the category is for ingredients, made ingredients or packaging: a material only goes in a category of its own type.</summary>
     public RawMaterialCategoryType EditingType
@@ -60,81 +25,23 @@ public sealed class RawMaterialCategoriesState : ScreenState, IDisposable
     /// <summary>The Type picker's choices.</summary>
     public IReadOnlyList<RawMaterialCategoryType> Types { get; } = Enum.GetValues<RawMaterialCategoryType>();
 
-    /// <summary>"New Category", or "Edit Category" while one is picked, so it's clear what Save will do.</summary>
-    public string FormTitle => SelectedCategory is null ? "New Category" : "Edit Category";
+    protected override Task<IReadOnlyList<RawMaterialCategory>> ReadAllAsync() => repository.GetAllAsync(CancellationToken.None);
 
-    public ScreenCommand LoadCommand { get; }
-    public ScreenCommand NewCommand { get; }
-    public ScreenCommand SaveCommand { get; }
-    public ScreenCommand DeleteCommand { get; }
+    protected override Task AddAsync(RawMaterialCategory item) => repository.AddAsync(item, CancellationToken.None);
 
-    public RawMaterialCategoriesState(IRawMaterialCategoryRepository categoryRepository, IValidator<RawMaterialCategory> categoryValidator, ILogger logger)
-        : base(logger)
+    protected override Task UpdateAsync(RawMaterialCategory item) => repository.UpdateAsync(item, CancellationToken.None);
+
+    protected override Task DeleteAsync(int id) => repository.DeleteAsync(id, CancellationToken.None);
+
+    protected override string DeleteQuestion(RawMaterialCategory item) => $"Delete the '{item.Name}' category? This can't be undone.";
+
+    protected override void LoadIntoForm(RawMaterialCategory item)
     {
-        _categoryRepository = categoryRepository;
-        _categoryValidator = categoryValidator;
-
-        _categoryCache.Connect()
-            .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
-            .Subscribe();
-
-        // Runs each time Settings opens and after this tab's own saves. It merges rather than
-        // replaces, so the selection and any unsaved edits survive.
-        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
-        {
-            var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
-            var selectedId = SelectedCategory?.Id;
-
-            ApplyRefresh(() =>
-            {
-                _categoryCache.MergeFrom(categories);
-                SelectedCategory = Categories.FirstOrDefault(c => c.Id == selectedId);
-            });
-        }));
-
-        NewCommand = ScreenCommand.Of(ClearForm);
-
-        SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
-        {
-            var category = new RawMaterialCategory { Id = _editingId, Name = EditingName.Trim(), Type = EditingType };
-
-            var validation = _categoryValidator.Validate(category);
-            if (!validation.IsValid)
-            {
-                ErrorMessage = validation.ToString(" ");
-                return;
-            }
-
-            if (_editingId == 0)
-            {
-                await _categoryRepository.AddAsync(category, CancellationToken.None);
-            }
-            else
-            {
-                await _categoryRepository.UpdateAsync(category, CancellationToken.None);
-            }
-
-            ClearForm();
-            await LoadCommand.ExecuteAsync();
-        }));
-
-        DeleteCommand = new ScreenCommand(
-            () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
-            {
-                await _categoryRepository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
-                ClearForm();
-                await LoadCommand.ExecuteAsync();
-            }),
-            () => SelectedCategory is not null);
+        EditingName = item.Name;
+        EditingType = item.Type;
     }
 
-    private void ClearForm()
-    {
-        SelectedCategory = null;
-        _editingId = 0;
-        EditingName = string.Empty;
-        EditingType = RawMaterialCategoryType.Ingredient;
-    }
+    protected override RawMaterialCategory FormItem() => new() { Id = EditingId, Name = EditingName.Trim(), Type = EditingType };
 
-    public void Dispose() => _categoryCache.Dispose();
+    protected override void ClearFields() => EditingType = RawMaterialCategoryType.Ingredient;
 }

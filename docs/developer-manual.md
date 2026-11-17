@@ -316,7 +316,7 @@ A file can hold a few small, closely related types, such as a tree's rows in `Pr
 3. [IngredientCostPropagator](../src/TinapayanRMS.Infrastructure/Services/IngredientCostPropagator.cs).
 4. [ProductCategoryRepository](../src/TinapayanRMS.Infrastructure/Repositories/ProductCategoryRepository.cs), the simplest repository; then `SaveAsync` in [RawMaterialRepository](../src/TinapayanRMS.Infrastructure/Repositories/RawMaterialRepository.cs).
 5. [MauiProgram.cs](../src/TinapayanRMS.Maui/MauiProgram.cs), [ServiceRegistration.cs](../src/TinapayanRMS.Components/ServiceRegistration.cs) and [MainLayout.razor](../src/TinapayanRMS.Components/Layout/MainLayout.razor).
-6. [ScreenState](../src/TinapayanRMS.Presentation/Shared/ScreenState.cs) and [ScreenBase](../src/TinapayanRMS.Components/Shared/ScreenBase.cs), then the smallest complete screen: [RawMaterialCategoriesState](../src/TinapayanRMS.Presentation/Settings/RawMaterialCategoriesState.cs) with [RawMaterialCategories.razor](../src/TinapayanRMS.Components/Pages/Settings/RawMaterialCategories.razor).
+6. [ScreenState](../src/TinapayanRMS.Presentation/Shared/ScreenState.cs) and [ScreenBase](../src/TinapayanRMS.Components/Shared/ScreenBase.cs), then the smallest complete screens: [LookupListState](../src/TinapayanRMS.Presentation/Settings/LookupListState.cs), which Settings' list tabs share, and one of them, [RawMaterialCategoriesState](../src/TinapayanRMS.Presentation/Settings/RawMaterialCategoriesState.cs) with [RawMaterialCategories.razor](../src/TinapayanRMS.Components/Pages/Settings/RawMaterialCategories.razor).
 7. [CollectionMerge](../src/TinapayanRMS.Presentation/Shared/CollectionMerge.cs) and [UndoHistory](../src/TinapayanRMS.Presentation/Shared/UndoHistory.cs).
 8. [ReactiveCostCascadeTests](../tests/TinapayanRMS.Infrastructure.Tests/Persistence/ReactiveCostCascadeTests.cs), which runs the whole cascade end to end.
 
@@ -882,7 +882,7 @@ A screen's page inherits [ScreenBase&lt;TState&gt;](../src/TinapayanRMS.Componen
 <div class="list-and-form">
     <section class="card list-card">
         <h2 class="section-header">Units of Measure</h2>
-        <PickGrid TItem="UnitOfMeasure" DataSource="State!.Units" @bind-SelectedItem="State!.SelectedUnit">
+        <PickGrid TItem="UnitOfMeasure" DataSource="State!.Items" @bind-SelectedItem="State!.SelectedItem">
             <Columns>
                 <GridColumn Field="@nameof(UnitOfMeasure.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(UnitOfMeasure.Name)" HeaderText="Name" />
@@ -947,78 +947,106 @@ A large screen is split into components in a folder named after it (`Pages/RawMa
 
 A command that deletes, or does anything else that can't be undone, goes through `RunWithConfirmationAsync`. A command that saves runs inside `RunSafelyAsync`, and runs its validator first. A command that only changes the form in memory isn't wrapped.
 
-The smallest complete screen is Settings' Material Categories tab ([RawMaterialCategories.razor](../src/TinapayanRMS.Components/Pages/Settings/RawMaterialCategories.razor)). Abridged from [RawMaterialCategoriesState](../src/TinapayanRMS.Presentation/Settings/RawMaterialCategoriesState.cs):
+The smallest complete screens are Settings' list tabs (Units of Measure, Material Categories, Product Categories, Roles): a list, and a form beside it. They share [LookupListState](../src/TinapayanRMS.Presentation/Settings/LookupListState.cs), which holds the list, the pick, the name and the commands; each tab adds what its form holds beyond the name, how its list is read and written, and what Delete asks. Abridged:
 
 ```csharp
-public sealed class RawMaterialCategoriesState : ScreenState, IDisposable
+public abstract class LookupListState<TItem> : ScreenState, IDisposable
+    where TItem : class
 {
-    private readonly SourceCache<RawMaterialCategory, int> _categoryCache = new(c => c.Id);
-    private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
-    public ReadOnlyObservableCollection<RawMaterialCategory> Categories => _categories;
+    private readonly SourceCache<TItem, int> _cache;
+    private readonly ReadOnlyObservableCollection<TItem> _items;
 
-    private RawMaterialCategory? _selectedCategory;
-    public RawMaterialCategory? SelectedCategory
-    {
-        get => _selectedCategory;
-        set
-        {
-            // Fills the form from the selection, but not while a load is only pointing the selection at its fresh copy.
-            if (RaiseAndSetIfChanged(ref _selectedCategory, value) && value is { } category && !IsRefreshing)
-            {
-                /* copy into the Editing* properties */
-            }
-        }
-    }
-
-    // Worked out as it's read: the screen reads it again each time it's drawn.
-    public string FormTitle => SelectedCategory is null ? "New Category" : "Edit Category";
-
-    public ScreenCommand LoadCommand { get; }
-    public ScreenCommand SaveCommand { get; }
-    public ScreenCommand DeleteCommand { get; }
-
-    public RawMaterialCategoriesState(IRawMaterialCategoryRepository repository, IValidator<RawMaterialCategory> validator, ILogger logger)
+    protected LookupListState(string noun, Func<TItem, int> idOf, IComparer<TItem> order, IValidator<TItem> validator, ILogger logger)
         : base(logger)
     {
-        _categoryCache.Connect()
-            .SortAndBind(out _categories, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name))
+        _cache = new SourceCache<TItem, int>(idOf);
+        _cache.Connect()
+            .SortAndBind(out _items, order)
             .Subscribe();
 
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            var categories = await repository.GetAllAsync(CancellationToken.None);   // 1. fetch
-            var selectedId = SelectedCategory?.Id;                                  // 2. remember picks by id
-            ApplyRefresh(() =>                                                      // 3. merge, and pick again by id
+            var items = await ReadAllAsync();                                          // 1. fetch
+            var selectedId = SelectedItem is { } selected ? idOf(selected) : (int?)null; // 2. remember picks by id
+            ApplyRefresh(() =>                                                         // 3. merge, and pick again by id
             {
-                _categoryCache.MergeFrom(categories);
-                SelectedCategory = Categories.FirstOrDefault(c => c.Id == selectedId);
+                _cache.MergeFrom(items);
+                SelectedItem = Items.FirstOrDefault(i => idOf(i) == selectedId);
             });
         }));
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
-            var category = new RawMaterialCategory { /* … from the Editing* properties … */ };
-            var validation = validator.Validate(category);
+            var item = FormItem();
+            var validation = validator.Validate(item);
             if (!validation.IsValid)
             {
-                ErrorMessage = string.Join(" ", validation.Errors.Select(e => e.ErrorMessage));
+                ErrorMessage = validation.ToString(" ");
                 return;
             }
 
-            await repository.AddAsync(category, CancellationToken.None);   // or UpdateAsync
-            await LoadCommand.ExecuteAsync();
+            await SaveAsync(item);   // AddAsync or UpdateAsync, then the form cleared and the list loaded again
         }));
 
         DeleteCommand = new ScreenCommand(
-            () => RunWithConfirmationAsync($"Delete the '{SelectedCategory!.Name}' category? This can't be undone.", async () =>
+            () => RunWithConfirmationAsync(DeleteQuestion(SelectedItem!), async () =>
             {
-                await repository.DeleteAsync(SelectedCategory!.Id, CancellationToken.None);
-                await LoadCommand.ExecuteAsync();
+                await DeleteAsync(idOf(SelectedItem!));
+                await FinishSaveAsync();
             }),
-            () => SelectedCategory is not null);
+            () => SelectedItem is not null);
     }
 
-    public void Dispose() => _categoryCache.Dispose();
+    public ReadOnlyObservableCollection<TItem> Items => _items;
+
+    public TItem? SelectedItem
+    {
+        get => _selectedItem;
+        set
+        {
+            // Fills the form from the selection, but not while a load is only pointing the selection at its fresh copy.
+            if (RaiseAndSetIfChanged(ref _selectedItem, value) && value is { } item && !IsRefreshing)
+            {
+                EditingId = idOf(item);
+                LoadIntoForm(item);
+            }
+        }
+    }
+
+    // Worked out as it's read: the screen reads it again each time it's drawn.
+    public string FormTitle => SelectedItem is null ? $"New {noun}" : $"Edit {noun}";
+
+    protected abstract Task<IReadOnlyList<TItem>> ReadAllAsync();
+    protected abstract string DeleteQuestion(TItem item);
+    protected abstract void LoadIntoForm(TItem item);
+    protected abstract TItem FormItem();
+    /* … AddAsync, UpdateAsync, DeleteAsync, ClearFields … */
+
+    public void Dispose() => _cache.Dispose();
+}
+```
+
+A tab is then its own fields and those few answers ([RawMaterialCategoriesState](../src/TinapayanRMS.Presentation/Settings/RawMaterialCategoriesState.cs), abridged); Roles overrides `SaveAsync` too, to ask before a role's product-owned box changes what it moves:
+
+```csharp
+public sealed class RawMaterialCategoriesState(IRawMaterialCategoryRepository repository, IValidator<RawMaterialCategory> validator, ILogger logger)
+    : LookupListState<RawMaterialCategory>("Category", c => c.Id, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name), validator, logger)
+{
+    public RawMaterialCategoryType EditingType { get; set; }   // RaiseAndSetIfChanged, as every stored property
+
+    protected override Task<IReadOnlyList<RawMaterialCategory>> ReadAllAsync() => repository.GetAllAsync(CancellationToken.None);
+
+    protected override string DeleteQuestion(RawMaterialCategory item) => $"Delete the '{item.Name}' category? This can't be undone.";
+
+    protected override void LoadIntoForm(RawMaterialCategory item)
+    {
+        EditingName = item.Name;
+        EditingType = item.Type;
+    }
+
+    protected override RawMaterialCategory FormItem() => new() { Id = EditingId, Name = EditingName.Trim(), Type = EditingType };
+
+    /* … AddAsync, UpdateAsync and DeleteAsync, each the repository's; ClearFields … */
 }
 ```
 
@@ -1380,7 +1408,7 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
         var fillingRoleId = await AddRoleAsync("Filling", isProductOwned: true);
         var state = CreateState(confirm: false);
         await state.LoadCommand.Execute();
-        state.SelectedRole = state.Roles.Single(r => r.Id == fillingRoleId);
+        state.SelectedItem = state.Items.Single(r => r.Id == fillingRoleId);
 
         state.EditingIsProductOwned = false;
         await state.SaveCommand.Execute();

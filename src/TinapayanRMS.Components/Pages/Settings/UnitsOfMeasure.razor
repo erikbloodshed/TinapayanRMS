@@ -8,7 +8,7 @@
 <div class="list-and-form">
     <section class="card list-card">
         <h2 class="section-header">Units of Measure</h2>
-        <PickGrid TItem="UnitOfMeasure" DataSource="State!.Units" @bind-SelectedItem="State!.SelectedUnit">
+        <PickGrid TItem="UnitOfMeasure" DataSource="State!.Items" @bind-SelectedItem="State!.SelectedItem">
             <Columns>
                 <GridColumn Field="@nameof(UnitOfMeasure.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(UnitOfMeasure.Name)" HeaderText="Name" />
