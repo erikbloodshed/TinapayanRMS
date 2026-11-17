@@ -193,6 +193,24 @@ public class FieldTests
     }
 
     [Test]
+    public async Task A_number_box_tells_the_page_whether_a_point_and_a_minus_may_be_typed()
+    {
+        // The page's script (app.js) refuses any other key before it shows: a point in a count's box, a minus where the
+        // number can't go below zero.
+        await using var context = AppServices.NewContext();
+
+        var amount = context.Render<NumberField<decimal?>>(parameters => parameters.Add(f => f.Min, 0m)).Find("input");
+        var count = context.Render<NumberField<int>>(parameters => parameters.Add(f => f.Min, 1m).Add(f => f.Format, "N0")).Find("input");
+        var change = context.Render<NumberField<decimal?>>().Find("input");
+        var below = context.Render<NumberField<decimal>>(parameters => parameters.Add(f => f.Min, -100m)).Find("input");
+
+        (amount.HasAttribute("data-whole"), amount.HasAttribute("data-signed")).Should().Be((false, false));
+        (count.HasAttribute("data-whole"), count.HasAttribute("data-signed")).Should().Be((true, false));
+        (change.HasAttribute("data-whole"), change.HasAttribute("data-signed")).Should().Be((false, true), "with no Min it may go below zero");
+        below.HasAttribute("data-signed").Should().BeTrue();
+    }
+
+    [Test]
     public async Task A_number_box_bound_to_a_double_or_a_float_is_refused()
     {
         await using var context = AppServices.NewContext();

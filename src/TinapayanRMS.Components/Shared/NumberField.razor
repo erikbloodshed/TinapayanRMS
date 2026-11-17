@@ -11,7 +11,10 @@
    A number beyond Largest is read as no number at all. Within an undo screen the edit is one undo step. As TextField,
    the box is given up when another record takes the form's place under the cursor. *@
 <span class="e-input-group field number-field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
+    @* data-whole and data-signed tell the page's script (app.js) what may be typed: no point in a count's box, a minus
+       only where the number may go below zero. Anything else typed is refused before it shows. *@
     <input @key="_box" id="@ID" class="e-input" type="text" inputmode="decimal" value="@_text" placeholder="@Placeholder" readonly="@ReadOnly" autocomplete="off" data-decimals="@DecimalsOf(Format)"
+           data-whole="@(IsWhole ? "true" : null)" data-signed="@(Min is null or < 0m ? "true" : null)"
            @onfocus="OnFocus" @oninput="OnInput" @onchange="OnChange" @onblur="OnBlur" />
     @if (Suffix is not null)
     {
@@ -26,6 +29,9 @@
     // 11 Convert.ToDecimal keeps its binary noise (28.35 becomes 28.3499…), so a box bound to one is refused as it's drawn.
     private static readonly bool HoldsExactNumbers =
         (Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue)) is var type && (type == typeof(decimal) || type == typeof(int));
+
+    // A count's box: whole numbers only, so a point typed is refused (app.js).
+    private static readonly bool IsWhole = (Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue)) == typeof(int);
 
     // A number still being typed that would read back differently once tidied ("1.", "2.50"): passed on when left.
     private static readonly Regex Settled = new(@"^-?[\d,]+(\.\d*[1-9])?$", RegexOptions.CultureInvariant);

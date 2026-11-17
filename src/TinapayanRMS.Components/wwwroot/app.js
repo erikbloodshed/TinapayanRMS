@@ -25,6 +25,81 @@ document.addEventListener("focusin", e => {
     }
 });
 
+// A number box (NumberField) takes only what makes a number: digits, commas between thousands, one point where it holds
+// decimals (not a count's, data-whole), and a minus first where the number may go below zero (data-signed). A letter or
+// symbol typed is refused before it shows, as is a second point. A paste or a drop goes in at the caret only when it's
+// one number, a currency sign and spaces around it aside ("₱1,250.00" puts in 1,250.00), and one the box takes there;
+// anything else is refused whole, since joining the digits of "1/2" or "3 x 250 g" would put in a number nobody typed (12,
+// 3250). Done here, before the character lands: the server hears of a key only once the box shows it. Deleting, the shortcuts and the Vim keys' sum (Ctrl+R =, which puts its answer in
+// with setRangeText) aren't typing, so none of them comes through here. An IME's text can't be refused as it's composed;
+// the box drops what it can't read when it's left, as it always has.
+const numberBox = target =>
+    target instanceof HTMLInputElement && !target.readOnly && target.closest(".number-field") ? target : null;
+
+const isNumberShaped = (input, text) => (input.dataset.whole
+    ? (input.dataset.signed ? /^-?[\d,]*$/ : /^[\d,]*$/)
+    : (input.dataset.signed ? /^-?[\d,]*\.?\d*$/ : /^[\d,]*\.?\d*$/)).test(text);
+
+// The box's text with `text` in place of what's selected, or at the caret.
+const withTyped = (input, text) => {
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    return input.value.slice(0, start) + text + input.value.slice(end);
+};
+
+document.addEventListener("beforeinput", e => {
+    const input = numberBox(e.target);
+    if (!input || !e.inputType.startsWith("insert") || e.inputType === "insertFromPaste" || e.inputType === "insertCompositionText") {
+        return;
+    }
+    // A drop is the drop handler's below, which puts it in at the caret: one that gets past it lands where the pointer
+    // is, which can't be checked here, so it's refused.
+    if (e.inputType === "insertFromDrop" || !isNumberShaped(input, withTyped(input, e.data ?? ""))) {
+        e.preventDefault();
+    }
+}, true);
+
+// The one number in pasted or dropped text, with a currency sign and spaces around it, and a minus before or after the
+// sign, left out ("₱1,250.00", "-₱5", " 3.5 "); null when it holds anything else ("1/2", "12.50 (3 pcs)", "3 x 250 g",
+// "10-12"), or no digit. A minus is kept, so a negative number where none can go is refused rather than made positive.
+const oneNumberIn = text => {
+    const match = /^\s*(-?)\s*[₱$€]?\s*(-?)\s*([\d,]*\.?\d*)\s*$/.exec(text);
+    if (!match || !/\d/.test(match[3]) || (match[1] && match[2])) {
+        return null;
+    }
+
+    return match[1] + match[2] + match[3];
+};
+
+// Puts what was pasted or dropped in at the caret, in place of what's selected, if it's one number the box takes there.
+const putNumber = (input, text) => {
+    const number = oneNumberIn(text);
+    if (number !== null && isNumberShaped(input, withTyped(input, number))) {
+        const start = input.selectionStart ?? input.value.length;
+        input.setRangeText(number, start, input.selectionEnd ?? start, "end");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+};
+
+document.addEventListener("paste", e => {
+    const input = numberBox(e.target);
+    if (input) {
+        e.preventDefault();
+        putNumber(input, e.clipboardData?.getData("text/plain") ?? "");
+    }
+}, true);
+
+// A drop goes in as a paste does, at the caret: where the pointer lets go of it can't be read before it lands, and the
+// text it would make there is what has to be checked (a drop of "5.5" into "1.25" made "1.255.5").
+document.addEventListener("drop", e => {
+    const input = numberBox(e.target);
+    if (input) {
+        e.preventDefault();
+        input.focus();
+        putNumber(input, e.dataTransfer?.getData("text/plain") ?? "");
+    }
+}, true);
+
 // The pane a drag scrolls: the nearest element from `from` up that scrolls up and down and has more than it shows.
 const scrollingPane = from => {
     for (let at = from; at && at !== document.body; at = at.parentElement) {
