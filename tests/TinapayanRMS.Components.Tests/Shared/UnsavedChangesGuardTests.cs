@@ -97,6 +97,54 @@ public class UnsavedChangesGuardTests
         print.Dispose();
     }
 
+    // Windows asks before a sign-out, a shutdown or an install ends the app, and wants its answer there and then
+    // (WindowsWindow): what keeps the window open is told at once, and nothing is asked of the user for it.
+    [Test]
+    public async Task What_keeps_the_window_open_is_told_at_once_without_asking()
+    {
+        await using var context = AppServices.NewContext();
+        var busy = new Busy();
+        context.Services.AddScoped<IBusyWork>(_ => busy);
+        var app = context.Services.GetRequiredService<AppStatus>();
+        app.KeepsWindowOpen.Should().BeNull("no screen is up yet");
+
+        var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
+        var form = new Form();
+        using var watching = guard.Watch(form);
+        app.KeepsWindowOpen.Should().BeNull("the form has nothing unsaved");
+
+        form.HasUnsavedChanges = true;
+        app.KeepsWindowOpen.Should().Be("A product, sub-assembly or raw material has changes you haven't saved.");
+
+        busy.KeepsWindowOpen = "A restore is running, and closing now would cut it short.";
+        app.KeepsWindowOpen.Should().Be("A restore is running, and closing now would cut it short.");
+        form.Asked.Should().Be(0);
+    }
+
+    // A restore reloads the page, which brings a guard of its own: the window asks that one from then on, and the old
+    // page's going doesn't take it away.
+    [Test]
+    public async Task The_newest_pages_guard_answers_for_the_window()
+    {
+        await using var context = AppServices.NewContext();
+        var app = context.Services.GetRequiredService<AppStatus>();
+        var firstPage = context.Services.CreateScope();
+        using var firstForm = firstPage.ServiceProvider.GetRequiredService<UnsavedChangesGuard>().Watch(new Form { HasUnsavedChanges = true });
+        app.KeepsWindowOpen.Should().NotBeNull();
+
+        using (var reloaded = context.Services.CreateScope())
+        {
+            var guard = reloaded.ServiceProvider.GetRequiredService<UnsavedChangesGuard>();
+            app.KeepsWindowOpen.Should().BeNull("the reloaded page has nothing unsaved");
+
+            firstPage.Dispose();
+            using var reloadedForm = guard.Watch(new Form { HasUnsavedChanges = true });
+            app.KeepsWindowOpen.Should().NotBeNull("the old page went, and the reloaded one's guard still answers");
+        }
+
+        app.KeepsWindowOpen.Should().BeNull("no page is loaded");
+    }
+
     [Test]
     public async Task Settings_Database_keeps_the_window_open_only_while_it_works()
     {

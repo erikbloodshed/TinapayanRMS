@@ -29,10 +29,11 @@
     <Launch Condition="Installed OR DOTNET_RUNTIME_CHECK=&quot;0&quot;"
             Message="TinapayanRMS needs the .NET 11 Runtime (x64). Install it from https://dotnet.microsoft.com/download/dotnet/11.0, then run this installer again." />
 
-    <!-- A copy that's open holds its files: Windows Installer's Restart Manager closes it (InstallValidate), finding it by
-         the files it holds, so only the copy in INSTALLFOLDER. It isn't the window's Close, so a form's unsaved changes
-         are lost: close the app first. WiX's util:CloseApplication, tried on 2026-11-15, came after it and could only
-         reach copies run from elsewhere, as it finds the app by its .exe's name alone. -->
+    <!-- A copy that's open holds its files: Windows Installer's Restart Manager asks it to close (InstallValidate),
+         finding it by the files it holds, so only the copy in INSTALLFOLDER. The app answers as its Close would: with a
+         form's unsaved changes it stays open and asks about them (WindowsWindow), and the files it holds are replaced at
+         a restart if it's still open when they're copied. WiX's util:CloseApplication, tried on 2026-11-15, came after it
+         and could only reach copies run from elsewhere, as it finds the app by its .exe's name alone. -->
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="TinapayanRMS" />

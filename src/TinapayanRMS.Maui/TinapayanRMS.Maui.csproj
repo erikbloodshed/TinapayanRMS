@@ -27,7 +27,8 @@
          for it. -->
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <!-- The code LibraryImport writes for the calls into user32 and dwmapi (SingleInstance, AppWindowChrome). -->
+    <!-- The code LibraryImport writes for the calls into user32, dwmapi and comctl32 (SingleInstance, AppWindowChrome,
+         WindowsWindow), and the window's own handler of Windows' messages that comctl32 calls (WindowsWindow). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>

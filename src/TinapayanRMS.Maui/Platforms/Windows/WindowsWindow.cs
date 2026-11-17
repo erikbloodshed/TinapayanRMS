@@ -11,7 +11,8 @@ namespace TinapayanRMS.Maui.WinUI;
 /// <summary>
 /// The app's window, set up chromeless, with the page's title bar in place of Windows' own
 /// (<see cref="AppWindowChrome"/>), opening at 1400×800 in the middle of the monitor the mouse is on, and asking about a
-/// form's unsaved changes before it closes (Save, Don't Save or Cancel, as moving away from the form asks).
+/// form's unsaved changes before it closes (Save, Don't Save or Cancel, as moving away from the form asks), Windows'
+/// own request to close it included (a sign-out, a shutdown, an install: <see cref="OnSessionEnding"/>).
 /// </summary>
 public static partial class WindowsWindow
 {
@@ -76,7 +77,89 @@ public static partial class WindowsWindow
                 deciding = false;
             }
         };
+
+        // Windows' own request to close the app, which MAUI's handling of the window's messages (OnMessage) can't answer.
+        unsafe
+        {
+            if (!SetWindowSubclass(hwnd, &OnSessionEnding, SessionEndingSubclass, 0))
+            {
+                Log.Warning("Couldn't watch for Windows closing the app: a sign-out or an install would close it without asking");
+            }
+        }
     }
+
+    /// <summary>
+    /// Windows asking whether the app may end (WM_QUERYENDSESSION), then saying whether it does (WM_ENDSESSION). It asks
+    /// before a sign-out or a shutdown, and for an install or uninstall that replaces the app's files (Windows
+    /// Installer's Restart Manager: ENDSESSION_CLOSEAPP), and wants its answer at once. While a form has unsaved changes,
+    /// or a backup or restore runs, the answer is no: the app stays open, and Windows shows why beside it in the list of
+    /// apps a sign-out or a shutdown is waiting for (an installer's close of it fails at once). The window then asks
+    /// what its Close asks, so the changes can be saved or let go, and the app closed. Otherwise the app ends as its
+    /// window's closing ends it, once Windows says the session ends. An end that's forced (Sign out anyway, an installer
+    /// told to force it) still ends it.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    private static unsafe nint OnSessionEnding(nint hwnd, uint message, nint wParam, nint lParam, nuint id, nuint data)
+    {
+        try
+        {
+            switch (message)
+            {
+                case WmQueryEndSession:
+                    if (IPlatformApplication.Current?.Services.GetService<AppStatus>()?.KeepsWindowOpen is { } why)
+                    {
+                        Log.Information("Windows asked to close the app for {Ending}, and it stays open: {Why}", EndingFor(lParam), why);
+                        _ = ShutdownBlockReasonCreate(hwnd, why);
+                        AskAsCloseDoes(hwnd);
+                        return 0;
+                    }
+
+                    _ = ShutdownBlockReasonDestroy(hwnd);
+                    break;
+
+                case WmEndSession:
+                    _ = ShutdownBlockReasonDestroy(hwnd);
+                    if (wParam != 0 && IPlatformApplication.Current?.Services is { } services)
+                    {
+                        Log.Information("Windows is ending the app, for {Ending}", EndingFor(lParam));
+                        TinapayanRMS.Maui.App.End(services);
+                    }
+
+                    break;
+
+                case WmNcDestroy:
+                    _ = RemoveWindowSubclass(hwnd, &OnSessionEnding, id);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Never keep Windows from closing the app over an answer that couldn't be worked out.
+            Log.Warning(ex, "Couldn't answer Windows asking to close the app");
+        }
+
+        return DefSubclassProc(hwnd, message, wParam, lParam);
+    }
+
+    /// <summary>
+    /// The window's own question, as its Close asks it (the title bar's Close posts the same: AppWindowChrome), after
+    /// Windows' question has had its answer. A minimized window comes back first, or nobody would see it.
+    /// </summary>
+    private static void AskAsCloseDoes(nint hwnd)
+    {
+        if (IsIconic(hwnd))
+        {
+            _ = PostMessage(hwnd, WmSysCommand, ScRestore, 0);
+        }
+
+        _ = PostMessage(hwnd, WmSysCommand, ScClose, 0);
+    }
+
+    /// <summary>What Windows ends the app for, from the flags it asks with, for the log.</summary>
+    private static string EndingFor(nint flags) =>
+        (flags & EndSessionCloseApp) != 0 ? "an install or update (Restart Manager)"
+        : ((long)flags & EndSessionLogoff) != 0 ? "a sign-out"
+        : "a shutdown or restart";
 
     /// <summary>
     /// The window's messages, after MAUI's own handling of each: after a change to its style (showing it, maximizing or
@@ -135,6 +218,15 @@ public static partial class WindowsWindow
     private const nint GwlStyle = -16;
     private const int DwmWindowCornerPreference = 33;
     private const int DwmCornerRound = 2;
+    private const uint WmQueryEndSession = 0x0011;
+    private const uint WmEndSession = 0x0016;
+    private const uint WmNcDestroy = 0x0082;
+    private const nint EndSessionCloseApp = 0x1;
+    private const long EndSessionLogoff = 0x80000000;
+    private const int WmSysCommand = 0x0112;
+    private const nint ScClose = 0xF060;
+    private const nint ScRestore = 0xF120;
+    private const nuint SessionEndingSubclass = 1;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Point32
@@ -152,4 +244,33 @@ public static partial class WindowsWindow
 
     [LibraryImport("dwmapi.dll")]
     private static partial int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int size);
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool SetWindowSubclass(
+        nint hwnd, delegate* unmanaged<nint, uint, nint, nint, nuint, nuint, nint> subclass, nuint id, nuint data);
+
+    [LibraryImport("comctl32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool RemoveWindowSubclass(
+        nint hwnd, delegate* unmanaged<nint, uint, nint, nint, nuint, nuint, nint> subclass, nuint id);
+
+    [LibraryImport("comctl32.dll")]
+    private static partial nint DefSubclassProc(nint hwnd, uint message, nint wParam, nint lParam);
+
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShutdownBlockReasonCreate(nint hwnd, string reason);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool ShutdownBlockReasonDestroy(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool IsIconic(nint hwnd);
+
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool PostMessage(nint hwnd, int message, nint wParam, nint lParam);
 }

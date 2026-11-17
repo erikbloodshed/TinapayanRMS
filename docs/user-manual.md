@@ -161,6 +161,7 @@ The column heading changes to show which one you're looking at. Only the grams a
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find, at the first press even with the Vim keys on. The best 50 matches are listed; type more of the name to narrow them. Your last search is still there the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
 - Changes made on one screen show up on another the next time you open it.
 - **Closing the window** closes the app. What you've saved is kept. If a product, sub-assembly or raw material has changes you **haven't** saved, the app asks whether to save them first, as it does when you go to another screen (see [Editing and saving](#editing-and-saving)). While a save is still on its way, the window waits for it rather than ask. While **Settings → Database** is backing up, copying or restoring, the window doesn't close, and a red notice says why: close it once that's done (a restore restarts the app by itself).
+- **Windows closing the app** (when you sign out, shut down or restart, or an installer updates or removes the app) works the same way. If there are changes you haven't saved, or **Settings → Database** is busy, the app stays open and asks its question (it comes back up first if it was minimized). When you're signing out or shutting down, Windows lists the app as keeping it waiting, with the reason (*A product, sub-assembly or raw material has changes you haven't saved.*): choose **Cancel** there, answer the app, then sign out or shut down again. **Sign out anyway** or **Shut down anyway** there closes the app without saving.
 
 ### Signing in and locking
 
@@ -1342,7 +1343,7 @@ The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanR
 - the **.NET 11 Runtime (x64)**, from Microsoft's .NET download page. Without it the installer stops before changing anything and says where to get it;
 - PostgreSQL, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing. The app's database itself needn't be there: the app makes it the first time it opens.
 
-1. Close TinapayanRMS if it's open. If it's still open, the installer closes it, and any changes not saved are lost.
+1. Close TinapayanRMS if it's open. If it's still open, the installer offers to close it. If it has changes you haven't saved, it stays open and asks about them instead, and the installer can't close it: answer the app, which then closes. If the installer asks to restart Windows at the end, restart before you open the app again.
 2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
 3. Open the app. If this version changes the data, the first start updates it, after a backup (see [What an update does](#what-an-update-does)).
 
@@ -1506,7 +1507,7 @@ Purchased materials are costed at their **buffered cost**, which stays fixed unt
 Packaging quantities are per sellable unit and aren't rescaled. Update the Packaging tab by hand, or link a packaging set made for that pack size.
 
 **A message asks "Save the changes to …?" when I click somewhere else.**
-The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving). Closing the window asks the same. Right after **Save**, it doesn't ask: the app waits for the save to go through first. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
+The product, sub-assembly or raw material showing has changes you haven't saved. **Yes** saves them, **No** throws them away, and **Cancel** keeps you where you are. See [Editing and saving](#editing-and-saving). Closing the window asks the same, and so does Windows closing the app to sign out, shut down or install an update. Right after **Save**, it doesn't ask: the app waits for the save to go through first. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
 
 **The window shows a notice about a Syncfusion licence.**
 The app needs a licence key for its screen components, set on the computer by whoever installed it. Ask them to check it.

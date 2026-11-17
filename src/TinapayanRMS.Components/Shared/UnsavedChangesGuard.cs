@@ -9,20 +9,43 @@ namespace TinapayanRMS.Components.Shared;
 /// changes, asked about as leaving the form asks. ScreenBase keeps its form here while its screen is up. A form whose
 /// screen went while it still held unsaved changes is kept too: a screen that failed gives way to its error panel
 /// (ScreenErrorBoundary) without the question leaving it would have asked, and what it held is still its state's. One
-/// per page the window loads.
+/// per page the window loads: the newest page's is the one <see cref="AppStatus.KeepsWindowOpen"/> asks, for Windows.
 /// </summary>
-/// <param name="services">The page's services, for the screens that may be busy: asked only as the window closes.</param>
-/// <param name="notices">The page's notices, to say why the window stays open.</param>
-public sealed class UnsavedChangesGuard(IServiceProvider services, Notices notices)
+public sealed class UnsavedChangesGuard : IDisposable
 {
+    /// <summary>What Windows shows beside the app while it keeps a sign-out, a shutdown or an install waiting for it.</summary>
+    public const string UnsavedChangesReason = "A product, sub-assembly or raw material has changes you haven't saved.";
+
+    private readonly IServiceProvider _services;
+    private readonly Notices _notices;
+    private readonly AppStatus _app;
+
     /// <summary>The forms on show, by how many screens show each (Products and Print show the same one).</summary>
     private readonly Dictionary<IUnsavedChangesScreen, int> _shown = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>Forms whose screens went while they held unsaved changes.</summary>
     private readonly HashSet<IUnsavedChangesScreen> _leftUnsaved = new(ReferenceEqualityComparer.Instance);
 
+    /// <param name="services">The page's services, for the screens that may be busy: asked only when the window would close.</param>
+    /// <param name="notices">The page's notices, to say why the window stays open.</param>
+    /// <param name="app">The app's status, which follows this guard while its page is the newest.</param>
+    public UnsavedChangesGuard(IServiceProvider services, Notices notices, AppStatus app)
+    {
+        _services = services;
+        _notices = notices;
+        _app = app;
+        app.Follow(this);
+    }
+
     /// <summary>Whether a form on show, or one left with them, holds anything a Save would write.</summary>
     public bool HasUnsavedChanges => Forms().Any(form => form.HasUnsavedChanges);
+
+    /// <summary>
+    /// Why the window mustn't close without asking, in words for the user, found at once and asking nothing: what's
+    /// running that closing would cut short, or that a form holds unsaved changes; null when it may close. For Windows'
+    /// question before it ends the app, which wants its answer there and then (<see cref="AppStatus.KeepsWindowOpen"/>).
+    /// </summary>
+    public string? KeepsWindowOpen => BusyWith() ?? (HasUnsavedChanges ? UnsavedChangesReason : null);
 
     /// <summary>Keeps <paramref name="form"/> as one on show until the returned subscription goes.</summary>
     public IDisposable Watch(IUnsavedChangesScreen form)
@@ -39,13 +62,10 @@ public sealed class UnsavedChangesGuard(IServiceProvider services, Notices notic
     /// </summary>
     public async Task<bool> ResolveBeforeClosingAsync()
     {
-        foreach (var work in services.GetServices<IBusyWork>())
+        if (BusyWith() is { } why)
         {
-            if (work.KeepsWindowOpen is { } why)
-            {
-                notices.ShowError(why);
-                return false;
-            }
+            _notices.ShowError(why);
+            return false;
         }
 
         foreach (var form in Forms().Where(form => form.HasUnsavedChanges).ToList())
@@ -59,6 +79,13 @@ public sealed class UnsavedChangesGuard(IServiceProvider services, Notices notic
         _leftUnsaved.RemoveWhere(form => !form.HasUnsavedChanges);
         return true;
     }
+
+    /// <summary>The app's status lets go of this guard as its page goes (the scope ends).</summary>
+    public void Dispose() => _app.Forget(this);
+
+    /// <summary>Why something running keeps the window open (<see cref="IBusyWork"/>); null while nothing does.</summary>
+    private string? BusyWith() =>
+        _services.GetServices<IBusyWork>().Select(work => work.KeepsWindowOpen).FirstOrDefault(why => why is not null);
 
     private IEnumerable<IUnsavedChangesScreen> Forms() => _shown.Keys.Concat(_leftUnsaved);
 
