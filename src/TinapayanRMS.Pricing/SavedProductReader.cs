@@ -274,7 +274,7 @@ public sealed class SavedProductReader(
     /// <paramref name="details"/> with every composite's products priced again with <paramref name="materialsById"/> in place
     /// of the materials they were read with (the Price Simulator screen): what a composite's products bring is worked out
     /// when they're read, so a different cost for one of their materials has to reach them here, however deeply they're held.
-    /// A product holding none comes back as it was, since <see cref="Build"/> takes the materials for its own sections.
+    /// A product holding none comes back as it was, since <see cref="Build(Product, ProductDetail, CostBasis, IReadOnlyDictionary{int, RawMaterial})"/> takes the materials for its own sections.
     /// </summary>
     public static IReadOnlyDictionary<int, ProductDetail> PricedAt(
         IReadOnlyDictionary<int, ProductDetail> details, IReadOnlyDictionary<int, RawMaterial> materialsById)

@@ -49,7 +49,7 @@ public sealed class TinapayanRMSDbContext : DbContext
             .UseSeeding((context, _) => Upgrades.DataUpgrades.Run(context))
             .UseAsyncSeeding((context, _, cancellationToken) => Upgrades.DataUpgrades.RunAsync(context, cancellationToken));
 
-    /// <summary>The options <see cref="Configure"/> builds, for a context made by hand rather than by the factory.</summary>
+    /// <summary>The options <see cref="Configure(DbContextOptionsBuilder, string)"/> builds, for a context made by hand rather than by the factory.</summary>
     public static DbContextOptions<TinapayanRMSDbContext> CreateOptions(string connectionString) =>
         (DbContextOptions<TinapayanRMSDbContext>)Configure(new DbContextOptionsBuilder<TinapayanRMSDbContext>(), connectionString).Options;
 

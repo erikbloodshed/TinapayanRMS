@@ -7,7 +7,6 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
-using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Products;

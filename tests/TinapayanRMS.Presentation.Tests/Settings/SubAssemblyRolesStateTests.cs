@@ -1,6 +1,5 @@
 using AwesomeAssertions;
 using Serilog;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Repositories;

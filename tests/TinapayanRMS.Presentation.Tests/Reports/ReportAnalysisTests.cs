@@ -1,7 +1,5 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Pricing.Versions;

@@ -92,7 +92,7 @@ public sealed class UndoHistory<TSnapshot>(
     /// <summary>
     /// Whether the form holds anything a Save would write. It's what the Save button is enabled by, so it has to
     /// follow the form as it's typed into rather than only as each field is left: a button still disabled under
-    /// the cursor swallows the very click that would have enabled it. The screen calls <see cref="RefreshDirty"/>
+    /// the cursor swallows the very click that would have enabled it. The screen calls <see cref="RefreshDirty()"/>
     /// for every change it can see; this class calls it for the ones it settles itself.
     /// </summary>
     public bool IsDirty

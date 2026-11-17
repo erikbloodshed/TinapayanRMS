@@ -1,4 +1,3 @@
-using System.IO;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Infrastructure.Services;

@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
 

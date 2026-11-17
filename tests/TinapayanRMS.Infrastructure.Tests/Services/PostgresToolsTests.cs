@@ -1,4 +1,3 @@
-using System.IO;
 using AwesomeAssertions;
 using Npgsql;
 using TinapayanRMS.Infrastructure.Services;

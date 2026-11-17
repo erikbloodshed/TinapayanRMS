@@ -1,4 +1,3 @@
-using System.Windows.Input;
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using Serilog;

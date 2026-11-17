@@ -1,4 +1,3 @@
-using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Products;

@@ -3,7 +3,6 @@ using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Pricing;

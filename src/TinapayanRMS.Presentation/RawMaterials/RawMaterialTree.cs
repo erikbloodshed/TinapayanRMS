@@ -31,7 +31,6 @@ public closed class RawMaterialTreeNode : ObservableState
 /// A folder of the Raw Materials list: a type's (Ingredients, Packaging), or a category's inside the type it's for, a Made
 /// category's among the ingredient ones. There's no Uncategorized, since every material has a category. Its rows are in
 /// <see cref="Children"/>, which the tree (FolderTree) draws under it, as a Products folder's are (ProductFolderNode).
-
 /// </summary>
 public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<RawMaterialTreeNode>
 {

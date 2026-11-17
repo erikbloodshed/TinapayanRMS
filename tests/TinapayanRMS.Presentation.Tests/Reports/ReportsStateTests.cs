@@ -1,5 +1,4 @@
 using System.Collections.Specialized;
-using System.IO;
 using System.Reactive.Linq;
 using AwesomeAssertions;
 using Serilog;

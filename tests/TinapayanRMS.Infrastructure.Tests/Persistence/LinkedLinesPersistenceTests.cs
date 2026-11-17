@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
 

@@ -1,4 +1,3 @@
-using System.IO;
 using AwesomeAssertions;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;

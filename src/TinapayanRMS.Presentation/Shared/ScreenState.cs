@@ -1,4 +1,3 @@
-using System.IO;
 using System.Reactive.Linq;
 using TinapayanRMS.Infrastructure.Services;
 using ILogger = Serilog.ILogger;
@@ -205,7 +204,7 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     });
 
     /// <summary>
-    /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync"/>'s
+    /// Runs a load, a LoadCommand's body: a load that fails shows why and is logged as <see cref="RunSafelyAsync(Func{Task})"/>'s
     /// actions are, rather than reaching the screen that ran it, and the next load tries again (showing the tab again). Unlike an
     /// action it leaves the notices alone, since a screen loads after its own Save too and mustn't take that Save's message
     /// away; but a load that succeeds takes away the error a failed one left.

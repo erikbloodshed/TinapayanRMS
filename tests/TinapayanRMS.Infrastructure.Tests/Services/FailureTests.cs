@@ -1,11 +1,9 @@
-using System.IO;
 using AwesomeAssertions;
 using Npgsql;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;

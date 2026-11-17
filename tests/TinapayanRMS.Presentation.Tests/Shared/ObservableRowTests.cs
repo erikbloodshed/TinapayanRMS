@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Tests.Shared;

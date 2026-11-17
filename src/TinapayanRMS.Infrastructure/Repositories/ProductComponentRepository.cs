@@ -9,7 +9,7 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 
 /// <summary>
 /// A composite product's lines: which products go into it, and how many of each. They're written with the rest of the
-/// product (<see cref="ProductRepository.SaveAsync"/>, ProductCloner) and read through IProductRepository.GetComponentsAsync,
+/// product (ProductRepository.SaveAsync, ProductCloner) and read through IProductRepository.GetComponentsAsync,
 /// as a product's own detail, so there's no repository of their own to inject.
 /// </summary>
 public static class ProductComponentRepository

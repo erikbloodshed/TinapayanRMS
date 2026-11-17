@@ -5,7 +5,6 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
-using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.PriceSimulator;

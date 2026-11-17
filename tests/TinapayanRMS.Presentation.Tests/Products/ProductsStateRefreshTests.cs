@@ -2525,7 +2525,10 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         return (linkerId, doughId, ubeId, flourId);
     }
 
-    /// <summary>Selects <paramref name="productId"/> and links the dough into it with <paramref name="addInGrams"/> of ube.</summary>
+    /// <summary>
+    /// Links the dough into the product <paramref name="state"/> shows, with <paramref name="addInGrams"/> of ube and
+    /// <paramref name="weightPerPiece"/> a piece, and saves it.
+    /// </summary>
     private static async Task LinkWithUbeAsync(ProductsState state, int ubeId, decimal addInGrams, decimal weightPerPiece)
     {
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);

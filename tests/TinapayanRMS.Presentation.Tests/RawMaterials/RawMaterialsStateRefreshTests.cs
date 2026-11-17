@@ -1915,11 +1915,6 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// Types a brand into the Purchase Cost Setup grid's add row as the grid does: it edits the row the screen hands it
-    /// (NewBrandPriceRow), picking the unit named <paramref name="unitName"/>, then adds it to the rows when it's
-    /// committed. Only Save writes it.
-    /// </summary>
     [Test]
     public Task A_purchase_unit_later_made_the_base_unit_is_priced_in_the_base_unit_and_saves() => UiThread.RunAsync(async () =>
     {
@@ -1950,6 +1945,11 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         (await dbContext.RawMaterialBrandPrices.SingleAsync(Cancellation)).Should().BeEquivalentTo(new { UnitId = (int?)null, Price = 5m });
     });
 
+    /// <summary>
+    /// Types a brand into the Purchase Cost Setup grid's add row as the grid does: it edits the row the screen hands it
+    /// (NewBrandPriceRow), picking the unit named <paramref name="unitName"/>, then adds it to the rows when it's
+    /// committed. Only Save writes it.
+    /// </summary>
     private static BrandPriceRow AddBrandPrice(RawMaterialsState state, string? brand, string unitName, decimal price)
     {
         var row = state.PurchaseCost.NewBrandPriceRow();
