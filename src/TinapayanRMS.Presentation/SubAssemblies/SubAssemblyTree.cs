@@ -9,18 +9,7 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>A row of the Sub-Assemblies list's tree (SubAssemblyTree): a role's folder, or a sub-assembly in one.</summary>
-public closed class SubAssemblyTreeNode : ObservableState
-{
-    public abstract string Title { get; }
-
-    /// <summary>The icon before the title, or null for none.</summary>
-    public abstract AppIcon? Icon { get; }
-
-    public abstract bool IsFolder { get; }
-
-    /// <summary>How many sub-assemblies a folder holds, shown after its title; always 0 for a sub-assembly, which shows none.</summary>
-    public virtual int SubAssemblyCount => 0;
-}
+public closed class SubAssemblyTreeNode : ListTreeNode;
 
 /// <summary>
 /// A role's folder in the Sub-Assemblies list, holding the sub-assemblies in that role. Its rows are in
@@ -59,31 +48,17 @@ public sealed class SubAssemblyFolderNode : SubAssemblyTreeNode, ITreeFolder<Sub
 
     public IEnumerable<SubAssemblyLeafNode> SubAssemblies => Children.OfType<SubAssemblyLeafNode>();
 
-    private int _subAssemblyCount;
+    private int _count;
     /// <summary>The sub-assemblies it shows, or while a search filters the list, the matches.</summary>
-    public override int SubAssemblyCount => _subAssemblyCount;
+    public override int Count => _count;
 
-    internal void ShowCount(int count)
-    {
-        if (_subAssemblyCount != count)
-        {
-            _subAssemblyCount = count;
-            RaisePropertyChanged(nameof(SubAssemblyCount));
-        }
-    }
+    internal void ShowCount(int count) => RaiseAndSetIfChanged(ref _count, count, nameof(Count));
 
     private string _title;
     public override string Title => _title;
 
     /// <summary>A role renamed keeps its folder, under its new name.</summary>
-    internal void Rename(string title)
-    {
-        if (_title != title)
-        {
-            _title = title;
-            RaisePropertyChanged(nameof(Title));
-        }
-    }
+    internal void Rename(string title) => RaiseAndSetIfChanged(ref _title, title, nameof(Title));
 
     /// <summary>FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included.</summary>
     public override AppIcon? Icon => IsExpanded && Children.Count > 0 ? AppIcon.FolderOpen : AppIcon.Folder;
@@ -372,7 +347,7 @@ public sealed class SubAssemblyTree : IDisposable
         if (pendingAt >= 0)
         {
             var folder = wanted[pendingAt].Folder;
-            folder.ShowCount(folder.SubAssemblyCount - 1);
+            folder.ShowCount(folder.Count - 1);
         }
     }
 }

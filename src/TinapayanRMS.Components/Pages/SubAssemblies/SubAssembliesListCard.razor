@@ -1,3 +1,4 @@
+@inherits ListCardBase
 @* Sub-Assemblies' list: a search box; the list's commands as icons; the standalone
    sub-assemblies in a folder for each role; and what the last move did, with Undo. Dragging sub-assemblies onto another
    role's folder gives them that role, saved at once; a right-click opens the row's menu, or the list's. A name is typed
@@ -33,26 +34,7 @@
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="List.TreeMenuFor"
                 Shortcut="List.TreeShortcut">
-        <RowTemplate Context="node">
-            @if (node.IsFolder)
-            {
-                <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
-            }
-            @if (List.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
-            {
-                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
-                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
-                             OnCommit="List.CommitTreeNameAsync" OnCancel="List.CancelTreeName" />
-            }
-            else
-            {
-                <span class="tree-title">@node.Title</span>
-                @if (node.IsFolder)
-                {
-                    <span class="tree-count">(@node.SubAssemblyCount)</span>
-                }
-            }
-        </RowTemplate>
+        <RowTemplate Context="node">@RowContent(node, List)</RowTemplate>
     </FolderTree>
 
     <MoveNoticeBar Notice="@List.MoveNotice" UndoCommand="List.UndoMoveCommand" DismissCommand="List.DismissMoveNoticeCommand" />

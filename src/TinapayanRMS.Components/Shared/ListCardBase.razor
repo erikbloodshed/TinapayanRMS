@@ -1,0 +1,35 @@
+@*
+    The base of the main screens' list cards (ProductsListCard, RawMaterialsListCard, SubAssembliesListCard): what a row of
+    their tree shows, which each card's FolderTree draws as its RowTemplate. The row is a fragment drawn into the tree, not
+    a component of its own, so a long list draws no extra component for each row; the card it's drawn in handles what the
+    row's name box does. Its base is named in ListCardBase.razor.cs (see there).
+*@
+
+@code {
+    /// <summary>
+    /// A folder's icon; then the box the row's name is typed into while <paramref name="list"/> names it
+    /// (RecordList.TreeNameEdit), or else its title, what <paramref name="afterTitle"/> adds, and a folder's count.
+    /// </summary>
+    protected RenderFragment RowContent(ListTreeNode node, RecordList list, RenderFragment? afterTitle = null) => __builder =>
+    {
+        @if (node.IsFolder)
+        {
+            <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
+        }
+        @if (list.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
+        {
+            @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
+            <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
+                         OnCommit="list.CommitTreeNameAsync" OnCancel="list.CancelTreeName" />
+        }
+        else
+        {
+            <span class="tree-title">@node.Title</span>
+            @afterTitle
+            @if (node.IsFolder)
+            {
+                <span class="tree-count">(@node.Count)</span>
+            }
+        }
+    };
+}

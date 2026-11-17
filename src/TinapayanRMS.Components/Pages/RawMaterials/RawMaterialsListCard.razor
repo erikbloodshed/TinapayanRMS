@@ -1,3 +1,4 @@
+@inherits ListCardBase
 @using TinapayanRMS.Domain.Enums
 @* Raw Materials' list: a search box; the list's commands as icons; the materials in a folder
    for their type, then their category; and, under the tree, what the last move did, with Undo. Dragging materials onto
@@ -42,26 +43,7 @@
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="List.TreeMenuFor"
                 Shortcut="List.TreeShortcut">
-        <RowTemplate Context="node">
-            @if (node.IsFolder)
-            {
-                <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
-            }
-            @if (List.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
-            {
-                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
-                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
-                             OnCommit="List.CommitTreeNameAsync" OnCancel="List.CancelTreeName" />
-            }
-            else
-            {
-                <span class="tree-title">@node.Title</span>
-                @if (node.IsFolder)
-                {
-                    <span class="tree-count">(@node.MaterialCount)</span>
-                }
-            }
-        </RowTemplate>
+        <RowTemplate Context="node">@RowContent(node, List)</RowTemplate>
     </FolderTree>
 
     <MoveNoticeBar Notice="@List.MoveNotice" UndoCommand="List.UndoMoveCommand" DismissCommand="List.DismissMoveNoticeCommand" />

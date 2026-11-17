@@ -92,10 +92,10 @@ public class ProductTreeTests
         tree.Refresh(AllFolders, [pandesal], isFiltered: false, [ensaymada, mamon]);
 
         TitlesIn(tree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
-        tree.DeletedFolder.ProductCount.Should().Be(2);
+        tree.DeletedFolder.Count.Should().Be(2);
         tree.DeletedFolder.Icon.Should().Be(AppIcon.Delete, "the bin, open or not");
         TitlesIn(Folder(tree, Cakes.Id)).Should().BeEmpty();
-        Root(tree, ProductStage.Production).ProductCount.Should().Be(1, "a stage counts only its own");
+        Root(tree, ProductStage.Production).Count.Should().Be(1, "a stage counts only its own");
         tree.Find(2)!.IsDeleted.Should().BeTrue();
         tree.Find(1)!.IsDeleted.Should().BeFalse();
     }
@@ -304,8 +304,8 @@ public class ProductTreeTests
         TitlesIn(Folder(tree, Trials.Id)).Should().Equal("Holiday");
         TitlesIn(Folder(tree, Breads.Id)).Should().BeEmpty();
         holiday.Children.Should().Equal(leaf);
-        Folder(tree, Trials.Id).ProductCount.Should().Be(1, "a folder counts what the folders in it hold");
-        Root(tree, ProductStage.Production).ProductCount.Should().Be(0);
+        Folder(tree, Trials.Id).Count.Should().Be(1, "a folder counts what the folders in it hold");
+        Root(tree, ProductStage.Production).Count.Should().Be(0);
     }
 
     [Test]
@@ -400,16 +400,16 @@ public class ProductTreeTests
 
         tree.Refresh(AllFolders, products, isFiltered: false);
 
-        Folder(tree, Breads.Id).ProductCount.Should().Be(2);
-        Folder(tree, Holiday.Id).ProductCount.Should().Be(1);
-        Folder(tree, Trials.Id).ProductCount.Should().Be(0, "an empty folder says so");
-        Root(tree, ProductStage.Production).ProductCount.Should().Be(4);
-        Root(tree, ProductStage.Innovation).ProductCount.Should().Be(1);
-        tree.Find(1)!.ProductCount.Should().Be(0, "a product counts nothing");
+        Folder(tree, Breads.Id).Count.Should().Be(2);
+        Folder(tree, Holiday.Id).Count.Should().Be(1);
+        Folder(tree, Trials.Id).Count.Should().Be(0, "an empty folder says so");
+        Root(tree, ProductStage.Production).Count.Should().Be(4);
+        Root(tree, ProductStage.Innovation).Count.Should().Be(1);
+        tree.Find(1)!.Count.Should().Be(0, "a product counts nothing");
 
         tree.Refresh(AllFolders, [products[1]], isFiltered: true);
-        Folder(tree, Breads.Id).ProductCount.Should().Be(1, "with a filter on, a folder counts its matches");
-        Root(tree, ProductStage.Production).ProductCount.Should().Be(1);
+        Folder(tree, Breads.Id).Count.Should().Be(1, "with a filter on, a folder counts its matches");
+        Root(tree, ProductStage.Production).Count.Should().Be(1);
     }
 
     [Test]
@@ -645,8 +645,8 @@ public class ProductTreeTests
 
         tree.Refresh(AllFolders, [pandesal], isFiltered: false);
         TitlesIn(breads).Should().Equal("Holiday", "Pandesal", "New composite product");
-        breads.ProductCount.Should().Be(1, "it isn't a product until it's saved");
-        Root(tree, ProductStage.Production).ProductCount.Should().Be(1);
+        breads.Count.Should().Be(1, "it isn't a product until it's saved");
+        Root(tree, ProductStage.Production).Count.Should().Be(1);
         tree.Find(0).Should().BeNull();
         ProductTree.MoveTo(row, ProductOf(2, "Mamon", ProductStage.Innovation)).Should().BeNull("nothing is dropped on it");
         ProductTree.MoveTo(breads, row.Product).Should().BeNull("and it isn't moved");

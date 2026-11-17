@@ -53,9 +53,9 @@ public class RawMaterialTreeTests
         TitlesIn(tree.TypeFolder(RawMaterialType.Packaging)).Should().Equal("Boxes");
         TitlesIn(Folder(tree, RawMaterialType.Ingredient, "Flour")).Should().Equal("All-Purpose Flour", "Bread Flour");
         TitlesIn(Folder(tree, RawMaterialType.Ingredient, "Dairy")).Should().BeEmpty("an empty folder still shows, to be dropped on");
-        Folder(tree, RawMaterialType.Ingredient, "Flour").MaterialCount.Should().Be(2);
-        tree.TypeFolder(RawMaterialType.Ingredient).MaterialCount.Should().Be(2);
-        tree.TypeFolder(RawMaterialType.Packaging).MaterialCount.Should().Be(1);
+        Folder(tree, RawMaterialType.Ingredient, "Flour").Count.Should().Be(2);
+        tree.TypeFolder(RawMaterialType.Ingredient).Count.Should().Be(2);
+        tree.TypeFolder(RawMaterialType.Packaging).Count.Should().Be(1);
     }
 
     [Test]
@@ -258,8 +258,8 @@ public class RawMaterialTreeTests
 
         tree.Refresh(Categories, [breadFlour], isFiltered: false);
         TitlesIn(flour).Should().Equal("Bread Flour", "New ingredient");
-        flour.MaterialCount.Should().Be(1, "it isn't a material until it's saved");
-        ingredients.MaterialCount.Should().Be(1);
+        flour.Count.Should().Be(1, "it isn't a material until it's saved");
+        ingredients.Count.Should().Be(1);
         tree.Find(0).Should().BeNull();
         RawMaterialTree.MoveTo(row, MaterialOf(2, "Cake Flour", Dairy)).Should().BeNull("nothing is dropped on it");
         RawMaterialTree.MoveTo(Folder(tree, RawMaterialType.Ingredient, "Dairy"), row.RawMaterial).Should().BeNull("and it isn't moved");

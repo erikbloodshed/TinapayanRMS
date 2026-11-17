@@ -973,7 +973,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         TitlesIn(tree.Folder(bakeryId)!).Should().Equal("Pandesal");
         TitlesIn(tree.Folder(trialsId)!).Should().Equal("Test Bun");
         TitlesIn(tree.DeletedFolder).Should().Equal(["Old Bun"], "the Deleted folder is filtered too");
-        tree.Folder(bakeryId)!.ProductCount.Should().Be(1);
+        tree.Folder(bakeryId)!.Count.Should().Be(1);
 
         state.List.SearchText = "test";
         state.List.VisibleProducts.Select(p => p.Id).Should().Equal([testBunId], "with a search, both have to match");

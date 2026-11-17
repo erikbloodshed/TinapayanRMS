@@ -253,7 +253,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         state.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
         var row = state.List.RawMaterialTree.PendingMaterial!;
         flour.Children.Should().Equal(row);
-        flour.MaterialCount.Should().Be(0, "it isn't a material until it's saved");
+        flour.Count.Should().Be(0, "it isn't a material until it's saved");
         state.List.SelectedTreeNode.Should().BeSameAs(row);
         state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New ingredient"));
         state.List.TreeMenuFor(row).Should().BeEmpty();

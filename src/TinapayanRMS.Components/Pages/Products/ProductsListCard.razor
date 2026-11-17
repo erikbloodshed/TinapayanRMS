@@ -1,3 +1,4 @@
+@inherits ListCardBase
 @* Products' list: a search box; the list's commands as icons, and the category filter; the
    products in a folder for their stage (Production, Innovation), then in the user's own folders, as deep as they go, as
    in a file explorer; the deleted ones in a Deleted folder at the end; and what the last move did, with Undo. A folder
@@ -49,36 +50,16 @@
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="List.TreeMenuFor"
                 Shortcut="List.TreeShortcut">
-        <RowTemplate Context="node">
-            @if (node.IsFolder)
-            {
-                <span class="@AppIcons.CssOf(node.Icon!.Value) tree-glyph" aria-hidden="true"></span>
-            }
-            @if (List.TreeNameEdit is { } edit && ReferenceEquals(edit.Node, node))
-            {
-                @* Keyed by the edit: a name refused comes back as a new one, and a new box. *@
-                <TreeNameBox @key="edit" InitialText="@edit.InitialText" Hint="@edit.Hint"
-                             OnCommit="List.CommitTreeNameAsync" OnCancel="List.CancelTreeName" />
-            }
-            else
-            {
-                <span class="tree-title">@node.Title</span>
-                @if (node.IsBelowTargetMarkup)
-                {
-                    <span class="@AppIcons.CssOf(AppIcon.Warning) tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup"></span>
-                }
-                @if (node.IsFolder)
-                {
-                    <span class="tree-count">(@node.ProductCount)</span>
-                }
-            }
-        </RowTemplate>
+        <RowTemplate Context="node">@RowContent(node, List, node.IsBelowTargetMarkup ? BelowTargetMarkup : null)</RowTemplate>
     </FolderTree>
 
     <MoveNoticeBar Notice="@List.MoveNotice" UndoCommand="List.UndoMoveCommand" DismissCommand="List.DismissMoveNoticeCommand" />
 </section>
 
 @code {
+    // The flag after a product's name when its current price earns less than its target markup.
+    private static readonly RenderFragment BelowTargetMarkup = @<span class="@AppIcons.CssOf(AppIcon.Warning) tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup"></span>;
+
     [Parameter, EditorRequired] public ProductsList List { get; set; } = null!;
 
     private static string KeyOf(ProductTreeNode node) => node switch

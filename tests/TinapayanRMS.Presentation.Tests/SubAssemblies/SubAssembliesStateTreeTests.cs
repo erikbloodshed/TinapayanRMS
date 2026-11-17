@@ -290,7 +290,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         state.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
         var row = state.List.SubAssemblyTree.PendingSubAssembly!;
         filling.Children.Should().Equal(row);
-        filling.SubAssemblyCount.Should().Be(0, "it isn't a sub-assembly until it's saved");
+        filling.Count.Should().Be(0, "it isn't a sub-assembly until it's saved");
         state.List.SelectedTreeNode.Should().BeSameAs(row);
         state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New sub-assembly"));
         state.List.TreeMenuFor(row).Should().BeEmpty();

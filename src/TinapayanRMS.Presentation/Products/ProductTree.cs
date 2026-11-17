@@ -12,23 +12,13 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>A row of the Products list's tree (ProductTree): a folder, or a product in one.</summary>
-public closed class ProductTreeNode : ObservableState
+public closed class ProductTreeNode : ListTreeNode
 {
-    public abstract string Title { get; }
-
-    /// <summary>The icon before the title, or null for none.</summary>
-    public abstract AppIcon? Icon { get; }
-
-    public abstract bool IsFolder { get; }
-
     /// <summary>One of the two top-level folders, Production and Innovation, which hold the user's folders.</summary>
     public abstract bool IsStage { get; }
 
     /// <summary>A row at the top of the list, shown in bold: a stage's folder, or the Deleted folder.</summary>
     public virtual bool IsTopLevel => IsStage;
-
-    /// <summary>How many products a folder holds, shown after its title; always 0 for a product, which shows none.</summary>
-    public virtual int ProductCount => 0;
 
     private bool _isBelowTargetMarkup;
     /// <summary>
@@ -162,31 +152,17 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
         return false;
     }
 
-    private int _productCount;
+    private int _count;
     /// <summary>The products it holds, in the folders in it too, or while the list is filtered, the matches.</summary>
-    public override int ProductCount => _productCount;
+    public override int Count => _count;
 
-    internal void ShowCount(int count)
-    {
-        if (_productCount != count)
-        {
-            _productCount = count;
-            RaisePropertyChanged(nameof(ProductCount));
-        }
-    }
+    internal void ShowCount(int count) => RaiseAndSetIfChanged(ref _count, count, nameof(Count));
 
     private string _title;
     public override string Title => _title;
 
     /// <summary>A folder renamed keeps its row, under its new name.</summary>
-    internal void Rename(string title)
-    {
-        if (_title != title)
-        {
-            _title = title;
-            RaisePropertyChanged(nameof(Title));
-        }
-    }
+    internal void Rename(string title) => RaiseAndSetIfChanged(ref _title, title, nameof(Title));
 
     /// <summary>
     /// FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included; the Deleted folder's is

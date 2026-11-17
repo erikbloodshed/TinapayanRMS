@@ -39,7 +39,7 @@ public class SubAssemblyTreeTests
         tree.Roots.Select(r => r.Title).Should().Equal("Sponge", "Dough", "Filling", "Packaging");
         TitlesIn(tree.Folder(Dough.Id)!).Should().Equal("Ensaymada Dough", "Pandesal Dough");
         TitlesIn(tree.Folder(Sponge.Id)!).Should().BeEmpty("an empty folder still shows, to be dropped on");
-        tree.Folder(Dough.Id)!.SubAssemblyCount.Should().Be(2);
+        tree.Folder(Dough.Id)!.Count.Should().Be(2);
         tree.Folder(Packaging.Id)!.IsPackaging.Should().BeTrue();
         tree.Roots.Should().OnlyContain(r => r.IsExpanded, "the list first shows every sub-assembly");
     }
@@ -215,7 +215,7 @@ public class SubAssemblyTreeTests
 
         tree.Refresh(Roles, [pandesal], isFiltered: false);
         TitlesIn(dough).Should().Equal("Pandesal Dough", "New sub-assembly");
-        dough.SubAssemblyCount.Should().Be(1, "it isn't a sub-assembly until it's saved");
+        dough.Count.Should().Be(1, "it isn't a sub-assembly until it's saved");
         tree.Find(0).Should().BeNull();
         SubAssemblyTree.MoveTo(row, RowOf(2, "Ube Halaya", Filling).SubAssembly).Should().BeNull("nothing is dropped on it");
         SubAssemblyTree.MoveTo(tree.Folder(Filling.Id), row.SubAssembly).Should().BeNull("and it isn't moved");

@@ -11,21 +11,10 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.RawMaterials;
 
 /// <summary>A row of the Raw Materials list's tree (RawMaterialTree): a folder, or a material in one.</summary>
-public closed class RawMaterialTreeNode : ObservableState
+public closed class RawMaterialTreeNode : ListTreeNode
 {
-    public abstract string Title { get; }
-
-    /// <summary>The icon before the title, or null for none.</summary>
-    public abstract AppIcon? Icon { get; }
-
-    public abstract bool IsFolder { get; }
-
     /// <summary>One of the two top-level folders, Ingredients and Packaging, which hold the category folders.</summary>
-    public abstract bool IsTypeFolder { get; }
-
-    /// <summary>How many materials a folder holds, shown after its title; always 0 for a material, which shows none.</summary>
-    public virtual int MaterialCount => 0;
-}
+    public abstract bool IsTypeFolder { get; }}
 
 /// <summary>
 /// A folder of the Raw Materials list: a type's (Ingredients, Packaging), or a category's inside the type it's for, a Made
@@ -88,31 +77,17 @@ public sealed class RawMaterialFolderNode : RawMaterialTreeNode, ITreeFolder<Raw
     /// <summary>The materials the folder shows: none for a type's folder, whose rows are folders.</summary>
     public IEnumerable<RawMaterialLeafNode> Materials => Children.OfType<RawMaterialLeafNode>();
 
-    private int _materialCount;
+    private int _count;
     /// <summary>The materials it shows (a type's: in all its folders), or while a search filters the list, the matches.</summary>
-    public override int MaterialCount => _materialCount;
+    public override int Count => _count;
 
-    internal void ShowCount(int count)
-    {
-        if (_materialCount != count)
-        {
-            _materialCount = count;
-            RaisePropertyChanged(nameof(MaterialCount));
-        }
-    }
+    internal void ShowCount(int count) => RaiseAndSetIfChanged(ref _count, count, nameof(Count));
 
     private string _title;
     public override string Title => _title;
 
     /// <summary>A category renamed keeps its folder, under its new name.</summary>
-    internal void Rename(string title)
-    {
-        if (_title != title)
-        {
-            _title = title;
-            RaisePropertyChanged(nameof(Title));
-        }
-    }
+    internal void Rename(string title) => RaiseAndSetIfChanged(ref _title, title, nameof(Title));
 
     /// <summary>FolderOpen while the folder is open on its rows, and Folder otherwise, empty ones included.</summary>
     public override AppIcon? Icon => IsExpanded && Children.Count > 0 ? AppIcon.FolderOpen : AppIcon.Folder;
@@ -458,8 +433,8 @@ public sealed class RawMaterialTree : IDisposable
             var root = TypeFolder(pending.RawMaterial.Type);
             if (FolderOf(pending.RawMaterial) is { } folder && folder.Children.Contains(pending))
             {
-                folder.ShowCount(folder.MaterialCount - 1);
-                root.ShowCount(root.MaterialCount - 1);
+                folder.ShowCount(folder.Count - 1);
+                root.ShowCount(root.Count - 1);
             }
             else if (FolderOf(pending.RawMaterial) is null && !root.Children.Contains(pending))
             {
