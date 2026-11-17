@@ -21,6 +21,7 @@ const components = [
     "sfdropdownbutton",
     "sfdropdownlist",
     "sfgrid",
+    "sfmultiselect",
     "sfsidebar",
     "sftab",
     "sftoast",

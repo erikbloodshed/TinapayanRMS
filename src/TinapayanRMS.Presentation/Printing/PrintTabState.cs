@@ -13,9 +13,9 @@ namespace TinapayanRMS.Presentation.Printing;
 
 /// <summary>
 /// What the Print tab prints: the product the Products screen has open, a folder of the Products list (a stage, or one of
-/// the user's folders, with the folders in it), or every product.
+/// the user's folders, with the folders in it), the products picked in the list, or every product.
 /// </summary>
-/// <param name="Label">What the tab's Print choice reads: "This product", "Production › Breads", "All products".</param>
+/// <param name="Label">What the tab's Print choice reads: "This product", "Production › Breads", "Selected products (3)", "All products".</param>
 public closed record PrintScope(string Label)
 {
     /// <summary>A set's title over its contents, and in the job's name; null for This product.</summary>
@@ -32,6 +32,7 @@ public closed record PrintScope(string Label)
         Folder { IsStage: true } stage => product => product.Stage == stage.Stage,
         Folder { FolderId: { } id } => InFolders(ProductFolderRules.SubtreeIds(folders, id)),
         Folder => _ => false,
+        Products picked => product => picked.ProductIds.Contains(product.Id),
         AllProducts => _ => true,
     };
 
@@ -72,6 +73,40 @@ public closed record PrintScope(string Label)
         public override string? Title => Label;
     }
 
+    /// <summary>
+    /// Products chosen one by one, by their ids, as they're saved: those ticked in the Print tab's product list, or picked in
+    /// the Products list (Ctrl or Shift, then Print on their menu). "Selected products (3)", or the product's name for one,
+    /// which prints on its own, with no contents page. They print in the list's order, whatever order they were chosen in.
+    /// The same products chosen again are the same choice.
+    /// </summary>
+    public sealed record Products(string Label, IReadOnlyList<int> ProductIds) : PrintScope(Label)
+    {
+        /// <summary>The choice for <paramref name="products"/>.</summary>
+        public static Products Of(IReadOnlyList<Product> products) => Of([.. products.Select(p => (p.Id, p.Name))]);
+
+        /// <summary>The choice for <paramref name="products"/>, by id and name; a name not known yet is empty.</summary>
+        public static Products Of(IReadOnlyList<(int Id, string Name)> products) => new(
+            products is [var one] && one.Name.Length > 0 ? one.Name : $"Selected products ({products.Count})",
+            [.. products.Select(p => p.Id).Order()]);
+
+        public override string? Title => ProductIds.Count == 1 ? null : "Selected Products";
+
+        // By the ids they hold, not the list object holding them, which a record would compare.
+        public bool Equals(Products? other) => other is not null && Label == other.Label && ProductIds.SequenceEqual(other.ProductIds);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(Label);
+            foreach (var id in ProductIds)
+            {
+                hash.Add(id);
+            }
+
+            return hash.ToHashCode();
+        }
+    }
+
     public sealed record AllProducts() : PrintScope("All products")
     {
         public override string? Title => "All Products";
@@ -79,11 +114,17 @@ public closed record PrintScope(string Label)
 }
 
 /// <summary>
+/// A product the Print tab's product list offers to tick: its name, and where the Products list files it
+/// ("Production › Breads", or "Production" at the top of the stage), which the list groups it under.
+/// </summary>
+public sealed record PrintableProduct(int Id, string Name, string Place);
+
+/// <summary>
 /// The main window's Print tab: what it prints (<see cref="SelectedScope"/>) and the pages for it (<see cref="PrintSet"/>),
 /// prepared each time the tab is shown (<see cref="LoadCommand"/>, which the main window runs as it runs every tab's) and
 /// each time another choice is made. This product is the Products screen's product as it shows it, unsaved edits
-/// included; a folder or all products are read as they're saved (SavedProductReader), each starting a page of its own
-/// after a contents page.
+/// included; a folder, the products picked in the list or all products are read as they're saved (SavedProductReader),
+/// each starting a page of its own after a contents page.
 /// </summary>
 public sealed class PrintTabState : ScreenState
 {
@@ -114,7 +155,10 @@ public sealed class PrintTabState : ScreenState
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(PrepareAsync));
     }
 
-    /// <summary>The choices the tab offers: This product, the folder a menu asked for (while there is one), All products.</summary>
+    /// <summary>
+    /// The choices the tab offers: This product, the folder a menu asked for last (while there is one), the products ticked
+    /// in the product list or picked in the Products list (while there are some), All products.
+    /// </summary>
     public ObservableCollection<PrintScope> Scopes { get; } = [new PrintScope.ThisProduct(), new PrintScope.AllProducts()];
 
     private PrintScope _selectedScope = new PrintScope.ThisProduct();
@@ -129,6 +173,41 @@ public sealed class PrintTabState : ScreenState
             {
                 _ = LoadCommand.ExecuteAsync();
             }
+        }
+    }
+
+    private IReadOnlyList<PrintableProduct> _productChoices = [];
+    /// <summary>
+    /// The products the tab's product list offers, every one in use, in the Products list's order, as they're saved: read
+    /// each time the tab prepares its pages, and replaced only when something in it changed, so the list stays as it is
+    /// while products are ticked in it.
+    /// </summary>
+    public IReadOnlyList<PrintableProduct> ProductChoices
+    {
+        get => _productChoices;
+        private set => RaiseAndSetIfChanged(ref _productChoices, value);
+    }
+
+    private int[] _chosenProductIds = [];
+    /// <summary>
+    /// The products ticked in the product list. Ticking some makes them the choice showing ("Selected products (3)"), and
+    /// prepares their pages; unticking the last takes the choice back to This product. Products picked in the Products
+    /// list and printed from their menu are ticked here too.
+    /// </summary>
+    public int[] ChosenProductIds
+    {
+        get => _chosenProductIds;
+        set
+        {
+            value ??= [];
+            if (value.Order().SequenceEqual(_chosenProductIds.Order()))
+            {
+                return;
+            }
+
+            _chosenProductIds = value;
+            RaisePropertyChanged();
+            ShowChosen(ChosenScope(), show: true, quiet: false);
         }
     }
 
@@ -160,22 +239,82 @@ public sealed class PrintTabState : ScreenState
     public ScreenCommand LoadCommand { get; }
 
     /// <summary>
-    /// A Print on Products: the header's for This product, a folder's or the list's for a set. A folder takes the place of
-    /// any folder asked for before, beside This product and All products. Showing the tab then prepares the pages.
+    /// A Print on Products: the header's for This product, a folder's, the products picked or the list's for a set. A folder
+    /// takes the place of any folder asked for before; products picked are ticked in the product list, in place of those
+    /// ticked before. Showing the tab then prepares the pages.
     /// </summary>
     public void Pick(PrintScope scope)
     {
-        if (scope is PrintScope.Folder && !Scopes.Contains(scope))
+        switch (scope)
         {
-            foreach (var folder in Scopes.OfType<PrintScope.Folder>().ToList())
-            {
-                Scopes.Remove(folder);
-            }
+            case PrintScope.Products picked:
+                _chosenProductIds = AsListed(picked.ProductIds);
+                RaisePropertyChanged(nameof(ChosenProductIds));
+                ShowChosen(picked, show: true, quiet: true);
+                return;
 
-            Scopes.Insert(1, scope);
+            case PrintScope.Folder when !Scopes.Contains(scope):
+                foreach (var folder in Scopes.OfType<PrintScope.Folder>().ToList())
+                {
+                    Scopes.Remove(folder);
+                }
+
+                Scopes.Insert(1, scope);
+                break;
         }
 
-        _isPicking = true;
+        Choose(scope, quiet: true);
+    }
+
+    /// <summary>
+    /// <paramref name="ids"/> in the product list's order, so the list's box names them as the list shows them ("Asado Roll
+    /// 60g +2 more"); any not listed yet go last.
+    /// </summary>
+    private int[] AsListed(IEnumerable<int> ids)
+    {
+        var placeOf = ProductChoices.Select((choice, at) => (choice.Id, at)).ToDictionary(p => p.Id, p => p.at);
+        return [.. ids.OrderBy(id => placeOf.GetValueOrDefault(id, int.MaxValue))];
+    }
+
+    /// <summary>The choice for the products ticked, named from the product list; null with none ticked.</summary>
+    private PrintScope.Products? ChosenScope() => _chosenProductIds.Length == 0
+        ? null
+        : PrintScope.Products.Of([.. _chosenProductIds.Select(id => (id, ProductChoices.FirstOrDefault(c => c.Id == id)?.Name ?? string.Empty))]);
+
+    /// <summary>
+    /// Offers <paramref name="chosen"/> in place of the products chosen before, before All products, and shows it when
+    /// <paramref name="show"/> or when they were showing; with none chosen, This product shows if they were showing.
+    /// <paramref name="quiet"/>: the choice alone prepares nothing, as a Print request's doesn't, or a preparation already
+    /// running goes on with it.
+    /// </summary>
+    private void ShowChosen(PrintScope.Products? chosen, bool show, bool quiet)
+    {
+        var before = Scopes.OfType<PrintScope.Products>().FirstOrDefault();
+        if (chosen is not null && !Scopes.Contains(chosen))
+        {
+            Scopes.Insert(Scopes.Count - 1, chosen);
+        }
+
+        // Shown before the old choice goes, so the picker never shows nothing.
+        if (chosen is not null && (show || SelectedScope is PrintScope.Products))
+        {
+            Choose(chosen, quiet);
+        }
+        else if (chosen is null && SelectedScope is PrintScope.Products)
+        {
+            Choose(Scopes[0], quiet);
+        }
+
+        if (before is not null && before != chosen)
+        {
+            Scopes.Remove(before);
+        }
+    }
+
+    /// <summary>Shows <paramref name="scope"/>, preparing its pages unless <paramref name="quiet"/>.</summary>
+    private void Choose(PrintScope scope, bool quiet)
+    {
+        _isPicking = quiet;
         try
         {
             SelectedScope = scope;
@@ -203,16 +342,7 @@ public sealed class PrintTabState : ScreenState
         }
 
         // Picked as it already is, so it prepares nothing again.
-        _isPicking = true;
-        try
-        {
-            SelectedScope = now;
-        }
-        finally
-        {
-            _isPicking = false;
-        }
-
+        Choose(now, quiet: true);
         return now;
     }
 
@@ -228,13 +358,34 @@ public sealed class PrintTabState : ScreenState
 
         try
         {
-            if (SelectedScope is PrintScope.ThisProduct)
+            // This product first, as the Products screen shows it, needing nothing read.
+            var isThisProduct = SelectedScope is PrintScope.ThisProduct;
+            if (isThisProduct)
             {
                 PrepareThisProduct();
             }
             else
             {
-                await PrepareSetAsync(SelectedScope, preparing.Token);
+                Progress = "Preparing…";
+            }
+
+            // The products and their folders as they're saved now, read together, for the product list and a set alike, not
+            // the folders as the Products screen last read them: products another computer filed in a folder it made in the
+            // one picked are in the set, in their place.
+            var productsRead = _productRepository.GetAllAsync(preparing.Token);
+            var foldersRead = _folderRepository.GetAllAsync(preparing.Token);
+            await Task.WhenAll(productsRead, foldersRead);
+            var (products, folders) = (await productsRead, await foldersRead);
+            ShowChoices(products, folders);
+
+            // The products ticked may have gone since, and the choice with them, back to This product.
+            if (!isThisProduct && SelectedScope is PrintScope.ThisProduct)
+            {
+                PrepareThisProduct();
+            }
+            else if (!isThisProduct)
+            {
+                await PrepareSetAsync(SelectedScope, products, folders, preparing.Token);
             }
         }
         catch (OperationCanceledException) when (preparing.IsCancellationRequested)
@@ -276,18 +427,48 @@ public sealed class PrintTabState : ScreenState
         }
     }
 
-    private async Task PrepareSetAsync(PrintScope scope, CancellationToken cancellationToken)
+    /// <summary>
+    /// The product list as <paramref name="products"/> are saved now, in the Products list's order, each under its place in
+    /// it; and the products ticked, less any gone since (deleted on Products, or on another computer), named as they are now.
+    /// </summary>
+    private void ShowChoices(IReadOnlyList<Product> products, IReadOnlyList<ProductFolder> folders)
     {
-        Progress = "Preparing…";
+        List<PrintableProduct> choices =
+        [
+            .. ProductFolderRules.InListOrder(products, folders).Select(p => new PrintableProduct(
+                p.Id,
+                p.Name,
+                p.FolderId is { } folderId ? ProductFolderRules.PathTitle(folders, p.Stage, folderId) : ProductRules.StageTitle(p.Stage))),
+        ];
+        if (!choices.SequenceEqual(ProductChoices))
+        {
+            ProductChoices = choices;
+        }
 
-        // The products and their folders as they're saved now, read together, not the folders as the Products screen last
-        // read them: products another computer filed in a folder it made in the one picked are in the set, in their place.
-        var productsRead = _productRepository.GetAllAsync(cancellationToken);
-        var foldersRead = _folderRepository.GetAllAsync(cancellationToken);
-        await Task.WhenAll(productsRead, foldersRead);
-        var folders = await foldersRead;
+        var listed = choices.Select(c => c.Id).ToHashSet();
+        if (_chosenProductIds.Any(id => !listed.Contains(id)))
+        {
+            _chosenProductIds = [.. _chosenProductIds.Where(listed.Contains)];
+            RaisePropertyChanged(nameof(ChosenProductIds));
+        }
+
+        // Ticked from the Products list before the product list was read, they take its order now.
+        if (AsListed(_chosenProductIds) is var listedOrder && !listedOrder.SequenceEqual(_chosenProductIds))
+        {
+            _chosenProductIds = listedOrder;
+            RaisePropertyChanged(nameof(ChosenProductIds));
+        }
+
+        if (ChosenScope() is var chosen && chosen != Scopes.OfType<PrintScope.Products>().FirstOrDefault())
+        {
+            ShowChosen(chosen, show: false, quiet: true);
+        }
+    }
+
+    private async Task PrepareSetAsync(PrintScope scope, IReadOnlyList<Product> allProducts, IReadOnlyList<ProductFolder> folders, CancellationToken cancellationToken)
+    {
         scope = NamedAsNow(scope, folders);
-        var products = ProductFolderRules.InListOrder((await productsRead).Where(scope.Holds(folders)), folders);
+        var products = ProductFolderRules.InListOrder(allProducts.Where(scope.Holds(folders)), folders);
         var printedAt = DateTime.Now;
 
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the

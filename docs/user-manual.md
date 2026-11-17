@@ -647,11 +647,12 @@ Right-click menus:
   - **Move to**: any stage, then the top of the stage or any folder in it. A folder that holds others opens a further menu, starting with the folder itself. The place the product is in already is greyed.
   - **Cut** (Ctrl+X) and **Paste** (Ctrl+V): see Cut and paste above. Paste on a product moves what was cut into that product's folder.
   - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
+  - **Print**: the product as saved, on the Print tab.
   - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
   - **Delete** (Del)
 
-  With several products picked, the menu offers to promote or move them all, or to apply the costing defaults to them all.
+  With several products picked, the menu offers to promote or move them all, to apply the costing defaults to them all, or to print them all (**Print 3 Products**).
 - **A stage's folder**: **New Product Here**, **New Composite Product Here**, **New Folder**, **Paste** (Ctrl+V; to the top of the stage), **Print Stage**, **Expand All** and **Collapse All**.
 - **One of your folders**: **New Product Here**, **New Composite Product Here**, **New Folder** (a folder inside it), **Promote All to Production** (in Innovation, for everything in it and its folders; with a search or filter on, what it shows), **Move to** (any stage, then the top of the stage or any folder but itself and those inside it), **Cut** (Ctrl+X) and **Paste** (Ctrl+V), **Print Folder** (its products and those of every folder inside it), **Rename** (F2), **Delete** (Del), **Expand All** and **Collapse All**.
   - **Delete** deletes the folder, never the products in it. It asks first, saying how many products and folders it holds: they all move up into the folder it was in, or to the top of the stage. If a folder inside it has the same name as one already there, the delete is refused, and the message says which: rename one of them first.
@@ -914,13 +915,14 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
-- **Print** (the picker at the top left) chooses **This product**, the folder last asked for, or **All products**.
+- **Print** (the picker at the top left) chooses **This product**, the folder last asked for, the products ticked under **Products**, or **All products**.
+- **Products** (the list beside it) prints the products you tick, from any folders. Open it, type part of a name in **Search products** to find them, and tick each one; a folder's box ticks every product in it, and **Select All** every product listed. When the list closes, **Print** reads **Selected products (3)** and the pages show them, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
 - The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup (the amount, then its percentage in brackets, lighter), VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup prints amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
 - **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
-To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**.
+To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**), which ticks them under **Products** on the Print tab.
 
 A set prints each product **as saved**, with a contents list first and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen and prints on two pages or more. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
@@ -1299,6 +1301,12 @@ If the data restored wasn't the one you wanted, the **Before restore** backup ho
 ### Print the recipes of a whole folder
 
 Right-click the folder in the Products list and choose **Print Folder**: it prints the folder's products and those of every folder in it. Untick **Costing** for kitchen copies.
+
+### Print a few products together
+
+1. Open the **Print** tab (press **Print** in the Products header).
+2. Open the **Products** list beside the **Print** picker, type part of a name to find a product, and tick it. Do the same for each product you want; they can be in different folders.
+3. Close the list (click elsewhere, or press **Esc**). **Print** reads **Selected products (3)** and the pages show them. Press **Print** at the top right.
 
 ### Make a composite product, such as a gift box of several products
 

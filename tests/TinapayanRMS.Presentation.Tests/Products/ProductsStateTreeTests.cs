@@ -39,7 +39,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         var menu = state.List.TreeMenuFor(leaf);
 
-        Headers(menu).Should().Equal("Promote to Production", "Move to", "Cut", "Paste", "Apply Costing Defaults…", "Rename", "Clone…", "Create Variant…", "Delete");
+        Headers(menu).Should().Equal("Promote to Production", "Move to", "Cut", "Paste", "Apply Costing Defaults…", "Print", "Rename", "Clone…", "Create Variant…", "Delete");
         menu.Single(i => i.Header == "Cut").Gesture.Should().Be("Ctrl+X");
         menu.Single(i => i.Header == "Paste").Should().Match<TreeMenuItem>(i => i.Gesture == "Ctrl+V" && !i.IsEnabled, "nothing is cut yet");
         menu.Single(i => i.Header == "Rename").Gesture.Should().Be("F2");
@@ -265,7 +265,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         Headers(menu).Should().Equal(
             "Promote 2 Products to Production", "Send 1 Product Back to Innovation", "Move 3 Products to", "Cut 3 Products", "Paste",
-            "Apply Costing Defaults to 3 Products…");
+            "Apply Costing Defaults to 3 Products…", "Print 3 Products");
         await RunAsync(menu[0]);
 
         state.ErrorMessage.Should().BeNull();

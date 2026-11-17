@@ -110,7 +110,7 @@ You'll be productive sooner if you're comfortable with the following.
 | EF Core 11 | `DbContext`, `IEntityTypeConfiguration<T>`, migrations, change tracking, transactions, `ExecuteDeleteAsync` | Writes and the schema, in `Infrastructure` |
 | Dapper and PostgreSQL SQL | Multi-mapped joins (`splitOn`), recursive CTEs (`WITH RECURSIVE`, stopped at a loop by `CYCLE`), arrays with `unnest` | Reads, in `Infrastructure` |
 | PostgreSQL | Roles and the password file, snake_case names, `psql`, `pg_dump` and `pg_restore`, ICU collations | Setup, tests, backups, debugging |
-| Syncfusion Blazor | `SfGrid`, `SfComboBox`, `SfTab`, `SfDialog`, `SfToast`, `SfSidebar`, `SfButton`, `SfDropDownButton`, `SfChart`; the Fluent 2 theme; XlsIO for workbooks | Every page |
+| Syncfusion Blazor | `SfGrid`, `SfComboBox`, `SfMultiSelect` (the Print tab's Products), `SfTab`, `SfDialog`, `SfToast`, `SfSidebar`, `SfButton`, `SfDropDownButton`, `SfChart`; the Fluent 2 theme; XlsIO for workbooks | Every page |
 | FluentValidation | `AbstractValidator<T>` | `ApplicationCore/Validators` |
 | DI | Service lifetimes, scopes (one per page the web view loads) | `Components/ServiceRegistration.cs` |
 | Serilog | The static `Log.Logger`, `ForContext` | Logging |
@@ -1185,7 +1185,8 @@ An optional layer of Vim-style keys over the whole app, in the manner of Vimium.
   - A Syncfusion component left off `syncfusion.js`'s list has no script in the window: it throws as it starts (the "Something went wrong" bar) or quietly does without, and bUnit can't see either. `SyncfusionScriptsTests` fails first.
   - `_Imports.razor` aliases the names Syncfusion's namespaces share with each other and with ASP.NET Core (`SelectionMode`, `SelectionType`, `FilterType`, `ChangeEventArgs`, `DragEventArgs`, `Action`). A new clash shows as CS0104: add an alias there.
   - `SfComboBox` reads an enum's first value as empty. Use `PickField`.
-  - A Syncfusion drop-down that filters holds each filter back 300 ms after the key (`DebounceDelay`), so its list trails the typing. `PickField` sets it to 0: the lists are in memory, and a filter takes the window a few milliseconds.
+  - A Syncfusion drop-down that filters holds each filter back 300 ms after the key (`DebounceDelay`), so its list trails the typing. `PickField` sets it to 0, and so does the Print tab's `SfMultiSelect`: the lists are in memory, and a filter takes the window a few milliseconds.
+  - `SfMultiSelect` in checkbox mode draws its text (the items ticked, or its placeholder) on the theme's 28px line, lower than a picker's in the app's compact boxes; `app.css` sets its line to the box's (`--control-height`).
   - `SfComboBox`'s own `Autofill` writes the rest of the first name starting with what's typed into the box under the cursor, and its own highlight goes to the item the box held when that's still listed, not the best match. `PickComboBox` sorts by the match and highlights it instead (`PickField`).
   - A `Query` given to an `SfComboBox` as a parameter is taken in on its first redraw after it's drawn, which for a picker is the first letter typed into it: the combo box reloads its whole list, and that letter's filter is lost. `PickComboBox` adds its sort in `GetQuery`.
   - `SfComboBox.FilterAsync` with a list of the picker's own, from its `Filtering` event, lost to the combo box's own list: the popup kept showing everything.

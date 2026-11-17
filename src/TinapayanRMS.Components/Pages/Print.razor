@@ -6,15 +6,26 @@
 <PageTitle>Print · TinapayanRMS</PageTitle>
 
 @* The Print screen: what to print — the product Products has open, unsaved edits included, a
-   folder, or every product as saved — then the preview. Products'
-   Print, a folder's and Print All Products open it with that choice made. It shows Products' form, so going back there
+   folder, the products ticked in its product list, or every product as saved — then the preview. Products'
+   Print, a folder's, the products' and Print All Products open it with that choice made. It shows Products' form, so going back there
    asks nothing about its unsaved changes, and going anywhere else asks about them, as leaving Products would. *@
 <section class="card print-card">
     <PrintPane Set="State!.PrintSet" Status="@(State!.Progress ?? State!.Note)" Empty="Nothing to print yet. Open a product on the Products screen, or pick All products.">
         <Options>
             <label class="form-label" for="print-scope">Print</label>
             <PickField ID="print-scope" TItem="PrintScope" Items="State!.Scopes" TextField="Label" @bind-Value="State!.SelectedScope" CssClass="print-scope"
-                       Tooltip="This product prints the product Products has open, unsaved edits included. A folder or all products print as they're saved, each on pages of its own after a contents page." />
+                       Tooltip="This product prints the product Products has open, unsaved edits included. A folder, the products ticked under Products or all products print as they're saved, each on pages of its own after a contents page." />
+            <label class="form-label" for="print-products">Products</label>
+            @* Ticked products become the Print choice once the list closes (EnableChangeOnBlur, Syncfusion's default), so
+               ticking several prepares the pages once. Grouped by folder, a folder's box ticks all of it. *@
+            <SfMultiSelect ID="print-products" TValue="int[]" TItem="PrintableProduct" DataSource="State!.ProductChoices"
+                           @bind-Value="State!.ChosenProductIds" Mode="VisualMode.CheckBox" ShowSelectAll="true" ShowDropDownIcon="true"
+                           AllowFiltering="true" FilterType="FilterType.Contains" DebounceDelay="0" FilterBarPlaceholder="Search products"
+                           EnableGroupCheckBox="true" EnableSelectionOrder="false" PopupHeight="420px" Width="320px"
+                           Placeholder="Choose products to print" CssClass="print-products"
+                           title="Tick the products to print, from any folders: they print as saved, after a contents page. A folder's box ticks every product in it. Typing finds products by name.">
+                <MultiSelectFieldSettings Text="@nameof(PrintableProduct.Name)" Value="@nameof(PrintableProduct.Id)" GroupBy="@nameof(PrintableProduct.Place)" />
+            </SfMultiSelect>
         </Options>
     </PrintPane>
 </section>

@@ -692,6 +692,26 @@ input.e-input {
     padding-bottom: 0;
 }
 
+/* A list with checkboxes (SfMultiSelect, the Print tab's Products): what it shows, the products ticked or its
+   placeholder, kept the theme's 28px line inside the box, so it sat lower than a picker's text beside it. */
+.e-multiselect.e-input-group .e-multi-select-wrapper {
+    min-height: 0;
+    height: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.e-multiselect.e-input-group .e-delim-values {
+    line-height: calc(var(--control-height) - 2px);
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.e-multiselect.e-input-group .e-multi-select-wrapper input.e-dropdownbase {
+    height: calc(var(--control-height) - 2px);
+    min-height: 0;
+}
+
 /* A picker's list (PickField). Every highlight in it looks the same: the pale Sky the screens' lists and tables mark
    their selected row with, in the list's own ink and weight (the theme's, #f5f5f5 on the list's white, couldn't be
    seen). The item Enter takes also has a deep Sky bar down its left side: the theme marks it e-item-focus (the first

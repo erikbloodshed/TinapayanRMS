@@ -11,6 +11,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Products;
+using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Tests.Printing;
 
@@ -27,7 +28,7 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
     public void Each_choice_reads_as_its_label()
     {
         // What a screen reader says for the dropdown's choice. A record case's own ToString would say "Folder { Label = … }".
-        PrintScope[] scopes = [new PrintScope.ThisProduct(), PrintScope.Folder.Of(ProductFolderNode.ForStage(ProductStage.Production)), new PrintScope.AllProducts()];
+        PrintScope[] scopes = [new PrintScope.ThisProduct(), PrintScope.Folder.Of(ProductFolderNode.ForStage(ProductStage.Production)), new PrintScope.Products("Selected products (2)", [1, 2]), new PrintScope.AllProducts()];
 
         scopes.Select(s => s.ToString()).Should().Equal(scopes.Select(s => s.Label));
         scopes.Select(s => s.Label).Should().NotContain(label => label.Contains('{'));
@@ -102,6 +103,141 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
         tab.Scopes.Should().HaveCount(3);
         changes.Should().Be(0);
     });
+
+    [Test]
+    public Task Products_picked_in_the_list_print_from_their_menu_as_saved_in_the_lists_order() => UiThread.RunAsync(async () =>
+    {
+        await AddCatalogueAsync();
+        var products = await OpenProductsAsync("Loaf");
+        var tab = CreatePrintTab(products);
+        List<PrintScope> asked = [];
+        using var _ = products.PrintRequests.Subscribe(asked.Add);
+
+        // Ctrl+clicks, from three folders and both stages, in an order of their own.
+        var tree = products.List.ProductTree;
+        products.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Test Bread"))!);
+        products.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Cheese Roll"))!);
+        var print = products.List.TreeMenuFor(tree.Find(IdOf(products, "Loaf"))).Single(i => i.Header == "Print 3 Products");
+        await ((ScreenCommand<IReadOnlyList<Product>>)print.Command!).ExecuteAsync((IReadOnlyList<Product>)print.Parameter!);
+
+        var scope = asked.Should().ContainSingle().Which.Should().BeOfType<PrintScope.Products>().Subject;
+        tab.Pick(scope);
+        await tab.LoadCommand.ExecuteAsync();
+
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Selected products (3)", "All products");
+        tab.PrintSet!.Title.Should().Be("Selected Products");
+        tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Loaf", "Test Bread");
+        tab.PrintSet.Products.Should().OnlyContain(p => p.SaveNote == null, "a set prints as saved");
+        tab.ChosenProductIds.Should().Equal([IdOf(products, "Cheese Roll"), IdOf(products, "Loaf"), IdOf(products, "Test Bread")],
+            "the product list ticks them, in its order, which its box names them in");
+    });
+
+    [Test]
+    public Task One_product_picked_prints_on_its_own_under_its_name_with_no_contents_page() => UiThread.RunAsync(async () =>
+    {
+        await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+
+        tab.Pick(PrintScope.Products.Of([products.Products.Single(p => p.Name == "Mocha Roll")]));
+        await tab.LoadCommand.ExecuteAsync();
+
+        tab.SelectedScope.Label.Should().Be("Mocha Roll");
+        tab.PrintSet!.Title.Should().BeNull("one product prints as This product does");
+        tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Mocha Roll");
+    });
+
+    [Test]
+    public Task A_folder_and_the_products_chosen_are_offered_side_by_side_and_the_same_products_again_are_the_same_choice() => UiThread.RunAsync(async () =>
+    {
+        var (breads, _) = await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+        var loaf = products.Products.Single(p => p.Name == "Loaf");
+        var mocha = products.Products.Single(p => p.Name == "Mocha Roll");
+
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Products.Of([loaf, mocha]));
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Production › Breads", "Selected products (2)", "All products");
+        tab.ChosenProductIds.Should().BeEquivalentTo([loaf.Id, mocha.Id], "the product list ticks them");
+
+        // Picked the other way round, they're the same products.
+        var chosen = tab.SelectedScope;
+        tab.Pick(PrintScope.Products.Of([mocha, loaf]));
+        tab.SelectedScope.Should().BeSameAs(chosen);
+        tab.Scopes.Should().HaveCount(4);
+
+        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.SelectedScope.Label.Should().Be("Production › Breads");
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Production › Breads", "Selected products (2)", "All products");
+    });
+
+    [Test]
+    public Task The_product_list_offers_every_product_in_the_lists_order_under_its_place() => UiThread.RunAsync(async () =>
+    {
+        await AddCatalogueAsync();
+        var tab = CreatePrintTab(await OpenProductsAsync());
+
+        await tab.LoadCommand.ExecuteAsync();
+
+        tab.ProductChoices.Select(c => (c.Name, c.Place)).Should().Equal(
+            ("Cheese Roll", "Production › Breads › Rolls"),
+            ("Pan de Coco", "Production › Breads"),
+            ("Mocha Roll", "Production › Cakes"),
+            ("Loaf", "Production"),
+            ("Test Bread", "Innovation › Breads"));
+    });
+
+    [Test]
+    public Task Ticking_products_in_the_list_prints_them_and_unticking_the_last_goes_back_to_This_product() => UiThread.RunAsync(async () =>
+    {
+        await AddCatalogueAsync();
+        var products = await OpenProductsAsync("Loaf");
+        var tab = CreatePrintTab(products);
+        await tab.LoadCommand.ExecuteAsync();
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Loaf");
+
+        tab.ChosenProductIds = [IdOf(products, "Test Bread"), IdOf(products, "Pan de Coco")];
+        await Settle.UntilAsync(tab, () => tab.PrintSet?.Products.Count == 2, () => $"pages: {tab.PrintSet?.Products.Count}");
+
+        tab.SelectedScope.Label.Should().Be("Selected products (2)");
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Selected products (2)", "All products");
+        tab.PrintSet!.Title.Should().Be("Selected Products");
+        tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Pan de Coco", "Test Bread");
+
+        // One left ticked prints on its own, under its name.
+        tab.ChosenProductIds = [IdOf(products, "Pan de Coco")];
+        await Settle.UntilAsync(tab, () => tab.PrintSet?.Products.Count == 1, () => $"pages: {tab.PrintSet?.Products.Count}");
+        tab.SelectedScope.Label.Should().Be("Pan de Coco");
+        tab.PrintSet!.Title.Should().BeNull();
+
+        tab.ChosenProductIds = [];
+        await Settle.UntilAsync(tab, () => tab.PrintSet?.Products is [{ ProductName: "Loaf" }], () => $"pages: {tab.PrintSet?.Products.Count}");
+        tab.SelectedScope.Should().BeOfType<PrintScope.ThisProduct>();
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "All products");
+    });
+
+    [Test]
+    public Task A_product_ticked_and_deleted_since_is_left_out_and_the_choice_named_again() => UiThread.RunAsync(async () =>
+    {
+        await AddCatalogueAsync();
+        var products = await OpenProductsAsync();
+        var tab = CreatePrintTab(products);
+        await tab.LoadCommand.ExecuteAsync();
+        tab.ChosenProductIds = [IdOf(products, "Loaf"), IdOf(products, "Mocha Roll")];
+        await Settle.UntilAsync(tab, () => tab.PrintSet?.Products.Count == 2, () => $"pages: {tab.PrintSet?.Products.Count}");
+
+        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(IdOf(products, "Mocha Roll"), Cancellation);
+        await tab.LoadCommand.ExecuteAsync();
+
+        tab.ChosenProductIds.Should().Equal(IdOf(products, "Loaf"));
+        tab.SelectedScope.Label.Should().Be("Loaf");
+        tab.Scopes.Select(s => s.Label).Should().Equal("This product", "Loaf", "All products");
+        tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Loaf");
+        tab.ProductChoices.Select(c => c.Name).Should().NotContain("Mocha Roll");
+    });
+
+    private static int IdOf(ProductsState products, string name) => products.Products.Single(p => p.Name == name).Id;
 
     [Test]
     public Task A_folder_prints_a_folder_made_in_it_after_it_was_picked() => UiThread.RunAsync(async () =>

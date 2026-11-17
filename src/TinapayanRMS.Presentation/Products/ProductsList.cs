@@ -200,6 +200,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         DeleteFolderCommand = new ScreenCommand<ProductFolderNode>(DeleteFolderAsync);
         ExpandAllCommand = ScreenCommand.Of<ProductFolderNode?>(ProductTree.ExpandAll);
         PrintFolderCommand = ScreenCommand.Of<ProductFolderNode>(folder => host.Print(PrintScope.Folder.Of(folder)));
+        PrintProductsCommand = ScreenCommand.Of<IReadOnlyList<Product>>(products => host.Print(PrintScope.Products.Of(products)));
         PrintAllCommand = ScreenCommand.Of(() => host.Print(new PrintScope.AllProducts()));
         CollapseAllCommand = ScreenCommand.Of<ProductFolderNode?>(ProductTree.CollapseAll);
     }
@@ -372,6 +373,12 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
     /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, on the Print tab.</summary>
     public ScreenCommand<ProductFolderNode> PrintFolderCommand { get; }
+
+    /// <summary>
+    /// Print, or Print 3 Products, on a product's menu: the products picked in the list (Ctrl or Shift), as saved, on the
+    /// Print tab, in the list's order.
+    /// </summary>
+    public ScreenCommand<IReadOnlyList<Product>> PrintProductsCommand { get; }
 
     /// <summary>Print All Products on the list's empty space: every product, as saved, on the Print tab.</summary>
     public ScreenCommand PrintAllCommand { get; }
@@ -758,6 +765,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         {
             Icon = AppIcon.Calculate,
         });
+        items.Add(new($"Print{(isOne ? string.Empty : $" {products.Count} Products")}", PrintProductsCommand, products) { Icon = AppIcon.Print });
 
         if (isOne)
         {
