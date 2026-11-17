@@ -263,20 +263,14 @@
                 return;
             }
 
-            await using (workbook)
-            await using (var file = File.Create(path))
-            {
-                workbook.Position = 0;
-                await workbook.CopyToAsync(file);
-            }
-
+            await File.WriteAllBytesAsync(path, workbook);
             interaction.SetOutput(path);
         }));
     }
 
-    // The grid's own Excel export, as a workbook in memory rather than the browser's download it would otherwise start.
-    private static async Task<MemoryStream?> WorkbookOfAsync<TRow>(SfGrid<TRow>? grid, ExcelExportProperties properties) =>
-        grid is null ? null : await grid.ExportToExcelAsync(asMemoryStream: true, properties);
+    // The grid's own Excel export, the table as it's shown (GridExports).
+    private static async Task<byte[]?> WorkbookOfAsync<TRow>(SfGrid<TRow>? grid, ExcelExportProperties properties) =>
+        grid is null ? null : await GridExports.WorkbookAsync(grid, properties);
 
     // A table as it was left, for the Windows user: its sort, filters and columns.
     private Task RestoreAsync<TRow>(SfGrid<TRow>? grid, string key) => GridLayouts.RestoreAsync(grid, ViewState, key);
