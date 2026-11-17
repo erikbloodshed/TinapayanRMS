@@ -712,6 +712,21 @@ input.e-input {
     min-height: 0;
 }
 
+/* Its drop-down arrow and its clear button (the ✕ shown on hover with something ticked) fill the box, as a picker's
+   arrow does, their glyph centred in it. The theme sized them for its 32px box (32px and 28px tall, the arrow with 9px
+   above and below) and hung them from the box's bottom by a negative margin (top: 100%; margin-top: -2.3em, -2em), so in
+   the app's compact box each sat 3 to 5px above the middle. The theme's selectors name e-control-container too. */
+.e-multiselect.e-control-container.e-input-group .e-multi-select-wrapper .e-input-group-icon.e-ddl-icon,
+.e-multiselect.e-control-container.e-input-group .e-multi-select-wrapper .e-clear-icon {
+    top: 0;
+    bottom: 0;
+    height: auto;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
 /* A picker's list (PickField). Every highlight in it looks the same: the pale Sky the screens' lists and tables mark
    their selected row with, in the list's own ink and weight (the theme's, #f5f5f5 on the list's white, couldn't be
    seen). The item Enter takes also has a deep Sky bar down its left side: the theme marks it e-item-focus (the first
