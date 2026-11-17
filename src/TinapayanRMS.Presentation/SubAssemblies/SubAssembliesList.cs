@@ -56,7 +56,7 @@ public interface ISubAssembliesListHost : IRecordListHost
 }
 
 /// <summary>
-/// The Sub-Assemblies list (through SubAssembliesState.List; SubAssemblyList draws it): the standalone sub-assemblies,
+/// The Sub-Assemblies list (through SubAssembliesState.List; SubAssembliesListCard draws it): the standalone sub-assemblies,
 /// searched by name and filed in a folder for each role, the rows picked, its menus and keys, moves and their Undo, naming in
 /// place, the roles as its folders, and Make In-House. What its actions do to the sub-assembly the form shows, it asks of the
 /// screen (<see cref="ISubAssembliesListHost"/>).
@@ -166,7 +166,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// <summary>The sub-assemblies the list shows: those whose name matches SearchText.</summary>
     public ReadOnlyObservableCollection<StandaloneSubAssemblyRow> VisibleRows => _visibleRows;
 
-    /// <summary>The list's tree (SubAssemblyList draws it): VisibleRows filed in a folder for their role.</summary>
+    /// <summary>The list's tree (SubAssembliesListCard draws it): VisibleRows filed in a folder for their role.</summary>
     public SubAssemblyTree SubAssemblyTree { get; }
 
     private string _searchText = string.Empty;
@@ -319,7 +319,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// The menu a right-click opens on the list (SubAssemblyList): on <paramref name="node"/>'s row, which the list
+    /// The menu a right-click opens on the list (SubAssembliesListCard): on <paramref name="node"/>'s row, which the list
     /// picks first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null.
     /// A sub-assembly's menu covers every sub-assembly picked with it.
     /// </summary>

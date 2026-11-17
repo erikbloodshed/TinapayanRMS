@@ -12,7 +12,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 ## The layout
 
-- **The list beside the form, which is in two cards, as on Products and Raw Materials.** The list (`Pages/SubAssemblies/SubAssemblyList.razor`) is as wide as its tree, 370px, and the form takes the rest.
+- **The list beside the form, which is in two cards, as on Products and Raw Materials.** The list (`Pages/SubAssemblies/SubAssembliesListCard.razor`) is as wide as its tree, 370px, and the form takes the rest.
   - **The header card**, held to `HeaderCardHeight`: the title (`HeaderTitle`: the saved name, "New sub-assembly", or "Copy of …"), then New, Copy, New Product, Save, Undo, Redo and Delete; Batch Weight, Batch Cost and Cost per g (Set Cost for a packaging set), worked out from the lines as they're typed; then Name and Role.
   - **The details card** under it scrolls while the header stays put, with two tabs along its bottom: **Recipe**, the lines, and **Dependents**, bound to `SelectedDetailsTab` (`RecipeTab`, `DependentsTab`), so the screen comes back on the tab it was left on, as Products and Raw Materials do.
 - **The lines are typed straight into the table** (`IngredientLineRow`, through the grids' shared drop-down, edit-commit and add-row behaviours in Application Architecture): Ingredient, Grams, the percentage, Cost/g, Cost and Base. Ticking Base makes the percentages baker's, over the ticked lines' total; with nothing ticked they're absolute, each line's share of the batch (`Batch.PercentHeader`, `FormulaBaseCaption`). A line typed as a baker's percentage keeps it as the base changes (Domain Model). Lines can be dragged into order and put in above the current one. Remove Line acts on the table showing.
@@ -93,7 +93,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Sub-Assemblies screen a
 
 ## Settings → Roles
 
-- **The Roles tab** (`Pages/Settings/Roles` over `SubAssemblyRolesState`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, Settings).
+- **The Roles tab** (`Pages/Settings/SubAssemblyRoles` over `SubAssemblyRolesState`) lists the roles in recipe order, the order the Sub-Assemblies list's folders and a product's recipe tabs follow, beside a form of Name and Product-owned. The form resets after Save and Delete, as the other lookup tabs' do (Application Architecture, Settings).
 - **The order has no box: Move Up and Move Down** in the list card's header (`MoveUpCommand`/`MoveDownCommand`, off for the first and last row and with nothing picked) call `SubAssemblyRoleRepository.MoveAsync`, which swaps the role with its neighbour.
   - `AddAsync` numbers a new role one past the last, whatever it's given, and `UpdateAsync` leaves the order alone.
   - `MoveAsync` and `DeleteAsync` number every role 1…n again (ties by name, the order the tab lists them in), so the order never has a gap.

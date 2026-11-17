@@ -171,7 +171,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     public Task A_save_that_fails_says_why_and_doesnt_throw() => UiThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var state = new CategoriesState(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
+        var state = new RawMaterialCategoriesState(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
         await state.LoadCommand.ExecuteAsync();
         state.EditingName = "Breads";
 

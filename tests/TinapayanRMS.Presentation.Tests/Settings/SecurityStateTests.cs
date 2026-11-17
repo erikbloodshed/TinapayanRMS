@@ -11,13 +11,13 @@ namespace TinapayanRMS.Presentation.Tests.Settings;
 /// <summary>Settings' Security tab: changes the password with the current one, sets one when there's none, and saves the auto-lock.</summary>
 [NotInParallel(DatabaseCollection.A)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
-public class SecuritySettingsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+public class SecurityStateTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private readonly AppLock _appLock = new(new TestClock(new DateTime(2026, 11, 15, 8, 0, 0)));
 
-    private SecuritySettingsState CreateState()
+    private SecurityState CreateState()
     {
-        return new SecuritySettingsState(new AccessSettingsRepository(CreateDbContextFactory()), _appLock, new LoggerConfiguration().CreateLogger());
+        return new SecurityState(new AccessSettingsRepository(CreateDbContextFactory()), _appLock, new LoggerConfiguration().CreateLogger());
     }
 
     private AccessSettingsRepository Repository() => new(CreateDbContextFactory());

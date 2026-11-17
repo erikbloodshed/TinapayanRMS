@@ -53,11 +53,11 @@ public class ServiceRegistrationTests
     [Arguments(typeof(QuickFindState))]
     [Arguments(typeof(PrintTabState))]
     [Arguments(typeof(UnitsOfMeasureState))]
-    [Arguments(typeof(CategoriesState))]
+    [Arguments(typeof(RawMaterialCategoriesState))]
     [Arguments(typeof(ProductCategoriesState))]
     [Arguments(typeof(SubAssemblyRolesState))]
     [Arguments(typeof(CostingDefaultsState))]
-    [Arguments(typeof(KeyboardSettingsState))]
+    [Arguments(typeof(KeyboardState))]
     [Arguments(typeof(DatabaseBackupsState))]
     [Arguments(typeof(ScreenLinks))]
     [Arguments(typeof(ScreenTabs))]
@@ -99,7 +99,7 @@ public class ServiceRegistrationTests
         keys.Changed += () => changes++;
         keys.IsOn.Should().BeFalse("they're off until the Windows user turns them on");
 
-        context.Services.GetRequiredService<KeyboardSettingsState>().IsVimKeysOn = true;
+        context.Services.GetRequiredService<KeyboardState>().IsVimKeysOn = true;
 
         keys.IsOn.Should().BeTrue();
         changes.Should().Be(1);

@@ -11,7 +11,7 @@ namespace TinapayanRMS.Presentation.Settings;
 
 /// <summary>
 /// Settings' Product Categories tab: what the Products list groups products under, a list of its own
-/// apart from raw material categories (CategoriesState).
+/// apart from raw material categories (RawMaterialCategoriesState).
 /// Picking a category loads it for renaming; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
 /// A category can set the Wastage % its products are priced with in place of the shop-wide one.

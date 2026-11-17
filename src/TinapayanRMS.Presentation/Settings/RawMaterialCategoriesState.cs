@@ -15,7 +15,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// Picking a category loads it for renaming or retyping; New, or finishing a Save or Delete, clears the form, so
 /// the next Save always adds a category rather than renaming the last one touched.
 /// </summary>
-public sealed class CategoriesState : ScreenState, IDisposable
+public sealed class RawMaterialCategoriesState : ScreenState, IDisposable
 {
     private readonly IRawMaterialCategoryRepository _categoryRepository;
     private readonly IValidator<RawMaterialCategory> _categoryValidator;
@@ -68,7 +68,7 @@ public sealed class CategoriesState : ScreenState, IDisposable
     public ScreenCommand SaveCommand { get; }
     public ScreenCommand DeleteCommand { get; }
 
-    public CategoriesState(IRawMaterialCategoryRepository categoryRepository, IValidator<RawMaterialCategory> categoryValidator, ILogger logger)
+    public RawMaterialCategoriesState(IRawMaterialCategoryRepository categoryRepository, IValidator<RawMaterialCategory> categoryValidator, ILogger logger)
         : base(logger)
     {
         _categoryRepository = categoryRepository;

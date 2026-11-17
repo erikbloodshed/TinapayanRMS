@@ -78,7 +78,7 @@ public interface IProductsListHost : IRecordListHost
 }
 
 /// <summary>
-/// The Products list (through ProductsState.List; ProductList draws it): every product, filed in its stage and the
+/// The Products list (through ProductsState.List; ProductsListCard draws it): every product, filed in its stage and the
 /// user's folders, with the Deleted folder last; searched by name and filtered by category; the rows picked, their menus and
 /// keys, moves to other folders and the other stage and their Undo, Cut and Paste, the folders themselves, and names typed in
 /// place. The products, folders and categories are the screen's, which loads them; what the list's actions do to the
@@ -204,7 +204,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         CollapseAllCommand = ScreenCommand.Of<ProductFolderNode?>(ProductTree.CollapseAll);
     }
 
-    /// <summary>The Products list (ProductList): VisibleProducts filed in their stage, in the user's folders.</summary>
+    /// <summary>The Products list (ProductsListCard): VisibleProducts filed in their stage, in the user's folders.</summary>
     public ProductTree ProductTree { get; }
 
     /// <summary>The products the list shows: those whose name matches SearchText, in the category CategoryFilter picks.</summary>
@@ -275,7 +275,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// Products moved to other folders of the Products list (ProductList), by a drag or Move to: files each in its
+    /// Products moved to other folders of the Products list (ProductsListCard), by a drag or Move to: files each in its
     /// folder and stage straight away, with no Save, and says so on the list's notice bar with an Undo (MoveNotice). Its
     /// category stays as it is. The form's Save never writes a saved product's stage or folder, so whatever is typed into
     /// the form stays as it is.
@@ -616,7 +616,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// The menu a right-click opens on the list (ProductList): on <paramref name="node"/>'s row, which the list picks
+    /// The menu a right-click opens on the list (ProductsListCard): on <paramref name="node"/>'s row, which the list picks
     /// first (keeping the rows picked with it, when it was one of them), or on the list's empty space when it's null. A
     /// product's menu covers every product picked with it.
     /// </summary>

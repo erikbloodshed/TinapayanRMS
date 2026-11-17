@@ -6,7 +6,7 @@ namespace TinapayanRMS.Presentation.Trees;
 
 /// <summary>
 /// A screen whose list is a tree of folders: Products, Raw Materials and Sub-Assemblies. What its list card works the tree
-/// with (ProductList, MaterialList and SubAssemblyList, through FolderTree and MoveNoticeBar): the rows picked, their menus
+/// with (ProductsListCard, RawMaterialsListCard and SubAssembliesListCard, through FolderTree and MoveNoticeBar): the rows picked, their menus
 /// and shortcuts, dragging rows onto a folder, and the notice of the last move. The rows are the screen's own tree's nodes.
 /// The drag rules are the screen's alone: the cards ask these members, so the rules the tests check are the ones the
 /// window runs.

@@ -11,7 +11,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// set, as a restore of an older backup can leave it, set by the new one alone), and the idle minutes before the window
 /// locks itself, which take effect at once (AppLock). Both are kept in the database (AccessSettings).
 /// </summary>
-public sealed class SecuritySettingsState : ScreenState
+public sealed class SecurityState : ScreenState
 {
     private readonly IAccessSettingsRepository _repository;
     private readonly AppLock _appLock;
@@ -60,7 +60,7 @@ public sealed class SecuritySettingsState : ScreenState
 
     public ScreenCommand SaveAutoLockCommand { get; }
 
-    public SecuritySettingsState(IAccessSettingsRepository repository, AppLock appLock, ILogger logger)
+    public SecurityState(IAccessSettingsRepository repository, AppLock appLock, ILogger logger)
         : base(logger)
     {
         _repository = repository;

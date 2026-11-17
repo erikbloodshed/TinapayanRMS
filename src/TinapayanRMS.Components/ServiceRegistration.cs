@@ -78,11 +78,11 @@ public static class ServiceRegistration
         services.AddScoped<PriceSimulatorState>();
         services.AddScoped<PrintTabState>();
         services.AddScoped<UnitsOfMeasureState>();
-        services.AddScoped<CategoriesState>();
+        services.AddScoped<RawMaterialCategoriesState>();
         services.AddScoped<ProductCategoriesState>();
         services.AddScoped<SubAssemblyRolesState>();
         services.AddScoped<CostingDefaultsState>();
-        services.AddScoped<SecuritySettingsState>();
+        services.AddScoped<SecurityState>();
 
         // Whether the window is locked, one for the process, so the page loading again after a restore keeps it; the
         // sign-in panel's state is the page's.
@@ -91,7 +91,7 @@ public static class ServiceRegistration
 
         // The Vim keys, for this page: ticking the box in Settings → Keyboard turns them on or off at once.
         services.AddScoped<VimKeysState>();
-        services.AddScoped(provider => new KeyboardSettingsState(
+        services.AddScoped(provider => new KeyboardState(
             provider.GetRequiredService<IViewStateStore>(), provider.GetRequiredService<VimKeysState>().Set));
 
         // A restore replaces everything every screen holds, so the window starts again (AppStatus.Restored): a forced load

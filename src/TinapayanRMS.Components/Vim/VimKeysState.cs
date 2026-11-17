@@ -22,7 +22,7 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
     /// <summary>Raised when the keys are turned on or off in Settings.</summary>
     public event Action? Changed;
 
-    public bool IsOn => _isOn ??= KeyboardSettingsState.IsVimKeysSaved(viewState);
+    public bool IsOn => _isOn ??= KeyboardState.IsVimKeysSaved(viewState);
 
     /// <summary>The state of the screen on show, or null between screens.</summary>
     public object? Screen { get; private set; }
