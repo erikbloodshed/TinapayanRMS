@@ -326,7 +326,7 @@ public class FieldTests
         drawn.Clear();
         field.Find("input").Blur();
 
-        field.WaitForAssertion(() => drawn.Should().Equal("abc", "5.00"));
+        await field.WaitForAssertionAsync(() => drawn.Should().Equal("abc", "5.00"));
     }
 
     [Test]
@@ -609,7 +609,7 @@ public class FieldTests
 
         // The look-alike takes the cursor: the combo box is made, and once it's set up, the cursor is handed to it.
         field.Find(".deferred-pick input").Focus();
-        field.WaitForAssertion(() => field.FindAll(".deferred-pick").Should().BeEmpty());
+        await field.WaitForAssertionAsync(() => field.FindAll(".deferred-pick").Should().BeEmpty());
         var handOver = context.JSInterop.Invocations.Single(i => i.Identifier == "tinapayan.handOverPick");
         handOver.Arguments[1].Should().Be(false, "the arrow wasn't pressed");
         form.Begun.Should().Be(0, "the look-alike's cursor is no visit to the picker yet");
@@ -644,7 +644,7 @@ public class FieldTests
 
         field.Find(".deferred-pick .e-ddl-icon").MouseDown();
 
-        field.WaitForAssertion(() => field.FindAll("li.e-list-item").Select(li => li.TextContent.Trim()).Should().Equal("Flour", "Salt", "Water"));
+        await field.WaitForAssertionAsync(() => field.FindAll("li.e-list-item").Select(li => li.TextContent.Trim()).Should().Equal("Flour", "Salt", "Water"));
         context.JSInterop.Invocations.Single(i => i.Identifier == "tinapayan.handOverPick").Arguments[1].Should().Be(true);
     }
 
@@ -667,14 +667,14 @@ public class FieldTests
             field.Find(".deferred-pick .e-ddl-icon").MouseDown();
         }
 
-        field.WaitForAssertion(() => field.FindAll("li.e-list-item").Should().HaveCount(3));
+        await field.WaitForAssertionAsync(() => field.FindAll("li.e-list-item").Should().HaveCount(3));
 
         // Escape, as the combo box's script hands it on, closes it, as it does a list opened by a press on the combo box's
         // own arrow: Syncfusion closes only a list it has marked open.
         var box = field.FindComponent<PickComboBox<string>>();
         await field.InvokeAsync(() => box.Instance.KeyActionHandler(new KeyActions { Action = "escape", Key = "Escape", Type = "keydown", Events = new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Escape" } }));
 
-        field.WaitForAssertion(() => field.FindAll(".e-popup-open li.e-list-item").Should().BeEmpty());
+        await field.WaitForAssertionAsync(() => field.FindAll(".e-popup-open li.e-list-item").Should().BeEmpty());
     }
 
     [Test]
@@ -691,8 +691,8 @@ public class FieldTests
 
         field.Find(".deferred-pick input").Focus();
 
-        field.WaitForAssertion(() => context.JSInterop.Invocations.Any(i => i.Identifier == "tinapayan.handOverPick").Should().BeTrue());
-        field.WaitForAssertion(() => field.FindComponents<PickComboBox<string>>().Should().BeEmpty());
+        await field.WaitForAssertionAsync(() => context.JSInterop.Invocations.Any(i => i.Identifier == "tinapayan.handOverPick").Should().BeTrue());
+        await field.WaitForAssertionAsync(() => field.FindComponents<PickComboBox<string>>().Should().BeEmpty());
         field.Find(".deferred-pick input").GetAttribute("value").Should().Be("Salt");
     }
 

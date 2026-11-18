@@ -132,7 +132,7 @@ public class LineGridTests
 
         await grid.InvokeAsync(() => _drafts[0].Name = "Yeast");
 
-        grid.WaitForAssertion(() => _lines.Select(line => line.Name).Should().Equal("Flour", "Water", "Yeast"));
+        await grid.WaitForAssertionAsync(() => _lines.Select(line => line.Name).Should().Equal("Flour", "Water", "Yeast"));
         _lines[2].Should().BeSameAs(_drafts[0]);
         _drafts.Should().HaveCount(2, "a fresh draft takes the add row");
         var rows = grid.FindAll("tbody tr");
@@ -165,7 +165,7 @@ public class LineGridTests
 
         await grid.InvokeAsync(() => _drafts[0].Name = "Yeast");
 
-        grid.WaitForAssertion(() => _lines.Should().HaveCount(3));
+        await grid.WaitForAssertionAsync(() => _lines.Should().HaveCount(3));
     }
 
     [Test]

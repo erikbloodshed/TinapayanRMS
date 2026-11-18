@@ -122,17 +122,17 @@ public class ScreenBaseTests
 
         await screen.InvokeAsync(() => state.Rows.Add(1));
 
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("1"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("1"));
         state.Reads.Should().Be(0);
     }
 
-    private static (IRenderedComponent<LinesScreen> Screen, Lines State) Render(BunitContext context)
+    private static async Task<(IRenderedComponent<LinesScreen> Screen, Lines State)> RenderAsync(BunitContext context)
     {
         context.Services.AddScoped<Lines>();
         var screen = context.Render<LinesScreen>();
 
         // The screen's first drawings settle.
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|False"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("|0|False"));
         return (screen, context.Services.GetRequiredService<Lines>());
     }
 
@@ -140,7 +140,7 @@ public class ScreenBaseTests
     public async Task A_load_that_changes_hundreds_of_things_is_drawn_once()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
         var before = screen.Instance.Drawings;
 
         await screen.InvokeAsync(() =>
@@ -152,7 +152,7 @@ public class ScreenBaseTests
             }
         });
 
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("Product 200|200|False"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("Product 200|200|False"));
         (screen.Instance.Drawings - before).Should().Be(1);
     }
 
@@ -160,23 +160,23 @@ public class ScreenBaseTests
     public async Task A_list_changing_alone_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
 
         await screen.InvokeAsync(() => state.Rows.Add(1));
 
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|1|False"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("|1|False"));
     }
 
     [Test]
     public async Task A_table_replaced_in_one_go_redraws_the_screen_once()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
         var before = screen.Instance.Drawings;
 
         await screen.InvokeAsync(() => state.Table.ReplaceWith([3, 1, 2]));
 
-        screen.WaitForAssertion(() => screen.Find("span").TextContent.Should().Be("3,1,2"));
+        await screen.WaitForAssertionAsync(() => screen.Find("span").TextContent.Should().Be("3,1,2"));
         (screen.Instance.Drawings - before).Should().Be(1);
     }
 
@@ -184,27 +184,27 @@ public class ScreenBaseTests
     public async Task A_command_becoming_able_to_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
 
         await screen.InvokeAsync(state.AllowSave);
 
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("|0|True"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("|0|True"));
     }
 
     [Test]
     public async Task A_screen_command_starting_and_ending_a_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
         screen.Find("b").TextContent.Should().Be("True");
 
         var printing = Task.CompletedTask;
         await screen.InvokeAsync(() => { printing = state.PrintCommand.ExecuteAsync(); });
-        screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("False"));
+        await screen.WaitForAssertionAsync(() => screen.Find("b").TextContent.Should().Be("False"));
 
         await screen.InvokeAsync(state.PrintDone.SetResult);
         await printing;
-        screen.WaitForAssertion(() => screen.Find("b").TextContent.Should().Be("True"));
+        await screen.WaitForAssertionAsync(() => screen.Find("b").TextContent.Should().Be("True"));
     }
 
     // A part's commands are its own (the Products screen's Packaging tab's Remove Line, say), so the screen watches them
@@ -213,29 +213,29 @@ public class ScreenBaseTests
     public async Task A_command_of_a_part_becoming_able_to_run_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
 
         await screen.InvokeAsync(state.Part.AllowRemove);
 
-        screen.WaitForAssertion(() => screen.Find("em").TextContent.Should().Be("True"));
+        await screen.WaitForAssertionAsync(() => screen.Find("em").TextContent.Should().Be("True"));
     }
 
     [Test]
     public async Task A_change_from_another_thread_redraws_the_screen()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
 
         await Task.Run(() => state.Name = "Cheese Roll");
 
-        screen.WaitForAssertion(() => screen.Find("p").TextContent.Should().Be("Cheese Roll|0|False"));
+        await screen.WaitForAssertionAsync(() => screen.Find("p").TextContent.Should().Be("Cheese Roll|0|False"));
     }
 
     [Test]
     public async Task A_screen_drawn_at_once_isnt_drawn_again_for_the_same_changes()
     {
         await using var context = AppServices.NewContext();
-        var (screen, state) = Render(context);
+        var (screen, state) = await RenderAsync(context);
         var before = screen.Instance.Drawings;
 
         // What undo does: the changes, then the drawing, before the browser is told it's done.

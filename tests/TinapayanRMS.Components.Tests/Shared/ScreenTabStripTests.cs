@@ -37,7 +37,7 @@ public class ScreenTabStripTests
 
         navigation.NavigateTo("reports");
 
-        strip.WaitForAssertion(() => Showing(strip).Should().Be("Reports"));
+        await strip.WaitForAssertionAsync(() => Showing(strip).Should().Be("Reports"));
         Labels(strip).Should().Equal("Raw Materials", "Sub-Assemblies", "Products", "Reports");
     }
 
@@ -78,7 +78,7 @@ public class ScreenTabStripTests
 
         strip.Find("button[aria-label='Close Reports']").Click();
 
-        strip.WaitForAssertion(() => Showing(strip).Should().Be("Products"));
+        await strip.WaitForAssertionAsync(() => Showing(strip).Should().Be("Products"));
         navigation.ToBaseRelativePath(navigation.Uri).Should().Be("products");
         Labels(strip).Should().Equal("Raw Materials", "Sub-Assemblies", "Products");
     }

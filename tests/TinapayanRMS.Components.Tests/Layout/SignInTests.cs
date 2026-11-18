@@ -16,8 +16,6 @@ namespace TinapayanRMS.Components.Tests.Layout;
 /// </summary>
 public class SignInTests
 {
-    private static readonly TimeSpan Hashing = TimeSpan.FromSeconds(10);
-
     private static BunitContext NewContext(InMemoryAccessSettings settings, StubDatabaseUpdater? database = null)
     {
         var context = AppServices.NewContext();
@@ -44,12 +42,12 @@ public class SignInTests
         var appLock = context.Services.GetRequiredService<AppLock>();
 
         var panel = context.Render<SignInScreen>();
-        panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().HaveCount(2));
+        await panel.WaitForAssertionAsync(() => panel.FindAll("input[type=password]").Should().HaveCount(2));
 
         await TypeAsync(panel, "sign-in-password", "pandesal 6am");
         await TypeAsync(panel, "sign-in-confirmation", "pandesal 6am", enter: true);
 
-        panel.WaitForAssertion(() => appLock.IsLocked.Should().BeFalse(), Hashing);
+        await panel.WaitForAssertionAsync(() => appLock.IsLocked.Should().BeFalse());
         (await settings.VerifyAsync("pandesal 6am", CancellationToken.None)).Should().BeTrue();
     }
 
@@ -62,16 +60,16 @@ public class SignInTests
         var appLock = context.Services.GetRequiredService<AppLock>();
 
         var panel = context.Render<SignInScreen>();
-        panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().ContainSingle());
+        await panel.WaitForAssertionAsync(() => panel.FindAll("input[type=password]").Should().ContainSingle());
         panel.Find(".caption").TextContent.Should().Be("Type the password to open the app.");
 
         await TypeAsync(panel, "sign-in-password", "pandesal 7am", enter: true);
-        panel.WaitForAssertion(() => panel.Find(".sign-in-error").TextContent.Should().Be("That isn't the password."), Hashing);
+        await panel.WaitForAssertionAsync(() => panel.Find(".sign-in-error").TextContent.Should().Be("That isn't the password."));
         panel.Find("#sign-in-password").GetAttribute("value").Should().BeEmpty("the box is drawn afresh after a try");
         appLock.IsLocked.Should().BeTrue();
 
         await TypeAsync(panel, "sign-in-password", "pandesal 6am", enter: true);
-        panel.WaitForAssertion(() => appLock.IsLocked.Should().BeFalse(), Hashing);
+        await panel.WaitForAssertionAsync(() => appLock.IsLocked.Should().BeFalse());
     }
 
     [Test]
@@ -82,7 +80,7 @@ public class SignInTests
         await using var context = NewContext(settings);
         var signIn = context.Services.GetRequiredService<SignInState>();
         var panel = context.Render<SignInScreen>();
-        panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().ContainSingle());
+        await panel.WaitForAssertionAsync(() => panel.FindAll("input[type=password]").Should().ContainSingle());
         await panel.Find("#sign-in-password").InputAsync(new ChangeEventArgs { Value = "pandesal 7am" });
 
         // As the web view sends them: the key, then the box's text as a change, which lands while the check runs.
@@ -92,7 +90,7 @@ public class SignInTests
         settings.Hold.SetResult();
         await enter;
 
-        panel.WaitForAssertion(() => panel.Find(".sign-in-error").TextContent.Should().Be("That isn't the password."), Hashing);
+        await panel.WaitForAssertionAsync(() => panel.Find(".sign-in-error").TextContent.Should().Be("That isn't the password."));
         signIn.Password.Should().BeEmpty();
         panel.Find("#sign-in-password").GetAttribute("value").Should().BeEmpty();
     }
@@ -107,12 +105,12 @@ public class SignInTests
 
         var panel = context.Render<SignInScreen>();
 
-        panel.WaitForAssertion(() => panel.Find(".caption").TextContent.Should().StartWith("Bringing the data up to this version"));
+        await panel.WaitForAssertionAsync(() => panel.Find(".caption").TextContent.Should().StartWith("Bringing the data up to this version"));
         panel.FindAll("input[type=password]").Should().BeEmpty("nothing is read from the database until it's ready");
 
         database.Release.SetResult();
 
-        panel.WaitForAssertion(() => panel.FindAll("input[type=password]").Should().ContainSingle());
+        await panel.WaitForAssertionAsync(() => panel.FindAll("input[type=password]").Should().ContainSingle());
     }
 
     [Test]
@@ -127,7 +125,7 @@ public class SignInTests
 
         var panel = context.Render<SignInScreen>();
 
-        panel.WaitForAssertion(() => panel.Find(".caption").TextContent.Should().StartWith("The window is locked."));
+        await panel.WaitForAssertionAsync(() => panel.Find(".caption").TextContent.Should().StartWith("The window is locked."));
     }
 
     [Test]
@@ -136,7 +134,7 @@ public class SignInTests
         var settings = new InMemoryAccessSettings();
         await using var context = NewContext(settings);
 
-        // No WaitForAssertion on the panel: bUnit's wait would hold it. The database made ready first, so the panel's load
+        // No wait on the panel: bUnit's would hold it. The database made ready first, so the panel's load
         // finds it ready, and the in-memory password reads at once.
         await context.Services.GetRequiredService<DatabaseReadiness>().EnsureReadyAsync();
         var left = context.ShowAndLeave<SignInScreen>(
@@ -159,7 +157,7 @@ public class SignInTests
 
         await context.Renderer.Dispatcher.InvokeAsync(appLock.Unlock);
 
-        layout.WaitForAssertion(() => layout.FindComponents<Probe>().Should().ContainSingle());
+        await layout.WaitForAssertionAsync(() => layout.FindComponents<Probe>().Should().ContainSingle());
         layout.FindComponents<SignInScreen>().Should().BeEmpty();
         layout.Find(".app-screen").HasAttribute("inert").Should().BeFalse();
         layout.FindAll(".app-titlebar button").Select(b => b.GetAttribute("aria-label")).Should().Contain("Lock");
@@ -176,7 +174,7 @@ public class SignInTests
 
         await layout.Find(".app-titlebar button[aria-label='Lock']").ClickAsync(new MouseEventArgs());
 
-        layout.WaitForAssertion(() => layout.FindComponents<SignInScreen>().Should().ContainSingle());
+        await layout.WaitForAssertionAsync(() => layout.FindComponents<SignInScreen>().Should().ContainSingle());
         appLock.IsLocked.Should().BeTrue();
         layout.FindComponent<Probe>().Instance.Should().BeSameAs(screen, "the screen isn't built again, so its unsaved edits stay");
         layout.Find(".app-screen").HasAttribute("inert").Should().BeTrue();
@@ -184,7 +182,7 @@ public class SignInTests
 
         await context.Renderer.Dispatcher.InvokeAsync(appLock.Unlock);
 
-        layout.WaitForAssertion(() => layout.FindComponents<SignInScreen>().Should().BeEmpty());
+        await layout.WaitForAssertionAsync(() => layout.FindComponents<SignInScreen>().Should().BeEmpty());
         layout.FindComponent<Probe>().Instance.Should().BeSameAs(screen);
         layout.Find(".app-screen").HasAttribute("inert").Should().BeFalse();
     }

@@ -1467,7 +1467,7 @@ public class LineGridTests
 
         await grid.InvokeAsync(() => _drafts[0].Name = "Yeast");
 
-        grid.WaitForAssertion(() => _lines.Select(line => line.Name).Should().Equal("Flour", "Water", "Yeast"));
+        await grid.WaitForAssertionAsync(() => _lines.Select(line => line.Name).Should().Equal("Flour", "Water", "Yeast"));
         grid.FindAll("tbody tr")[^1].ClassList.Should().Contain("add-row");
     }
 }
@@ -1477,6 +1477,7 @@ public class LineGridTests
 - A test that draws a Syncfusion dialog calls `RenderingAsTheWebView()` on the context once its services are added: the dialog asks the renderer whether it's interactive, and bUnit's says it isn't.
 - bUnit's own `TestContext` is aliased away in the project file: `TestContext` is TUnit's.
 - Change a screen state or a row from a test inside `InvokeAsync`, as the app changes it on the UI thread.
+- **Await bUnit's waits**: `WaitForAssertionAsync`, never the blocking `WaitForAssertion`. A blocking wait holds a thread-pool thread for as long as it waits, and with tests running side by side those threads are the ones the renderer needs to finish what's being waited for. [WaitsSetup](../tests/TinapayanRMS.Components.Tests/WaitsSetup.cs) gives each wait 30 seconds, where bUnit's default is one: a wait that's met ends at once.
 - **A component that hooks into what outlives it has a test that it's let go once it's left.** `context.ShowAndLeave<T>(parameters, whileShown)` ([Visits](../tests/TinapayanRMS.Components.Tests/Fixtures/Visits.cs)) shows the component in a page, leaves it as the router does, and returns a weak reference to it. `IsCollected()` is true once nothing holds it. See `A_screen_left_is_let_go_though_its_viewmodel_lives_on`, and its like for `FolderTree` and `LineGrid`. In `whileShown`, check what's drawn with `Find`, not `WaitForAssertion`: bUnit's waits leave a continuation on its renderer that holds the component.
 
 Other helpers:

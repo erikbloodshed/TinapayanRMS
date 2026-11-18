@@ -19,7 +19,7 @@ public class CommandButtonTests
         button.Find("button").Click();
 
         // The click's handler runs on the renderer's dispatcher, so its result is waited for, not assumed.
-        button.WaitForAssertion(() => runs.Should().Be(1));
+        await button.WaitForAssertionAsync(() => runs.Should().Be(1));
         button.Find(".command-label").TextContent.Should().Be("Save");
     }
 
@@ -40,7 +40,7 @@ public class CommandButtonTests
 
         button.Find("button").HasAttribute("disabled").Should().BeFalse();
         button.Find("button").Click();
-        button.WaitForAssertion(() => runs.Should().Be(1));
+        await button.WaitForAssertionAsync(() => runs.Should().Be(1));
     }
 
     [Test]

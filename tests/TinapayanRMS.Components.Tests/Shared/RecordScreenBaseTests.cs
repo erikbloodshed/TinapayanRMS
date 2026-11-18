@@ -106,7 +106,7 @@ public class RecordScreenBaseTests
         var (screen, records, navigation) = Render(context, 13);
 
         await screen.InvokeAsync(() => records.Shown = 26);
-        screen.WaitForAssertion(() => navigation.Uri.Should().EndWith("/things/26"));
+        await screen.WaitForAssertionAsync(() => navigation.Uri.Should().EndWith("/things/26"));
 
         await screen.InvokeAsync(() => records.Shown = 0);
         navigation.Uri.Should().EndWith("/things/26", "a new record has no address of its own");

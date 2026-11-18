@@ -61,12 +61,12 @@ public class TitleBarTests
         await bar.Find("button[aria-label='Maximize']").ClickAsync(new());
 
         window.IsMaximized.Should().BeTrue();
-        bar.WaitForAssertion(() => bar.FindAll(".caption-button")[1].GetAttribute("aria-label").Should().Be("Restore Down"));
+        await bar.WaitForAssertionAsync(() => bar.FindAll(".caption-button")[1].GetAttribute("aria-label").Should().Be("Restore Down"));
 
         await bar.Find("button[aria-label='Restore Down']").ClickAsync(new());
 
         window.IsMaximized.Should().BeFalse();
-        bar.WaitForAssertion(() => bar.FindAll(".caption-button")[1].GetAttribute("aria-label").Should().Be("Maximize"));
+        await bar.WaitForAssertionAsync(() => bar.FindAll(".caption-button")[1].GetAttribute("aria-label").Should().Be("Maximize"));
     }
 
     [Test]
@@ -93,7 +93,7 @@ public class TitleBarTests
 
         await bar.InvokeAsync(() => bar.Instance.HistoryChanged(canGoBack: true, canGoForward: false));
 
-        bar.WaitForAssertion(() =>
+        await bar.WaitForAssertionAsync(() =>
         {
             bar.Find("button[aria-label='Back']").HasAttribute("disabled").Should().BeFalse();
             bar.Find("button[aria-label='Forward']").HasAttribute("disabled").Should().BeTrue();

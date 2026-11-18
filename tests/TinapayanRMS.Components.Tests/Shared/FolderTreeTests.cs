@@ -233,7 +233,7 @@ public class FolderTreeTests
             }
         });
 
-        tree.WaitForAssertion(() => tree.FindAll(".tree-row .title").Should().HaveCount(41));
+        await tree.WaitForAssertionAsync(() => tree.FindAll(".tree-row .title").Should().HaveCount(41));
         tree.Find(".tree-row .title").TextContent.Should().Be("Breads (40)");
         (drawings - before).Should().Be(1);
     }
@@ -490,7 +490,7 @@ public class FolderTreeTests
 
         wait.SetResult();
 
-        tree.WaitForAssertion(() => rename.Runs.Should().Be(1));
+        await tree.WaitForAssertionAsync(() => rename.Runs.Should().Be(1));
     }
 
     [Test]

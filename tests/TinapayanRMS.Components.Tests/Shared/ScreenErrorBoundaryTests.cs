@@ -72,7 +72,7 @@ public class ScreenErrorBoundaryTests
 
         boundary.Find(".screen-error button").Click();
 
-        boundary.WaitForAssertion(() => boundary.Find("p").TextContent.Should().Be("Pandesal, not saved yet"));
+        await boundary.WaitForAssertionAsync(() => boundary.Find("p").TextContent.Should().Be("Pandesal, not saved yet"));
         boundary.FindAll(".screen-error").Should().BeEmpty();
     }
 
@@ -85,6 +85,6 @@ public class ScreenErrorBoundaryTests
 
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("products");
 
-        boundary.WaitForAssertion(() => boundary.Find("p").TextContent.Should().Be("Pandesal"));
+        await boundary.WaitForAssertionAsync(() => boundary.Find("p").TextContent.Should().Be("Pandesal"));
     }
 }
