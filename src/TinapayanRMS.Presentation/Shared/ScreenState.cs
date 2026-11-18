@@ -135,6 +135,8 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
                 case UnsavedChangesAnswer.Save:
                     return await save();
                 case UnsavedChangesAnswer.DontSave:
+                    // What the screen said in red about the changes goes with them.
+                    ErrorMessage = null;
                     if (discard is not null)
                     {
                         await discard();

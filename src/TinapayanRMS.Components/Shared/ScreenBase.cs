@@ -313,6 +313,13 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
     {
         if (disposing)
         {
+            // What the screen said in red was about the screen. Left up, it would follow the user to the next one, which has
+            // no message of its own to clear and so take it away.
+            if (State?.ErrorMessage is not null)
+            {
+                Notices.ShowError(null);
+            }
+
             foreach (var subscription in _subscriptions)
             {
                 subscription.Dispose();

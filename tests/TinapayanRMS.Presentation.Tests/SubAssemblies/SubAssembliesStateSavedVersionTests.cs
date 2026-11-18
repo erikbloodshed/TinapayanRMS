@@ -59,6 +59,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
 
         (await state.OpenRecordAsync(otherId)).Should().BeTrue();
         await ShowingAsync(state, "Filling", 100m);
+        state.ErrorMessage.Should().BeNull("what was said was about the changes thrown away");
         (await state.OpenRecordAsync(id)).Should().BeTrue();
         await ShowingAsync(state, "Sweet Dough", 200m);
 
@@ -82,6 +83,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
         await ShowingAsync(state, "Sweet Dough", 200m);
 
+        state.ErrorMessage.Should().BeNull("what was said was about the changes thrown away");
         state.History.IsDirty.Should().BeFalse();
 
         TypeGrams(state, 300m);
@@ -215,6 +217,23 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
         (await StoredAsync(id)).Should().Be(("Sweet Dough", 200m));
         otherFlourId.Should().NotBe(flourId);
+    });
+
+    [Test]
+    public Task What_the_screen_said_stays_while_the_sub_assembly_shows_and_goes_when_another_opens() => UiThread.RunAsync(async () =>
+    {
+        var (id, _) = await AddRecipeAsync("Dough");
+        var (otherId, _) = await AddRecipeAsync("Filling");
+        var state = await OpenedStateAsync(id);
+
+        ((IScreenPartHost)state).ShowError("Dough is in use.");
+        await state.LoadCommand.ExecuteAsync();
+        state.ErrorMessage.Should().Be("Dough is in use.");
+
+        state.OpenRecord(otherId);
+        await ShowingAsync(state, "Filling", 100m);
+
+        state.ErrorMessage.Should().BeNull();
     });
 
     [Test]

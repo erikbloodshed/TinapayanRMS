@@ -104,6 +104,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
 
         (await state.OpenRecordAsync(otherId)).Should().BeTrue();
         await ShowingAsync(state, otherId);
+        state.ErrorMessage.Should().BeNull("what was said was about the changes thrown away");
         (await state.OpenRecordAsync(id)).Should().BeTrue();
         await ShowingAsync(state, id);
 
@@ -282,6 +283,23 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
         (await StoredAsync(id)).Should().Be(("Mamon Classic", (string?)null));
+    });
+
+    [Test]
+    public Task What_the_screen_said_stays_while_the_product_shows_and_goes_when_another_opens() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        var otherId = await SaveProductAsync("Ensaymada");
+        var state = await OpenedStateAsync(id);
+
+        ((IScreenPartHost)state).ShowError("Mamon is in use.");
+        await state.LoadCommand.ExecuteAsync();
+        state.ErrorMessage.Should().Be("Mamon is in use.");
+
+        state.OpenRecord(otherId);
+        await ShowingAsync(state, otherId);
+
+        state.ErrorMessage.Should().BeNull();
     });
 
     [Test]

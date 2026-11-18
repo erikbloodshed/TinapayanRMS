@@ -61,8 +61,19 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
 
     public ScreenCommand RedoCommand { get; }
 
-    /// <summary>IUndoRecorder: goes up as another record, or a new one, takes the form's place.</summary>
-    public int FormVersion { get; protected set; }
+    /// <summary>
+    /// IUndoRecorder: goes up as another record, or a new one, takes the form's place. What the screen said in red was about
+    /// the record that's gone, so it goes too.
+    /// </summary>
+    public int FormVersion
+    {
+        get;
+        protected set
+        {
+            field = value;
+            ErrorMessage = null;
+        }
+    }
 
     /// <summary>The form as it stands: everything an undo step puts back.</summary>
     protected abstract TSnapshot CaptureSnapshot();

@@ -60,6 +60,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
 
         (await state.OpenRecordAsync(otherId)).Should().BeTrue();
         await ShowingAsync(state, otherId);
+        state.ErrorMessage.Should().BeNull("what was said was about the changes thrown away");
         (await state.OpenRecordAsync(id)).Should().BeTrue();
         await ShowingAsync(state, id);
 
@@ -86,6 +87,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue();
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.EditingName == "Strong Flour", () => $"name={state.EditingName}");
 
+        state.ErrorMessage.Should().BeNull("what was said was about the changes thrown away");
         state.History.IsDirty.Should().BeFalse();
 
         TypeBuffer(state, 7m);
@@ -212,6 +214,23 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
         (await StoredAsync(id)).Should().Be(("Strong Flour", 0m));
+    });
+
+    [Test]
+    public Task What_the_screen_said_stays_while_the_material_shows_and_goes_when_another_opens() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        var otherId = await SaveMaterialAsync("Cake Flour");
+        var state = await OpenedStateAsync(id);
+
+        ((IScreenPartHost)state).ShowError("Bread Flour is in use.");
+        await state.LoadCommand.ExecuteAsync();
+        state.ErrorMessage.Should().Be("Bread Flour is in use.");
+
+        state.OpenRecord(otherId);
+        await ShowingAsync(state, otherId);
+
+        state.ErrorMessage.Should().BeNull();
     });
 
     [Test]

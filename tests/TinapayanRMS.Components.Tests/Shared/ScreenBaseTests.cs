@@ -126,6 +126,35 @@ public class ScreenBaseTests
         state.Reads.Should().Be(0);
     }
 
+    [Test]
+    public async Task A_screen_left_takes_its_red_notice_with_it()
+    {
+        await using var context = AppServices.NewContext();
+        var (screen, state) = await RenderAsync(context);
+        List<(NoticeKind Kind, string? Message)> shown = [];
+        context.Services.GetRequiredService<Notices>().Changed += (kind, message) => shown.Add((kind, message));
+
+        await screen.InvokeAsync(() => ((IScreenPartHost)state).ShowError("That name is already in use."));
+        shown.Should().Equal((NoticeKind.Error, "That name is already in use."));
+
+        await context.DisposeComponentsAsync();
+
+        shown.Should().Equal((NoticeKind.Error, "That name is already in use."), (NoticeKind.Error, null));
+    }
+
+    [Test]
+    public async Task A_screen_left_with_nothing_to_say_leaves_the_notices_alone()
+    {
+        await using var context = AppServices.NewContext();
+        var (screen, _) = await RenderAsync(context);
+        List<(NoticeKind Kind, string? Message)> shown = [];
+        context.Services.GetRequiredService<Notices>().Changed += (kind, message) => shown.Add((kind, message));
+
+        await context.DisposeComponentsAsync();
+
+        shown.Should().BeEmpty("what's showing may be the next screen's");
+    }
+
     private static async Task<(IRenderedComponent<LinesScreen> Screen, Lines State)> RenderAsync(BunitContext context)
     {
         context.Services.AddScoped<Lines>();
