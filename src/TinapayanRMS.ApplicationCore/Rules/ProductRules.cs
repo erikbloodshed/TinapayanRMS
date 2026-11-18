@@ -112,11 +112,18 @@ public static class ProductRules
     }
 
     /// <summary>
+    /// Whether a batch of <paramref name="totalWeight"/> grams is cut into pieces: not while it weighs nothing, nor while no
+    /// piece size is typed (ResolvePieceSize gives a weight per piece of 0 then).
+    /// </summary>
+    public static bool HasPieces(decimal totalWeight, decimal weightPerPiece) => totalWeight > 0 && weightPerPiece > 0;
+
+    /// <summary>
     /// This usage's share of the sub-assembly's cost, per piece. The batch's whole cost is spread over its
-    /// weight (<paramref name="totalWeight"/>), so this comes to the same thing as TotalCost / Yield.
+    /// weight (<paramref name="totalWeight"/>), so this comes to the same thing as TotalCost / Yield. Nothing while the
+    /// batch has no pieces (<see cref="HasPieces"/>): a section with no piece size yet costs the product nothing per piece.
     /// </summary>
     public static decimal CalculateUsageCostPerPiece(decimal subAssemblyTotalCost, decimal weightPerPiece, decimal totalWeight) =>
-        subAssemblyTotalCost * weightPerPiece / totalWeight;
+        HasPieces(totalWeight, weightPerPiece) ? subAssemblyTotalCost * weightPerPiece / totalWeight : 0m;
 
     /// <summary>
     /// A product's packaging lines. Unlike EnsureValidUsages and the ingredient/sub-assembly line rules,

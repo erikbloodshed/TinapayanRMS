@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -232,7 +233,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var addedBare = () => CreateRepository().AddAsync(new Product { Name = "Party Package", IsComposite = true }, Cancellation);
 
         await twoBoxes.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product is one sellable unit*");
-        await addedBare.Should().ThrowAsync<InvalidOperationException>();
+        await addedBare.Should().ThrowAsync<BusinessRuleException>();
 
         // The database holds to it too.
         await using var dbContext = CreateDbContext();

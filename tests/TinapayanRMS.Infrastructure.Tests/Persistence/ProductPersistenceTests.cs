@@ -142,7 +142,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             (ribbonId, twineMeterId, PackagingLineAuthoredField.QtyPerUnit, 0.127m),
         ], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     private async Task<int> AddPackagingMaterialUnitAsync(int packagingMaterialId, int unitOfMeasureId, decimal baseUnitsPerUnit)
@@ -192,7 +192,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 4m),
         ], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -270,7 +270,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -280,7 +280,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
 
         var act = () => CreateCostingParametersRepository().SetAsync(productId, laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -358,7 +358,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
     {
         var act = () => CreateProductRepository().UpdateAsync(new Product { Id = 999_999, Name = "Ghost" }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -373,7 +373,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             (boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -408,7 +408,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             (999_999, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m),
         ], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

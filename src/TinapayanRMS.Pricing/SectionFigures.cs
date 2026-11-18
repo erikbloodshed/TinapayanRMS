@@ -44,8 +44,7 @@ public sealed record SectionFigures(
         var unbufferedTotalCost = ProductRules.CalculateEffectiveBatch(baseTotalWeight, baseUnbufferedCost, CostInputs(addIns, CostBasis.Unbuffered)).TotalCost;
         var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(authoredField, authoredValue, totalWeight);
 
-        // A batch that weighs nothing, or has no piece size yet, has nothing to share out per piece.
-        var hasPieces = totalWeight > 0 && weightPerPiece > 0;
+        // A batch that weighs nothing, or has no piece size yet, has nothing to share out per piece: the rule gives 0.
         return new SectionFigures(
             baseTotalWeight,
             totalWeight,
@@ -53,8 +52,8 @@ public sealed record SectionFigures(
             yield,
             bufferedTotalCost,
             unbufferedTotalCost,
-            hasPieces ? ProductRules.CalculateUsageCostPerPiece(bufferedTotalCost, weightPerPiece, totalWeight) : 0m,
-            hasPieces ? ProductRules.CalculateUsageCostPerPiece(unbufferedTotalCost, weightPerPiece, totalWeight) : 0m);
+            ProductRules.CalculateUsageCostPerPiece(bufferedTotalCost, weightPerPiece, totalWeight),
+            ProductRules.CalculateUsageCostPerPiece(unbufferedTotalCost, weightPerPiece, totalWeight));
     }
 
     private static List<(decimal Grams, decimal IngredientCostPerGram)> CostInputs(IReadOnlyList<SectionLine> lines, CostBasis basis) =>

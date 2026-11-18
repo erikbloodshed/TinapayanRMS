@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -86,7 +87,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var act = async () => await SaveRecipeAsync(miniId, new RecipeDraft([], [Linked(doughId, 30m, [(flourId, 500m), (flourId, 200m)])]));
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).Select(l => l.Grams).ToListAsync(Cancellation)).Should().Equal(1000m);
         (await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == miniId, Cancellation)).AuthoredValue.Should().Be(30m);

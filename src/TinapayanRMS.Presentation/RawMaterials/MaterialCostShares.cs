@@ -31,19 +31,10 @@ public sealed class MaterialCostShares(
 
         var bomLines = await bomLineRepository.GetAllAsync(cancellationToken);
 
-        // A composite is priced with the products it holds, which needn't use the material themselves: those are read too.
+        // A composite is priced with the products it holds, which needn't use the material themselves: ReadDetailsAsync
+        // reads those with it, however deeply they're held.
         var products = (await productRepository.GetByIdsAsync(productIds, cancellationToken)).ToDictionary(p => p.Id);
-        var details = new Dictionary<int, ProductDetail>();
-        List<int> toRead = [.. productIds.Distinct()];
-        while (toRead.Count > 0)
-        {
-            foreach (var (id, detail) in await savedProducts.ReadDetailsAsync(toRead, cancellationToken))
-            {
-                details[id] = detail;
-            }
-
-            toRead = [.. details.Values.SelectMany(d => d.Components).Select(c => c.Component.ComponentProductId).Distinct().Where(id => !details.ContainsKey(id))];
-        }
+        var details = await savedProducts.ReadDetailsAsync([.. productIds.Distinct()], cancellationToken);
 
         var withoutIt = IngredientCostRules.Reprice(materials, [.. bomLines], new Dictionary<int, (decimal, decimal)> { [materialId] = (0m, 0m) });
         var pricedWithoutIt = SavedProductReader.PricedAt(details, withoutIt);

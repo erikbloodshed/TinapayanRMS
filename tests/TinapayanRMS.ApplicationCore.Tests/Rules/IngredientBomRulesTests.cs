@@ -49,16 +49,27 @@ public class IngredientBomRulesTests
         act.Should().Throw<BusinessRuleException>().WithMessage("Butter Icing is made from Butter Icing Base, so it can't be one of Butter Icing Base's ingredients.");
     }
 
+    private static readonly Dictionary<int, string> Names = new()
+    {
+        [1] = "Sugar",
+        [2] = "Simple Syrup",
+        [3] = "Glaze",
+        [4] = "Caramel",
+    };
+
+    private static readonly Func<int, string> NameOf = id => Names[id];
+
     [Test]
     public void EnsureNoCycle_rejects_an_ingredient_as_its_own_component()
     {
-        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 1, newComponentIds: [1], componentIdsByIngredientId: new Dictionary<int, IReadOnlyList<int>>());
+        var act = () => IngredientBomRules.EnsureNoCycle(
+            ingredientId: 1, newComponentIds: [1], componentIdsByIngredientId: new Dictionary<int, IReadOnlyList<int>>(), NameOf);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>().WithMessage("An ingredient can't be a component of itself.");
     }
 
     [Test]
-    public void EnsureNoCycle_rejects_a_component_that_already_contains_the_ingredient()
+    public void EnsureNoCycle_rejects_a_component_that_already_contains_the_ingredient_by_name()
     {
         // Ingredient 2 (syrup) is already made from ingredient 1 (sugar). Trying to make
         // ingredient 1 out of ingredient 2 would create a 1 -> 2 -> 1 cycle.
@@ -67,15 +78,16 @@ public class IngredientBomRulesTests
             [2] = [1],
         };
 
-        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 1, newComponentIds: [2], componentIdsByIngredientId);
+        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 1, newComponentIds: [2], componentIdsByIngredientId, NameOf);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>().WithMessage(
+            "Sugar can't be costed from Simple Syrup: Simple Syrup is already costed from Sugar, through a recipe or a link, so Sugar would end up costed from itself.");
     }
 
     [Test]
     public void EnsureNoCycle_rejects_a_cycle_hidden_several_levels_deep()
     {
-        // 4 (caramel) is made from 3 (syrup), which is made from 2, which is made from 1
+        // 4 (caramel) is made from 3 (glaze), which is made from 2 (simple syrup), which is made from 1
         // (sugar). Trying to make 1 out of 4 would create a cycle several levels down.
         var componentIdsByIngredientId = new Dictionary<int, IReadOnlyList<int>>
         {
@@ -84,9 +96,9 @@ public class IngredientBomRulesTests
             [2] = [1],
         };
 
-        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 1, newComponentIds: [4], componentIdsByIngredientId);
+        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 1, newComponentIds: [4], componentIdsByIngredientId, NameOf);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>().WithMessage("Sugar can't be costed from Caramel: Caramel is already costed from Sugar*");
     }
 
     [Test]
@@ -97,7 +109,7 @@ public class IngredientBomRulesTests
             [2] = [1],
         };
 
-        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 3, newComponentIds: [2], componentIdsByIngredientId);
+        var act = () => IngredientBomRules.EnsureNoCycle(ingredientId: 3, newComponentIds: [2], componentIdsByIngredientId, NameOf);
 
         act.Should().NotThrow();
     }

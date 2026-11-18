@@ -10,7 +10,7 @@ public class PackagingLinkRulesTests
     {
         var act = () => PackagingLinkRules.EnsureNotSelfLink(productId: 1, linkedProductId: 1);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -48,7 +48,7 @@ public class PackagingLinkRulesTests
 
         var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -59,7 +59,7 @@ public class PackagingLinkRulesTests
 
         var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -71,6 +71,6 @@ public class PackagingLinkRulesTests
 
         var act = () => PackagingLinkRules.EnsureNoCycle(productId: 1, linkedProductId: 2, existingLinkedProductId: id => links.TryGetValue(id, out var v) ? v : null);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 }

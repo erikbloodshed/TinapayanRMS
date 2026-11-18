@@ -65,6 +65,8 @@ Every ingredient has a **source**, which is set when it's created and can't be c
 - **Made**: made in the shop from other ingredients, such as a syrup or an icing. Its recipe is a **sub-assembly** on the Sub-Assemblies screen, the one place that recipe is written. Its cost comes from that recipe's ingredients, any **add-ins** of its own on top, and its **weight loss %**, the weight lost while making it.
 - **Linked**: a part of another ingredient, such as egg white and egg yolk from a whole egg. Its cost is a share of that ingredient's cost.
 
+An ingredient's cost can't end up coming from itself. A recipe line, an add-in or a link that would close such a loop is refused, and the red notice names the two ingredients in it, for example "Egg White can't be costed from Meringue Base: Meringue Base is already costed from Egg White…".
+
 ### Cost buffer and buffered cost
 
 A **cost buffer %** is a cushion on top of what a purchased material really costs. It covers price swings, waste and variation in yield.

@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -166,7 +167,7 @@ public class FormulaBasePersistenceTests(DatabaseFixture fixture) : PersistenceT
             [new RecipeLine(flourId, 1000m, IsFormulaBase: true, AuthoredBakersPercent: 100m)],
             Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

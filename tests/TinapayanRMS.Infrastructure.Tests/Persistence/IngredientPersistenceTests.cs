@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -79,7 +80,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             SubAssemblyId = await AddEmptyRecipeAsync(),
         }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -102,7 +103,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => repository.UpdateAsync(ingredient, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -190,7 +191,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             WeightLossPercent = 10m,
         }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

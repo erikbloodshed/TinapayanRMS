@@ -183,9 +183,42 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
 
         var act = () => SetRecipeLinesAsync(bId, [(aId, 100m)]); // B made from A would close the loop
 
-        await act.Should().ThrowAsync<BusinessRuleException>();
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("B can't be costed from A: A is already costed from B*");
         await using var dbContext = CreateDbContext();
         var recipeId = await RecipeIdOfAsync(bId);
+        (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == recipeId).Select(l => l.IngredientId).ToListAsync(Cancellation))
+            .Should().Equal([sugarId], "the refused lines roll back with their save");
+    }
+
+    [Test]
+    public async Task A_line_that_closes_a_loop_through_one_of_two_made_ingredients_made_from_it_is_refused_and_nothing_changes()
+    {
+        // Thin and Thick Syrup are both made from one recipe, and Glaze from a recipe with Thick Syrup in it. Glaze in the
+        // shared recipe would make Thick Syrup from Glaze, made from Thick Syrup; Thin Syrup is in no loop.
+        var sugarId = await SeedPurchasedIngredientAsync("Sugar");
+        var thinId = await AddMadeIngredientAsync("Thin Syrup", [(sugarId, 100m)]);
+        var thickId = await CreateRepository().SaveAsync(
+            new RawMaterial
+            {
+                Name = "Thick Syrup",
+                Type = RawMaterialType.Ingredient,
+                Source = RawMaterialSource.Made,
+                CategoryId = await MadeCategoryIdAsync(),
+                WeightLossPercent = 30m,
+                SubAssemblyId = await RecipeIdOfAsync(thinId),
+            },
+            [],
+            brandPrices: null,
+            addIns: null,
+            Cancellation);
+        var glazeId = await AddMadeIngredientAsync("Glaze", [(thickId, 100m)]);
+
+        var act = () => SetRecipeLinesAsync(thinId, [(sugarId, 100m), (glazeId, 10m)]);
+
+        await act.Should().ThrowAsync<BusinessRuleException>()
+            .WithMessage("Thick Syrup can't be costed from Glaze: Glaze is already costed from Thick Syrup*");
+        await using var dbContext = CreateDbContext();
+        var recipeId = await RecipeIdOfAsync(thinId);
         (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == recipeId).Select(l => l.IngredientId).ToListAsync(Cancellation))
             .Should().Equal([sugarId], "the refused lines roll back with their save");
     }
@@ -222,7 +255,8 @@ public class MadeIngredientLinkPersistenceTests(DatabaseFixture fixture) : Persi
 
         var act = () => SetAddInsAsync(syrupId, [(caramelId, 10m)]);
 
-        await act.Should().ThrowAsync<BusinessRuleException>();
+        await act.Should().ThrowAsync<BusinessRuleException>()
+            .WithMessage("Simple Syrup can't be costed from Caramel: Caramel is already costed from Simple Syrup*");
         (await CreateBomRepository().GetForIngredientAsync(syrupId, Cancellation)).Should().NotContain(l => l.IsAddIn);
     }
 

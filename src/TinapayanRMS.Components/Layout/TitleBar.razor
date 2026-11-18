@@ -10,6 +10,10 @@
    right-clicks (wwwroot/app.js, watchTitleBar). The menu opens under it, so its toggle stays where it is to put the
    menu away again. Lock puts the sign-in panel over the window (AppLock); while it's locked the bar keeps only the app's
    name and the window's own buttons, so the window can still be moved, sized and closed. *@
+@{
+    // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
+    _redraws?.Drawn();
+}
 <header class="app-titlebar" @ref="_bar">
     @if (Locked)
     {
@@ -58,6 +62,7 @@
     private IJSObjectReference? _watch;
     private bool _disposed;
     private bool _maximized;
+    private RedrawGate? _redraws;
     private bool _canGoBack;
     private bool _canGoForward;
 
@@ -127,7 +132,11 @@
         StateHasChanged();
     });
 
-    private void OnShellChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(StateHasChanged);
+    // The window's title, which the heading is made from, changes as another screen shows: drawn through the gate, as a
+    // screen state's changes are.
+    private void OnShellChanged(object? sender, PropertyChangedEventArgs e) => Redraws.Request();
+
+    private RedrawGate Redraws => _redraws ??= new RedrawGate(InvokeAsync, StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {

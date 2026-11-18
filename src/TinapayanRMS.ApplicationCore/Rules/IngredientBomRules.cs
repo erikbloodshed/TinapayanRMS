@@ -41,10 +41,12 @@ public static class IngredientBomRules
     /// replaced lines or link are excluded by the caller). newComponentIds are its new BOM
     /// components, or the one ingredient it's being linked to.
     /// </summary>
+    /// <param name="nameOf">An ingredient's name, for the message: a refusal names the two ingredients in the loop.</param>
     public static void EnsureNoCycle(
         int ingredientId,
         IEnumerable<int> newComponentIds,
-        IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId)
+        IReadOnlyDictionary<int, IReadOnlyList<int>> componentIdsByIngredientId,
+        Func<int, string> nameOf)
     {
         foreach (var componentId in newComponentIds)
         {
@@ -55,8 +57,9 @@ public static class IngredientBomRules
 
             if (IsReachable(componentId, ingredientId, componentIdsByIngredientId))
             {
+                var (ingredient, component) = (nameOf(ingredientId), nameOf(componentId));
                 throw new BusinessRuleException(
-                    $"That would create a cycle: ingredient {componentId} already uses ingredient {ingredientId} somewhere in its BOM or links.");
+                    $"{ingredient} can't be costed from {component}: {component} is already costed from {ingredient}, through a recipe or a link, so {ingredient} would end up costed from itself.");
             }
         }
     }

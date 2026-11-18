@@ -74,15 +74,20 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // A made ingredient made from it has these lines in its BOM (IngredientBoms), so each is checked for a loop through
-        // them, then repriced, which reaches every made ingredient using it in turn.
+        // them, against one read of the graph however many there are, then repriced, which reaches every made ingredient
+        // using it in turn.
         var madeFromIt = await dbContext.RawMaterials
             .Where(m => m.SubAssemblyId == subAssembly.Id)
             .Select(m => new { m.Id, m.Name })
             .ToListAsync(cancellationToken);
-        foreach (var made in madeFromIt)
+        if (madeFromIt.Count > 0)
         {
-            IngredientBomRules.EnsureNotInOwnRecipe(made.Id, made.Name, subAssembly.Name, ingredientIds);
-            await IngredientDependencies.EnsureNoCycleAsync(dbContext, made.Id, cancellationToken);
+            var graph = await IngredientDependencies.LoadAsync(dbContext, cancellationToken);
+            foreach (var made in madeFromIt)
+            {
+                IngredientBomRules.EnsureNotInOwnRecipe(made.Id, made.Name, subAssembly.Name, ingredientIds);
+                graph.EnsureNoCycle(made.Id, graph.DependenciesOf(made.Id));
+            }
         }
 
         await IngredientCostPropagator.RecomputeAndPropagateAsync(dbContext, [.. madeFromIt.Select(m => m.Id)], cancellationToken);

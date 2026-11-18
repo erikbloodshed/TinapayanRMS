@@ -132,8 +132,8 @@ public class CompositeProductRulesTests
         var becoming = () => CompositeProductRules.EnsureKindUnchanged(storedIsComposite: false, isComposite: true);
         var leaving = () => CompositeProductRules.EnsureKindUnchanged(storedIsComposite: true, isComposite: false);
 
-        becoming.Should().Throw<InvalidOperationException>();
-        leaving.Should().Throw<InvalidOperationException>();
+        becoming.Should().Throw<BusinessRuleException>();
+        leaving.Should().Throw<BusinessRuleException>();
         CompositeProductRules.EnsureKindUnchanged(true, true);
         CompositeProductRules.EnsureKindUnchanged(false, false);
     }
@@ -143,7 +143,7 @@ public class CompositeProductRulesTests
     {
         var composite = () => CompositeProductRules.EnsureOneUnit(isComposite: true, quantityRequired: 8);
 
-        composite.Should().Throw<InvalidOperationException>();
+        composite.Should().Throw<BusinessRuleException>();
         CompositeProductRules.EnsureOneUnit(isComposite: true, quantityRequired: 1);
         CompositeProductRules.EnsureOneUnit(isComposite: false, quantityRequired: 8);
     }

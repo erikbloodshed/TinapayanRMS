@@ -15,12 +15,18 @@ public sealed class IngredientBomLineRepository(IDbContextFactory<TinapayanRMSDb
         dbContextFactory.ReadAsync<IReadOnlyList<IngredientBomLine>>(
             async dbContext =>
             {
+                // The lines through the one EF query every BOM is read by (IngredientBoms); their ingredients through Dapper.
                 var lines = await IngredientBoms.ForAsync(dbContext, [ingredientId], cancellationToken);
-                var componentIds = lines.Select(l => l.ComponentIngredientId).Distinct().ToList();
-                var components = await dbContext.RawMaterials
-                    .AsNoTracking()
-                    .Where(m => componentIds.Contains(m.Id))
-                    .ToDictionaryAsync(m => m.Id, cancellationToken);
+                if (lines.Count == 0)
+                {
+                    return lines;
+                }
+
+                var components = (await dbContext.QueryAsync<RawMaterial>(
+                        $"SELECT {Columns.Of<RawMaterial>("m")} FROM raw_materials m WHERE m.id IN ({DapperReads.IdsTable}) ORDER BY m.id",
+                        new { ids = DapperReads.IdList(lines.Select(l => l.ComponentIngredientId).Distinct()) },
+                        cancellationToken))
+                    .ToDictionary(m => m.Id);
                 foreach (var line in lines)
                 {
                     line.ComponentIngredient = components[line.ComponentIngredientId];

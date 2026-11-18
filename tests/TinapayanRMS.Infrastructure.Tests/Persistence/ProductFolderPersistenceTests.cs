@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -69,7 +70,7 @@ public class ProductFolderPersistenceTests(DatabaseFixture fixture) : Persistenc
         var empty = () => AddFolderAsync("   ");
         await empty.Should().ThrowAsync<InvalidOperationException>().WithMessage("Every folder needs a name.");
         var orphan = () => AddFolderAsync("Lost", parentId: inside + 999);
-        await orphan.Should().ThrowAsync<InvalidOperationException>();
+        await orphan.Should().ThrowAsync<BusinessRuleException>();
         (await CreateRepository().GetAllAsync(Cancellation)).Should().HaveCount(3);
     }
 

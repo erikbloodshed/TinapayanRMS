@@ -282,17 +282,19 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
 
     public async Task<IReadOnlyDictionary<int, IReadOnlyList<MadeIngredientUse>>> GetMadeIngredientsBySubAssemblyAsync(CancellationToken cancellationToken)
     {
-        await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var made = await dbContext.RawMaterials
-            .Where(m => m.SubAssemblyId != null)
-            .Select(m => new { SubAssemblyId = m.SubAssemblyId!.Value, m.Id, m.Name })
-            .ToListAsync(cancellationToken);
+        var made = await dbContextFactory.QueryAsync<MadeFromRow>(
+            "SELECT m.sub_assembly_id, m.id, m.name FROM raw_materials m WHERE m.sub_assembly_id IS NOT NULL ORDER BY m.sub_assembly_id, m.id",
+            null,
+            cancellationToken);
         return made
             .GroupBy(m => m.SubAssemblyId)
             .ToDictionary(
                 g => g.Key,
                 g => (IReadOnlyList<MadeIngredientUse>)[.. g.Select(m => new MadeIngredientUse(m.Id, m.Name)).OrderBy(m => m.Name, StringComparer.CurrentCultureIgnoreCase)]);
     }
+
+    /// <summary>A made ingredient and the sub-assembly it's made from.</summary>
+    private sealed record MadeFromRow(int SubAssemblyId, int Id, string Name);
 
     public async Task<int> AddMadeIngredientAsync(int id, MadeIngredientDraft made, CancellationToken cancellationToken)
     {

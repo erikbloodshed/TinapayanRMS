@@ -168,7 +168,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -180,7 +180,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -190,7 +190,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(ingredient);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -385,7 +385,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureTypeUnchanged(RawMaterialType.Ingredient, RawMaterialType.Packaging);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -401,7 +401,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureSourceUnchanged(RawMaterialSource.Purchased, RawMaterialSource.Made);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -671,7 +671,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureNotTheBaseUnit(baseUnitId: 1, unitOfMeasureId: 1);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -714,7 +714,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureBaseUnitCanChange(hasUnits, hasPrices, hasLines);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]

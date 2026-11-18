@@ -60,7 +60,7 @@ public class ProductRulesTests
             (SubAssemblyId: 1, AuthoredValue: 20m),
         ]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -134,6 +134,17 @@ public class ProductRulesTests
     }
 
     [Test]
+    public void A_batch_with_no_pieces_costs_nothing_per_piece_rather_than_dividing_by_zero()
+    {
+        // A batch that weighs nothing yet, or one with no piece size typed: nothing to share out, whatever it costs.
+        ProductRules.HasPieces(totalWeight: 0m, weightPerPiece: 10m).Should().BeFalse();
+        ProductRules.HasPieces(totalWeight: 100m, weightPerPiece: 0m).Should().BeFalse();
+        ProductRules.HasPieces(totalWeight: 100m, weightPerPiece: 10m).Should().BeTrue();
+        ProductRules.CalculateUsageCostPerPiece(subAssemblyTotalCost: 24m, weightPerPiece: 10m, totalWeight: 0m).Should().Be(0m);
+        ProductRules.CalculateUsageCostPerPiece(subAssemblyTotalCost: 24m, weightPerPiece: 0m, totalWeight: 100m).Should().Be(0m);
+    }
+
+    [Test]
     [Arguments(null)]
     [Arguments(0)]
     public void EnsureValidBulkPackaging_needs_how_many_products_a_pack_holds_once_it_has_lines(int? quantity)
@@ -172,7 +183,7 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidPackagingLines([(PackagingMaterialId: 1, QtyPerUnit: 0m)]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -186,7 +197,7 @@ public class ProductRulesTests
             (PackagingMaterialId: 1, QtyPerUnit: 3m),
         ]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -341,7 +352,7 @@ public class ProductRulesTests
             "Sweet Dough",
             []);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]

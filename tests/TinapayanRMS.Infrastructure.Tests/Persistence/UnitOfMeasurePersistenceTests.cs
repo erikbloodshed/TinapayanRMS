@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -75,7 +76,7 @@ public class UnitOfMeasurePersistenceTests(DatabaseFixture fixture) : Persistenc
     {
         var act = () => CreateRepository().UpdateAsync(new UnitOfMeasure { Id = 999_999, Name = "ghost", Abbreviation = "gh" }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

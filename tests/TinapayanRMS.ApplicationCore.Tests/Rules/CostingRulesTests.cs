@@ -36,7 +36,7 @@ public class CostingRulesTests
     {
         var act = () => CostingRules.EnsureValidParameters(laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -44,7 +44,7 @@ public class CostingRulesTests
     {
         var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: -1m, administrativePercent: 0m, marginPercent: 0m);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -52,7 +52,7 @@ public class CostingRulesTests
     {
         var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -60,7 +60,7 @@ public class CostingRulesTests
     {
         var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: -5m);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -69,7 +69,7 @@ public class CostingRulesTests
         var negative = () => CostingRules.EnsureValidVat(-1m);
         var none = () => CostingRules.EnsureValidVat(0m);
 
-        negative.Should().Throw<InvalidOperationException>();
+        negative.Should().Throw<BusinessRuleException>();
         none.Should().NotThrow();
     }
 

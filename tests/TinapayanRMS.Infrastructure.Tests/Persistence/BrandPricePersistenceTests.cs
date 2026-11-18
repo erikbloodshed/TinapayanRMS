@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -258,7 +259,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var act = () => SetPriceAsync(999_999, null, 0.05m);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -306,7 +307,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
     {
         var act = () => new RawMaterialPriceHistoryRepository(CreateDbContextFactory()).DeleteAsync(999_999, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

@@ -297,7 +297,8 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => SaveAsync(Linked("Egg White", categoryId, meringueId, weightShare: 70m, costShare: 30m, id: whiteId));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");
+        await act.Should().ThrowAsync<BusinessRuleException>()
+            .WithMessage("Egg White can't be costed from Meringue Base: Meringue Base is already costed from Egg White*");
     }
 
     [Test]
@@ -310,7 +311,8 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => SetRecipeLinesAsync(eggMixId, [(mixWhiteId, 100m)]);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*cycle*");
+        await act.Should().ThrowAsync<BusinessRuleException>()
+            .WithMessage("Egg Mix can't be costed from Egg Mix White: Egg Mix White is already costed from Egg Mix*");
     }
 
     [Test]

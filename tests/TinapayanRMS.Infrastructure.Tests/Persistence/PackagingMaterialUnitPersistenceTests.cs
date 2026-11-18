@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -93,7 +94,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => CreateRepository().AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = centimeterId, BaseUnitsPerUnit = 1m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -136,7 +137,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => CreateRepository().AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = rollId, BaseUnitsPerUnit = baseUnitsPerUnit }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -146,7 +147,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => CreateRepository().AddAsync(new RawMaterialUnit { RawMaterialId = 999_999, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 1000m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -179,7 +180,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
         roll.UnitOfMeasureId = centimeterId;
         var act = () => repository.UpdateAsync(roll, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -240,6 +241,6 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
     {
         var act = () => CreateRepository().DeleteAsync(999_999, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 }

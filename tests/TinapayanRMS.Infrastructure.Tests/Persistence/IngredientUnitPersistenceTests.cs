@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -77,7 +78,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var act = () => CreateRepository().AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = bagId, BaseUnitsPerUnit = gramsPerUnit }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -131,7 +132,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var act = () => CreateRepository().AddAsync(new RawMaterialUnit { RawMaterialId = 999_999, UnitOfMeasureId = bagId, BaseUnitsPerUnit = 25000m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -242,7 +243,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         renamed.UnitOfMeasureId = packId;
         var act = () => repository.UpdateAsync(renamed, Cancellation);
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -280,6 +281,6 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
     {
         var act = () => CreateRepository().DeleteAsync(999_999, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 }

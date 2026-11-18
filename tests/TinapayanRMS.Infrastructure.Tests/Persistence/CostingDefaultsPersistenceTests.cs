@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -51,7 +52,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var act = () => CreateRepository().SetAsync(new CostingDefaults { CostBufferPercent = buffer }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -85,7 +86,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var act = () => CreateRepository().SetAsync(Defaults(0m, 0m, 0m, 0m, 0m, wastage: wastage), Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]
@@ -106,7 +107,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var act = () => CreateRepository().SetAsync(Defaults(-1m, 0m, 0m, 0m, 0m), Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

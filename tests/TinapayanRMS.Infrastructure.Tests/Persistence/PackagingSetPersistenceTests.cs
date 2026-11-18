@@ -460,7 +460,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         ribbon.BaseUnit = null;
         var act = () => repository.UpdateAsync(ribbon, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

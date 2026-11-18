@@ -25,7 +25,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureValidLines([]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -33,7 +33,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureValidLines([(IngredientId: 1, Grams: 0m)]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -45,7 +45,7 @@ public class SubAssemblyRulesTests
             (IngredientId: 1, Grams: 50m),
         ]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -366,7 +366,7 @@ public class SubAssemblyRulesTests
         var act = () => SubAssemblyRules.EnsureValidLines(
             [new RecipeLine(IngredientId: 1, Grams: 1000m, IsFormulaBase: true, AuthoredBakersPercent: 100m)]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -378,7 +378,7 @@ public class SubAssemblyRulesTests
                 new RecipeLine(IngredientId: 2, Grams: 650m, AuthoredBakersPercent: 0m),
             ]);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
@@ -416,7 +416,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureKindUnchanged(wasPackaging, isPackaging);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]

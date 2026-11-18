@@ -12,6 +12,10 @@
    one, and Esc closes Find: at the first press with the Vim keys on too, typing or not (its dialog's
    closes-on-first-esc, which vim.js reads). A double-click on a match opens it too. The last search is still there,
    selected, the next time Find opens. *@
+@{
+    // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
+    _redraws?.Drawn();
+}
 @* On the title bar's right: a glyph button built like Back, Forward and the window's own. *@
 <button type="button" class="titlebar-button titlebar-small-glyph" title="Find a raw material, sub-assembly or product (Ctrl+K)"
         aria-label="Find" @onclick="OpenAsync">
@@ -56,6 +60,7 @@
 
 @code {
     private bool _open;
+    private RedrawGate? _redraws;
     private DotNetObjectReference<FindHost>? _self;
     private IJSObjectReference? _key;
     private bool _disposed;
@@ -130,7 +135,10 @@
 
     private static string RowId(QuickFindResult result) => $"find-{result.Screen}-{result.Id}";
 
-    private void OnFindChanged(object? sender, PropertyChangedEventArgs e) => InvokeAsync(StateHasChanged);
+    // Find's changes come in a row (a load sets its results, their note and the pick): drawn once for them all.
+    private void OnFindChanged(object? sender, PropertyChangedEventArgs e) => Redraws.Request();
+
+    private RedrawGate Redraws => _redraws ??= new RedrawGate(InvokeAsync, StateHasChanged);
 
     public async ValueTask DisposeAsync()
     {

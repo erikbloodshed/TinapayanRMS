@@ -568,7 +568,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
                 ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
                 : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
 
-        var costPerPiece = totalWeight > 0 && weightPerPiece > 0
+        // No pieces yet shows as a dash rather than 0.00, which would read as a section that costs nothing.
+        var costPerPiece = ProductRules.HasPieces(totalWeight, weightPerPiece)
             ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
             : (decimal?)null;
 

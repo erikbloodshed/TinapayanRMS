@@ -496,7 +496,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         IngredientBomRules.EnsureValidAddIns([.. addIns.Select(a => (a.AddInIngredientId, a.Grams, a.Name))], made.SubAssemblyName, made.LineIngredientIds);
 
         IngredientBomRules.EnsureNotInOwnRecipe(id, made.Name, made.SubAssemblyName, made.LineIngredientIds);
-        await IngredientDependencies.EnsureNoCycleAsync(dbContext, id, cancellationToken);
+        await IngredientDependencies.EnsureNoCycleAsync(dbContext, [id], cancellationToken);
     }
 
     /// <summary>A made ingredient's name, and the sub-assembly it's made from: its name, owner, kind and lines' ingredients.</summary>
@@ -653,8 +653,8 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         // A new ingredient has nothing depending on it yet, so it can't close a loop.
         if (material.Id != 0)
         {
-            var dependencies = await IngredientDependencies.LoadAsync(dbContext, material.Id, cancellationToken);
-            IngredientBomRules.EnsureNoCycle(material.Id, [linkedToId], dependencies);
+            var graph = await IngredientDependencies.LoadAsync(dbContext, cancellationToken);
+            graph.EnsureNoCycle(material.Id, [linkedToId], material.Name);
         }
 
         return linkedTo.CostBufferPercent;

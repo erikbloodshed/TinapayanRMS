@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -129,7 +130,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             new CostingParameters { LaborPercent = 5m },
             Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
         var product = (await CreateProductRepository().GetByIdAsync(productId, Cancellation))!;
         product.Name.Should().Be("Ensaymada");
         product.Description.Should().BeNull();
@@ -158,7 +159,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
             costing: null,
             Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.AnyAsync(Cancellation)).Should().BeFalse();
         (await dbContext.SubAssemblies.AnyAsync(Cancellation)).Should().BeFalse();

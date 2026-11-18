@@ -88,7 +88,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
     {
         var act = () => CreateRepository().UpdateAsync(new ProductCategory { Id = 999_999, Name = "Ghost" }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>();
+        await act.Should().ThrowAsync<BusinessRuleException>();
     }
 
     [Test]

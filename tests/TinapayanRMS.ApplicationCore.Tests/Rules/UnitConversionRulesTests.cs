@@ -46,6 +46,6 @@ public class UnitConversionRulesTests
     {
         var act = () => UnitConversionRules.EnsureValidMultiplier(multiplier);
 
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<BusinessRuleException>();
     }
 }
