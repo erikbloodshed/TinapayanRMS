@@ -289,10 +289,10 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _subAssemblyRepository.MoveAsync(moves, CancellationToken.None);
+        await _subAssemblyRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
 
-        // The load only re-points the selection at the fresh copy: the form isn't loaded again, so what's typed stays.
-        await _host.LoadAsync();
+        // The load only re-points the selection at the fresh copy: with something typed, the form isn't loaded again.
+        await _host.LoadAfterSavingAsync(moves.Select(m => m.SubAssemblyId));
         if (moves.FirstOrDefault(m => m.SubAssemblyId == _host.EditingId) is { } onForm)
         {
             _host.MovedOnForm(onForm.RoleId);
@@ -653,8 +653,8 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// </summary>
     private async Task RenameSubAssemblyToAsync(StandaloneSubAssemblyRow row, string name)
     {
-        await _subAssemblyRepository.RenameAsync(row.Id, name, CancellationToken.None);
-        await _host.LoadAsync();
+        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
+        await _host.LoadAfterSavingAsync([row.Id]);
         if (_host.EditingId == row.Id)
         {
             _host.RenamedOnForm(name);

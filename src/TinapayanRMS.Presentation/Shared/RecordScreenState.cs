@@ -141,28 +141,35 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
 
     public bool HasUnsavedChanges => History.IsDirty;
 
+    /// <summary>The saved record the form shows, by its id; 0 for a new one.</summary>
+    protected abstract int ShowingRecordId { get; }
+
     /// <summary>
     /// When the record the form shows had last been saved (its UpdatedAt) as the form took it: what the form's Save sends
-    /// with it, so a save made since by another PC refuses it rather than be written over (SavedVersionRules). Null for a
-    /// new record. The screen sets it as it loads a record into the form, and as its own Save reads the record back.
+    /// with it (<see cref="SavedVersionToSend"/>), so a save made since by another PC refuses it rather than be written over
+    /// (SavedVersionRules). Null for a new record, and for a saved one no save has stamped yet. The screen sets it as it
+    /// loads a record into the form, and as its own Save reads the record back.
     /// </summary>
     protected DateTime? SavedVersion { get; set; }
 
-    /// <summary>Set by the screen's list as it saves the record showing itself (a rename, a move): see <see cref="FollowSavedVersion"/>.</summary>
+    /// <summary>What the form's Save sends as the record's UpdatedAt: the time the form took; nothing for a new record.</summary>
+    protected DateTime? SavedVersionToSend => ShowingRecordId == 0 ? null : SavedVersionRules.OpenedAs(SavedVersion);
+
+    /// <summary>Set as the window itself saves the record showing, checked (a rename, a move): see <see cref="FollowSavedVersion"/>.</summary>
     private bool _savedVersionFollowsNextLoad;
 
     /// <summary>
-    /// The screen's list is about to save something itself (a rename, a move, a stage) and load: the next load takes the
-    /// record showing's saved time as the form's, edits and all, since the save is the window's own, not another PC's.
+    /// The window has saved the record showing itself, over the time the form took, and is about to load: with something
+    /// typed, the next load takes the record's new saved time as the form's.
     /// </summary>
     protected void FollowOwnSaveOnNextLoad() => _savedVersionFollowsNextLoad = true;
 
     /// <summary>
     /// How the form follows the record it shows, as a load finds it saved at <paramref name="storedSavedAt"/>. Saved as the
-    /// form took it: nothing. Saved since by the screen's own list (<see cref="FollowOwnSaveOnNextLoad"/>): the form takes
-    /// the new time. Saved since with nothing typed (another screen's save stamping it, or another PC's): true, so the
-    /// screen loads the record into the form again, which shows what it would otherwise save over. Saved since with
-    /// something typed: the form keeps the time it took, so its Save is refused rather than write over that save unseen.
+    /// form took it: nothing. Saved since with nothing typed: true, so the screen loads the record into the form again,
+    /// whoever saved it, which shows what the form would otherwise save over. Saved since with something typed: by the window
+    /// itself (<see cref="FollowOwnSaveOnNextLoad"/>), the form takes the new time; by anyone else, it keeps the time it took,
+    /// so its Save is refused rather than write over that save unseen.
     /// </summary>
     /// <returns>Whether the screen loads the record into its form again.</returns>
     protected bool FollowSavedVersion(DateTime? storedSavedAt)
@@ -174,14 +181,26 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
             return false;
         }
 
+        if (!History.IsDirty)
+        {
+            return true;
+        }
+
         if (ownSave)
         {
             SavedVersion = storedSavedAt;
-            return false;
         }
 
-        return !History.IsDirty;
+        return false;
     }
+
+    /// <summary>
+    /// A Save, or a rename or move from the list, refused for a save made since the form opened the record reads the screen's
+    /// lists again before it says so: the record opened next is then the one that's saved now, where the list's old copy would
+    /// be refused in its turn. What's typed stays, and so does the time the form took (<see cref="FollowSavedVersion"/>).
+    /// </summary>
+    protected override Task OnActionFailedAsync(Exception failure) =>
+        failure is SavedSinceException ? ReadListsAgainAsync() : Task.CompletedTask;
 
     /// <summary>The form's last Save (<see cref="RunSaveAsync"/>), done or still running.</summary>
     private Task _saving = Task.CompletedTask;
@@ -194,23 +213,7 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     /// runs whatever CanExecute says. Kept here rather than read from the command, as the question is asked of the form, not
     /// of the button that saves it.
     /// </summary>
-    /// <remarks>
-    /// A Save refused for a save made since the form opened the record (SavedSinceException) reads the screen's lists again
-    /// before it says so: the record opened next is then the one that's saved now, where the list's old copy would be
-    /// refused in its turn. What's typed stays, and so does the time the form took (<see cref="FollowSavedVersion"/>).
-    /// </remarks>
-    protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(async () =>
-    {
-        try
-        {
-            await save();
-        }
-        catch (SavedSinceException)
-        {
-            await ReadListsAgainAsync();
-            throw;
-        }
-    });
+    protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(save);
 
     /// <summary>The screen's load: its lists read again, and what's typed on the form left as it is.</summary>
     protected abstract Task ReadListsAgainAsync();
@@ -356,4 +359,17 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     string? IRecordListHost.ErrorMessage => ErrorMessage;
 
     Task IRecordListHost.AfterUnsavedChangesAsync(Action then) => AfterUnsavedChangesAsync(then);
+
+    SavedVersionCheck? IRecordListHost.ShowingSavedVersion =>
+        ShowingRecordId != 0 && History.IsDirty ? new SavedVersionCheck(ShowingRecordId, SavedVersionRules.OpenedAs(SavedVersion)) : null;
+
+    Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
+    {
+        if (ids.Contains(ShowingRecordId))
+        {
+            FollowOwnSaveOnNextLoad();
+        }
+
+        return ReadListsAgainAsync();
+    }
 }

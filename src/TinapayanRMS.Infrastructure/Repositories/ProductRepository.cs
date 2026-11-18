@@ -142,7 +142,10 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.UpdatedAt, now), cancellationToken);
     }
 
-    public async Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken)
+    public Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken) =>
+        MoveAsync(moves, showing: null, cancellationToken);
+
+    public async Task MoveAsync(IReadOnlyCollection<ProductMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken)
     {
         if (moves.Count == 0)
         {
@@ -150,6 +153,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         }
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        // One turn for the check and the write, so no save lands between them.
+        await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var productIds = moves.Select(m => m.ProductId).Distinct().ToList();
         var products = await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToDictionaryAsync(p => p.Id, cancellationToken);
         if (productIds.Where(id => !products.ContainsKey(id)).ToList() is [var missingId, ..])
@@ -175,15 +181,20 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             }
 
             var product = products[move.ProductId];
+            SavedVersionRules.EnsureNotSavedSince(showing, product.Id, product.Name, product.UpdatedAt);
             product.Stage = move.Stage;
             product.FolderId = move.FolderId;
             product.UpdatedAt = now;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, CancellationToken cancellationToken)
+    public Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, CancellationToken cancellationToken) =>
+        MoveToStageAsync(productIds, stage, showing: null, cancellationToken);
+
+    public async Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, SavedVersionCheck? showing, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
@@ -204,6 +215,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         var now = dbContext.LocalNow();
         foreach (var product in products.Where(p => p.Stage != stage))
         {
+            SavedVersionRules.EnsureNotSavedSince(showing, product.Id, product.Name, product.UpdatedAt);
             if (product.FolderId is not { } from || !folderInStage.TryGetValue(from, out var folderId))
             {
                 folderId = await ProductFolderRepository.EnsurePathAsync(
@@ -225,13 +237,17 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
         return new StageMove(moves, made);
     }
 
-    public async Task RenameAsync(int productId, string name, CancellationToken cancellationToken)
+    public Task RenameAsync(int productId, string name, CancellationToken cancellationToken) =>
+        RenameAsync(productId, name, showing: null, cancellationToken);
+
+    public async Task RenameAsync(int productId, string name, SavedVersionCheck? showing, CancellationToken cancellationToken)
     {
         name = ProductRules.StoredName(name);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == productId, cancellationToken)
             ?? throw new BusinessRuleException($"Product {productId} does not exist.");
+        SavedVersionRules.EnsureNotSavedSince(showing, productId, existing.Name, existing.UpdatedAt);
         await EnsureNameNotHeldByDeletedAsync(dbContext, productId, name, cancellationToken);
 
         var oldName = existing.Name;

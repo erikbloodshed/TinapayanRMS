@@ -6,19 +6,46 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 /// refused if it's been saved since: by another PC on the same database, whose save would otherwise be written over unseen.
 /// The edits stay on the form, and opening the record again shows what's saved now. Every write takes its turn behind any
 /// other (Transactions.BeginOrJoinTransactionAsync), so the time compared is the one the last save committed. A save that
-/// says nothing (a new record, or a caller that isn't a form) isn't checked, and nor is a record no save has stamped yet.
+/// says nothing (a new record, or a caller that isn't a form) isn't checked.
 /// </summary>
 public static class SavedVersionRules
 {
+    /// <summary>
+    /// What a form sends for a saved record it opened with no saved time, one no save has stamped yet: it did open it, so a
+    /// save stamped since refuses this one, where null would say nothing was opened. Never stored: a save stamps its own.
+    /// </summary>
+    public static readonly DateTime NeverSaved = DateTime.MinValue;
+
+    /// <summary>The time a form sends for a saved record it took as saved at <paramref name="savedAt"/>.</summary>
+    public static DateTime OpenedAs(DateTime? savedAt) => savedAt ?? NeverSaved;
+
     /// <summary>
     /// Refuses a save of <paramref name="name"/> when it's been saved since the form opened it: its UpdatedAt stored now,
     /// <paramref name="storedSavedAt"/>, isn't the one the form took, <paramref name="openedSavedAt"/>.
     /// </summary>
     public static void EnsureNotSavedSince(string name, DateTime? storedSavedAt, DateTime? openedSavedAt)
     {
-        if (openedSavedAt is { } opened && storedSavedAt != opened)
+        if (openedSavedAt is not { } opened)
+        {
+            return;
+        }
+
+        DateTime? openedAt = opened == NeverSaved ? null : opened;
+        if (storedSavedAt != openedAt)
         {
             throw new SavedSinceException(SavedSinceText(name));
+        }
+    }
+
+    /// <summary>
+    /// A rename or a move from a list, of the record <paramref name="id"/>: refused as the form's Save would be when it's
+    /// the record the form shows with unsaved changes (<paramref name="showing"/>). Any other record isn't checked.
+    /// </summary>
+    public static void EnsureNotSavedSince(SavedVersionCheck? showing, int id, string name, DateTime? storedSavedAt)
+    {
+        if (showing is not null && showing.RecordId == id)
+        {
+            EnsureNotSavedSince(name, storedSavedAt, showing.OpenedSavedAt);
         }
     }
 

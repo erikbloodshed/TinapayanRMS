@@ -1,4 +1,5 @@
-﻿using TinapayanRMS.Domain.Entities;
+﻿using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
@@ -217,6 +218,9 @@ public interface IProductRepository
     /// </summary>
     Task MoveAsync(IReadOnlyCollection<ProductMove> moves, CancellationToken cancellationToken);
 
+    /// <summary>The same from the Products list: refused, with nothing moved, over a save made since the form showing opened its product (<paramref name="showing"/>).</summary>
+    Task MoveAsync(IReadOnlyCollection<ProductMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken);
+
     /// <summary>
     /// Promote and Send Back: files each product in <paramref name="stage"/>, in the folder at the same path as its own
     /// (Innovation › Breads › Holiday to Production › Breads › Holiday), making the folders that aren't there yet; one at
@@ -225,11 +229,17 @@ public interface IProductRepository
     /// </summary>
     Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, CancellationToken cancellationToken);
 
+    /// <summary>The same from the Products list: refused, with nothing moved, over a save made since the form showing opened its product (<paramref name="showing"/>).</summary>
+    Task<StageMove> MoveToStageAsync(IReadOnlyCollection<int> productIds, ProductStage stage, SavedVersionCheck? showing, CancellationToken cancellationToken);
+
     /// <summary>
     /// Renames the product and nothing else, stamping UpdatedAt; its own sub-assemblies, named after it, take the new
     /// name as a Save's rename gives it to them.
     /// </summary>
     Task RenameAsync(int productId, string name, CancellationToken cancellationToken);
+
+    /// <summary>The same from the Products list: refused over a save made since the form showing opened the product (<paramref name="showing"/>).</summary>
+    Task RenameAsync(int productId, string name, SavedVersionCheck? showing, CancellationToken cancellationToken);
 
     /// <summary>
     /// Saves everything the Products screen edits in one transaction, so nothing is saved unless every

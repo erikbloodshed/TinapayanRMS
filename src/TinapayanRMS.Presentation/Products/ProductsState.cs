@@ -1306,7 +1306,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             IncludesComponentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging,
 
             // When it had last been saved as the form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-            UpdatedAt = SavedVersion,
+            UpdatedAt = SavedVersionToSend,
         };
 
         var validation = _productValidator.Validate(product);
@@ -1735,6 +1735,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
 
+    protected override int ShowingRecordId => _editingId;
+
     /// <summary>
     /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
     /// product's detail again, which replaces the recipe, packaging, packs and costing wholesale, so anything staged but
@@ -1866,12 +1868,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         set => Folders = value;
     }
 
-    /// <summary>The list's reload after it saved something itself (a rename, a move): the product showing takes its new time.</summary>
-    Task IProductsListHost.LoadAsync()
-    {
-        FollowOwnSaveOnNextLoad();
-        return LoadCommand.ExecuteAsync();
-    }
+    Task IProductsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IProductsListHost.Pick(Product product) =>
         PickFromList(product.Id, () => Pick(product), List.SyncTreeSelection);
@@ -1928,10 +1925,15 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             SelectedProduct = fresh;
         }
 
-        // The window's own save, with no load after it: the form takes the new time, what's typed and all (FollowSavedVersion).
+        // The window's own save, checked as it was written, with no load after it: the form takes the new time and what's
+        // typed stays. With nothing typed, the list loads the screen, which puts what's saved on the form (FollowSavedVersion).
         if (moved.FirstOrDefault(p => p.Id == _editingId) is { } onForm)
         {
-            SavedVersion = onForm.UpdatedAt;
+            if (History.IsDirty)
+            {
+                SavedVersion = onForm.UpdatedAt;
+            }
+
             ShowUpdatedAt(onForm.UpdatedAt);
         }
     }

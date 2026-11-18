@@ -827,7 +827,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             BufferedCostPerBaseUnit = source == RawMaterialSource.Purchased ? PurchaseCost.EditingBufferedCost ?? 0m : 0m,
 
             // When it had last been saved as the form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-            UpdatedAt = SavedVersion,
+            UpdatedAt = SavedVersionToSend,
         };
 
         var validation = _rawMaterialValidator.Validate(material);
@@ -1391,6 +1391,8 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
     protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
 
+    protected override int ShowingRecordId => _editingId;
+
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the material as it was last saved, read again, since its
     /// alternative units write through to the copy the list holds. A new material was never saved, so it goes back to a
@@ -1411,12 +1413,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     // What the list asks of the screen (IRawMaterialsListHost): the material the form shows, and what the list's actions do to it.
     int IRawMaterialsListHost.EditingId => _editingId;
 
-    /// <summary>The list's reload after it saved something itself (a rename, a move): the material showing takes its new time.</summary>
-    Task IRawMaterialsListHost.LoadAsync()
-    {
-        FollowOwnSaveOnNextLoad();
-        return LoadCommand.ExecuteAsync();
-    }
+    Task IRawMaterialsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void IRawMaterialsListHost.Pick(RawMaterial material) =>
         PickFromList(material.Id, () => Pick(material), List.SyncTreeSelection);

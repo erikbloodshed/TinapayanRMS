@@ -41,4 +41,35 @@ public class SavedVersionRulesTests
 
         act.Should().NotThrow("a new record, or a caller that isn't a form, has opened nothing");
     }
+
+    [Test]
+    public void A_record_opened_with_no_saved_time_saves_while_it_still_has_none()
+    {
+        var act = () => SavedVersionRules.EnsureNotSavedSince("Pandesal", storedSavedAt: null, SavedVersionRules.OpenedAs(null));
+
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public void A_record_opened_with_no_saved_time_is_refused_once_a_save_has_stamped_one()
+    {
+        var act = () => SavedVersionRules.EnsureNotSavedSince("Pandesal", storedSavedAt: Opened, SavedVersionRules.OpenedAs(null));
+
+        act.Should().Throw<SavedSinceException>();
+    }
+
+    [Test]
+    public void A_list_write_is_checked_on_the_record_the_form_shows_and_no_other()
+    {
+        var showing = new SavedVersionCheck(7, Opened);
+        var savedSince = Opened.AddMinutes(1);
+
+        var onIt = () => SavedVersionRules.EnsureNotSavedSince(showing, 7, "Pandesal", savedSince);
+        var onAnother = () => SavedVersionRules.EnsureNotSavedSince(showing, 8, "Ensaymada", savedSince);
+        var withNothingTyped = () => SavedVersionRules.EnsureNotSavedSince(showing: null, 7, "Pandesal", savedSince);
+
+        onIt.Should().Throw<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Pandesal"));
+        onAnother.Should().NotThrow();
+        withNothingTyped.Should().NotThrow();
+    }
 }

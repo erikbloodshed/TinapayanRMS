@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.Trees;
@@ -19,6 +20,19 @@ public interface IRecordListHost : IFormPartHost
 
     /// <summary>Runs <paramref name="then"/>, which replaces the record the form shows, once its unsaved changes are saved or let go.</summary>
     Task AfterUnsavedChangesAsync(Action then);
+
+    /// <summary>
+    /// What a rename or a move from the list sends with its write: the record the form shows and the time the form took, while
+    /// it holds unsaved changes, so the write is refused over a save made since. Null with nothing typed, as there's nothing to
+    /// lose: the form then loads what's saved.
+    /// </summary>
+    SavedVersionCheck? ShowingSavedVersion { get; }
+
+    /// <summary>
+    /// The screen's load after the list has saved the records <paramref name="ids"/> itself: the record showing, if it's one of
+    /// them, takes its new saved time, and what's typed on the form stays.
+    /// </summary>
+    Task LoadAfterSavingAsync(IEnumerable<int> ids);
 }
 
 /// <summary>

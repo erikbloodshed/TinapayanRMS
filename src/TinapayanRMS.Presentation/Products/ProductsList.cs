@@ -489,7 +489,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _productRepository.MoveAsync(moves, CancellationToken.None);
+        await _productRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
         await ShowMovedAsync([.. moves.Select(m => m.ProductId)], picked);
 
         _moveUndo = isUndo ? null : new MoveUndo.Products(undo, []);
@@ -513,7 +513,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             .ToDictionary(p => p.Id, p => new ProductMove(p.Id, p.Stage, p.FolderId));
         var picked = SelectedTreeNodes.ToList();
 
-        var moved = await _productRepository.MoveToStageAsync([.. products.Select(p => p.Id)], request.Stage, CancellationToken.None);
+        var moved = await _productRepository.MoveToStageAsync([.. products.Select(p => p.Id)], request.Stage, _host.ShowingSavedVersion, CancellationToken.None);
         // Read again whether or not this move made any: the folder it found may be one another computer made.
         _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
         await ShowMovedAsync([.. products.Select(p => p.Id)], picked);
@@ -532,8 +532,9 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <summary>
     /// The products moved, read again and filed in their new folders. A selection is only re-pointed at the fresh copy, as
     /// a load re-points it: the form isn't loaded again, so whatever's typed into it stays, and no undo step changes, since
-    /// Save never writes a saved product's stage or folder. Then the rows the tree dropped from its selection as they moved
-    /// are picked again.
+    /// Save never writes a saved product's stage or folder. With nothing typed on the product showing, the screen loads, so
+    /// the form has what's saved now, whoever saved it. Then the rows the tree dropped from its selection as they moved are
+    /// picked again.
     /// </summary>
     private async Task ShowMovedAsync(IReadOnlyCollection<int> productIds, IReadOnlyList<object> picked)
     {
@@ -544,6 +545,11 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             RefreshTree();
             _host.ShowMoved(moved);
         });
+
+        if (!_host.IsDirty && _host.SelectedProduct is { } showing && productIds.Contains(showing.Id))
+        {
+            await _host.LoadAsync();
+        }
 
         ListSelection.Restore(picked, IsStillListed);
     }
@@ -561,8 +567,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
         var back = new ProductFolderMove(folder.Id, folder.Stage, folder.ParentId);
         var picked = SelectedTreeNodes.ToList();
-        await _folderRepository.MoveAsync(move, CancellationToken.None);
-        await _host.LoadAsync();
+        var restaged = await _folderRepository.MoveAsync(move, _host.ShowingSavedVersion, CancellationToken.None);
+        await _host.LoadAfterSavingAsync(restaged);
         if (ProductTree.Folder(folder.Id) is { ParentFolder: { } parent })
         {
             ProductTree.OpenDownTo(parent);
@@ -1145,10 +1151,10 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameProductToAsync(ProductLeafNode leaf, string name)
     {
         var product = leaf.Product;
-        await _productRepository.RenameAsync(product.Id, name, CancellationToken.None);
+        await _productRepository.RenameAsync(product.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
 
         // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
-        await _host.LoadAsync();
+        await _host.LoadAfterSavingAsync([product.Id]);
         _host.RenamedOnForm(product, name);
     }
 

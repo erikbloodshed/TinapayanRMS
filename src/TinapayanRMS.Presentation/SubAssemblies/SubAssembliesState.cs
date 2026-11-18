@@ -358,7 +358,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
         // The lines as they're typed, read here on the UI thread, for the save below. With when it had last been saved as the
         // form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-        var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id, UpdatedAt = SavedVersion };
+        var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id, UpdatedAt = SavedVersionToSend };
         Func<CancellationToken, Task<int>> save;
         if (IsPackaging)
         {
@@ -609,6 +609,8 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
 
+    protected override int ShowingRecordId => _editingId;
+
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
     /// A new one (or a copy) was never saved, so it goes back to a blank one.
@@ -619,12 +621,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     // do to it.
     int ISubAssembliesListHost.EditingId => _editingId;
 
-    /// <summary>The list's reload after it saved something itself (a rename, a move): the sub-assembly showing takes its new time.</summary>
-    Task ISubAssembliesListHost.LoadAsync()
-    {
-        FollowOwnSaveOnNextLoad();
-        return LoadCommand.ExecuteAsync();
-    }
+    Task ISubAssembliesListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
     void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
         PickFromList(row.Id, () => Pick(row), List.SyncTreeSelection);

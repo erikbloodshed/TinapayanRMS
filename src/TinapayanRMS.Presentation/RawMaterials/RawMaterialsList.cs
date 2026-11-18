@@ -284,10 +284,10 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _rawMaterialRepository.MoveAsync(moves, CancellationToken.None);
+        await _rawMaterialRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
 
-        // The load only re-points the selection at the fresh copy: the form isn't loaded again, so what's typed stays.
-        await _host.LoadAsync();
+        // The load only re-points the selection at the fresh copy: with something typed, the form isn't loaded again.
+        await _host.LoadAfterSavingAsync(moves.Select(m => m.RawMaterialId));
         if (moves.FirstOrDefault(m => m.RawMaterialId == _host.EditingId) is { } onForm)
         {
             _host.MovedOnForm(onForm.CategoryId);
@@ -638,8 +638,8 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameMaterialToAsync(RawMaterialLeafNode leaf, string name)
     {
         var material = leaf.RawMaterial;
-        await _rawMaterialRepository.RenameAsync(material.Id, name, CancellationToken.None);
-        await _host.LoadAsync();
+        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
+        await _host.LoadAfterSavingAsync([material.Id]);
         if (_host.EditingId == material.Id)
         {
             _host.RenamedOnForm(name);

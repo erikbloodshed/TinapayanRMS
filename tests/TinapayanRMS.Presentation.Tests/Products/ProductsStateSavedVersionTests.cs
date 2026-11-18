@@ -143,8 +143,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         var state = await OpenedStateAsync(id);
         TypeDescription(state, "Toasted and sugared");
 
-        await state.List.RenameProductCommand.ExecuteAsync((ProductLeafNode)state.List.ProductTree.Find(id)!);
-        await state.List.CommitTreeNameAsync("Mamon Tostado");
+        await RenameFromTheListAsync(state, id, "Mamon Tostado");
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -176,11 +175,113 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         var state = await OpenedStateAsync(id);
 
         await state.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
+        await ShowingAsync(state, id);
         TypeDescription(state, "Toasted");
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         (await StoredAsync(id)).Should().Be(("Mamon", "Toasted"));
+    });
+
+    [Test]
+    public Task A_rename_from_the_list_is_refused_over_a_save_from_another_pc_and_what_is_typed_stays() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        var state = await OpenedStateAsync(id);
+        TypeDescription(state, "Toasted and sugared");
+
+        await AnotherPcRenamesAsync(id, "Mamon Classic");
+        await RenameFromTheListAsync(state, id, "Mamon Tostado");
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
+        state.EditingDescription.Should().Be("Toasted and sugared");
+        (await StoredAsync(id)).Should().Be(("Mamon Classic", (string?)null));
+
+        // The form's Save is refused in its turn: the refused rename took up nothing.
+        state.List.CancelTreeName();
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
+    });
+
+    [Test]
+    public Task A_move_from_the_list_is_refused_over_a_save_from_another_pc_and_nothing_moves() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        var state = await OpenedStateAsync(id);
+        TypeDescription(state, "Toasted and sugared");
+
+        await AnotherPcRenamesAsync(id, "Mamon Classic");
+        await state.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
+        state.EditingDescription.Should().Be("Toasted and sugared");
+        (await StoredStageAsync(id)).Should().Be(ProductStage.Innovation);
+    });
+
+    [Test]
+    public Task What_the_list_does_elsewhere_doesnt_let_what_is_typed_over_a_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        var otherId = await SaveProductAsync("Ensaymada");
+        var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
+        await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(folder, Cancellation);
+        var state = await OpenedStateAsync(id);
+        state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        TypeDescription(state, "Toasted and sugared");
+
+        await AnotherPcRenamesAsync(id, "Mamon Classic");
+
+        // Another product moved, and a folder deleted, which reads the screen's lists again.
+        await state.List.MoveProductsCommand.ExecuteAsync([new ProductMove(otherId, ProductStage.Production, null)]);
+        state.ErrorMessage.Should().BeNull("the move is of another product, which nobody has saved");
+        await state.List.DeleteFolderCommand.ExecuteAsync(state.List.ProductTree.Folder(folder.Id)!);
+        state.ErrorMessage.Should().BeNull();
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
+        (await StoredAsync(id)).Should().Be(("Mamon Classic", (string?)null));
+    });
+
+    [Test]
+    public Task A_rename_with_nothing_typed_puts_what_another_pc_saved_on_the_form() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        var state = await OpenedStateAsync(id);
+
+        await AnotherPcDescribesAsync(id, "Saved on the other PC");
+        await RenameFromTheListAsync(state, id, "Mamon Tostado");
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.EditingDescription == "Saved on the other PC", () => $"description={state.EditingDescription}");
+
+        state.ErrorMessage.Should().BeNull();
+        state.EditingName.Should().Be("Mamon Tostado");
+        state.History.IsDirty.Should().BeFalse();
+
+        TypeDescription(state, "Saved on this one");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredAsync(id)).Should().Be(("Mamon Tostado", "Saved on this one"));
+    });
+
+    [Test]
+    public Task A_product_no_save_has_stamped_is_refused_over_the_first_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveProductAsync("Mamon");
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.Products.Where(p => p.Id == id).ExecuteUpdateAsync(s => s.SetProperty(p => p.UpdatedAt, (DateTime?)null), Cancellation);
+        }
+
+        var state = await OpenedStateAsync(id);
+        TypeDescription(state, "Toasted and sugared");
+
+        await AnotherPcRenamesAsync(id, "Mamon Classic");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
+        (await StoredAsync(id)).Should().Be(("Mamon Classic", (string?)null));
     });
 
     [Test]
@@ -211,6 +312,12 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     private static Task ShowingAsync(ProductsState state, int id) =>
         Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedProduct?.Id == id, () => $"ready={state.AreDetailsReady}");
 
+    private static async Task RenameFromTheListAsync(ProductsState state, int id, string name)
+    {
+        await state.List.RenameProductCommand.ExecuteAsync((ProductLeafNode)state.List.ProductTree.Find(id)!);
+        await state.List.CommitTreeNameAsync(name);
+    }
+
     private Task<int> SaveProductAsync(string name) =>
         new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Name = name, Stage = ProductStage.Innovation }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
@@ -227,6 +334,14 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         var products = new ProductRepository(CreateDbContextFactory());
         var theirs = (await products.GetByIdAsync(id, Cancellation))!;
         theirs.Name = name;
+        await products.SaveAsync(theirs, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+    }
+
+    private async Task AnotherPcDescribesAsync(int id, string description)
+    {
+        var products = new ProductRepository(CreateDbContextFactory());
+        var theirs = (await products.GetByIdAsync(id, Cancellation))!;
+        theirs.Description = description;
         await products.SaveAsync(theirs, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
     }
 

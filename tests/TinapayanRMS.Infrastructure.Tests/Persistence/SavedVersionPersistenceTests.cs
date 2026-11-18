@@ -183,6 +183,132 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage(SavedVersionRules.SavedSinceText("Dough"));
     }
 
+    [Test]
+    public async Task A_sub_assembly_no_save_has_stamped_saves_alone_and_is_refused_once_another_save_stamps_it()
+    {
+        var (id, flourId) = await AddDoughAsync();
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.SubAssemblies.Where(s => s.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAt, (DateTime?)null), Cancellation);
+        }
+
+        var opened = await SubAssemblyAsync(id);
+        opened.UpdatedAt.Should().BeNull();
+        opened.UpdatedAt = SavedVersionRules.OpenedAs(null);
+
+        // Nobody has saved it since: this save goes through, and stamps it.
+        AMinuteLater();
+        await SubAssemblies.SaveStandaloneAsync(opened, [new RecipeLine(flourId, 200m)], Cancellation);
+        (await SubAssemblyAsync(id)).UpdatedAt.Should().Be(_clock.Now);
+
+        // Opened the same way by a form still showing it as it was: that save is one made since.
+        AMinuteLater();
+        var act = () => SubAssemblies.SaveStandaloneAsync(opened, [new RecipeLine(flourId, 300m)], Cancellation);
+        await act.Should().ThrowAsync<SavedSinceException>();
+    }
+
+    [Test]
+    public async Task A_products_rename_and_moves_from_the_list_are_refused_over_a_save_made_since_the_form_opened_it()
+    {
+        var id = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation });
+        var otherId = await SaveAsync(new Product { Name = "Ensaymada", Stage = ProductStage.Innovation });
+        var showing = new SavedVersionCheck(id, (await ProductAsync(id)).UpdatedAt!.Value);
+
+        AMinuteLater();
+        var theirs = await ProductAsync(id);
+        theirs.Name = "Mamon Classic";
+        await SaveAsync(theirs);
+
+        var rename = () => Products.RenameAsync(id, "Mamon Tostado", showing, Cancellation);
+        var move = () => Products.MoveAsync([new ProductMove(otherId, ProductStage.Production, null), new ProductMove(id, ProductStage.Production, null)], showing, Cancellation);
+        var promote = () => Products.MoveToStageAsync([otherId, id], ProductStage.Production, showing, Cancellation);
+
+        await rename.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Mamon Classic"));
+        await move.Should().ThrowAsync<SavedSinceException>();
+        await promote.Should().ThrowAsync<SavedSinceException>();
+
+        var stored = await ProductAsync(id);
+        (stored.Name, stored.Stage).Should().Be(("Mamon Classic", ProductStage.Innovation));
+        (await ProductAsync(otherId)).Stage.Should().Be(ProductStage.Innovation, "a move refused moves nothing");
+
+        // Another product isn't checked, and the one showing is once the form has the time it's saved at.
+        await Products.RenameAsync(otherId, "Ensaymada Especial", showing, Cancellation);
+        await Products.RenameAsync(id, "Mamon Tostado", new SavedVersionCheck(id, stored.UpdatedAt!.Value), Cancellation);
+        (await ProductAsync(id)).Name.Should().Be("Mamon Tostado");
+    }
+
+    [Test]
+    public async Task A_folder_moved_to_the_other_stage_is_refused_over_a_save_of_the_product_the_form_shows_in_it()
+    {
+        var folders = new ProductFolderRepository(CreateDbContextFactory(_clock));
+        var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
+        await folders.AddAsync(folder, Cancellation);
+        var id = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation, FolderId = folder.Id });
+        var showing = new SavedVersionCheck(id, (await ProductAsync(id)).UpdatedAt!.Value);
+
+        AMinuteLater();
+        var theirs = await ProductAsync(id);
+        theirs.Description = "Saved on the other PC";
+        await SaveAsync(theirs);
+
+        var act = () => folders.MoveAsync(new ProductFolderMove(folder.Id, ProductStage.Production, null), showing, Cancellation);
+
+        await act.Should().ThrowAsync<SavedSinceException>();
+        (await ProductAsync(id)).Stage.Should().Be(ProductStage.Innovation);
+    }
+
+    [Test]
+    public async Task A_raw_materials_rename_and_move_from_the_list_are_refused_over_a_save_made_since_the_form_opened_it()
+    {
+        var id = await AddIngredientAsync("Flour", 0.05m);
+        await SaveAsync(await RawMaterialAsync(id));
+        var opened = await RawMaterialAsync(id);
+        var showing = new SavedVersionCheck(id, opened.UpdatedAt!.Value);
+        int categoryId;
+        await using (var dbContext = CreateDbContext())
+        {
+            var category = new RawMaterialCategory { Name = "Flours", Type = RawMaterialCategoryType.Ingredient };
+            dbContext.RawMaterialCategories.Add(category);
+            await dbContext.SaveChangesAsync(Cancellation);
+            categoryId = category.Id;
+        }
+
+        AMinuteLater();
+        var theirs = await RawMaterialAsync(id);
+        theirs.Name = "Bread Flour";
+        await SaveAsync(theirs);
+
+        var rename = () => RawMaterials.RenameAsync(id, "Cake Flour", showing, Cancellation);
+        var move = () => RawMaterials.MoveAsync([new RawMaterialMove(id, categoryId)], showing, Cancellation);
+
+        await rename.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Bread Flour"));
+        await move.Should().ThrowAsync<SavedSinceException>();
+
+        var stored = await RawMaterialAsync(id);
+        (stored.Name, stored.CategoryId).Should().Be(("Bread Flour", opened.CategoryId));
+    }
+
+    [Test]
+    public async Task A_sub_assemblys_rename_and_move_from_the_list_are_refused_over_a_save_made_since_the_form_opened_it()
+    {
+        var (id, flourId) = await AddDoughAsync();
+        var opened = await SubAssemblyAsync(id);
+        var showing = new SavedVersionCheck(id, opened.UpdatedAt!.Value);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+
+        AMinuteLater();
+        await SubAssemblies.SaveStandaloneAsync(await SubAssemblyAsync(id), [new RecipeLine(flourId, 200m)], Cancellation);
+
+        var rename = () => SubAssemblies.RenameAsync(id, "Sweet Dough", showing, Cancellation);
+        var move = () => SubAssemblies.MoveAsync([new SubAssemblyMove(id, fillingRoleId)], showing, Cancellation);
+
+        await rename.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Dough"));
+        await move.Should().ThrowAsync<SavedSinceException>();
+
+        var stored = await SubAssemblyAsync(id);
+        (stored.Name, stored.RoleId).Should().Be(("Dough", opened.RoleId));
+    }
+
     private async Task<(int Id, int FlourId)> AddDoughAsync()
     {
         var flourId = await AddIngredientAsync("Flour", 0.05m);

@@ -1,3 +1,4 @@
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Interfaces;
@@ -56,8 +57,14 @@ public interface ISubAssemblyRepository
     /// </summary>
     Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, CancellationToken cancellationToken);
 
+    /// <summary>The same from the Sub-Assemblies list: refused, with nothing moved, over a save made since the form showing opened its sub-assembly (<paramref name="showing"/>).</summary>
+    Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken);
+
     /// <summary>Renames a sub-assembly and changes nothing else, checked as Save checks a new name.</summary>
     Task RenameAsync(int id, string name, CancellationToken cancellationToken);
+
+    /// <summary>The same from the Sub-Assemblies list: refused over a save made since the form showing opened the sub-assembly (<paramref name="showing"/>).</summary>
+    Task RenameAsync(int id, string name, SavedVersionCheck? showing, CancellationToken cancellationToken);
 
     /// <summary>Deletes a sub-assembly and its lines; refused while a product links it or a made ingredient is made from it.</summary>
     Task DeleteStandaloneAsync(int id, CancellationToken cancellationToken);

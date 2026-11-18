@@ -117,8 +117,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         var state = await OpenedStateAsync(id);
         TypeGrams(state, 250m);
 
-        await state.List.RenameSubAssemblyCommand.ExecuteAsync((SubAssemblyLeafNode)state.List.SubAssemblyTree.Find(id)!);
-        await state.List.CommitTreeNameAsync("Sweet Dough");
+        await RenameFromTheListAsync(state, id, "Sweet Dough");
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -140,6 +139,82 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         (await StoredAsync(id)).Should().Be(("Dough", 250m));
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblies.SingleAsync(s => s.Id == id, Cancellation)).RoleId.Should().Be(fillingRoleId);
+    });
+
+    [Test]
+    public Task A_rename_from_the_list_is_refused_over_a_save_from_another_pc_and_what_is_typed_stays() => UiThread.RunAsync(async () =>
+    {
+        var (id, flourId) = await AddRecipeAsync("Dough");
+        var state = await OpenedStateAsync(id);
+        TypeGrams(state, 250m);
+
+        await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
+        await RenameFromTheListAsync(state, id, "Soft Dough");
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
+        state.Batch.Lines.Single().Grams.Should().Be(250m);
+        (await StoredAsync(id)).Should().Be(("Sweet Dough", 200m));
+    });
+
+    [Test]
+    public Task A_move_from_the_list_is_refused_over_a_save_from_another_pc_and_nothing_moves() => UiThread.RunAsync(async () =>
+    {
+        var (id, flourId) = await AddRecipeAsync("Dough");
+        var fillingRoleId = await AddRoleAsync("Filling Role", sortOrder: 2);
+        var state = await OpenedStateAsync(id);
+        TypeGrams(state, 250m);
+
+        await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
+        await state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(id, fillingRoleId)]);
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
+        await using var dbContext = CreateDbContext();
+        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == id, Cancellation)).RoleId.Should().NotBe(fillingRoleId);
+    });
+
+    [Test]
+    public Task Moving_another_sub_assembly_from_the_list_doesnt_let_what_is_typed_over_a_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var (id, flourId) = await AddRecipeAsync("Dough");
+        var (otherId, _) = await AddRecipeAsync("Filling");
+        var toppingRoleId = await AddRoleAsync("Topping Role", sortOrder: 3);
+        var state = await OpenedStateAsync(id);
+        TypeGrams(state, 250m);
+
+        await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
+        await state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(otherId, toppingRoleId)]);
+        state.ErrorMessage.Should().BeNull("the move is of another sub-assembly, which nobody has saved");
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
+        (await StoredAsync(id)).Should().Be(("Sweet Dough", 200m));
+    });
+
+    [Test]
+    public Task A_sub_assembly_no_save_has_stamped_saves_alone_and_is_refused_over_the_first_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var (id, flourId) = await AddRecipeAsync("Dough");
+        var (otherId, otherFlourId) = await AddRecipeAsync("Filling");
+        await ClearSavedTimeAsync(id);
+        await ClearSavedTimeAsync(otherId);
+
+        // Nobody else has saved this one: its first Save goes through.
+        var state = await OpenedStateAsync(otherId);
+        TypeGrams(state, 150m);
+        await state.SaveCommand.ExecuteAsync();
+        state.ErrorMessage.Should().BeNull();
+        (await StoredAsync(otherId)).Should().Be(("Filling", 150m));
+
+        // Another PC got to this one first.
+        state = await OpenedStateAsync(id);
+        TypeGrams(state, 250m);
+        await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
+        (await StoredAsync(id)).Should().Be(("Sweet Dough", 200m));
+        otherFlourId.Should().NotBe(flourId);
     });
 
     [Test]
@@ -171,6 +246,19 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         Settle.UntilAsync(state,
             () => state.EditingName == name && state.Batch.Lines.Count == 1 && state.Batch.Lines[0].Grams == grams && !state.History.IsDirty,
             () => $"name={state.EditingName}, lines={state.Batch.Lines.Count}, dirty={state.History.IsDirty}");
+
+    private static async Task RenameFromTheListAsync(SubAssembliesState state, int id, string name)
+    {
+        await state.List.RenameSubAssemblyCommand.ExecuteAsync((SubAssemblyLeafNode)state.List.SubAssemblyTree.Find(id)!);
+        await state.List.CommitTreeNameAsync(name);
+    }
+
+    /// <summary>As every sub-assembly was when the column came: no save has stamped it.</summary>
+    private async Task ClearSavedTimeAsync(int id)
+    {
+        await using var dbContext = CreateDbContext();
+        await dbContext.SubAssemblies.Where(s => s.Id == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.UpdatedAt, (DateTime?)null), Cancellation);
+    }
 
     /// <summary>A recipe of 100 g of one ingredient, saved as the form saves one, which stamps when it was saved.</summary>
     private async Task<(int Id, int IngredientId)> AddRecipeAsync(string name)

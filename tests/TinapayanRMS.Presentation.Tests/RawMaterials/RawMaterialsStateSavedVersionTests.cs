@@ -121,8 +121,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         var state = await OpenedStateAsync(id);
         TypeBuffer(state, 5m);
 
-        await state.List.RenameMaterialCommand.ExecuteAsync((RawMaterialLeafNode)state.List.RawMaterialTree.Find(id)!);
-        await state.List.CommitTreeNameAsync("Strong Flour");
+        await RenameFromTheListAsync(state, id, "Strong Flour");
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -144,6 +143,75 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         (await StoredAsync(id)).Should().Be(("Bread Flour", 5m));
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == id, Cancellation)).CategoryId.Should().Be(flourId);
+    });
+
+    [Test]
+    public Task A_rename_from_the_list_is_refused_over_a_save_from_another_pc_and_what_is_typed_stays() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        var state = await OpenedStateAsync(id);
+        TypeBuffer(state, 5m);
+
+        await AnotherPcRenamesAsync(id, "Strong Flour");
+        await RenameFromTheListAsync(state, id, "Cake Flour");
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
+        state.PurchaseCost.EditingCostBufferPercent.Should().Be(5m);
+        (await StoredAsync(id)).Should().Be(("Strong Flour", 0m));
+    });
+
+    [Test]
+    public Task A_move_from_the_list_is_refused_over_a_save_from_another_pc_and_nothing_moves() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        var flourId = await AddCategoryAsync("Flours");
+        var state = await OpenedStateAsync(id);
+        TypeBuffer(state, 5m);
+
+        await AnotherPcRenamesAsync(id, "Strong Flour");
+        await state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(id, flourId)]);
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(m => m.Id == id, Cancellation)).CategoryId.Should().NotBe(flourId);
+    });
+
+    [Test]
+    public Task Moving_another_material_from_the_list_doesnt_let_what_is_typed_over_a_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        var otherId = await SaveMaterialAsync("Cake Flour");
+        var flourId = await AddCategoryAsync("Flours");
+        var state = await OpenedStateAsync(id);
+        TypeBuffer(state, 5m);
+
+        await AnotherPcRenamesAsync(id, "Strong Flour");
+        await state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(otherId, flourId)]);
+        state.ErrorMessage.Should().BeNull("the move is of another material, which nobody has saved");
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
+        (await StoredAsync(id)).Should().Be(("Strong Flour", 0m));
+    });
+
+    [Test]
+    public Task A_material_no_save_has_stamped_is_refused_over_the_first_save_from_another_pc() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Id == id).ExecuteUpdateAsync(s => s.SetProperty(m => m.UpdatedAt, (DateTime?)null), Cancellation);
+        }
+
+        var state = await OpenedStateAsync(id);
+        TypeBuffer(state, 5m);
+
+        await AnotherPcRenamesAsync(id, "Strong Flour");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
+        (await StoredAsync(id)).Should().Be(("Strong Flour", 0m));
     });
 
     [Test]
@@ -173,6 +241,12 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
 
     private static Task ShowingAsync(RawMaterialsState state, int id) =>
         Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedRawMaterial?.Id == id, () => $"ready={state.AreDetailsReady}");
+
+    private static async Task RenameFromTheListAsync(RawMaterialsState state, int id, string name)
+    {
+        await state.List.RenameMaterialCommand.ExecuteAsync((RawMaterialLeafNode)state.List.RawMaterialTree.Find(id)!);
+        await state.List.CommitTreeNameAsync(name);
+    }
 
     /// <summary>A purchased ingredient saved as a form saves one, which stamps when it was saved.</summary>
     private async Task<int> SaveMaterialAsync(string name)
