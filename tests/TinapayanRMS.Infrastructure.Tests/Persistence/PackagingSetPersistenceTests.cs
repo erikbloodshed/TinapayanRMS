@@ -168,7 +168,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Id = productId, Name = "Ensaymada Big" }, recipe: null, new PackagingLinkDraft.NewSet(), [], costing: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at least one line*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*at least one line*");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation)).Name.Should().Be("Ensaymada", "nothing is left half saved");
         (await dbContext.SubAssemblies.CountAsync(Cancellation)).Should().Be(0);
@@ -185,7 +185,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => new ProductRepository(CreateDbContextFactory()).SaveAsync(
             new Product { Id = aId, Name = "A renamed" }, recipe: null, new PackagingLinkDraft.OtherProduct(bId), packagingLines: null, costing: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*circular*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*circular*");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.SingleAsync(p => p.Id == aId, Cancellation)).Name.Should().Be("A", "nothing is left half saved");
     }
@@ -234,8 +234,8 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var inRecipeRole = () => SaveSetAsync("Gift Box Set", glazeRoleId, [(boxId, 1m)]);
         var withIngredient = () => SaveSetAsync("Gift Box Set", packagingRoleId, [(sugarId, 1m)]);
 
-        await inRecipeRole.Should().ThrowAsync<InvalidOperationException>().WithMessage("*goes in the Packaging role*");
-        await withIngredient.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Sugar*");
+        await inRecipeRole.Should().ThrowAsync<BusinessRuleException>().WithMessage("*goes in the Packaging role*");
+        await withIngredient.Should().ThrowAsync<BusinessRuleException>().WithMessage("*Sugar*");
         (await CreateDbContext().SubAssemblies.CountAsync(Cancellation)).Should().Be(0, "nothing is left half saved");
     }
 
@@ -254,9 +254,9 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var recipeToSet = () => SaveSetAsync("Glaze", packagingRoleId, [(boxId, 1m)], glazeId);
         var setToRecipe = () => repository.SaveStandaloneAsync(new SubAssembly { Id = setId, Name = "Gift Box Set", RoleId = glazeRoleId }, [(sugarId, 100m)], Cancellation);
 
-        await newRecipeAsPackaging.Should().ThrowAsync<InvalidOperationException>().WithMessage("*for packaging sets*");
-        await recipeToSet.Should().ThrowAsync<InvalidOperationException>().WithMessage("*recipe can't move to the Packaging role*");
-        await setToRecipe.Should().ThrowAsync<InvalidOperationException>().WithMessage("*stays in the Packaging role*");
+        await newRecipeAsPackaging.Should().ThrowAsync<BusinessRuleException>().WithMessage("*for packaging sets*");
+        await recipeToSet.Should().ThrowAsync<BusinessRuleException>().WithMessage("*recipe can't move to the Packaging role*");
+        await setToRecipe.Should().ThrowAsync<BusinessRuleException>().WithMessage("*stays in the Packaging role*");
     }
 
     [Test]
@@ -269,7 +269,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => SaveRecipeAsync(productId, new RecipeDraft(
             [new NewSubAssemblyDraft(packagingRoleId, [(sugarId, 100m)], UsageAuthoredField.Yield, 10m)], []));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*for packaging sets*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*for packaging sets*");
     }
 
     [Test]
@@ -346,7 +346,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = () => CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, glazeId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*only link a packaging set*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*only link a packaging set*");
     }
 
     [Test]
@@ -413,7 +413,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         (await CreateRepository().GetStandaloneLinkedByAsync(Cancellation))[setId].Select(p => p.Name).Should().Equal("Ensaymada");
         var act = () => CreateRepository().DeleteStandaloneAsync(setId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada links Gift Box Set*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Ensaymada links Gift Box Set*");
         await CreatePackagingLinkRepository().RemoveLinkAsync(productId, Cancellation);
         await CreateRepository().DeleteStandaloneAsync(setId, Cancellation);
         (await CreateDbContext().SubAssemblyPackagingLines.CountAsync(Cancellation)).Should().Be(0, "its lines go with it");
@@ -441,7 +441,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = () => roleRepository.DeleteAsync(packagingRoleId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*can't be deleted*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*can't be deleted*");
         await roleRepository.DeleteAsync(glazeRoleId, Cancellation);
         (await roleRepository.GetAllAsync(Cancellation)).Should().ContainSingle().Which.IsPackaging.Should().BeTrue();
     }
@@ -499,7 +499,7 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = () => SaveSetInUnitsAsync("Gift Box Set", packagingRoleId, [(boxId, rollId, 1m)]);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*must be one of that material's own units*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*must be one of that material's own units*");
     }
 
     [Test]
@@ -513,6 +513,6 @@ public class PackagingSetPersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => new RawMaterialUnitRepository(CreateDbContextFactory())
             .DeleteAsync(rollId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging set line*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*packaging set line*");
     }
 }

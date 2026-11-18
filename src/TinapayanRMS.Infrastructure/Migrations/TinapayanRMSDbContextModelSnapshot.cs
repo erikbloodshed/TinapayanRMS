@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261115054714_AccessSettings";
+    public override string LastMigrationId => "20261118034638_RawMaterialWeightLossCheck";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -843,6 +843,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                         t.HasCheckConstraint("CK_RawMaterials_SubAssemblyMatchesSource", "(source = 'Made') = (sub_assembly_id IS NOT NULL)");
 
                         t.HasCheckConstraint("CK_RawMaterials_TargetCostBufferPercent", "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
+
+                        t.HasCheckConstraint("CK_RawMaterials_WeightLossPercent", "weight_loss_percent IS NULL OR (weight_loss_percent >= 0 AND weight_loss_percent < 100)");
                     });
             });
 

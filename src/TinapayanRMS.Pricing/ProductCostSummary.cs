@@ -191,9 +191,12 @@ public sealed class ProductCostSummary
 
     /// <summary>
     /// The current price earns less than the costing's Markup %, compared as they're shown,
-    /// to 2 decimals, so a price that rounds to the target isn't flagged: amber in the header, the Products list and Reports.
+    /// to 2 decimals and rounded half away from zero as a shown number is, so a price that shows the target isn't flagged:
+    /// amber in the header, the Products list and Reports.
     /// </summary>
-    public bool IsBelowTargetMarkup => CurrentMarkupPercent is { } earned && Math.Round(earned, 2) < Math.Round(MarginPercent, 2);
+    public bool IsBelowTargetMarkup =>
+        CurrentMarkupPercent is { } earned
+        && Math.Round(earned, 2, MidpointRounding.AwayFromZero) < Math.Round(MarginPercent, 2, MidpointRounding.AwayFromZero);
 
     public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
 

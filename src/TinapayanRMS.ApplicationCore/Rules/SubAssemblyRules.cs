@@ -237,7 +237,7 @@ public static class SubAssemblyRules
     /// by a ten-thousandth and make a recipe nobody touched look changed.
     /// </summary>
     public static decimal GramsFromBakersPercent(decimal percent, decimal baseWeight) =>
-        Math.Round(baseWeight * percent / 100m, 4);
+        Math.Round(baseWeight * percent / 100m, 4, MidpointRounding.ToEven);
 
     /// <summary>
     /// A line's grams in a batch scaled from weighing <paramref name="from"/> to <paramref name="to"/> (the
@@ -246,7 +246,7 @@ public static class SubAssemblyRules
     /// leaves the grams as they are.
     /// </summary>
     public static decimal ScaledGrams(decimal grams, decimal from, decimal to) =>
-        from <= 0m ? grams : Math.Round(grams * to / from, 4);
+        from <= 0m ? grams : Math.Round(grams * to / from, 4, MidpointRounding.ToEven);
 
     /// <summary>The longest name a sub-assembly can have (the Name column's length).</summary>
     public const int MaxNameLength = 100;

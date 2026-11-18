@@ -91,7 +91,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var act = () => repository.AddAsync(new RawMaterialUnit { RawMaterialId = flourId, UnitOfMeasureId = bagId, BaseUnitsPerUnit = 50000m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already has*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*already has*");
     }
 
     [Test]
@@ -272,7 +272,7 @@ public class IngredientUnitPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var act = () => repository.DeleteAsync(bag.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 purchase price*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'bag' is used by 1 purchase price*");
         (await repository.GetForRawMaterialAsync(flourId, Cancellation)).Should().ContainSingle();
     }
 

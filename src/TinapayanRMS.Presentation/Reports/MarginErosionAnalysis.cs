@@ -28,8 +28,8 @@ public sealed record MarginErosionRow(
     decimal MarkupNow,
     decimal Change)
 {
-    /// <summary>The markup dropped by a hundredth of a point or more.</summary>
-    public bool HasDropped => Math.Round(Change, 2) < 0m;
+    /// <summary>The markup dropped by a hundredth of a point or more, as it's shown: rounded half away from zero.</summary>
+    public bool HasDropped => Math.Round(Change, 2, MidpointRounding.AwayFromZero) < 0m;
 }
 
 /// <summary>

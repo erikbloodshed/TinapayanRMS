@@ -673,7 +673,7 @@ If the name is already taken, a message says so and the box stays open with what
 
 **Clone…** and **Create Variant…** put the new product in Innovation, in the folder with the same path as the source's (made if it isn't there).
 
-A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new mark the next time the Products tab opens.
+A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. A section mark (the icon of a recipe section) means one of its recipe sections has neither a **Weight per Piece** nor a **Yield**: that section adds nothing to the product's cost until one is typed, so its costs and suggested price leave it out. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new marks the next time the Products tab opens.
 
 ### The header
 
@@ -959,8 +959,9 @@ One row for every product, as it's saved:
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 - **Target Markup %**: the **Markup Metric** on the product's Costing tab, what you're aiming for.
 - **Short By**: how many percentage points **Markup %** is under **Target Markup %**. Blank when it isn't short, or there's no current price.
+- **No Piece Size**: the product's recipe sections that have neither a weight per piece nor a yield, such as **Topping**. Each adds nothing to the product's costs until one is typed. Blank when every section has one.
 
-Sort by **Markup %** to see which products earn the least, or by **Short By** to see which fall furthest short of what you're aiming for.
+Sort by **Markup %** to see which products earn the least, or by **Short By** to see which fall furthest short of what you're aiming for. Sort by **No Piece Size** to bring the products missing a piece size together.
 
 To show only some products, click the funnel in the **Product**, **Stage** or **Category** heading. Untick what you don't want to see, or untick **(Select All)** and tick only what you do, then click **OK**. The search box at the top finds a name in a long list. A funnel with a dot shows that its column is filtered, and filters in more than one column work together: **Stage** set to Production and **Category** set to Breads shows only the breads in production. **Clear Filter** at the top of the list shows everything in that column again. The filters stay as you set them, for you on this computer: Reports opens with them the next time you open the app.
 

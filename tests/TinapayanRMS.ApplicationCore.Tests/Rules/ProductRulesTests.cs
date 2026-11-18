@@ -48,7 +48,7 @@ public class ProductRulesTests
     {
         var act = () => ProductRules.EnsureValidUsages([(SubAssemblyId: 1, AuthoredValue: -1m)]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*can't be negative*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*can't be negative*");
     }
 
     [Test]
@@ -326,7 +326,7 @@ public class ProductRulesTests
             "Sweet Dough",
             [7, 9]);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("*Butter*").WithMessage("*Sweet Dough*");
     }
 
@@ -341,7 +341,7 @@ public class ProductRulesTests
             "Sweet Dough",
             []);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*Ube Flavour*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*Ube Flavour*");
     }
 
     [Test]

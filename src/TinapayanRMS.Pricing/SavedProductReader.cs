@@ -98,6 +98,13 @@ public sealed record SavedProduct(
 
     /// <summary>Its bulk packaging, priced, whose share per unit is in its packaging cost; null for a product without.</summary>
     public PricedBulkPackaging? BulkPackaging { get; init; }
+
+    /// <summary>
+    /// Its sections with no weight per piece or yield (<see cref="PricedSection.HasPieces"/>), by name, in recipe order: each
+    /// costs it nothing per piece, so its cost and price leave that section out until one is typed. The Products list and
+    /// Reports flag them.
+    /// </summary>
+    public IReadOnlyList<string> SectionsWithoutPieceSize => [.. Sections.Where(s => !s.HasPieces).Select(s => s.SectionName)];
 }
 
 /// <summary>

@@ -74,7 +74,7 @@ public class LinkedLinesPersistenceTests(DatabaseFixture fixture) : PersistenceT
         // Ube put into the dough's own lines while it's an add-in here is refused, and nothing is written.
         var act = async () => await SaveRecipeAsync(miniId, new RecipeDraft([], [Linked(doughId, 30m, [(flourId, 800m), (ubeId, 50m)], (ubeId, 20m))]));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Ube Flavour*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*Ube Flavour*");
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).Select(l => new { l.IngredientId, l.Grams }).ToListAsync(Cancellation))
             .Should().Equal(new { IngredientId = flourId, Grams = 800m });

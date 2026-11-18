@@ -30,6 +30,17 @@ public closed class ProductTreeNode : ListTreeNode
         get => _isBelowTargetMarkup;
         set => RaiseAndSetIfChanged(ref _isBelowTargetMarkup, value);
     }
+
+    private bool _hasSectionWithoutPieceSize;
+    /// <summary>
+    /// A product with a recipe section that has no weight per piece or yield (SavedProduct.SectionsWithoutPieceSize), which
+    /// costs it nothing per piece: a flag after its name. Worked out with <see cref="IsBelowTargetMarkup"/>; never set on a folder.
+    /// </summary>
+    public bool HasSectionWithoutPieceSize
+    {
+        get => _hasSectionWithoutPieceSize;
+        set => RaiseAndSetIfChanged(ref _hasSectionWithoutPieceSize, value);
+    }
 }
 
 /// <summary>

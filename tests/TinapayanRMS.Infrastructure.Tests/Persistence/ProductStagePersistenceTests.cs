@@ -130,7 +130,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = () => CreateRepository().MoveAsync([new ProductMove(id, ProductStage.Innovation, breadsId)], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("That folder is in Production, not Innovation.");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("That folder is in Production, not Innovation.");
         (await CreateRepository().GetByIdAsync(id, Cancellation))!.FolderId.Should().BeNull();
     }
 
@@ -212,7 +212,7 @@ public class ProductStagePersistenceTests(DatabaseFixture fixture) : Persistence
         var act = () => CreateRepository().MoveAsync(
             [new ProductMove(mamonId, ProductStage.Production, breadsId), new ProductMove(pandesalId, ProductStage.Production, breadsId + 999)], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("The folder to move it to no longer exists.");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("The folder to move it to no longer exists.");
         (await CreateRepository().GetAllAsync(Cancellation)).Should().OnlyContain(p => p.Stage == ProductStage.Innovation && p.FolderId == null);
     }
 

@@ -87,6 +87,23 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
     }
 
     [Test]
+    [Arguments(100)]
+    [Arguments(150)]
+    [Arguments(-1)]
+    public async Task A_made_ingredients_weight_loss_is_at_least_0_and_under_100(int weightLossPercent)
+    {
+        // At 100% the recipe would make nothing, and the ingredient would cost nothing a gram.
+        var flourId = await AddIngredientAsync("Flour", 0.05m);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(flourId, 1000m)]);
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).WeightLossPercent = weightLossPercent;
+
+        var save = () => dbContext.SaveChangesAsync(Cancellation);
+
+        (await save.Should().ThrowAsync<DbUpdateException>()).WithInnerException<PostgresException>().WithMessage("*CK_RawMaterials_WeightLossPercent*");
+    }
+
+    [Test]
     [Arguments(0)]
     [Arguments(-1)]
     public async Task A_units_multiplier_has_to_be_positive(int baseUnitsPerUnit)

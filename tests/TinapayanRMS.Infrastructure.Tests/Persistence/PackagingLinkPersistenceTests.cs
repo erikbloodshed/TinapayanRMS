@@ -170,7 +170,7 @@ public class PackagingLinkPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         var act = () => CreateProductRepository().DeleteAsync(bigId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Small links this product's packaging*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Small links this product's packaging*");
     }
 
     [Test]

@@ -250,7 +250,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
             BaseUnitId = kilogramId,
         }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*gram*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*gram*");
     }
 
     [Test]
@@ -266,7 +266,7 @@ public class IngredientPersistenceTests(DatabaseFixture fixture) : PersistenceTe
         sugar.BaseUnitId = pieceId;
         var act = () => repository.UpdateAsync(sugar, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*type*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*type*");
     }
 
     [Test]

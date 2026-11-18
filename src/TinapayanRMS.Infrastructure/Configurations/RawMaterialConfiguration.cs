@@ -84,6 +84,13 @@ public sealed class RawMaterialConfiguration : IEntityTypeConfiguration<RawMater
             table.HasCheckConstraint(
                 "CK_RawMaterials_TargetCostBufferPercent",
                 "target_cost_buffer_percent IS NULL OR (target_cost_buffer_percent >= 0 AND target_cost_buffer_percent <= 100)");
+
+            // A made ingredient's weight loss, which RawMaterialRules.EnsureFieldsMatchSource keeps at 0 or more and under 100:
+            // what the recipe makes is its grams less that, and the cost per gram divides by it, so at 100% or more the
+            // ingredient would cost nothing (IngredientBomRules.CalculateCost), with every product using it under-costed.
+            table.HasCheckConstraint(
+                "CK_RawMaterials_WeightLossPercent",
+                "weight_loss_percent IS NULL OR (weight_loss_percent >= 0 AND weight_loss_percent < 100)");
         });
     }
 }

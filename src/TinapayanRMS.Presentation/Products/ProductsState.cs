@@ -80,8 +80,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     /// <summary>The Category picker's naming of a new category (BeginCategoryEdit, CommitCategoryTextAsync).</summary>
     private readonly CategoryPicker<ProductCategory> _categoryPicker;
 
-    /// <summary>The products each load brings, whose markups the list's flags are worked out from.</summary>
-    private readonly Subject<IReadOnlyList<Product>> _markupChecks = new();
+    /// <summary>The products each load brings, whose markups and sections the list's flags are worked out from.</summary>
+    private readonly Subject<IReadOnlyList<Product>> _flagChecks = new();
 
     private readonly Subject<PrintScope> _printRequests = new();
 
@@ -192,8 +192,9 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         // The list's row follows the product picked (SelectionChanged), from the start.
         List.SyncTreeSelection();
 
-        // The list's flags for a price short of its target markup, after each load: a newer load cancels one still working.
-        LoadLatest(_markupChecks, FlagBelowTargetMarkupAsync);
+        // The list's flags for a price short of its target markup and a section with no piece size, after each load: a newer
+        // load cancels one still working.
+        LoadLatest(_flagChecks, FlagProductsAsync);
 
         WireDetailsTabs();
         WirePicks();
@@ -601,20 +602,22 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     public Interaction<string, string?> PromptForNewCategory { get; } = new();
 
     /// <summary>
-    /// Flags each product in the list whose current price earns less than its target markup: every product
-    /// priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a dozen or so queries however many there are),
-    /// off the UI thread. A product's flag follows its Save at the next load.
+    /// Flags each product in the list whose current price earns less than its target markup, and each with a recipe section
+    /// that has no piece size: every product priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a
+    /// dozen or so queries however many there are), off the UI thread. A product's flags follow its Save at the next load.
     /// </summary>
-    private async Task FlagBelowTargetMarkupAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
+    private async Task FlagProductsAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
     {
         var saved = await Task.Run(() => _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var below = saved.Where(s => s.Costs.IsBelowTargetMarkup).Select(s => s.Product.Id).ToHashSet();
+        var unsized = saved.Where(s => s.SectionsWithoutPieceSize.Count > 0).Select(s => s.Product.Id).ToHashSet();
         foreach (var product in products)
         {
             if (List.ProductTree.Find(product.Id) is { } leaf)
             {
                 leaf.IsBelowTargetMarkup = below.Contains(product.Id);
+                leaf.HasSectionWithoutPieceSize = unsized.Contains(product.Id);
             }
         }
     }
@@ -832,7 +835,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             Folders = load.Folders;
             _productCache.MergeFrom(load.Products);
             List.RefreshTree();
-            _markupChecks.OnNext(load.Products);
+            _flagChecks.OnNext(load.Products);
             _linkable = load.Linkable;
             Packaging.TakePackagingSets(load.PackagingSets);
             RefreshCostingDefaults(load.CostingDefaults);
@@ -1997,7 +2000,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         _subAssemblyOpenRequests.Dispose();
         _printRequests.Dispose();
         _versionReads.Dispose();
-        _markupChecks.Dispose();
+        _flagChecks.Dispose();
         _picks.Dispose();
         UsageForm.Dispose();
         Packaging.Dispose();

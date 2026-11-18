@@ -30,7 +30,7 @@ public sealed record TypedAmount(decimal Amount, decimal Percent, decimal OfCost
             return currentPercent;
         }
 
-        var percent = Math.Round(CostingRules.PercentOf(amount, ofCost), PercentDecimals);
+        var percent = Math.Round(CostingRules.PercentOf(amount, ofCost), PercentDecimals, MidpointRounding.ToEven);
         typed = new TypedAmount(amount, percent, ofCost);
         return percent;
     }

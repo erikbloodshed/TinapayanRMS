@@ -144,7 +144,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var act = () => repository.SaveAsync(MadeIngredient("Custard", madeCategoryId, 0m, recipeId), [Unit(bagId, 25000m)], brandPrices: null, [(boxId, 1m)], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'Cake Box' is packaging*");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.Select(m => m.Name).OrderBy(n => n).ToListAsync(Cancellation)).Should().Equal("Cake Box", "Egg");
         (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
@@ -159,7 +159,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Flour", categoryId), [Unit(bagId, 25000m)], [(null, sackId, 900m)], addIns: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*own units*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*own units*");
         await using var dbContext = CreateDbContext();
         (await dbContext.RawMaterials.AnyAsync(Cancellation)).Should().BeFalse();
         (await dbContext.RawMaterialUnits.AnyAsync(Cancellation)).Should().BeFalse();
@@ -201,7 +201,7 @@ public class RawMaterialSavePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var act = () => repository.SaveAsync(PurchasedIngredient("Bread Flour", categoryId, flourId), [], brandPrices: null, addIns: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'bag' is used by 1 purchase price*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'bag' is used by 1 purchase price*");
         var flour = await repository.GetByIdAsync(flourId, Cancellation);
         flour!.Name.Should().Be("Flour", "the rename was part of the save that was rejected");
         flour.Units.Should().ContainSingle();

@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -104,7 +105,7 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = async () => await SaveRecipeAsync(linkerId, new RecipeDraft([], [Linked(doughId, 30m, (flourId, 100m))]));
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
+        await act.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("*Flour*").WithMessage("*Cream Loaf Dough*");
         (await CreateUsageRepository().GetForProductAsync(linkerId, Cancellation)).Should().ContainSingle("the recipe it refused is left as it was");
         (await AddInsAsync(linkerId)).Select(l => l.IngredientId).Should().Equal(ubeId);

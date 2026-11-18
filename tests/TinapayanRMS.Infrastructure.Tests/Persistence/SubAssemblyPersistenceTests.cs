@@ -174,8 +174,8 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var oneNameTwice = () => SaveRecipeAsync(productId, new RecipeDraft(
             [New(fillingRoleId, [(sugarId, 100m)], sectionName: "Ube"), New(fillingRoleId, [(sugarId, 200m)], sectionName: "ube")], []));
 
-        await twoUnnamed.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has more than one Filling without a name*");
-        await oneNameTwice.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
+        await twoUnnamed.Should().ThrowAsync<BusinessRuleException>().WithMessage("This recipe has more than one Filling without a name*");
+        await oneNameTwice.Should().ThrowAsync<BusinessRuleException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
 
         // A new Dough beside Ensaymada's, which goes by its name; and an unnamed Filling beside one named Cheese.
         await SaveRecipeAsync(productId, new RecipeDraft(
@@ -204,7 +204,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         var act = () => SaveRecipeAsync(productId, new RecipeDraft(
             [New(fillingRoleId, [(sugarId, 200m)], sectionName: "Ube")], [new LinkedUsageDraft(ubeId, UsageAuthoredField.WeightPerPiece, 10m)]));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("This recipe has two Filling sub-assemblies called Ube*");
     }
 
     [Test]
@@ -222,7 +222,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
         // Ensaymada Small's own Filling reads "Filling: Ube" there.
         var act = () => CreateSubAssemblyRepository().SaveStandaloneAsync(new SubAssembly { Id = doughId, Name = "Ube", RoleId = fillingRoleId }, [(flourId, 1000m)], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
+        await act.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Ensaymada Small, which links this sub-assembly, has two Filling sub-assemblies called Ube*");
         (await GetSubAssemblyAsync(doughId)).RoleId.Should().Be(doughRoleId);
 
@@ -249,7 +249,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
 
         var act = () => SaveRecipeAsync(productId, new RecipeDraft([New(roleId, [(sugarId, 100m), (boxId, 1m)])], []));
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'Cake Box' is packaging*");
         (await SubAssemblyNamesAsync()).Should().Equal(["Ensaymada Filling"], "a rejected save rolls back the sub-assembly it was making");
         (await CreateUsageRepository().GetForProductAsync(productId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == custardId);
     }
@@ -285,7 +285,7 @@ public class SubAssemblyPersistenceTests(DatabaseFixture fixture) : PersistenceT
             new CostingParameters { LaborPercent = -1m },
             Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*can't be negative*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*can't be negative*");
         (await SubAssemblyNamesAsync()).Should().BeEmpty();
     }
 

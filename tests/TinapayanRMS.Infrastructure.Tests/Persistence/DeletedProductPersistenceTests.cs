@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -97,9 +98,9 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
             new Product { Id = pandesalId, Name = "Mamon" }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
         const string message = "A deleted product is named Mamon. Restore it from the Deleted folder, or delete it permanently there first.";
-        await add.Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
-        await rename.Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
-        await save.Should().ThrowAsync<InvalidOperationException>().WithMessage(message);
+        await add.Should().ThrowAsync<BusinessRuleException>().WithMessage(message);
+        await rename.Should().ThrowAsync<BusinessRuleException>().WithMessage(message);
+        await save.Should().ThrowAsync<BusinessRuleException>().WithMessage(message);
     }
 
     [Test]
@@ -117,7 +118,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         (await subAssemblies.GetStandaloneLinkedByAsync(Cancellation))[glazeId]
             .Should().ContainSingle().Which.Should().Be(new LinkingProduct(creamLoafId, "Cream Loaf (deleted)", null));
         var deleteGlaze = () => subAssemblies.DeleteStandaloneAsync(glazeId, Cancellation);
-        await deleteGlaze.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cream Loaf (deleted) links Glaze.*");
+        await deleteGlaze.Should().ThrowAsync<BusinessRuleException>().WithMessage("Cream Loaf (deleted) links Glaze.*");
 
         await CreateRepository().DeletePermanentlyAsync(creamLoafId, Cancellation);
         await subAssemblies.DeleteStandaloneAsync(glazeId, Cancellation);
@@ -146,7 +147,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var deleteBig = () => CreateRepository().DeleteAsync(bigId, Cancellation);
 
-        await deleteBig.Should().ThrowAsync<InvalidOperationException>()
+        await deleteBig.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Small (deleted) links this product's packaging. Unlink it there first.");
     }
 
@@ -167,8 +168,8 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
             costing: null,
             Cancellation);
 
-        await link.Should().ThrowAsync<InvalidOperationException>().WithMessage("Big is deleted. Restore it from the Deleted folder to link its packaging.");
-        await hold.Should().ThrowAsync<InvalidOperationException>().WithMessage("Big is deleted. Restore it from the Deleted folder to put it in Pasalubong Box.");
+        await link.Should().ThrowAsync<BusinessRuleException>().WithMessage("Big is deleted. Restore it from the Deleted folder to link its packaging.");
+        await hold.Should().ThrowAsync<BusinessRuleException>().WithMessage("Big is deleted. Restore it from the Deleted folder to put it in Pasalubong Box.");
     }
 
     [Test]
@@ -177,8 +178,8 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         var delete = () => CreateRepository().DeleteAsync(999, Cancellation);
         var restore = () => CreateRepository().RestoreAsync(999, Cancellation);
 
-        await delete.Should().ThrowAsync<InvalidOperationException>().WithMessage("Product 999 does not exist.");
-        await restore.Should().ThrowAsync<InvalidOperationException>().WithMessage("Product 999 does not exist.");
+        await delete.Should().ThrowAsync<BusinessRuleException>().WithMessage("Product 999 does not exist.");
+        await restore.Should().ThrowAsync<BusinessRuleException>().WithMessage("Product 999 does not exist.");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.CountAsync(Cancellation)).Should().Be(0);
     }

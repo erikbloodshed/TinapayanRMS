@@ -84,9 +84,9 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
             new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = flour.Id, BaseUnitId = pieceId }, Cancellation);
         var flourAsBox = () => materials.AddAsync(new RawMaterial { Name = "Bread Flour", CategoryId = boxesId }, Cancellation);
 
-        await boxAsFlour.Should().ThrowAsync<InvalidOperationException>()
+        await boxAsFlour.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Flour is an ingredient category. Put this packaging material in a category for packaging.");
-        await flourAsBox.Should().ThrowAsync<InvalidOperationException>()
+        await flourAsBox.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Boxes is a packaging category. Put this ingredient in a category for ingredients.");
 
         await materials.AddAsync(new RawMaterial { Name = "Cake Box", Type = RawMaterialType.Packaging, CategoryId = boxesId, BaseUnitId = pieceId }, Cancellation);
@@ -106,7 +106,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
 
         var retype = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = flour.Id, Name = "Flour", Type = RawMaterialCategoryType.Packaging }, Cancellation);
 
-        await retype.Should().ThrowAsync<InvalidOperationException>()
+        await retype.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Flour has 1 material that can't go in a packaging category, so its type can't change. Move it to another category first.");
 
         // A rename alone is still fine.
@@ -124,9 +124,9 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
         var syrupAsFlour = async () => await materials.AddAsync(await MadeIngredientAsync("Simple Syrup", flour.Id), Cancellation);
         var flourAsSyrup = () => materials.AddAsync(new RawMaterial { Name = "Bread Flour", CategoryId = inHouseId }, Cancellation);
 
-        await syrupAsFlour.Should().ThrowAsync<InvalidOperationException>()
+        await syrupAsFlour.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Flour is an ingredient category. Put this made ingredient in a Made category.");
-        await flourAsSyrup.Should().ThrowAsync<InvalidOperationException>()
+        await flourAsSyrup.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("In-House is a Made category, for made ingredients only. Put this ingredient in a category for ingredients.");
 
         await materials.AddAsync(await MadeIngredientAsync("Simple Syrup", inHouseId), Cancellation);
@@ -145,7 +145,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
 
         // Back to an ingredient category would leave the syrup in one it can't go in.
         var back = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = inHouse.Id, Name = "In-House", Type = RawMaterialCategoryType.Ingredient }, Cancellation);
-        await back.Should().ThrowAsync<InvalidOperationException>()
+        await back.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("In-House has 1 material that can't go in an ingredient category, so its type can't change. Move it to another category first.");
     }
 
@@ -159,7 +159,7 @@ public class CategoryPersistenceTests(DatabaseFixture fixture) : PersistenceTest
 
         var retype = () => CreateRepository().UpdateAsync(new RawMaterialCategory { Id = fillings.Id, Name = "Fillings", Type = RawMaterialCategoryType.Made }, Cancellation);
 
-        await retype.Should().ThrowAsync<InvalidOperationException>()
+        await retype.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Fillings has 2 materials that can't go in a Made category, so its type can't change. Move them to another category first.");
     }
 

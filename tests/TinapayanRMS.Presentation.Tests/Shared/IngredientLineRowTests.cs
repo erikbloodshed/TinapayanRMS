@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Shared;
@@ -109,7 +110,7 @@ public class IngredientLineRowTests
     {
         var act = () => IngredientLineRow.CompleteLines([new IngredientLineRow { Grams = 150m }], "Bread Dough");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Pick the ingredient for the 150 g line of Bread Dough, or delete that line.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Pick the ingredient for the 150 g line of Bread Dough, or delete that line.");
     }
 
     [Test]
@@ -120,7 +121,7 @@ public class IngredientLineRowTests
 
         var act = () => IngredientLineRow.CompleteLines([row], "Bread Dough");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
     }
 
     [Test]
@@ -130,7 +131,7 @@ public class IngredientLineRowTests
 
         var act = () => IngredientLineRow.CompleteLines([row], "Bread Dough");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Enter how many grams of Sugar go into Bread Dough, or delete its line.");
     }
 
     [Test]
@@ -138,7 +139,7 @@ public class IngredientLineRowTests
     {
         var act = () => IngredientLineRow.CompleteLines([new IngredientLineRow(Sugar, 100m), new IngredientLineRow(Sugar, 50m)], "Bread Dough");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Sugar is on two lines of Bread Dough. Put its total on one line and delete the other.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Sugar is on two lines of Bread Dough. Put its total on one line and delete the other.");
     }
 
     /// <summary>A 1,000 g flour base, then water given as 65% and eggs given as 100 g, the base worked out across them.</summary>

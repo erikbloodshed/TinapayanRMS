@@ -463,14 +463,14 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     {
         var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Batch().Sum(l => l.Grams));
 
-        // Rounded to the 2 decimals the box shows.
+        // Rounded to the 2 decimals the box shows, half to even as it always has been: the figure can be saved as typed.
         if (AuthoredField == UsageAuthoredField.WeightPerPiece)
         {
-            SetPieceSizeFigure(UsageAuthoredField.Yield, Math.Round(yield, 2));
+            SetPieceSizeFigure(UsageAuthoredField.Yield, Math.Round(yield, 2, MidpointRounding.ToEven));
         }
         else
         {
-            SetPieceSizeFigure(UsageAuthoredField.WeightPerPiece, Math.Round(weightPerPiece, 2));
+            SetPieceSizeFigure(UsageAuthoredField.WeightPerPiece, Math.Round(weightPerPiece, 2, MidpointRounding.ToEven));
         }
 
         Recompute();

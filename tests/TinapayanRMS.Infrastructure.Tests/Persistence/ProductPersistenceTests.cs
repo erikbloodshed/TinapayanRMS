@@ -395,7 +395,7 @@ public class ProductPersistenceTests(DatabaseFixture fixture) : PersistenceTestB
             (butterId, null, PackagingLineAuthoredField.QtyPerUnit, 1m),
         ], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Butter' is an ingredient*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'Butter' is an ingredient*");
     }
 
     [Test]

@@ -252,7 +252,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var shell = () => SaveAsync(Linked("Egg Shell", categoryId, eggId, weightShare: 10m, costShare: 1m));
 
-        await shell.Should().ThrowAsync<InvalidOperationException>()
+        await shell.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Egg White (70%), Egg Yolk (30%) already take 100% of Egg's weight, so Egg Shell can take at most 0%.");
         await using (var dbContext = CreateDbContext())
         {
@@ -283,8 +283,8 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
         var toItself = () => SaveAsync(Linked("Egg White", categoryId, whiteId, weightShare: 70m, costShare: 30m, id: whiteId));
         var toPackaging = () => SaveAsync(Linked("Egg Yolk", categoryId, trayBoxId, weightShare: 30m, costShare: 70m));
 
-        await toItself.Should().ThrowAsync<InvalidOperationException>().WithMessage("*itself*");
-        await toPackaging.Should().ThrowAsync<InvalidOperationException>().WithMessage("'Egg Tray Box' is packaging*");
+        await toItself.Should().ThrowAsync<BusinessRuleException>().WithMessage("*itself*");
+        await toPackaging.Should().ThrowAsync<BusinessRuleException>().WithMessage("'Egg Tray Box' is packaging*");
     }
 
     [Test]
@@ -324,7 +324,7 @@ public class LinkedIngredientPersistenceTests(DatabaseFixture fixture) : Persist
 
         var act = () => SetPriceAsync(whiteId, null, 10m);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Only a purchased material has purchase prices.");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Only a purchased material has purchase prices.");
     }
 
     [Test]

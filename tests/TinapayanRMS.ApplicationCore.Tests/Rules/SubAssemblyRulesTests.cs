@@ -107,7 +107,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(1, "Dough", null), (2, "Filling", null), (2, "Filling", "  ")]);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("This recipe has more than one Filling without a name. Name them, such as Ube and Cheese, so their tabs can be told apart.");
     }
 
@@ -116,7 +116,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureSectionsDistinct([(2, "Filling", "Ube"), (2, "Filling", " ube ")], "Cream Loaf");
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("Cream Loaf has two Filling sub-assemblies called Ube. Give one of them another name.");
     }
 
@@ -129,7 +129,7 @@ public class SubAssemblyRulesTests
 
         none.Should().NotThrow("names are optional");
         blank.Should().NotThrow();
-        tooLong.Should().Throw<InvalidOperationException>().WithMessage("*keep it to 100 characters*");
+        tooLong.Should().Throw<BusinessRuleException>().WithMessage("*keep it to 100 characters*");
     }
 
     [Test]
@@ -219,7 +219,7 @@ public class SubAssemblyRulesTests
         var own = () => SubAssemblyRules.EnsureLinkable("Cheese Roll Filling: Cheese", "Cheese Roll");
         var standalone = () => SubAssemblyRules.EnsureLinkable("Pan de Coco", null);
 
-        own.Should().Throw<InvalidOperationException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so it can't be linked. Copy it instead*");
+        own.Should().Throw<BusinessRuleException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so it can't be linked. Copy it instead*");
         standalone.Should().NotThrow();
     }
 
@@ -253,7 +253,7 @@ public class SubAssemblyRulesTests
         var packaging = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });
         var filling = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Filling", IsProductOwned = true });
 
-        packaging.Should().Throw<InvalidOperationException>().WithMessage("*can't be product-owned*");
+        packaging.Should().Throw<BusinessRuleException>().WithMessage("*can't be product-owned*");
         filling.Should().NotThrow();
     }
 
@@ -282,8 +282,8 @@ public class SubAssemblyRulesTests
         var one = () => SubAssemblyRules.EnsureNotLinkedElsewhere("Sweet Dough", ["Cream Loaf Mini"]);
         var two = () => SubAssemblyRules.EnsureNotLinkedElsewhere("Sweet Dough", ["Ube Roll", "Cream Loaf Mini"]);
 
-        one.Should().Throw<InvalidOperationException>().WithMessage("Cream Loaf Mini links Sweet Dough. Make a copy of it there, or remove it there, first.");
-        two.Should().Throw<InvalidOperationException>().WithMessage("Cream Loaf Mini, Ube Roll link Sweet Dough.*");
+        one.Should().Throw<BusinessRuleException>().WithMessage("Cream Loaf Mini links Sweet Dough. Make a copy of it there, or remove it there, first.");
+        two.Should().Throw<BusinessRuleException>().WithMessage("Cream Loaf Mini, Ube Roll link Sweet Dough.*");
     }
 
     [Test]
@@ -299,7 +299,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureStandaloneNameAvailable(" sweet dough ", ["Sweet Dough"]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'sweet dough'. Give this one its own name.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("There's already a sub-assembly named 'sweet dough'. Give this one its own name.");
     }
 
     [Test]
@@ -396,7 +396,7 @@ public class SubAssemblyRulesTests
     {
         var act = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, qty)]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*quantity must be positive*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*quantity must be positive*");
     }
 
     [Test]
@@ -405,8 +405,8 @@ public class SubAssemblyRulesTests
         var none = () => SubAssemblyRules.EnsureValidPackagingLines([]);
         var twice = () => SubAssemblyRules.EnsureValidPackagingLines([(1, null, 1m), (1, null, 2m)]);
 
-        none.Should().Throw<InvalidOperationException>().WithMessage("*at least one line*");
-        twice.Should().Throw<InvalidOperationException>().WithMessage("*same material more than once*");
+        none.Should().Throw<BusinessRuleException>().WithMessage("*at least one line*");
+        twice.Should().Throw<BusinessRuleException>().WithMessage("*same material more than once*");
     }
 
     [Test]
@@ -425,7 +425,7 @@ public class SubAssemblyRulesTests
         var renamed = () => SubAssemblyRules.EnsureRecipeRole(new SubAssemblyRole { Name = "Boxes", IsPackaging = true });
         var named = () => SubAssemblyRules.EnsureRecipeRole(new SubAssemblyRole { Name = "Packaging" });
 
-        renamed.Should().Throw<InvalidOperationException>().WithMessage("*Boxes role is for packaging sets*");
+        renamed.Should().Throw<BusinessRuleException>().WithMessage("*Boxes role is for packaging sets*");
         named.Should().NotThrow();
     }
 }

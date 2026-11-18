@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -55,7 +56,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var move = () => CreateRepository().MoveAsync([new RawMaterialMove(breadFlourId, dryGoodsId), new RawMaterialMove(cakeFlourId, boxesId)], Cancellation);
 
-        await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("Boxes is a packaging category.*");
+        await move.Should().ThrowAsync<BusinessRuleException>().WithMessage("Boxes is a packaging category.*");
         (await CategoryIdsAsync()).Should().OnlyContain(id => id == flourId);
     }
 
@@ -71,8 +72,8 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
         var intoIngredients = () => CreateRepository().MoveAsync([new RawMaterialMove(custardId, dryGoodsId)], Cancellation);
         var flourIntoMade = () => CreateRepository().MoveAsync([new RawMaterialMove(breadFlourId, inHouseId)], Cancellation);
 
-        await intoIngredients.Should().ThrowAsync<InvalidOperationException>().WithMessage("Dry Goods is an ingredient category. Put this made ingredient in a Made category.");
-        await flourIntoMade.Should().ThrowAsync<InvalidOperationException>().WithMessage("In-House is a Made category*");
+        await intoIngredients.Should().ThrowAsync<BusinessRuleException>().WithMessage("Dry Goods is an ingredient category. Put this made ingredient in a Made category.");
+        await flourIntoMade.Should().ThrowAsync<BusinessRuleException>().WithMessage("In-House is a Made category*");
 
         // One saved in an ingredient category before Made ones came in moves out of it into one.
         await CreateRepository().MoveAsync([new RawMaterialMove(custardId, inHouseId)], Cancellation);
@@ -87,7 +88,7 @@ public class RawMaterialMovePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var move = () => CreateRepository().MoveAsync([new RawMaterialMove(breadFlourId, flourId + 1000)], Cancellation);
 
-        await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("The category to move it to no longer exists.");
+        await move.Should().ThrowAsync<BusinessRuleException>().WithMessage("The category to move it to no longer exists.");
     }
 
     [Test]

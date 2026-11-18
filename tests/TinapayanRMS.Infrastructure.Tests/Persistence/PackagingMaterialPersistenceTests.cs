@@ -213,7 +213,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
 
         var act = () => CreateRepository().AddAsync(new RawMaterial { Type = RawMaterialType.Packaging, Name = "Label", CategoryId = categoryId }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*base unit*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*base unit*");
     }
 
     [Test]
@@ -232,7 +232,7 @@ public class PackagingMaterialPersistenceTests(DatabaseFixture fixture) : Persis
             WeightLossPercent = 0m,
         }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*packaging is always purchased*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*packaging is always purchased*");
     }
 
     [Test]

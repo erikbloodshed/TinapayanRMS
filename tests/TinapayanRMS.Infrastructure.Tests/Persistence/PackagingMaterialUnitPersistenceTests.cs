@@ -107,7 +107,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => repository.AddAsync(new RawMaterialUnit { RawMaterialId = ribbonId, UnitOfMeasureId = rollId, BaseUnitsPerUnit = 500m }, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*already has*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*already has*");
     }
 
     [Test]
@@ -209,7 +209,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => repository.DeleteAsync(roll.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'roll' is used by 1 purchase price*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'roll' is used by 1 purchase price*");
     }
 
     [Test]
@@ -233,7 +233,7 @@ public class PackagingMaterialUnitPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => repository.DeleteAsync(meter.Id, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("'meter' is used by 1 packaging line*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("'meter' is used by 1 packaging line*");
     }
 
     [Test]

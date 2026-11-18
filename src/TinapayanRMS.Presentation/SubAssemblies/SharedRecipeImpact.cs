@@ -48,7 +48,8 @@ public sealed class SharedRecipeImpact(
             var before = SavedProductReader.Build(product, detail).Costs.BaseCost;
             var withNewLines = detail with { SubAssemblyLines = [.. detail.SubAssemblyLines.Where(l => l.SubAssemblyId != subAssemblyId), .. newLines] };
             var after = SavedProductReader.Build(product, withNewLines).Costs.BaseCost;
-            if (Math.Round(before, 2) != Math.Round(after, 2))
+            // A change that shows: to the centavo, rounded half away from zero as a shown amount is.
+            if (Math.Round(before, 2, MidpointRounding.AwayFromZero) != Math.Round(after, 2, MidpointRounding.AwayFromZero))
             {
                 impacts.Add(new RecipeImpact(product.Name, before, after));
             }

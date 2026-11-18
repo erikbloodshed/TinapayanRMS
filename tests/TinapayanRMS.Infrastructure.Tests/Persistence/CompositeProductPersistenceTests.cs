@@ -93,8 +93,8 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var withNone = () => CreateRepository().SaveAsync(
             new Product { Name = "Party Package", IsComposite = true }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
-        await withOne.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product needs at least two different products.");
-        await withNone.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product needs at least two different products.");
+        await withOne.Should().ThrowAsync<BusinessRuleException>().WithMessage("A composite product needs at least two different products.");
+        await withNone.Should().ThrowAsync<BusinessRuleException>().WithMessage("A composite product needs at least two different products.");
         await using var dbContext = CreateDbContext();
         (await dbContext.Products.CountAsync(Cancellation)).Should().Be(1, "each refused save rolled its new product back");
     }
@@ -108,8 +108,8 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var twice = () => AddCompositeAsync("Pasalubong Box", (ensaymadaId, 2), (cheeseRollId, 4), (ensaymadaId, 4));
         var none = () => AddCompositeAsync("Pasalubong Box", (ensaymadaId, 6), (cheeseRollId, 0));
 
-        await twice.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada is on two lines*");
-        await none.Should().ThrowAsync<InvalidOperationException>().WithMessage("Enter how many Cheese Roll go in*");
+        await twice.Should().ThrowAsync<BusinessRuleException>().WithMessage("Ensaymada is on two lines*");
+        await none.Should().ThrowAsync<BusinessRuleException>().WithMessage("Enter how many Cheese Roll go in*");
     }
 
     [Test]
@@ -126,10 +126,10 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var directly = () => SaveComponentsAsync(boxId, (ensaymadaId, 6), (partyId, 1));
         var throughAnother = () => SaveComponentsAsync(boxId, (ensaymadaId, 6), (trayId, 1));
 
-        await itself.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product can't contain itself.");
-        await directly.Should().ThrowAsync<InvalidOperationException>().WithMessage(
+        await itself.Should().ThrowAsync<BusinessRuleException>().WithMessage("A composite product can't contain itself.");
+        await directly.Should().ThrowAsync<BusinessRuleException>().WithMessage(
             "Party Package can't go into Pasalubong Box: it already contains Pasalubong Box, so Pasalubong Box would end up containing itself.");
-        await throughAnother.Should().ThrowAsync<InvalidOperationException>().WithMessage("Office Tray can't go into Pasalubong Box*");
+        await throughAnother.Should().ThrowAsync<BusinessRuleException>().WithMessage("Office Tray can't go into Pasalubong Box*");
         (await HeldAsync(boxId)).Should().Equal(("Ensaymada", 6), ("Cheese Roll", 4));
     }
 
@@ -156,9 +156,9 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
             []) { Components = [(ensaymadaId, 6), (cheeseRollId, 4)] });
         var productsInSingle = () => SaveRecipeAsync(ensaymadaId, Holding((cheeseRollId, 1), (boxId, 1)));
 
-        await sectionInComposite.Should().ThrowAsync<InvalidOperationException>().WithMessage(
+        await sectionInComposite.Should().ThrowAsync<BusinessRuleException>().WithMessage(
             "Pasalubong Box can only have sections in product-owned roles, such as a topping or filling. Dough isn't one: tick Product-owned for it in Settings ▸ Roles, or take that section out.");
-        await productsInSingle.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada is made of sub-assemblies*");
+        await productsInSingle.Should().ThrowAsync<BusinessRuleException>().WithMessage("Ensaymada is made of sub-assemblies*");
         await using var dbContext = CreateDbContext();
         (await dbContext.ProductSubAssemblyUsages.Where(u => u.ProductId == boxId).Select(u => u.SubAssembly!.RoleId).ToListAsync(Cancellation))
             .Should().Equal([toppingRoleId, toppingRoleId], "the refused save left the two toppings as they were");
@@ -193,9 +193,9 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
         var untick = () => roles.UpdateAsync(new SubAssemblyRole { Id = toppingRoleId, Name = "Topping", SortOrder = 3, IsProductOwned = false }, Cancellation);
         var toDough = () => subAssemblies.SaveStandaloneAsync(new SubAssembly { Id = glazeId, Name = "House Glaze", RoleId = doughRoleId }, [(icingId, 500m)], Cancellation);
 
-        await untick.Should().ThrowAsync<InvalidOperationException>().WithMessage(
+        await untick.Should().ThrowAsync<BusinessRuleException>().WithMessage(
             "Party Box, Pasalubong Box have a Topping section, and a composite product can only have sections in product-owned roles. Take it out there first, then untick Product-owned.");
-        await toDough.Should().ThrowAsync<InvalidOperationException>().WithMessage(
+        await toDough.Should().ThrowAsync<BusinessRuleException>().WithMessage(
             "Party Box, Pasalubong Box have House Glaze as a section*which Dough isn't*");
 
         // Another product-owned role is fine, and so is unticking one no composite uses.
@@ -216,8 +216,8 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
             new Product { Id = ensaymadaId, Name = "Ensaymada", IsComposite = true }, null, null, null, null, Cancellation);
         var leaving = () => CreateRepository().UpdateAsync(new Product { Id = boxId, Name = "Pasalubong Box" }, Cancellation);
 
-        await becoming.Should().ThrowAsync<InvalidOperationException>().WithMessage("A product can't become a composite product*");
-        await leaving.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product can't become a single product*");
+        await becoming.Should().ThrowAsync<BusinessRuleException>().WithMessage("A product can't become a composite product*");
+        await leaving.Should().ThrowAsync<BusinessRuleException>().WithMessage("A composite product can't become a single product*");
         (await CreateRepository().GetByIdAsync(boxId, Cancellation))!.IsComposite.Should().BeTrue();
     }
 
@@ -232,7 +232,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
             new Product { Id = boxId, Name = "Pasalubong Box", IsComposite = true, QuantityRequired = 2 }, Cancellation);
         var addedBare = () => CreateRepository().AddAsync(new Product { Name = "Party Package", IsComposite = true }, Cancellation);
 
-        await twoBoxes.Should().ThrowAsync<InvalidOperationException>().WithMessage("A composite product is one sellable unit*");
+        await twoBoxes.Should().ThrowAsync<BusinessRuleException>().WithMessage("A composite product is one sellable unit*");
         await addedBare.Should().ThrowAsync<BusinessRuleException>();
 
         // The database holds to it too.
@@ -261,7 +261,7 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
 
         var single = () => CreateRepository().SaveAsync(
             new Product { Id = ensaymadaId, Name = "Ensaymada", IncludesComponentPackaging = true }, null, null, null, null, Cancellation);
-        await single.Should().ThrowAsync<InvalidOperationException>().WithMessage("Only a composite product can include*");
+        await single.Should().ThrowAsync<BusinessRuleException>().WithMessage("Only a composite product can include*");
 
         // The database holds to it too.
         await using var dbContext = CreateDbContext();
@@ -281,18 +281,18 @@ public class CompositeProductPersistenceTests(DatabaseFixture fixture) : Persist
 
         var deleteHeld = () => CreateRepository().DeleteAsync(ensaymadaId, Cancellation);
 
-        await deleteHeld.Should().ThrowAsync<InvalidOperationException>()
+        await deleteHeld.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Merienda Set, Pasalubong Box hold this product. Take it out there first.");
 
         var deleteBox = () => CreateRepository().DeleteAsync(boxId, Cancellation);
-        await deleteBox.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set holds this product. Take it out there first.");
+        await deleteBox.Should().ThrowAsync<BusinessRuleException>().WithMessage("Merienda Set holds this product. Take it out there first.");
 
         // A deleted composite still holds its products, so it can be restored whole, until it's deleted permanently.
         var setId = (await CreateRepository().GetAllAsync(Cancellation)).Single(p => p.Name == "Merienda Set").Id;
         await CreateRepository().DeleteAsync(setId, Cancellation);
-        await deleteBox.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set (deleted) holds this product. Take it out there first.");
+        await deleteBox.Should().ThrowAsync<BusinessRuleException>().WithMessage("Merienda Set (deleted) holds this product. Take it out there first.");
         var deleteBoxPermanently = () => CreateRepository().DeletePermanentlyAsync(boxId, Cancellation);
-        await deleteBoxPermanently.Should().ThrowAsync<InvalidOperationException>().WithMessage("Merienda Set (deleted) holds this product.*");
+        await deleteBoxPermanently.Should().ThrowAsync<BusinessRuleException>().WithMessage("Merienda Set (deleted) holds this product.*");
 
         await CreateRepository().DeletePermanentlyAsync(setId, Cancellation);
         await CreateRepository().DeletePermanentlyAsync(boxId, Cancellation);

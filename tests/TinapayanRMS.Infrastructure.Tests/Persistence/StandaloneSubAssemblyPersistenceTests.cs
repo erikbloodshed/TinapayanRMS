@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -79,8 +80,8 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         var act = () => SaveStandaloneAsync(" glaze ", roleId, [(sugarId, 50m)]);
         var productsName = () => SaveStandaloneAsync("cream loaf glaze", roleId, [(sugarId, 50m)]);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'glaze'*");
-        await productsName.Should().ThrowAsync<InvalidOperationException>().WithMessage("There's already a sub-assembly named 'cream loaf glaze'*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("There's already a sub-assembly named 'glaze'*");
+        await productsName.Should().ThrowAsync<BusinessRuleException>().WithMessage("There's already a sub-assembly named 'cream loaf glaze'*");
     }
 
     [Test]
@@ -99,7 +100,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
         // Cream Loaf's own Topping was saved as "Cream Loaf Topping: Glaze", which reads "Topping: Glaze" there.
         var act = () => SaveStandaloneAsync("Glaze", toppingRoleId, [(sugarId, 100m)], glazeId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
+        await act.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Cream Loaf, which links this sub-assembly, has two Topping sub-assemblies called Glaze*");
         (await GetSubAssemblyAsync(glazeId)).RoleId.Should().Be(glazeRoleId);
 
@@ -116,7 +117,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => SaveStandaloneAsync("Glaze", roleId, []);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*at least one line*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*at least one line*");
         await using var dbContext = CreateDbContext();
         (await dbContext.SubAssemblies.AnyAsync(Cancellation)).Should().BeFalse("a rejected save rolls back");
     }
@@ -188,7 +189,7 @@ public class StandaloneSubAssemblyPersistenceTests(DatabaseFixture fixture) : Pe
 
         var act = () => CreateRepository().DeleteStandaloneAsync(glazeId, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cream Loaf links Glaze.*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Cream Loaf links Glaze.*");
         (await GetSubAssemblyAsync(glazeId)).Name.Should().Be("Glaze");
     }
 

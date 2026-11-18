@@ -267,7 +267,7 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
     public decimal? EditingBufferedCostInUnit
     {
         get => EditingBufferedCost is { } cost
-            ? Math.Round(cost * BufferedCostUnitSize(), IsBufferedCostOnBaseUnit ? 4 : 2)
+            ? Math.Round(cost * BufferedCostUnitSize(), IsBufferedCostOnBaseUnit ? 4 : 2, MidpointRounding.ToEven)
             : null;
         set
         {
@@ -553,11 +553,11 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
             // the amount stays put. Held to the 0-100 the box, the validator and the
             // check constraint allow, so a buffer that's gone (or more than double) pins it; the line below and the
             // warning say where it really stands. Typing the % still works the other way, through TypedCostBufferPercent.
-            EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4), 0m, 100m);
+            EditingCostBufferPercent = Math.Clamp(Math.Round(over, 4, MidpointRounding.ToEven), 0m, 100m);
             PurchaseBufferedCostText = $"{FormatInBufferedCostUnit(buffered)}/{unit} is {over:0.##}% over {source}'s {FormatInBufferedCostUnit(cost)}/{unit}.";
             // Compared to the 4 places costs per base unit are shown to: a saved buffered cost comes back cut to its
             // column's 20 places, so a repeating one (170/240) would otherwise read as a hair under an unchanged dearest brand.
-            BufferedCostWarningText = Math.Round(buffered, 4) < Math.Round(cost, 4)
+            BufferedCostWarningText = Math.Round(buffered, 4, MidpointRounding.AwayFromZero) < Math.Round(cost, 4, MidpointRounding.AwayFromZero)
                 ? $"{char.ToUpperInvariant(source[0])}{source[1..]} now costs more than the buffered cost. Type the Cost Buffer % again to put the buffer back on top."
                 : string.Empty;
         }

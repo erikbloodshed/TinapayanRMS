@@ -385,7 +385,7 @@ public static class RawMaterialRules
     /// (9.98% against 10%), isn't counted.
     /// </summary>
     public static bool IsBufferBelowTarget(RawMaterial material) =>
-        CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < Math.Round(TargetBufferPercentOf(material), 1);
+        CurrentBufferPercentOf(material) is { } now && AsShown(now) < AsShown(TargetBufferPercentOf(material));
 
     /// <summary>
     /// A purchased material that prices have risen past its fixed buffered cost (RawMaterial.BufferedCostPerBaseUnit): its
@@ -393,13 +393,19 @@ public static class RawMaterialRules
     /// costs. A tenth of a point, as <see cref="IsBufferBelowTarget"/> counts, so a 0% buffer typed to the centavo isn't one.
     /// </summary>
     public static bool IsBufferedBelowCost(RawMaterial material) =>
-        CurrentBufferPercentOf(material) is { } now && Math.Round(now, 1) < 0m;
+        CurrentBufferPercentOf(material) is { } now && AsShown(now) < 0m;
 
     /// <summary>
     /// A buffer that has drifted from its target, either way, by a tenth of a point or more, as <see cref="IsBufferBelowTarget"/>
     /// counts it: the Raw Materials form's Re-apply Target shows.
     /// </summary>
-    public static bool IsOffTarget(decimal bufferPercent, decimal targetPercent) => Math.Round(bufferPercent, 1) != Math.Round(targetPercent, 1);
+    public static bool IsOffTarget(decimal bufferPercent, decimal targetPercent) => AsShown(bufferPercent) != AsShown(targetPercent);
+
+    /// <summary>
+    /// A buffer percent to the tenth of a point the buffer checks count in, rounded half away from zero as a number is when
+    /// it's shown, so a buffer shown at its target is never counted off it.
+    /// </summary>
+    private static decimal AsShown(decimal bufferPercent) => Math.Round(bufferPercent, 1, MidpointRounding.AwayFromZero);
 
     /// <summary>A cost buffer is at least 0% (none) and at most 100% (double the cost).</summary>
     public static void EnsureValidCostBuffer(decimal bufferPercent)

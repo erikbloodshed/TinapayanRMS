@@ -16,7 +16,8 @@ namespace TinapayanRMS.Presentation.Reports;
 /// A row of the Product Cost Summary: a product's cost and price for one sellable unit, computed live from today's data,
 /// never historized.
 /// </summary>
-public sealed class ProductCostRow(Product product, ProductCostSummary costs)
+/// <param name="sectionsWithoutPieceSize">Its sections with no weight per piece or yield (SavedProduct.SectionsWithoutPieceSize), by name.</param>
+public sealed class ProductCostRow(Product product, ProductCostSummary costs, IReadOnlyList<string>? sectionsWithoutPieceSize = null)
 {
     public int ProductId => product.Id;
 
@@ -76,6 +77,12 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs)
     /// when it isn't short, or there's no current price. Sorting by it puts the furthest short first.
     /// </summary>
     public decimal? ShortOfTargetMarkup => costs.IsBelowTargetMarkup ? costs.MarginPercent - costs.CurrentMarkupPercent : null;
+
+    /// <summary>
+    /// The recipe sections with no weight per piece or yield, which cost it nothing per piece, by name ("Topping", or
+    /// "Dough, Topping"); empty when every section has one. Its costs and prices leave those sections out.
+    /// </summary>
+    public string NoPieceSize { get; } = string.Join(", ", sectionsWithoutPieceSize ?? []);
 }
 
 /// <summary>
@@ -369,7 +376,7 @@ public sealed class ReportsState : ScreenState, IDisposable
         List<RawMaterial> purchased = [.. materials.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
         return new Read(
             priced,
-            [.. priced.Select(s => new ProductCostRow(s.Product, s.Costs))],
+            [.. priced.Select(s => new ProductCostRow(s.Product, s.Costs, s.SectionsWithoutPieceSize))],
             [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
             [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))],
             bomLinesRead is null ? [] : CostDriverAnalysis.Analyse(products, details, materials.ToDictionary(m => m.Id), [.. await bomLinesRead]));

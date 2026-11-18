@@ -127,6 +127,33 @@ public class ReportsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fi
     });
 
     [Test]
+    public Task A_section_with_no_piece_size_is_named_in_the_product_cost_summary() => UiThread.RunAsync(async () =>
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var toppingId = await AddRoleAsync("Topping", sortOrder: 2);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+
+        // Ensaymada's dough is cut 50 g a piece, but its topping has neither a weight per piece nor a yield yet.
+        var ensaymadaId = await AddProductAsync("Ensaymada");
+        await SaveRecipeAsync(ensaymadaId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 50m),
+                new NewSubAssemblyDraft(toppingId, [(sugarId, 100m)], UsageAuthoredField.WeightPerPiece, 0m),
+            ],
+            []));
+        await AddProductWithSubAssemblyAsync("Pandesal", doughId, [(flourId, 1000m)], weightPerPiece: 30m);
+
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+
+        var ensaymada = state.ProductCosts.Should().ContainSingle(r => r.ProductName == "Ensaymada").Subject;
+        ensaymada.NoPieceSize.Should().Be("Topping");
+        ensaymada.IngredientsCost.Should().Be(2.5m, "the topping adds nothing until it has a piece size");
+        state.ProductCosts.Should().ContainSingle(r => r.ProductName == "Pandesal").Subject.NoPieceSize.Should().BeEmpty();
+    });
+
+    [Test]
     public Task The_price_summary_shows_each_purchased_materials_latest_price_and_its_change_per_gram() => UiThread.RunAsync(async () =>
     {
         var flourId = await AddIngredientAsync("Flour");

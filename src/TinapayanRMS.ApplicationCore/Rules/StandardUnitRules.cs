@@ -58,7 +58,7 @@ public static class StandardUnitRules
         }
 
         // A unit too small to show in 4 places of the base unit (a milligram of a kilogram) is left to type.
-        var multiplier = Math.Round(standard.Size / standardBase.Size, 4);
+        var multiplier = Math.Round(standard.Size / standardBase.Size, 4, MidpointRounding.ToEven);
         return multiplier > 0 ? multiplier : null;
     }
 

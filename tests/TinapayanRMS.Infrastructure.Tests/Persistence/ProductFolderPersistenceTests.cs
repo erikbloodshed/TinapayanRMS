@@ -60,15 +60,15 @@ public class ProductFolderPersistenceTests(DatabaseFixture fixture) : Persistenc
         var breadsId = await AddFolderAsync("Breads");
 
         var sameCase = () => AddFolderAsync("breads");
-        await sameCase.Should().ThrowAsync<InvalidOperationException>().WithMessage("Production already has a folder named breads.");
+        await sameCase.Should().ThrowAsync<BusinessRuleException>().WithMessage("Production already has a folder named breads.");
 
         await AddFolderAsync("Breads", ProductStage.Innovation);
         var inside = await AddFolderAsync("Breads", parentId: breadsId);
         var insideAgain = () => AddFolderAsync("BREADS", parentId: breadsId);
-        await insideAgain.Should().ThrowAsync<InvalidOperationException>().WithMessage("Production › Breads already has a folder named BREADS.");
+        await insideAgain.Should().ThrowAsync<BusinessRuleException>().WithMessage("Production › Breads already has a folder named BREADS.");
 
         var empty = () => AddFolderAsync("   ");
-        await empty.Should().ThrowAsync<InvalidOperationException>().WithMessage("Every folder needs a name.");
+        await empty.Should().ThrowAsync<BusinessRuleException>().WithMessage("Every folder needs a name.");
         var orphan = () => AddFolderAsync("Lost", parentId: inside + 999);
         await orphan.Should().ThrowAsync<BusinessRuleException>();
         (await CreateRepository().GetAllAsync(Cancellation)).Should().HaveCount(3);
@@ -97,7 +97,7 @@ public class ProductFolderPersistenceTests(DatabaseFixture fixture) : Persistenc
         await CreateRepository().RenameAsync(breadsId, " Bread ", Cancellation);
         var taken = () => CreateRepository().RenameAsync(breadsId, "cakes", Cancellation);
 
-        await taken.Should().ThrowAsync<InvalidOperationException>().WithMessage("Production already has a folder named cakes.");
+        await taken.Should().ThrowAsync<BusinessRuleException>().WithMessage("Production already has a folder named cakes.");
         (await FolderAsync(breadsId))!.Name.Should().Be("Bread");
         (await ProductAsync(pandesalId)).FolderId.Should().Be(breadsId);
         await CreateRepository().RenameAsync(breadsId, "BREAD", Cancellation);
@@ -162,11 +162,11 @@ public class ProductFolderPersistenceTests(DatabaseFixture fixture) : Persistenc
         var gone = () => CreateRepository().MoveAsync(new ProductFolderMove(holidayId, ProductStage.Production, trialsId + 999), Cancellation);
         var otherStage = () => CreateRepository().MoveAsync(new ProductFolderMove(holidayId, ProductStage.Production, trialsId), Cancellation);
 
-        await intoItself.Should().ThrowAsync<InvalidOperationException>().WithMessage("A folder can't go inside itself.");
-        await intoItsOwn.Should().ThrowAsync<InvalidOperationException>().WithMessage("A folder can't go inside itself.");
-        await nameTaken.Should().ThrowAsync<InvalidOperationException>().WithMessage("Production already has a folder named Holiday.");
-        await gone.Should().ThrowAsync<InvalidOperationException>().WithMessage("The folder to move it to no longer exists.");
-        await otherStage.Should().ThrowAsync<InvalidOperationException>().WithMessage("That folder is in Innovation, not Production.");
+        await intoItself.Should().ThrowAsync<BusinessRuleException>().WithMessage("A folder can't go inside itself.");
+        await intoItsOwn.Should().ThrowAsync<BusinessRuleException>().WithMessage("A folder can't go inside itself.");
+        await nameTaken.Should().ThrowAsync<BusinessRuleException>().WithMessage("Production already has a folder named Holiday.");
+        await gone.Should().ThrowAsync<BusinessRuleException>().WithMessage("The folder to move it to no longer exists.");
+        await otherStage.Should().ThrowAsync<BusinessRuleException>().WithMessage("That folder is in Innovation, not Production.");
         (await FolderAsync(holidayId))!.ParentId.Should().Be(breadsId);
         (await FolderAsync(otherHolidayId))!.ParentId.Should().BeNull();
     }
@@ -203,7 +203,7 @@ public class ProductFolderPersistenceTests(DatabaseFixture fixture) : Persistenc
 
         var delete = () => CreateRepository().DeleteAsync(breadsId, Cancellation);
 
-        await delete.Should().ThrowAsync<InvalidOperationException>().WithMessage("Production already has a folder named holiday.");
+        await delete.Should().ThrowAsync<BusinessRuleException>().WithMessage("Production already has a folder named holiday.");
         (await FolderAsync(breadsId)).Should().NotBeNull();
         (await FolderAsync(innerId))!.ParentId.Should().Be(breadsId);
         (await ProductAsync(pandesalId)).FolderId.Should().Be(breadsId);

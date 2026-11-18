@@ -1153,6 +1153,22 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         state.List.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
     });
 
+    [Test]
+    public Task A_product_with_a_section_that_has_no_piece_size_is_flagged_in_the_list() => UiThread.RunAsync(async () =>
+    {
+        var fillingId = await AddRoleAsync("Filling");
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.25m);
+
+        // Ube Pandesal's filling has neither a weight per piece nor a yield yet, so it costs the bread nothing.
+        var (unsizedId, _) = await AddProductWithSubAssemblyAsync("Ube Pandesal", fillingId, [(ubeId, 100m)], weightPerPiece: 0m);
+        var (sizedId, _) = await AddProductWithSubAssemblyAsync("Ube Roll", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
+
+        var state = await LoadedStateAsync();
+        await Settle.UntilAsync(state, () => state.List.ProductTree.Find(unsizedId)!.HasSectionWithoutPieceSize, () => "not flagged yet");
+
+        state.List.ProductTree.Find(sizedId)!.HasSectionWithoutPieceSize.Should().BeFalse();
+    });
+
     private async Task PriceAsync(int productId, decimal currentPrice, decimal targetMarkupPercent)
     {
         await using var dbContext = CreateDbContext();

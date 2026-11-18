@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -52,7 +53,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var move = () => CreateRepository().MoveAsync([new SubAssemblyMove(halayaId, fillingRoleId), new SubAssemblyMove(jamId, packagingRoleId)], Cancellation);
 
-        await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("The Packaging role is for packaging sets*");
+        await move.Should().ThrowAsync<BusinessRuleException>().WithMessage("The Packaging role is for packaging sets*");
         (await RoleIdsAsync()).Should().OnlyContain(id => id == doughRoleId, "the first refusal moves none");
     }
 
@@ -77,7 +78,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
         var move = () => CreateRepository().MoveAsync(
             [new SubAssemblyMove(ownGlazeId, toppingRoleId), new SubAssemblyMove(glazeId, toppingRoleId)], Cancellation);
 
-        await move.Should().ThrowAsync<InvalidOperationException>()
+        await move.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Cream Loaf, which links this sub-assembly, has two Topping sub-assemblies called Glaze*");
         (await RoleIdsAsync()).Should().BeEquivalentTo([fillingRoleId, doughRoleId], "the first refusal moves none");
     }
@@ -91,7 +92,7 @@ public class SubAssemblyMovePersistenceTests(DatabaseFixture fixture) : Persiste
 
         var move = () => CreateRepository().MoveAsync([new SubAssemblyMove(halayaId, doughRoleId + 1000)], Cancellation);
 
-        await move.Should().ThrowAsync<InvalidOperationException>().WithMessage("Every sub-assembly needs a role, and that role must still exist.");
+        await move.Should().ThrowAsync<BusinessRuleException>().WithMessage("Every sub-assembly needs a role, and that role must still exist.");
     }
 
     [Test]

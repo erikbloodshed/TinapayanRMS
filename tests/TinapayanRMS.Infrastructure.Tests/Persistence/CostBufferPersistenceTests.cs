@@ -275,7 +275,7 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => CreateRepository().SaveAsync(sugar, [], brandPrices: null, addIns: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Buffered cost can't be negative.");
     }
 
     [Test]
@@ -287,6 +287,6 @@ public class CostBufferPersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => CreateRepository().SaveAsync(PurchasedIngredient("Sugar", categoryId, costBufferPercent), [], brandPrices: null, addIns: null, Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cost buffer*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("Cost buffer*");
     }
 }

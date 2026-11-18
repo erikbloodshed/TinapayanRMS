@@ -47,6 +47,12 @@ public sealed record PricedSection(
 
     public decimal Yield => Figures.Yield;
 
+    /// <summary>
+    /// Whether its batch is cut into pieces (ProductRules.HasPieces): not while no weight per piece or yield is typed, when
+    /// it costs the product nothing per piece, whatever its batch costs.
+    /// </summary>
+    public bool HasPieces => ProductRules.HasPieces(TotalWeight, WeightPerPiece);
+
     public decimal TotalCostAt(CostBasis basis) => Figures.TotalCostAt(basis);
 
     public decimal CostPerPieceAt(CostBasis basis) => Figures.CostPerPieceAt(basis);

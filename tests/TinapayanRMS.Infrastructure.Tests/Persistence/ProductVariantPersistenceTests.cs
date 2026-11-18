@@ -1,6 +1,7 @@
 ﻿using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -153,7 +154,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var relink = () => SaveRecipeAsync(variantId, new RecipeDraft([], [new LinkedUsageDraft(fillingId, UsageAuthoredField.WeightPerPiece, 30m)]));
 
-        await relink.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Ensaymada Big's own, so it can't be linked*");
+        await relink.Should().ThrowAsync<BusinessRuleException>().WithMessage("*is Ensaymada Big's own, so it can't be linked*");
     }
 
     [Test]
@@ -164,7 +165,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
 
         var drop = () => SaveRecipeAsync(sourceId, new RecipeDraft([], []));
 
-        await drop.Should().ThrowAsync<InvalidOperationException>()
+        await drop.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Ensaymada Small links Ensaymada Big Filling. Make a copy of it there, or remove it there, first.");
         (await CreateUsageRepository().GetForProductAsync(sourceId, Cancellation)).Should().ContainSingle(u => u.SubAssemblyId == fillingId);
 
@@ -183,8 +184,8 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         var delete = () => products.DeleteAsync(sourceId, Cancellation);
         var deletePermanently = () => products.DeletePermanentlyAsync(sourceId, Cancellation);
 
-        await delete.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada Small links Ensaymada Big Filling.*");
-        await deletePermanently.Should().ThrowAsync<InvalidOperationException>().WithMessage("Ensaymada Small links Ensaymada Big Filling.*");
+        await delete.Should().ThrowAsync<BusinessRuleException>().WithMessage("Ensaymada Small links Ensaymada Big Filling.*");
+        await deletePermanently.Should().ThrowAsync<BusinessRuleException>().WithMessage("Ensaymada Small links Ensaymada Big Filling.*");
     }
 
     [Test]

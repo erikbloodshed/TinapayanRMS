@@ -53,6 +53,18 @@ public class RawMaterialRulesTests
     }
 
     [Test]
+    public void A_buffer_at_an_exact_half_is_counted_as_it_shows_rounded_half_away_from_zero()
+    {
+        // 4.85% shows as 4.9%, so against a 4.9% target it's on target; 4.84% shows as 4.8%, a tenth off.
+        RawMaterialRules.IsOffTarget(4.85m, 4.9m).Should().BeFalse();
+        RawMaterialRules.IsOffTarget(4.84m, 4.9m).Should().BeTrue();
+
+        // 99.95 over 100 is -0.05%, which shows as -0.1%: below cost, as shown.
+        RawMaterialRules.IsBufferedBelowCost(Purchased(100m, 99.95m, 0m, null)).Should().BeTrue();
+        Purchased(100m, 104.85m, 4.85m, 4.9m).Should().Match<RawMaterial>(m => !RawMaterialRules.IsBufferBelowTarget(m), "4.85% shows as the 4.9% target");
+    }
+
+    [Test]
     public void A_material_saved_before_targets_were_kept_takes_its_last_saved_buffer_as_its_target()
     {
         RawMaterialRules.TargetBufferPercentOf(Purchased(0.05m, 0.055m, 10m, null)).Should().Be(10m);
@@ -77,7 +89,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchType(ingredient);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*gram*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*gram*");
     }
 
     [Test]
@@ -99,7 +111,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchType(packaging);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*base unit*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*base unit*");
     }
 
     [Test]
@@ -109,7 +121,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchType(packaging);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*packaging is always purchased*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*packaging is always purchased*");
     }
 
     [Test]
@@ -222,7 +234,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*linked to*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*linked to*");
     }
 
     public static IEnumerable<(decimal?, decimal?)> SharesMissingOrOutOfRange() =>
@@ -250,7 +262,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*share must be above 0 and at most 100*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*share must be above 0 and at most 100*");
     }
 
     [Test]
@@ -260,7 +272,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(eggWhite);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*weight loss*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*weight loss*");
     }
 
     [Test]
@@ -277,7 +289,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchSource(material);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Only a linked ingredient*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Only a linked ingredient*");
     }
 
     [Test]
@@ -287,7 +299,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureFieldsMatchType(packaging);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*packaging is always purchased*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*packaging is always purchased*");
     }
 
     [Test]
@@ -326,7 +338,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 1, linkedToId: 1, RawMaterialType.Ingredient, "Egg");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*itself*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*itself*");
     }
 
     [Test]
@@ -334,7 +346,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureValidLinkTarget(id: 0, linkedToId: 1, RawMaterialType.Packaging, "Egg Tray");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("'Egg Tray' is packaging*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("'Egg Tray' is packaging*");
     }
 
     [Test]
@@ -359,7 +371,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg White", "Egg", 75m, 30m, [("Egg Yolk", 30m, 70m)]);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("Egg Yolk (30%) already takes 30% of Egg's weight, so Egg White can take at most 70%.");
     }
 
@@ -368,7 +380,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureLinkSharesFit("Egg Shell", "Egg", 10m, 5m, [("Egg White", 60m, 30m), ("Egg Yolk", 30m, 70m)]);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("Egg White (30%), Egg Yolk (70%) already take 100% of Egg's cost, so Egg Shell can take at most 0%.");
     }
 
@@ -411,7 +423,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureUsableInRecipes(RawMaterialType.Packaging, "Cake Box");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("'Cake Box' is packaging*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("'Cake Box' is packaging*");
     }
 
     [Test]
@@ -421,7 +433,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureUsableAsPackaging(RawMaterialType.Ingredient, "Sugar");
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("'Sugar' is an ingredient*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("'Sugar' is an ingredient*");
     }
 
     [Test]
@@ -478,7 +490,7 @@ public class RawMaterialRulesTests
 
         var act = () => RawMaterialRules.EnsureValidBufferedCost(-0.01m);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Buffered cost can't be negative.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Buffered cost can't be negative.");
     }
 
     public static IEnumerable<(CostBasis, decimal)> CostsAtEachBasis() =>
@@ -573,7 +585,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureDistinctBrandPrices([("Gold Medal", 1), (" gold medal ", 1)]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("'Gold Medal' is priced twice*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("'Gold Medal' is priced twice*");
     }
 
     [Test]
@@ -581,7 +593,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureDistinctBrandPrices([(null, null), ("  ", null)]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Two prices without a brand*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Two prices without a brand*");
     }
 
     public static IEnumerable<(decimal, decimal, decimal)> BufferedCosts() =>
@@ -655,7 +667,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureValidCostBuffer(bufferPercent);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Cost buffer*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Cost buffer*");
     }
 
     [Test]
@@ -695,7 +707,7 @@ public class RawMaterialRulesTests
     {
         var act = () => RawMaterialRules.EnsureUnitNotAlreadyAdded(alreadyAdded: true);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("*already has that unit*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("*already has that unit*");
     }
 
     [Test]

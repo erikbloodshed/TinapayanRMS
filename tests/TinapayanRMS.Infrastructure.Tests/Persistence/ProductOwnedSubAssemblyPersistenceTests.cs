@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -167,7 +168,7 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
 
         var otherId = await AddProductAsync("Cheese Bun");
         var link = () => SaveRecipeAsync(otherId, new RecipeDraft([], [new LinkedUsageDraft(ownId, UsageAuthoredField.WeightPerPiece, 10m)]));
-        await link.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own, so it can't be linked*");
+        await link.Should().ThrowAsync<BusinessRuleException>().WithMessage("*is Cheese Roll's own, so it can't be linked*");
 
         // Saved again with its id, as the Products form does, and in another role that isn't product-owned: still its own.
         await SaveRecipeAsync(productId, new RecipeDraft([Own(doughRoleId, [(flourId, 900m)], id: ownId, placement: new SectionPlacement.ProductsOwn())], []));
@@ -285,8 +286,8 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var link = () => SaveRecipeAsync(otherId, new RecipeDraft([], [new LinkedUsageDraft(fillingId, UsageAuthoredField.WeightPerPiece, 10m)]));
         var claim = () => SaveRecipeAsync(otherId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)], id: fillingId)], []));
 
-        await link.Should().ThrowAsync<InvalidOperationException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so it can't be linked*");
-        await claim.Should().ThrowAsync<InvalidOperationException>().WithMessage("*isn't one of this product's own*");
+        await link.Should().ThrowAsync<BusinessRuleException>().WithMessage("Cheese Roll Filling: Cheese is Cheese Roll's own, so it can't be linked*");
+        await claim.Should().ThrowAsync<BusinessRuleException>().WithMessage("*isn't one of this product's own*");
 
         // A copy is Cheese Bun's own.
         await SaveRecipeAsync(otherId, new RecipeDraft([Own(fillingRoleId, [(cheeseId, 100m)])], []));
@@ -305,8 +306,8 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var save = () => CreateSubAssemblyRepository().SaveStandaloneAsync(new SubAssembly { Id = id, Name = "Cheese", RoleId = fillingRoleId }, [(cheeseId, 50m)], Cancellation);
         var delete = () => CreateSubAssemblyRepository().DeleteStandaloneAsync(id, Cancellation);
 
-        await save.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own*");
-        await delete.Should().ThrowAsync<InvalidOperationException>().WithMessage("*is Cheese Roll's own*");
+        await save.Should().ThrowAsync<BusinessRuleException>().WithMessage("*is Cheese Roll's own*");
+        await delete.Should().ThrowAsync<BusinessRuleException>().WithMessage("*is Cheese Roll's own*");
     }
 
     [Test]
@@ -485,8 +486,8 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
         var update = () => CreateRoleRepository().UpdateAsync(role, Cancellation);
         var add = () => CreateRoleRepository().AddAsync(new SubAssemblyRole { Name = "Boxes", IsPackaging = true, IsProductOwned = true }, Cancellation);
 
-        await update.Should().ThrowAsync<InvalidOperationException>().WithMessage("*can't be product-owned*");
-        await add.Should().ThrowAsync<InvalidOperationException>().WithMessage("*can't be product-owned*");
+        await update.Should().ThrowAsync<BusinessRuleException>().WithMessage("*can't be product-owned*");
+        await add.Should().ThrowAsync<BusinessRuleException>().WithMessage("*can't be product-owned*");
         (await RoleAsync(packagingRoleId)).IsProductOwned.Should().BeFalse();
     }
 

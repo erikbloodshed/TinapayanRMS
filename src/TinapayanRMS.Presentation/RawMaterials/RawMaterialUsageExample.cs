@@ -117,7 +117,7 @@ public sealed class RawMaterialUsageExample : ObservableState
             baseQuantity * material.CostPerBaseUnit,
             // What the fixed buffered cost comes to over the cost, which drifts from the percent as prices move.
             material.CostPerBaseUnit > 0
-                ? Math.Round(RawMaterialRules.CostBufferPercentOf(material.CostPerBaseUnit, material.BufferedCostPerBaseUnit), 2)
+                ? Math.Round(RawMaterialRules.CostBufferPercentOf(material.CostPerBaseUnit, material.BufferedCostPerBaseUnit), 2, MidpointRounding.AwayFromZero)
                 : material.CostBufferPercent,
             baseQuantity * material.BufferedCostPerBaseUnit);
     }

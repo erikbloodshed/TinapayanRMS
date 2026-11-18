@@ -33,8 +33,8 @@ public class CompositeProductRulesTests
         var none = () => CompositeProductRules.EnsureValidComponents(1, []);
         var one = () => CompositeProductRules.EnsureValidComponents(1, [(2, 6, "Ensaymada")]);
 
-        none.Should().Throw<InvalidOperationException>().WithMessage("A composite product needs at least two different products.");
-        one.Should().Throw<InvalidOperationException>().WithMessage("A composite product needs at least two different products.");
+        none.Should().Throw<BusinessRuleException>().WithMessage("A composite product needs at least two different products.");
+        one.Should().Throw<BusinessRuleException>().WithMessage("A composite product needs at least two different products.");
     }
 
     [Test]
@@ -42,7 +42,7 @@ public class CompositeProductRulesTests
     {
         var act = () => CompositeProductRules.EnsureValidComponents(1, [(2, 6, "Ensaymada"), (3, 4, "Cheese Roll"), (2, 2, "Ensaymada")]);
 
-        act.Should().Throw<InvalidOperationException>()
+        act.Should().Throw<BusinessRuleException>()
             .WithMessage("Ensaymada is on two lines. Put its quantity on one line and delete the other.");
     }
 
@@ -53,7 +53,7 @@ public class CompositeProductRulesTests
     {
         var act = () => CompositeProductRules.EnsureValidComponents(1, [(2, 6, "Ensaymada"), (3, quantity, "Cheese Roll")]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Enter how many Cheese Roll go in: a whole number, 1 or more.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Enter how many Cheese Roll go in: a whole number, 1 or more.");
     }
 
     [Test]
@@ -61,7 +61,7 @@ public class CompositeProductRulesTests
     {
         var act = () => CompositeProductRules.EnsureValidComponents(1, [(1, 1, "Pasalubong Box"), (3, 4, "Cheese Roll")]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("A composite product can't contain itself.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("A composite product can't contain itself.");
     }
 
     [Test]
@@ -81,7 +81,7 @@ public class CompositeProductRulesTests
 
         var act = () => CompositeProductRules.EnsureNoCycle(1, [2, 4], held, NameOf);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage(
+        act.Should().Throw<BusinessRuleException>().WithMessage(
             "Party Package can't go into Pasalubong Box: it already contains Pasalubong Box, so Pasalubong Box would end up containing itself.");
     }
 
@@ -93,7 +93,7 @@ public class CompositeProductRulesTests
 
         var act = () => CompositeProductRules.EnsureNoCycle(1, [4], held, NameOf);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("Party Package can't go into Pasalubong Box*");
+        act.Should().Throw<BusinessRuleException>().WithMessage("Party Package can't go into Pasalubong Box*");
     }
 
     [Test]
@@ -101,7 +101,7 @@ public class CompositeProductRulesTests
     {
         var act = () => CompositeProductRules.EnsureNoCycle(1, [1], new Dictionary<int, IReadOnlyList<int>>(), NameOf);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage("A composite product can't contain itself.");
+        act.Should().Throw<BusinessRuleException>().WithMessage("A composite product can't contain itself.");
     }
 
     [Test]
@@ -160,7 +160,7 @@ public class CompositeProductRulesTests
     {
         var act = () => CompositeProductRules.EnsureSectionRoles("Party Box", [("Topping", true), ("Dough", false)]);
 
-        act.Should().Throw<InvalidOperationException>().WithMessage(
+        act.Should().Throw<BusinessRuleException>().WithMessage(
             "Party Box can only have sections in product-owned roles, such as a topping or filling. Dough isn't one: tick Product-owned for it in Settings ▸ Roles, or take that section out.");
     }
 
@@ -181,7 +181,7 @@ public class CompositeProductRulesTests
     {
         var single = () => CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: false, includesComponentPackaging: true);
 
-        single.Should().Throw<InvalidOperationException>().WithMessage("Only a composite product can include the packaging of the products in it.");
+        single.Should().Throw<BusinessRuleException>().WithMessage("Only a composite product can include the packaging of the products in it.");
         CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: true, includesComponentPackaging: true);
         CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: true, includesComponentPackaging: false);
         CompositeProductRules.EnsureComponentPackagingOnComposite(isComposite: false, includesComponentPackaging: false);

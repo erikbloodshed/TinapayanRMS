@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -117,9 +118,9 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
             ],
             []));
 
-        await taken.Should().ThrowAsync<InvalidOperationException>()
+        await taken.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("There's already a raw material named 'sugar'. Give the made ingredient its own name.");
-        await twice.Should().ThrowAsync<InvalidOperationException>()
+        await twice.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("There's already a raw material named 'Butter Icing'. Give the made ingredient its own name.");
         await ShouldBeAsSeededAsync(toppingId);
     }
@@ -135,9 +136,9 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         var intoNothing = () => SaveRecipeAsync(productId, new RecipeDraft(
             [Section(toppingRoleId, lines, id: toppingId, made: new MadeIngredientDraft("Butter Icing", ingredientsId + 1000))], []));
 
-        await intoIngredients.Should().ThrowAsync<InvalidOperationException>()
+        await intoIngredients.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Ingredients is an ingredient category. Put this made ingredient in a Made category.");
-        await intoNothing.Should().ThrowAsync<InvalidOperationException>()
+        await intoNothing.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("The category to put the made ingredient in no longer exists.");
         await ShouldBeAsSeededAsync(toppingId);
     }
@@ -236,13 +237,13 @@ public class MoveToInHousePersistenceTests(DatabaseFixture fixture) : Persistenc
         var intoIngredients = () => SubAssemblies().AddMadeIngredientAsync(syrupId, new MadeIngredientDraft("Simple Syrup", ingredientsId), Cancellation);
 
 
-        await set.Should().ThrowAsync<InvalidOperationException>()
+        await set.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Gift Set is a packaging set. A made ingredient is made from a recipe of ingredients.");
-        await own.Should().ThrowAsync<InvalidOperationException>()
+        await own.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Cheese Roll Topping is Cheese Roll's own. Move it to In-House from that product's recipe instead.");
-        await taken.Should().ThrowAsync<InvalidOperationException>()
+        await taken.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("There's already a raw material named 'box'. Give the made ingredient its own name.");
-        await intoIngredients.Should().ThrowAsync<InvalidOperationException>()
+        await intoIngredients.Should().ThrowAsync<BusinessRuleException>()
             .WithMessage("Ingredients is an ingredient category. Put this made ingredient in a Made category.");
         await ShouldBeAsSeededAsync(toppingId);
         (await LinesAsync(syrupId)).Select(l => l.IngredientId).Should().Equal(sugarId);

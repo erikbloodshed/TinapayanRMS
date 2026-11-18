@@ -208,7 +208,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => CreateBrandPriceRepository().SetAsync(ingredientId, [Brand("Gold Medal", bagId, 900m), Brand("gold medal", bagId, 950m)], Cancellation);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*priced twice*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*priced twice*");
         (await CreateBrandPriceRepository().GetForRawMaterialAsync(ingredientId, Cancellation)).Should().BeEmpty();
     }
 
@@ -219,7 +219,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => SetPriceAsync(ingredientId, bagId, 0m);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*positive*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*positive*");
     }
 
     [Test]
@@ -230,7 +230,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => SetPriceAsync(ingredientId, rollId, 45m);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*own units*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*own units*");
     }
 
     [Test]
@@ -251,7 +251,7 @@ public class BrandPricePersistenceTests(DatabaseFixture fixture) : PersistenceTe
 
         var act = () => SetPriceAsync(syrup.Id, null, 0.05m);
 
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*purchased*");
+        await act.Should().ThrowAsync<BusinessRuleException>().WithMessage("*purchased*");
     }
 
     [Test]
