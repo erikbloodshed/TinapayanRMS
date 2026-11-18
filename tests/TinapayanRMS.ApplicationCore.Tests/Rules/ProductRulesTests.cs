@@ -134,6 +134,14 @@ public class ProductRulesTests
     }
 
     [Test]
+    public void A_section_has_a_piece_size_once_a_weight_per_piece_or_yield_is_typed()
+    {
+        ProductRules.HasPieceSize(0m).Should().BeFalse("a section is saved with 0 until one is typed");
+        ProductRules.HasPieceSize(1m).Should().BeTrue("a yield of 1 is a piece size: one piece takes the whole batch");
+        ProductRules.HasPieceSize(50m).Should().BeTrue();
+    }
+
+    [Test]
     public void A_batch_with_no_pieces_costs_nothing_per_piece_rather_than_dividing_by_zero()
     {
         // A batch that weighs nothing yet, or one with no piece size typed: nothing to share out, whatever it costs.

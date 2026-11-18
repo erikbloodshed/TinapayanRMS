@@ -183,7 +183,7 @@ public sealed record PrintedSection(
             section.WeightPerPiece,
             section.Yield,
             section.CostPerPieceAt(basis),
-            section.AuthoredValue > 0);
+            section.HasPieceSize);
     }
 }
 

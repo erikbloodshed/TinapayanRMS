@@ -118,6 +118,14 @@ public static class ProductRules
     public static bool HasPieces(decimal totalWeight, decimal weightPerPiece) => totalWeight > 0 && weightPerPiece > 0;
 
     /// <summary>
+    /// Whether a section has a piece size: a weight per piece or a yield typed, whichever (<paramref name="authoredValue"/>,
+    /// which EnsureValidUsages keeps from going below 0). One with neither costs the product nothing per piece, however much
+    /// its batch costs, so the product's cost and price leave it out until one is typed: the Products header, the Products
+    /// list, Reports and Print say so. A saved section always has lines, so for one that's saved this is <see cref="HasPieces"/>.
+    /// </summary>
+    public static bool HasPieceSize(decimal authoredValue) => authoredValue > 0;
+
+    /// <summary>
     /// This usage's share of the sub-assembly's cost, per piece. The batch's whole cost is spread over its
     /// weight (<paramref name="totalWeight"/>), so this comes to the same thing as TotalCost / Yield. Nothing while the
     /// batch has no pieces (<see cref="HasPieces"/>): a section with no piece size yet costs the product nothing per piece.

@@ -134,6 +134,7 @@ public sealed class ProductCosting : ObservableState
         RaisePropertyChanged(nameof(EditingAdministrativeAmount));
         RaisePropertyChanged(nameof(EditingMarkupAmount));
         RaisePropertyChanged(nameof(BelowCostText));
+        RaisePropertyChanged(nameof(NoPieceSizeText));
         RaisePropertyChanged(nameof(CostUnitCaption));
         RaisePropertyChanged(nameof(SuggestedSellingPriceLabel));
         RaisePropertyChanged(nameof(MaterialCostTooltip));
@@ -188,6 +189,13 @@ public sealed class ProductCosting : ObservableState
     /// in the form, so they aren't counted; each says so when it's opened.
     /// </summary>
     public string? BelowCostText => _figures.Value.BelowCostText;
+
+    /// <summary>
+    /// The header's "No piece size" badge's tooltip, naming the recipe's sections with neither a weight per piece nor a yield
+    /// (ProductRules.HasPieceSize), which cost the product nothing per piece as the form stands. Null, and no badge, while
+    /// every section has one.
+    /// </summary>
+    public string? NoPieceSizeText => _figures.Value.NoPieceSizeText;
 
     /// <summary>What the figures on this screen are for: "Per piece", or "Per unit of 8 pieces".</summary>
     public string CostUnitCaption => ProductPrintout.CostUnitCaptionFor(_figures.Value.QuantityRequired, _figures.Value.IsComposite);
@@ -302,7 +310,16 @@ public sealed class ProductCosting : ObservableState
                 + "product is priced under what they cost. Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.",
         };
 
-        return new CostingFigures(costs, belowCostText, recipe.QuantityRequired, recipe.IsComposite, recipe.ComponentPackaging is not null);
+        var unsized = inputs.SectionsWithoutPieceSize;
+        var noPieceSizeText = unsized.Count switch
+        {
+            0 => null,
+            1 => $"{unsized[0]} has no weight per piece or yield, so it adds nothing to this product's cost. Type one on its tab.",
+            _ => $"{string.Join(", ", unsized.Take(unsized.Count - 1))} and {unsized[^1]} have no weight per piece or yield, so they add "
+                + "nothing to this product's cost. Type one on each one's tab.",
+        };
+
+        return new CostingFigures(costs, belowCostText, noPieceSizeText, recipe.QuantityRequired, recipe.IsComposite, recipe.ComponentPackaging is not null);
     }
 
     /// <summary>
@@ -310,11 +327,15 @@ public sealed class ProductCosting : ObservableState
     /// composite, and whether a composite takes its products' packaging too.
     /// </summary>
     private sealed record CostingFigures(
-        ProductCostSummary Costs, string? BelowCostText, int QuantityRequired, bool IsComposite, bool IncludesComponentPackaging);
+        ProductCostSummary Costs, string? BelowCostText, string? NoPieceSizeText, int QuantityRequired, bool IsComposite, bool IncludesComponentPackaging);
 }
 
 /// <summary>
 /// What the screen has for a product's costs as they stand (ProductsState.CostingInputs): the recipe's and product's
 /// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
 /// </summary>
-public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials);
+public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials)
+{
+    /// <summary>The form's sections with no weight per piece or yield (ProductRules.HasPieceSize), by name, in recipe order.</summary>
+    public IReadOnlyList<string> SectionsWithoutPieceSize { get; init; } = [];
+}

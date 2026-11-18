@@ -156,6 +156,36 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
             + "Re-apply their target buffers on Raw Materials, or in Reports' Cost Buffers.");
     });
 
+    // A section with neither a weight per piece nor a yield costs the product nothing per piece, which the costs alone
+    // can't show: the header names it.
+    [Test]
+    public Task The_header_names_the_sections_with_no_piece_size() => UiThread.RunAsync(async () =>
+    {
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 1);
+        var toppingId = await AddRoleAsync("Topping", sortOrder: 2);
+        var cheeseId = await AddIngredientAsync("Cheese", costPerGram: 0.4m);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.09m);
+        var halfSizedId = await AddProductWithSectionsAsync("Cheese Roll", (fillingId, cheeseId, 30m), (toppingId, sugarId, 0m));
+        var sizedId = await AddProductWithSectionsAsync("Plain Cheese Roll", (fillingId, cheeseId, 30m));
+        var unsizedId = await AddProductWithSectionsAsync("Sugar Roll", (fillingId, cheeseId, 0m), (toppingId, sugarId, 0m));
+
+        (await OpenAsync(halfSizedId, s => s.Recipe.UsageEdits.Count == 2)).Costing.NoPieceSizeText
+            .Should().Be("Topping has no weight per piece or yield, so it adds nothing to this product's cost. Type one on its tab.");
+        (await OpenAsync(sizedId, s => s.Recipe.UsageEdits.Count == 1)).Costing.NoPieceSizeText.Should().BeNull();
+        (await OpenAsync(unsizedId, s => s.Recipe.UsageEdits.Count == 2)).Costing.NoPieceSizeText
+            .Should().Be("Filling and Topping have no weight per piece or yield, so they add nothing to this product's cost. Type one on each one's tab.");
+    });
+
+    /// <summary>A product with a section of its own for each of <paramref name="sections"/>: 100 g of one ingredient, at a weight per piece (0 for none).</summary>
+    private async Task<int> AddProductWithSectionsAsync(string name, params (int RoleId, int IngredientId, decimal WeightPerPiece)[] sections)
+    {
+        var productId = await AddProductAsync(name);
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [.. sections.Select(s => new NewSubAssemblyDraft(s.RoleId, [(s.IngredientId, 100m)], UsageAuthoredField.WeightPerPiece, s.WeightPerPiece))],
+            []));
+        return productId;
+    }
+
     private async Task<int> AddEnsaymadaAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);

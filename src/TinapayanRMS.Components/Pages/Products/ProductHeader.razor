@@ -13,6 +13,10 @@
             {
                 <span class="badge badge-warning" title="@belowCost">Priced below cost</span>
             }
+            @if (State.Costing.NoPieceSizeText is { } noPieceSize)
+            {
+                <span class="badge badge-warning" title="@noPieceSize">No piece size</span>
+            }
             @if (State.NewProductTag is { } tag)
             {
                 <span class="badge badge-warning" title="Where Save files this new product in the Products list: after New, the stage New Products In gives it (Settings → Costing Defaults); after New Product Here, the folder it was picked on.">@tag</span>

@@ -1571,7 +1571,10 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             },
             EditingCategory?.WastagePercent,
             [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())]);
+                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
+        {
+            SectionsWithoutPieceSize = [.. usages.Where(u => !ProductRules.HasPieceSize(u.AuthoredValue)).Select(u => u.SectionName)],
+        };
     }
 
     /// <summary>

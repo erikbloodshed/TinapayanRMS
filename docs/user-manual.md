@@ -700,6 +700,8 @@ Below the header are the fields you fill in:
 
 A **Priced below cost** badge in the header means prices have risen past the buffered cost of a purchased material in the recipe or packaging. Every cost here is at buffered costs, so the product is priced under what that material costs. Point at the badge to see which materials. Re-apply their target buffers on Raw Materials, or in Reports' **Cost Buffers**, to carry their new prices in. A composite product's own products aren't checked here; each shows its badge when you open it.
 
+A **No piece size** badge in the header means a section of the recipe has neither a **Weight per Piece** nor a **Yield**, so it adds nothing to the product's cost. Point at the badge to see which sections. Open each one's tab and type either figure; the badge goes once every section has one and you've moved off its tab, as the header's costs take the section in then.
+
 Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage, folder and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanBMS's copy leaves it out.
 
 - **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its folder was deleted in the meantime, it comes back where that folder's products went. If its category was deleted, it comes back uncategorized.
