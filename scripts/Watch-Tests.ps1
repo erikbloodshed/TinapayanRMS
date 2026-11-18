@@ -12,7 +12,7 @@
     Give it a class or a test to keep each run short: with neither, every test in the project runs after each change,
     about 3 minutes for Presentation.Tests.
 
-    Hot reload runs the tests again in the same test session, which TUnit (1.81.16 to 1.86.0 so far) doesn't expect:
+    Hot reload runs the tests again in the same test session, which TUnit (1.81.16 to 1.86.6 so far) doesn't expect:
     without tests/HotReloadReruns.cs, every run after the first also reported a failure of TUnit's own
     ("ChannelClosedException: The channel has been closed."). If that comes back after a TUnit upgrade, see that file.
 
