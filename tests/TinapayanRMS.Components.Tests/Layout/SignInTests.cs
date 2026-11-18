@@ -129,6 +129,25 @@ public class SignInTests
     }
 
     [Test]
+    public async Task Locking_the_window_closes_the_print_dialog_and_unlocking_it_doesnt()
+    {
+        var settings = new InMemoryAccessSettings();
+        await settings.CreatePasswordAsync("pandesal 6am", CancellationToken.None);
+        await using var context = NewContext(settings);
+        var window = context.Services.GetRequiredService<FakeAppWindow>();
+        var appLock = context.Services.GetRequiredService<AppLock>();
+        appLock.Unlock();
+        var layout = context.Render<MainLayout>();
+
+        appLock.Lock();
+        await layout.WaitForAssertionAsync(() => window.PrintDialogsClosed.Should().Be(1, "a dialog left up would show the printout over the sign-in panel"));
+
+        appLock.Unlock();
+        await layout.WaitForAssertionAsync(() => layout.FindAll("#sign-in-password").Should().BeEmpty());
+        window.PrintDialogsClosed.Should().Be(1);
+    }
+
+    [Test]
     public async Task The_panel_left_is_let_go_though_its_state_and_the_lock_live_on()
     {
         var settings = new InMemoryAccessSettings();

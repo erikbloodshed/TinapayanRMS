@@ -13,6 +13,8 @@ public sealed class FakeAppWindow : IAppWindow
 
     public int Closed { get; private set; }
 
+    public int PrintDialogsClosed { get; private set; }
+
     public (DeviceRect TitleBar, IReadOnlyList<DeviceRect> Buttons)? TitleBar { get; private set; }
 
     public void Minimize() => Minimized++;
@@ -24,6 +26,8 @@ public sealed class FakeAppWindow : IAppWindow
     }
 
     public void Close() => Closed++;
+
+    public void ClosePrintDialog() => PrintDialogsClosed++;
 
     public void SetTitleBar(DeviceRect titleBar, IReadOnlyList<DeviceRect> buttons) => TitleBar = (titleBar, buttons);
 }

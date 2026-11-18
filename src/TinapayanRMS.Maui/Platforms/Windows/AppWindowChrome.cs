@@ -99,6 +99,14 @@ public sealed partial class AppWindowChrome : IAppWindow
         }
     });
 
+    public void ClosePrintDialog() => OnWindowThread(() =>
+    {
+        if (MainPage.Current?.WebView.Handler?.PlatformView is Microsoft.UI.Xaml.Controls.WebView2 { CoreWebView2: { } webView })
+        {
+            _ = PrintDialog.CloseAsync(webView);
+        }
+    });
+
     public void SetTitleBar(DeviceRect titleBar, IReadOnlyList<DeviceRect> buttons) => OnWindowThread(() =>
     {
         _titleBar = (titleBar, buttons);

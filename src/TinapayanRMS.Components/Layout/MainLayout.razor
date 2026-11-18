@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject AppStatus Status
 @inject AppLock Lock
+@inject IAppWindow Window
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject Serilog.ILogger Logger
@@ -135,13 +136,15 @@
         }
     }
 
-    // On whichever thread locked or unlocked: drawn with the state it's in by then. The menu goes as the window locks.
+    // On whichever thread locked or unlocked: drawn with the state it's in by then. The menu goes as the window locks, and
+    // so does a print dialog, which would otherwise stay up over the sign-in panel, showing the printout.
     private void OnLockChanged() => InvokeAsync(() =>
     {
         (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
         if (_locked)
         {
             _navigationOpen = false;
+            Window.ClosePrintDialog();
         }
 
         _redraws.Request();

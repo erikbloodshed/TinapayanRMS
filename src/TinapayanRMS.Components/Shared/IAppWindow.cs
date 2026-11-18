@@ -23,6 +23,12 @@ public interface IAppWindow
     void Close();
 
     /// <summary>
+    /// Cancels the print dialog if one is open, or opens in the next moments. The dialog draws the printout over the page
+    /// and holds the page still while it's up, so the window's lock asks for this: nothing else takes it off the screen.
+    /// </summary>
+    void ClosePrintDialog();
+
+    /// <summary>
     /// Where the title bar is, and what in it takes the mouse itself (its buttons), in the web view's device pixels from
     /// its top left corner. Windows takes the rest of the bar (<see cref="DeviceRect.Caption"/>) as the window's caption:
     /// dragging it moves the window (and snaps it to an edge), a double-click maximizes or restores it, and a right-click
