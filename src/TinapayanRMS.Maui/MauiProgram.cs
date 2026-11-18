@@ -85,6 +85,8 @@ public static class MauiProgram
             Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", WebViewFolder);
         }
 
+        Log.Information("TinapayanRMS {Version} is starting", AppVersion.Current);
+
         // Which garbage collector this copy runs on: Satori's in a build with -p:UseSatoriGC=true (the Maui project's
         // experiment), which lists its settings under its own name, or .NET's own.
         Log.Information(

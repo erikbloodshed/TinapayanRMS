@@ -20,10 +20,25 @@ public static class ReadOnlyConnection
     /// </summary>
     public const string UserKey = "Database:ReadOnlyUser";
 
+    /// <summary>
+    /// How many seconds a connection left idle in its pool stays open. A restore can't end the connections of another role,
+    /// such as the reader's, and waits 30 seconds for them to go (DatabaseBackups), where a pool's default of 5 minutes
+    /// would refuse the restore for up to 5 minutes after the Recipe API's last request.
+    /// </summary>
+    public const int IdleLifetimeSeconds = 10;
+
+    /// <summary>How often, in seconds, the pool looks for connections left idle: at most <see cref="IdleLifetimeSeconds"/>.</summary>
+    public const int PruningIntervalSeconds = 5;
+
     /// <summary><paramref name="connectionString"/>, its transactions read-only, and as <paramref name="user"/> when one is given.</summary>
     public static string Of(string connectionString, string? user = null)
     {
-        var builder = new NpgsqlConnectionStringBuilder(connectionString) { Options = "-c default_transaction_read_only=on" };
+        var builder = new NpgsqlConnectionStringBuilder(connectionString)
+        {
+            Options = "-c default_transaction_read_only=on",
+            ConnectionIdleLifetime = IdleLifetimeSeconds,
+            ConnectionPruningInterval = PruningIntervalSeconds,
+        };
         if (!string.IsNullOrWhiteSpace(user))
         {
             builder.Username = user.Trim();

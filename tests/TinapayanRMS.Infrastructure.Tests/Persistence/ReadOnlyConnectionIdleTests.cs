@@ -1,0 +1,49 @@
+using AwesomeAssertions;
+using Npgsql;
+using TinapayanRMS.Infrastructure.Tests.Fixtures;
+
+namespace TinapayanRMS.Infrastructure.Tests.Persistence;
+
+/// <summary>
+/// A restore has to wait for connections it can't end, such as the Recipe API's as its reader role, and gives up after 30
+/// seconds (DatabaseBackups). A read-only connection left idle in its pool has to have closed by itself before then. In
+/// the collection of the tests that clear every pool, which would close it first.
+/// </summary>
+[NotInParallel(DatabaseCollection.A)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+public class ReadOnlyConnectionIdleTests(DatabaseFixture fixture)
+{
+    private static readonly TimeSpan RestoreWait = TimeSpan.FromSeconds(25);
+
+    private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;
+
+    [Test]
+    public async Task A_connection_left_idle_closes_by_itself_within_what_a_restore_waits()
+    {
+        var name = $"idle-{Guid.NewGuid():N}";
+        var pooled = new NpgsqlConnectionStringBuilder(ReadOnlyConnection.Of(fixture.ConnectionString)) { ApplicationName = name };
+        await using (var connection = new NpgsqlConnection(pooled.ConnectionString))
+        {
+            await connection.OpenAsync(Cancellation);
+        }
+
+        (await OpenConnectionsAsync(name)).Should().Be(1, "closing it only hands it back to its pool, still open on the server");
+
+        var giveUpAt = DateTime.UtcNow + RestoreWait;
+        while (await OpenConnectionsAsync(name) > 0)
+        {
+            DateTime.UtcNow.Should().BeBefore(giveUpAt, "a restore gives up on a connection that stays open");
+            await Task.Delay(TimeSpan.FromMilliseconds(250), Cancellation);
+        }
+    }
+
+    private async Task<long> OpenConnectionsAsync(string applicationName)
+    {
+        var unpooled = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Pooling = false };
+        await using var connection = new NpgsqlConnection(unpooled.ConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var command = new NpgsqlCommand("SELECT count(*) FROM pg_stat_activity WHERE application_name = @name", connection);
+        command.Parameters.AddWithValue("name", applicationName);
+        return (long)(await command.ExecuteScalarAsync(Cancellation))!;
+    }
+}

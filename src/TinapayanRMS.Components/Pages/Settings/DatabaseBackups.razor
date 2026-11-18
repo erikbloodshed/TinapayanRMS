@@ -32,6 +32,9 @@
     {
         <p class="warning-text">@copyProblem</p>
     }
+    <FormRow Label="App Version">
+        <span id="app-version" class="read-only-text" title="Which build of TinapayanRMS this is. Give it when reporting a problem.">@AppVersion.Current</span>
+    </FormRow>
 
     <div class="button-row form-extra">
         <CommandButton Command="State!.BackUpNowCommand" Icon="AppIcon.Save" Label="Back Up Now" Primary="true" />

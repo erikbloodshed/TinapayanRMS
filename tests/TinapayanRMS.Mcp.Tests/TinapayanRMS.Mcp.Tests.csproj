@@ -5,4 +5,8 @@
     <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Golden\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
