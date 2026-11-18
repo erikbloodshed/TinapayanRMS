@@ -1,23 +1,35 @@
-@* A saved purchased material's prices over time, newest first, each worked out per base unit. *@
+@* A saved purchased material's prices over time, newest first, each worked out per base unit. The table is made the first
+   time its tab shows, then kept: a Syncfusion grid made while it's hidden waits to be shown, polling for it, and one that
+   never is crashes as it's let go and leaves that timer running for as long as the window is open. *@
 <div class="tab-card tab-card-fill">
     <h2 class="section-header">Price History</h2>
-    <PickGrid TItem="RawMaterialPriceRow" DataSource="State.PriceLog.Entries" @bind-SelectedItem="State.PriceLog.SelectedEntry">
-        <Columns>
-            <GridColumn Field="Entry.Id" IsPrimaryKey="true" Visible="false" />
-            <GridColumn Field="@nameof(RawMaterialPriceRow.Date)" HeaderText="Date" Width="130">
-                <Template Context="cell">@(((RawMaterialPriceRow)cell).Date.ToString("MMM d, yyyy"))</Template>
-            </GridColumn>
-            <GridColumn Field="@nameof(RawMaterialPriceRow.Brand)" HeaderText="Brand" />
-            <GridColumn Field="@nameof(RawMaterialPriceRow.UnitName)" HeaderText="Unit" />
-            <GridColumn Field="@nameof(RawMaterialPriceRow.Price)" HeaderText="Price" Format="N2" TextAlign="TextAlign.Right" Width="120" />
-            <GridColumn Field="@nameof(RawMaterialPriceRow.CostPerBaseUnit)" HeaderText="Cost / Base Unit" Format="N4" TextAlign="TextAlign.Right" Width="150" />
-        </Columns>
-    </PickGrid>
+    @if (_shown)
+    {
+        <PickGrid TItem="RawMaterialPriceRow" DataSource="State.PriceLog.Entries" @bind-SelectedItem="State.PriceLog.SelectedEntry">
+            <Columns>
+                <GridColumn Field="Entry.Id" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field="@nameof(RawMaterialPriceRow.Date)" HeaderText="Date" Width="130">
+                    <Template Context="cell">@(((RawMaterialPriceRow)cell).Date.ToString("MMM d, yyyy"))</Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(RawMaterialPriceRow.Brand)" HeaderText="Brand" />
+                <GridColumn Field="@nameof(RawMaterialPriceRow.UnitName)" HeaderText="Unit" />
+                <GridColumn Field="@nameof(RawMaterialPriceRow.Price)" HeaderText="Price" Format="N2" TextAlign="TextAlign.Right" Width="120" />
+                <GridColumn Field="@nameof(RawMaterialPriceRow.CostPerBaseUnit)" HeaderText="Cost / Base Unit" Format="N4" TextAlign="TextAlign.Right" Width="150" />
+            </Columns>
+        </PickGrid>
+    }
     <div class="button-row align-right form-extra">
         <CommandButton Command="State.PriceLog.DeleteCommand" Icon="AppIcon.Delete" Label="Delete Price" />
     </div>
 </div>
 
 @code {
+    private bool _shown;
+
     [Parameter, EditorRequired] public RawMaterialsState State { get; set; } = null!;
+
+    /// <summary>Whether the Price History tab is the one showing.</summary>
+    [Parameter] public bool IsShowing { get; set; }
+
+    protected override void OnParametersSet() => _shown |= IsShowing;
 }

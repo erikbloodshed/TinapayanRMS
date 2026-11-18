@@ -1211,6 +1211,8 @@ An optional layer of Vim-style keys over the whole app, in the manner of Vimium.
   - A grid's menu items are `MenuItem`s set in code, which trips analyzer BL0005: the tree's menu suppresses it locally.
   - Syncfusion's dialog asks the renderer whether it's interactive: a bUnit test that draws one calls `RenderingAsTheWebView()` (Components.Tests' `AppServices`).
 
+**Make an `SfGrid` when it can be seen.** A grid created while hidden (`offsetWidth` 0) puts off building its modules, polling every 500 ms until it's shown. One that's never shown then crashes as it's let go ("Cannot read properties of undefined (reading 'unwireEvents')", which reaches the log as a task nothing awaited), and its timer runs for as long as the window is open. So a tab whose content is made up front (`LoadOn="ContentLoad.Init"`) makes its grid the first time the tab shows, as [PriceHistory](../src/TinapayanRMS.Components/Pages/RawMaterials/PriceHistory.razor) does; Reports' tabs load on demand for the same reason.
+
 ### Printing
 
 The Products screen prints a product, a version from its History tab, or a whole folder of products. The Price Simulator prints a report of its own. The parts:

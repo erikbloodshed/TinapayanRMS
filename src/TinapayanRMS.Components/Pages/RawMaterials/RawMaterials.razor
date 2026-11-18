@@ -58,7 +58,7 @@
                         </TabItem>
                         <TabItem Visible="State!.ShowPriceHistory">
                             <ChildContent><TabHeader Text="Price History" /></ChildContent>
-                            <ContentTemplate><PriceHistory State="State!" /></ContentTemplate>
+                            <ContentTemplate><PriceHistory State="State!" IsShowing="State!.SelectedDetailsTab == RawMaterialsState.PriceHistoryTab" /></ContentTemplate>
                         </TabItem>
                     </TabItems>
                 </SfTab>
