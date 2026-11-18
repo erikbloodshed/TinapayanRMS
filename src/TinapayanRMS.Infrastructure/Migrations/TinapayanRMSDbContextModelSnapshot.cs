@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261118034638_RawMaterialWeightLossCheck";
+    public override string LastMigrationId => "20261118045022_SubAssemblyUpdatedAt";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -1042,6 +1042,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(100)")
                     .HasColumnName("section_name")
                     .UseCollation("case_insensitive");
+
+                b.Property<DateTime?>("UpdatedAt")
+                    .HasColumnType("timestamp without time zone")
+                    .HasColumnName("updated_at");
 
                 b.HasKey("Id")
                     .HasName("pk_sub_assemblies");

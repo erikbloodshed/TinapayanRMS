@@ -279,6 +279,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
                 TargetCostBufferPercent = material.TargetCostBufferPercent,
                 PreferredBrand = material.PreferredBrand,
                 BufferedCostPerBaseUnit = material.BufferedCostPerBaseUnit,
+
+                // When the material the form opened had last been saved, for UpdateAsync's check (SavedVersionRules).
+                UpdatedAt = material.UpdatedAt,
             };
 
             if (fields.Id == 0)
@@ -554,6 +557,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
 
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == material.Id, cancellationToken)
             ?? throw new BusinessRuleException($"Raw material {material.Id} does not exist.");
+
+        // Not over a save made since the form opened it, by another PC: material.UpdatedAt is the time it opened, if it says.
+        SavedVersionRules.EnsureNotSavedSince(existing.Name, existing.UpdatedAt, material.UpdatedAt);
 
         RawMaterialRules.EnsureTypeUnchanged(existing.Type, material.Type);
         RawMaterialRules.EnsureSourceUnchanged(existing.Source, material.Source);

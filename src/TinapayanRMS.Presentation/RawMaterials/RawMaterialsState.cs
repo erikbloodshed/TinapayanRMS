@@ -722,6 +722,10 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         var exampleMaterialId = UsageExample.Material?.Id;
         var exampleUnit = UsageExample.Unit;
 
+        // The material showing, saved since the form took it (SavedVersion): read into the form again when nothing's typed,
+        // so what it shows, and what its next Save starts from, is what's saved now (FollowSavedVersion).
+        var savedSince = false;
+
         ApplyRefresh(() =>
         {
             _categoryCache.MergeFrom(categories);
@@ -743,6 +747,9 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             Recipe.BomInputsChanged();
 
             SelectedRawMaterial = RawMaterials.FirstOrDefault(m => m.Id == selectedId);
+
+            // Every load, so a list's own save is followed by the load it asked for and no later one.
+            savedSince = FollowSavedVersion(SelectedRawMaterial is { } showing && showing.Id == _editingId ? showing.UpdatedAt : SavedVersion);
 
             // The form's alternative units may not be saved yet, so they stay rather than being reloaded from the refreshed
             // material. Each points at its refreshed unit of measure, so one renamed in Settings shows its new name.
@@ -772,6 +779,11 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         if (detailMaterialId is { } readFor && _detailMaterialId == readFor)
         {
             Dependents.Show(await dependentsRead);
+        }
+
+        if (savedSince && SelectedRawMaterial is { } savedAgain)
+        {
+            await ReloadSavedRawMaterialAsync(savedAgain.Id);
         }
 
         // After the merge, which only points the selection at its fresh copy: this one has to load the material's form.
@@ -813,6 +825,9 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
             PreferredBrand = source == RawMaterialSource.Purchased ? PurchaseCost.EditingPreferredBrand : null,
             // Only a purchased material's is the form's; a made or linked one's is worked out by the cascade.
             BufferedCostPerBaseUnit = source == RawMaterialSource.Purchased ? PurchaseCost.EditingBufferedCost ?? 0m : 0m,
+
+            // When it had last been saved as the form took it: a save since, from another PC, refuses this one (SavedVersionRules).
+            UpdatedAt = SavedVersion,
         };
 
         var validation = _rawMaterialValidator.Validate(material);
@@ -902,6 +917,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         History.Clear();
         FormVersion++;
         _editingId = 0;
+        SavedVersion = null;
         Pick(null);
         CanChangeTypeAndSource = true;
         EditingName = string.Empty;
@@ -938,6 +954,7 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
         }
 
         _editingId = material.Id;
+        SavedVersion = material.UpdatedAt;
         CanChangeTypeAndSource = false;
         EditingName = material.Name;
         EditingType = material.Type;
@@ -1372,6 +1389,8 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
 
     protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
+    protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
+
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the material as it was last saved, read again, since its
     /// alternative units write through to the copy the list holds. A new material was never saved, so it goes back to a
@@ -1392,7 +1411,12 @@ public sealed class RawMaterialsState : RecordScreenState<RawMaterialFormSnapsho
     // What the list asks of the screen (IRawMaterialsListHost): the material the form shows, and what the list's actions do to it.
     int IRawMaterialsListHost.EditingId => _editingId;
 
-    Task IRawMaterialsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
+    /// <summary>The list's reload after it saved something itself (a rename, a move): the material showing takes its new time.</summary>
+    Task IRawMaterialsListHost.LoadAsync()
+    {
+        FollowOwnSaveOnNextLoad();
+        return LoadCommand.ExecuteAsync();
+    }
 
     void IRawMaterialsListHost.Pick(RawMaterial material) =>
         PickFromList(material.Id, () => Pick(material), List.SyncTreeSelection);

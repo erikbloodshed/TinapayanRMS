@@ -815,6 +815,10 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
         var reloadDetails = ownershipChanged && !History.IsDirty && detailProductId is not null;
 
+        // The product showing, saved since the form took it (SavedVersion): read into the form again when nothing's typed,
+        // so what it shows, and what its next Save starts from, is what's saved now (FollowSavedVersion).
+        var savedSince = false;
+
         // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
         var selectedId = SelectedProduct?.Id;
         var categoryId = EditingCategory?.Id;
@@ -850,6 +854,10 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
                 ShowUpdatedAt(SelectedProduct.UpdatedAt);
             }
 
+            // Every load, so a list's own save is followed by the load it asked for and no later one.
+            savedSince = FollowSavedVersion(
+                SelectedProduct is { } showing && showing.Id == _editingId && _editingId == detailProductId ? showing.UpdatedAt : SavedVersion);
+
             if (detailProductId == _detailProductId && linkedPackagingLines is not null)
             {
                 // A renamed product or set reads right in the banner too.
@@ -873,8 +881,14 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             InvalidateCosts();
         });
 
-        if (reloadDetails && SelectedProduct is { } reloaded && reloaded.Id == detailProductId)
+        if ((reloadDetails || savedSince) && SelectedProduct is { } reloaded && reloaded.Id == detailProductId)
         {
+            if (savedSince)
+            {
+                History.Clear();
+                LoadIntoForm(reloaded);
+            }
+
             await LoadProductDetailAsync(reloaded, CancellationToken.None);
         }
 
@@ -984,6 +998,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         }
 
         _editingId = product.Id;
+        SavedVersion = product.UpdatedAt;
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
         EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
@@ -1124,6 +1139,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         Pick(null);
         FormVersion++;
         _editingId = 0;
+        SavedVersion = null;
         EditingName = string.Empty;
         EditingDescription = string.Empty;
         EditingCategory = null;
@@ -1288,6 +1304,9 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
             IsComposite = IsEditingComposite,
             IncludesComponentPackaging = IsEditingComposite && ComponentsTable.IncludesPackaging,
+
+            // When it had last been saved as the form took it: a save since, from another PC, refuses this one (SavedVersionRules).
+            UpdatedAt = SavedVersion,
         };
 
         var validation = _productValidator.Validate(product);
@@ -1328,6 +1347,9 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         // What's saved is the new starting point: stepping back past it would show changes already written.
         // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
         History.Clear();
+
+        // Saved at this time now, as read back: the reload below finds it so, and doesn't read the form again for it.
+        SavedVersion = saved.Product.UpdatedAt;
 
         // The list picks up the new name; then the form shows what was saved, which is what the next Save compares
         // against.
@@ -1458,6 +1480,9 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             };
             var changed = await Task.Run(() => _versionedSaves.ApplyCostingAsync(
                 [.. products.Select(p => p.Id)], costing, DateTime.Now, CancellationToken.None));
+
+            // The window's own save: the product showing, if it was one, takes its new time, and its new costing below.
+            FollowOwnSaveOnNextLoad();
             await LoadCommand.ExecuteAsync();
 
             // The product the form shows reads its new costing, as after its own Save.
@@ -1708,6 +1733,8 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
+    protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
+
     /// <summary>
     /// Puts the form back as the product was last saved: Revert, and Don't Save on leaving the screen. It reads the picked
     /// product's detail again, which replaces the recipe, packaging, packs and costing wholesale, so anything staged but
@@ -1722,6 +1749,18 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             List.EndNewRow();
             StartNewProduct(NewProductPlace.ChosenStage, NewProductPlace.FolderId, IsEditingComposite);
             return;
+        }
+
+        // As it's saved now, not as the list last read it: another PC may have saved it since, which is what Revert shows after
+        // a Save refused for it (SavedVersionRules), and whose time the form then takes, so its next Save goes through.
+        if (await Task.Run(() => _productRepository.GetByIdAsync(product.Id, CancellationToken.None)) is { } saved && saved.UpdatedAt != product.UpdatedAt)
+        {
+            ApplyRefresh(() =>
+            {
+                _productCache.AddOrUpdate(saved);
+                SelectedProduct = Products.FirstOrDefault(p => p.Id == saved.Id);
+            });
+            product = saved;
         }
 
         History.Clear();
@@ -1827,7 +1866,12 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         set => Folders = value;
     }
 
-    Task IProductsListHost.LoadAsync() => LoadCommand.ExecuteAsync();
+    /// <summary>The list's reload after it saved something itself (a rename, a move): the product showing takes its new time.</summary>
+    Task IProductsListHost.LoadAsync()
+    {
+        FollowOwnSaveOnNextLoad();
+        return LoadCommand.ExecuteAsync();
+    }
 
     void IProductsListHost.Pick(Product product) =>
         PickFromList(product.Id, () => Pick(product), List.SyncTreeSelection);
@@ -1884,8 +1928,10 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
             SelectedProduct = fresh;
         }
 
+        // The window's own save, with no load after it: the form takes the new time, what's typed and all (FollowSavedVersion).
         if (moved.FirstOrDefault(p => p.Id == _editingId) is { } onForm)
         {
+            SavedVersion = onForm.UpdatedAt;
             ShowUpdatedAt(onForm.UpdatedAt);
         }
     }

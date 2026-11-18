@@ -43,4 +43,12 @@ public sealed class SubAssembly
     /// the Sub-Assemblies screen, whose label in a recipe comes from its name (SubAssemblyRules.SectionLabel).
     /// </summary>
     public string? SectionName { get; set; }
+
+    /// <summary>
+    /// When the sub-assembly was last saved, in local time: set as it's saved, renamed or moved on the Sub-Assemblies
+    /// screen, and as its lines are written from anywhere (a product's Save relining one it links), as Product.UpdatedAt
+    /// is. What the Sub-Assemblies screen's Save checks it opened (SavedVersionRules), so it can't write over a save made
+    /// since on another PC. Null for one not saved since this was added.
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
 }

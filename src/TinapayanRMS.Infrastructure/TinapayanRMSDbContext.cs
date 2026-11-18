@@ -19,7 +19,14 @@ public sealed class TinapayanRMSDbContext : DbContext
     public TimeProvider Clock { get; init; } = TimeProvider.System;
 
     /// <summary>The shop's local time now, by <see cref="Clock"/>: what every saved time is (see ConfigureConventions).</summary>
-    public DateTime LocalNow() => Clock.GetLocalNow().DateTime;
+    public DateTime LocalNow() => ToStoredPrecision(Clock.GetLocalNow().DateTime);
+
+    /// <summary>
+    /// <paramref name="time"/> to the whole microsecond PostgreSQL keeps of a timestamp, so a time stamped here equals the
+    /// one read back: a form's Save compares the UpdatedAt it opened with the one stored (SavedVersionRules), and a tick
+    /// PostgreSQL dropped would read as a save made since.
+    /// </summary>
+    public static DateTime ToStoredPrecision(DateTime time) => time.AddTicks(-(time.Ticks % TimeSpan.TicksPerMicrosecond));
 
     /// <summary>
     /// Every string column's collation: case-insensitive but accent-sensitive. The unique name indexes rely on it (a raw material "flour" is a duplicate of "Flour"),

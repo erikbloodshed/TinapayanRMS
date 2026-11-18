@@ -21,7 +21,7 @@ public partial class SubAssemblyEntityType
             "TinapayanRMS.Domain.Entities.SubAssembly",
             typeof(SubAssembly),
             baseEntityType,
-            propertyCount: 5,
+            propertyCount: 6,
             navigationCount: 2,
             foreignKeyCount: 2,
             unnamedIndexCount: 3,
@@ -74,6 +74,16 @@ public partial class SubAssemblyEntityType
             maxLength: 100);
         sectionName.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         sectionName.AddAnnotation("Relational:ColumnName", "section_name");
+
+        var updatedAt = runtimeEntityType.AddProperty(
+            "UpdatedAt",
+            typeof(DateTime?),
+            propertyInfo: typeof(SubAssembly).GetProperty("UpdatedAt", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(SubAssembly).GetField("<UpdatedAt>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true);
+        updatedAt.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        updatedAt.AddAnnotation("Relational:ColumnName", "updated_at");
+        updatedAt.AddAnnotation("Relational:ColumnType", "timestamp without time zone");
 
         var key = runtimeEntityType.AddKey(
             new[] { id });

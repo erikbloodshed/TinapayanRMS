@@ -343,6 +343,9 @@ public class ProductOwnedSubAssemblyPersistenceTests(DatabaseFixture fixture) : 
 
         (await SubAssembliesAsync()).Should().Equal(("Cheese Roll Dough", null), ("Cheese Bun Filling: Cheese", productId));
 
+        // Read back after its Save, as the form reads it: the copy from before says when it was saved then, and a save of it
+        // now would be refused as one over a save made since (SavedVersionRules).
+        product = (await repository.GetByIdAsync(productId, Cancellation))!;
         product.Name = "Cheese Loaf";
         await repository.UpdateAsync(product, Cancellation);
 

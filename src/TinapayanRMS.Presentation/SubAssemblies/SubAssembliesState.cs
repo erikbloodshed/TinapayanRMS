@@ -289,6 +289,10 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         // That isn't the user's change, so what Save measures against has to follow it.
         var formHasNoRole = _editingId == 0 && roleId is null;
 
+        // The sub-assembly showing, saved since the form took it (SavedVersion): read into the form again when nothing's
+        // typed, so what it shows, and what its next Save starts from, is what's saved now (FollowSavedVersion).
+        var savedSince = false;
+
         ApplyRefresh(() =>
         {
             Roles.MergeFrom(roles, r => r.Id);
@@ -303,6 +307,9 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             PackagingSet.ResolveRows();
 
             SelectedRow = List.Rows.FirstOrDefault(r => r.Id == selectedId);
+
+            // Every load, so a list's own save is followed by the load it asked for and no later one.
+            savedSince = FollowSavedVersion(SelectedRow is { } showing && showing.Id == _editingId ? showing.SubAssembly.UpdatedAt : SavedVersion);
             if (_editingId > 0)
             {
                 Dependents.Show(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? [], IsPackaging);
@@ -314,6 +321,11 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         if (formHasNoRole && EditingRole is not null)
         {
             History.Rebase((settled, now) => settled with { RoleId = now.RoleId });
+        }
+
+        if (savedSince && SelectedRow is { } savedAgain)
+        {
+            await LoadIntoFormAsync(savedAgain);
         }
 
         // After the merge, which only points the selection at its fresh copy: this one has to load the sub-assembly's form.
@@ -344,8 +356,9 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             return;
         }
 
-        // The lines as they're typed, read here on the UI thread, for the save below.
-        var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id };
+        // The lines as they're typed, read here on the UI thread, for the save below. With when it had last been saved as the
+        // form took it: a save since, from another PC, refuses this one (SavedVersionRules).
+        var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id, UpdatedAt = SavedVersion };
         Func<CancellationToken, Task<int>> save;
         if (IsPackaging)
         {
@@ -422,6 +435,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         SelectedRow = null;
         FormVersion++;
         _editingId = 0;
+        SavedVersion = null;
         HeaderTitle = "New sub-assembly";
         EditingName = string.Empty;
         EditingRole = role ?? Roles.FirstOrDefault();
@@ -496,6 +510,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         }
 
         _editingId = row.Id;
+        SavedVersion = row.SubAssembly.UpdatedAt;
         HeaderTitle = row.Name;
         EditingName = row.Name;
         EditingRole = Roles.FirstOrDefault(r => r.Id == row.SubAssembly.RoleId);
@@ -592,6 +607,8 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
 
+    protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
+
     /// <summary>
     /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
     /// A new one (or a copy) was never saved, so it goes back to a blank one.
@@ -602,7 +619,12 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     // do to it.
     int ISubAssembliesListHost.EditingId => _editingId;
 
-    Task ISubAssembliesListHost.LoadAsync() => LoadCommand.ExecuteAsync();
+    /// <summary>The list's reload after it saved something itself (a rename, a move): the sub-assembly showing takes its new time.</summary>
+    Task ISubAssembliesListHost.LoadAsync()
+    {
+        FollowOwnSaveOnNextLoad();
+        return LoadCommand.ExecuteAsync();
+    }
 
     void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
         PickFromList(row.Id, () => Pick(row), List.SyncTreeSelection);

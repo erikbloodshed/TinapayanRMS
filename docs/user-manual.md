@@ -198,6 +198,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
   - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
   - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Leaving Print for any other screen asks about the product's changes, as leaving Products would. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
+- **If another PC saves the same record while you have it open**, your **Save** is refused, so neither of you overwrites the other without knowing. A red notice says so, and what you typed stays on the form. [Troubleshooting](#14-troubleshooting-and-questions) says what to do next.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again.
 - If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, the screen gives way to a panel saying **This screen ran into a problem it didn't expect**: press **Open It Again**, and the screen comes back as it was, changes you haven't saved included. The other screens keep working meanwhile. Only rarely, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
 
@@ -1482,10 +1483,13 @@ Something happened on that screen that the app didn't expect. It's in the log fi
 Something happened outside the screens that the app didn't expect. It's in the log file. Press **Reload**. What you had saved is safe; what you hadn't saved is lost.
 
 **Opening the app brings up the window that's already open, not a new one.**
-Only one copy of TinapayanRMS opens at a time, because a save in one copy could overwrite what was saved in the other, with neither saying so. This doesn't stop another PC using the same database, so take care not to work on the same thing on two PCs at the same time.
+Only one copy of TinapayanRMS opens at a time on a PC, so that two copies don't run the same backups or overwrite each other's settings. Another PC can still use the same database. If both change the same product, raw material or sub-assembly, the second **Save** is refused (see below).
 
 **Opening the app says it's open in another Windows sign-in on this PC.**
 Someone else signed in to Windows on this PC has TinapayanRMS open. Only one copy can be open on the PC, for the same reason as above. Sign in as them and close it there, or ask them to, then open it again.
+
+**"Someone else saved … after you opened it, so your changes weren't saved."**
+Another PC using the same database saved this product, raw material or sub-assembly while you had it open, and saving yours would have overwritten what they saved. What you typed is still on the form, and **Save** keeps refusing it. Note what you changed. Then go to another item in the list, or to another screen, and answer **No** when asked about saving your changes. Come back to the item: it now shows what they saved. On the Products screen, **Revert** does the same without leaving it. Make your changes again and press **Save**.
 
 **The password is forgotten.**
 Clear it, and the app asks for a new one. On the PC that holds the database, signed in to Windows as the app's user, open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Reset-Password.ps1`. It asks first; answer **y**. The next time the app opens, or its window is locked, it asks you to set a new password. Nothing else changes, the auto-lock's minutes included.

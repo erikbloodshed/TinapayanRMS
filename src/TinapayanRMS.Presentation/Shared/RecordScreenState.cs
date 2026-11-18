@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using TinapayanRMS.ApplicationCore.Rules;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Trees;
 
@@ -140,6 +141,48 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
 
     public bool HasUnsavedChanges => History.IsDirty;
 
+    /// <summary>
+    /// When the record the form shows had last been saved (its UpdatedAt) as the form took it: what the form's Save sends
+    /// with it, so a save made since by another PC refuses it rather than be written over (SavedVersionRules). Null for a
+    /// new record. The screen sets it as it loads a record into the form, and as its own Save reads the record back.
+    /// </summary>
+    protected DateTime? SavedVersion { get; set; }
+
+    /// <summary>Set by the screen's list as it saves the record showing itself (a rename, a move): see <see cref="FollowSavedVersion"/>.</summary>
+    private bool _savedVersionFollowsNextLoad;
+
+    /// <summary>
+    /// The screen's list is about to save something itself (a rename, a move, a stage) and load: the next load takes the
+    /// record showing's saved time as the form's, edits and all, since the save is the window's own, not another PC's.
+    /// </summary>
+    protected void FollowOwnSaveOnNextLoad() => _savedVersionFollowsNextLoad = true;
+
+    /// <summary>
+    /// How the form follows the record it shows, as a load finds it saved at <paramref name="storedSavedAt"/>. Saved as the
+    /// form took it: nothing. Saved since by the screen's own list (<see cref="FollowOwnSaveOnNextLoad"/>): the form takes
+    /// the new time. Saved since with nothing typed (another screen's save stamping it, or another PC's): true, so the
+    /// screen loads the record into the form again, which shows what it would otherwise save over. Saved since with
+    /// something typed: the form keeps the time it took, so its Save is refused rather than write over that save unseen.
+    /// </summary>
+    /// <returns>Whether the screen loads the record into its form again.</returns>
+    protected bool FollowSavedVersion(DateTime? storedSavedAt)
+    {
+        var ownSave = _savedVersionFollowsNextLoad;
+        _savedVersionFollowsNextLoad = false;
+        if (storedSavedAt == SavedVersion)
+        {
+            return false;
+        }
+
+        if (ownSave)
+        {
+            SavedVersion = storedSavedAt;
+            return false;
+        }
+
+        return !History.IsDirty;
+    }
+
     /// <summary>The form's last Save (<see cref="RunSaveAsync"/>), done or still running.</summary>
     private Task _saving = Task.CompletedTask;
 
@@ -151,7 +194,26 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     /// runs whatever CanExecute says. Kept here rather than read from the command, as the question is asked of the form, not
     /// of the button that saves it.
     /// </summary>
-    protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(save);
+    /// <remarks>
+    /// A Save refused for a save made since the form opened the record (SavedSinceException) reads the screen's lists again
+    /// before it says so: the record opened next is then the one that's saved now, where the list's old copy would be
+    /// refused in its turn. What's typed stays, and so does the time the form took (<see cref="FollowSavedVersion"/>).
+    /// </remarks>
+    protected Task RunSaveAsync(Func<Task> save) => _saving = RunSafelyAsync(async () =>
+    {
+        try
+        {
+            await save();
+        }
+        catch (SavedSinceException)
+        {
+            await ReadListsAgainAsync();
+            throw;
+        }
+    });
+
+    /// <summary>The screen's load: its lists read again, and what's typed on the form left as it is.</summary>
+    protected abstract Task ReadListsAgainAsync();
 
     /// <inheritdoc/>
     /// <remarks>

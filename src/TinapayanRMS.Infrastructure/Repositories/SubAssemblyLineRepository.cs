@@ -71,6 +71,10 @@ public sealed class SubAssemblyLineRepository(IDbContextFactory<TinapayanRMSDbCo
             SortOrder = index,
         }));
 
+        // Its lines are part of it, wherever they're written from (a product's Save relining one it links): saved now, so a
+        // Sub-Assemblies form opened before refuses to save over them (SavedVersionRules).
+        subAssembly.UpdatedAt = dbContext.LocalNow();
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         // A made ingredient made from it has these lines in its BOM (IngredientBoms), so each is checked for a loop through

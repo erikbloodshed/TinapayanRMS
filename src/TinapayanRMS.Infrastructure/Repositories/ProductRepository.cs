@@ -282,6 +282,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             FolderId = product.FolderId,
             IsComposite = product.IsComposite,
             IncludesComponentPackaging = product.IncludesComponentPackaging,
+
+            // When the product the form opened had last been saved, for UpdateAsync's check (SavedVersionRules).
+            UpdatedAt = product.UpdatedAt,
         };
         var stored = fields.Id == 0
             ? await AddAsync(dbContext, fields, cancellationToken)
@@ -469,6 +472,9 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
     {
         var existing = await dbContext.Products.FirstOrDefaultAsync(p => p.Id == product.Id, cancellationToken)
             ?? throw new BusinessRuleException($"Product {product.Id} does not exist.");
+
+        // Not over a save made since the form opened it, by another PC: product.UpdatedAt is the time it opened, if it says.
+        SavedVersionRules.EnsureNotSavedSince(existing.Name, existing.UpdatedAt, product.UpdatedAt);
 
         CompositeProductRules.EnsureKindUnchanged(existing.IsComposite, product.IsComposite);
         CompositeProductRules.EnsureOneUnit(existing.IsComposite, product.QuantityRequired);

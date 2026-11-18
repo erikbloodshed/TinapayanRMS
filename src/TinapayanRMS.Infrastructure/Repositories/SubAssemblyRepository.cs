@@ -163,13 +163,19 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
         SubAssembly stored;
         if (subAssembly.Id == 0)
         {
-            stored = new SubAssembly { Name = name, RoleId = subAssembly.RoleId };
+            stored = new SubAssembly { Name = name, RoleId = subAssembly.RoleId, UpdatedAt = dbContext.LocalNow() };
             dbContext.SubAssemblies.Add(stored);
         }
         else
         {
             stored = await dbContext.SubAssemblies.Include(s => s.Role).Include(s => s.OwnerProduct).FirstOrDefaultAsync(s => s.Id == subAssembly.Id, cancellationToken)
                 ?? throw new BusinessRuleException($"Sub-assembly {subAssembly.Id} does not exist.");
+
+            // Not over a save made since the form opened it, by another PC: subAssembly.UpdatedAt is the time it opened, if it
+            // says (a rename or a move from the list doesn't).
+            SavedVersionRules.EnsureNotSavedSince(stored.Name, stored.UpdatedAt, subAssembly.UpdatedAt);
+            stored.UpdatedAt = dbContext.LocalNow();
+
             if (stored.OwnerProduct is { } owner)
             {
                 throw new BusinessRuleException($"{stored.Name} is {owner.Name}'s own. Change it in that product's recipe.");
