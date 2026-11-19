@@ -109,6 +109,60 @@
     font-size: calc(9pt * var(--type-scale, 1));
 }
 
+/* A production copy (PrintDocument.ProductionCopy): said under the title; a box to tick at the end of each line, under
+   "Done"; and lines to sign at the end. */
+.print-production {
+    margin: 4px 0 0;
+    font-size: calc(9pt * var(--type-scale, 1));
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.print-table .print-tick {
+    width: 1%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.print-tick-box {
+    display: inline-block;
+    width: 4mm;
+    height: 4mm;
+    border: 1px solid #1f2233;
+    border-radius: 1px;
+    vertical-align: middle;
+}
+
+.print-signoff {
+    margin: 18px 0 0;
+    white-space: nowrap;
+    break-inside: avoid;
+}
+
+.print-signoff span {
+    display: inline-block;
+    width: 28mm;
+    margin: 0 10px 0 4px;
+    border-bottom: 1px solid #1f2233;
+}
+
+/* A draft (unsaved changes, or never saved): a red banner under the title, and on paper "Draft" faintly across the middle
+   of every page, as a fixed box is printed on each. */
+.print-draft {
+    margin: 4px 0 10px;
+    padding: 4px 8px;
+    border: 1.5px solid #bd0e33;
+    border-radius: 3px;
+    color: #bd0e33;
+    font-weight: 600;
+    break-inside: avoid;
+}
+
+.print-draft-mark {
+    display: none;
+}
+
 /* Settings → Printing's logo, beside its buttons, and its tick boxes, one under another. */
 .print-logo-row {
     display: flex;
@@ -435,6 +489,21 @@
     /* Where app.js found each page starts. */
     [data-page-break] {
         break-before: page;
+    }
+
+    .print-draft-mark {
+        display: block;
+        position: fixed;
+        top: 40%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 110pt;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(189, 14, 51, 0.08);
+        transform: rotate(-30deg);
     }
 
     /* Export to PDF's pages take the place of the screen they're drawn on. */

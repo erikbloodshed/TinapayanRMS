@@ -83,6 +83,20 @@
     /// <summary>The costing breakdown, and the costs beside the recipe's lines.</summary>
     [Parameter] public bool IncludeCosting { get; set; } = true;
 
+    /// <summary>
+    /// For the production floor: the recipe alone (the preview passes no costing with it), in large type, with a box to
+    /// tick beside each ingredient and packaging line as it's weighed, and a line to sign at the end.
+    /// </summary>
+    [Parameter] public bool ProductionCopy { get; set; }
+
+    /// <summary>The production copy's type: Settings → Printing's size, or a quarter larger than normal if that's more.</summary>
+    public const decimal ProductionTypeScale = 1.25m;
+
+    private decimal TypeScale => ProductionCopy ? Math.Max(ProductionTypeScale, PageSetup.TypeScale) : PageSetup.TypeScale;
+
+    // A production copy's box to tick, at the end of a line.
+    private static RenderFragment TickBox => @<td class="print-tick"><span class="print-tick-box"></span></td>;
+
     // The pages, as printing will break them, each time the document is drawn: the preview shows where each starts, the
     // part's name at its top and a set's contents' page numbers (app.js). A page going away as it's drawn has nothing to do.
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -102,7 +116,7 @@
     private string SheetStyle =>
         $"--paper-width: {Mm(PageSetup.Paper.Width)}; --paper-height: {Mm(PageSetup.Paper.Height)}; " +
         $"--margin-top: {Mm(PageSetup.Margins.Top)}; --margin-side: {Mm(PageSetup.Margins.Side)}; --margin-bottom: {Mm(PageSetup.Margins.Bottom)}; " +
-        $"--type-scale: {PageSetup.TypeScale.ToString("0.##", CultureInfo.InvariantCulture)}";
+        $"--type-scale: {TypeScale.ToString("0.##", CultureInfo.InvariantCulture)}";
 
     // The paper and margins, and the note at the foot of each page, opposite its number (print.css's @bottom-right). It
     // comes after print.css's @page, so it wins.
@@ -160,6 +174,7 @@
     /// <summary>What the printout is, naming only the parts included.</summary>
     private string Parts => (IncludeRecipe, IncludeCosting) switch
     {
+        _ when ProductionCopy => "Production Copy",
         (true, true) => "Recipe and Costing",
         (true, false) => "Recipe",
         _ => "Costing",
@@ -215,7 +230,19 @@
             <h1>@printout.ProductName</h1>
             <p class="print-muted">@printout.CategoryName · @printout.StageTitle · @printout.CostUnitCaption@BasisSuffix(printout)@(printout.Simulation is not null ? " · Simulated prices" : "")</p>
             <p class="print-small">Last updated @printout.LastUpdatedText · Printed @Printed(Set.PrintedAt)@(printout.SaveNote is { } note ? " · " + note : "")</p>
+            @if (ProductionCopy)
+            {
+                <p class="print-production">Production copy</p>
+            }
         </header>
+
+        @if (printout.IsDraft)
+        {
+            @* A banner under the title, and on paper "Draft" faintly across every page (print.css: a fixed box is printed
+               on each page). Only This product can be a draft: a set prints as saved. *@
+            <p class="print-draft">Draft: @(printout.SaveNote == ProductPrintout.NotSavedNote ? "this product hasn't been saved yet" : "it includes changes not yet saved"). Save it on the Products screen before it's used.</p>
+            <div class="print-draft-mark" aria-hidden="true">Draft</div>
+        }
 
         @if (ShowsFigures)
         {
@@ -248,6 +275,10 @@
         @if (IncludeCosting)
         {
             @CostingPart(printout)
+        }
+        @if (ProductionCopy)
+        {
+            <p class="print-signoff">Weighed by <span></span> Checked by <span></span> Date <span></span></p>
         }
     </text>;
 
@@ -366,6 +397,7 @@
                     @if (ShowsUnitCosts) { <th class="n">Cost/g</th> }
                     @if (IncludeCosting) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
+                    @if (ProductionCopy) { <th class="print-tick">Done</th> }
                 </tr>
             </thead>
             <tbody>
@@ -375,7 +407,7 @@
                 }
                 @if (section.AddIns.Count > 0)
                 {
-                    <tr class="print-subheading"><td colspan="@(2 + (ShowsPercentages ? 1 : 0) + (ShowsUnitCosts ? 1 : 0) + (IncludeCosting ? 1 : 0) + (withNow ? 1 : 0))">Add-ins</td></tr>
+                    <tr class="print-subheading"><td colspan="@(2 + (ShowsPercentages ? 1 : 0) + (ShowsUnitCosts ? 1 : 0) + (IncludeCosting ? 1 : 0) + (withNow ? 1 : 0) + (ProductionCopy ? 1 : 0))">Add-ins</td></tr>
                     @foreach (var line in section.AddIns)
                     {
                         @LineRow(line, withNow)
@@ -389,6 +421,7 @@
                     @if (ShowsUnitCosts) { <td></td> }
                     @if (IncludeCosting) { <td class="n">@Money(section.BatchCost)</td> }
                     @if (withNow) { <td class="n">@(section.NowBatchCost is { } now ? Money(now) : "")</td> }
+                    @if (ProductionCopy) { <td></td> }
                 </tr>
             </tfoot>
         </table>
@@ -401,6 +434,7 @@
         @if (ShowsUnitCosts) { <td class="n">@line.CostPerGram.ToString("N4")</td> }
         @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
+        @if (ProductionCopy) { @TickBox }
     </tr>;
 
     private RenderFragment PackagingPart(ProductPrintout printout, PrintedPackaging packaging) => @<section class="print-block">
@@ -413,6 +447,7 @@
                     @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
                     @if (IncludeCosting) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
+                    @if (ProductionCopy) { <th class="print-tick">Done</th> }
                 </tr>
             </thead>
             <tbody>
@@ -423,6 +458,7 @@
                         @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
                         @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
                         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
+                        @if (ProductionCopy) { @TickBox }
                     </tr>
                 }
             </tbody>
@@ -447,6 +483,7 @@
                         <th>Material</th><th class="n">Qty per Pack</th><th>Unit</th>
                         @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
                         @if (IncludeCosting) { <th class="n">Cost per Pack</th> }
+                        @if (ProductionCopy) { <th class="print-tick">Done</th> }
                     </tr>
                 </thead>
                 <tbody>
@@ -456,6 +493,7 @@
                             <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
                             @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
                             @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
+                            @if (ProductionCopy) { @TickBox }
                         </tr>
                     }
                 </tbody>

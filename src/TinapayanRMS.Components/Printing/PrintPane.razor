@@ -1,31 +1,41 @@
 @inject IPagePrinter Printer
+@inject IFileDialogs Dialogs
+@inject IAppWindow Window
+@inject Notices Notices
+@inject Serilog.ILogger Logger
 
-@* A printout's preview: what to include, and Print, over the document on sheets of
-   paper, one for each part that starts a page. Print opens the computer's print dialog over the window's page, which
-   prints the document alone (print.css hides the rest), on pages app.js breaks as it's printed and the web view numbers. *@
+@* A printout's preview: what to include, and Print and Export to PDF, over the document on sheets of paper, one for each
+   part that starts a page. Print opens the computer's print dialog over the window's page, and Export to PDF writes the
+   same pages to a file, each printing the document alone (print.css hides the rest), on pages app.js breaks and the web
+   view numbers. Production copy prints the recipe alone for the production floor, in large type with a box to tick
+   beside each line. *@
 <div class="print-pane">
     <div class="print-bar no-print">
         @Options
         @if (Set is not null)
         {
             <span class="form-label">Include</span>
-            <SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing"
+            <SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing || Includes.ProductionCopy"
                         title="Each sub-assembly's ingredients and piece size, then the packaging." />
-            <SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe"
+            <SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe || Includes.ProductionCopy"
                         title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
+            <SfCheckBox Label="Production copy" @bind-Checked="Includes.ProductionCopy"
+                        title="The recipe alone, with no costs, for the production floor: large type, a box to tick beside each line as it's weighed, and a line to sign." />
         }
         <span class="print-bar-space"></span>
         @if (Status is not null)
         {
             <span class="busy-text">@Status</span>
         }
+        <ActionButton Icon="AppIcon.ExportToPdf" Label="Export to PDF" Disabled="Set is null || _exporting" OnClick="ExportPdfAsync" />
         <ActionButton Icon="AppIcon.Print" Label="Print" Primary="true" Disabled="Set is null" OnClick="PrintAsync" />
     </div>
 
     <div class="print-stage">
         @if (Set is not null)
         {
-            <PrintDocument Set="Set" IncludeRecipe="Includes.Recipe" IncludeCosting="Includes.Costing" />
+            <PrintDocument Set="Set" IncludeRecipe="Includes.ProductionCopy || Includes.Recipe"
+                           IncludeCosting="!Includes.ProductionCopy && Includes.Costing" ProductionCopy="Includes.ProductionCopy" />
         }
         else if (Empty is not null)
         {
@@ -35,7 +45,11 @@
 </div>
 
 @code {
-    // The Include ticks, as this Windows user last left them.
+    private const string Kind = "PDF document";
+
+    private bool _exporting;
+
+    // The Include ticks and Production copy, as this Windows user last left them.
     [Inject] private PrintIncludes Includes { get; set; } = null!;
 
     [Parameter] public ProductPrintSet? Set { get; set; }
@@ -49,4 +63,33 @@
     [Parameter] public string? Empty { get; set; }
 
     private Task PrintAsync() => Printer.PrintAsync();
+
+    // The pages as the preview shows them, to a file the Save dialog names: the window prints its page to it, as Print
+    // does (Page.printToPDF, which keeps print.css's paper). A failure says so in a toast, as a screen's would.
+    private async Task ExportPdfAsync()
+    {
+        if (Set is not { } set)
+        {
+            return;
+        }
+
+        _exporting = true;
+        try
+        {
+            if (await Dialogs.ChooseSaveFileAsync(PdfExport.FileNameOf(set), Kind) is { } path)
+            {
+                await Window.SavePageAsPdfAsync(path);
+                Notices.ShowSuccess($"Saved {Path.GetFileName(path)} in {Path.GetDirectoryName(path)}.");
+            }
+        }
+        catch (Exception exception)
+        {
+            Logger.Warning(exception, "The print preview's Export to PDF failed");
+            Notices.ShowError($"The PDF wasn't saved: {exception.Message}");
+        }
+        finally
+        {
+            _exporting = false;
+        }
+    }
 }

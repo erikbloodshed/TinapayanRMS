@@ -52,6 +52,7 @@ public class PrintDocumentColumnsTests
     public async Task The_preview_starts_with_the_Include_ticks_as_they_were_left()
     {
         await using var context = AppServices.NewContext();
+        context.Services.AddSingleton<Components.Shared.IFileDialogs>(new FakeFileDialogs());
         context.Services.GetRequiredService<IViewStateStore>().WriteList(PrintIncludes.Key, ["recipe"]);
 
         var pane = context.Render<PrintPane>(parameters => parameters.Add(p => p.Set, Set()));

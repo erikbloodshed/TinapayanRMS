@@ -44,6 +44,12 @@ public sealed record ProductPrintout(
     /// <summary>The footer's note for a version from the History tab, which isn't the product as it is now.</summary>
     public const string VersionNote = "From the version history, at its costs then";
 
+    /// <summary>
+    /// A draft: the Products screen's form with changes Save hasn't written, or a product never saved, which the page marks
+    /// as one so it isn't taken for the recipe as it stands.
+    /// </summary>
+    public bool IsDraft => SaveNote is NotSavedNote or UnsavedChangesNote;
+
     /// <summary>A composite: its recipe is the products it holds (<see cref="Components"/>).</summary>
     public bool IsComposite => Components is not null;
 

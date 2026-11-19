@@ -38,6 +38,21 @@ public class PrintIncludesTests
     }
 
     [Test]
+    public void Production_copy_is_off_until_ticked_and_stays_as_the_parts_change()
+    {
+        var viewState = new InMemoryViewStateStore();
+        var includes = new PrintIncludes(viewState);
+        includes.ProductionCopy.Should().BeFalse();
+
+        includes.ProductionCopy = true;
+        includes.Costing = false;
+
+        var next = new PrintIncludes(viewState);
+        (next.Recipe, next.Costing, next.ProductionCopy).Should().Be((true, false, true));
+        viewState.ReadList(PrintIncludes.Key).Should().Equal("recipe", "production");
+    }
+
+    [Test]
     public void A_kept_list_with_no_part_in_it_is_both()
     {
         var viewState = new InMemoryViewStateStore();

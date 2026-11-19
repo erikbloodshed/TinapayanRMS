@@ -59,8 +59,9 @@
         interaction.SetOutput(path);
     }
 
-    // The product's name, less what Windows refuses in a file's name ("Ube/Cheese Roll" is "Ube-Cheese Roll.pdf").
-    private static string FileNameOf(ProductPrintSet set)
+    // The set's title or the product's name, less what Windows refuses in a file's name ("Ube/Cheese Roll" is
+    // "Ube-Cheese Roll.pdf"). The print preview's Export to PDF suggests the same.
+    internal static string FileNameOf(ProductPrintSet set)
     {
         var name = set.Title ?? set.Products[0].ProductName;
         foreach (var refused in Path.GetInvalidFileNameChars())
