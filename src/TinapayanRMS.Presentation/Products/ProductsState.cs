@@ -247,30 +247,51 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
         PrintCommand = new ScreenCommand(
             () => RunSafelyAsync(() =>
             {
-                if (!AreDetailsReady)
+                if (IsReadyToPrint("print"))
                 {
-                    return;
+                    _printRequests.OnNext(new PrintScope.ThisProduct());
                 }
+            }));
 
-                // On the History tab it prints the version picked there (PreparePrintout), so the form isn't applied: its
-                // pages aren't the form's.
-                if (SelectedDetailsTab == HistoryTab)
+        // The same pages as Print, straight to a file.
+        ExportPdfCommand = new ScreenCommand(
+            () => RunSafelyAsync(async () =>
+            {
+                if (IsReadyToPrint("export") && PreparePrintout() is ProductPrintout printout
+                    && await ExportPdf.Handle(ProductPrintSet.Of(printout)) is { } path)
                 {
-                    if (VersionHistory.SelectedRow is null)
-                    {
-                        ErrorMessage = "Pick a version in the History tab's table to print it.";
-                        return;
-                    }
+                    SuccessMessage = $"Saved {Path.GetFileName(path)} in {Path.GetDirectoryName(path)}.";
                 }
-                else
-                {
-                    Recipe.ApplyOpenForm();
-                }
-
-                _printRequests.OnNext(new PrintScope.ThisProduct());
             }));
 
         ToggleCostBasisCommand = ScreenCommand.Of(ToggleCostBasis);
+    }
+
+    /// <summary>
+    /// Whether the product's pages can be asked for now: its details have arrived, and either the version to
+    /// <paramref name="verb"/> is picked on the History tab, whose pages aren't the form's (PreparePrintout), or a form left
+    /// open has been applied. A rule refusing that form throws, for the command to show.
+    /// </summary>
+    private bool IsReadyToPrint(string verb)
+    {
+        if (!AreDetailsReady)
+        {
+            return false;
+        }
+
+        if (SelectedDetailsTab != HistoryTab)
+        {
+            Recipe.ApplyOpenForm();
+            return true;
+        }
+
+        if (VersionHistory.SelectedRow is null)
+        {
+            ErrorMessage = $"Pick a version in the History tab's table to {verb} it.";
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>The list: every product in its stage and the user's folders, searched, filtered, its menus, moves and folders.</summary>
@@ -565,6 +586,15 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     /// refusing it shows its message here and the tab doesn't open.
     /// </summary>
     public ScreenCommand PrintCommand { get; }
+
+    /// <summary>
+    /// Export to PDF: saves the pages Print would show for the product (<see cref="PreparePrintout"/>) as a PDF file, through
+    /// <see cref="ExportPdf"/>, and says where it went.
+    /// </summary>
+    public ScreenCommand ExportPdfCommand { get; }
+
+    /// <summary>Input: the pages to save. Output: where they were saved, or null when the user cancelled. The screen answers it (PdfExport).</summary>
+    public Interaction<ProductPrintSet, string?> ExportPdf { get; } = new();
 
     /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (ProductCosting.CostBasis).</summary>
     public ScreenCommand ToggleCostBasisCommand { get; }

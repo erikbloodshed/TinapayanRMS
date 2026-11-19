@@ -1,5 +1,6 @@
 @page "/products"
 @page "/products/{Id:int}"
+@using TinapayanRMS.Components.Printing
 @inherits RecordScreenBase<ProductsState>
 @inject Prompts Prompts
 
@@ -56,6 +57,8 @@
         </div>
     </div>
 </CascadingValue>
+
+<PdfExport Export="State!.ExportPdf" />
 
 @code {
     protected override ScreenCommand LoadCommand => State!.LoadCommand;

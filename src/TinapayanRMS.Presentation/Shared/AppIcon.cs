@@ -38,6 +38,7 @@ public enum AppIcon
     FolderOpen,
     NewFolder,
     ExportToExcel,
+    ExportToPdf,
 
     /// <summary>Made in-house: a made ingredient, or a section moved to one.</summary>
     InHouse,

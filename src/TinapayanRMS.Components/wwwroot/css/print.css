@@ -251,6 +251,14 @@
     break-inside: avoid;
 }
 
+/* Export to PDF's pages (PdfExport), out of sight on the screen while the file is written. */
+.pdf-export {
+    position: fixed;
+    top: 0;
+    left: -300mm;
+    width: 210mm;
+}
+
 /* ---- On paper. ---- */
 
 @page {
@@ -304,5 +312,15 @@
         margin: 0;
         padding: 0;
         box-shadow: none;
+    }
+
+    /* Export to PDF's pages take the place of the screen they're drawn on. */
+    :has(> .pdf-export) > :not(.pdf-export) {
+        display: none !important;
+    }
+
+    .pdf-export {
+        position: static;
+        width: auto;
     }
 }

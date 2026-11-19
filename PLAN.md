@@ -101,7 +101,7 @@ TinapayanRMS.slnx
 │   │   ├── Layout/                   — MainLayout, TitleBar (the chromeless window's title bar), NavMenu, ScreenTabStrip, FindHost, VimKeys
 │   │   ├── Shared/                   — ScreenBase, RedrawGate, the shared fields and tables (TextField, NumberField, PickField, LineGrid, FolderTree…),
 │   │   │                               the hosts, AppIcons, and what only the window can do (IAppWindow, IFileDialogs, IPagePrinter)
-│   │   ├── Printing/                 — PrintDocument (a printout as HTML) and PrintPreviews
+│   │   ├── Printing/                 — PrintDocument (a printout as HTML), PdfExport (Products' Export to PDF) and PrintPreviews
 │   │   ├── Vim/                      — the Vim keys' C#: the key table, the command line, the hint labels, the sums
 │   │   └── wwwroot/                  — the screens' styles and scripts, served at _content/TinapayanRMS.Components/: app.css and css/,
 │   │                                   app.js (page helpers, the title bar's caption), vim.js, and syncfusion.js (the screens' Syncfusion

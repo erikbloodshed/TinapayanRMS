@@ -107,6 +107,11 @@ public sealed partial class AppWindowChrome : IAppWindow
         }
     });
 
+    public Task SavePageAsPdfAsync(string path) => MainThread.InvokeOnMainThreadAsync(() =>
+        MainPage.Current?.WebView.Handler?.PlatformView is Microsoft.UI.Xaml.Controls.WebView2 { CoreWebView2: { } webView }
+            ? PagePdf.SaveAsync(webView, path)
+            : throw new InvalidOperationException("The window has no page to save as a PDF."));
+
     public void SetTitleBar(DeviceRect titleBar, IReadOnlyList<DeviceRect> buttons) => OnWindowThread(() =>
     {
         _titleBar = (titleBar, buttons);

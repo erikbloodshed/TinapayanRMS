@@ -1,6 +1,6 @@
 @* The picked product's header: its name, with a tag while its costs
    show unbuffered and one saying where a new product will be filed; New (a product, or from its arrow a composite),
-   Save, Undo, Redo, Revert, Print, the Buffered/Unbuffered switch and Delete; its figures in coloured tiles; then what's
+   Save, Undo, Redo, Revert, Print, Export to PDF, the Buffered/Unbuffered switch and Delete; its figures in coloured tiles; then what's
    typed in about it on one row. A composite has no Quantity Required: it's one unit of the products it holds. *@
 <section class="card header-card">
     <div class="header-title-row">
@@ -40,6 +40,8 @@
                            Tooltip="Puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited." />
             <CommandButton Command="State.PrintCommand" Icon="AppIcon.Print" Label="Print"
                            Tooltip="Opens the Print screen, which previews and prints this product's recipe and costing as this screen shows them." />
+            <CommandButton Command="State.ExportPdfCommand" Icon="AppIcon.ExportToPdf" Label="Export to PDF"
+                           Tooltip="Saves this product's recipe and costing as a PDF file, as this screen shows them, unsaved changes included. On the History tab, the version picked there." />
             <CommandButton Command="State.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@State.Costing.CostBasisButtonLabel" Tooltip="@State.Costing.CostBasisButtonTooltip" />
             <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
         </div>

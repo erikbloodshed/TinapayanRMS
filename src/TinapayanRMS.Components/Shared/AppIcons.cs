@@ -40,6 +40,7 @@ public static class AppIcons
         AppIcon.FolderOpen => IconName.FolderOpen,
         AppIcon.NewFolder => IconName.Folder,
         AppIcon.ExportToExcel => IconName.ExportExcel,
+        AppIcon.ExportToPdf => IconName.ExportPdf,
         AppIcon.InHouse => IconName.Home,
         AppIcon.Composite => IconName.SendToBack,
         AppIcon.RawMaterials => IconName.Grain,

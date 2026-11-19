@@ -1,0 +1,77 @@
+@implements IDisposable
+@inject IFileDialogs Dialogs
+@inject IAppWindow Window
+
+@* Export to PDF: asks where to save the pages, then draws them out of sight for as long as the window takes to write the
+   file. While they're here print.css prints them in place of the screen around them. *@
+@if (_set is not null)
+{
+    <div class="pdf-export" aria-hidden="true">
+        <PrintDocument Set="_set" IncludeRecipe="true" IncludeCosting="true" />
+    </div>
+}
+
+@code {
+    private const string Kind = "PDF document";
+
+    private IDisposable? _handler;
+    private ProductPrintSet? _set;
+    private TaskCompletionSource? _drawn;
+
+    /// <summary>The screen's question: these pages, answered with where they were saved, or null when cancelled.</summary>
+    [Parameter, EditorRequired] public Interaction<ProductPrintSet, string?> Export { get; set; } = null!;
+
+    protected override void OnInitialized() => _handler = Export.RegisterHandler(SaveAsync);
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_set is not null)
+        {
+            _drawn?.TrySetResult();
+        }
+    }
+
+    private async Task SaveAsync(InteractionContext<ProductPrintSet, string?> interaction)
+    {
+        _drawn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var path = await Dialogs.ChooseSaveFileAsync(FileNameOf(interaction.Input), Kind);
+        if (path is null)
+        {
+            interaction.SetOutput(null);
+            return;
+        }
+
+        try
+        {
+            _set = interaction.Input;
+            await InvokeAsync(StateHasChanged);
+            await _drawn.Task;
+            await Window.SavePageAsPdfAsync(path);
+        }
+        finally
+        {
+            _set = null;
+            await InvokeAsync(StateHasChanged);
+        }
+
+        interaction.SetOutput(path);
+    }
+
+    // The product's name, less what Windows refuses in a file's name ("Ube/Cheese Roll" is "Ube-Cheese Roll.pdf").
+    private static string FileNameOf(ProductPrintSet set)
+    {
+        var name = set.Title ?? set.Products[0].ProductName;
+        foreach (var refused in Path.GetInvalidFileNameChars())
+        {
+            name = name.Replace(refused, '-');
+        }
+
+        return $"{name.Trim().TrimEnd('.')}.pdf";
+    }
+
+    public void Dispose()
+    {
+        _handler?.Dispose();
+        _drawn?.TrySetCanceled();
+    }
+}

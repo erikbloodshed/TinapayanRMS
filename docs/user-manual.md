@@ -679,7 +679,7 @@ A ⚠ after a product's name means its **Current Price** earns less than the **M
 
 ### The header
 
-The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
+The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Export to PDF**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
 
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
 - **Base Cost**: materials plus wastage, labour, overhead and administrative.
@@ -938,6 +938,12 @@ Under each product's title are when it was last updated, when it was printed, an
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
 Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, or by closing the **Print** tab with its **✕**.
+
+### Exporting a product to PDF
+
+Press **Export to PDF** in the Products header, beside **Print**, to save the product's recipe and costing as a PDF file without opening the Print tab. Choose where to save it: the file is named after the product to start with. A message says where it went.
+
+The PDF has the same pages **Print** shows, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF. To leave out the recipe or the costing, or to put several products in one PDF, use the **Print** tab and choose **Microsoft Print to PDF** as the printer.
 
 A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 

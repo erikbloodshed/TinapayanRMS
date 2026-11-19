@@ -148,6 +148,58 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         printout.Packaging.Should().BeNull();
     });
 
+    [Test]
+    public Task Export_to_PDF_saves_the_product_as_the_screen_shows_it_and_says_where() => UiThread.RunAsync(async () =>
+    {
+        var (state, sugarId) = await OpenOneSubAssemblyProductAsync();
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 500m });
+        ProductPrintSet? asked = null;
+        using var handler = state.ExportPdf.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(@"C:\Exports\Ube Roll.pdf");
+        });
+
+        await state.ExportPdfCommand.ExecuteAsync();
+
+        var printout = asked!.Products.Should().ContainSingle().Subject;
+        asked.Title.Should().BeNull("one product has no contents page");
+        printout.ProductName.Should().Be("Ube Roll");
+        printout.Sections.Single().Lines.Select(l => (l.Ingredient, l.Grams)).Should().Equal(("Flour", 1000m), ("Sugar", 500m));
+        printout.SaveNote.Should().Be(ProductPrintout.UnsavedChangesNote);
+        state.SuccessMessage.Should().Be(@"Saved Ube Roll.pdf in C:\Exports.");
+    });
+
+    [Test]
+    public Task Cancelling_Export_to_PDF_says_nothing() => UiThread.RunAsync(async () =>
+    {
+        var (state, _) = await OpenOneSubAssemblyProductAsync();
+        using var handler = state.ExportPdf.RegisterHandler(interaction => interaction.SetOutput(null));
+
+        await state.ExportPdfCommand.ExecuteAsync();
+
+        state.SuccessMessage.Should().BeNull();
+        state.ErrorMessage.Should().BeNull();
+    });
+
+    [Test]
+    public Task Export_to_PDF_of_a_form_a_rule_refuses_shows_why_and_asks_nothing() => UiThread.RunAsync(async () =>
+    {
+        var (state, sugarId) = await OpenOneSubAssemblyProductAsync();
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
+        var asked = 0;
+        using var handler = state.ExportPdf.RegisterHandler(interaction =>
+        {
+            asked++;
+            interaction.SetOutput(null);
+        });
+
+        await state.ExportPdfCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Contain("Sugar", "a line with no grams can't go into the recipe");
+        asked.Should().Be(0);
+    });
+
     /// <summary>Runs Print, then asks for the printout as the main window's Print tab does once Print has asked for it.</summary>
     private static async Task<ProductPrintout> PrintAsync(ProductsState state)
     {

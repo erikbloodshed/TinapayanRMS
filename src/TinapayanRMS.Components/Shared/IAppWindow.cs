@@ -29,6 +29,12 @@ public interface IAppWindow
     void ClosePrintDialog();
 
     /// <summary>
+    /// Writes the page as it prints (print.css) to the PDF file at <paramref name="path"/>, in place of any file there,
+    /// without the print dialog.
+    /// </summary>
+    Task SavePageAsPdfAsync(string path);
+
+    /// <summary>
     /// Where the title bar is, and what in it takes the mouse itself (its buttons), in the web view's device pixels from
     /// its top left corner. Windows takes the rest of the bar (<see cref="DeviceRect.Caption"/>) as the window's caption:
     /// dragging it moves the window (and snaps it to an edge), a double-click maximizes or restores it, and a right-click

@@ -29,5 +29,17 @@ public sealed class FakeAppWindow : IAppWindow
 
     public void ClosePrintDialog() => PrintDialogsClosed++;
 
+    /// <summary>Where the page was saved as a PDF, each time.</summary>
+    public List<string> PdfsSaved { get; } = [];
+
+    /// <summary>What saving the page as a PDF does besides being remembered: a test looks at the page then, or fails it.</summary>
+    public Func<string, Task> OnSavePdf { get; set; } = _ => Task.CompletedTask;
+
+    public Task SavePageAsPdfAsync(string path)
+    {
+        PdfsSaved.Add(path);
+        return OnSavePdf(path);
+    }
+
     public void SetTitleBar(DeviceRect titleBar, IReadOnlyList<DeviceRect> buttons) => TitleBar = (titleBar, buttons);
 }
