@@ -139,21 +139,27 @@ const dragScrolling = (currentDrag, moved) => {
     return scroll;
 };
 
-// A printout's pages (Printing/PrintDocument.razor), worked out as the page is printed, by Print or by Export to PDF. The
-// browser repeats a table's heading on each page the table reaches, but can't write on a page where the table goes on:
-// a page number is known only in the margins. So the pages are broken here, and a table that goes on to the next page
-// says so under its last row there ("Continued on page 2"). Each part that starts a page (.print-sheet) is filled from
-// the heights of its rows, headings and notes as the screen lays them out, at the page's width, by print.css's rules: a
-// row whole, a heading with what follows it, a table's heading again at the top of each page it goes on to, the costing
-// (.print-keep) whole if it fits on a page, a table's totals with its last row, and never its first row alone. A break before each page's first row
-// or heading then has the browser break there too. The pages are Settings → Printing's paper less its margins, whose
-// height PrintDocument gives the document (data-page-height, in millimetres); printed at another size or scale, they
-// break where the browser does, and the page numbers they name may be off.
+// A printout's pages (Printing/PrintDocument.razor), worked out each time it's drawn, so the preview shows them, and again
+// as it's printed, by Print or by Export to PDF. A page number is known only in the margins, so the browser can't write
+// on a page where a table goes on: the pages are broken here instead. Each part that starts a page (.print-sheet) is
+// filled from the heights of its rows, headings and notes as the screen lays them out, at the page's width, by
+// print.css's rules: a row whole, a heading with what follows it, the costing (.print-keep) whole if it fits on a page,
+// a table's totals with its last row, and never its first row alone. Then, at each page after a part's first:
+//   - a break before its first row or heading, so the browser breaks there too (data-page-break);
+//   - the part's name at its top, "Asado Roll 60g (continued)", with the table's section when one goes on, "Asado Roll
+//     60g · Filling (continued)", then that table's column headings again (the browser's own repeat of them is turned off,
+//     as it would come above the name);
+//   - "Continued on page 3" under the last row of a table that goes on.
+// A set's contents gets the page each product starts on. On the screen each page after the first starts under a dashed
+// line saying its number. The pages are Settings → Printing's paper less its margins, whose height PrintDocument gives the
+// document (data-page-height, in millimetres); printed at another size or scale, they break where the browser does too,
+// and the page numbers they name may be off.
 const printMillimetre = 96 / 25.4;
 const printPage = {
     height: 267 * printMillimetre,      // A4 less normal margins, for a document that doesn't say
     slack: 3 * printMillimetre,         // what the printed layout may differ from the screen's by
     continued: 7 * printMillimetre,     // a "Continued on page" row
+    runningHead: 8 * printMillimetre,   // the part's name at the top of a page after its first
 };
 
 // What a printout's part is laid out in, top to bottom: each heading, note, row of figures and table row, with where it
@@ -195,7 +201,7 @@ const printPageStarts = (boxes, height) => {
         starts.push(at);
         first = at;
         top = boxes[at].top;
-        header = boxes[at].row && !boxes[at].firstRow ? boxes[at].header : 0;
+        header = printPage.runningHead + (boxes[at].row && !boxes[at].firstRow ? boxes[at].header : 0);
     };
     const sameTable = (at, before) => boxes[at].row && boxes[before].row && boxes[at].table === boxes[before].table;
     for (let at = 0; at < boxes.length; at++) {
@@ -209,7 +215,7 @@ const printPageStarts = (boxes, height) => {
                 at = last;
                 continue;
             }
-            if (at > first && boxes[last].bottom - box.top <= limit) {
+            if (at > first && boxes[last].bottom - box.top + printPage.runningHead <= limit) {
                 startPage(at);
                 at = last;
                 continue;
@@ -239,9 +245,35 @@ const printPageStarts = (boxes, height) => {
     return starts;
 };
 
+// A heading's own words: a section's name without the source beside it ("Dough", not "Dough Asado Roll Dough, from…").
+const printHeadingText = heading =>
+    [...heading.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join("").trim()
+    || heading.textContent.trim();
+
+// The heading a table is under: the nearest h2 or h3 before it.
+const printSectionOf = table => {
+    let element = table.previousElementSibling;
+    while (element && !/^H[23]$/.test(element.tagName)) {
+        element = element.previousElementSibling;
+    }
+    return element;
+};
+
+const printCells = (tag, className, text, span) => {
+    const row = document.createElement("tr");
+    row.className = `print-added ${className}`;
+    const cell = document.createElement(tag);
+    cell.colSpan = span;
+    cell.textContent = text;
+    row.append(cell);
+    return row;
+};
+
 const clearPrintoutPages = () => {
-    document.querySelectorAll(".print-continued").forEach(row => row.remove());
+    document.querySelectorAll(".print-added").forEach(element => element.remove());
     document.querySelectorAll("[data-page-break]").forEach(element => element.removeAttribute("data-page-break"));
+    document.querySelectorAll(".print-contents-page").forEach(cell => { cell.textContent = ""; });
+    document.querySelectorAll(".print-paged").forEach(printout => printout.classList.remove("print-paged"));
 };
 
 const layOutPrintoutPages = () => {
@@ -251,32 +283,61 @@ const layOutPrintoutPages = () => {
             continue;
         }
         const breaks = [];
+        const starts = [];
         const height = parseFloat(printout.dataset.pageHeight) * printMillimetre || printPage.height;
         let page = 1;
         for (const sheet of printout.querySelectorAll(":scope > .print-sheet")) {
             const boxes = printBoxes(sheet);
-            const starts = printPageStarts(boxes, height);
-            for (let index = 1; index < starts.length; index++) {
-                breaks.push({ box: boxes[starts[index]], before: boxes[starts[index] - 1], page: page + index });
+            const pageStarts = printPageStarts(boxes, height);
+            const name = sheet.querySelector(".print-title h1")?.textContent.trim() ?? "";
+            starts.push({ sheet, page });
+            for (let index = 1; index < pageStarts.length; index++) {
+                breaks.push({ box: boxes[pageStarts[index]], before: boxes[pageStarts[index] - 1], page: page + index, name });
             }
-            page += starts.length;
+            page += pageStarts.length;
         }
-        for (const { box, before, page } of breaks) {
-            (box.firstRow ? box.table : box.element).setAttribute("data-page-break", "");
-            if (box.row && !box.firstRow && before.row && before.table === box.table) {
-                const row = document.createElement("tr");
-                row.className = "print-continued";
-                const cell = row.insertCell();
-                cell.colSpan = [...before.element.cells].reduce((count, each) => count + each.colSpan, 0);
-                cell.textContent = `Continued on page ${page}`;
-                before.element.after(row);
+
+        // Taken from the screen's layout before anything is put in.
+        printout.classList.add("print-paged");
+        for (const { box, before, page, name } of breaks) {
+            const label = `Page ${page}`;
+            if (box.row && !box.firstRow) {
+                // A table going on: the part's name and the table's section, then its column headings, in the table.
+                const span = [...box.element.cells].reduce((count, each) => count + each.colSpan, 0);
+                const section = printSectionOf(box.table);
+                const head = printCells("td", "print-running-row", `${name}${section ? ` · ${printHeadingText(section)}` : ""} (continued)`, span);
+                head.cells[0].dataset.page = label;
+                head.setAttribute("data-page-break", "");
+                const headings = box.table.tHead?.rows[0]?.cloneNode(true);
+                headings?.classList.add("print-added", "print-repeat-head");
+                box.element.before(head);
+                if (headings) {
+                    box.element.before(headings);
+                }
+                if (before.row && before.table === box.table) {
+                    before.element.after(printCells("td", "print-continued", `Continued on page ${page}`, span));
+                }
+            } else {
+                // A heading, a note, or a whole table: the part's name above it.
+                const head = document.createElement("div");
+                head.className = "print-added print-running-head";
+                head.textContent = `${name} (continued)`;
+                head.dataset.page = label;
+                head.setAttribute("data-page-break", "");
+                (box.firstRow ? box.table : box.element).before(head);
             }
         }
+
+        // The contents' page column: each product's part in turn, after the contents' own.
+        const productStarts = starts.filter(start => start.sheet.classList.contains("print-product"));
+        printout.querySelectorAll(".print-contents-page").forEach((cell, index) => {
+            cell.textContent = productStarts[index] ? String(productStarts[index].page) : "";
+        });
     }
 };
 
 // Before each printing: the print preview's, each time it's drawn, and Export to PDF's. What's put in stays until the
-// next, out of sight on the screen: the preview may print what it holds after its afterprint.
+// next drawing or printing, as the preview shows it and may print what it holds after its afterprint.
 window.addEventListener("beforeprint", () => {
     try {
         layOutPrintoutPages();
@@ -909,6 +970,15 @@ window.tinapayan = {
     // Opens the web view's print dialog for the page (the print views lay themselves out with @page CSS).
     print() {
         window.print();
+    },
+
+    // A printout's pages, for the preview, each time PrintDocument has drawn it: as printing works them out (above).
+    layOutPrintoutPages() {
+        try {
+            layOutPrintoutPages();
+        } catch (error) {
+            console.warn("The printout's pages weren't worked out for the preview.", error);
+        }
     },
 
     // The window's title bar, which the page draws (Layout/TitleBar.razor). The window is told where the bar is and where

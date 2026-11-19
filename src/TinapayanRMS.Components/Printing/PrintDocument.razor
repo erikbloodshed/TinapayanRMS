@@ -2,14 +2,16 @@
 @using TinapayanRMS.ApplicationCore.Rules
 @using TinapayanRMS.Domain.Enums
 @inject PrintPage PageSetup
+@inject IJSRuntime JS
 
 @* A printout as a document the browser prints, built from a ProductPrintSet:
    one product's recipe and costing; a set of products, each starting a page of its own after a
    title and contents; or a Price Simulator report, with today's figures beside the simulated ones.
    Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
-   one, app.js works out the pages as it's printed (a heading kept with its table, a table's totals once, after its last
-   row, and "Continued on page n" under a table that goes on), and the browser repeats table headings and numbers the
-   pages. The page is Settings → Printing's (PrintPage): the paper's size and margins, and the note at each page's foot,
+   one, app.js works out the pages each time it's drawn and as it's printed (a heading kept with its table, a table's
+   totals once, after its last row, the part's name and a split table's column headings at the top of each page after its
+   first, "Continued on page n" under a table that goes on, and a set's contents' page numbers), and the browser numbers
+   the pages. The page is Settings → Printing's (PrintPage): the paper's size and margins, and the note at each page's foot,
    for @page; each sheet's size on the screen and the type's; the height app.js fills each page to; the shop's heading at
    the top of each part; and the columns and parts it leaves out. *@
 <style>@PageRule</style>
@@ -41,12 +43,12 @@
             else if (IsSimulation)
             {
                 <table class="print-table">
-                    <thead><tr><th>Product</th><th class="n">Base Cost</th><th class="n">Simulated Base Cost</th><th class="n">Change %</th></tr></thead>
+                    <thead><tr><th>Product</th><th class="n">Base Cost</th><th class="n">Simulated Base Cost</th><th class="n">Change %</th><th class="n">Page</th></tr></thead>
                     <tbody>
                         @foreach (var product in Set.Products)
                         {
                             var now = product.Simulation?.Now ?? product.Costs;
-                            <tr><td>@product.ProductName</td><td class="n">@Money(now.BaseCost)</td><td class="n">@Money(product.Costs.BaseCost)</td><td class="n">@ChangePercent(now.BaseCost, product.Costs.BaseCost)</td></tr>
+                            <tr><td>@product.ProductName</td><td class="n">@Money(now.BaseCost)</td><td class="n">@Money(product.Costs.BaseCost)</td><td class="n">@ChangePercent(now.BaseCost, product.Costs.BaseCost)</td><td class="n print-contents-page"></td></tr>
                         }
                     </tbody>
                 </table>
@@ -54,11 +56,11 @@
             else
             {
                 <table class="print-table">
-                    <thead><tr><th>Product</th><th>Folder</th></tr></thead>
+                    <thead><tr><th>Product</th><th>Folder</th><th class="n">Page</th></tr></thead>
                     <tbody>
                         @foreach (var product in Set.Products)
                         {
-                            <tr><td>@product.ProductName</td><td>@product.StageTitle › @product.CategoryName</td></tr>
+                            <tr><td>@product.ProductName</td><td>@product.StageTitle › @product.CategoryName</td><td class="n print-contents-page"></td></tr>
                         }
                     </tbody>
                 </table>
@@ -80,6 +82,19 @@
 
     /// <summary>The costing breakdown, and the costs beside the recipe's lines.</summary>
     [Parameter] public bool IncludeCosting { get; set; } = true;
+
+    // The pages, as printing will break them, each time the document is drawn: the preview shows where each starts, the
+    // part's name at its top and a set's contents' page numbers (app.js). A page going away as it's drawn has nothing to do.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("tinapayan.layOutPrintoutPages");
+        }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+        }
+    }
 
     private static string Mm(decimal millimetres) => millimetres.ToString("0.##", CultureInfo.InvariantCulture) + "mm";
 

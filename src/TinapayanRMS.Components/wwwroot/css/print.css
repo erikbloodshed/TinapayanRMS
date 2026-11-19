@@ -246,9 +246,56 @@
     border-bottom: none;
 }
 
-/* Under a table's last row on a page, when it goes on to the next (app.js), on paper only. */
-.print-table .print-continued {
-    display: none;
+/* What app.js puts in where a page breaks: "Continued on page n" under a table's last row on a page; the part's name at
+   the top of the next ("Asado Roll 60g (continued)", in the table when it goes on, with its section), and the table's
+   column headings again, as the browser's own repeat of them is turned off once the pages are worked out
+   (print-paged), since it would come above the name. */
+.print-paged .print-table thead {
+    display: table-row-group;
+}
+
+.print-running-head,
+.print-table .print-running-row td {
+    color: #5c5f77;
+    font-size: calc(9pt * var(--type-scale, 1));
+    font-style: italic;
+}
+
+.print-running-head {
+    margin-bottom: 6px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #ccd0da;
+}
+
+.print-table .print-running-row td {
+    padding: 0 6px 4px;
+    border-bottom: none;
+}
+
+/* On the screen, each page after a part's first starts under a dashed line saying its number. */
+@media screen {
+    .print-running-head,
+    .print-table .print-running-row td {
+        position: relative;
+        padding-top: 10mm;
+        background-image: repeating-linear-gradient(to right, #9ca0b0 0 4px, transparent 4px 8px);
+        background-size: 100% 1px;
+        background-position: 0 5mm;
+        background-repeat: no-repeat;
+    }
+
+    .print-running-head::before,
+    .print-table .print-running-row td::before {
+        content: attr(data-page);
+        position: absolute;
+        top: calc(5mm - 0.7em);
+        right: 0;
+        padding: 0 6px;
+        background: #fff;
+        color: #7c7f93;
+        font-size: 8pt;
+        font-style: normal;
+    }
 }
 
 .print-table .print-continued td {
@@ -388,10 +435,6 @@
     /* Where app.js found each page starts. */
     [data-page-break] {
         break-before: page;
-    }
-
-    .print-table .print-continued {
-        display: table-row;
     }
 
     /* Export to PDF's pages take the place of the screen they're drawn on. */

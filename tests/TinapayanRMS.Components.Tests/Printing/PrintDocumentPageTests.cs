@@ -68,8 +68,23 @@ public class PrintDocumentPageTests
         printout.GetAttribute("style").Should().StartWith("--paper-width: 330.2mm; --paper-height: 215.9mm; --margin-top: 20mm;");
     }
 
+    [Test]
+    public async Task Each_drawing_has_app_js_work_out_the_pages_and_a_sets_contents_has_a_page_column_for_it()
+    {
+        await using var context = AppServices.NewContext();
+        var set = new ProductPrintSet("Breads", [Printout(), Printout() with { ProductName = "Ensaymada" }], Printout().PrintedAt);
+
+        var document = context.Render<PrintDocument>(parameters => parameters.Add(d => d.Set, set));
+
+        context.JSInterop.VerifyInvoke("tinapayan.layOutPrintoutPages");
+        document.FindAll(".print-sheet:first-child thead th").Select(th => th.TextContent).Should().Equal("Product", "Folder", "Page");
+        document.FindAll(".print-contents-page").Should().HaveCount(2, "one for each product, which app.js fills in");
+    }
+
     private static IRenderedComponent<PrintDocument> Render(BunitContext context) =>
-        context.Render<PrintDocument>(parameters => parameters.Add(d => d.Set, ProductPrintSet.Of(new ProductPrintout(
-            "Pandesal", "Breads", "Production", "Per piece", "—", null, new DateTime(2026, 11, 9, 14, 0, 0), [], null,
-            new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 100m)], MarginPercent = 30m, VatPercent = 12m })))));
+        context.Render<PrintDocument>(parameters => parameters.Add(d => d.Set, ProductPrintSet.Of(Printout())));
+
+    private static ProductPrintout Printout() => new(
+        "Pandesal", "Breads", "Production", "Per piece", "—", null, new DateTime(2026, 11, 9, 14, 0, 0), [], null,
+        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 100m)], MarginPercent = 30m, VatPercent = 12m }));
 }
