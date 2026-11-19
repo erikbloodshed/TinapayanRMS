@@ -30,6 +30,10 @@ public static class AppServices
 
         // The Windows user's view state is a file in their app data folder: the tests keep theirs in memory.
         context.Services.AddSingleton<IViewStateStore>(new InMemoryViewStateStore());
+
+        // Settings → Printing, which Export to PDF reads as it prints, in memory too.
+        context.Services.AddSingleton<InMemoryPrintSettings>();
+        context.Services.AddSingleton<IPrintSettingsRepository>(provider => provider.GetRequiredService<InMemoryPrintSettings>());
         context.Services.AddSingleton<FakeAppWindow>();
         context.Services.AddSingleton<IAppWindow>(provider => provider.GetRequiredService<FakeAppWindow>());
         return context;

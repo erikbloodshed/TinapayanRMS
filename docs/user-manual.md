@@ -305,7 +305,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the bottom of the navigation menu. It opens as a screen of its own, with a tab at the end of the tab strip, and has eight tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Keyboard**, **Security** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
+Open **Settings** from the bottom of the navigation menu. It opens as a screen of its own, with a tab at the end of the tab strip, and has nine tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Printing**, **Keyboard**, **Security** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
 
 ### Units of Measure
 
@@ -365,6 +365,16 @@ Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of eve
 Each product keeps its own stage and percentages, and each raw material its own cost buffer, from its first Save. Changing those defaults doesn't change anything saved. Changing the Wastage % does: it reprices every product. A new product you haven't saved yet moves to the new stage, since you didn't pick one for it. A new raw material you haven't saved moves to the new cost buffer, unless you've typed one.
 
 **Stored Costs**, to the right of the defaults, has a **Recalculate Costs** button. The app keeps every made and linked ingredient's cost up to date as you save. You only need this button if the database was changed outside the app, for example by a script. It works those costs out again from what they're made of, and a green notice says how many were out of date. Sub-assemblies and products need nothing: their costs are always worked out fresh from their lines. Purchased materials keep their prices.
+
+### Printing
+
+How printouts are laid out: [Print](#8-printing-recipes-and-costings), [Export to PDF](#exporting-a-product-to-pdf) and the [Price Simulator's report](#printing-a-price-simulator-report) all use it. Pick each, then press **Save**:
+
+- **Paper**: **A4 (210 × 297 mm)**, **Letter, short (8.5 × 11 in)**, **Long (8.5 × 13 in)** (long bond) or **Legal (8.5 × 14 in)**.
+- **Orientation**: **Portrait**, or **Landscape** for the paper on its side: wider tables, fewer rows on each page.
+- **Margins**: **Normal (14 mm)**, **Narrow (8 mm)** for more on each page, or **Wide (20 mm)** for room to write notes. The foot's margin is a little deeper, as the page number is printed in it.
+
+Under them, a line says how much of the paper each page prints on, such as *Each page prints on 182 × 267 mm of the paper*. The pages break for the paper picked, so a **Continued on page** note names the right page. Choose the same paper in the print window when you print. The setting is kept in the database, so every computer the shop prints from uses it. Before it's saved, printouts are A4, portrait, with normal margins.
 
 ### Keyboard
 
@@ -927,13 +937,13 @@ Press **Print** in the Products header to open the **Print** tab. It shows the p
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
 - The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup (the amount, then its percentage in brackets, lighter), VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup prints amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
-- **Print** (the button at the top right) opens Windows' print window. Choose the printer, the paper, the orientation and the margins there. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
+- **Print** (the button at the top right) opens Windows' print window. Choose the printer there. The pages are already laid out on the paper, orientation and margins set in [Settings → Printing](#printing), which the print window starts with. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.
 
 To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**). Each opens the Print tab with those products ticked under **Print**, in place of any ticked before, and every category offered. A folder's pages keep its name as their title while its products are the ones ticked. **Print** in the Products header unticks them all, back to **This product**.
 
 A set prints each product **as saved**, with a contents list first and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen and prints on two pages or more. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
-Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. A table too long for its page ends there with **Continued on page 3** (the next page's number) under its last row, and goes on at the top of that page under its column headings again. Its **Total** prints once, at the end of the table, with at least its last row. A table that would leave only its first row on a page starts on the next page. The pages are worked out for A4 paper at the print window's own scale and margins: choose another paper size, scale or margins there and the pages may break elsewhere, so a "Continued on page" note can name the wrong page. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
+Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. A table too long for its page ends there with **Continued on page 3** (the next page's number) under its last row, and goes on at the top of that page under its column headings again. Its **Total** prints once, at the end of the table, with at least its last row. A table that would leave only its first row on a page starts on the next page. The pages are worked out for the paper, orientation and margins in [Settings → Printing](#printing) (A4, portrait, normal margins until you change them), at the print window's own scale: choose another paper size, scale or margins in the print window and the pages may break elsewhere, so a "Continued on page" note can name the wrong page. Change them in Settings instead. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
 
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
@@ -943,7 +953,7 @@ Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, 
 
 Press **Export to PDF** in the Products header, beside **Print**, to save the product's recipe and costing as a PDF file without opening the Print tab. Choose where to save it: the file is named after the product to start with. A message says where it went.
 
-The PDF has the same pages **Print** shows, broken the same way on A4 pages, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF. To leave out the recipe or the costing, or to put several products in one PDF, use the **Print** tab and choose **Microsoft Print to PDF** as the printer.
+The PDF has the same pages **Print** shows, on the paper set in [Settings → Printing](#printing) and broken the same way, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF. To leave out the recipe or the costing, or to put several products in one PDF, use the **Print** tab and choose **Microsoft Print to PDF** as the printer.
 
 A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 
@@ -1104,7 +1114,7 @@ The figures start at the materials' buffered costs, as everywhere else in the ap
 
 ### Printing a Price Simulator report
 
-**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures. **Print** there opens Windows' print window: print it, or choose **Microsoft Print to PDF** as the printer to make a PDF. **Back** returns to the Price Simulator.
+**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures, on the paper set in [Settings → Printing](#printing). **Print** there opens Windows' print window: print it, or choose **Microsoft Print to PDF** as the printer to make a PDF. **Back** returns to the Price Simulator.
 
 To print only some products, click one in the **Products** table, or several with **Ctrl** or **Shift** held, before pressing **Print Report**. The products you picked stay picked while you change prices. At the top of the preview, the **Print** picker chooses:
 

@@ -6,6 +6,7 @@
 @inject IFileDialogs Dialogs
 @inject NavigationManager Navigation
 @inject Prompts Prompts
+@inject PrintPage PageSetup
 
 <PageTitle>Price Simulator · TinapayanRMS</PageTitle>
 
@@ -157,9 +158,11 @@
         AddSubscription(state.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
 
-        // Print Report: the preview page, with the choices the screen state made (the products picked, and all shown).
-        AddSubscription(state.ShowPrint.RegisterHandler(interaction =>
+        // Print Report: the preview page, with the choices the screen state made (the products picked, and all shown), on
+        // Settings → Printing's page as it's saved now.
+        AddSubscription(state.ShowPrint.RegisterHandler(async interaction =>
         {
+            await PageSetup.RefreshAsync(CancellationToken.None);
             Previews.Show(interaction.Input, "price-simulator");
             Navigation.NavigateTo("print/preview");
             interaction.SetOutput(System.Reactive.Unit.Default);

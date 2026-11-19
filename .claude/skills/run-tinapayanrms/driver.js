@@ -83,7 +83,7 @@ async function smoke(page) {
   const screens = [
     'raw-materials', 'sub-assemblies', 'products', 'reports', 'price-simulator', 'print',
     'settings/units-of-measure', 'settings/material-categories', 'settings/product-categories', 'settings/roles',
-    'settings/costing-defaults', 'settings/keyboard', 'settings/database',
+    'settings/costing-defaults', 'settings/printing', 'settings/keyboard', 'settings/database',
   ];
   // The web view asks for a favicon on every move, which the app hasn't ("Failed to load resource:
   // net::ERR_ADDRESS_UNREACHABLE", the address only in the message's location): not a failure.

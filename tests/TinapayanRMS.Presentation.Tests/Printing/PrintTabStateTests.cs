@@ -481,7 +481,8 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
     {
         var factory = CreateDbContextFactory();
         return new PrintTabState(
-            products, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(), new LoggerConfiguration().CreateLogger());
+            products, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(),
+            new PrintPage(new PrintSettingsRepository(factory)), new LoggerConfiguration().CreateLogger());
     }
 
     private SavedProductReader CreateReader()

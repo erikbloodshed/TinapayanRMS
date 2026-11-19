@@ -1,0 +1,41 @@
+@page "/settings/printing"
+@using TinapayanRMS.Domain.Enums
+@inherits ScreenBase<PrintingState>
+
+<PageTitle>Printing · TinapayanRMS</PageTitle>
+
+<SettingsTabs />
+
+@* How printouts are laid out: the paper, which way up, and the margins, kept in the database for every computer the shop
+   prints from (PrintSettings). Print, Export to PDF and the Price Simulator's report lay their pages out on it. *@
+<div class="card-wrap">
+    <section class="card fixed-card">
+        <h2 class="section-header">Printing</h2>
+        <p class="caption">The paper printouts are laid out for: Print, Export to PDF and the Price Simulator's report. The pages break for it, so "Continued on page" names the right page. Choose the same paper in the print window.</p>
+
+        <FormRow Label="Paper" For="paper-size">
+            <PickField ID="paper-size" TItem="KeyValuePair<PaperSize, string>" Items="State!.PaperSizes" TextOf="p => p.Value"
+                       Value="State!.PaperSizes.FirstOrDefault(p => p.Key == State!.EditingPaperSize)" ValueChanged="p => State!.EditingPaperSize = p.Key"
+                       Tooltip="The paper in the shop's printer. Long is 8.5 × 13 in long bond." />
+        </FormRow>
+        <FormRow Label="Orientation" For="page-orientation">
+            <PickField ID="page-orientation" TItem="KeyValuePair<PaperOrientation, string>" Items="State!.Orientations" TextOf="o => o.Value"
+                       Value="State!.Orientations.FirstOrDefault(o => o.Key == State!.EditingOrientation)" ValueChanged="o => State!.EditingOrientation = o.Key"
+                       Tooltip="Landscape turns the paper on its side: wider tables, fewer rows on each page." />
+        </FormRow>
+        <FormRow Label="Margins" For="page-margins">
+            <PickField ID="page-margins" TItem="KeyValuePair<PageMargins, string>" Items="State!.MarginChoices" TextOf="m => m.Value"
+                       Value="State!.MarginChoices.FirstOrDefault(m => m.Key == State!.EditingMargins)" ValueChanged="m => State!.EditingMargins = m.Key"
+                       Tooltip="The blank paper around each page. The foot's is a little deeper, for the page number." />
+        </FormRow>
+        <p class="caption form-extra">@State!.PrintedAreaText</p>
+
+        <div class="button-row form-extra">
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+        </div>
+    </section>
+</div>
+
+@code {
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
+}

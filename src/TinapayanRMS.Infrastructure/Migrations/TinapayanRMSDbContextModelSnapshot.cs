@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261118045022_SubAssemblyUpdatedAt";
+    public override string LastMigrationId => "20261119105907_PrintSettings";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -412,6 +412,45 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                         t.HasCheckConstraint("CK_PriceScenarioLines_NewPrice", "new_price > 0");
 
                         t.HasCheckConstraint("CK_PriceScenarioLines_OneTyped", "(change_percent IS NULL) <> (new_price IS NULL)");
+                    });
+            });
+
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.PrintSettings", b =>
+            {
+                b.Property<int>("Id")
+                    .HasColumnType("integer")
+                    .HasColumnName("id");
+
+                b.Property<string>("Margins")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("character varying(20)")
+                    .HasColumnName("margins");
+
+                b.Property<string>("Orientation")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("character varying(20)")
+                    .HasColumnName("orientation");
+
+                b.Property<string>("PaperSize")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("character varying(20)")
+                    .HasColumnName("paper_size");
+
+                b.HasKey("Id")
+                    .HasName("pk_print_settings");
+
+                b.ToTable("print_settings", t =>
+                    {
+                        t.HasCheckConstraint("CK_PrintSettings_Margins", "margins IN ('Normal', 'Narrow', 'Wide')");
+
+                        t.HasCheckConstraint("CK_PrintSettings_Orientation", "orientation IN ('Portrait', 'Landscape')");
+
+                        t.HasCheckConstraint("CK_PrintSettings_PaperSize", "paper_size IN ('A4', 'Letter', 'LongBond', 'Legal')");
+
+                        t.HasCheckConstraint("CK_PrintSettings_SingleRow", "id = 1");
                     });
             });
 

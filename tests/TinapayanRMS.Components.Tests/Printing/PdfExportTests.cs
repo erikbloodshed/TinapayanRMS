@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
+using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Pricing;
@@ -36,6 +38,32 @@ public class PdfExportTests
         window.PdfsSaved.Should().Equal(Chosen);
         drawnAsSaved.Should().Be("Pandesal");
         await page.WaitForAssertionAsync(() => page.FindAll(".pdf-export").Should().BeEmpty());
+    }
+
+    [Test]
+    public async Task The_pages_are_laid_out_on_the_paper_Settings_has_saved()
+    {
+        var (context, dialogs, window) = NewContext();
+        await using var _ = context;
+        dialogs.SaveAnswer = Chosen;
+        context.Services.GetRequiredService<InMemoryPrintSettings>().Saved = new PrintSettings
+        {
+            PaperSize = PaperSize.Letter, Orientation = PaperOrientation.Landscape, Margins = PageMargins.Narrow,
+        };
+        var export = new Interaction<ProductPrintSet, string?>();
+        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        (string Rule, string? Height)? drawn = null;
+        window.OnSavePdf = _ =>
+        {
+            drawn = (page.Find(".pdf-export style").TextContent, page.Find(".pdf-export .print-document").GetAttribute("data-page-height"));
+            return Task.CompletedTask;
+        };
+
+        await page.InvokeAsync(() => export.Handle(Set("Pandesal")));
+
+        drawn.Should().NotBeNull();
+        drawn!.Value.Rule.Should().Be("@page { size: 279.4mm 215.9mm; margin: 8mm 8mm 12mm; }", "Letter turned on its side, with narrow margins");
+        drawn.Value.Height.Should().Be("195.9", "215.9 mm less the 8 mm top and 12 mm foot");
     }
 
     [Test]

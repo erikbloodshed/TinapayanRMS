@@ -54,12 +54,14 @@
 }
 
 /* A part that starts a page: a set's title and contents, then each of its products. The preview shows each as a sheet
-   of its own, as long as the part is: only the browser knows where a page ends within one. */
+   of its own, as long as the part is: the pages within one are worked out only as it's printed. Its paper and margins are
+   Settings → Printing's, which PrintDocument sets on the document (A4 and 14 mm until then), so what's printed is laid out
+   at the page's width on the screen too. */
 .print-sheet {
-    width: 210mm;
-    min-height: 297mm;
+    width: var(--paper-width, 210mm);
+    min-height: var(--paper-height, 297mm);
     margin: 0 auto 16px;
-    padding: 14mm 14mm 16mm;
+    padding: var(--margin-top, 14mm) var(--margin-side, 14mm) var(--margin-bottom, 16mm);
     box-sizing: border-box;
     background: #fff;
     box-shadow: 0 2px 10px rgba(76, 79, 105, 0.25);
@@ -271,16 +273,18 @@
     break-inside: avoid;
 }
 
-/* Export to PDF's pages (PdfExport), out of sight on the screen while the file is written. */
+/* Export to PDF's pages (PdfExport), out of sight on the screen while the file is written: just past the window's left
+   edge, as wide as its paper. */
 .pdf-export {
     position: fixed;
     top: 0;
-    left: -300mm;
-    width: 210mm;
+    right: 100%;
+    width: max-content;
 }
 
 /* ---- On paper. ---- */
 
+/* A4 with normal margins, until PrintDocument's own @page sets Settings → Printing's paper and margins. */
 @page {
     size: A4;
     margin: 14mm 14mm 16mm;

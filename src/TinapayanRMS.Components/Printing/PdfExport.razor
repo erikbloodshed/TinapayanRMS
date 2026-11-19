@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject IFileDialogs Dialogs
 @inject IAppWindow Window
+@inject PrintPage PageSetup
 
 @* Export to PDF: asks where to save the pages, then draws them out of sight for as long as the window takes to write the
    file. While they're here print.css prints them in place of the screen around them. *@
@@ -43,6 +44,7 @@
 
         try
         {
+            await PageSetup.RefreshAsync(CancellationToken.None);
             _set = interaction.Input;
             await InvokeAsync(StateHasChanged);
             await _drawn.Task;

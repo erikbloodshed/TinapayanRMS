@@ -77,12 +77,14 @@ public static class ServiceRegistration
         services.AddScoped<QuickFindState>();
         services.AddScoped<PriceSimulatorState>();
         services.AddScoped<PrintTabState>();
+        services.AddScoped<PrintPage>();
         services.AddScoped<UnitsOfMeasureState>();
         services.AddScoped<RawMaterialCategoriesState>();
         services.AddScoped<ProductCategoriesState>();
         services.AddScoped<SubAssemblyRolesState>();
         services.AddScoped<CostingDefaultsState>();
         services.AddScoped<SecurityState>();
+        services.AddScoped<PrintingState>();
 
         // Whether the window is locked, one for the process, so the page loading again after a restore keeps it; the
         // sign-in panel's state is the page's.

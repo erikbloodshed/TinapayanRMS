@@ -146,11 +146,12 @@ const dragScrolling = (currentDrag, moved) => {
 // the heights of its rows, headings and notes as the screen lays them out, at the page's width, by print.css's rules: a
 // row whole, a heading with what follows it, a table's heading again at the top of each page it goes on to, the costing
 // (.print-keep) whole if it fits on a page, a table's totals with its last row, and never its first row alone. A break before each page's first row
-// or heading then has the browser break there too. The pages are A4, as print.css's @page has them; printed at another
-// size or scale, they break where the browser does, and the page numbers they name may be off.
+// or heading then has the browser break there too. The pages are Settings → Printing's paper less its margins, whose
+// height PrintDocument gives the document (data-page-height, in millimetres); printed at another size or scale, they
+// break where the browser does, and the page numbers they name may be off.
 const printMillimetre = 96 / 25.4;
 const printPage = {
-    height: 267 * printMillimetre,      // A4's 297 mm less print.css's @page margins (14 mm and 16 mm)
+    height: 267 * printMillimetre,      // A4 less normal margins, for a document that doesn't say
     slack: 3 * printMillimetre,         // what the printed layout may differ from the screen's by
     continued: 7 * printMillimetre,     // a "Continued on page" row
 };
@@ -184,8 +185,8 @@ const printBoxes = sheet => {
 };
 
 // Where each page of a part starts, as the index of its first box.
-const printPageStarts = boxes => {
-    const limit = printPage.height - printPage.slack;
+const printPageStarts = (boxes, height) => {
+    const limit = height - printPage.slack;
     const starts = [0];
     let first = 0, top = boxes.length ? boxes[0].top : 0, header = 0;
     const fits = bottom => bottom - top + header <= limit;
@@ -249,10 +250,11 @@ const layOutPrintoutPages = () => {
             continue;
         }
         const breaks = [];
+        const height = parseFloat(printout.dataset.pageHeight) * printMillimetre || printPage.height;
         let page = 1;
         for (const sheet of printout.querySelectorAll(":scope > .print-sheet")) {
             const boxes = printBoxes(sheet);
-            const starts = printPageStarts(boxes);
+            const starts = printPageStarts(boxes, height);
             for (let index = 1; index < starts.length; index++) {
                 breaks.push({ box: boxes[starts[index]], before: boxes[starts[index] - 1], page: page + index });
             }

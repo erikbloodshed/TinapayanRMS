@@ -106,6 +106,8 @@ public sealed class TinapayanRMSDbContext : DbContext
 
     public DbSet<AccessSettings> AccessSettings => Set<AccessSettings>();
 
+    public DbSet<PrintSettings> PrintSettings => Set<PrintSettings>();
+
     public DbSet<PackagingLink> PackagingLinks => Set<PackagingLink>();
 
     public DbSet<ProductVersion> ProductVersions => Set<ProductVersion>();

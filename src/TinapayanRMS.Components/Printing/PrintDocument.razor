@@ -1,6 +1,7 @@
 @using System.Globalization
 @using TinapayanRMS.ApplicationCore.Rules
 @using TinapayanRMS.Domain.Enums
+@inject PrintPage PageSetup
 
 @* A printout as a document the browser prints, built from a ProductPrintSet:
    one product's recipe and costing; a set of products, each starting a page of its own after a
@@ -8,8 +9,10 @@
    Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
    one, app.js works out the pages as it's printed (a heading kept with its table, a table's totals once, after its last
    row, and "Continued on page n" under a table that goes on), and the browser repeats table headings and numbers the
-   pages. *@
-<div class="print-document">
+   pages. The page is Settings → Printing's (PrintPage): the paper's size and margins for @page, each sheet's on the screen,
+   and the height app.js fills each page to. *@
+<style>@@page { size: @Mm(PageSetup.Paper.Width) @Mm(PageSetup.Paper.Height); margin: @Mm(PageSetup.Margins.Top) @Mm(PageSetup.Margins.Side) @Mm(PageSetup.Margins.Bottom); }</style>
+<div class="print-document" style="@SheetStyle" data-page-height="@PageSetup.PrintedArea.Height.ToString("0.##", CultureInfo.InvariantCulture)">
     @if (Set.Title is { } title)
     {
         <section class="print-sheet">
@@ -75,6 +78,13 @@
 
     /// <summary>The costing breakdown, and the costs beside the recipe's lines.</summary>
     [Parameter] public bool IncludeCosting { get; set; } = true;
+
+    private static string Mm(decimal millimetres) => millimetres.ToString("0.##", CultureInfo.InvariantCulture) + "mm";
+
+    // Each sheet on the screen as the paper is, with what's printed at the page's width (print.css).
+    private string SheetStyle =>
+        $"--paper-width: {Mm(PageSetup.Paper.Width)}; --paper-height: {Mm(PageSetup.Paper.Height)}; " +
+        $"--margin-top: {Mm(PageSetup.Margins.Top)}; --margin-side: {Mm(PageSetup.Margins.Side)}; --margin-bottom: {Mm(PageSetup.Margins.Bottom)}";
 
     private bool IsSimulation => Set.PriceChanges is not null || Set.Products.Any(p => p.Simulation is not null);
 

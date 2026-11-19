@@ -107,6 +107,7 @@ public sealed class PrintTabState : ScreenState
     private readonly IProductFolderRepository _folderRepository;
     private readonly IProductCategoryRepository _categoryRepository;
     private readonly SavedProductReader _savedProducts;
+    private readonly PrintPage _page;
 
     // The preparation running; a newer one cancels it.
     private CancellationTokenSource? _preparing;
@@ -128,9 +129,11 @@ public sealed class PrintTabState : ScreenState
         IProductFolderRepository folderRepository,
         IProductCategoryRepository categoryRepository,
         SavedProductReader savedProducts,
+        PrintPage page,
         ILogger logger)
         : base(logger)
     {
+        _page = page;
         _products = products;
         _productRepository = productRepository;
         _folderRepository = folderRepository;
@@ -302,7 +305,10 @@ public sealed class PrintTabState : ScreenState
 
         try
         {
-            // This product first, as the Products screen shows it, needing nothing read.
+            // The page the pages are laid out on, as Settings → Printing has it now (one row).
+            await _page.RefreshAsync(preparing.Token);
+
+            // This product first, as the Products screen shows it, needing nothing else read.
             var isThisProduct = _chosenProductIds.Length == 0 && _request is null;
             if (isThisProduct)
             {

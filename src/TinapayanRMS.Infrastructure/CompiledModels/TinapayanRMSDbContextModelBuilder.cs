@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("1876883f-0d97-4aef-be71-dbf77d793515"), entityTypeCount: 26)
+        : base(skipDetectChanges: false, modelId: new Guid("7501bc41-6903-41c4-8a2f-f4938a7595b2"), entityTypeCount: 27)
     {
     }
 
@@ -26,6 +26,7 @@ public partial class TinapayanRMSDbContextModel
         var packagingLink = PackagingLinkEntityType.Create(this);
         var priceScenario = PriceScenarioEntityType.Create(this);
         var priceScenarioLine = PriceScenarioLineEntityType.Create(this);
+        var printSettings = PrintSettingsEntityType.Create(this);
         var product = ProductEntityType.Create(this);
         var productCategory = ProductCategoryEntityType.Create(this);
         var productComponent = ProductComponentEntityType.Create(this);
@@ -92,6 +93,7 @@ public partial class TinapayanRMSDbContextModel
         PackagingLinkEntityType.CreateAnnotations(packagingLink);
         PriceScenarioEntityType.CreateAnnotations(priceScenario);
         PriceScenarioLineEntityType.CreateAnnotations(priceScenarioLine);
+        PrintSettingsEntityType.CreateAnnotations(printSettings);
         ProductEntityType.CreateAnnotations(product);
         ProductCategoryEntityType.CreateAnnotations(productCategory);
         ProductComponentEntityType.CreateAnnotations(productComponent);
