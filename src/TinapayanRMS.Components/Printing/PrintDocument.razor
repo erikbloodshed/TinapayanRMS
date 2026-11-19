@@ -6,8 +6,9 @@
    one product's recipe and costing; a set of products, each starting a page of its own after a
    title and contents; or a Price Simulator report, with today's figures beside the simulated ones.
    Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
-   one the browser breaks the pages (print.css keeps a heading with its table and repeats table headings), and it numbers
-   them. *@
+   one, app.js works out the pages as it's printed (a heading kept with its table, a table's totals once, after its last
+   row, and "Continued on page n" under a table that goes on), and the browser repeats table headings and numbers the
+   pages. *@
 <div class="print-document">
     @if (Set.Title is { } title)
     {

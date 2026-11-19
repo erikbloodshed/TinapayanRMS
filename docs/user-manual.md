@@ -933,7 +933,7 @@ To print a set of products, right-click in the Products list and choose **Print 
 
 A set prints each product **as saved**, with a contents list first and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen and prints on two pages or more. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
 
-Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
+Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. A table too long for its page ends there with **Continued on page 3** (the next page's number) under its last row, and goes on at the top of that page under its column headings again. Its **Total** prints once, at the end of the table, with at least its last row. A table that would leave only its first row on a page starts on the next page. The pages are worked out for A4 paper at the print window's own scale and margins: choose another paper size, scale or margins there and the pages may break elsewhere, so a "Continued on page" note can name the wrong page. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
 
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
@@ -943,7 +943,7 @@ Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, 
 
 Press **Export to PDF** in the Products header, beside **Print**, to save the product's recipe and costing as a PDF file without opening the Print tab. Choose where to save it: the file is named after the product to start with. A message says where it went.
 
-The PDF has the same pages **Print** shows, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF. To leave out the recipe or the costing, or to put several products in one PDF, use the **Print** tab and choose **Microsoft Print to PDF** as the printer.
+The PDF has the same pages **Print** shows, broken the same way on A4 pages, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF. To leave out the recipe or the costing, or to put several products in one PDF, use the **Print** tab and choose **Microsoft Print to PDF** as the printer.
 
 A production plan prints from TinapayanBMS's **Plan** tab: see [Production Plan](#11-production-plan). A report of what price changes would do prints from the **Price Simulator**: see [Printing a Price Simulator report](#printing-a-price-simulator-report).
 

@@ -1,6 +1,7 @@
 /* Printouts: the preview on screen (sheets of paper on the page, one for each part that starts a page), and the printed
-   pages. On paper only the document prints; the browser breaks the pages, repeats each table's heading, and numbers
-   them in the bottom margin. */
+   pages. On paper only the document prints; app.js works out where each page breaks as it's printed, writing
+   "Continued on page n" under a table that goes on, and the browser breaks them there, repeats each table's heading, and
+   numbers the pages in the bottom margin. */
 
 .print-card {
     flex: 1;
@@ -185,10 +186,29 @@
     text-align: center;
 }
 
+/* A table's totals once, after its last row: as a footer the browser repeated them at the foot of each page. */
+.print-table tfoot {
+    display: table-row-group;
+}
+
 .print-table tfoot td {
     font-weight: 600;
     border-top: 1px solid #9ca0b0;
     border-bottom: none;
+}
+
+/* Under a table's last row on a page, when it goes on to the next (app.js), on paper only. */
+.print-table .print-continued {
+    display: none;
+}
+
+.print-table .print-continued td {
+    padding: 4px 6px 2px;
+    border-bottom: none;
+    text-align: right;
+    font-size: 9pt;
+    font-style: italic;
+    color: #5c5f77;
 }
 
 .print-table .print-subheading td {
@@ -312,6 +332,15 @@
         margin: 0;
         padding: 0;
         box-shadow: none;
+    }
+
+    /* Where app.js found each page starts. */
+    [data-page-break] {
+        break-before: page;
+    }
+
+    .print-table .print-continued {
+        display: table-row;
     }
 
     /* Export to PDF's pages take the place of the screen they're drawn on. */

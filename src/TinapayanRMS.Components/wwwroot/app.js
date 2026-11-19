@@ -139,6 +139,149 @@ const dragScrolling = (currentDrag, moved) => {
     return scroll;
 };
 
+// A printout's pages (Printing/PrintDocument.razor), worked out as the page is printed, by Print or by Export to PDF. The
+// browser repeats a table's heading on each page the table reaches, but can't write on a page where the table goes on:
+// a page number is known only in the margins. So the pages are broken here, and a table that goes on to the next page
+// says so under its last row there ("Continued on page 2"). Each part that starts a page (.print-sheet) is filled from
+// the heights of its rows, headings and notes as the screen lays them out, at the page's width, by print.css's rules: a
+// row whole, a heading with what follows it, a table's heading again at the top of each page it goes on to, the costing
+// (.print-keep) whole if it fits on a page, a table's totals with its last row, and never its first row alone. A break before each page's first row
+// or heading then has the browser break there too. The pages are A4, as print.css's @page has them; printed at another
+// size or scale, they break where the browser does, and the page numbers they name may be off.
+const printMillimetre = 96 / 25.4;
+const printPage = {
+    height: 267 * printMillimetre,      // A4's 297 mm less print.css's @page margins (14 mm and 16 mm)
+    slack: 3 * printMillimetre,         // what the printed layout may differ from the screen's by
+    continued: 7 * printMillimetre,     // a "Continued on page" row
+};
+
+// What a printout's part is laid out in, top to bottom: each heading, note, row of figures and table row, with where it
+// is from the top of the part.
+const printBoxes = sheet => {
+    const origin = sheet.getBoundingClientRect().top + parseFloat(getComputedStyle(sheet).paddingTop);
+    const boxes = [];
+    for (const element of sheet.querySelectorAll("h1, h2, h3, p, .print-figures, tbody > tr, tfoot > tr")) {
+        const rect = element.getBoundingClientRect();
+        if (rect.height === 0) {
+            continue;
+        }
+        const row = element.tagName === "TR";
+        const table = row ? element.closest("table") : null;
+        const firstRow = row && table.tBodies[0]?.rows[0] === element;
+        boxes.push({
+            element, row, table, firstRow,
+            foot: row && element.parentElement.tagName === "TFOOT",
+            heading: /^H[23]$/.test(element.tagName),
+            keep: element.closest(".print-keep"),
+            // A table's first row starts a page with the table's heading above it.
+            top: (firstRow ? table.getBoundingClientRect().top : rect.top) - origin
+                - (row ? 0 : parseFloat(getComputedStyle(element).marginTop)),
+            bottom: rect.bottom - origin,
+            header: row ? table.tHead?.getBoundingClientRect().height ?? 0 : 0,
+        });
+    }
+    return boxes;
+};
+
+// Where each page of a part starts, as the index of its first box.
+const printPageStarts = boxes => {
+    const limit = printPage.height - printPage.slack;
+    const starts = [0];
+    let first = 0, top = boxes.length ? boxes[0].top : 0, header = 0;
+    const fits = bottom => bottom - top + header <= limit;
+    const startPage = at => {
+        starts.push(at);
+        first = at;
+        top = boxes[at].top;
+        header = boxes[at].row && !boxes[at].firstRow ? boxes[at].header : 0;
+    };
+    const sameTable = (at, before) => boxes[at].row && boxes[before].row && boxes[at].table === boxes[before].table;
+    for (let at = 0; at < boxes.length; at++) {
+        const box = boxes[at];
+        if (box.keep && (at === 0 || boxes[at - 1].keep !== box.keep)) {
+            let last = at;
+            while (last + 1 < boxes.length && boxes[last + 1].keep === box.keep) {
+                last++;
+            }
+            if (fits(boxes[last].bottom)) {
+                at = last;
+                continue;
+            }
+            if (at > first && boxes[last].bottom - box.top <= limit) {
+                startPage(at);
+                at = last;
+                continue;
+            }
+        }
+        if (at === first || fits(box.bottom)) {
+            continue;
+        }
+        let start = at;
+        while (start - 1 > first && boxes[start].foot && sameTable(start, start - 1)) {
+            start--;
+        }
+        while (start - 1 > first && !boxes[start].firstRow && sameTable(start, start - 1)
+            && !fits(boxes[start - 1].bottom + printPage.continued)) {
+            start--;
+        }
+        // A table's first row isn't left alone at the foot of a page.
+        if (start - 1 > first && boxes[start - 1].firstRow && sameTable(start, start - 1)) {
+            start--;
+        }
+        while (start - 1 > first && boxes[start - 1].heading) {
+            start--;
+        }
+        startPage(start);
+        at = first;
+    }
+    return starts;
+};
+
+const clearPrintoutPages = () => {
+    document.querySelectorAll(".print-continued").forEach(row => row.remove());
+    document.querySelectorAll("[data-page-break]").forEach(element => element.removeAttribute("data-page-break"));
+};
+
+const layOutPrintoutPages = () => {
+    clearPrintoutPages();
+    for (const printout of document.querySelectorAll(".print-document")) {
+        if (printout.getClientRects().length === 0) {
+            continue;
+        }
+        const breaks = [];
+        let page = 1;
+        for (const sheet of printout.querySelectorAll(":scope > .print-sheet")) {
+            const boxes = printBoxes(sheet);
+            const starts = printPageStarts(boxes);
+            for (let index = 1; index < starts.length; index++) {
+                breaks.push({ box: boxes[starts[index]], before: boxes[starts[index] - 1], page: page + index });
+            }
+            page += starts.length;
+        }
+        for (const { box, before, page } of breaks) {
+            (box.firstRow ? box.table : box.element).setAttribute("data-page-break", "");
+            if (box.row && !box.firstRow && before.row && before.table === box.table) {
+                const row = document.createElement("tr");
+                row.className = "print-continued";
+                const cell = row.insertCell();
+                cell.colSpan = [...before.element.cells].reduce((count, each) => count + each.colSpan, 0);
+                cell.textContent = `Continued on page ${page}`;
+                before.element.after(row);
+            }
+        }
+    }
+};
+
+// Before each printing: the print preview's, each time it's drawn, and Export to PDF's. What's put in stays until the
+// next, out of sight on the screen: the preview may print what it holds after its afterprint.
+window.addEventListener("beforeprint", () => {
+    try {
+        layOutPrintoutPages();
+    } catch (error) {
+        console.warn("The printout's pages weren't worked out, so the browser breaks them.", error);
+    }
+});
+
 window.tinapayan = {
     // Scrolls an element into view only if it isn't already.
     scrollIntoView(id) {
