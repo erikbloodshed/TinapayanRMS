@@ -1,0 +1,85 @@
+@implements IDisposable
+@inject PrintPreviews Previews
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* The Print dialog, over the window and the screen it was opened from, which stays as it was, unsaved edits and all:
+   Products' Print with its products (ProductPrintPane), the Price Simulator's printouts, or a table (a Reports table as
+   it's shown, a sub-assembly's recipe). Its ✕ or Esc closes it, and so does a move to another address (Back, Forward, a
+   link) or the window locking (MainLayout). On paper, print.css prints the dialog's document alone. Its content is drawn
+   only while it's open, so the products' pages are prepared afresh each time it opens. *@
+<SfDialog Visible="Previews.Showing is not null" IsModal="true" Width="calc(100% - 48px)" Height="calc(100% - 48px)"
+          ShowCloseIcon="true" CloseOnEscape="true" CssClass="print-dialog">
+    <DialogEvents OnClose="Previews.Close" Opened="LayOutPagesAsync" />
+    <DialogTemplates>
+        <Header>@Heading</Header>
+        <Content>
+            @switch (Previews.Showing)
+            {
+                case PrintPreviewKind.Products:
+                    <ProductPrintPane />
+                    break;
+                case PrintPreviewKind.Choices:
+                    <PrintPane Set="_choice?.Set" Empty="Nothing to preview.">
+                        <Options>
+                            @if (Previews.Choices.Count > 1)
+                            {
+                                <label class="form-label" for="preview-choice">Print</label>
+                                <PickField ID="preview-choice" TItem="PrintChoice" Items="Previews.Choices" TextField="Label" @bind-Value="_choice" CssClass="print-scope" />
+                            }
+                        </Options>
+                    </PrintPane>
+                    break;
+                case PrintPreviewKind.Tables:
+                    <PrintPane Tables="Previews.Tables" />
+                    break;
+            }
+        </Content>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    private PrintChoice? _choice;
+
+    private string Heading => Previews.Showing switch
+    {
+        PrintPreviewKind.Tables when Previews.Tables is { } tables => tables.Title,
+        PrintPreviewKind.Choices => "Print Preview",
+        _ => "Print",
+    };
+
+    protected override void OnInitialized()
+    {
+        Previews.Changed += OnPreviewsChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    // Whoever opened it, on the UI thread: a screen's handler, ScreenLinks, the Vim keys.
+    private void OnPreviewsChanged() => InvokeAsync(() =>
+    {
+        _choice = Previews.Choices.FirstOrDefault();
+        StateHasChanged();
+    });
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(Previews.Close);
+
+    // The document is drawn as the dialog starts to open, before it has a size, so app.js can't work out its pages then
+    // (PrintDocument): worked out again once the dialog is up, for the preview's page lines and a contents' page numbers.
+    private async Task LayOutPagesAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("tinapayan.layOutPrintoutPages");
+        }
+        catch (Exception exception) when (exception is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            // The page has gone.
+        }
+    }
+
+    public void Dispose()
+    {
+        Previews.Changed -= OnPreviewsChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

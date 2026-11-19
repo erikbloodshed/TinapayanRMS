@@ -3,11 +3,11 @@
    "Continued on page n" under a table that goes on, and the browser breaks them there, repeats each table's heading, and
    numbers the pages in the bottom margin. */
 
-.print-card {
-    flex: 1;
-    min-height: 0;
-    padding: 8px;
+/* The Print dialog (Printing/PrintDialog): nearly the whole window, its content the print pane, whose stage scrolls. */
+.print-dialog .e-dlg-content {
     display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .print-pane {
@@ -459,7 +459,6 @@
     .app-titlebar,
     .app-banner,
     .activity-bar,
-    .screen-tabs,
     .no-print,
     .e-toast-container,
     #blazor-error-ui,
@@ -471,7 +470,6 @@
     .app-body,
     .app-screen,
     .app-page,
-    .print-card,
     .print-pane,
     .print-stage {
         display: block;
@@ -509,6 +507,32 @@
         text-transform: uppercase;
         color: rgba(189, 14, 51, 0.08);
         transform: rotate(-30deg);
+    }
+
+    /* The Print dialog (Printing/PrintDialog) prints its document alone: the window's shell under it goes, and so does
+       its own frame, its heading, ✕ and the shade over the window, its box laid out as the page's own. */
+    body:has(.print-dialog.e-popup-open) .app-shell,
+    .print-dialog .e-dlg-header-content,
+    .e-dlg-overlay {
+        display: none !important;
+    }
+
+    .e-dlg-container:has(.print-dialog.e-popup-open),
+    .print-dialog.e-dialog,
+    .print-dialog .e-dlg-content {
+        position: static !important;
+        display: block !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: none !important;
+        max-height: none !important;
+        overflow: visible !important;
+        transform: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: #fff !important;
     }
 
     /* Export to PDF's pages take the place of the screen they're drawn on. */

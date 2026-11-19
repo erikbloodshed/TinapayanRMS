@@ -16,14 +16,14 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Tests.Printing;
 
 /// <summary>
-/// The Print tab, on real repositories: with no product ticked it prints the Products screen's product as it shows it;
+/// The Print dialog's products, on real repositories: with no product ticked it prints the Products screen's product as it shows it;
 /// the products ticked, or a folder of the Products list or all products asked for there, which tick theirs, print as
 /// they're saved, in the list's order. And a saved product read for a set is the same printout the Products screen gives
 /// once it's opened.
 /// </summary>
 [NotInParallel(DatabaseCollection.D)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
-public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
+public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Test]
     public Task A_folder_prints_its_products_and_those_of_the_folders_in_it_in_the_lists_order_under_its_path() => UiThread.RunAsync(async () =>
@@ -477,10 +477,10 @@ public class PrintTabStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private PrintTabState CreatePrintTab(ProductsState products)
+    private PrintDialogState CreatePrintTab(ProductsState products)
     {
         var factory = CreateDbContextFactory();
-        return new PrintTabState(
+        return new PrintDialogState(
             products, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(),
             new PrintPage(new PrintSettingsRepository(factory)), new LoggerConfiguration().CreateLogger());
     }

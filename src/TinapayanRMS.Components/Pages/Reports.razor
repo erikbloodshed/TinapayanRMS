@@ -246,13 +246,12 @@
 
     [Inject] private PrintPreviews Previews { get; set; } = null!;
     [Inject] private PrintPage PageSetup { get; set; } = null!;
-    [Inject] private NavigationManager Navigation { get; set; } = null!;
     [Inject] private Serilog.ILogger PrintLogger { get; set; } = null!;
 
     protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
-    // Print: the table as it's shown, in the print preview, on Settings → Printing's page as it's saved now; Back returns
-    // here. A grid that can't be read says so in a toast.
+    // Print: the table as it's shown, in the Print dialog, on Settings → Printing's page as it's saved now. A grid that
+    // can't be read says so in a toast.
     private async Task PrintAsync<TRow>(SfGrid<TRow>? grid, string title, string caption)
     {
         if (grid is null)
@@ -263,8 +262,7 @@
         try
         {
             await PageSetup.RefreshAsync(CancellationToken.None);
-            Previews.ShowTables(await GridPrints.PrintoutAsync(grid, title, caption, DateTime.Now), "reports");
-            Navigation.NavigateTo("print/preview");
+            Previews.ShowTables(await GridPrints.PrintoutAsync(grid, title, caption, DateTime.Now));
         }
         catch (Exception exception)
         {

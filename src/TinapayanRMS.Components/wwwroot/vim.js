@@ -360,9 +360,8 @@ window.tinapayanVim = (() => {
         }
     }
 
-    // The next tab along the top (1) or the one before (-1), round from the last to the first: a closed tab is passed
-    // over. In Settings, its own tabs: so the strip's Settings tab is passed over too, or the keys
-    // that went in couldn't come back out.
+    // The next screen down the activity bar (1) or the one above (-1), round from the last to the first. In Settings, its
+    // own tabs: so the bar's Settings is passed over too, or the keys that went in couldn't come back out.
     function stepScreen(delta) {
         const settings = [...document.querySelectorAll(".settings-tabs a")];
         if (settings.length > 0) {
@@ -371,13 +370,13 @@ window.tinapayanVim = (() => {
             return;
         }
 
-        const tabs = [...document.querySelectorAll(".screen-tabs a:not([href='settings'])")];
-        if (tabs.length === 0) {
+        const screens = [...document.querySelectorAll(".activity-item:not([href='settings'])")];
+        if (screens.length === 0) {
             return;
         }
 
-        const current = tabs.findIndex(tab => tab.parentElement.classList.contains("active"));
-        tabs[current < 0 ? (delta > 0 ? 0 : tabs.length - 1) : (current + delta + tabs.length) % tabs.length].click();
+        const current = screens.findIndex(screen => screen.classList.contains("active"));
+        screens[current < 0 ? (delta > 0 ? 0 : screens.length - 1) : (current + delta + screens.length) % screens.length].click();
     }
 
     function navigate(url) {

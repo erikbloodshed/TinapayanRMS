@@ -12,6 +12,7 @@ public enum VimCommandKind
     Revert,
     Screen,
     Settings,
+    Print,
     Help,
 }
 
@@ -44,7 +45,7 @@ public static class VimCommandLine
         new("products", 3, VimCommandKind.Screen, AppScreen.Products, false, ":products", "Products"),
         new("reports", 3, VimCommandKind.Screen, AppScreen.Reports, false, ":reports", "Reports"),
         new("simulator", 2, VimCommandKind.Screen, AppScreen.PriceSimulator, false, ":simulator", "Price Simulator"),
-        new("print", 3, VimCommandKind.Screen, AppScreen.Print, false, ":print", "Print what Products has open"),
+        new("print", 3, VimCommandKind.Print, default, false, ":print", "Print what Products has open"),
         new("settings", 3, VimCommandKind.Settings, default, false, ":settings", "Settings"),
         new("help", 1, VimCommandKind.Help, default, false, ":help", "These keys"),
     ];

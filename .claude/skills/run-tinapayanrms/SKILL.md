@@ -63,10 +63,11 @@ does. To check the build the shop will run, install it into a trial folder (`scr
 `launch` does (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`), and set `TINAPAYANRMS_EXE` to its path for every `driver.ps1` call.
 
 Addresses: `raw-materials`, `sub-assemblies`, `products` (`products/<id>` opens one), `reports`, `price-simulator`,
-`print`, `settings` (`settings/units-of-measure`, `material-categories`, `product-categories`, `roles`,
-`costing-defaults`, `printing`, `keyboard`, `database`). Useful selectors: `text=<label>`, `button[aria-label='Close']` (the title
-bar's buttons are named: Find, Lock, Back, Forward, Minimize, Maximize, Close), `.activity-item[aria-label='Reports']` (the
-activity bar's icons, down the left edge), `.screen-tab-link[href='reports']`,
+`settings` (`settings/units-of-measure`, `material-categories`, `product-categories`, `roles`,
+`costing-defaults`, `printing`, `keyboard`, `database`). Print has no address: it's a dialog over the screen
+(`.print-dialog.e-popup-open`), opened by a screen's Print button and closed by Escape. Useful selectors: `text=<label>`,
+`button[aria-label='Close']` (the title bar's buttons are named: Find, Lock, Back, Forward, Minimize, Maximize, Close),
+`.activity-item[aria-label='Reports']` (the activity bar's icons, down the left edge, the only way between screens),
 `.tree-row` (a list's rows; folders carry `aria-expanded`, `.tree-expander` opens one), `.e-dialog .e-footer-content
 button:has-text('No')` (a dialog's button), and the fields' ids (`eval "[...document.querySelectorAll('input[id]')].map(i => i.id)"`).
 

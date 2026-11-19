@@ -36,10 +36,17 @@ public class VimCommandLineTests
     [Arguments("rep", AppScreen.Reports)]
     [Arguments("si", AppScreen.PriceSimulator)]
     [Arguments("simulator", AppScreen.PriceSimulator)]
-    [Arguments("pri", AppScreen.Print)]
     public void A_screen_is_named_by_its_command(string line, AppScreen screen)
     {
         VimCommandLine.Parse(line, out _).Should().Be(new VimCommand(VimCommandKind.Screen, Screen: screen));
+    }
+
+    [Test]
+    [Arguments("pri")]
+    [Arguments("print")]
+    public void Print_is_its_own_command(string line)
+    {
+        VimCommandLine.Parse(line, out _).Should().Be(new VimCommand(VimCommandKind.Print));
     }
 
     [Test]

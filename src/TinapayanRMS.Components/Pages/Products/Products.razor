@@ -93,7 +93,4 @@
     protected override int? ShownId => State!.SelectedProduct?.Id;
 
     protected override string ShownProperty => nameof(ProductsState.SelectedProduct);
-
-    // Print prints the product as this screen shows it, unsaved edits and all, so going there asks nothing.
-    protected override bool KeepsForm(string path) => path.Equals("print", StringComparison.OrdinalIgnoreCase);
 }

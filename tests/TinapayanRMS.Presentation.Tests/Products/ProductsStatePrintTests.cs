@@ -15,7 +15,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Tests.Products;
 
 /// <summary>
-/// Print on the Products screen, on real repositories: what the Print tab shows is the product as the screen shows it,
+/// Print on the Products screen, on real repositories: what the Print dialog shows is the product as the screen shows it,
 /// unsaved edits included, with a form left open applied first, as Save applies it.
 /// </summary>
 [NotInParallel(DatabaseCollection.B)]
@@ -101,7 +101,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         await state.PrintCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().Contain("Sugar", "a line with no grams can't go into the recipe");
-        requests.Should().Be(0, "the Print tab doesn't open");
+        requests.Should().Be(0, "the Print dialog doesn't open");
         state.Recipe.UsageEdits.Single().Lines.Should().ContainSingle();
     });
 
@@ -237,7 +237,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         asked.Should().Be(0);
     });
 
-    /// <summary>Runs Print, then asks for the printout as the main window's Print tab does once Print has asked for it.</summary>
+    /// <summary>Runs Print, then asks for the printout as the Print dialog does once Print has asked for it.</summary>
     private static async Task<ProductPrintout> PrintAsync(ProductsState state)
     {
         var requests = 0;
@@ -247,8 +247,8 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         }
 
         state.ErrorMessage.Should().BeNull();
-        requests.Should().Be(1, "Print asks for the Print tab");
-        return state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>("the Print tab gets the pages").Subject;
+        requests.Should().Be(1, "Print asks for the Print dialog");
+        return state.PreparePrintout().Value.Should().BeOfType<ProductPrintout>("the Print dialog gets the pages").Subject;
     }
 
     /// <summary>A saved product with one Dough of 1,000 g of flour, opened with its form showing, and the id of an ingredient it doesn't use.</summary>

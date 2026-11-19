@@ -241,7 +241,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
         // Print shows the product as the screen does, unsaved edits and all. A form left
         // open is part of that, as it's part of what Save writes, so it's applied first; a rule refusing it shows its
-        // message, and the Print tab doesn't open. It stays enabled while a picked product's details are on their way,
+        // message, and the Print dialog doesn't open. It stays enabled while a picked product's details are on their way,
         // and does nothing if clicked then: disabled for that moment, it flickered on every pick. (Save is off then
         // anyway, with nothing unsaved, so it doesn't flicker.)
         PrintCommand = new ScreenCommand(
@@ -591,7 +591,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     public ScreenCommand RevertCommand { get; }
 
     /// <summary>
-    /// Print: asks for the Print tab (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
+    /// Print: asks for the Print dialog (<see cref="PrintRequests"/>), which shows the product's recipe and costing as the
     /// screen shows them, unsaved edits included (<see cref="PreparePrintout"/>). A sub-assembly form left open is applied first, as Save applies it, so a rule
     /// refusing it shows its message here and the tab doesn't open.
     /// </summary>
@@ -621,7 +621,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     /// <summary>
     /// What a Print here asks to print: the header's, This product; a folder's menu, the folder; the list's, all products.
-    /// ScreenLinks opens the Print screen with that choice (PrintTabState.Pick), and that screen asks
+    /// ScreenLinks opens the Print dialog with that choice (PrintDialogState.Pick), and the dialog asks
     /// <see cref="PreparePrintout"/> for This product.
     /// </summary>
     public IObservable<PrintScope> PrintRequests => _printRequests;
@@ -1653,7 +1653,7 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
     }
 
     /// <summary>
-    /// The product the screen has open, as the Print tab shows it: asked for each time that tab is shown, so it follows
+    /// The product the screen has open, as the Print dialog shows it: asked for each time the dialog opens, so it follows
     /// the edits made here since, and the product opened here since. A sub-assembly form
     /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
     /// <see cref="PrintProblem"/> when a rule refuses the form, with its message (shown on this screen too, for when it's

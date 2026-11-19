@@ -1,5 +1,6 @@
 using System.Windows.Input;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Settings;
 using TinapayanRMS.Presentation.Shared;
@@ -13,10 +14,12 @@ public sealed record VimCommandResult(string? Message = null, string? Url = null
 /// The Vim keys for one page the window loads: whether they're on (the Windows user's choice, kept with the view state
 /// and changed in Settings → Keyboard), and the screen on show, which the command line's <c>:w</c>, <c>:new</c>, <c>:delete</c>,
 /// <c>:e name</c> and <c>:revert</c> run on: each screen says it's
-/// showing (ScreenBase) and that it's gone.
+/// showing (ScreenBase) and that it's gone. A screen state shown over another (the Print dialog's products, over Products)
+/// is on show until it goes, and then the one under it is again.
 /// </summary>
-public sealed class VimKeysState(IViewStateStore viewState, ProductsState products)
+public sealed class VimKeysState(IViewStateStore viewState, ProductsState products, PrintPreviews printDialog)
 {
+    private readonly List<object> _shown = [];
     private bool? _isOn;
 
     /// <summary>Raised when the keys are turned on or off in Settings.</summary>
@@ -24,8 +27,8 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
 
     public bool IsOn => _isOn ??= KeyboardState.IsVimKeysSaved(viewState);
 
-    /// <summary>The state of the screen on show, or null between screens.</summary>
-    public object? Screen { get; private set; }
+    /// <summary>The state of the screen on show, the latest shown of those still up; null between screens.</summary>
+    public object? Screen => _shown.Count > 0 ? _shown[^1] : null;
 
     public void Set(bool isOn)
     {
@@ -33,15 +36,13 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
         Changed?.Invoke();
     }
 
-    public void Show(object screen) => Screen = screen;
-
-    public void Hide(object screen)
+    public void Show(object screen)
     {
-        if (ReferenceEquals(Screen, screen))
-        {
-            Screen = null;
-        }
+        _shown.Remove(screen);
+        _shown.Add(screen);
     }
+
+    public void Hide(object screen) => _shown.Remove(screen);
 
     /// <summary>
     /// Runs what's typed after <c>:</c>. Each command runs the screen's own command, as its button does, so it asks and
@@ -57,7 +58,7 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
         var screen = Screen as IRecordScreen;
         return command.Kind switch
         {
-            VimCommandKind.Screen when command.Screen == AppScreen.Print => Print(),
+            VimCommandKind.Print => Print(),
             VimCommandKind.Screen => new VimCommandResult(Url: UrlOf(command.Screen)),
             VimCommandKind.Settings => new VimCommandResult(Url: UrlOf(AppScreen.Settings)),
             VimCommandKind.Help => new VimCommandResult(Help: true),
@@ -71,7 +72,7 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
         };
     }
 
-    /// <summary>The address of <paramref name="screen"/>, as the menu's links have it.</summary>
+    /// <summary>The address of <paramref name="screen"/>, as the activity bar's links have it.</summary>
     public static string UrlOf(AppScreen screen) => screen switch
     {
         AppScreen.RawMaterials => "raw-materials",
@@ -79,21 +80,23 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
         AppScreen.Products => "products",
         AppScreen.Reports => "reports",
         AppScreen.PriceSimulator => "price-simulator",
-        AppScreen.Settings => "settings",
-        _ => "print",
+        _ => "settings",
     };
 
-    // Print what Products has open, as its Print button does (which opens the Print screen with that choice); with
-    // nothing open there, just the Print screen.
+    // Print what Products has open, as its Print button does (which opens the Print dialog with that choice); with
+    // nothing open there, the Print dialog with nothing ticked.
     private VimCommandResult Print()
     {
         if (products.PrintCommand.CanExecute())
         {
             ((ICommand)products.PrintCommand).Execute(null);
-            return new VimCommandResult();
+        }
+        else
+        {
+            printDialog.ShowProducts();
         }
 
-        return new VimCommandResult(Url: UrlOf(AppScreen.Print));
+        return new VimCommandResult();
     }
 
     /// <summary>Runs <paramref name="command"/> as its button does, errors and all going where they always go.</summary>

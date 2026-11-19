@@ -11,9 +11,9 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Printing;
 
 /// <summary>
-/// What a Print on the Products screen asks the Print tab to print: the product it has open, a folder of its list (a
+/// What a Print on the Products screen asks the Print dialog to print: the product it has open, a folder of its list (a
 /// stage, or one of the user's folders, with the folders in it), the products picked in the list, or every product. The
-/// tab ticks a set's products in its Print list (PrintTabState.Pick).
+/// dialog ticks a set's products in its Print list (PrintDialogState.Pick).
 /// </summary>
 public closed record PrintScope
 {
@@ -80,11 +80,11 @@ public closed record PrintScope
     }
 }
 
-/// <summary>A product the Print tab's Print list offers to tick, with its category (null for none).</summary>
+/// <summary>A product the Print dialog's Print list offers to tick, with its category (null for none).</summary>
 public sealed record PrintableProduct(int Id, string Name, int? CategoryId);
 
 /// <summary>
-/// A product category the Print tab's Categories list offers, which holds a product in use; <see cref="None"/> stands for
+/// A product category the Print dialog's Categories list offers, which holds a product in use; <see cref="None"/> stands for
 /// the products with no category.
 /// </summary>
 public sealed record PrintableCategory(int Id, string Name)
@@ -94,13 +94,13 @@ public sealed record PrintableCategory(int Id, string Name)
 }
 
 /// <summary>
-/// The main window's Print tab: what it prints and the pages for it (<see cref="PrintSet"/>), prepared each time the tab
-/// is shown (<see cref="LoadCommand"/>, which the main window runs as it runs every tab's) and each time the products or
-/// categories ticked change. With no product ticked it prints the Products screen's product as it shows it, unsaved
+/// The Print dialog's products: what it prints and the pages for it (<see cref="PrintSet"/>), prepared each time the dialog
+/// opens on them (<see cref="LoadCommand"/>, which the dialog runs as a screen runs its load) and each time the products
+/// or categories ticked change. With no product ticked it prints the Products screen's product as it shows it, unsaved
 /// edits included; the products ticked are read as they're saved (SavedProductReader), each starting a page of its own
 /// after a contents page, or on their own with no contents page for one.
 /// </summary>
-public sealed class PrintTabState : ScreenState
+public sealed class PrintDialogState : ScreenState
 {
     private readonly ProductsState _products;
     private readonly IProductRepository _productRepository;
@@ -123,7 +123,7 @@ public sealed class PrintTabState : ScreenState
     // Every product in use, in the Products list's order, before the categories ticked narrow it.
     private IReadOnlyList<PrintableProduct> _everyProduct = [];
 
-    public PrintTabState(
+    public PrintDialogState(
         ProductsState products,
         IProductRepository productRepository,
         IProductFolderRepository folderRepository,
@@ -146,7 +146,7 @@ public sealed class PrintTabState : ScreenState
     private IReadOnlyList<PrintableProduct> _productChoices = [];
     /// <summary>
     /// The products the Print list offers, a flat list in the Products list's order, as they're saved: every one in use, or
-    /// those in the categories ticked. Read each time the tab prepares its pages, and replaced only when something in it
+    /// those in the categories ticked. Read each time the dialog prepares its pages, and replaced only when something in it
     /// changed, so the list stays as it is while products are ticked in it.
     /// </summary>
     public IReadOnlyList<PrintableProduct> ProductChoices
@@ -236,7 +236,7 @@ public sealed class PrintTabState : ScreenState
     /// <summary>
     /// A Print on Products: the header's for This product unticks every product; a folder's, the products picked or the
     /// list's tick their products in place of those ticked before, with every category offered, once the next preparation
-    /// has read them. Showing the tab then prepares the pages.
+    /// has read them. Opening the dialog then prepares the pages.
     /// </summary>
     public void Pick(PrintScope scope)
     {
@@ -352,7 +352,7 @@ public sealed class PrintTabState : ScreenState
         }
         catch (OperationCanceledException) when (preparing.IsCancellationRequested)
         {
-            // A newer choice, or the tab shown again, is preparing its own.
+            // A newer choice, or the dialog opened again, is preparing its own.
         }
         catch (NpgsqlException) when (preparing.IsCancellationRequested)
         {

@@ -1,0 +1,33 @@
+@inherits ScreenBase<PrintDialogState>
+
+@* The Print dialog on products: what to print, then the preview. Print ticks products from one flat list, which print as
+   saved; with none ticked it prints the product Products has open, unsaved edits included. Categories beside it narrows
+   that list. Products' Print, a folder's, the products' and Print All Products open it with their products ticked. Its
+   pages are prepared each time the dialog opens on them (LoadCommand, run as a screen runs its load). *@
+<PrintPane Set="State!.PrintSet" Status="@(State!.Progress ?? State!.Note)" Empty="Nothing to print yet. Open a product on the Products screen, or tick products under Print.">
+    <Options>
+        @* Each list's change takes when it closes (EnableChangeOnBlur, Syncfusion's default), so ticking several prepares
+           the pages once. *@
+        <label class="form-label" for="print-products">Print</label>
+        <SfMultiSelect ID="print-products" TValue="int[]" TItem="PrintableProduct" DataSource="State!.ProductChoices"
+                       @bind-Value="State!.ChosenProductIds" Mode="VisualMode.CheckBox" ShowSelectAll="true" ShowDropDownIcon="true"
+                       AllowFiltering="true" FilterType="FilterType.Contains" DebounceDelay="0" FilterBarPlaceholder="Search products"
+                       EnableSelectionOrder="false" PopupHeight="420px" Width="320px"
+                       Placeholder="This product" CssClass="print-products"
+                       title="Tick the products to print: they print as saved, after a contents page. With none ticked, it prints the product Products has open, unsaved edits included. Typing finds products by name.">
+            <MultiSelectFieldSettings Text="@nameof(PrintableProduct.Name)" Value="@nameof(PrintableProduct.Id)" />
+        </SfMultiSelect>
+        <label class="form-label" for="print-categories">Categories</label>
+        <SfMultiSelect ID="print-categories" TValue="int[]" TItem="PrintableCategory" DataSource="State!.CategoryChoices"
+                       @bind-Value="State!.ChosenCategoryIds" Mode="VisualMode.CheckBox" ShowSelectAll="true" ShowDropDownIcon="true"
+                       EnableSelectionOrder="false" PopupHeight="320px" Width="220px"
+                       Placeholder="All categories" CssClass="print-categories"
+                       title="Tick categories to offer only their products under Print: a product ticked in another category is unticked.">
+            <MultiSelectFieldSettings Text="@nameof(PrintableCategory.Name)" Value="@nameof(PrintableCategory.Id)" />
+        </SfMultiSelect>
+    </Options>
+</PrintPane>
+
+@code {
+    protected override ScreenCommand LoadCommand => State!.LoadCommand;
+}

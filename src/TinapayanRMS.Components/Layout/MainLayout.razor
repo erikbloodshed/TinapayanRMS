@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using TinapayanRMS.Components.Printing
 @implements IAsyncDisposable
 @inject AppStatus Status
 @inject AppLock Lock
@@ -8,6 +9,7 @@
 @inject Serilog.ILogger Logger
 @* Started here, once per page, so one screen can open another (a Dependents tile, a Print). *@
 @inject ScreenLinks Links
+@inject PrintPreviews Previews
 
 @{
     // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
@@ -39,12 +41,10 @@
            and all, but take no click or focus (inert) and are covered by the sign-in panel. *@
         @if (_signedIn)
         {
-            @* The activity bar down the left edge, always out, and the screen with its tabs beside it. *@
+            @* The activity bar down the left edge, always out, the one way between the screens, and the screen beside it. *@
             <ActivityBar Locked="_locked" />
 
             <div class="app-screen" inert="@_locked">
-                <ScreenTabStrip />
-
                 <main class="app-page">
                     @* A screen that fails gives way to a panel saying so, rather than taking the window's page with it. *@
                     <ScreenErrorBoundary>
@@ -59,6 +59,13 @@
         }
     </div>
 </div>
+
+@* Outside the shell, so on paper print.css can put the shell away and print the dialog's document alone. Drawn once the
+   password is given; the window locking closes it, as its printout would otherwise show over the sign-in panel. *@
+@if (_signedIn)
+{
+    <PrintDialog />
+}
 
 <NoticeHost />
 <ConfirmationHost />
@@ -130,13 +137,14 @@
         }
     }
 
-    // On whichever thread locked or unlocked: drawn with the state it's in by then. A print dialog goes as the window
-    // locks, as it would otherwise stay up over the sign-in panel, showing the printout.
+    // On whichever thread locked or unlocked: drawn with the state it's in by then. The Print dialog and Windows' print
+    // dialog go as the window locks, as they would otherwise stay up over the sign-in panel, showing the printout.
     private void OnLockChanged() => InvokeAsync(() =>
     {
         (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
         if (_locked)
         {
+            Previews.Close();
             Window.ClosePrintDialog();
         }
 

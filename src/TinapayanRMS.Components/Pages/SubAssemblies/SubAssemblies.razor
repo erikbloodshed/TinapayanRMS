@@ -154,23 +154,17 @@
         AddSubscription(state.List.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
 
-        // Print: the print preview, on Settings → Printing's page as it's saved now; Back returns to this sub-assembly.
+        // Print: the Print dialog over the form, which stays as it is, on Settings → Printing's page as it's saved now.
         AddSubscription(state.ShowPrint.RegisterHandler(async interaction =>
         {
             await PageSetup.RefreshAsync(CancellationToken.None);
-            Previews.ShowTables(interaction.Input, state.SelectedRow is { } row ? $"sub-assemblies/{row.Id}" : "sub-assemblies");
-            Navigation.NavigateTo("print/preview");
+            Previews.ShowTables(interaction.Input);
             interaction.SetOutput(System.Reactive.Unit.Default);
         }));
     }
 
     [Inject] private PrintPreviews Previews { get; set; } = null!;
     [Inject] private PrintPage PageSetup { get; set; } = null!;
-    [Inject] private NavigationManager Navigation { get; set; } = null!;
-
-    // The print preview shows the form as it is, so going there keeps its unsaved changes rather than asking about them:
-    // they're still here on the way back.
-    protected override bool KeepsForm(string path) => path.Equals("print/preview", StringComparison.OrdinalIgnoreCase);
 
     protected override string AddressRoot => "sub-assemblies";
 

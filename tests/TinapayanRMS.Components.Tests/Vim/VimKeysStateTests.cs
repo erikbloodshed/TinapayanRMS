@@ -1,7 +1,10 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Reports;
+using TinapayanRMS.Components.Printing;
+using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using TinapayanRMS.Components.Vim;
 
@@ -91,5 +94,37 @@ public class VimKeysStateTests
 
         keys.Hide(reports);
         keys.Screen.Should().BeNull();
+    }
+
+    [Test]
+    public async Task A_screen_shown_over_another_gives_the_keys_back_as_it_goes()
+    {
+        await using var context = AppServices.NewContext();
+        var keys = context.Services.GetRequiredService<VimKeysState>();
+        var products = context.Services.GetRequiredService<ProductsState>();
+        var print = context.Services.GetRequiredService<PrintDialogState>();
+
+        // The Print dialog's products over Products: :w is Products' again once the dialog closes.
+        keys.Show(products);
+        keys.Show(print);
+        keys.Screen.Should().BeSameAs(print);
+
+        keys.Hide(print);
+        keys.Screen.Should().BeSameAs(products);
+    }
+
+    [Test]
+    public async Task Print_opens_the_Print_dialog_on_what_Products_has_open()
+    {
+        await using var context = AppServices.NewContext();
+        var keys = context.Services.GetRequiredService<VimKeysState>();
+        var dialog = context.Services.GetRequiredService<PrintPreviews>();
+
+        // As the layout starts it, so Products' Print reaches the dialog.
+        _ = context.Services.GetRequiredService<ScreenLinks>();
+
+        keys.Run("print").Should().Be(new VimCommandResult());
+
+        dialog.Showing.Should().Be(PrintPreviewKind.Products);
     }
 }

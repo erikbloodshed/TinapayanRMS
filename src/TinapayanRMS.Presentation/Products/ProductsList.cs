@@ -73,7 +73,7 @@ public interface IProductsListHost : IRecordListHost
     /// <summary>Sets the products' costing to Settings' costing defaults, once it's confirmed.</summary>
     Task ApplyCostingDefaultsAsync(IReadOnlyList<Product> products);
 
-    /// <summary>Asks the Print screen to print <paramref name="scope"/> (the screen's PrintRequests).</summary>
+    /// <summary>Asks the Print dialog to print <paramref name="scope"/> (the screen's PrintRequests).</summary>
     void Print(PrintScope scope);
 }
 
@@ -371,16 +371,16 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <summary>Collapse All: closes every folder in the folder given, or in both stages, leaving the one given and the stages open.</summary>
     public ScreenCommand<ProductFolderNode?> CollapseAllCommand { get; }
 
-    /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, on the Print tab.</summary>
+    /// <summary>Print Folder, or Print Stage, on the list's folder: its products, as saved, in the Print dialog.</summary>
     public ScreenCommand<ProductFolderNode> PrintFolderCommand { get; }
 
     /// <summary>
     /// Print, or Print 3 Products, on a product's menu: the products picked in the list (Ctrl or Shift), as saved, on the
-    /// Print tab, in the list's order.
+    /// Print dialog, in the list's order.
     /// </summary>
     public ScreenCommand<IReadOnlyList<Product>> PrintProductsCommand { get; }
 
-    /// <summary>Print All Products on the list's empty space: every product, as saved, on the Print tab.</summary>
+    /// <summary>Print All Products on the list's empty space: every product, as saved, in the Print dialog.</summary>
     public ScreenCommand PrintAllCommand { get; }
 
     /// <summary>

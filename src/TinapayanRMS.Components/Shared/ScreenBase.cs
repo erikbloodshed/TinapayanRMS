@@ -22,7 +22,7 @@ namespace TinapayanRMS.Components.Shared;
 /// (<see cref="RedrawGate"/>).
 /// <para>
 /// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them: a
-/// move to another address (the tab strip, the menu, a link, Back and Forward) asks
+/// move to another address (the activity bar, a link, Find, Back and Forward) asks
 /// about them first, and Cancel stays; closing the window asks the same (<see cref="UnsavedChangesGuard"/>), and
 /// reloading its page has the web view ask.
 /// </para>
@@ -133,17 +133,8 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
         Navigator.NavigateTo(path);
     }
 
-    /// <summary>
-    /// The form this screen keeps from being left with unsaved changes: its own state's, when it has one; Print's is
-    /// Products', which it prints as Products shows it.
-    /// </summary>
-    protected virtual IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
-
-    /// <summary>
-    /// Whether a move to <paramref name="path"/> (an address within the app, products/42) keeps the form showing, so its
-    /// unsaved changes aren't asked about: Products' Print, which prints the product as Products shows it.
-    /// </summary>
-    protected virtual bool KeepsForm(string path) => false;
+    /// <summary>The form this screen keeps from being left with unsaved changes: its own state's, when it has one.</summary>
+    private IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
 
     /// <summary>Whether <paramref name="path"/> is this screen's own, a record's of it included (products/42).</summary>
     protected virtual bool IsOwnAddress(string path) => false;
@@ -248,7 +239,7 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
         }
 
         var path = Navigator.ToBaseRelativePath(target);
-        if (KeepsForm(path) || target == Navigator.Uri)
+        if (target == Navigator.Uri)
         {
             return;
         }

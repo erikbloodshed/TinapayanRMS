@@ -154,11 +154,9 @@ The column heading changes to show which one you're looking at. Only the grams a
 - **The window doesn't zoom**: Ctrl with the mouse wheel, Ctrl with **+**, **-** or **0**, and a pinch on a touchpad leave it as it is. To make everything larger, change the scale in Windows' display settings.
 - **The title bar**, along the top, has the app's name on the left, and **Find**, **Lock**, **Back**, **Forward**, then **Minimize**, **Maximize** and **Close** on the right. Drag the title bar by any empty part of it to move the window, drag it to the top of the screen or double-click it to make the window fill the screen, and right-click it for Windows' own window menu. While the window fills the screen, **Maximize** becomes **Restore Down**.
 - **The activity bar**, the strip of icons down the left edge of the window, opens the screens: **Raw Materials**, **Sub-Assemblies**, **Products**, **Reports** and **Price Simulator** from the top, and **Settings** (the gear) at the bottom. Hold the pointer over an icon to see its name, in a tooltip to its right; the icon darkens while the pointer is on it. The screen showing has its icon darker, with a coloured line on its left.
-- **Tabs**, under the title bar, show the screens you have open. Click a tab to go to its screen.
-  - **Raw Materials**, **Sub-Assemblies** and **Products** have a tab from the start. **Reports**, **Price Simulator**, **Print** and **Settings** get one the first time you open them.
-  - The **✕** on a tab closes it. Nothing is lost: the screen keeps the record it had open, and its tab comes back when you open the screen again from the activity bar. The last tab left has no ✕.
-  - The **Settings** tab is the last one. Clicking it opens Settings on its first tab, **Units of Measure**.
   - Each screen keeps its place, such as the record you were looking at, until you close the app. A screen with changes you haven't saved asks about them before you leave it (see [Editing and saving](#editing-and-saving)).
+  - **Settings** opens on its first tab, **Units of Measure**.
+- **Printing** opens the **Print** window over the screen you printed from, which stays as it was, changes not yet saved included. It shows the pages as they'll print, with **Print** and **Export to PDF** above them. Close it with its **✕** or **Esc** to go back to the screen (see [Printing recipes and costings](#8-printing-recipes-and-costings)).
 - **Back and Forward** (the arrows at the top right, or **Alt+Left** and **Alt+Right**) move between the screens and records you've looked at, Settings' tabs included, like a web browser. If the cursor was in a box when another record opens, the cursor leaves the box, so that you don't type over the record that just opened. Click the box again to type in it.
 - **Find** (the magnifier at the top right, before Back, or **Ctrl+K** from anywhere) looks up any raw material, sub-assembly or product by name and opens it on its own screen. Type part of the name: every word you type has to be in the name, in any order, and capitals and accents don't matter, so `ube ensay` finds *Ube Macapuno Ensaymada*. The closest names come first, with what each one is (Raw Material, Made Ingredient, Sub-Assembly or Product) and its category or role. **Up** and **Down** pick one, **Enter** or a double-click opens it, and **Esc** closes Find, at the first press even with the Vim keys on. The best 50 matches are listed; type more of the name to narrow them. Your last search is still there the next time you open Find. A sub-assembly that belongs to one product isn't listed: find the product instead. Deleted products aren't listed either. If the screen you're leaving has unsaved changes, you're asked about them first, as with any link between screens.
 - Changes made on one screen show up on another the next time you open it.
@@ -238,7 +236,7 @@ While a picker's list is open, **Ctrl+J** and **Ctrl+K** move down and up it, li
 - **gg** and **G**: the first and last row.
 - **0** and **$**: the first and last column of a table, or the start and end of a field.
 - **J** and **K**: leave the list or table, for the control after it or before it.
-- **gt** and **gT**: the next and previous tab along the top, round from the last to the first. They pass over the **Settings** tab, because in Settings they move through its own tabs instead.
+- **gt** and **gT**: the next and previous screen down the activity bar, round from the last to the first. They pass over **Settings**, because in Settings they move through its own tabs instead.
 - **H** and **L**: Back and Forward, like **Alt+Left** and **Alt+Right**.
 - **/**: the search box of the list on screen.
 - **f**: puts a small yellow label on everything you can click. Type a label to click its item. Esc takes the labels away.
@@ -275,7 +273,7 @@ Type **:**, then a command, then **Enter**. A bar opens at the bottom of the win
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports**, **:plan**, **:simulator** and **:print** switch screens.
+- **:raw**, **:sub**, **:products**, **:reports** and **:simulator** switch screens. **:print** opens the Print window on what Products has open, as its **Print** button does.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -305,7 +303,7 @@ You don't have to finish each list before moving on. You can add a category or u
 
 ## 4. Settings
 
-Open **Settings** from the gear at the bottom of the activity bar. It opens as a screen of its own, with a tab at the end of the tab strip, and has nine tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Printing**, **Keyboard**, **Security** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
+Open **Settings** from the gear at the bottom of the activity bar. It opens as a screen of its own, and has nine tabs inside it: **Units of Measure**, **Material Categories**, **Product Categories**, **Roles**, **Costing Defaults**, **Printing**, **Keyboard**, **Security** and **Database**. Each list tab works the same way: pick a row to edit it, or press **New**. Then fill in the form and press **Save**, or press **Delete**. Leave Settings by clicking another screen's tab, or close its tab with its **✕**.
 
 ### Units of Measure
 
@@ -631,7 +629,7 @@ The tab you were on stays picked when you pick another sub-assembly, and when yo
 
 **Scale**, under the lines, resizes the recipe. Pick **the whole batch** or **the base (ticked lines)**, type the grams it should weigh, and press **Scale**: every line is multiplied by the same amount, so each keeps its percentage. For example, a 1,200 g batch scaled to 2,400 g doubles every line, and a dough whose ticked flour is 1,000 g, scaled on the base to 500 g, halves. It's one step for **Undo**, and **Save** keeps it. Scaling the base needs at least one line's **Base** ticked. It isn't offered for a packaging set.
 
-**Print** shows the sub-assembly on its own in a print preview, as the form shows it: its name and role, the base and whole formula, each line's grams, percentage, cost per gram and cost, and the batch's total. A packaging set prints its materials, each set's quantity and cost. Changes you haven't saved are in it, marked **Draft**. **Print** there prints it, **Export to PDF** saves it as a PDF file, and **Back** returns to the sub-assembly, unsaved changes and all. It's laid out on the paper in [Settings → Printing](#printing), with the shop's heading.
+**Print** shows the sub-assembly on its own in the Print window, as the form shows it: its name and role, the base and whole formula, each line's grams, percentage, cost per gram and cost, and the batch's total. A packaging set prints its materials, each set's quantity and cost. Changes you haven't saved are in it, marked **Draft**. **Print** there prints it, **Export to PDF** saves it as a PDF file, and its **✕** or **Esc** closes it, leaving the sub-assembly as it was, unsaved changes and all. It's laid out on the paper in [Settings → Printing](#printing), with the shop's heading.
 
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
 
@@ -676,7 +674,7 @@ Right-click menus:
   - **Move to**: any stage, then the top of the stage or any folder in it. A folder that holds others opens a further menu, starting with the folder itself. The place the product is in already is greyed.
   - **Cut** (Ctrl+X) and **Paste** (Ctrl+V): see Cut and paste above. Paste on a product moves what was cut into that product's folder.
   - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
-  - **Print**: the product as saved, on the Print tab.
+  - **Print**: the product as saved, in the Print window.
   - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
   - **Delete** (Del)
@@ -946,7 +944,7 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** tab. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
+Press **Print** in the Products header to open the **Print** window over the Products screen. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
 - **Print** (the list at the top left) chooses the products to print. With none ticked it reads **This product** and prints the product open on the Products screen, as described above. Open it, type part of a name in **Search products** to find a product, and tick it; tick as many as you like, from any folders, or **Select All** for every product the list shows. When the list closes, the pages show the products ticked, as saved, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
 - **Categories** (the list beside it) narrows **Print** to the products of the categories you tick, such as **Breads**; **No category** is the products without one. A product ticked under **Print** that isn't in them is unticked. To print every bread, tick **Breads** here, then **Select All** under **Print**. With no category ticked (**All categories**), **Print** lists every product.
@@ -958,19 +956,19 @@ Press **Print** in the Products header to open the **Print** tab. It shows the p
 - **Production copy** prints the recipe for the production floor: no costs at all (Include's ticks are set aside while it's ticked), larger type, a **Done** column with a box to tick beside each ingredient and packaging line as it's weighed, and lines for **Weighed by**, **Checked by** and **Date** at the end. *Production copy* is printed under each product's title. Like Include's ticks, it stays as you leave it for your Windows account.
 - **Draft**: a product printed with changes not saved yet, or never saved, has a red banner under its title saying so, and on paper a faint **DRAFT** across every page, so it isn't taken for the recipe as it stands. Save it on the Products screen and print again for a clean copy.
 
-To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**). Each opens the Print tab with those products ticked under **Print**, in place of any ticked before, and every category offered. A folder's pages keep its name as their title while its products are the ones ticked. **Print** in the Products header unticks them all, back to **This product**.
+To print a set of products, right-click in the Products list and choose **Print Folder**, **Print Stage** or **Print All Products**. Products picked in the list (Ctrl-click each, or Shift-click for a run) print from their right-click menu too (**Print 3 Products**). Each opens the Print window with those products ticked under **Print**, in place of any ticked before, and every category offered. A folder's pages keep its name as their title while its products are the ones ticked. **Print** in the Products header unticks them all, back to **This product**.
 
-A set prints each product **as saved**, with a contents list first, giving the **Page** each product starts on, and each product starting on a new page. The Print tab shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen that prints on two pages or more: a dashed line marks where each page after the first starts, with its number (**Page 2**) at the right. If the product open on the Products screen has unsaved changes, the Print tab warns you that it's printed as saved.
+A set prints each product **as saved**, with a contents list first, giving the **Page** each product starts on, and each product starting on a new page. The Print window shows the same: the contents on a sheet of its own, then a sheet for each product. A sheet there is as long as its product, so a long recipe is one tall sheet on the screen that prints on two pages or more: a dashed line marks where each page after the first starts, with its number (**Page 2**) at the right. If the product open on the Products screen has unsaved changes, the Print window warns you that it's printed as saved.
 
 Under each product's title are when it was last updated, when it was printed, and whether it includes unsaved changes. Each page has its number at the bottom. Each page after a product's first starts with the product's name, such as *Asado Roll 60g (continued)*, so a page that comes loose can be put back. A table too long for its page ends there with **Continued on page 3** (the next page's number) under its last row, and goes on at the top of that page under the product's name and the table's section, such as *Asado Roll 60g · Filling (continued)*, then its column headings again. Its **Total** prints once, at the end of the table, with at least its last row. A table that would leave only its first row on a page starts on the next page. The pages are worked out for the paper, orientation and margins in [Settings → Printing](#printing) (A4, portrait, normal margins until you change them), at the print window's own scale: choose another paper size, scale or margins in the print window and the pages may break elsewhere, so a "Continued on page" note can name the wrong page. Change them in Settings instead. The print window can add a line of its own at the top and bottom of each page, with the date and the page's address: untick **Headers and footers** there to leave it out.
 
 While the Products screen shows unbuffered costs, everything printed, a single product or a set, is at the materials' true costs. Each product's page says **Unbuffered costs** under its title and over its costing.
 
-Leave the Print tab with Back (**Alt+Left**), by clicking another screen's tab, or by closing the **Print** tab with its **✕**.
+Close the Print window with its **✕** at the top right, or **Esc**: the Products screen is as you left it, changes not yet saved included. Going to another screen (Back, **Alt+Left**, or the activity bar) closes it too.
 
 ### Exporting a product to PDF
 
-Press **Export to PDF** in the Products header, beside **Print**, to save the product's recipe and costing as a PDF file without opening the Print tab. Choose where to save it: the file is named after the product to start with. A message says where it went.
+Press **Export to PDF** in the Products header, beside **Print**, to save the product's recipe and costing as a PDF file without opening the Print window. Choose where to save it: the file is named after the product to start with. A message says where it went.
 
 The PDF has the same pages **Print** shows, on the paper set in [Settings → Printing](#printing) and broken the same way, including changes you haven't saved yet, and always has both the recipe and the costing. On the History tab, it's the version picked there. While the screen shows unbuffered costs, so does the PDF, and with unsaved changes it's marked **Draft**. To leave out the recipe or the costing, to make a production copy, or to put several products in one PDF, use **Export to PDF** on the **Print** tab, which saves what its preview shows.
 
@@ -1079,7 +1077,7 @@ If a file of that name is open in Excel, the app can't replace it. Close it in E
 
 ### Printing a report
 
-Each tab also has **Print** beside **Export to Excel**. It opens a print preview of the table as it's shown, as Export to Excel takes it: in your sort, with your filters, and with only the columns showing. Above the table are the report's name, what it shows, how many rows, and when it was printed. **Print** there opens Windows' print window, **Export to PDF** saves it as a PDF file (named after the report and today's date), and **Back** returns to Reports.
+Each tab also has **Print** beside **Export to Excel**. It opens the Print window over Reports, with the table as it's shown, as Export to Excel takes it: in your sort, with your filters, and with only the columns showing. Above the table are the report's name, what it shows, how many rows, and when it was printed. **Print** there opens Windows' print window, **Export to PDF** saves it as a PDF file (named after the report and today's date), and its **✕** or **Esc** closes it, back to Reports.
 
 It prints on the paper in [Settings → Printing](#printing), with the shop's heading, and a table longer than a page goes on with its name and column headings at the top of the next. A wide table such as Product Cost Summary fits better on **Landscape** paper, or with fewer columns ticked under **Columns**.
 
@@ -1141,7 +1139,7 @@ The figures start at the materials' buffered costs, as everywhere else in the ap
 
 ### Printing a Price Simulator report
 
-**Print Report** opens a print preview with each product's recipe and costing at the new prices, next to today's figures, on the paper set in [Settings → Printing](#printing). **Print** there opens Windows' print window, and **Export to PDF** beside it saves the pages as a PDF file. **Back** returns to the Price Simulator.
+**Print Report** opens the Print window, titled **Print Preview**, with each product's recipe and costing at the new prices, next to today's figures, on the paper set in [Settings → Printing](#printing). **Print** there opens Windows' print window, and **Export to PDF** beside it saves the pages as a PDF file. Its **✕** or **Esc** closes it, back to the Price Simulator as you left it.
 
 To print only some products, click one in the **Products** table, or several with **Ctrl** or **Shift** held, before pressing **Print Report**. The products you picked stay picked while you change prices. At the top of the preview, the **Print** picker chooses:
 

@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using Microsoft.AspNetCore.Components;
+using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Presentation.PriceSimulator;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Products;
@@ -14,7 +15,7 @@ namespace TinapayanRMS.Components.Shared;
 /// double-clicked row (Reports, the Price Simulator) opens its product on Products; Sub-Assemblies' New Product starts a product
 /// there that links it; a Reports row, or a made ingredient's tile on Sub-Assemblies' Dependents, opens its material on Raw
 /// Materials; a linked badge on Products, or a made ingredient's Made from badge, opens its sub-assembly on
-/// Sub-Assemblies; and a Print on Products goes to the Print screen with that choice. One per page the window loads, started by
+/// Sub-Assemblies; and a Print on Products opens the Print dialog with that choice. One per page the window loads, started by
 /// the layout. The record goes into the screen's address, and the screen opens it from there.
 /// </summary>
 public sealed class ScreenLinks : IDisposable
@@ -28,7 +29,8 @@ public sealed class ScreenLinks : IDisposable
         ProductsState products,
         ReportsState reports,
         PriceSimulatorState priceSimulator,
-        PrintTabState print)
+        PrintDialogState print,
+        PrintPreviews previews)
     {
         _subscriptions.Add(subAssemblies.Dependents.ProductOpenRequests
             .Merge(rawMaterials.Dependents.ProductOpenRequests)
@@ -54,7 +56,7 @@ public sealed class ScreenLinks : IDisposable
         _subscriptions.Add(products.PrintRequests.Subscribe(scope =>
         {
             print.Pick(scope);
-            navigation.NavigateTo("print");
+            previews.ShowProducts();
         }));
     }
 

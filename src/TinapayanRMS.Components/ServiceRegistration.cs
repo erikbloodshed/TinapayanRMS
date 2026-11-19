@@ -76,7 +76,7 @@ public static class ServiceRegistration
         services.AddScoped<ReportsState>();
         services.AddScoped<QuickFindState>();
         services.AddScoped<PriceSimulatorState>();
-        services.AddScoped<PrintTabState>();
+        services.AddScoped<PrintDialogState>();
         services.AddScoped<PrintPage>();
         services.AddScoped<PrintIncludes>();
         services.AddScoped<UnitsOfMeasureState>();
@@ -118,7 +118,6 @@ public static class ServiceRegistration
         services.AddScoped<Confirmations>();
         services.AddScoped<Prompts>();
         services.AddScoped<ScreenLinks>();
-        services.AddScoped<ScreenTabs>();
         services.AddScoped<PrintPreviews>();
         services.AddScoped<UnsavedChangesGuard>();
 
