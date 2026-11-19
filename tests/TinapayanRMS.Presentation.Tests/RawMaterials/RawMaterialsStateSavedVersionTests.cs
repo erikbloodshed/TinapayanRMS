@@ -138,7 +138,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         var state = await OpenedStateAsync(id);
         TypeBuffer(state, 5m);
 
-        await state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(id, flourId)]);
+        await state.View.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(id, flourId)]);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -171,7 +171,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         TypeBuffer(state, 5m);
 
         await AnotherPcRenamesAsync(id, "Strong Flour");
-        await state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(id, flourId)]);
+        await state.View.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(id, flourId)]);
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"));
         await using var dbContext = CreateDbContext();
@@ -188,7 +188,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         TypeBuffer(state, 5m);
 
         await AnotherPcRenamesAsync(id, "Strong Flour");
-        await state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(otherId, flourId)]);
+        await state.View.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(otherId, flourId)]);
         state.ErrorMessage.Should().BeNull("the move is of another material, which nobody has saved");
 
         await state.SaveCommand.ExecuteAsync();
@@ -250,7 +250,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
     });
 
     /// <summary>One field typed and left, as the form brackets it in the app.</summary>
-    private static void TypeBuffer(RawMaterialsState state, decimal percent)
+    private static void TypeBuffer(RawMaterialForm state, decimal percent)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -258,13 +258,13 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         recorder.EndUndoStep();
     }
 
-    private static Task ShowingAsync(RawMaterialsState state, int id) =>
+    private static Task ShowingAsync(RawMaterialForm state, int id) =>
         Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedRawMaterial?.Id == id, () => $"ready={state.AreDetailsReady}");
 
-    private static async Task RenameFromTheListAsync(RawMaterialsState state, int id, string name)
+    private static async Task RenameFromTheListAsync(RawMaterialForm state, int id, string name)
     {
-        await state.List.RenameMaterialCommand.ExecuteAsync((RawMaterialLeafNode)state.List.RawMaterialTree.Find(id)!);
-        await state.List.CommitTreeNameAsync(name);
+        await state.View.List.RenameMaterialCommand.ExecuteAsync((RawMaterialLeafNode)state.View.List.RawMaterialTree.Find(id)!);
+        await state.View.List.CommitTreeNameAsync(name);
     }
 
     /// <summary>A purchased ingredient saved as a form saves one, which stamps when it was saved.</summary>
@@ -309,7 +309,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
     }
 
     /// <summary>The screen with <paramref name="id"/> open on the form, its details in.</summary>
-    private async Task<RawMaterialsState> OpenedStateAsync(int id)
+    private async Task<RawMaterialForm> OpenedStateAsync(int id)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -318,7 +318,7 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         return state;
     }
 
-    private RawMaterialsState CreateState()
+    private RawMaterialForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -337,6 +337,6 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

@@ -147,10 +147,11 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
         Edit(state, () => state.EditingName = "Renamed again");
         state.History.CanUndo.Should().BeTrue();
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        // New over unsaved changes opens a tab of its own, with no history; this one keeps its own.
         await state.NewCommand.ExecuteAsync();
-        state.History.CanUndo.Should().BeFalse("a new material has no history of its own");
+        state.View.Form.Should().NotBeSameAs(state);
+        state.View.Form!.History.CanUndo.Should().BeFalse("a new material has no history of its own");
+        state.History.CanUndo.Should().BeTrue("each tab keeps its own");
     });
 
     [Test]
@@ -317,10 +318,10 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static bool CanSave(RawMaterialsState state) => state.SaveCommand.CanExecute();
+    private static bool CanSave(RawMaterialForm state) => state.SaveCommand.CanExecute();
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
-    private static void Edit(RawMaterialsState state, Action change)
+    private static void Edit(RawMaterialForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -394,7 +395,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
         raised.Should().Contain(nameof(RawMaterialPurchaseCost.TypedCostBufferPercent), "the Cost Buffer % box shows it");
     });
 
-    private async Task<(RawMaterialsState State, int MaterialId)> OpenPurchasedIngredientAsync()
+    private async Task<(RawMaterialForm State, int MaterialId)> OpenPurchasedIngredientAsync()
     {
         var bagId = await GetOrCreateUnitOfMeasureAsync("bag", "bag");
         int materialId;
@@ -431,7 +432,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
     /// of brown sugar, each at a buffered ₱0.11/g, open in the form. "Thin Syrup Base" (500 g of sugar, 500 g of water) is
     /// another recipe it could be made from.
     /// </summary>
-    private async Task<(RawMaterialsState State, int MaterialId)> OpenMadeIngredientAsync()
+    private async Task<(RawMaterialForm State, int MaterialId)> OpenMadeIngredientAsync()
     {
         int materialId;
         RawMaterialCategory category;
@@ -490,7 +491,7 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
         BufferedCostPerBaseUnit = 0.11m,
     };
 
-    private RawMaterialsState CreateState()
+    private RawMaterialForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -509,6 +510,6 @@ public class RawMaterialsStateUndoTests(DatabaseFixture fixture) : PersistenceTe
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

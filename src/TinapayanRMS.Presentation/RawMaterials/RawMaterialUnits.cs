@@ -26,7 +26,7 @@ public interface IRawMaterialUnitsHost : IFormPartHost
 }
 
 /// <summary>
-/// A material's alternative units on the Raw Materials screen (through RawMaterialsState.Units; AlternativeUnits draws
+/// A material's alternative units on the Raw Materials screen (through RawMaterialForm.Units; AlternativeUnits draws
 /// them): each a unit of measure and how many base units it holds, typed straight into the table, saved with the material.
 /// A unit picked on a brand row that the material didn't have is added here too, with its multiplier typed as the row's
 /// quantity, and goes again once no row is in it (the Cost Setup tab, RawMaterialPurchaseCost, asks for both).

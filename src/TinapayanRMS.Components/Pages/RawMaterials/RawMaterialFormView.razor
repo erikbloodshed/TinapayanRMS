@@ -1,0 +1,68 @@
+@inherits FormBase<RawMaterialForm>
+@inject Prompts Prompts
+
+<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
+
+@* One tab of the Raw Materials view: the material's header, then its cards in tabs along the bottom. Every tab is part of
+   the one form Save writes. Price History only applies to a saved purchased material. Between picking a material and its
+   details arriving, the tabs ignore the mouse (AreDetailsReady). Drawn afresh each time its tab shows (keyed by its form),
+   which keeps everything typed. *@
+<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
+    <SummaryHeader State="State!" />
+
+    <section class="card tabs-card @(State!.AreDetailsReady ? "" : "details-pending")">
+        <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+            <TabItems>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Cost Setup" /></ChildContent>
+                    <ContentTemplate>
+                        @if (State!.ShowPurchaseSetup)
+                        {
+                            <PurchaseCostSetup State="State!" />
+                        }
+                        @if (State!.IsEditingMade)
+                        {
+                            <BillOfMaterials State="State!" />
+                        }
+                        @if (State!.IsEditingLinked)
+                        {
+                            <LinkedCost State="State!" />
+                        }
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Alternative Units" /></ChildContent>
+                    <ContentTemplate><AlternativeUnits State="State!" /></ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Usage Example" /></ChildContent>
+                    <ContentTemplate><UsageExample State="State!" /></ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Dependents" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="tab-card">
+                            <h2 class="section-header">Dependents</h2>
+                            <DependentTiles Products="State!.Dependents.Products" Caption="@State!.Dependents.Text" Open="id => Commands.Run(State!.Dependents.OpenProductCommand, id)" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem Visible="State!.ShowPriceHistory">
+                    <ChildContent><TabHeader Text="Price History" /></ChildContent>
+                    <ContentTemplate><PriceHistory State="State!" IsShowing="State!.SelectedDetailsTab == RawMaterialForm.PriceHistoryTab" /></ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    </section>
+</CascadingValue>
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
+        AddSubscription(State!.PromptForNewCategory.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
+    }
+}

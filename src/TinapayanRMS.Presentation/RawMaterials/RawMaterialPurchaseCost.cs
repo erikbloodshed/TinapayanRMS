@@ -39,7 +39,7 @@ public interface IRawMaterialPurchaseCostHost : IFormPartHost
 }
 
 /// <summary>
-/// A purchased material's cost on the Raw Materials screen (through RawMaterialsState.PurchaseCost; PurchaseCostSetup
+/// A purchased material's cost on the Raw Materials screen (through RawMaterialForm.PurchaseCost; PurchaseCostSetup
 /// draws it): a price per brand, typed straight into the table, which brand the cost comes from (the dearest, or one picked
 /// in Basis), the fixed buffered cost on top of it and the Cost Buffer % it comes to, with the target buffer it was typed
 /// at; and the header's saved costs, in the unit picked to show them in (Per). The brand rows' units are the form's

@@ -8,7 +8,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.RawMaterials;
 
 /// <summary>
-/// The Raw Materials screen's Usage Example tab (through RawMaterialsState.UsageExample): what a quantity of a material,
+/// The Raw Materials screen's Usage Example tab (through RawMaterialForm.UsageExample): what a quantity of a material,
 /// in one of its units, costs as saved and buffered. It starts on the material picked, and any other can be picked; it isn't
 /// part of the form, so nothing in it is an edit to save.
 /// </summary>

@@ -196,7 +196,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
   - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
   - The **Print** window doesn't ask, since it prints the item with your changes and leaves it as it was. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
-  - **On the Sub-Assemblies screen, each sub-assembly opens in a tab of its own** (see [Tabs](#tabs)), so going somewhere else doesn't ask: picking another in the list, **New**, another screen, **Back** or **Forward** leave the changes in their tab. Closing that tab asks, and so does closing the window, for each tab with changes, even one not showing.
+  - **On the Raw Materials and Sub-Assemblies screens, each record opens in a tab of its own** (see Raw Materials' [Tabs](#tabs) and Sub-Assemblies' [Tabs](#tabs-1)), so going somewhere else doesn't ask: picking another in the list, **New**, **Copy**, another screen, **Back** or **Forward** leave the changes in their tab. Closing that tab asks, and so does closing the window, for each tab with changes, even one not showing.
 - **If another PC saves the same record while you have it open**, your **Save** is refused, so neither of you overwrites the other without knowing. So is renaming or moving that record in the list while you have unsaved changes on it. A red notice says so, and what you typed stays on the form. [Troubleshooting](#14-troubleshooting-and-questions) says what to do next.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again. A red notice stays until you close it or do something else, and goes when you open another item, answer **No** about unsaved changes, or leave the screen.
 - If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, the screen gives way to a panel saying **This screen ran into a problem it didn't expect**: press **Open It Again**, and the screen comes back as it was, changes you haven't saved included. The other screens keep working meanwhile. Only rarely, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
@@ -432,7 +432,20 @@ Backups are *.backup* files. The *.bak* files the app made before 21 October 202
 
 ## 5. Raw Materials
 
-The Raw Materials screen has the list of materials on the left, and the selected material's details on the right.
+The Raw Materials screen has the list of materials on the left, and to its right a tab for each material you open, with its details.
+
+### Tabs
+
+**Each material you open has a tab of its own**, along the top, as on the Sub-Assemblies screen, so you can have several open at once and go between them. Each keeps what you've typed into it, and its **Undo**, while another shows, and while you're on another screen.
+
+- **A click on a material in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A material that's open already just shows its own tab.
+- **To keep a tab open**, double-click the material in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
+- **New** and **Copy** start the new material in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new material, in the preview tab, as it always has.
+- **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
+- **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
+- **Back** and **Forward** go through the tabs you've shown, like a web browser. Going back to a material whose tab you've closed opens it again, in the preview tab.
+- **Delete** closes the deleted material's tab.
+- With every tab closed, the screen says so, with **New** beside it. Click a material in the list to open it.
 
 ### The list
 
@@ -455,7 +468,7 @@ The same commands are buttons under the search box: **New Raw Material**, **New 
 
 Dragging materials onto another category moves them straight away. A material can't be dragged into a category of another type, so a made ingredient only drops into a Made category, and nothing else does.
 
-**Copy** starts a new material from the one you right-clicked, named after it with *Copy* on the end (*Disposable Spoon* becomes *Disposable Spoon Copy*, or *Disposable Spoon Copy 2* if that name is taken). Only its type, its category and its base unit come with it. Its prices, alternative units, cost buffer and the rest start empty, as for **New**. A copy of a made ingredient is a made ingredient in the same Made category, but you still pick its sub-assembly. Change the name if you like, fill in the rest, then press **Save**: nothing is saved until you do. If the material showing has unsaved changes, you're asked about them first.
+**Copy** starts a new material from the one you right-clicked, named after it with *Copy* on the end (*Disposable Spoon* becomes *Disposable Spoon Copy*, or *Disposable Spoon Copy 2* if that name is taken). Only its type, its category and its base unit come with it. Its prices, alternative units, cost buffer and the rest start empty, as for **New**. A copy of a made ingredient is a made ingredient in the same Made category, but you still pick its sub-assembly. Change the name if you like, fill in the rest, then press **Save**: nothing is saved until you do. The copy opens in the preview tab, so a tab with unsaved changes stays as it is.
 
 ### The header
 
@@ -467,7 +480,7 @@ At the top are the material's name and **New**, **Save**, **Undo**, **Redo** and
 - **Total Weight** and **Total Cost**, for a made ingredient only: what its batch yields after weight loss, and what that batch costs.
 - **Last Updated**: when the material was last saved, and when its cost last changed.
 
-**Delete** removes the material with its prices and alternative units. While anything uses it, it stays, and the message names each one and how it uses it: a recipe or packaging set with it in its lines, a product with it in its packaging or as an add-in, a made ingredient with it as an add-in, or an ingredient linked to it. Take it out of those first.
+**Delete** removes the material with its prices and alternative units, and closes its tab. While anything uses it, it stays, and the message names each one and how it uses it: a recipe or packaging set with it in its lines, a product with it in its packaging or as an add-in, a made ingredient with it as an add-in, or an ingredient linked to it. Take it out of those first.
 
 Below the figures are the fields you fill in:
 

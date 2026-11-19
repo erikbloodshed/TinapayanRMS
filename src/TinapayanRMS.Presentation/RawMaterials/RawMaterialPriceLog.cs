@@ -18,7 +18,7 @@ public interface IRawMaterialPriceLogHost : IFormPartHost
 }
 
 /// <summary>
-/// The Raw Materials screen's Price History tab (through RawMaterialsState.PriceLog): a purchased material's price
+/// The Raw Materials screen's Price History tab (through RawMaterialForm.PriceLog): a purchased material's price
 /// changes, newest first, and Delete for one. The history is only a log, so deleting an entry leaves the material's cost and
 /// the form as they are.
 /// </summary>

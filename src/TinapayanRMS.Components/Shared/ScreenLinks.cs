@@ -33,7 +33,7 @@ public sealed class ScreenLinks : IDisposable
         PrintPreviews previews)
     {
         _subscriptions.Add(subAssemblies.ProductOpenRequests
-            .Merge(rawMaterials.Dependents.ProductOpenRequests)
+            .Merge(rawMaterials.ProductOpenRequests)
             .Merge(reports.ProductOpenRequests)
             .Merge(priceSimulator.ProductOpenRequests)
             .Subscribe(productId => navigation.NavigateTo($"products/{productId}")));
@@ -50,7 +50,7 @@ public sealed class ScreenLinks : IDisposable
             .Subscribe(rawMaterialId => navigation.NavigateTo($"raw-materials/{rawMaterialId}")));
 
         _subscriptions.Add(products.SubAssemblyOpenRequests
-            .Merge(rawMaterials.Recipe.SubAssemblyOpenRequests)
+            .Merge(rawMaterials.SubAssemblyOpenRequests)
             .Subscribe(subAssemblyId => navigation.NavigateTo($"sub-assemblies/{subAssemblyId}")));
 
         _subscriptions.Add(products.PrintRequests.Subscribe(scope =>

@@ -74,6 +74,7 @@ public static class ServiceRegistration
         services.AddScoped<SubAssembliesState>();
 
         // A record view's open forms, every tab's, which the window asks about as it closes (UnsavedChangesGuard).
+        services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<RawMaterialsState>());
         services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<SubAssembliesState>());
         services.AddScoped<ProductsState>();
         services.AddScoped<ReportsState>();

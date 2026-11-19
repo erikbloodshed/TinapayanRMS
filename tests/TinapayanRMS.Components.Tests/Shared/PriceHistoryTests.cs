@@ -17,7 +17,7 @@ public class PriceHistoryTests
     public async Task The_table_is_made_the_first_time_its_tab_shows_and_kept_after()
     {
         await using var context = AppServices.NewContext();
-        var state = context.Services.GetRequiredService<RawMaterialsState>();
+        var state = context.Services.GetRequiredService<RawMaterialsState>().Form!;
 
         var tab = context.Render<PriceHistory>(parameters => parameters.Add(p => p.State, state).Add(p => p.IsShowing, false));
         tab.FindComponents<PickGrid<RawMaterialPriceRow>>().Should().BeEmpty("the tab hasn't been shown");

@@ -67,15 +67,15 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.SelectedRawMaterial!.Id.Should().Be(sugarId);
         await Settle.UntilAsync(state, () => state.AreDetailsReady && state.EditingName == "Sugar", () => $"name={state.EditingName}");
 
-        state.List.SearchText = "Flour";
+        state.View.List.SearchText = "Flour";
         state.OpenRecord(flourId);
         state.SelectedRawMaterial!.Id.Should().Be(flourId);
-        state.List.SearchText.Should().Be("Flour", "a search showing it is left alone");
+        state.View.List.SearchText.Should().Be("Flour", "a search showing it is left alone");
 
         state.OpenRecord(sugarId);
         state.SelectedRawMaterial!.Id.Should().Be(sugarId);
-        state.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
-        state.List.VisibleRawMaterials.Should().Contain(state.SelectedRawMaterial);
+        state.View.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        state.View.List.VisibleRawMaterials.Should().Contain(state.SelectedRawMaterial);
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => "Sugar's details never arrived");
     });
 
@@ -396,7 +396,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
 
         await SelectAsync(state, state.RawMaterials.Single());
         state.ShowPriceHistory.Should().BeTrue();
-        state.SelectedDetailsTab = RawMaterialsState.PriceHistoryTab;
+        state.SelectedDetailsTab = RawMaterialForm.PriceHistoryTab;
 
         await state.NewCommand.ExecuteAsync();
 
@@ -988,15 +988,17 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.ChangeSource(RawMaterialSource.Made);
         state.Recipe.AddIns.Add(new IngredientLineRow { IngredientId = state.Ingredients.Single().Id, Grams = 100m });
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        // New over unsaved changes opens a tab of its own: the changes stay in theirs.
         await state.NewCommand.ExecuteAsync();
+        var fresh = state.View.Form!;
 
-        state.Units.Rows.Should().BeEmpty();
-        state.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
-        state.PurchaseCost.BrandPriceRows.Should().BeEmpty();
-        state.PurchaseCost.PurchaseCostText.Should().Be("—");
-        state.Recipe.AddIns.Should().BeEmpty();
+        fresh.Should().NotBeSameAs(state);
+        fresh.Units.Rows.Should().BeEmpty();
+        fresh.PurchaseCost.PurchaseUnitOptions.Select(o => o.Name).Should().Equal("gram", "bag");
+        fresh.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        fresh.PurchaseCost.PurchaseCostText.Should().Be("—");
+        fresh.Recipe.AddIns.Should().BeEmpty();
+        state.Units.Rows.Should().ContainSingle("the unsaved one keeps its own");
     });
 
     [Test]
@@ -1466,10 +1468,11 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.LoadCommand.ExecuteAsync();
         state.PurchaseCost.EditingCostBufferPercent.Should().Be(4m);
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        // New over unsaved changes opens a tab of its own, which starts at the new default; the typed buffer stays in its tab.
         await state.NewCommand.ExecuteAsync();
-        state.PurchaseCost.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
+        state.View.Form.Should().NotBeSameAs(state);
+        state.View.Form!.PurchaseCost.EditingCostBufferPercent.Should().Be(15m, "the next new material starts at the new default");
+        state.PurchaseCost.EditingCostBufferPercent.Should().Be(4m);
     });
 
     [Test]
@@ -1480,16 +1483,20 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
+        // Flour, saved with a buffer of its own, in the preview tab with nothing unsaved: New takes the tab's place.
         await SelectAsync(state, state.RawMaterials.Single());
         AddBrandPrice(state, null, "bag", 1250m);
-        state.UsageExample.Material.Should().NotBeNull("selecting a material puts it in the usage example");
         state.PurchaseCost.EditingCostBufferPercent = 5m;
+        await state.SaveCommand.ExecuteAsync();
+        state.ErrorMessage.Should().BeNull();
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && !state.History.IsDirty, () => $"ready={state.AreDetailsReady}");
+        state.UsageExample.Material.Should().NotBeNull("selecting a material puts it in the usage example");
         state.UsageExample.Quantity = 3m;
+        state.History.IsDirty.Should().BeFalse("the usage example isn't part of the form");
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         await state.NewCommand.ExecuteAsync();
 
+        state.View.Form.Should().BeSameAs(state);
         state.EditingName.Should().BeEmpty();
         state.EditingType.Should().Be(RawMaterialType.Ingredient, "most materials are purchased ingredients");
         state.EditingSource.Should().Be(RawMaterialSource.Purchased);
@@ -1544,7 +1551,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     });
 
     [Test]
-    public Task Deleting_a_material_leaves_an_empty_form() => UiThread.RunAsync(async () =>
+    public Task Deleting_a_material_closes_its_tab() => UiThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
         await SeedPurchasedIngredientAsync("Flour", (bagId, 25000m));
@@ -1558,12 +1565,10 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         await state.DeleteCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.RawMaterials.Should().BeEmpty();
-        state.EditingName.Should().BeEmpty("the deleted material's details don't stay in the form");
-        state.EditingCategory.Should().BeNull();
-        state.PurchaseCost.BrandPriceRows.Should().BeEmpty();
-        state.UsageExample.Material.Should().BeNull();
-        state.CanChangeTypeAndSource.Should().BeTrue("the form is a new material now");
+        state.View.ErrorMessage.Should().BeNull();
+        state.View.RawMaterials.Should().BeEmpty();
+        state.View.Tabs.All.Should().BeEmpty("the deleted material's details don't stay in a tab");
+        state.View.Form.Should().BeNull();
     });
 
     [Test]
@@ -1880,7 +1885,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         return id;
     }
 
-    private RawMaterialsState CreateState()
+    private RawMaterialForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -1899,14 +1904,14 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     /// <summary>
     /// Types an alternative unit into the grid's add row as the grid does: it edits the row the screen hands it
     /// (NewUnitRow), then adds it to the rows when it's committed. Only Save writes it.
     /// </summary>
-    private static Task AddUnitAsync(RawMaterialsState state, int unitOfMeasureId, decimal baseUnitsPerUnit)
+    private static Task AddUnitAsync(RawMaterialForm state, int unitOfMeasureId, decimal baseUnitsPerUnit)
     {
         var row = state.Units.NewRow();
         row.UnitOfMeasureId = unitOfMeasureId;
@@ -1950,7 +1955,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     /// (NewBrandPriceRow), picking the unit named <paramref name="unitName"/>, then adds it to the rows when it's
     /// committed. Only Save writes it.
     /// </summary>
-    private static BrandPriceRow AddBrandPrice(RawMaterialsState state, string? brand, string unitName, decimal price)
+    private static BrandPriceRow AddBrandPrice(RawMaterialForm state, string? brand, string unitName, decimal price)
     {
         var row = state.PurchaseCost.NewBrandPriceRow();
         row.Brand = brand;
@@ -1964,7 +1969,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     /// Types into the Category picker: the text lands, and a name the picker doesn't list (exactly, whatever its case)
     /// clears the category it held, as typing can (CategoryPicker.Begin).
     /// </summary>
-    private static void TypeCategory(RawMaterialsState state, string text)
+    private static void TypeCategory(RawMaterialForm state, string text)
     {
         state.CategorySearchText = text;
         if (!state.CategoryOptions.Any(c => string.Equals(c.Name, text, StringComparison.OrdinalIgnoreCase)))
@@ -1974,7 +1979,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     /// <summary>Picks the first category, which a new material starts without.</summary>
-    private static void PickCategory(RawMaterialsState state) =>
+    private static void PickCategory(RawMaterialForm state) =>
         state.EditingCategory = state.Categories.First(c => c.Type == RawMaterialRules.CategoryTypeFor(state.EditingType, state.EditingSource));
 
     private async Task SeedCategoryAsync(string name)
@@ -2037,7 +2042,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     }
 
     /// <summary>Picks the sub-assembly named <paramref name="name"/> on the Recipe card, and waits for its lines to show.</summary>
-    private static async Task PickRecipeAsync(RawMaterialsState state, string name)
+    private static async Task PickRecipeAsync(RawMaterialForm state, string name)
     {
         state.Recipe.PickSubAssembly(state.Recipe.SubAssemblyOptions.Single(s => s.Name == name));
         await Settle.UntilAsync(state, () => state.Recipe.Lines.Count > 0, () => $"recipe lines={state.Recipe.Lines.Count}");
@@ -2062,7 +2067,7 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     /// Picks <paramref name="material"/> as a click in the list does, and waits for its details (price history, brand
     /// prices, BOM), which are read off the UI thread: until they arrive the previous material's show, and Save waits.
     /// </summary>
-    private static async Task SelectAsync(RawMaterialsState state, RawMaterial material)
+    private static async Task SelectAsync(RawMaterialForm state, RawMaterial material)
     {
         state.Pick(material);
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"{material.Name}'s details never arrived");

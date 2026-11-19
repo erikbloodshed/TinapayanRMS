@@ -11,7 +11,7 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// <summary>What a made ingredient's recipe asks of its screen, on top of what any part of its form asks.</summary>
 public interface IRawMaterialRecipeHost : IFormPartHost
 {
-    /// <summary>The details showing are the picked material's (RawMaterialsState.AreDetailsReady): the totals wait until they are.</summary>
+    /// <summary>The details showing are the picked material's (RawMaterialForm.AreDetailsReady): the totals wait until they are.</summary>
     bool AreDetailsReady { get; }
 
     /// <summary>The form's Weight Loss %, which the batch's yield is less.</summary>
@@ -22,7 +22,7 @@ public interface IRawMaterialRecipeHost : IFormPartHost
 }
 
 /// <summary>
-/// A made ingredient's recipe on the Raw Materials screen (through RawMaterialsState.Recipe; BillOfMaterials draws it):
+/// A made ingredient's recipe on the Raw Materials screen (through RawMaterialForm.Recipe; BillOfMaterials draws it):
 /// the sub-assembly it's made from, shown as a badge with Edit once picked, that recipe's lines as it's saved on the
 /// Sub-Assemblies screen, for show, the made ingredient's own add-ins on top, typed straight into their table, and the
 /// batch's totals. The screen keeps the Weight Loss % and says when the recipe's lines are read again.

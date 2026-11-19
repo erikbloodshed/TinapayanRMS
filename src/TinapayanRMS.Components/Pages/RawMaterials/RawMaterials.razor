@@ -1,95 +1,53 @@
 @page "/raw-materials"
 @page "/raw-materials/{Id:int}"
-@inherits RecordScreenBase<RawMaterialsState>
-@inject Prompts Prompts
+@page "/raw-materials/new/{Number:int}"
+@inherits RecordViewBase<RawMaterialsState, RawMaterialForm>
 @inject IJSRuntime JS
 
-<PageTitle>@(State!.SelectedRawMaterial?.Name ?? "Raw Materials") · TinapayanRMS</PageTitle>
+<PageTitle>@(State!.Form?.SelectedRawMaterial?.Name ?? "Raw Materials") · TinapayanRMS</PageTitle>
 
-<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
+@* The Raw Materials view: the materials, the list by type and category, beside a strip of tabs, a material open in each,
+   as Visual Studio Code's editors are; under it, the form of the tab showing (RawMaterialFormView), drawn afresh as
+   another tab shows, each keeping what's typed into it. A material picked in the list opens in the preview tab, which the
+   next one picked replaces while it holds nothing unsaved. *@
+<div class="record-screen">
+    <RawMaterialsListCard List="State!.List" />
 
-@* The list beside the picked material: its header, then its cards in tabs along the bottom.
-   Every tab is part of the one form Save writes. Price History only applies to a saved purchased material. Between
-   picking a material and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each material has its own
-   address, so the browser's Back and Forward step between the materials opened. *@
-<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
-    <div class="record-screen">
-        <RawMaterialsListCard List="State!.List" />
+    <div class="record-details">
+        <RecordTabStrip TForm="RawMaterialForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseAsync" Keep="State!.Keep" Label="Raw materials open" />
 
-        <div class="record-details">
-            <SummaryHeader State="State!" />
-
-            <section class="card tabs-card @(State!.AreDetailsReady ? "" : "details-pending")">
-                <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
-                    <TabItems>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Cost Setup" /></ChildContent>
-                            <ContentTemplate>
-                                @if (State!.ShowPurchaseSetup)
-                                {
-                                    <PurchaseCostSetup State="State!" />
-                                }
-                                @if (State!.IsEditingMade)
-                                {
-                                    <BillOfMaterials State="State!" />
-                                }
-                                @if (State!.IsEditingLinked)
-                                {
-                                    <LinkedCost State="State!" />
-                                }
-                            </ContentTemplate>
-                        </TabItem>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Alternative Units" /></ChildContent>
-                            <ContentTemplate><AlternativeUnits State="State!" /></ContentTemplate>
-                        </TabItem>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Usage Example" /></ChildContent>
-                            <ContentTemplate><UsageExample State="State!" /></ContentTemplate>
-                        </TabItem>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Dependents" /></ChildContent>
-                            <ContentTemplate>
-                                <div class="tab-card">
-                                    <h2 class="section-header">Dependents</h2>
-                                    <DependentTiles Products="State!.Dependents.Products" Caption="@State!.Dependents.Text" Open="id => Commands.Run(State!.Dependents.OpenProductCommand, id)" />
-                                </div>
-                            </ContentTemplate>
-                        </TabItem>
-                        <TabItem Visible="State!.ShowPriceHistory">
-                            <ChildContent><TabHeader Text="Price History" /></ChildContent>
-                            <ContentTemplate><PriceHistory State="State!" IsShowing="State!.SelectedDetailsTab == RawMaterialsState.PriceHistoryTab" /></ContentTemplate>
-                        </TabItem>
-                    </TabItems>
-                </SfTab>
+        @if (State!.Form is { } form)
+        {
+            <RawMaterialFormView @key="form" Form="form" />
+        }
+        else
+        {
+            <section class="card empty-record">
+                <p>No raw material is open. Pick one in the list, or start a new one.</p>
+                <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
             </section>
-        </div>
+        }
     </div>
-</CascadingValue>
+</div>
 
 @code {
     protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
+    protected override string AddressRoot => "raw-materials";
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var state = State!;
+        var view = State!;
 
-        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
-        AddSubscription(state.PromptForNewCategory.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
-
-        // Copy fills the form with a name to change: the cursor goes to Name. New names the material in the list instead,
+        // Copy fills a form with a name to change: the cursor goes to Name. New names the material in the list instead,
         // where its row's box has the cursor.
-        state.List.Copied += FocusName;
-        AddSubscription(System.Reactive.Disposables.Disposable.Create(() => state.List.Copied -= FocusName));
+        view.List.Copied += FocusName;
+        AddSubscription(System.Reactive.Disposables.Disposable.Create(() => view.List.Copied -= FocusName));
     }
 
-    protected override string AddressRoot => "raw-materials";
-
-    protected override int? ShownId => State!.SelectedRawMaterial?.Id;
-
-    protected override string ShownProperty => nameof(RawMaterialsState.SelectedRawMaterial);
+    // A tab's ✕: asks about its changes first, showing it, and stays on Cancel.
+    private async Task CloseAsync(RecordTab<RawMaterialForm> tab) => await State!.CloseTabAsync(tab);
 
     private void FocusName() => _ = FocusNameAsync();
 

@@ -14,56 +14,62 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.RawMaterials;
 
 /// <summary>
-/// What the Raw Materials list asks of its screen, on top of what any record screen's list asks: the material the form
-/// shows, and what the list's actions do to it.
+/// What the Raw Materials list asks of its view, on top of what any record view's list asks: the form showing, and what the
+/// list's actions do to the forms holding the materials they act on.
 /// </summary>
 public interface IRawMaterialsListHost : IRecordListHost
 {
-    /// <summary>The material picked, which the form shows; null for a new one.</summary>
+    /// <summary>The material the form showing is about; null for a new one, or with no tab open.</summary>
     RawMaterial? SelectedRawMaterial { get; }
 
-    /// <summary>The material the form holds: 0 for a new one not saved yet.</summary>
-    int EditingId { get; }
-
-    /// <summary>The category the form's material is in, which a new one's row is filed under.</summary>
+    /// <summary>The category the form showing's material is in, which a new one's row is filed under.</summary>
     RawMaterialCategory? EditingCategory { get; }
 
-    /// <summary>Reads the screen's lists again (its LoadCommand), keeping the form and what's typed into it.</summary>
+    /// <summary>Reads the view's lists again (its LoadCommand), keeping every form and what's typed into it.</summary>
     Task LoadAsync();
 
-    /// <summary>A material's row picked in the list: it opens, once the form's unsaved changes are saved or let go.</summary>
+    /// <summary>A material's row picked in the list: it shows in its tab, or the preview tab.</summary>
     void Pick(RawMaterial material);
 
-    /// <summary>A fresh form for a new material of <paramref name="type"/>, in <paramref name="categoryId"/>, made or purchased as <paramref name="source"/> says.</summary>
+    /// <summary>A material's row double-clicked in the list: it shows in a tab that stays, not the preview tab.</summary>
+    void KeepOpen(RawMaterial material);
+
+    /// <summary>A fresh form for a new material of <paramref name="type"/>, in <paramref name="categoryId"/>, made or purchased as <paramref name="source"/> says, in the preview tab.</summary>
     void StartNew(RawMaterialType type, int? categoryId, RawMaterialSource source);
 
-    /// <summary>A fresh form for a copy of <paramref name="material"/>: its type, category and base unit, named "… Copy".</summary>
+    /// <summary>A fresh form for a copy of <paramref name="material"/>: its type, category and base unit, named "… Copy", in the preview tab.</summary>
     void StartCopyOf(RawMaterial material);
 
-    /// <summary>Deletes the material once it's confirmed, as the header's Delete does.</summary>
+    /// <summary>Deletes the material once it's confirmed, as a form's Delete does.</summary>
     Task DeleteAsync(RawMaterial material);
 
-    /// <summary>The name typed into the new material's row goes into the form, as typed there: one undo step.</summary>
+    /// <summary>The name typed into the new material's row goes into the form showing, as typed there: one undo step.</summary>
     void NameNew(string name);
 
     /// <summary>The new material's row went with Esc: the name its form was given goes too, as no edit of the user's.</summary>
     void ClearNewName();
 
-    /// <summary>The material the form shows was renamed in the list, saved: the form and its undo steps take the name as given.</summary>
-    void RenamedOnForm(string name);
+    /// <summary>The material <paramref name="id"/> was renamed in the list, saved: a form holding it, and its undo steps, take the name as given.</summary>
+    void Renamed(int id, string name);
 
-    /// <summary>The material the form shows was moved to another category, saved: the form and its undo steps take it as given.</summary>
-    void MovedOnForm(int categoryId);
+    /// <summary>Materials were moved to another category, saved: the forms holding them, and their undo steps, take it as given.</summary>
+    void Moved(IReadOnlyList<RawMaterialMove> moves);
 
-    /// <summary>A category was deleted: the form's undo steps forget it, so none puts back a category there's no longer any of.</summary>
+    /// <summary>A category was deleted: every form's undo steps forget it, so none puts back a category there's no longer any of.</summary>
     void CategoryDeleted(int categoryId);
+
+    /// <summary>
+    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
+    /// and the time it took it, so the write is refused over a save made since; null when none does.
+    /// </summary>
+    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
 }
 
 /// <summary>
 /// The Raw Materials list (through RawMaterialsState.List; RawMaterialsListCard draws it): the materials, searched by name and
 /// filed in a folder for their type, then their category; the rows picked, its menus and keys, moves and their Undo, naming
-/// in place, and the categories as its folders. The materials and categories are the screen's, which its form's pickers
-/// read too; what the list's actions do to the material the form shows, it asks of the screen
+/// in place, and the categories as its folders. The materials and categories are the view's, which its forms' pickers
+/// read too; what the list's actions do to the forms holding the materials, it asks of the view
 /// (<see cref="IRawMaterialsListHost"/>).
 /// </summary>
 public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
@@ -264,10 +270,19 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         }
     }
 
+    /// <summary>A row double-clicked: a material's shows in a tab that stays, as a file double-clicked does in Visual Studio Code.</summary>
+    public void KeepOpen(RawMaterialTreeNode node)
+    {
+        if (node is RawMaterialLeafNode { IsNew: false } leaf)
+        {
+            _host.KeepOpen(leaf.RawMaterial);
+        }
+    }
+
     /// <summary>
-    /// Saves <paramref name="moves"/> and files the materials in their new folders. On the material the form shows, the
-    /// Category picker follows, and every undo step takes the new category as given, so no undo puts the old one back for a
-    /// Save to write; whatever else is typed there stays unsaved.
+    /// Saves <paramref name="moves"/> and files the materials in their new folders. On a form holding one, the Category
+    /// picker follows, and every undo step takes the new category as given, so no undo puts the old one back for a Save to
+    /// write; whatever else is typed there stays unsaved.
     /// </summary>
     private async Task MoveMaterialsAsync(IReadOnlyList<RawMaterialMove> moves, bool isUndo)
     {
@@ -284,14 +299,12 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _rawMaterialRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
+        var ids = moves.Select(m => m.RawMaterialId).ToList();
+        await _rawMaterialRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
 
-        // The load only re-points the selection at the fresh copy: with something typed, the form isn't loaded again.
-        await _host.LoadAfterSavingAsync(moves.Select(m => m.RawMaterialId));
-        if (moves.FirstOrDefault(m => m.RawMaterialId == _host.EditingId) is { } onForm)
-        {
-            _host.MovedOnForm(onForm.CategoryId);
-        }
+        // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
+        await _host.LoadAfterSavingAsync(ids);
+        _host.Moved(moves);
 
         // Picks again the rows the tree dropped from its selection as they moved.
         ListSelection.Restore(picked, r => r is not RawMaterialLeafNode leaf || RawMaterialTree.Find(leaf.RawMaterial.Id) == leaf);
@@ -631,19 +644,16 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// Saves <paramref name="name"/> as the material's at once. On the material the form shows, the name box takes it, and
+    /// Saves <paramref name="name"/> as the material's at once. On a form holding the material, the name box takes it, and
     /// the form's undo steps take it as given, as a move gives them its category: whatever else is typed there stays to be
     /// saved, and no undo brings the old name back for a Save to write.
     /// </summary>
     private async Task RenameMaterialToAsync(RawMaterialLeafNode leaf, string name)
     {
         var material = leaf.RawMaterial;
-        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
+        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.SavedVersionFor([material.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([material.Id]);
-        if (_host.EditingId == material.Id)
-        {
-            _host.RenamedOnForm(name);
-        }
+        _host.Renamed(material.Id, name);
     }
 
     /// <summary>

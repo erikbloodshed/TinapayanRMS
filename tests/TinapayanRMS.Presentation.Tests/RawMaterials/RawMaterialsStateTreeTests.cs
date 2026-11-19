@@ -31,10 +31,10 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var state = await LoadedStateAsync();
-        var leaf = state.List.RawMaterialTree.Find(breadFlourId)!;
-        state.List.SelectedTreeNode = leaf;
+        var leaf = state.View.List.RawMaterialTree.Find(breadFlourId)!;
+        state.View.List.SelectedTreeNode = leaf;
 
-        var menu = state.List.TreeMenuFor(leaf);
+        var menu = state.View.List.TreeMenuFor(leaf);
 
         Headers(menu).Should().Equal("Move to", "Rename", "Copy", "Delete");
         menu.Single(i => i.Header == "Rename").Gesture.Should().Be("F2");
@@ -52,18 +52,18 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
-        var breadFlour = state.List.RawMaterialTree.Find(breadFlourId)!;
+        IListTreeScreen screen = state.View.List;
+        var breadFlour = state.View.List.RawMaterialTree.Find(breadFlourId)!;
 
         screen.CanDrag(breadFlour).Should().BeTrue();
         screen.CanDrag(TreeFolder(state, RawMaterialType.Ingredient, "Flour")).Should().BeFalse("a folder isn't dragged");
         screen.CanDrop([breadFlour], TreeFolder(state, RawMaterialType.Packaging, "Boxes")).Should().BeFalse("a material's type is fixed");
-        screen.CanDrop([breadFlour], state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
+        screen.CanDrop([breadFlour], state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().BeFalse("a type's folder has no category to give");
 
         (await screen.DropAsync([breadFlour], TreeFolder(state, RawMaterialType.Ingredient, "Dry Goods"))).Should().BeSameAs(breadFlour);
 
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
-        state.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+        state.View.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
     });
 
     [Test]
@@ -74,11 +74,11 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var caneSugarId = await AddIngredientAsync("Cane Sugar", flourId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
+        IListTreeScreen screen = state.View.List;
 
-        var firstMove = state.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(breadFlourId, dryGoodsId)]);
-        state.List.MoveMaterialsCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
-        (await screen.DropAsync([state.List.RawMaterialTree.Find(caneSugarId)!], TreeFolder(state, RawMaterialType.Ingredient, "Dry Goods")))
+        var firstMove = state.View.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(breadFlourId, dryGoodsId)]);
+        state.View.List.MoveMaterialsCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
+        (await screen.DropAsync([state.View.List.RawMaterialTree.Find(caneSugarId)!], TreeFolder(state, RawMaterialType.Ingredient, "Dry Goods")))
             .Should().BeNull("a move is still saving");
         await firstMove;
 
@@ -99,15 +99,15 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         state.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
         TreeFolder(state, RawMaterialType.Ingredient, "Dry Goods").Materials.Should().ContainSingle();
-        state.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
+        state.View.List.MoveNotice.Should().Be("Moved Bread Flour to Ingredients › Dry Goods");
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(flourId);
         TreeFolder(state, RawMaterialType.Ingredient, "Flour").Materials.Should().ContainSingle();
-        state.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        state.List.UndoMoveCommand.CanExecute().Should().BeFalse();
+        state.View.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
+        state.View.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -119,14 +119,14 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
         var sugarId = await AddIngredientAsync("Sugar", dryGoodsId);
         var state = await OpenedStateAsync(breadFlourId);
-        var tree = state.List.RawMaterialTree;
+        var tree = state.View.List.RawMaterialTree;
 
         // Ctrl+clicks: the rows join the first, which stays the one showing.
-        state.List.SelectedTreeNodes.Add(tree.Find(cakeFlourId)!);
-        state.List.SelectedTreeNodes.Add(tree.Find(sugarId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(cakeFlourId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(sugarId)!);
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
 
-        var menu = state.List.TreeMenuFor(tree.Find(cakeFlourId));
+        var menu = state.View.List.TreeMenuFor(tree.Find(cakeFlourId));
 
         Headers(menu).Should().Equal(["Move 3 Materials to"], "renaming or deleting is for one at a time");
         await RunAsync(menu[0].Items.Single(i => i.Header == "Dry Goods"));
@@ -134,8 +134,8 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         state.ErrorMessage.Should().BeNull();
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
         (await CategoryOfAsync(cakeFlourId)).Should().Be(dryGoodsId);
-        state.List.MoveNotice.Should().Be("Moved 2 materials to Ingredients › Dry Goods", "Sugar was there already");
-        state.List.SelectedTreeMaterials.Select(l => l.RawMaterial.Id).Should().Equal(breadFlourId, cakeFlourId, sugarId);
+        state.View.List.MoveNotice.Should().Be("Moved 2 materials to Ingredients › Dry Goods", "Sugar was there already");
+        state.View.List.SelectedTreeMaterials.Select(l => l.RawMaterial.Id).Should().Equal(breadFlourId, cakeFlourId, sugarId);
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
     });
 
@@ -147,10 +147,10 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var cakeBoxId = await AddPackagingAsync("Cake Box", boxesId);
         var state = await LoadedStateAsync();
-        state.List.SelectedTreeNode = state.List.RawMaterialTree.Find(breadFlourId);
-        state.List.SelectedTreeNodes.Add(state.List.RawMaterialTree.Find(cakeBoxId)!);
+        state.View.List.SelectedTreeNode = state.View.List.RawMaterialTree.Find(breadFlourId);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.RawMaterialTree.Find(cakeBoxId)!);
 
-        state.List.TreeMenuFor(state.List.RawMaterialTree.Find(cakeBoxId)).Should().BeEmpty();
+        state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(cakeBoxId)).Should().BeEmpty();
     });
 
     [Test]
@@ -183,17 +183,17 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var state = await OpenedStateAsync(breadFlourId);
         Edit(state, () => state.PurchaseCost.EditingCostBufferPercent = 5m);
-        var breadFlour = state.List.RawMaterialTree.Find(breadFlourId)!;
+        var breadFlour = state.View.List.RawMaterialTree.Find(breadFlourId)!;
 
-        await RunAsync(state.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
+        await RunAsync(state.View.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
 
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Bread Flour"));
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Bread Flour"));
 
-        await state.List.CommitTreeNameAsync(" Strong Flour ");
-        await state.List.CommitTreeNameAsync("Strong Flour Again");
+        await state.View.List.CommitTreeNameAsync(" Strong Flour ");
+        await state.View.List.CommitTreeNameAsync("Strong Flour Again");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var saved = await dbContext.RawMaterials.SingleAsync(m => m.Id == breadFlourId, Cancellation);
@@ -201,7 +201,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         }
 
         state.EditingName.Should().Be("Strong Flour");
-        state.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Strong Flour");
+        state.View.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Strong Flour");
         state.History.IsDirty.Should().BeTrue("the buffer is still to be saved");
 
         state.TryUndo().Should().BeTrue();
@@ -217,26 +217,26 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         await AddIngredientAsync("Cake Flour", flourId);
         var state = await LoadedStateAsync();
-        var breadFlour = state.List.RawMaterialTree.Find(breadFlourId)!;
+        var breadFlour = state.View.List.RawMaterialTree.Find(breadFlourId)!;
 
-        await RunAsync(state.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
-        await state.List.CommitTreeNameAsync("Cake Flour");
+        await RunAsync(state.View.List.TreeMenuFor(breadFlour).Single(i => i.Header == "Rename"));
+        await state.View.List.CommitTreeNameAsync("Cake Flour");
 
         state.ErrorMessage.Should().Be("That name is already in use.");
-        state.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Bread Flour");
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Cake Flour"));
+        state.View.List.RawMaterialTree.Find(breadFlourId)!.Title.Should().Be("Bread Flour");
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(breadFlour, "Cake Flour"));
 
         // Esc, an empty name and the same name leave it be; so does a search.
-        state.List.CancelTreeName();
-        state.List.TreeNameEdit.Should().BeNull();
-        state.List.SelectedTreeNode = breadFlour;
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync("  ");
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync("Bread Flour");
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        state.List.SearchText = "flour";
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.CancelTreeName();
+        state.View.List.TreeNameEdit.Should().BeNull();
+        state.View.List.SelectedTreeNode = breadFlour;
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync("  ");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync("Bread Flour");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        state.View.List.SearchText = "flour";
+        state.View.List.TreeNameEdit.Should().BeNull();
         (await NameOfAsync(breadFlourId)).Should().Be("Bread Flour");
     });
 
@@ -246,41 +246,41 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var state = await LoadedStateAsync();
         var flour = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
-        state.List.SearchText = "nothing like it";
+        state.View.List.SearchText = "nothing like it";
 
-        await RunAsync(state.List.TreeMenuFor(flour).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(state.View.List.TreeMenuFor(flour).Single(i => i.Header == "New Ingredient Here"));
 
-        state.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
-        var row = state.List.RawMaterialTree.PendingMaterial!;
+        state.View.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
+        var row = state.View.List.RawMaterialTree.PendingMaterial!;
         flour.Children.Should().Equal(row);
         flour.Count.Should().Be(0, "it isn't a material until it's saved");
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New ingredient"));
-        state.List.TreeMenuFor(row).Should().BeEmpty();
-        state.List.SelectedTreeMaterials.Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New ingredient"));
+        state.View.List.TreeMenuFor(row).Should().BeEmpty();
+        state.View.List.SelectedTreeMaterials.Should().BeEmpty();
         state.EditingCategory!.Id.Should().Be(flourId);
 
-        await state.List.CommitTreeNameAsync("Rye Flour");
+        await state.View.List.CommitTreeNameAsync("Rye Flour");
 
         state.ErrorMessage.Should().BeNull();
         state.RawMaterials.Should().BeEmpty("a material needs more than a name, so Save files it");
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
         row.Title.Should().Be("Rye Flour");
         state.EditingName.Should().Be("Rye Flour");
         state.History.IsDirty.Should().BeTrue("Save is offered for it");
 
         await state.LoadCommand.ExecuteAsync();
         flour.Children.Should().Equal([row], "a load keeps it");
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
 
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.RawMaterialTree.PendingMaterial.Should().BeNull();
-        var saved = state.List.RawMaterialTree.Find(state.SelectedRawMaterial!.Id)!;
+        state.View.List.RawMaterialTree.PendingMaterial.Should().BeNull();
+        var saved = state.View.List.RawMaterialTree.Find(state.SelectedRawMaterial!.Id)!;
         flour.Children.Should().Equal(saved);
         saved.Title.Should().Be("Rye Flour");
-        state.List.SelectedTreeNode.Should().BeSameAs(saved);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(saved);
     });
 
     [Test]
@@ -289,24 +289,24 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var state = await LoadedStateAsync();
         AnswerUnsavedChanges(state, UnsavedChangesAnswer.DontSave);
-        var ingredients = state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
         await state.NewCommand.ExecuteAsync();
 
-        var row = state.List.RawMaterialTree.PendingMaterial!;
+        var row = state.View.List.RawMaterialTree.PendingMaterial!;
         TitlesIn(ingredients).Should().Equal(["Flour", "New ingredient"], "with no category yet, it's last in its type's folder");
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
         TitlesIn(ingredients).Should().Equal("Flour");
-        state.List.SelectedTreeNode.Should().BeNull();
+        state.View.List.SelectedTreeNode.Should().BeNull();
         state.SelectedRawMaterial.Should().BeNull("the form stays on the blank new material");
 
         await state.NewCommand.ExecuteAsync();
-        await state.List.CommitTreeNameAsync("Rye Flour");
+        await state.View.List.CommitTreeNameAsync("Rye Flour");
         TitlesIn(ingredients).Should().Equal("Flour", "Rye Flour");
 
         (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("Don't Save puts the form back blank");
 
-        state.List.RawMaterialTree.PendingMaterial.Should().BeNull("put back blank, it has no row");
+        state.View.List.RawMaterialTree.PendingMaterial.Should().BeNull("put back blank, it has no row");
         TitlesIn(ingredients).Should().Equal("Flour");
         state.RawMaterials.Should().BeEmpty();
     });
@@ -318,25 +318,25 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var state = await LoadedStateAsync();
 
-        await RunAsync(state.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Packaging, "Boxes")).Single(i => i.Header == "New Packaging Material Here"));
+        await RunAsync(state.View.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Packaging, "Boxes")).Single(i => i.Header == "New Packaging Material Here"));
 
         state.SelectedRawMaterial.Should().BeNull();
         state.EditingType.Should().Be(RawMaterialType.Packaging);
         state.EditingCategory!.Id.Should().Be(boxesId);
         state.History.IsDirty.Should().BeFalse("nothing is typed yet");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Single(i => i.Header == "New Ingredient Here"));
 
         state.EditingType.Should().Be(RawMaterialType.Ingredient);
         state.EditingCategory.Should().BeNull("a type's folder has no category");
 
-        await RunAsync(state.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Ingredient Here"));
+        await RunAsync(state.View.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Ingredient Here"));
         Edit(state, () => state.EditingName = "Rye Flour");
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         TreeFolder(state, RawMaterialType.Ingredient, "Flour").Materials.Select(l => l.Title).Should().Equal("Rye Flour");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.RawMaterialTree.Find(state.SelectedRawMaterial!.Id));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.RawMaterialTree.Find(state.SelectedRawMaterial!.Id));
         (await CategoryOfAsync(state.SelectedRawMaterial.Id)).Should().Be(flourId);
     });
 
@@ -347,28 +347,31 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var spoonId = await AddPackagingAsync("Disposable Spoon", boxesId);
         var state = await OpenedStateAsync(spoonId);
         Edit(state, () => state.PurchaseCost.EditingCostBufferPercent = 25m);
-        var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.DontSave);
+        var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.Find(spoonId)).Single(i => i.Header == "Copy"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(spoonId)).Single(i => i.Header == "Copy"));
+        var copy = state.View.Form!;
 
-        asked.Should().HaveCount(1, "the spoon's unsaved buffer is asked about first");
-        state.SelectedRawMaterial.Should().BeNull("the copy is a new material");
-        state.EditingName.Should().Be("Disposable Spoon Copy");
-        state.EditingType.Should().Be(RawMaterialType.Packaging);
-        state.EditingCategory!.Id.Should().Be(boxesId);
-        state.EditingBaseUnit!.Name.Should().Be("piece");
-        state.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "the buffer is the new material's default, not the spoon's");
-        state.PurchaseCost.BrandPriceRows.Should().BeEmpty();
-        state.CanChangeTypeAndSource.Should().BeTrue();
-        state.History.IsDirty.Should().BeTrue("the copy is there to be saved");
+        asked.Should().BeEmpty("the spoon's unsaved buffer stays in its own tab");
+        copy.Should().NotBeSameAs(state);
+        state.PurchaseCost.EditingCostBufferPercent.Should().Be(25m);
+        copy.SelectedRawMaterial.Should().BeNull("the copy is a new material");
+        copy.EditingName.Should().Be("Disposable Spoon Copy");
+        copy.EditingType.Should().Be(RawMaterialType.Packaging);
+        copy.EditingCategory!.Id.Should().Be(boxesId);
+        copy.EditingBaseUnit!.Name.Should().Be("piece");
+        copy.PurchaseCost.EditingCostBufferPercent.Should().Be(10m, "the buffer is the new material's default, not the spoon's");
+        copy.PurchaseCost.BrandPriceRows.Should().BeEmpty();
+        copy.CanChangeTypeAndSource.Should().BeTrue();
+        copy.History.IsDirty.Should().BeTrue("the copy is there to be saved");
 
-        await state.SaveCommand.ExecuteAsync();
+        await copy.SaveCommand.ExecuteAsync();
 
-        state.ErrorMessage.Should().BeNull();
-        TreeFolder(state, RawMaterialType.Packaging, "Boxes").Materials.Select(l => l.Title).Should().Equal("Disposable Spoon", "Disposable Spoon Copy");
+        copy.ErrorMessage.Should().BeNull();
+        TreeFolder(copy, RawMaterialType.Packaging, "Boxes").Materials.Select(l => l.Title).Should().Equal("Disposable Spoon", "Disposable Spoon Copy");
         await using var dbContext = CreateDbContext();
-        var copy = await dbContext.RawMaterials.SingleAsync(m => m.Id == state.SelectedRawMaterial!.Id, Cancellation);
-        (copy.Type, copy.CategoryId, copy.BaseUnitId).Should().Be((RawMaterialType.Packaging, boxesId, state.List.RawMaterialTree.Find(spoonId)!.RawMaterial.BaseUnitId));
+        var saved = await dbContext.RawMaterials.SingleAsync(m => m.Id == copy.SelectedRawMaterial!.Id, Cancellation);
+        (saved.Type, saved.CategoryId, saved.BaseUnitId).Should().Be((RawMaterialType.Packaging, boxesId, state.View.List.RawMaterialTree.Find(spoonId)!.RawMaterial.BaseUnitId));
     });
 
     [Test]
@@ -380,21 +383,26 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await AddIngredientAsync("bread flour copy", flourId);
         var syrupId = await AddIngredientAsync("Simple Syrup", inHouseId, RawMaterialSource.Made);
         var state = await LoadedStateAsync();
-        AnswerUnsavedChanges(state, UnsavedChangesAnswer.DontSave);
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Copy"));
+        // The blank form the view opens on holds nothing unsaved, so the copy takes its place.
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Copy"));
 
+        state.View.Form.Should().BeSameAs(state);
         state.EditingName.Should().Be("Bread Flour Copy 2", "names are told apart without their case");
         (state.EditingType, state.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Purchased));
         state.EditingCategory!.Id.Should().Be(flourId);
         state.EditingBaseUnit.Should().BeNull("an ingredient's base unit is always the gram");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Copy"));
+        // That copy is there to be saved, so the next one opens in a tab of its own.
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Copy"));
+        var syrupCopy = state.View.Form!;
 
-        state.EditingName.Should().Be("Simple Syrup Copy");
-        (state.EditingType, state.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
-        state.EditingCategory!.Id.Should().Be(inHouseId);
-        state.Recipe.SubAssembly.Should().BeNull("its recipe isn't copied");
+        syrupCopy.Should().NotBeSameAs(state);
+        state.EditingName.Should().Be("Bread Flour Copy 2");
+        syrupCopy.EditingName.Should().Be("Simple Syrup Copy");
+        (syrupCopy.EditingType, syrupCopy.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
+        syrupCopy.EditingCategory!.Id.Should().Be(inHouseId);
+        syrupCopy.Recipe.SubAssembly.Should().BeNull("its recipe isn't copied");
     });
 
     [Test]
@@ -403,21 +411,21 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var state = await LoadedStateAsync();
-        var ingredients = state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
-        Headers(state.List.TreeMenuFor(ingredients)).Should().Equal("New Ingredient Here", "New Folder", "New Made Folder", "Expand All", "Collapse All");
-        Headers(state.List.TreeMenuFor(state.List.RawMaterialTree.TypeFolder(RawMaterialType.Packaging)))
+        Headers(state.View.List.TreeMenuFor(ingredients)).Should().Equal("New Ingredient Here", "New Folder", "New Made Folder", "Expand All", "Collapse All");
+        Headers(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Packaging)))
             .Should().Equal("New Packaging Material Here", "New Folder", "Expand All", "Collapse All");
-        var listMenu = state.List.TreeMenuFor(null);
+        var listMenu = state.View.List.TreeMenuFor(null);
         Headers(listMenu).Should().Equal(
             "New Raw Material", "New Ingredient Folder", "New Made Folder", "New Packaging Folder", "Expand All", "Collapse All");
 
         await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
         TreeFolder(state, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeFalse();
         TreeFolder(state, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
-        state.List.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
+        state.View.List.RawMaterialTree.Roots.Should().OnlyContain(r => r.IsExpanded);
 
-        await RunAsync(state.List.TreeMenuFor(ingredients).Single(i => i.Header == "Expand All"));
+        await RunAsync(state.View.List.TreeMenuFor(ingredients).Single(i => i.Header == "Expand All"));
         TreeFolder(state, RawMaterialType.Ingredient, "Flour").IsExpanded.Should().BeTrue();
         TreeFolder(state, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse("only that type's folders");
 
@@ -430,48 +438,48 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     {
         await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var state = await LoadedStateAsync();
-        var ingredients = state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        var ingredients = state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
 
-        await RunAsync(state.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Folder"));
+        await RunAsync(state.View.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour")).Single(i => i.Header == "New Folder"));
 
-        var folder = state.List.RawMaterialTree.PendingFolder!;
+        var folder = state.View.List.RawMaterialTree.PendingFolder!;
         TitlesIn(ingredients).Should().Equal("Flour", "New folder");
-        state.List.SelectedTreeNode.Should().BeSameAs(folder);
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
-        state.List.TreeNameEdit.Hint.Should().Be("A folder in Ingredients.");
-        state.List.TreeMenuFor(folder).Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit.Hint.Should().Be("A folder in Ingredients.");
+        state.View.List.TreeMenuFor(folder).Should().BeEmpty();
 
-        await state.List.CommitTreeNameAsync("Dairy");
+        await state.View.List.CommitTreeNameAsync("Dairy");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.RawMaterialTree.PendingFolder.Should().BeNull();
+        state.View.List.RawMaterialTree.PendingFolder.Should().BeNull();
         state.Categories.Should().ContainSingle(c => c.Name == "Dairy" && c.Type == RawMaterialCategoryType.Ingredient);
-        state.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "Dairy"));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "Dairy"));
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Packaging Folder"));
-        await state.List.CommitTreeNameAsync("Labels");
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Packaging Folder"));
+        await state.View.List.CommitTreeNameAsync("Labels");
 
         state.Categories.Should().ContainSingle(c => c.Name == "Labels" && c.Type == RawMaterialCategoryType.Packaging);
-        state.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Packaging, "Labels"));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Packaging, "Labels"));
 
-        await RunAsync(state.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        await state.List.CommitTreeNameAsync("flour");
+        await RunAsync(state.View.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        await state.View.List.CommitTreeNameAsync("flour");
 
         state.Categories.Should().HaveCount(3, "a name that's one of the type's categories already adds none");
-        state.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "Flour"));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "Flour"));
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Made Folder"));
-        state.List.TreeNameEdit!.Hint.Should().Be("A folder in Ingredients, for made ingredients only.");
-        await state.List.CommitTreeNameAsync("In-House");
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Made Folder"));
+        state.View.List.TreeNameEdit!.Hint.Should().Be("A folder in Ingredients, for made ingredients only.");
+        await state.View.List.CommitTreeNameAsync("In-House");
 
         state.Categories.Should().ContainSingle(c => c.Name == "In-House" && c.Type == RawMaterialCategoryType.Made);
-        state.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "In-House"), "a Made category's folder is among the ingredient ones");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(TreeFolder(state, RawMaterialType.Ingredient, "In-House"), "a Made category's folder is among the ingredient ones");
 
         // Esc and an empty name add nothing.
-        await RunAsync(state.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        state.List.CancelTreeName();
-        await RunAsync(state.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
-        await state.List.CommitTreeNameAsync(string.Empty);
+        await RunAsync(state.View.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        state.View.List.CancelTreeName();
+        await RunAsync(state.View.List.TreeMenuFor(ingredients).Single(i => i.Header == "New Folder"));
+        await state.View.List.CommitTreeNameAsync(string.Empty);
         TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "In-House");
         state.Categories.Should().HaveCount(4);
     });
@@ -486,19 +494,19 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var state = await LoadedStateAsync();
         var inHouse = TreeFolder(state, RawMaterialType.Ingredient, "In-House");
 
-        TitlesIn(state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour", "In-House");
+        TitlesIn(state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour", "In-House");
         inHouse.Materials.Select(l => l.Title).Should().Equal("Simple Syrup");
-        Headers(state.List.TreeMenuFor(inHouse)).Should().StartWith(["New Made Ingredient Here", "New Folder"]);
-        state.List.TreeMenuFor(state.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Move to").Items
+        Headers(state.View.List.TreeMenuFor(inHouse)).Should().StartWith(["New Made Ingredient Here", "New Folder"]);
+        state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Move to").Items
             .Select(i => i.Header).Should().Equal(["Flour"], "a purchased ingredient can't go in a Made category");
-        state.List.TreeMenuFor(state.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Move to").Items
+        state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(syrupId)).Single(i => i.Header == "Move to").Items
             .Select(i => i.Header).Should().Equal(["In-House"], "and a made one goes in nothing else");
-        RawMaterialTree.MoveTo(TreeFolder(state, RawMaterialType.Ingredient, "Flour"), state.List.RawMaterialTree.Find(syrupId)!.RawMaterial)
+        RawMaterialTree.MoveTo(TreeFolder(state, RawMaterialType.Ingredient, "Flour"), state.View.List.RawMaterialTree.Find(syrupId)!.RawMaterial)
             .Should().BeNull("a drop on an ingredient category does nothing for a made ingredient");
-        RawMaterialTree.MoveTo(state.List.RawMaterialTree.Find(syrupId), state.List.RawMaterialTree.Find(breadFlourId)!.RawMaterial)
+        RawMaterialTree.MoveTo(state.View.List.RawMaterialTree.Find(syrupId), state.View.List.RawMaterialTree.Find(breadFlourId)!.RawMaterial)
             .Should().BeNull("nor a drop on a made ingredient for a purchased one");
 
-        await RunAsync(state.List.TreeMenuFor(inHouse).Single(i => i.Header == "New Made Ingredient Here"));
+        await RunAsync(state.View.List.TreeMenuFor(inHouse).Single(i => i.Header == "New Made Ingredient Here"));
 
         (state.EditingType, state.EditingSource).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made));
         state.EditingWeightLossPercent.Should().Be(3m, "a made ingredient starts at 3%, as New and a Source change start it");
@@ -522,10 +530,10 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var state = await OpenedStateAsync(breadFlourId);
         var flour = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
 
-        await RunAsync(state.List.TreeMenuFor(flour).Single(i => i.Header == "Rename Category"));
+        await RunAsync(state.View.List.TreeMenuFor(flour).Single(i => i.Header == "Rename Category"));
 
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(flour, "Flour"));
-        await state.List.CommitTreeNameAsync("Flours");
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(flour, "Flour"));
+        await state.View.List.CommitTreeNameAsync("Flours");
 
         state.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
@@ -555,24 +563,24 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         });
 
         // With a search on, the folder shows only one of them, but both keep the category.
-        state.List.SearchText = "Bread";
-        var flourMenu = state.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour"));
+        state.View.List.SearchText = "Bread";
+        var flourMenu = state.View.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Flour"));
         Headers(flourMenu).Should().Equal("New Ingredient Here", "New Folder", "Rename Category", "Delete Category (holds 2)");
         flourMenu.Single(i => i.Header.StartsWith("Delete Category", StringComparison.Ordinal)).IsEnabled.Should().BeFalse();
-        state.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
-        state.List.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
-        state.List.SearchText = string.Empty;
+        state.View.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
+        state.View.List.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
+        state.View.List.SearchText = string.Empty;
 
-        await RunAsync(state.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Dairy")).Single(i => i.Header == "Delete Category"));
+        await RunAsync(state.View.List.TreeMenuFor(TreeFolder(state, RawMaterialType.Ingredient, "Dairy")).Single(i => i.Header == "Delete Category"));
 
         state.ErrorMessage.Should().BeNull();
         question.Should().Be("Delete the 'Dairy' category? It holds no materials. This can't be undone.");
         state.Categories.Select(c => c.Name).Should().Equal("Flour");
-        TitlesIn(state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
+        TitlesIn(state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient)).Should().Equal("Flour");
     });
 
     [Test]
-    public Task Delete_on_a_material_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it() => UiThread.RunAsync(async () =>
+    public Task Delete_on_a_material_asks_first_and_closes_its_tab_only_if_one_holds_it() => UiThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -585,17 +593,18 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
             interaction.SetOutput(true);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.Find(cakeFlourId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(cakeFlourId)).Single(i => i.Header == "Delete"));
 
         question.Should().StartWith("Delete 'Cake Flour'?");
         state.RawMaterials.Select(m => m.Name).Should().Equal("Bread Flour");
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId, "the one showing wasn't the one deleted");
+        state.View.Tabs.All.Should().ContainSingle("no tab held the one deleted");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(breadFlourId)).Single(i => i.Header == "Delete"));
 
-        state.RawMaterials.Should().BeEmpty();
-        state.SelectedRawMaterial.Should().BeNull();
-        state.EditingName.Should().BeEmpty();
+        state.View.RawMaterials.Should().BeEmpty();
+        state.View.Tabs.All.Should().BeEmpty("the tab holding the one deleted closed, as it's gone");
+        state.View.Form.Should().BeNull();
     });
 
     [Test]
@@ -606,22 +615,22 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
         var state = await LoadedStateAsync();
-        var breadFlour = state.List.RawMaterialTree.Find(breadFlourId)!;
+        var breadFlour = state.View.List.RawMaterialTree.Find(breadFlourId)!;
 
-        state.List.SelectedTreeNode = breadFlour;
-        state.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.List.RenameMaterialCommand && i.Parameter == breadFlour);
-        state.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.List.DeleteMaterialCommand && i.Parameter == breadFlour);
+        state.View.List.SelectedTreeNode = breadFlour;
+        state.View.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.RenameMaterialCommand && i.Parameter == breadFlour);
+        state.View.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.DeleteMaterialCommand && i.Parameter == breadFlour);
 
-        state.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Dairy");
-        state.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.List.RenameCategoryCommand);
-        state.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.List.DeleteCategoryCommand);
+        state.View.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Dairy");
+        state.View.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.View.List.RenameCategoryCommand);
+        state.View.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.View.List.DeleteCategoryCommand);
 
-        state.List.SelectedTreeNode = state.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
-        state.List.TreeShortcut("F2").Should().BeNull("a type can't be renamed");
+        state.View.List.SelectedTreeNode = state.View.List.RawMaterialTree.TypeFolder(RawMaterialType.Ingredient);
+        state.View.List.TreeShortcut("F2").Should().BeNull("a type can't be renamed");
 
-        state.List.SelectedTreeNode = breadFlour;
-        state.List.SelectedTreeNodes.Add(state.List.RawMaterialTree.Find(cakeFlourId)!);
-        state.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
+        state.View.List.SelectedTreeNode = breadFlour;
+        state.View.List.SelectedTreeNodes.Add(state.View.List.RawMaterialTree.Find(cakeFlourId)!);
+        state.View.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
     [Test]
@@ -633,18 +642,18 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var ryeFlourId = await AddIngredientAsync("Rye Flour", flourId);
         var state = await LoadedStateAsync();
 
-        state.List.SelectedTreeNode = state.List.RawMaterialTree.Find(breadFlourId);
+        state.View.List.SelectedTreeNode = state.View.List.RawMaterialTree.Find(breadFlourId);
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
 
-        state.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
+        state.View.List.SelectedTreeNode = TreeFolder(state, RawMaterialType.Ingredient, "Flour");
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId, "a folder picked leaves the material showing");
 
-        state.List.SelectedTreeNode = state.List.RawMaterialTree.Find(breadFlourId);
-        state.List.SelectedTreeNodes.Add(state.List.RawMaterialTree.Find(cakeFlourId)!);
+        state.View.List.SelectedTreeNode = state.View.List.RawMaterialTree.Find(breadFlourId);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.RawMaterialTree.Find(cakeFlourId)!);
         state.OpenRecord(ryeFlourId);
 
-        state.List.SelectedTreeNodes.Should().Equal(state.List.RawMaterialTree.Find(ryeFlourId)!);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.RawMaterialTree.Find(ryeFlourId));
+        state.View.List.SelectedTreeNodes.Should().Equal(state.View.List.RawMaterialTree.Find(ryeFlourId)!);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.RawMaterialTree.Find(ryeFlourId));
     });
 
     [Test]
@@ -657,7 +666,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await RunAsync(MoveToItem(state, breadFlourId, "Dry Goods"));
         await new RawMaterialCategoryRepository(CreateDbContextFactory()).DeleteAsync(flourId, Cancellation);
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().Be("The category to move it to no longer exists.");
         (await CategoryOfAsync(breadFlourId)).Should().Be(dryGoodsId);
@@ -669,7 +678,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
         var store = new InMemoryViewStateStore();
-        (await LoadedStateAsync(store)).Dispose();
+        (await LoadedStateAsync(store)).View.Dispose();
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
         var first = await LoadedStateAsync(store);
 
@@ -678,7 +687,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         await Settle.EventuallyAsync(
             () => store.ReadList(RawMaterialsList.ClosedFoldersKey)?.Contains($"Ingredient/{flourId}") == true,
             () => string.Join(", ", store.ReadList(RawMaterialsList.ClosedFoldersKey) ?? []));
-        first.Dispose();
+        first.View.Dispose();
 
         await AddCategoryAsync("Dairy", RawMaterialCategoryType.Ingredient);
         var next = await LoadedStateAsync(store);
@@ -688,7 +697,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         // One closed just before the app closes is written as it closes.
         TreeFolder(next, RawMaterialType.Packaging, "Boxes").IsExpanded = false;
-        next.Dispose();
+        next.View.Dispose();
         store.ReadList(RawMaterialsList.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}");
     });
 
@@ -706,7 +715,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         TreeFolder(state, RawMaterialType.Packaging, "Boxes").IsExpanded.Should().BeFalse();
 
         // Kept as closed folders from then on.
-        state.Dispose();
+        state.View.Dispose();
         store.ReadList(RawMaterialsList.ClosedFoldersKey).Should().Contain($"Packaging/{boxesId}").And.NotContain($"Ingredient/{flourId}");
     });
 
@@ -714,16 +723,16 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
 
     private static IEnumerable<string> TitlesIn(RawMaterialFolderNode folder) => folder.Children.Select(c => c.Title);
 
-    private static RawMaterialFolderNode TreeFolder(RawMaterialsState state, RawMaterialType type, string title) =>
-        state.List.RawMaterialTree.TypeFolder(type).Children.OfType<RawMaterialFolderNode>().Single(f => f.Title == title);
+    private static RawMaterialFolderNode TreeFolder(RawMaterialForm state, RawMaterialType type, string title) =>
+        state.View.List.RawMaterialTree.TypeFolder(type).Children.OfType<RawMaterialFolderNode>().Single(f => f.Title == title);
 
     /// <summary>The material's menu's Move To item for <paramref name="category"/>.</summary>
-    private static TreeMenuItem MoveToItem(RawMaterialsState state, int rawMaterialId, string category) =>
-        state.List.TreeMenuFor(state.List.RawMaterialTree.Find(rawMaterialId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == category);
+    private static TreeMenuItem MoveToItem(RawMaterialForm state, int rawMaterialId, string category) =>
+        state.View.List.TreeMenuFor(state.View.List.RawMaterialTree.Find(rawMaterialId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == category);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Test]
-    public Task Picking_another_material_over_unsaved_changes_asks_and_Cancel_stays_on_them() => UiThread.RunAsync(async () =>
+    public Task Picking_another_material_over_unsaved_changes_opens_it_in_a_tab_of_its_own_and_asks_nothing() => UiThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -732,40 +741,108 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
         state.EditingName = "Strong Bread Flour";
 
-        Click(state, state.List.RawMaterialTree.Find(cakeFlourId)!);
-        await Settle.UntilAsync(state, () => asked.Count == 1, () => $"asked={asked.Count}");
+        Click(state, state.View.List.RawMaterialTree.Find(cakeFlourId)!);
+        var cake = state.View.Form!;
+        await Settle.UntilAsync(cake, () => cake.SelectedRawMaterial?.Id == cakeFlourId && cake.AreDetailsReady, () => $"selected={cake.SelectedRawMaterial?.Id}");
 
-        asked.Single().Should().StartWith("Save the changes to Strong Bread Flour?");
+        asked.Should().BeEmpty("the changes stay in their own tab: nothing is left");
+        cake.Should().NotBeSameAs(state);
+        cake.EditingName.Should().Be("Cake Flour");
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.RawMaterialTree.Find(breadFlourId), "the list goes back to the row showing");
         state.EditingName.Should().Be("Strong Bread Flour");
         state.History.IsDirty.Should().BeTrue();
+        state.View.Tabs.All.Select(tab => tab.Form).Should().Equal(state, cake);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.RawMaterialTree.Find(cakeFlourId), "the list follows the tab showing");
     });
 
     [Test]
-    [Arguments(UnsavedChangesAnswer.Save, "Strong Bread Flour")]
-    [Arguments(UnsavedChangesAnswer.DontSave, "Bread Flour")]
-    public Task Picking_another_material_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => UiThread.RunAsync(async () =>
+    public Task A_pick_takes_the_preview_tabs_place_while_it_holds_nothing_unsaved_and_a_tab_kept_or_edited_stays() => UiThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
+        var ryeFlourId = await AddIngredientAsync("Rye Flour", flourId);
+        var state = await LoadedStateAsync();
+        var view = state.View;
+
+        // The blank form the view opens on is the preview tab: the first pick takes its place, and the next one's.
+        Click(state, view.List.RawMaterialTree.Find(breadFlourId)!);
+        Click(state, view.List.RawMaterialTree.Find(cakeFlourId)!);
+        await Settle.UntilAsync(state, () => state.SelectedRawMaterial?.Id == cakeFlourId && state.AreDetailsReady);
+        view.Tabs.All.Should().ContainSingle().Which.IsPreview.Should().BeTrue();
+
+        // Kept by a double-click on its row: the next pick opens a tab of its own.
+        view.List.KeepOpen(view.List.RawMaterialTree.Find(cakeFlourId)!);
+        view.Tabs.Active!.IsPreview.Should().BeFalse();
+        Click(state, view.List.RawMaterialTree.Find(ryeFlourId)!);
+        var rye = view.Form!;
+        await Settle.UntilAsync(rye, () => rye.SelectedRawMaterial?.Id == ryeFlourId && rye.AreDetailsReady);
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, rye);
+        view.Tabs.Preview!.Form.Should().BeSameAs(rye);
+
+        // An edit keeps the preview tab too: the next pick doesn't take its place.
+        rye.EditingName = "Dark Rye Flour";
+        Click(state, view.List.RawMaterialTree.Find(breadFlourId)!);
+        var bread = view.Form!;
+        await Settle.UntilAsync(bread, () => bread.SelectedRawMaterial?.Id == breadFlourId && bread.AreDetailsReady);
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, rye, bread);
+        rye.EditingName.Should().Be("Dark Rye Flour");
+
+        // A material open already shows in its own tab.
+        Click(state, view.List.RawMaterialTree.Find(cakeFlourId)!);
+        view.Form.Should().BeSameAs(state);
+        view.Tabs.All.Should().HaveCount(3);
+    });
+
+    [Test]
+    [Arguments(UnsavedChangesAnswer.Save, "Strong Bread Flour", true)]
+    [Arguments(UnsavedChangesAnswer.DontSave, "Bread Flour", true)]
+    [Arguments(UnsavedChangesAnswer.Cancel, "Bread Flour", false)]
+    public Task Closing_a_tab_with_changes_asks_about_them_first(UnsavedChangesAnswer answer, string savedName, bool closes) => UiThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
         var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
         var state = await OpenedStateAsync(breadFlourId);
-        AnswerUnsavedChanges(state, answer);
+        var view = state.View;
+        var asked = AnswerUnsavedChanges(state, answer);
         state.EditingName = "Strong Bread Flour";
+        Click(state, view.List.RawMaterialTree.Find(cakeFlourId)!);
+        var breadTab = view.Tabs.Holding(breadFlourId)!;
 
-        Click(state, state.List.RawMaterialTree.Find(cakeFlourId)!);
-        await Settle.UntilAsync(state,
-            () => state.SelectedRawMaterial?.Id == cakeFlourId && state.AreDetailsReady && !state.History.IsDirty,
-            () => $"selected={state.SelectedRawMaterial?.Id} ready={state.AreDetailsReady}");
+        (await view.CloseTabAsync(breadTab)).Should().Be(closes);
 
-        state.ErrorMessage.Should().BeNull();
-        state.EditingName.Should().Be("Cake Flour");
+        asked.Should().ContainSingle().Which.Should().StartWith("Save the changes to Strong Bread Flour?");
+        view.Tabs.All.Contains(breadTab).Should().Be(!closes);
         (await NameOfAsync(breadFlourId)).Should().Be(savedName);
+        if (!closes)
+        {
+            view.Tabs.Active.Should().BeSameAs(breadTab, "it's shown, so the question is about the form in view");
+            state.EditingName.Should().Be("Strong Bread Flour");
+        }
     });
 
     [Test]
-    public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => UiThread.RunAsync(async () =>
+    public Task Closing_a_tab_with_nothing_unsaved_asks_nothing_and_shows_the_one_before() => UiThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var cakeFlourId = await AddIngredientAsync("Cake Flour", flourId);
+        var state = await OpenedStateAsync(breadFlourId);
+        var view = state.View;
+        var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
+        view.Keep(view.Tabs.Active!);
+        Click(state, view.List.RawMaterialTree.Find(cakeFlourId)!);
+
+        (await view.CloseTabAsync(view.Tabs.Active!)).Should().BeTrue();
+
+        asked.Should().BeEmpty();
+        view.Form.Should().BeSameAs(state);
+        view.List.SelectedTreeNode.Should().BeSameAs(view.List.RawMaterialTree.Find(breadFlourId), "the list follows the tab showing");
+    });
+
+    [Test]
+    public Task New_over_unsaved_changes_opens_a_new_tab_and_keeps_them() => UiThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
         var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
@@ -775,7 +852,9 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
 
         await state.NewCommand.ExecuteAsync();
 
-        asked.Should().ContainSingle();
+        asked.Should().BeEmpty();
+        state.View.Form.Should().NotBeSameAs(state);
+        state.View.Form!.EditingId.Should().Be(0);
         state.SelectedRawMaterial!.Id.Should().Be(breadFlourId);
         state.EditingName.Should().Be("Strong Bread Flour");
     });
@@ -843,7 +922,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
-    private static List<string> AnswerUnsavedChanges(RawMaterialsState state, UnsavedChangesAnswer answer)
+    private static List<string> AnswerUnsavedChanges(RawMaterialForm state, UnsavedChangesAnswer answer)
     {
         List<string> asked = [];
         state.ConfirmUnsavedChanges.RegisterHandler(context =>
@@ -855,10 +934,10 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
-    private static void Click(RawMaterialsState state, object row)
+    private static void Click(RawMaterialForm state, object row)
     {
-        state.List.SelectedTreeNodes.Clear();
-        state.List.SelectedTreeNodes.Add(row);
+        state.View.List.SelectedTreeNodes.Clear();
+        state.View.List.SelectedTreeNodes.Add(row);
     }
 
     private async Task<string> NameOfAsync(int rawMaterialId)
@@ -889,7 +968,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
-    private static void Edit(RawMaterialsState state, Action change)
+    private static void Edit(RawMaterialForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -948,7 +1027,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         return await dbContext.RawMaterials.Where(m => m.Id == rawMaterialId).Select(m => m.CategoryId).SingleAsync(Cancellation);
     }
 
-    private async Task<RawMaterialsState> LoadedStateAsync(IViewStateStore? viewStateStore = null)
+    private async Task<RawMaterialForm> LoadedStateAsync(IViewStateStore? viewStateStore = null)
     {
         var state = CreateState(viewStateStore);
         await state.LoadCommand.ExecuteAsync();
@@ -956,7 +1035,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     }
 
     /// <summary>The screen with <paramref name="rawMaterialId"/> open on the form, its details in.</summary>
-    private async Task<RawMaterialsState> OpenedStateAsync(int rawMaterialId)
+    private async Task<RawMaterialForm> OpenedStateAsync(int rawMaterialId)
     {
         var state = await LoadedStateAsync();
         state.OpenRecord(rawMaterialId);
@@ -966,7 +1045,7 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
         return state;
     }
 
-    private RawMaterialsState CreateState(IViewStateStore? viewStateStore)
+    private RawMaterialForm CreateState(IViewStateStore? viewStateStore)
     {
         var factory = CreateDbContextFactory();
 
@@ -985,6 +1064,6 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
             new UnitOfMeasureRepository(factory),
             viewStateStore ?? new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

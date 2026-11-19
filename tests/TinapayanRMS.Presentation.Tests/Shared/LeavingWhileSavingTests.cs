@@ -199,7 +199,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
             new LoggerConfiguration().CreateLogger());
     }
 
-    private static RawMaterialsState CreateRawMaterialsState(FailingDbContextFactory factory)
+    private static RawMaterialForm CreateRawMaterialsState(FailingDbContextFactory factory)
     {
         return new RawMaterialsState(
             new RawMaterialRepository(factory),
@@ -216,7 +216,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
             new UnitOfMeasureRepository(factory),
             new InMemoryViewStateStore(),
             new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     private SubAssemblyForm CreateSubAssembliesState(FailingDbContextFactory factory)
