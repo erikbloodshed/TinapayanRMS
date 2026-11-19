@@ -48,7 +48,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             (await SubAssemblyTotalsAsync(saved.Id)).TotalCost.Should().Be(18m);
         }
 
-        var row = state.List.Rows.Should().ContainSingle().Subject;
+        var row = state.View.List.Rows.Should().ContainSingle().Subject;
         state.SelectedRow.Should().BeSameAs(row);
         state.Batch.BatchWeight.Should().Be(200m);
         state.HeaderTitle.Should().Be("Chocolate Glaze");
@@ -66,7 +66,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().Be("Add the ingredients that go into Chocolate Glaze, in grams.");
-        state.List.Rows.Should().BeEmpty();
+        state.View.List.Rows.Should().BeEmpty();
     });
 
     [Test]
@@ -78,7 +78,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             new SubAssembly { Name = "Glaze", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 1, () => $"lines={state.Batch.Lines.Count}");
 
         state.Batch.Lines.Single().Grams = 300m;
@@ -109,8 +109,8 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
         await state.LoadCommand.ExecuteAsync();
 
-        state.List.Rows.Single().DependentsText.Should().Be("Cream Loaf");
-        state.Pick(state.List.Rows.Single());
+        state.View.List.Rows.Single().DependentsText.Should().Be("Cream Loaf");
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 1, () => $"lines={state.Batch.Lines.Count}");
         var creamLoaf = state.Dependents.Products.Should().ContainSingle().Subject;
         creamLoaf.Name.Should().Be("Cream Loaf");
@@ -126,7 +126,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         await state.DeleteCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().StartWith("Cream Loaf links Glaze.");
-        state.List.Rows.Should().ContainSingle();
+        state.View.List.Rows.Should().ContainSingle();
     });
 
     [Test]
@@ -148,15 +148,15 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         state.SelectedRow!.Id.Should().Be(ubeId);
         await Settle.UntilAsync(state, () => state.EditingName == "Ube Glaze", () => $"name={state.EditingName}");
 
-        state.List.SearchText = "Chocolate";
+        state.View.List.SearchText = "Chocolate";
         state.OpenRecord(chocolateId);
         state.SelectedRow!.Id.Should().Be(chocolateId);
-        state.List.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
+        state.View.List.SearchText.Should().Be("Chocolate", "a search showing it is left alone");
 
         state.OpenRecord(ubeId);
         state.SelectedRow!.Id.Should().Be(ubeId);
-        state.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
-        state.List.VisibleRows.Should().Contain(state.SelectedRow);
+        state.View.List.SearchText.Should().BeEmpty("a search hiding it is cleared, so the list shows the row picked");
+        state.View.List.VisibleRows.Should().Contain(state.SelectedRow);
     });
 
     [Test]
@@ -282,7 +282,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
 
         await state.CopyCommand.ExecuteAsync();
@@ -301,7 +301,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.Rows.Select(r => r.Name).Should().Equal("House Glaze", "Ube Glaze");
+        state.View.List.Rows.Select(r => r.Name).Should().Equal("House Glaze", "Ube Glaze");
         state.SelectedRow!.Name.Should().Be("Ube Glaze");
         state.SelectedRow.Id.Should().NotBe(originalId);
         await using var dbContext = CreateDbContext();
@@ -320,14 +320,14 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         await repository.SaveStandaloneAsync(new SubAssembly { Name = "Glaze Copy", RoleId = roleId }, [(sugarId, 100m)], Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single(r => r.Name == "Glaze"));
+        state.Pick(state.View.List.Rows.Single(r => r.Name == "Glaze"));
         await Settle.UntilAsync(state, () => state.EditingName == "Glaze" && state.Batch.Lines.Count == 1, () => $"name={state.EditingName}");
 
         await state.CopyCommand.ExecuteAsync();
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
+        state.View.List.Rows.Select(r => r.Name).Should().Equal("Glaze", "Glaze Copy", "Glaze Copy 2");
     });
 
     [Test]
@@ -357,7 +357,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             new SubAssembly { Name = "Gift Set", RoleId = packagingRoleId }, [(boxId, null, 2m)], Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.PackagingSet.Lines.Count == 1, () => $"packaging lines={state.PackagingSet.Lines.Count}");
 
         await state.CopyCommand.ExecuteAsync();
@@ -371,7 +371,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
+        state.View.List.Rows.Select(r => r.Name).Should().Equal("Gift Set", "Gift Set Copy");
     });
 
     [Test]
@@ -388,7 +388,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
 
         state.NewProductCommand.CanExecute().Should().BeFalse("nothing is picked");
 
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 1, () => $"lines={state.Batch.Lines.Count}");
         state.NewProductCommand.CanExecute().Should().BeTrue();
         state.EditingName = "Sugar Glaze";
@@ -431,12 +431,12 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
 
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
 
         state.NewProductCommand.CanExecute().Should().BeFalse("a packaging set isn't a recipe");
     });
 
-    private SubAssembliesState CreateState()
+    private SubAssemblyForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -450,7 +450,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     [Test]
@@ -465,7 +465,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
 
         state.Batch.PercentHeader.Should().Be("Baker's %");
@@ -492,7 +492,7 @@ public class SubAssembliesStateRefreshTests(DatabaseFixture fixture) : Persisten
             Cancellation);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single());
+        state.Pick(state.View.List.Rows.Single());
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
         state.Batch.Lines.Single(l => l.Ingredient!.Id == waterId).Percent.Should().Be(500m / 1500m * 100m);
 

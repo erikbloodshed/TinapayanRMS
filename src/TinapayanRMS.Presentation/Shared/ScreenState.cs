@@ -323,6 +323,15 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
         await RunSafelyAsync(action);
     }
 
+    /// <summary>
+    /// Runs <paramref name="load"/> as this screen's own load (<see cref="LoadSafelyAsync"/>): for a record view, whose load
+    /// goes through the form showing, so what it says shows there, and its work counts with the form's (RecordViewState).
+    /// </summary>
+    internal Task RunLoadAsync(Func<Task> load) => LoadSafelyAsync(load);
+
+    /// <summary>Runs <paramref name="merge"/> as this screen's own load merge (<see cref="ApplyRefresh"/>), for a record view merging into its forms.</summary>
+    internal void RefreshWith(Action merge) => ApplyRefresh(merge);
+
     // What the screen's parts ask of it (IScreenPartHost): its own runners and messages, as its own actions use them.
     BackgroundWork IScreenPartHost.Work => Work;
 

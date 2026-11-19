@@ -127,10 +127,12 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
         Edit(state, () => state.EditingName = "Renamed again");
         state.History.CanUndo.Should().BeTrue();
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        // New over unsaved changes opens the new sub-assembly in a tab of its own: each form keeps its own history.
         await state.NewCommand.ExecuteAsync();
-        state.History.CanUndo.Should().BeFalse("a new sub-assembly has no history of its own");
+        var created = state.View.Form!;
+        created.Should().NotBeSameAs(state);
+        created.History.CanUndo.Should().BeFalse("a new sub-assembly has no history of its own");
+        state.History.CanUndo.Should().BeTrue("the one with changes keeps its own, in its tab");
     });
 
     [Test]
@@ -262,10 +264,10 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static bool CanSave(SubAssembliesState state) => state.SaveCommand.CanExecute();
+    private static bool CanSave(SubAssemblyForm state) => state.SaveCommand.CanExecute();
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
-    private static void Edit(SubAssembliesState state, Action change)
+    private static void Edit(SubAssemblyForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -274,7 +276,7 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>A saved standalone sub-assembly of 1,000 g of flour and 200 g of sugar, open in the form.</summary>
-    private async Task<(SubAssembliesState State, int SubAssemblyId)> OpenSavedSubAssemblyAsync()
+    private async Task<(SubAssemblyForm State, int SubAssemblyId)> OpenSavedSubAssemblyAsync()
     {
         var roleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -286,14 +288,14 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
 
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single(r => r.Id == subAssemblyId));
+        state.Pick(state.View.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
 
         state.History.CanUndo.Should().BeFalse("the load itself isn't a change");
         return (state, subAssemblyId);
     }
 
-    private SubAssembliesState CreateState()
+    private SubAssemblyForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -307,6 +309,6 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

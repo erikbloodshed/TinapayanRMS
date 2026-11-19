@@ -129,7 +129,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateSubAssembliesState(factory);
         await state.LoadCommand.ExecuteAsync();
-        StandaloneSubAssemblyRow Named(string name) => state.List.Rows.Single(r => r.Name == name);
+        StandaloneSubAssemblyRow Named(string name) => state.View.List.Rows.Single(r => r.Name == name);
 
         await Settle.PickAsync(state, () => state.Pick(Named("Almond Dough")), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1,
             () => $"name={state.EditingName} lines={state.Batch.Lines.Count} error={state.ErrorMessage}");
@@ -247,7 +247,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateSubAssembliesState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.Pick(state.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.View.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
         state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
         state.EditingName = "Almond Loaf Dough";
 
@@ -334,7 +334,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new LoggerConfiguration().CreateLogger());
     }
 
-    private SubAssembliesState CreateSubAssembliesState(FailingDbContextFactory factory)
+    private SubAssemblyForm CreateSubAssembliesState(FailingDbContextFactory factory)
     {
         return new SubAssembliesState(
             new SubAssemblyRepository(factory),
@@ -346,7 +346,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     private ReportsState CreateReportsState(FailingDbContextFactory factory)

@@ -1,0 +1,89 @@
+@typeparam TForm where TForm : class, ITabForm
+@implements IDisposable
+
+@* A record view's tabs, along the top of its details, as Visual Studio Code's editors: a tab for each record open, the one
+   showing marked, each a link to its address (so a click goes through Back and Forward, as any move between records
+   does). The preview tab, which the next record picked in the list replaces, has its name in italics until it's kept,
+   by a double-click on it or an edit. A tab with unsaved changes has a dot where its ✕ is, the ✕ coming back under the
+   pointer: closing it asks about the changes first. *@
+@{
+    // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
+    _redraws?.Drawn();
+}
+<nav class="record-tabs" aria-label="@Label">
+    @foreach (var tab in Tabs.All)
+    {
+        var showing = tab == Tabs.Active;
+        var dirty = tab.Form.HasUnsavedChanges;
+        var events = EventsOf(tab);
+        <div @key="tab" class="record-tab @(showing ? "active" : null) @(tab.IsPreview && !dirty ? "preview" : null) @(dirty ? "dirty" : null)"
+             title="@TooltipOf(tab, dirty)" @ondblclick="events.Keep">
+            <a class="record-tab-link" href="@AddressOf(tab)" aria-current="@(showing ? "page" : null)">@tab.Form.TabTitle</a>
+            <button type="button" class="record-tab-close" aria-label="Close @tab.Form.TabTitle" @onclick="events.Close">
+                <span class="record-tab-dot" aria-hidden="true"></span>
+                <Icon Of="AppIcon.Cancel" />
+            </button>
+        </div>
+    }
+</nav>
+
+@code {
+    private RedrawGate? _redraws;
+
+    // Each tab's handlers, made the first time it's drawn and let go of as it closes, as FolderTree's rows' are.
+    private readonly Dictionary<RecordTab<TForm>, TabEvents> _events = [];
+
+    private sealed record TabEvents(EventCallback Close, EventCallback Keep);
+
+    /// <summary>The view's tabs.</summary>
+    [Parameter, EditorRequired] public RecordTabs<TForm> Tabs { get; set; } = null!;
+
+    /// <summary>A tab's address, which its link goes to.</summary>
+    [Parameter, EditorRequired] public Func<RecordTab<TForm>, string> AddressOf { get; set; } = null!;
+
+    /// <summary>Closes a tab, asking about its unsaved changes first (RecordViewState.CloseTabAsync).</summary>
+    [Parameter, EditorRequired] public Func<RecordTab<TForm>, Task> Close { get; set; } = null!;
+
+    /// <summary>Keeps a tab open: it's no longer the preview tab (RecordViewState.Keep).</summary>
+    [Parameter, EditorRequired] public Action<RecordTab<TForm>> Keep { get; set; } = null!;
+
+    /// <summary>What the strip is called for a screen reader: "Sub-assemblies open".</summary>
+    [Parameter] public string Label { get; set; } = "Records open";
+
+    protected override void OnInitialized()
+    {
+        _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
+        Tabs.Changed += OnTabsChanged;
+    }
+
+    private TabEvents EventsOf(RecordTab<TForm> tab)
+    {
+        if (!_events.TryGetValue(tab, out var events))
+        {
+            events = new TabEvents(
+                EventCallback.Factory.Create(this, () => Close(tab)),
+                EventCallback.Factory.Create(this, () => Keep(tab)));
+            _events[tab] = events;
+        }
+
+        return events;
+    }
+
+    private static string TooltipOf(RecordTab<TForm> tab, bool dirty) =>
+        dirty ? $"{tab.Form.TabTitle}: changes not saved yet"
+        : tab.IsPreview ? $"{tab.Form.TabTitle}: the next one picked in the list takes this tab's place; double-click to keep it open"
+        : tab.Form.TabTitle;
+
+    // Drawn once for however many changes come together; a closed tab's handlers go with it.
+    private void OnTabsChanged()
+    {
+        foreach (var gone in _events.Keys.Where(tab => !Tabs.All.Contains(tab)).ToList())
+        {
+            _events.Remove(gone);
+        }
+
+        _redraws?.Request();
+    }
+
+    public void Dispose() => Tabs.Changed -= OnTabsChanged;
+}

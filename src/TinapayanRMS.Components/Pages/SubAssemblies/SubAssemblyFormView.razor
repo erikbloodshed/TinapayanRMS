@@ -1,0 +1,151 @@
+@inherits FormBase<SubAssemblyForm>
+@using TinapayanRMS.Components.Printing
+
+<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
+
+@* One tab of the Sub-Assemblies view: a sub-assembly's header, with its batch figures, and its Recipe and Dependents
+   tabs. One in the Packaging role is a packaging set: packaging materials per set instead of ingredients in grams, and
+   one figure, Set Cost. Drawn afresh each time its tab shows (keyed by its form), which keeps everything typed. *@
+<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
+    <section class="card header-card">
+        <div class="header-title-row">
+            <h1 class="header-title">@State!.HeaderTitle</h1>
+            <div class="button-row">
+                <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New"
+                               Tooltip="Starts a new sub-assembly in the preview tab. This one stays open in its tab, with whatever is typed." />
+                <CommandButton Command="State!.CopyCommand" Icon="AppIcon.Copy" Label="Copy"
+                               Tooltip="Starts a new sub-assembly with this one's role and lines, named '… Copy'. Rename it if you like, then Save; this one stays as it was saved." />
+                <CommandButton Command="State!.NewProductCommand" Icon="AppIcon.Link" Label="New Product"
+                               Tooltip="Starts a new product on the Products screen that links this sub-assembly, named after it. Type its piece size, then Save there. Not for a packaging set." />
+                <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the name, role and lines together." />
+                <CommandButton Command="State!.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed. Ctrl+Z." />
+                <CommandButton Command="State!.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
+                <CommandButton Command="State!.PrintCommand" Icon="AppIcon.Print" Label="Print"
+                               Tooltip="Shows this sub-assembly on its own in the Print window, as the form shows it: print it there or save it as a PDF. Unsaved changes print marked as a draft." />
+                <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="figure-tiles">
+            @if (State!.IsPackaging)
+            {
+                <div class="figure-tile tile-flamingo">
+                    <div class="figure-label">Set Cost</div>
+                    <div class="figure-value">@State!.PackagingSet.Cost.ToString("N4")</div>
+                </div>
+                <div class="figure-tile"></div>
+                <div class="figure-tile"></div>
+            }
+            else
+            {
+                <div class="figure-tile tile-teal">
+                    <div class="figure-label">Batch Weight</div>
+                    <div class="figure-value">@State!.Batch.BatchWeight.ToString("#,0.##") g</div>
+                </div>
+                <div class="figure-tile tile-flamingo">
+                    <div class="figure-label">Batch Cost</div>
+                    <div class="figure-value">@State!.Batch.BatchCost.ToString("N2")</div>
+                </div>
+                <div class="figure-tile tile-yellow">
+                    <div class="figure-label">Cost per g</div>
+                    <div class="figure-value">@State!.Batch.CostPerGram.ToString("N4")</div>
+                </div>
+            }
+        </div>
+
+        <div class="header-fields">
+            <label class="form-label" for="sa-name">Name</label>
+            <TextField ID="sa-name" @bind-Value="State!.EditingName" CssClass="field-wide" />
+            <label class="form-label" for="sa-role">Role</label>
+            <PickField ID="sa-role" TItem="SubAssemblyRole" Items="State!.Roles" TextField="Name" @bind-Value="State!.EditingRole" />
+        </div>
+    </section>
+
+    <section class="card tabs-card">
+        <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+            <TabItems>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Recipe" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="tab-card">
+                            <h2 class="section-header">Lines</h2>
+                            @if (State!.IsPackaging)
+                            {
+                                <PackagingLinesGrid @ref="_packagingLines" Items="State!.PackagingSet.Lines" NewItem="State!.PackagingSet.NewLine" Materials="State!.PackagingMaterials"
+                                                    @bind-SelectedItem="State!.PackagingSet.SelectedLine" CostHeader="Cost per Set" />
+                            }
+                            else
+                            {
+                                <IngredientLinesGrid @ref="_lines" Items="State!.Batch.Lines" NewItem="State!.Batch.NewLine" Ingredients="State!.Ingredients"
+                                                     @bind-SelectedItem="State!.Batch.SelectedLine" PercentHeader="@State!.Batch.PercentHeader" />
+                            }
+                            <div class="lines-footer">
+                                <p class="caption">
+                                    @(State!.IsPackaging
+                                        ? "A product whose packaging links this set takes one whole set per sellable unit."
+                                        : State!.Batch.FormulaBaseCaption)
+                                </p>
+                                <div class="button-row">
+                                    <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="InsertLineAsync"
+                                                  Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                                    <CommandButton Command="State!.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                                </div>
+                            </div>
+                            @if (!State!.IsPackaging)
+                            {
+                                <div class="scale-row">
+                                    <label class="form-label" for="sa-scale-basis">Scale</label>
+                                    <PickField ID="sa-scale-basis" TItem="BatchScaleOption" Items="State!.Batch.ScaleOptions" TextOf="o => o.Label"
+                                               Value="State!.Batch.ScaleOption" ValueChanged="o => { if (o is not null) State!.Batch.ScaleOption = o; }" CssClass="scale-basis" />
+                                    <span>to</span>
+                                    <NumberField TValue="decimal?" Value="State!.Batch.ScaleTo" ValueChanged="v => State!.Batch.ScaleTo = v" Format="#,0.##" Min="0"
+                                                 Placeholder="Grams" CssClass="scale-to" />
+                                    <span>g</span>
+                                    <CommandButton Command="State!.Batch.ScaleCommand" Icon="AppIcon.Calculate" Label="Scale"
+                                                   Tooltip="Multiplies every line so the batch, or its base, weighs this much. Each line keeps its percentage. Undo takes it back." />
+                                </div>
+                            }
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Dependents" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="tab-card">
+                            <h2 class="section-header">Dependents</h2>
+                            <DependentTiles Products="State!.Dependents.Products" MadeIngredients="State!.Dependents.MadeIngredients" Caption="@State!.Dependents.Text"
+                                         Open="id => Commands.Run(State!.Dependents.OpenProductCommand, id)" OpenMadeIngredient="id => Commands.Run(State!.Dependents.OpenRawMaterialCommand, id)" />
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    </section>
+</CascadingValue>
+
+@code {
+    private IngredientLinesGrid? _lines;
+    private PackagingLinesGrid? _packagingLines;
+
+    [Inject] private PrintPreviews Previews { get; set; } = null!;
+    [Inject] private PrintPage PageSetup { get; set; } = null!;
+
+    // Insert Line in the table showing: a recipe's lines, or a packaging set's.
+    private Task InsertLineAsync() =>
+        (State!.IsPackaging ? _packagingLines?.InsertLineAsync() : _lines?.InsertLineAsync()) ?? Task.CompletedTask;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Print: the Print dialog over the form, which stays as it is, on Settings → Printing's page as it's saved now.
+        AddSubscription(State!.ShowPrint.RegisterHandler(async interaction =>
+        {
+            await PageSetup.RefreshAsync(CancellationToken.None);
+            Previews.ShowTables(interaction.Input);
+            interaction.SetOutput(System.Reactive.Unit.Default);
+        }));
+    }
+}

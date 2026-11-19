@@ -1,5 +1,5 @@
 ﻿using System.Collections.ObjectModel;
-using System.Globalization;
+using System.Reactive.Disposables;
 using System.Reactive.Subjects;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -8,52 +8,43 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
-using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Trees;
 
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// The Sub-Assemblies screen: standalone sub-assemblies, which no product owns. Products link them (and follow every change
-/// saved here) or copy them, from their recipe on the Products screen. One Save writes the name, the role and the lines
-/// together. Its parts each hold a piece of it: the list (<see cref="List"/>), a recipe's lines (<see cref="Batch"/>), a
-/// packaging set's (<see cref="PackagingSet"/>) and the Dependents tab (<see cref="Dependents"/>). The screen keeps the
-/// form's own fields, which sub-assembly it shows, loading, Save, and the undo history over them all.
+/// The Sub-Assemblies view: the list of standalone sub-assemblies (<see cref="List"/>) beside a strip of tabs, each a
+/// sub-assembly's form of its own (<see cref="SubAssemblyForm"/>, through <see cref="RecordViewState{TForm}.Tabs"/>), so
+/// several can be open at once, each with its edits and its undo. A sub-assembly picked in the list opens in the preview
+/// tab, which the next pick replaces while it holds nothing unsaved; New starts one there too. The view keeps what every
+/// form reads (the roles, the ingredients and the packaging materials) and the load that brings them, which keeps each
+/// form, and what's typed into it, as it is. It opens on a blank new sub-assembly in the preview tab, as the screen always
+/// has.
 /// </summary>
-public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapshot>, IDisposable, IRecordScreen, ISubAssembliesListHost
+public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubAssembliesListHost, IScreenPartHost, IRecordOpener, IRecordScreen
 {
-    /// <summary>The details tabs along the bottom: Recipe, then Dependents.</summary>
-    public const int RecipeTab = 0;
-
-    /// <summary>Dependents: the products and made ingredients the sub-assembly goes into.</summary>
-    public const int DependentsTab = 1;
-
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
     private readonly ISubAssemblyRoleRepository _roleRepository;
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IValidator<SubAssembly> _subAssemblyValidator;
     private readonly VersionedSaves _versionedSaves;
+    private readonly ILogger _logger;
 
-    /// <summary>What a Save of a recipe products link is asked about with; null in a screen built without it.</summary>
+    /// <summary>What a Save of a recipe products link is asked about with; null in a view built without it.</summary>
     private readonly SharedRecipeImpact? _recipeImpact;
 
-    /// <summary>The screen's derived updates, run as their inputs change, or once at the end of an undo's restore.</summary>
-    private readonly DerivedUpdates _updates = new();
-
-    /// <summary>
-    /// Each sub-assembly picked, by the user or for them (Open, a list pick), nothing picked included: what loads one into
-    /// the form. Fed by <see cref="Pick"/> alone, starting with nothing picked.
-    /// </summary>
-    private readonly BehaviorSubject<StandaloneSubAssemblyRow?> _picks = new(null);
-
+    // What the forms ask of other screens, passed on from whichever form asks (Wire).
+    private readonly Subject<int> _productOpenRequests = new();
+    private readonly Subject<int> _rawMaterialOpenRequests = new();
     private readonly Subject<int> _newProductRequests = new();
 
-    /// <summary>The sub-assembly the form shows: 0 for a new one.</summary>
-    private int _editingId;
+    /// <summary>What <see cref="IRecordScreen.SaveCommand"/> and its Delete are while no tab is open: nothing to do.</summary>
+    private readonly ScreenCommand _nothing = ScreenCommand.Of(() => { }, () => false);
 
-    /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
-    private int _formLoadVersion;
+    /// <summary>A sub-assembly an address asked for before the list held it: the end of the next load opens it.</summary>
+    private int? _recordToOpen;
 
     public SubAssembliesState(
         ISubAssemblyRepository subAssemblyRepository,
@@ -69,88 +60,46 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         SharedRecipeImpact? recipeImpact = null)
         : base(logger)
     {
-        _recipeImpact = recipeImpact;
         _subAssemblyRepository = subAssemblyRepository;
-        _versionedSaves = versionedSaves;
         _lineRepository = lineRepository;
         _roleRepository = roleRepository;
         _rawMaterialRepository = rawMaterialRepository;
         _subAssemblyValidator = subAssemblyValidator;
+        _versionedSaves = versionedSaves;
+        _logger = logger;
+        _recipeImpact = recipeImpact;
 
-        // The parts first: the subscriptions below, and the blank form they start with, reach every one. Each makes its own
-        // subscriptions as it's made, to what it holds alone.
         List = new SubAssembliesList(
             this, Roles, Ingredients, PackagingMaterials, subAssemblyRepository, roleRepository, rawMaterialCategoryRepository, roleValidator, viewStateStore);
-        PackagingSet = new SubAssemblyPackagingSet(PackagingMaterials, _updates);
-        Batch = new SubAssemblyBatch(this, Ingredients, _updates, () => !IsPackaging);
-        Dependents = new SubAssemblyDependents();
 
-        // What follows the form's fields as they change is called by their setters (SelectionChanged). What follows here
-        // runs in this order: the last runs as it's made (_picks starts with nothing picked, which clears the form), so it
-        // comes after what it reads.
+        // Runs each time the page opens (ScreenBase) and after the forms' own saves. It merges rather than replaces, so each
+        // form keeps its selection and unsaved lines while picking up what changed elsewhere: a repriced ingredient, a
+        // renamed role, a product that links one. It runs as the form showing does (Runner).
+        LoadCommand = new ScreenCommand(() => Runner.RunLoadAsync(LoadAsync));
 
-        // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every change
-        // rather than only when an undo step settles: a step closes on the way out of a field, and a Save button still
-        // disabled under the cursor would swallow the very click that enabled it. The lines too, any change to one: grams
-        // typed into a recipe's line, or a quantity into a packaging set's, while the line's cell still has the cursor.
-        // Watched on the rows themselves, not through the figures they move: those are only worked out as they're read.
-        PropertyChanged += (_, _) => History.RefreshDirty();
-        Batch.PropertyChanged += (_, _) => History.RefreshDirty();
-        PackagingSet.PropertyChanged += (_, _) => History.RefreshDirty();
-        RowChanges.OnAnyChange(Batch.Lines, History.RefreshDirty);
-        RowChanges.OnAnyChange(PackagingSet.Lines, History.RefreshDirty);
+        // Through the list, which adds the new sub-assembly's row for its name to be typed into (NewInList), and starts it
+        // through the view (StartNew).
+        NewCommand = ScreenCommand.Of(() => List.NewInList());
 
-        // The list's row follows the sub-assembly picked (SelectionChanged), from the start.
-        List.SyncTreeSelection();
-
-        // Picking a sub-assembly loads it into the form. Only a pick does (Pick, through _picks): a refresh points the
-        // selection at its refreshed copy, which leaves the form and its unsaved edits alone.
-        LoadLatest(_picks, (row, _) => LoadIntoFormAsync(row));
-
-        // The commands. Making one runs nothing.
-
-        // Runs each time the page opens (ScreenBase) and after this screen's own saves. It merges rather than replaces, so
-        // the screen keeps its selection and unsaved lines while picking up what changed elsewhere: a repriced ingredient,
-        // a renamed role, a product that links one.
-        LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
-
-        // A new sub-assembly replaces the one showing, so its unsaved changes are asked about first. Copy doesn't ask: the
-        // copy holds them.
-        NewCommand = new ScreenCommand(() => AfterUnsavedChangesAsync(() => List.NewInList()));
-        CopyCommand = ScreenCommand.Of(CopyForm, () => SelectedRow is not null);
-        NewProductCommand = ScreenCommand.Of(AskForNewProduct, () => SelectedRow is { } row && row.SubAssembly.Role?.IsPackaging != true);
-        DeleteCommand = new ScreenCommand(() => DeleteSubAssemblyAsync(SelectedRow!), () => SelectedRow is not null);
-        SaveCommand = new ScreenCommand(() => RunSaveAsync(SaveAsync), () => History.IsDirty);
-        PrintCommand = new ScreenCommand(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintoutNow(DateTime.Now))));
-
-        // The line selected in whichever table is showing.
-        RemoveLineCommand = ScreenCommand.Of(
-            () => AsUndoStep(() =>
+        // The list's row follows the form showing, and a new sub-assembly's row being named in the list goes with its tab.
+        Tabs.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(RecordTabs<>.Active))
             {
-                if (IsPackaging)
-                {
-                    PackagingSet.Lines.Remove(PackagingSet.SelectedLine!);
-                }
-                else
-                {
-                    Batch.Lines.Remove(Batch.SelectedLine!);
-                }
-            }),
-            () => IsPackaging ? PackagingSet.SelectedLine is not null : Batch.SelectedLine is not null);
+                List.EndNewRow();
+                List.SyncTreeSelection();
+                RaisePropertyChanged(nameof(Form));
+            }
+        };
+
+        // The view opens on a blank new sub-assembly, as the screen always has: the first one picked takes its place.
+        Show(AddTab(isPreview: true));
     }
 
     /// <summary>The list: the sub-assemblies by role, searched, the rows picked, their menus, moves and naming in place.</summary>
     public SubAssembliesList List { get; }
 
-    /// <summary>A recipe's lines in grams, their formula base and totals, and Scale.</summary>
-    public SubAssemblyBatch Batch { get; }
-
-    /// <summary>A packaging set's lines and what the set costs, the packaging table's.</summary>
-    public SubAssemblyPackagingSet PackagingSet { get; }
-
-    /// <summary>The Dependents tab: the products and made ingredients the sub-assembly goes into.</summary>
-    public SubAssemblyDependents Dependents { get; }
-
+    /// <summary>The roles, which the forms' Role pickers offer and the list files the sub-assemblies under.</summary>
     public ObservableCollection<SubAssemblyRole> Roles { get; } = [];
 
     /// <summary>The ingredients only: packaging never goes in a recipe.</summary>
@@ -159,166 +108,36 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
     /// <summary>The packaging materials, for a packaging set's lines.</summary>
     public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
 
-    /// <summary>
-    /// The form is a packaging set: its role is the Packaging role, so it takes packaging materials per set instead of
-    /// ingredients in grams, and the screen shows the packaging table in place of the recipe's.
-    /// </summary>
-    public bool IsPackaging => EditingRole?.IsPackaging == true;
-
-    private StandaloneSubAssemblyRow? _selectedRow;
-
-    /// <summary>
-    /// The sub-assembly the form is for. Only <see cref="Pick"/> loads it into the form: a load points it at its fresh copy,
-    /// Save at the row it saved, and New clears it, each leaving the form as it is.
-    /// </summary>
-    public StandaloneSubAssemblyRow? SelectedRow
-    {
-        get => _selectedRow;
-        private set
-        {
-            if (RaiseAndSetIfChanged(ref _selectedRow, value))
-            {
-                SelectionChanged();
-            }
-        }
-    }
-
-    /// <summary>The user picks <paramref name="row"/> (a list's row, Open): it's loaded into the form, unless it's the one showing.</summary>
-    public void Pick(StandaloneSubAssemblyRow? row)
-    {
-        if (row != SelectedRow)
-        {
-            SelectedRow = row;
-            _picks.OnNext(row);
-        }
-    }
-
-    /// <summary>
-    /// What follows the sub-assembly showing, a pick's or a load's fresh copy: one opened, by its Save included, ends the new
-    /// one's row, since the form no longer shows the new one; and the list's row follows it.
-    /// </summary>
-    private void SelectionChanged()
-    {
-        if (SelectedRow is not null)
-        {
-            List.EndNewRow();
-        }
-
-        List.SyncTreeSelection();
-    }
-
-    private string _editingName = string.Empty;
-    public string EditingName
-    {
-        get => _editingName;
-        set => RaiseAndSetIfChanged(ref _editingName, value);
-    }
-
-    private SubAssemblyRole? _editingRole;
-    public SubAssemblyRole? EditingRole
-    {
-        get => _editingRole;
-        set => RaiseAndSetIfChanged(ref _editingRole, value);
-    }
-
-    private string _headerTitle = "New sub-assembly";
-    /// <summary>The saved name of the sub-assembly the form shows, "New sub-assembly", or "Copy of …" for a copy not yet saved.</summary>
-    public string HeaderTitle
-    {
-        get => _headerTitle;
-        private set => RaiseAndSetIfChanged(ref _headerTitle, value);
-    }
-
-    private int _selectedDetailsTab = RecipeTab;
-    /// <summary>
-    /// The details tab showing, kept here so the screen comes back on the tab it was left on, as Products and Raw
-    /// Materials do. Both tabs always show, so nothing moves it but the user.
-    /// </summary>
-    public int SelectedDetailsTab
-    {
-        get => _selectedDetailsTab;
-        set => RaiseAndSetIfChanged(ref _selectedDetailsTab, value);
-    }
-
+    /// <summary>Reads the roles, the materials and the sub-assemblies again, and merges them into the list and every open form.</summary>
     public ScreenCommand LoadCommand { get; }
 
+    /// <summary>
+    /// New, from a form's header, the list or the Vim keys' <c>:new</c>: a blank new sub-assembly in the preview tab, so a
+    /// tab holding changes is left as it is, and one holding none is used for it.
+    /// </summary>
     public ScreenCommand NewCommand { get; }
 
-    /// <summary>Starts a new sub-assembly from the one the form shows (<see cref="CopyForm"/>), saved by Save.</summary>
-    public ScreenCommand CopyCommand { get; }
+    /// <summary>The products a form's Dependents tile asks to open, by id. ScreenLinks opens each on Products.</summary>
+    public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
-    public ScreenCommand SaveCommand { get; }
+    /// <summary>The made ingredients a form's Dependents tile asks to open, by id. ScreenLinks opens each on Raw Materials.</summary>
+    public IObservable<int> RawMaterialOpenRequests => _rawMaterialOpenRequests;
 
-    public ScreenCommand DeleteCommand { get; }
-
-    /// <summary>Remove Line on whichever table shows: the recipe's lines, or a packaging set's.</summary>
-    public ScreenCommand RemoveLineCommand { get; }
-
-    /// <summary>Print: the form as it shows, unsaved edits included, in the print preview (<see cref="ShowPrint"/>).</summary>
-    public ScreenCommand PrintCommand { get; }
-
-    /// <summary>Input: the pages, which the screen shows in the print preview (PrintPreviews).</summary>
-    public Interaction<TablePrintout, System.Reactive.Unit> ShowPrint { get; } = new();
-
-    /// <summary>
-    /// The sub-assembly as the form shows it, on its own: a recipe's lines with their grams, share of the formula, cost per
-    /// gram and cost, and the batch's total; or a packaging set's materials, each set's quantity and cost. Its edits not
-    /// saved yet are in it, which it says (a draft).
-    /// </summary>
-    public TablePrintout PrintoutNow(DateTime printedAt)
-    {
-        var title = string.IsNullOrWhiteSpace(EditingName) ? HeaderTitle : EditingName.Trim();
-        var role = EditingRole?.Name ?? "No role";
-        PrintedTable table;
-        List<string> lines;
-        if (IsPackaging)
-        {
-            var priced = PackagingSet.Lines.Where(l => l.PackagingMaterial is not null).Select(l => (l.PackagingMaterial!.Name, Priced: l.ToPriced())).ToList();
-            lines = [$"{role} · Sub-Assemblies · a packaging set: what one set takes of each material"];
-            table = new PrintedTable(
-                null,
-                [new("Material"), new("Qty", true), new("Unit"), new("Unit Cost", true), new("Cost per Set", true)],
-                [.. priced.Select(p => (IReadOnlyList<string>)[
-                    p.Name, p.Priced.QtyPerUnit?.ToString("#,0.####", CultureInfo.CurrentCulture) ?? "", p.Priced.UnitAbbreviation ?? "",
-                    p.Priced.UnitCost.ToString("N4", CultureInfo.CurrentCulture), p.Priced.CostPerUnit.ToString("N2", CultureInfo.CurrentCulture)])])
-            {
-                Total = ["Total", "", "", "", PackagingSet.Cost.ToString("N2", CultureInfo.CurrentCulture)],
-            };
-        }
-        else
-        {
-            lines = [$"{role} · Sub-Assemblies", Batch.FormulaBaseCaption];
-            table = new PrintedTable(
-                null,
-                [new("Ingredient"), new("Grams", true), new(Batch.PercentHeader, true), new("Cost/g", true), new("Cost", true)],
-                [.. Batch.Lines.Where(l => l.Ingredient is not null).Select(l => (IReadOnlyList<string>)[
-                    l.Ingredient!.Name, l.Grams?.ToString("N1", CultureInfo.CurrentCulture) ?? "", l.Percent?.ToString("N1", CultureInfo.CurrentCulture) ?? "—",
-                    l.CostPerGram.ToString("N4", CultureInfo.CurrentCulture), l.Cost.ToString("N2", CultureInfo.CurrentCulture)])])
-            {
-                Total = ["Total", Batch.BatchWeight.ToString("N1", CultureInfo.CurrentCulture), "", "", Batch.BatchCost.ToString("N2", CultureInfo.CurrentCulture)],
-                Note = $"Cost per gram of the batch {Batch.CostPerGram.ToString("N4", CultureInfo.CurrentCulture)}",
-            };
-        }
-
-        return new TablePrintout(title, lines, [table], printedAt)
-        {
-            SaveNote = _editingId == 0 ? ProductPrintout.NotSavedNote : HasUnsavedChanges ? ProductPrintout.UnsavedChangesNote : null,
-        };
-    }
-
-    /// <summary>
-    /// Starts a new product that links the picked sub-assembly, through <see cref="NewProductRequests"/>. Not for a packaging
-    /// set, which isn't a recipe, and not while the form has changes not saved: the product links it as it's saved.
-    /// </summary>
-    public ScreenCommand NewProductCommand { get; }
-
-    /// <summary>
-    /// The sub-assemblies New Product asks a new product to link, by id. ScreenLinks subscribes and starts the new product on
-    /// the Products screen, as it opens a Dependents tile's product.
-    /// </summary>
+    /// <summary>The sub-assemblies a form's New Product asks a new product to link, by id. ScreenLinks starts it on Products.</summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
-    /// <summary>The roles, materials and sub-assemblies read again and merged, the form and its selection kept.</summary>
+    /// <inheritdoc/>
+    public override bool IsOpeningRecord => _recordToOpen is not null;
+
+    protected override SubAssemblyForm NewForm() =>
+        new(this, _subAssemblyRepository, _lineRepository, _subAssemblyValidator, _versionedSaves, _logger, _recipeImpact);
+
+    protected override IDisposable Wire(SubAssemblyForm form) => new CompositeDisposable(
+        form.Dependents.ProductOpenRequests.Subscribe(_productOpenRequests.OnNext),
+        form.Dependents.RawMaterialOpenRequests.Subscribe(_rawMaterialOpenRequests.OnNext),
+        form.NewProductRequests.Subscribe(_newProductRequests.OnNext));
+
+    /// <summary>The roles, materials and sub-assemblies read again and merged, every form and its selection kept.</summary>
     private async Task LoadAsync()
     {
         // All at once, on the thread pool, as Products reads its lists: one after another on the UI thread, each read came
@@ -336,258 +155,67 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         var linkedBy = await linkedByRead;
         var madeFrom = await madeFromRead;
 
-        // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
-        var selectedId = SelectedRow?.Id;
-        var roleId = EditingRole?.Id;
+        // What each form shows, by id, before anything it reads is replaced.
+        var forms = Tabs.All.Select(tab => tab.Form).ToList();
+        var loads = forms.Select(form => (Form: form, Load: form.BeginLoad())).ToList();
 
-        // A brand-new form has no role until the roles arrive, and the merge below gives it the first one.
-        // That isn't the user's change, so what Save measures against has to follow it.
-        var formHasNoRole = _editingId == 0 && roleId is null;
-
-        // The sub-assembly showing, saved since the form took it (SavedVersion): read into the form again when nothing's
-        // typed, so what it shows, and what its next Save starts from, is what's saved now (FollowSavedVersion).
-        var savedSince = false;
-
-        ApplyRefresh(() =>
+        // Within every form's refresh at once, so nothing the merge writes, into the lists or the forms, is taken for an edit.
+        RefreshingEach(forms, () =>
         {
-            Roles.MergeFrom(roles, r => r.Id);
-            Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
-            PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
-            List.TakeRows(subAssemblies.Select(s => new StandaloneSubAssemblyRow(s, linkedBy.GetValueOrDefault(s.Id) ?? [], madeFrom.GetValueOrDefault(s.Id))));
-
-            // A form opened before the roles were loaded (a new one, shown at start) takes the first role.
-            EditingRole = Roles.FirstOrDefault(r => r.Id == roleId) ?? (_editingId == 0 && roleId is null ? Roles.FirstOrDefault() : null);
-
-            Batch.ResolveLines();
-            PackagingSet.ResolveRows();
-
-            SelectedRow = List.Rows.FirstOrDefault(r => r.Id == selectedId);
-
-            // Every load, so a list's own save is followed by the load it asked for and no later one.
-            savedSince = FollowSavedVersion(SelectedRow is { } showing && showing.Id == _editingId ? showing.SubAssembly.UpdatedAt : SavedVersion);
-            if (_editingId > 0)
+            ApplyRefresh(() =>
             {
-                Dependents.Show(linkedBy.GetValueOrDefault(_editingId) ?? [], madeFrom.GetValueOrDefault(_editingId) ?? [], IsPackaging);
+                Roles.MergeFrom(roles, r => r.Id);
+                Ingredients.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Ingredient).OrderBy(m => m.Name)], m => m.Id);
+                PackagingMaterials.MergeFrom([.. rawMaterials.Where(m => m.Type == RawMaterialType.Packaging).OrderBy(m => m.Name)], m => m.Id);
+                List.TakeRows(subAssemblies.Select(s => new StandaloneSubAssemblyRow(s, linkedBy.GetValueOrDefault(s.Id) ?? [], madeFrom.GetValueOrDefault(s.Id))));
+            });
+
+            foreach (var (form, load) in loads)
+            {
+                form.TakeLoad(load, linkedBy, madeFrom);
             }
         });
 
-        // Only the role, and only when the form had none: a role the user picked must keep counting as a
-        // change, so this can't be a blanket MarkClean.
-        if (formHasNoRole && EditingRole is not null)
+        foreach (var (form, load) in loads)
         {
-            History.Rebase((settled, now) => settled with { RoleId = now.RoleId });
+            await form.EndLoadAsync(load);
         }
 
-        if (savedSince && SelectedRow is { } savedAgain)
+        // An address that asked for a sub-assembly before the list held it: the list holds it now, or never will.
+        if (_recordToOpen is { } id)
         {
-            await LoadIntoFormAsync(savedAgain);
+            _recordToOpen = null;
+            OpenRecord(id);
         }
-
-        // After the merge, which only points the selection at its fresh copy: this one has to load the sub-assembly's form.
-        OpenRecordAskedFor();
     }
 
-    /// <summary>New Product: asks Products for a new product linking the picked sub-assembly, as it's saved.</summary>
-    private void AskForNewProduct()
+    /// <summary>Runs <paramref name="merge"/> within each of <paramref name="forms"/>' own refresh, one inside another.</summary>
+    private static void RefreshingEach(IReadOnlyList<SubAssemblyForm> forms, Action merge, int from = 0)
     {
-        if (History.IsDirty)
+        if (from == forms.Count)
         {
-            ErrorMessage = $"Save {HeaderTitle} first, or undo its changes: the new product links it as it's saved.";
+            merge();
             return;
         }
 
-        ErrorMessage = null;
-        _newProductRequests.OnNext(SelectedRow!.Id);
+        forms[from].RefreshWith(() => RefreshingEach(forms, merge, from + 1));
     }
 
-    /// <summary>Save: the name, the role and the lines together, with a version of each product it changes.</summary>
-    private async Task SaveAsync()
-    {
-        var name = EditingName.Trim();
-        var validation = _subAssemblyValidator.Validate(new SubAssembly { Name = name, RoleId = EditingRole?.Id ?? 0 });
-        if (!validation.IsValid)
-        {
-            ErrorMessage = validation.ToString(" ");
-            return;
-        }
-
-        // The lines as they're typed, read here on the UI thread, for the save below. With when it had last been saved as the
-        // form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-        var subAssembly = new SubAssembly { Id = _editingId, Name = name, RoleId = EditingRole!.Id, UpdatedAt = SavedVersionToSend };
-        Func<CancellationToken, Task<int>> save;
-        if (IsPackaging)
-        {
-            var packagingLines = PackagingSet.CurrentLines();
-            if (packagingLines.Count == 0)
-            {
-                ErrorMessage = $"Add the packaging materials that go into {name}, per set.";
-                return;
-            }
-
-            save = cancellationToken => _subAssemblyRepository.SaveStandalonePackagingAsync(subAssembly, packagingLines, cancellationToken);
-        }
-        else
-        {
-            var lines = IngredientLineRow.CompleteLines(Batch.Lines, name);
-            if (lines.Count == 0)
-            {
-                ErrorMessage = $"Add the ingredients that go into {name}, in grams.";
-                return;
-            }
-
-            List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-            save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
-
-            // A saved one that products link: what it does to their costs is asked about first.
-            if (_recipeImpact is not null && subAssembly.Id != 0)
-            {
-                List<SubAssemblyLine> newLines =
-                [
-                    .. lines.Select((l, i) => new SubAssemblyLine
-                    {
-                        SubAssemblyId = subAssembly.Id, IngredientId = l.Ingredient.Id, Ingredient = l.Ingredient, Grams = l.Grams,
-                        IsFormulaBase = l.IsFormulaBase, AuthoredBakersPercent = l.AuthoredBakersPercent, SortOrder = i,
-                    }),
-                ];
-                var impacts = await Task.Run(() => _recipeImpact.ReadAsync(subAssembly.Id, newLines, CancellationToken.None));
-                if (impacts.Count > 0 && !await ConfirmDelete.Handle(SharedRecipeImpact.Question(name, impacts, Dependents.MadeIngredients.Count)))
-                {
-                    return;
-                }
-            }
-        }
-
-        // Written with a version of each product using it that this Save changes, both or neither (VersionedSaves).
-        var saved = await Task.Run(() => _versionedSaves.SaveSubAssemblyAsync(subAssembly.Id, name, save, DateTime.Now, CancellationToken.None));
-
-        // The list picks up the new totals; then the form reloads what was saved.
-        await LoadCommand.ExecuteAsync();
-        var row = List.Rows.FirstOrDefault(r => r.Id == saved.Id);
-        SelectedRow = row;
-        await LoadIntoFormAsync(row);
-        SuccessMessage = ProductVersionRecorder.RecordedMessage(saved.ProductsVersioned) is { } recorded
-            ? $"{name} was saved. {recorded}"
-            : $"{name} was saved.";
-    }
+    /// <summary>A sub-assembly picked in the list: its tab, or the preview tab.</summary>
+    private void OpenFromList(StandaloneSubAssemblyRow row, bool keep = false) => OpenInTab(row.Id, keep, form => form.Pick(row));
 
     /// <summary>
-    /// New, from the header or the list. A sub-assembly still waiting for LoadCommand to open it is no longer opened: it
-    /// would load over the new form, and a name typed into it since would then be saved as that sub-assembly's.
+    /// IRecordOpener: the sub-assembly in the view's address (Back, Forward, a link from another screen, Find), shown as a pick
+    /// in the list shows it, a search hiding its row cleared. A list that doesn't hold it yet opens it at the end of the next
+    /// load, which showing the view runs.
     /// </summary>
-    private void StartNewSubAssembly(SubAssemblyRole? role = null)
+    public void OpenRecord(int id)
     {
-        ForgetRecordToOpen();
-        ClearForm(role);
-    }
-
-    /// <summary>A fresh form for a new sub-assembly: nothing selected, no name or lines, in <paramref name="role"/> or the first role.</summary>
-    private void ClearForm(SubAssemblyRole? role = null)
-    {
-        // The new sub-assembly's row, if one was named in the list, goes with the form it stood for.
-        List.EndNewRow();
-        History.Clear();
-        _formLoadVersion++;
-        SelectedRow = null;
-        FormVersion++;
-        _editingId = 0;
-        SavedVersion = null;
-        HeaderTitle = "New sub-assembly";
-        EditingName = string.Empty;
-        EditingRole = role ?? Roles.FirstOrDefault();
-        Batch.Clear();
-        PackagingSet.Clear();
-        Dependents.Show([], [], IsPackaging);
-
-        // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
-        History.MarkClean();
-    }
-
-    /// <summary>
-    /// A new, unsaved sub-assembly holding what the form shows, edits not yet saved included: the same role and lines,
-    /// named "… Copy" (or "… Copy 2" and on, when that's taken), for Save to add beside the original. The original is
-    /// left as it was last saved. Like New, it's a fresh form with nothing to undo, measured against a blank one, so
-    /// Save is offered straight away.
-    /// </summary>
-    private void CopyForm()
-    {
-        var source = CaptureSnapshot();
-        var sourceName = HeaderTitle;
-        var name = SubAssemblyRules.UniqueStandaloneName($"{source.Name.Trim()} Copy", [.. List.Rows.Select(r => r.Name)]);
-
-        ClearForm();
-        RestoreSnapshot(source with { EditingId = 0, Name = name }, settledThen: null);
-        HeaderTitle = $"Copy of {sourceName}";
-        Dependents.Show([], [], IsPackaging);
-        History.RefreshDirty();
-    }
-
-    /// <summary>
-    /// The picked sub-assembly's name, role and lines, fetched again so they're what was saved. A load
-    /// overtaken by a newer one (another pick, New) is dropped. Nothing picked clears the form.
-    /// </summary>
-    private async Task LoadIntoFormAsync(StandaloneSubAssemblyRow? row)
-    {
-        if (row is null)
-        {
-            ClearForm();
-            return;
-        }
-
-        // A sub-assembly has one kind of line or the other, as its role says.
-        var version = ++_formLoadVersion;
-        var isSet = row.SubAssembly.Role?.IsPackaging == true;
-        IReadOnlyList<SubAssemblyLine> saved;
-        IReadOnlyList<SubAssemblyPackagingLine> savedSet;
-        try
-        {
-            saved = isSet ? [] : await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
-            savedSet = isSet ? await _subAssemblyRepository.GetPackagingLinesAsync(row.Id, CancellationToken.None) : [];
-        }
-        catch (Exception) when (version == _formLoadVersion)
-        {
-            // Nothing of the picked one's came: the form mustn't go on showing another sub-assembly under its row, so it's
-            // left blank, with nothing picked. Picking it again tries again.
-            ClearForm();
-            throw;
-        }
-
-        if (version != _formLoadVersion)
-        {
-            return;
-        }
-
-        History.Clear();
-
-        // Not for the same sub-assembly loaded again, as a Save does: the boxes still hold what's its.
-        if (row.Id != _editingId)
-        {
-            FormVersion++;
-        }
-
-        _editingId = row.Id;
-        SavedVersion = row.SubAssembly.UpdatedAt;
-        HeaderTitle = row.Name;
-        EditingName = row.Name;
-        EditingRole = Roles.FirstOrDefault(r => r.Id == row.SubAssembly.RoleId);
-        Batch.Show(saved);
-        PackagingSet.Show(savedSet);
-        Dependents.Show(row.GetDependents(), row.GetMadeIngredients(), IsPackaging);
-
-        // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
-        // end: the lines land after the name and role, and a form measured before them would read as changed
-        // the moment they arrived.
-        History.MarkClean();
-    }
-
-    protected override int? FindRecordByName(string text) => RecordNameMatch.Best(List.Rows, row => row.Name, text)?.Id;
-
-    protected override bool ReplacesShowing(int id) => id != SelectedRow?.Id;
-
-    protected override bool TrySelectRecord(int id)
-    {
+        _recordToOpen = null;
         if (List.Rows.FirstOrDefault(r => r.Id == id) is not { } row)
         {
-            return false;
+            _recordToOpen = id;
+            return;
         }
 
         if (!List.VisibleRows.Contains(row))
@@ -595,123 +223,223 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
             List.SearchText = string.Empty;
         }
 
-        Pick(row);
+        OpenFromList(row);
+    }
+
+    /// <summary>IRecordOpener: the sub-assembly in the address the view opens on, at the end of its load, the list fresh only then.</summary>
+    public void OpenRecordOnLoad(int id) => _recordToOpen = id;
+
+    /// <summary>The Vim command line's <c>:e name</c>: opens the sub-assembly the name means best, as an address would.</summary>
+    public bool OpenByName(string text)
+    {
+        if (RecordNameMatch.Best(List.Rows, row => row.Name, text) is not { } row)
+        {
+            return false;
+        }
+
+        OpenRecord(row.Id);
         return true;
     }
 
     /// <summary>
-    /// Deletes <paramref name="row"/>'s sub-assembly once it's confirmed: the header's Delete, for the one picked, or the
-    /// list's, for any. The form starts afresh if it was showing it.
+    /// New: a blank new sub-assembly in <paramref name="role"/> (or the first role), in the preview tab. A sub-assembly still
+    /// waiting for the load to open it is no longer opened: New is the later word.
     /// </summary>
-    private Task DeleteSubAssemblyAsync(StandaloneSubAssemblyRow row) =>
-        RunWithConfirmationAsync($"Delete '{row.Name}'? This can't be undone.", async () =>
+    private void NewDraft(SubAssemblyRole? role)
+    {
+        _recordToOpen = null;
+        var tab = PreviewSlot();
+        tab.Form.StartNew(role);
+        Show(tab);
+    }
+
+    /// <summary>
+    /// Deletes <paramref name="row"/>'s sub-assembly once it's confirmed: a form's Delete, for its own, or the list's, for any,
+    /// asked as <paramref name="asker"/>'s question (the view's own with none). The tab holding it closes, as it's gone.
+    /// </summary>
+    internal Task DeleteAsync(StandaloneSubAssemblyRow row, SubAssemblyForm? asker) =>
+        ConfirmedAsync(asker, $"Delete '{row.Name}'? This can't be undone.", async () =>
         {
             await _subAssemblyRepository.DeleteStandaloneAsync(row.Id, CancellationToken.None);
-            if (_editingId == row.Id || SelectedRow?.Id == row.Id)
+            if (Tabs.Holding(row.Id) is { } open)
             {
-                ClearForm();
+                Drop(open);
             }
 
             await LoadCommand.ExecuteAsync();
         });
 
-    protected override SubAssemblyFormSnapshot CaptureSnapshot() => new()
+    /// <summary>Runs <paramref name="action"/> once <paramref name="question"/> is answered Yes, as <paramref name="asker"/>'s (the view's own with none).</summary>
+    private Task ConfirmedAsync(SubAssemblyForm? asker, string question, Func<Task> action) =>
+        asker is IFormPartHost form ? form.RunWithConfirmationAsync(question, action) : RunWithConfirmationAsync(question, action);
+
+    /// <summary>A form shows another sub-assembly, or none: the list follows it while it's the one showing.</summary>
+    internal void FormShowsAnother(SubAssemblyForm form)
     {
-        EditingId = _editingId,
-        Name = EditingName,
-        RoleId = EditingRole?.Id,
-        Lines = Batch.Capture(),
-        PackagingLines = PackagingSet.Capture(),
-        FormulaBase = Batch.FormulaBase,
-    };
-
-    /// <summary>
-    /// Puts the form back as <paramref name="snapshot"/> had it. The lines are rebuilt rather than written into —
-    /// IngredientLineRow's setters drop a typed percentage — and the lines are pointed at their ingredients and the formula
-    /// base applied once, at the end, from the form that was put back.
-    /// </summary>
-    protected override void RestoreSnapshot(SubAssemblyFormSnapshot snapshot, SubAssemblyFormSnapshot? settledThen)
-    {
-        ErrorMessage = null;
-
-        // A load still on its way would otherwise land on top of what's being put back.
-        _formLoadVersion++;
-
-        ApplyRestore(() => _updates.Batch(() =>
+        if (form != Form)
         {
-            Batch.SelectedLine = null;
-            PackagingSet.SelectedLine = null;
+            return;
+        }
 
-            _editingId = snapshot.EditingId;
-            EditingName = snapshot.Name;
-            EditingRole = snapshot.RoleId is { } roleId ? Roles.FirstOrDefault(r => r.Id == roleId) : null;
+        if (form.SelectedRow is not null)
+        {
+            List.EndNewRow();
+        }
 
-            Batch.Restore(snapshot.Lines, snapshot.FormulaBase);
-            PackagingSet.Restore(snapshot.PackagingLines);
-        }));
-
-        // Once more, in this order, from the form put back: an undo that leaves a table as it was asks for none of these.
-        // The figures need nothing: they're worked out from the lines as they're next read.
-        Batch.ResolveLines();
-        PackagingSet.ResolveRows();
-        Batch.RecomputeFormulaBase();
+        List.SyncTreeSelection();
     }
 
-    protected override string UnsavedChangesName =>
-        !string.IsNullOrWhiteSpace(EditingName) ? EditingName.Trim() : SelectedRow?.Name ?? "the new sub-assembly";
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            // A change still settling when the app closes is written now, rather than lost.
+            List.Dispose();
+            _productOpenRequests.Dispose();
+            _rawMaterialOpenRequests.Dispose();
+            _newProductRequests.Dispose();
+        }
 
-    protected override Task SaveFormAsync() => SaveCommand.ExecuteAsync();
+        base.Dispose(disposing);
+    }
 
-    protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
+    // IRecordScreen, for the Vim command line while no form shows: New starts one, and nothing is there to save or delete.
+    ScreenCommand IRecordScreen.SaveCommand => Form?.SaveCommand ?? _nothing;
 
-    protected override int ShowingRecordId => _editingId;
+    ScreenCommand IRecordScreen.DeleteCommand => Form?.DeleteCommand ?? _nothing;
 
-    /// <summary>
-    /// Don't Save on leaving the screen: the form goes back to the sub-assembly as it was last saved, its lines read again.
-    /// A new one (or a copy) was never saved, so it goes back to a blank one.
-    /// </summary>
-    protected override Task RevertToSavedAsync() => LoadIntoFormAsync(SelectedRow);
+    // What the list asks of the view (ISubAssembliesListHost): the form showing, and what the list's actions do to the forms
+    // holding the sub-assemblies they act on. The list's own work runs as the form showing does, as the view's load does.
+    StandaloneSubAssemblyRow? ISubAssembliesListHost.SelectedRow => Form?.SelectedRow;
 
-    // What the list asks of the screen (ISubAssembliesListHost): the sub-assembly the form shows, and what the list's actions
-    // do to it.
-    int ISubAssembliesListHost.EditingId => _editingId;
+    SubAssemblyRole? ISubAssembliesListHost.EditingRole => Form?.EditingRole;
 
     Task ISubAssembliesListHost.LoadAsync() => LoadCommand.ExecuteAsync();
 
-    void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) =>
-        PickFromList(row.Id, () => Pick(row), List.SyncTreeSelection);
+    void ISubAssembliesListHost.Pick(StandaloneSubAssemblyRow row) => OpenFromList(row);
 
-    void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => StartNewSubAssembly(role);
+    void ISubAssembliesListHost.KeepOpen(StandaloneSubAssemblyRow row) => OpenFromList(row, keep: true);
 
-    Task ISubAssembliesListHost.DeleteAsync(StandaloneSubAssemblyRow row) => DeleteSubAssemblyAsync(row);
+    void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => NewDraft(role);
 
-    void ISubAssembliesListHost.NameNew(string name) => AsUndoStep(() => EditingName = name);
+    Task ISubAssembliesListHost.DeleteAsync(StandaloneSubAssemblyRow row) => DeleteAsync(row, Form);
 
-    void ISubAssembliesListHost.ClearNewName() => EditingName = string.Empty;
+    void ISubAssembliesListHost.NameNew(string name) => Form?.NameNew(name);
 
-    void ISubAssembliesListHost.RenamedOnForm(string name)
+    void ISubAssembliesListHost.ClearNewName() => Form?.ClearNewName();
+
+    void ISubAssembliesListHost.Renamed(int id, string name) => Tabs.Holding(id)?.Form.TakeRename(name);
+
+    void ISubAssembliesListHost.Moved(IReadOnlyList<SubAssemblyMove> moves)
     {
-        HeaderTitle = name;
-        EditingName = name;
-        History.RewriteAll(snapshot => snapshot with { Name = name });
+        foreach (var move in moves)
+        {
+            Tabs.Holding(move.SubAssemblyId)?.Form.TakeMove(move.RoleId);
+        }
     }
 
-    void ISubAssembliesListHost.MovedOnForm(int roleId)
+    void ISubAssembliesListHost.RoleDeleted(int roleId)
     {
-        EditingRole = Roles.FirstOrDefault(r => r.Id == roleId);
-        History.RewriteAll(snapshot => snapshot with { RoleId = roleId });
+        foreach (var tab in Tabs.All)
+        {
+            tab.Form.ForgetRole(roleId);
+        }
     }
 
-    void ISubAssembliesListHost.RoleDeleted(int roleId) =>
-        History.RewriteAll(snapshot => snapshot.RoleId == roleId ? snapshot with { RoleId = null } : snapshot);
+    bool ISubAssembliesListHost.HasUnsavedChangesFor(int id) => Tabs.Holding(id)?.Form.HasUnsavedChanges == true;
 
-    public void Dispose()
+    SavedVersionCheck? ISubAssembliesListHost.SavedVersionFor(IEnumerable<int> ids) =>
+        ids.Select(id => Tabs.Holding(id)).OfType<RecordTab<SubAssemblyForm>>()
+            .Select(tab => ((IRecordListHost)tab.Form).ShowingSavedVersion)
+            .FirstOrDefault(check => check is not null);
+
+    bool IRecordListHost.IsDirty => Form?.HasUnsavedChanges == true;
+
+    string? IRecordListHost.ErrorMessage => Runner.ErrorMessage;
+
+    // A new sub-assembly takes a tab of its own, or the preview tab, and replaces no form with changes: nothing to ask.
+    Task IRecordListHost.AfterUnsavedChangesAsync(Action then)
     {
-        // A change still settling when the app closes is written now, rather than lost.
-        List.Dispose();
-
-        Dependents.Dispose();
-        _picks.Dispose();
-        _newProductRequests.Dispose();
+        then();
+        return Task.CompletedTask;
     }
+
+    SavedVersionCheck? IRecordListHost.ShowingSavedVersion => (Form as IRecordListHost)?.ShowingSavedVersion;
+
+    Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
+    {
+        var saved = ids.ToList();
+        foreach (var tab in Tabs.All)
+        {
+            tab.Form.FollowOwnSaveOf(saved);
+        }
+
+        return LoadCommand.ExecuteAsync();
+    }
+
+    bool IFormPartHost.IsBusyApplying => Form is IFormPartHost form ? form.IsBusyApplying : IsBusyApplying;
+
+    Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => ConfirmedAsync(Form, question, action);
+
+    void IFormPartHost.ApplyRefresh(Action merge) => ApplyRefresh(merge);
+
+    BackgroundWork IScreenPartHost.Work => Form is IScreenPartHost form ? form.Work : Work;
+
+    Task IScreenPartHost.RunSafelyAsync(Func<Task> action) => Form is IScreenPartHost form ? form.RunSafelyAsync(action) : RunSafelyAsync(action);
+
+    void IScreenPartHost.LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load);
+
+    void IScreenPartHost.ShowError(string? message)
+    {
+        if (Form is IScreenPartHost form)
+        {
+            form.ShowError(message);
+        }
+        else
+        {
+            ErrorMessage = message;
+        }
+    }
+
+    void IScreenPartHost.ShowSuccess(string? message)
+    {
+        if (Form is IScreenPartHost form)
+        {
+            form.ShowSuccess(message);
+        }
+        else
+        {
+            SuccessMessage = message;
+        }
+    }
+
+    void IScreenPartHost.ShowFailure(Exception exception, string? context)
+    {
+        if (Form is IScreenPartHost form)
+        {
+            form.ShowFailure(exception, context);
+        }
+        else
+        {
+            ShowFailure(exception, context);
+        }
+    }
+
+    void IUndoRecorder.BeginUndoStep() => (Form as IUndoRecorder)?.BeginUndoStep();
+
+    void IUndoRecorder.EndUndoStep() => (Form as IUndoRecorder)?.EndUndoStep();
+
+    bool IUndoRecorder.IsEditPending
+    {
+        get => Form is IUndoRecorder form && form.IsEditPending;
+        set
+        {
+            if (Form is IUndoRecorder form)
+            {
+                form.IsEditPending = value;
+            }
+        }
+    }
+
+    int IUndoRecorder.FormVersion => (Form as IUndoRecorder)?.FormVersion ?? 0;
 }

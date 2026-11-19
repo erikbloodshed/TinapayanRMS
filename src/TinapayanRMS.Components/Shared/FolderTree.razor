@@ -62,8 +62,8 @@
     // changes (ASP.NET Core's rendering guidance: avoid recreating delegates for many repeated elements).
     private readonly Dictionary<object, RowEvents> _rowEvents = new(ReferenceEqualityComparer.Instance);
 
-    // A drag is the page's own (watchTreeDrag), so a row's handlers are its click and its menu.
-    private sealed record RowEvents(EventCallback<MouseEventArgs> Click, EventCallback<MouseEventArgs> ContextMenu);
+    // A drag is the page's own (watchTreeDrag), so a row's handlers are its click, its double-click and its menu.
+    private sealed record RowEvents(EventCallback<MouseEventArgs> Click, EventCallback<MouseEventArgs> DoubleClick, EventCallback<MouseEventArgs> ContextMenu);
 
     private RowEvents EventsOf(TNode node)
     {
@@ -71,6 +71,7 @@
         {
             events = new RowEvents(
                 EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowClick(node, e)),
+                EventCallback.Factory.Create<MouseEventArgs>(this, () => OnRowDoubleClick(node)),
                 EventCallback.Factory.Create<MouseEventArgs>(this, e => OnRowContextMenu(node, e)));
             _rowEvents[node] = events;
         }
@@ -136,6 +137,12 @@
     /// </summary>
     [Parameter] public Func<CancellationToken, Task> SecondClickWait { get; set; } = cancellation => Task.Delay(500, cancellation);
 
+    /// <summary>
+    /// What a double-click on a record's row does, after its first click has picked it: a record view keeps the record's tab
+    /// open (RecordViewState.Keep). Nothing on a folder's row, whose clicks open and close it. None when it's null.
+    /// </summary>
+    [Parameter] public Action<TNode>? DoubleClick { get; set; }
+
     private string ElementId(TNode node) => "tree-" + KeyOf(node).Replace('/', '-').Replace(' ', '-');
 
     private RenderFragment RenderNode(TNode node, int depth) => builder =>
@@ -177,6 +184,11 @@
 
         var events = EventsOf(node);
         builder.AddAttribute(seq++, "onclick", events.Click);
+        if (DoubleClick is not null && !isFolder)
+        {
+            builder.AddAttribute(seq++, "ondblclick", events.DoubleClick);
+        }
+
         builder.AddAttribute(seq++, "oncontextmenu", events.ContextMenu);
         builder.AddEventStopPropagationAttribute(seq++, "oncontextmenu", true);
 
@@ -324,6 +336,16 @@
         else if (wasPickedAlone && e.Detail <= 1 && RenamesOnSecondClick?.Invoke(node) == true)
         {
             _ = RenameAfterWaitAsync(node);
+        }
+    }
+
+    // A double-click renames nothing: its second click calls off any rename waiting, as a third would.
+    private void OnRowDoubleClick(TNode node)
+    {
+        CancelSecondClick();
+        if (IsEditing?.Invoke(node) != true)
+        {
+            DoubleClick?.Invoke(node);
         }
     }
 

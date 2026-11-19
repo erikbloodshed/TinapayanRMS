@@ -134,7 +134,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         var state = await OpenedStateAsync(id);
         TypeGrams(state, 250m);
 
-        await state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(id, fillingRoleId)]);
+        await state.View.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(id, fillingRoleId)]);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -167,7 +167,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         TypeGrams(state, 250m);
 
         await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
-        await state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(id, fillingRoleId)]);
+        await state.View.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(id, fillingRoleId)]);
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Sweet Dough"));
         await using var dbContext = CreateDbContext();
@@ -184,7 +184,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         TypeGrams(state, 250m);
 
         await AnotherPcSavesAsync(id, flourId, "Sweet Dough", 200m);
-        await state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(otherId, toppingRoleId)]);
+        await state.View.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(otherId, toppingRoleId)]);
         state.ErrorMessage.Should().BeNull("the move is of another sub-assembly, which nobody has saved");
 
         await state.SaveCommand.ExecuteAsync();
@@ -253,7 +253,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
     });
 
     /// <summary>One cell typed and left, as the line table brackets it in the app.</summary>
-    private static void TypeGrams(SubAssembliesState state, decimal grams)
+    private static void TypeGrams(SubAssemblyForm state, decimal grams)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -261,15 +261,15 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         recorder.EndUndoStep();
     }
 
-    private static Task ShowingAsync(SubAssembliesState state, string name, decimal grams) =>
+    private static Task ShowingAsync(SubAssemblyForm state, string name, decimal grams) =>
         Settle.UntilAsync(state,
             () => state.EditingName == name && state.Batch.Lines.Count == 1 && state.Batch.Lines[0].Grams == grams && !state.History.IsDirty,
             () => $"name={state.EditingName}, lines={state.Batch.Lines.Count}, dirty={state.History.IsDirty}");
 
-    private static async Task RenameFromTheListAsync(SubAssembliesState state, int id, string name)
+    private static async Task RenameFromTheListAsync(SubAssemblyForm state, int id, string name)
     {
-        await state.List.RenameSubAssemblyCommand.ExecuteAsync((SubAssemblyLeafNode)state.List.SubAssemblyTree.Find(id)!);
-        await state.List.CommitTreeNameAsync(name);
+        await state.View.List.RenameSubAssemblyCommand.ExecuteAsync((SubAssemblyLeafNode)state.View.List.SubAssemblyTree.Find(id)!);
+        await state.View.List.CommitTreeNameAsync(name);
     }
 
     /// <summary>As every sub-assembly was when the column came: no save has stamped it.</summary>
@@ -307,7 +307,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
     }
 
     /// <summary>The screen with <paramref name="id"/> open on the form, its lines in.</summary>
-    private async Task<SubAssembliesState> OpenedStateAsync(int id)
+    private async Task<SubAssemblyForm> OpenedStateAsync(int id)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -318,7 +318,7 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
         return state;
     }
 
-    private SubAssembliesState CreateState()
+    private SubAssemblyForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -332,6 +332,6 @@ public class SubAssembliesStateSavedVersionTests(DatabaseFixture fixture) : Pers
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

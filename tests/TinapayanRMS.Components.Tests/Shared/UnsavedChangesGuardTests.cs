@@ -4,6 +4,7 @@ using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Tests.Fixtures;
 using TinapayanRMS.Presentation.Settings;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.SubAssemblies;
 
 namespace TinapayanRMS.Components.Tests.Shared;
 
@@ -143,6 +144,31 @@ public class UnsavedChangesGuardTests
         }
 
         app.KeepsWindowOpen.Should().BeNull("no page is loaded");
+    }
+
+    // A record view's tab keeps its form while another tab, or another screen, shows: no page shows it, so the window asks
+    // about it itself as it closes, and Cancel keeps the window open.
+    [Test]
+    public async Task A_record_views_tab_with_changes_not_showing_is_asked_about_as_the_window_closes()
+    {
+        await using var context = AppServices.NewContext();
+        var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
+        var confirmations = context.Services.GetRequiredService<Confirmations>();
+        var view = context.Services.GetRequiredService<SubAssembliesState>();
+        var form = view.Form!;
+        guard.HasUnsavedChanges.Should().BeFalse("the view opens on a blank form");
+
+        form.EditingName = "Sweet Dough";
+        await view.NewCommand.ExecuteAsync();
+        view.Form.Should().NotBeSameAs(form, "the one with changes stays in its own tab");
+        guard.HasUnsavedChanges.Should().BeTrue();
+
+        var closing = guard.ResolveBeforeClosingAsync();
+        confirmations.Question.Should().StartWith("Save the changes to Sweet Dough?");
+        confirmations.Answer(UnsavedChangesAnswer.Cancel);
+
+        (await closing).Should().BeFalse("Cancel keeps the window open");
+        form.EditingName.Should().Be("Sweet Dough");
     }
 
     [Test]

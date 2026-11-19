@@ -58,7 +58,7 @@ public class SubAssembliesStatePrintTests(DatabaseFixture fixture) : Persistence
     });
 
     /// <summary>A saved standalone sub-assembly of 1,000 g of flour at 0.05 and 200 g of sugar at 0.09, open in the form.</summary>
-    private async Task<SubAssembliesState> OpenSavedSubAssemblyAsync()
+    private async Task<SubAssemblyForm> OpenSavedSubAssemblyAsync()
     {
         var roleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -79,9 +79,9 @@ public class SubAssembliesStatePrintTests(DatabaseFixture fixture) : Persistence
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single(r => r.Id == subAssemblyId));
+        state.Pick(state.View.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");
         return state;
     }

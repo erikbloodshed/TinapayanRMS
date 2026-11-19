@@ -176,6 +176,18 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     protected void FollowOwnSaveOnNextLoad() => _savedVersionFollowsNextLoad = true;
 
     /// <summary>
+    /// A record view's list has saved the records <paramref name="ids"/> itself (a rename, a move), before the view loads: the
+    /// form takes its record's new saved time if it's one of them (<see cref="FollowOwnSaveOnNextLoad"/>).
+    /// </summary>
+    internal void FollowOwnSaveOf(IEnumerable<int> ids)
+    {
+        if (ids.Contains(ShowingRecordId))
+        {
+            FollowOwnSaveOnNextLoad();
+        }
+    }
+
+    /// <summary>
     /// How the form follows the record it shows, as a load finds it saved at <paramref name="storedSavedAt"/>. Saved as the
     /// form took it: nothing. Saved since with nothing typed: true, so the screen loads the record into the form again,
     /// whoever saved it, which shows what the form would otherwise save over. Saved since with something typed: by the window

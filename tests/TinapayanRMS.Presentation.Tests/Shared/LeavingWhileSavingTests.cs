@@ -98,7 +98,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
         var state = CreateSubAssembliesState(factory);
         await state.LoadCommand.ExecuteAsync();
-        await Settle.PickAsync(state, () => state.Pick(state.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
+        await Settle.PickAsync(state, () => state.Pick(state.View.List.Rows.Single()), () => state.EditingName == "Almond Dough" && state.Batch.Lines.Count == 1);
         var asked = CountQuestions(state);
         state.EditingName = "Almond Loaf Dough";
 
@@ -108,7 +108,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         asked().Should().Be(0, "the Save was waited for and left nothing unsaved (error: {0})", state.ErrorMessage);
         waited.Should().BeTrue("it waited for the Save rather than ask while it ran");
         state.ErrorMessage.Should().BeNull();
-        state.List.Rows.Should().ContainSingle().Which.Name.Should().Be("Almond Loaf Dough");
+        state.View.List.Rows.Should().ContainSingle().Which.Name.Should().Be("Almond Loaf Dough");
     });
 
     // A Save that's refused leaves the form as it was, unsaved: the question still comes, once the Save is back.
@@ -219,7 +219,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
             new LoggerConfiguration().CreateLogger());
     }
 
-    private SubAssembliesState CreateSubAssembliesState(FailingDbContextFactory factory)
+    private SubAssemblyForm CreateSubAssembliesState(FailingDbContextFactory factory)
     {
         return new SubAssembliesState(
             new SubAssemblyRepository(factory),
@@ -231,6 +231,6 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
             new SubAssemblyRoleValidator(),
             new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

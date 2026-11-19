@@ -6,6 +6,7 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
@@ -13,53 +14,62 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// What the Sub-Assemblies list asks of its screen, on top of what any record screen's list asks: the sub-assembly the form
-/// shows, and what the list's actions do to it.
+/// What the Sub-Assemblies list asks of its view, on top of what any record screen's list asks: the form showing, and what
+/// the list's actions do to the forms holding the sub-assemblies they act on (SubAssembliesState).
 /// </summary>
 public interface ISubAssembliesListHost : IRecordListHost
 {
-    /// <summary>The sub-assembly picked, which the form shows; null for a new one.</summary>
+    /// <summary>The sub-assembly the form showing is for, whose row the list picks; null for a new one, or no form.</summary>
     StandaloneSubAssemblyRow? SelectedRow { get; }
 
-    /// <summary>The sub-assembly the form holds: 0 for a new one, or a copy, not saved yet.</summary>
-    int EditingId { get; }
-
-    /// <summary>The role the form's sub-assembly is in, which a new one's row is filed under.</summary>
+    /// <summary>The role the form showing is in, which a new sub-assembly's row is filed under.</summary>
     SubAssemblyRole? EditingRole { get; }
 
-    /// <summary>Reads the screen's lists again (its LoadCommand), keeping the form and what's typed into it.</summary>
+    /// <summary>Reads the view's lists again (its LoadCommand), keeping every form and what's typed into it.</summary>
     Task LoadAsync();
 
-    /// <summary>A sub-assembly's row picked in the list: it opens, once the form's unsaved changes are saved or let go.</summary>
+    /// <summary>A sub-assembly's row picked in the list: it shows in its own tab, or the preview tab.</summary>
     void Pick(StandaloneSubAssemblyRow row);
 
-    /// <summary>A fresh form for a new sub-assembly in <paramref name="role"/>, or the first role.</summary>
+    /// <summary>A sub-assembly's row double-clicked in the list: it shows in a tab that stays, not the preview tab.</summary>
+    void KeepOpen(StandaloneSubAssemblyRow row);
+
+    /// <summary>A fresh form for a new sub-assembly in <paramref name="role"/>, or the first role, in the preview tab.</summary>
     void StartNew(SubAssemblyRole? role);
 
-    /// <summary>Deletes the sub-assembly once it's confirmed, as the header's Delete does.</summary>
+    /// <summary>Deletes the sub-assembly once it's confirmed, as a form's Delete does.</summary>
     Task DeleteAsync(StandaloneSubAssemblyRow row);
 
-    /// <summary>The name typed into the new sub-assembly's row goes into the form, as typed there: one undo step.</summary>
+    /// <summary>The name typed into the new sub-assembly's row goes into the form showing, as typed there: one undo step.</summary>
     void NameNew(string name);
 
     /// <summary>The new sub-assembly's row went with Esc: the name its form was given goes too, as no edit of the user's.</summary>
     void ClearNewName();
 
-    /// <summary>The sub-assembly the form shows was renamed in the list, saved: the form and its undo steps take the name as given.</summary>
-    void RenamedOnForm(string name);
+    /// <summary>A sub-assembly was renamed in the list, saved: the form holding it, if any, and its undo steps take the name as given.</summary>
+    void Renamed(int id, string name);
 
-    /// <summary>The sub-assembly the form shows was moved to another role, saved: the form and its undo steps take the role as given.</summary>
-    void MovedOnForm(int roleId);
+    /// <summary>Sub-assemblies were moved to other roles, saved: the forms holding them, and their undo steps, take the roles as given.</summary>
+    void Moved(IReadOnlyList<SubAssemblyMove> moves);
 
-    /// <summary>A role was deleted: the form's undo steps forget it, so none puts back a role there's no longer any of.</summary>
+    /// <summary>A role was deleted: every form's undo steps forget it, so none puts back a role there's no longer any of.</summary>
     void RoleDeleted(int roleId);
+
+    /// <summary>Whether a form holds the sub-assembly <paramref name="id"/> with changes not saved yet.</summary>
+    bool HasUnsavedChangesFor(int id);
+
+    /// <summary>
+    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
+    /// and the time it took it, so the write is refused over a save made since; null when none does.
+    /// </summary>
+    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
 }
 
 /// <summary>
 /// The Sub-Assemblies list (through SubAssembliesState.List; SubAssembliesListCard draws it): the standalone sub-assemblies,
 /// searched by name and filed in a folder for each role, the rows picked, its menus and keys, moves and their Undo, naming in
-/// place, the roles as its folders, and Make In-House. What its actions do to the sub-assembly the form shows, it asks of the
-/// screen (<see cref="ISubAssembliesListHost"/>).
+/// place, the roles as its folders, and Make In-House. What its actions do to the forms holding the sub-assemblies they act
+/// on, it asks of the view (<see cref="ISubAssembliesListHost"/>).
 /// </summary>
 public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
 {
@@ -269,9 +279,18 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         }
     }
 
+    /// <summary>A row double-clicked: a sub-assembly's shows in a tab that stays, as a file double-clicked does in Visual Studio Code.</summary>
+    public void KeepOpen(SubAssemblyTreeNode node)
+    {
+        if (node is SubAssemblyLeafNode { IsNew: false } leaf)
+        {
+            _host.KeepOpen(leaf.Row);
+        }
+    }
+
     /// <summary>
-    /// Saves <paramref name="moves"/> and files the sub-assemblies in their new folders. On the one the form shows, the
-    /// Role picker follows, and every undo step takes the new role as given, so no undo puts the old one back for a Save to
+    /// Saves <paramref name="moves"/> and files the sub-assemblies in their new folders. On a form holding one, the Role
+    /// picker follows, and every undo step takes the new role as given, so no undo puts the old one back for a Save to
     /// write; whatever else is typed there stays unsaved.
     /// </summary>
     private async Task MoveSubAssembliesAsync(IReadOnlyList<SubAssemblyMove> moves, bool isUndo)
@@ -289,14 +308,12 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _subAssemblyRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
+        var ids = moves.Select(m => m.SubAssemblyId).ToList();
+        await _subAssemblyRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
 
-        // The load only re-points the selection at the fresh copy: with something typed, the form isn't loaded again.
-        await _host.LoadAfterSavingAsync(moves.Select(m => m.SubAssemblyId));
-        if (moves.FirstOrDefault(m => m.SubAssemblyId == _host.EditingId) is { } onForm)
-        {
-            _host.MovedOnForm(onForm.RoleId);
-        }
+        // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
+        await _host.LoadAfterSavingAsync(ids);
+        _host.Moved(moves);
 
         // Picks again the rows the tree dropped from its selection as they moved.
         ListSelection.Restore(picked, r => r is not SubAssemblyLeafNode leaf || SubAssemblyTree.Find(leaf.Row.Id) == leaf);
@@ -453,13 +470,13 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// The list's Make In-House Ingredient, saved at once once the prompt is answered: a new made ingredient made from the
     /// recipe, in the Made category picked, with no add-ins and no weight loss. The
     /// recipe stays here as it is, and the products linking it are
-    /// left alone; it shows under Dependents. The form's unsaved changes to it have to be saved or undone first: the made
+    /// left alone; it shows under Dependents. A form's unsaved changes to it have to be saved or undone first: the made
     /// ingredient is made from it as it's saved.
     /// </summary>
     private async Task MakeInHouseIngredientAsync(StandaloneSubAssemblyRow row)
     {
         _host.ShowError(null);
-        if (_host.EditingId == row.Id && _host.IsDirty)
+        if (_host.HasUnsavedChangesFor(row.Id))
         {
             _host.ShowError($"Save {row.Name} first, or undo its changes: the made ingredient is made from it as it's saved.");
             return;
@@ -647,18 +664,15 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// Saves <paramref name="name"/> as the sub-assembly's at once. On the one the form shows, the title and the name box
-    /// take it, and the form's undo steps take it as given, as a move gives them its role: whatever else is typed there
-    /// stays to be saved, and no undo brings the old name back for a Save to write.
+    /// Saves <paramref name="name"/> as the sub-assembly's at once. On a form holding it, the title and the name box take
+    /// it, and the form's undo steps take it as given, as a move gives them its role: whatever else is typed there stays to
+    /// be saved, and no undo brings the old name back for a Save to write.
     /// </summary>
     private async Task RenameSubAssemblyToAsync(StandaloneSubAssemblyRow row, string name)
     {
-        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
+        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.SavedVersionFor([row.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([row.Id]);
-        if (_host.EditingId == row.Id)
-        {
-            _host.RenamedOnForm(name);
-        }
+        _host.Renamed(row.Id, name);
     }
 
     /// <summary>

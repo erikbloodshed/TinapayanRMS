@@ -2,7 +2,8 @@
 @* Sub-Assemblies' list: a search box; the list's commands as icons; the standalone
    sub-assemblies in a folder for each role; and what the last move did, with Undo. Dragging sub-assemblies onto another
    role's folder gives them that role, saved at once; a right-click opens the row's menu, or the list's. A name is typed
-   in place, as in a file explorer (TreeNameEdit): a sub-assembly or role renamed, or a new sub-assembly or folder named. *@
+   in place, as in a file explorer (TreeNameEdit): a sub-assembly or role renamed, or a new sub-assembly or folder named.
+   A click on a sub-assembly opens it in the preview tab; a double-click, in a tab that stays. *@
 <section class="card list-card tree-card">
     <div class="list-heading">
         <h2 class="section-header">Sub-Assemblies</h2>
@@ -33,7 +34,8 @@
                 CanDrop="(dragged, target) => Screen.CanDrop(dragged, target)"
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="List.TreeMenuFor"
-                Shortcut="List.TreeShortcut">
+                Shortcut="List.TreeShortcut"
+                DoubleClick="List.KeepOpen">
         <RowTemplate Context="node">@RowContent(node, List)</RowTemplate>
     </FolderTree>
 

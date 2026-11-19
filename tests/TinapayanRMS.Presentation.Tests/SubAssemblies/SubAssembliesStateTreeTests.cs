@@ -33,10 +33,10 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await AddRoleAsync("Packaging", sortOrder: 3, isPackaging: true);
         var doughId = await AddRecipeAsync("Pandesal Dough", doughRoleId);
         var state = await LoadedStateAsync();
-        var leaf = state.List.SubAssemblyTree.Find(doughId)!;
-        state.List.SelectedTreeNode = leaf;
+        var leaf = state.View.List.SubAssemblyTree.Find(doughId)!;
+        state.View.List.SelectedTreeNode = leaf;
 
-        var menu = state.List.TreeMenuFor(leaf);
+        var menu = state.View.List.TreeMenuFor(leaf);
 
         Headers(menu).Should().Equal("Move to", "Rename", "Make In-House Ingredient…", "Delete");
         menu.Single(i => i.Header == "Rename").Gesture.Should().Be("F2");
@@ -54,14 +54,14 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var doughId = await AddRecipeAsync("Pandesal Dough", doughRoleId);
         var setId = await AddPackagingSetAsync("Gift Set", packagingRoleId);
         var state = await LoadedStateAsync();
-        var set = state.List.SubAssemblyTree.Find(setId)!;
+        var set = state.View.List.SubAssemblyTree.Find(setId)!;
 
-        Headers(state.List.TreeMenuFor(set)).Should().Equal("Rename", "Delete");
+        Headers(state.View.List.TreeMenuFor(set)).Should().Equal("Rename", "Delete");
 
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Find(doughId);
-        state.List.SelectedTreeNodes.Add(set);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Find(doughId);
+        state.View.List.SelectedTreeNodes.Add(set);
 
-        state.List.TreeMenuFor(set).Should().BeEmpty();
+        state.View.List.TreeMenuFor(set).Should().BeEmpty();
     });
 
     [Test]
@@ -71,19 +71,19 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
-        var halaya = state.List.SubAssemblyTree.Find(halayaId)!;
-        var filling = state.List.SubAssemblyTree.Folder(fillingRoleId)!;
+        IListTreeScreen screen = state.View.List;
+        var halaya = state.View.List.SubAssemblyTree.Find(halayaId)!;
+        var filling = state.View.List.SubAssemblyTree.Folder(fillingRoleId)!;
 
         screen.CanDrag(halaya).Should().BeTrue();
         screen.CanDrag(filling).Should().BeFalse("a folder isn't dragged");
-        screen.CanDrop([halaya], state.List.SubAssemblyTree.Folder(doughRoleId)).Should().BeFalse("it's there already");
+        screen.CanDrop([halaya], state.View.List.SubAssemblyTree.Folder(doughRoleId)).Should().BeFalse("it's there already");
 
         (await screen.DropAsync([halaya], filling)).Should().BeSameAs(halaya);
 
         (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
         filling.SubAssemblies.Should().ContainSingle();
-        state.List.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
+        state.View.List.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
     });
 
     [Test]
@@ -94,11 +94,11 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         var yemaId = await AddRecipeAsync("Yema", doughRoleId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
+        IListTreeScreen screen = state.View.List;
 
-        var firstMove = state.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(halayaId, fillingRoleId)]);
-        state.List.MoveSubAssembliesCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
-        (await screen.DropAsync([state.List.SubAssemblyTree.Find(yemaId)!], state.List.SubAssemblyTree.Folder(fillingRoleId)))
+        var firstMove = state.View.List.MoveSubAssembliesCommand.ExecuteAsync([new SubAssemblyMove(halayaId, fillingRoleId)]);
+        state.View.List.MoveSubAssembliesCommand.CanExecute([]).Should().BeFalse("the move is under way, as a drop would find it");
+        (await screen.DropAsync([state.View.List.SubAssemblyTree.Find(yemaId)!], state.View.List.SubAssemblyTree.Folder(fillingRoleId)))
             .Should().BeNull("a move is still saving");
         await firstMove;
 
@@ -118,16 +118,16 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
 
         state.ErrorMessage.Should().BeNull();
         (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
-        state.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Should().ContainSingle();
-        state.List.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
+        state.View.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Should().ContainSingle();
+        state.View.List.MoveNotice.Should().Be("Moved Ube Halaya to Filling");
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         (await RoleOfAsync(halayaId)).Should().Be(doughRoleId);
-        state.List.SubAssemblyTree.Folder(doughRoleId)!.SubAssemblies.Should().ContainSingle();
-        state.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        state.List.UndoMoveCommand.CanExecute().Should().BeFalse();
+        state.View.List.SubAssemblyTree.Folder(doughRoleId)!.SubAssemblies.Should().ContainSingle();
+        state.View.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
+        state.View.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -139,14 +139,14 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var jamId = await AddRecipeAsync("Ube Jam", doughRoleId);
         var custardId = await AddRecipeAsync("Custard", fillingRoleId);
         var state = await OpenedStateAsync(halayaId);
-        var tree = state.List.SubAssemblyTree;
+        var tree = state.View.List.SubAssemblyTree;
 
         // Ctrl+clicks: the rows join the first, which stays the one showing.
-        state.List.SelectedTreeNodes.Add(tree.Find(jamId)!);
-        state.List.SelectedTreeNodes.Add(tree.Find(custardId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(jamId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(custardId)!);
         state.SelectedRow!.Id.Should().Be(halayaId);
 
-        var menu = state.List.TreeMenuFor(tree.Find(jamId));
+        var menu = state.View.List.TreeMenuFor(tree.Find(jamId));
 
         Headers(menu).Should().Equal(["Move 3 Sub-Assemblies to"], "renaming or deleting is for one at a time");
         await RunAsync(menu[0].Items.Single(i => i.Header == "Filling"));
@@ -154,8 +154,8 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         state.ErrorMessage.Should().BeNull();
         (await RoleOfAsync(halayaId)).Should().Be(fillingRoleId);
         (await RoleOfAsync(jamId)).Should().Be(fillingRoleId);
-        state.List.MoveNotice.Should().Be("Moved 2 sub-assemblies to Filling", "Custard was there already");
-        state.List.SelectedTreeSubAssemblies.Select(l => l.Row.Id).Should().Equal(halayaId, jamId, custardId);
+        state.View.List.MoveNotice.Should().Be("Moved 2 sub-assemblies to Filling", "Custard was there already");
+        state.View.List.SelectedTreeSubAssemblies.Select(l => l.Row.Id).Should().Equal(halayaId, jamId, custardId);
         state.SelectedRow!.Id.Should().Be(halayaId);
     });
 
@@ -198,14 +198,14 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
                 new LinkedUsageDraft(ownGlazeId, UsageAuthoredField.WeightPerPiece, 5m),
             ]));
         var state = await LoadedStateAsync();
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Find(glazeId);
-        state.List.SelectedTreeNodes.Add(state.List.SubAssemblyTree.Find(ownGlazeId)!);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Find(glazeId);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.SubAssemblyTree.Find(ownGlazeId)!);
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(glazeId)).Single().Items.Single(i => i.Header == "Topping"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(glazeId)).Single().Items.Single(i => i.Header == "Topping"));
 
         state.ErrorMessage.Should().StartWith("Cream Loaf, which links this sub-assembly, has two Topping sub-assemblies called Glaze.");
-        state.List.MoveNotice.Should().BeNull();
-        state.List.SubAssemblyTree.Folder(toppingRoleId)!.SubAssemblies.Should().BeEmpty();
+        state.View.List.MoveNotice.Should().BeNull();
+        state.View.List.SubAssemblyTree.Folder(toppingRoleId)!.SubAssemblies.Should().BeEmpty();
         (await RoleOfAsync(glazeId)).Should().Be(fillingRoleId);
     });
 
@@ -216,17 +216,17 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         var state = await OpenedStateAsync(halayaId);
         Edit(state, () => state.Batch.Lines[0].Grams = 250m);
-        var halaya = state.List.SubAssemblyTree.Find(halayaId)!;
+        var halaya = state.View.List.SubAssemblyTree.Find(halayaId)!;
 
-        await RunAsync(state.List.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
+        await RunAsync(state.View.List.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
 
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "Ube Halaya"));
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "Ube Halaya"));
 
-        await state.List.CommitTreeNameAsync(" Ube Spread ");
-        await state.List.CommitTreeNameAsync("Ube Spread Again");
+        await state.View.List.CommitTreeNameAsync(" Ube Spread ");
+        await state.View.List.CommitTreeNameAsync("Ube Spread Again");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
         await using (var dbContext = CreateDbContext())
         {
             var saved = await dbContext.SubAssemblies.SingleAsync(s => s.Id == halayaId, Cancellation);
@@ -236,7 +236,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
 
         state.EditingName.Should().Be("Ube Spread");
         state.HeaderTitle.Should().Be("Ube Spread");
-        state.List.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Spread");
+        state.View.List.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Spread");
         state.History.IsDirty.Should().BeTrue("the grams are still to be saved");
 
         state.TryUndo().Should().BeTrue();
@@ -252,25 +252,25 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var halayaId = await AddRecipeAsync("Ube Halaya", doughRoleId);
         await AddRecipeAsync("Ube Jam", doughRoleId);
         var state = await LoadedStateAsync();
-        var halaya = state.List.SubAssemblyTree.Find(halayaId)!;
+        var halaya = state.View.List.SubAssemblyTree.Find(halayaId)!;
 
-        await RunAsync(state.List.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
-        await state.List.CommitTreeNameAsync("ube jam");
+        await RunAsync(state.View.List.TreeMenuFor(halaya).Single(i => i.Header == "Rename"));
+        await state.View.List.CommitTreeNameAsync("ube jam");
 
         state.ErrorMessage.Should().NotBeNullOrEmpty();
-        state.List.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Halaya");
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "ube jam"));
+        state.View.List.SubAssemblyTree.Find(halayaId)!.Title.Should().Be("Ube Halaya");
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(halaya, "ube jam"));
 
         // Esc, an empty name and the same name leave it be; so does a search.
-        state.List.CancelTreeName();
-        state.List.SelectedTreeNode = halaya;
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync(" ");
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync("Ube Halaya");
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        state.List.SearchText = "ube";
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.CancelTreeName();
+        state.View.List.SelectedTreeNode = halaya;
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync(" ");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync("Ube Halaya");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        state.View.List.SearchText = "ube";
+        state.View.List.TreeNameEdit.Should().BeNull();
         (await NameOfAsync(halayaId)).Should().Be("Ube Halaya");
     });
 
@@ -282,25 +282,25 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 3, isPackaging: true);
         var ubeId = await AddIngredientAsync("Ube");
         var state = await LoadedStateAsync();
-        var filling = state.List.SubAssemblyTree.Folder(fillingRoleId)!;
-        state.List.SearchText = "nothing like it";
+        var filling = state.View.List.SubAssemblyTree.Folder(fillingRoleId)!;
+        state.View.List.SearchText = "nothing like it";
 
-        await RunAsync(state.List.TreeMenuFor(filling).Single(i => i.Header == "New Sub-Assembly Here"));
+        await RunAsync(state.View.List.TreeMenuFor(filling).Single(i => i.Header == "New Sub-Assembly Here"));
 
-        state.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
-        var row = state.List.SubAssemblyTree.PendingSubAssembly!;
+        state.View.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
+        var row = state.View.List.SubAssemblyTree.PendingSubAssembly!;
         filling.Children.Should().Equal(row);
         filling.Count.Should().Be(0, "it isn't a sub-assembly until it's saved");
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New sub-assembly"));
-        state.List.TreeMenuFor(row).Should().BeEmpty();
-        state.List.SelectedTreeSubAssemblies.Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New sub-assembly"));
+        state.View.List.TreeMenuFor(row).Should().BeEmpty();
+        state.View.List.SelectedTreeSubAssemblies.Should().BeEmpty();
         state.EditingRole!.Id.Should().Be(fillingRoleId);
 
-        await state.List.CommitTreeNameAsync("Ube Halaya");
+        await state.View.List.CommitTreeNameAsync("Ube Halaya");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
         row.Title.Should().Be("Ube Halaya");
         state.EditingName.Should().Be("Ube Halaya");
         state.History.IsDirty.Should().BeTrue("Save is offered for it");
@@ -312,16 +312,16 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.SubAssemblyTree.PendingSubAssembly.Should().BeNull();
+        state.View.List.SubAssemblyTree.PendingSubAssembly.Should().BeNull();
         filling.SubAssemblies.Select(l => l.Title).Should().Equal("Ube Halaya");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Find(state.SelectedRow!.Id));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Find(state.SelectedRow!.Id));
 
         // In the Packaging role, a packaging set; Esc takes its row away, and Copy the form's.
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(packagingRoleId)).Single(i => i.Header == "New Packaging Set Here"));
-        state.List.TreeNameEdit!.InitialText.Should().Be("New packaging set");
-        state.List.CancelTreeName();
-        state.List.SubAssemblyTree.Folder(packagingRoleId)!.Children.Should().BeEmpty();
-        state.List.SelectedTreeNode.Should().BeNull();
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(packagingRoleId)).Single(i => i.Header == "New Packaging Set Here"));
+        state.View.List.TreeNameEdit!.InitialText.Should().Be("New packaging set");
+        state.View.List.CancelTreeName();
+        state.View.List.SubAssemblyTree.Folder(packagingRoleId)!.Children.Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeNull();
     });
 
     [Test]
@@ -331,18 +331,18 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await AddRoleAsync("Filling", sortOrder: 2);
         var state = await LoadedStateAsync();
         AnswerUnsavedChanges(state, UnsavedChangesAnswer.DontSave);
-        var dough = state.List.SubAssemblyTree.Folder(doughRoleId)!;
+        var dough = state.View.List.SubAssemblyTree.Folder(doughRoleId)!;
 
         await state.NewCommand.ExecuteAsync();
-        await state.List.CommitTreeNameAsync("Sweet Dough");
+        await state.View.List.CommitTreeNameAsync("Sweet Dough");
 
         dough.Children.Select(c => c.Title).Should().Equal("Sweet Dough");
 
         (await state.ResolveUnsavedChangesAsync(revert: true)).Should().BeTrue("Don't Save puts the form back blank");
 
-        state.List.SubAssemblyTree.PendingSubAssembly.Should().BeNull("put back blank, it has no row");
+        state.View.List.SubAssemblyTree.PendingSubAssembly.Should().BeNull("put back blank, it has no row");
         dough.Children.Should().BeEmpty();
-        state.List.Rows.Should().BeEmpty();
+        state.View.List.Rows.Should().BeEmpty();
     });
 
     [Test]
@@ -354,9 +354,9 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var ubeId = await AddIngredientAsync("Ube");
         var state = await LoadedStateAsync();
 
-        Headers(state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(packagingRoleId))).Should().StartWith(["New Packaging Set Here"]);
+        Headers(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(packagingRoleId))).Should().StartWith(["New Packaging Set Here"]);
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(fillingRoleId)).Single(i => i.Header == "New Sub-Assembly Here"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(fillingRoleId)).Single(i => i.Header == "New Sub-Assembly Here"));
 
         state.SelectedRow.Should().BeNull();
         state.EditingRole!.Id.Should().Be(fillingRoleId);
@@ -367,8 +367,8 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
-        state.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Select(l => l.Title).Should().Equal("Ube Halaya");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Find(state.SelectedRow!.Id));
+        state.View.List.SubAssemblyTree.Folder(fillingRoleId)!.SubAssemblies.Select(l => l.Title).Should().Equal("Ube Halaya");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Find(state.SelectedRow!.Id));
     });
 
     [Test]
@@ -377,20 +377,20 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 2, isPackaging: true);
         var state = await LoadedStateAsync();
-        var dough = state.List.SubAssemblyTree.Folder(doughRoleId)!;
+        var dough = state.View.List.SubAssemblyTree.Folder(doughRoleId)!;
 
-        Headers(state.List.TreeMenuFor(dough))
+        Headers(state.View.List.TreeMenuFor(dough))
             .Should().Equal("New Sub-Assembly Here", "New Folder", "Rename Role", "Delete Role", "Expand All", "Collapse All");
-        Headers(state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(packagingRoleId)))
+        Headers(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(packagingRoleId)))
             .Should().Equal(["New Packaging Set Here", "New Folder", "Rename Role", "Expand All", "Collapse All"], "the Packaging role is never deleted");
-        var listMenu = state.List.TreeMenuFor(null);
+        var listMenu = state.View.List.TreeMenuFor(null);
         Headers(listMenu).Should().Equal("New Sub-Assembly", "New Folder", "Expand All", "Collapse All");
 
         await RunAsync(listMenu.Single(i => i.Header == "Collapse All"));
-        state.List.SubAssemblyTree.Roots.Should().OnlyContain(f => !f.IsExpanded);
+        state.View.List.SubAssemblyTree.Roots.Should().OnlyContain(f => !f.IsExpanded);
 
-        await RunAsync(state.List.TreeMenuFor(dough).Single(i => i.Header == "Expand All"));
-        state.List.SubAssemblyTree.Roots.Should().OnlyContain(f => f.IsExpanded);
+        await RunAsync(state.View.List.TreeMenuFor(dough).Single(i => i.Header == "Expand All"));
+        state.View.List.SubAssemblyTree.Roots.Should().OnlyContain(f => f.IsExpanded);
     });
 
     [Test]
@@ -399,38 +399,38 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await AddRoleAsync("Dough", sortOrder: 1);
         var state = await LoadedStateAsync();
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
 
-        var folder = state.List.SubAssemblyTree.PendingFolder!;
-        state.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "New folder");
-        state.List.SelectedTreeNode.Should().BeSameAs(folder);
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
-        state.List.TreeNameEdit.Hint.Should().Contain("a section in the recipes that use it");
-        state.List.TreeMenuFor(folder).Should().BeEmpty();
+        var folder = state.View.List.SubAssemblyTree.PendingFolder!;
+        state.View.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "New folder");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit.Hint.Should().Contain("a section in the recipes that use it");
+        state.View.List.TreeMenuFor(folder).Should().BeEmpty();
 
         await state.LoadCommand.ExecuteAsync();
-        state.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal(["Dough", "New folder"], "a load keeps it");
+        state.View.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal(["Dough", "New folder"], "a load keeps it");
 
-        await state.List.CommitTreeNameAsync("Glaze");
+        await state.View.List.CommitTreeNameAsync("Glaze");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.SubAssemblyTree.PendingFolder.Should().BeNull();
+        state.View.List.SubAssemblyTree.PendingFolder.Should().BeNull();
         state.Roles.Select(r => r.Name).Should().Equal("Dough", "Glaze");
-        state.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Roots[1]);
+        state.View.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Roots[1]);
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
-        await state.List.CommitTreeNameAsync("dough");
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        await state.View.List.CommitTreeNameAsync("dough");
 
         state.Roles.Should().HaveCount(2, "a name that's a role already adds none");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Roots[0]);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Roots[0]);
 
         // Esc and an empty name add nothing.
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
-        state.List.CancelTreeName();
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
-        await state.List.CommitTreeNameAsync(string.Empty);
-        state.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        state.View.List.CancelTreeName();
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        await state.View.List.CommitTreeNameAsync(string.Empty);
+        state.View.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough", "Glaze");
         state.Roles.Should().HaveCount(2);
     });
 
@@ -440,13 +440,13 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
         var glazeId = await AddRecipeAsync("Glaze", toppingRoleId);
         var state = await OpenedStateAsync(glazeId);
-        var topping = state.List.SubAssemblyTree.Folder(toppingRoleId)!;
+        var topping = state.View.List.SubAssemblyTree.Folder(toppingRoleId)!;
 
-        await RunAsync(state.List.TreeMenuFor(topping).Single(i => i.Header == "Rename Role"));
+        await RunAsync(state.View.List.TreeMenuFor(topping).Single(i => i.Header == "Rename Role"));
 
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(topping);
-        state.List.TreeNameEdit.InitialText.Should().Be("Topping");
-        await state.List.CommitTreeNameAsync("Toppings");
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(topping);
+        state.View.List.TreeNameEdit.InitialText.Should().Be("Topping");
+        await state.View.List.CommitTreeNameAsync("Toppings");
 
         state.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
@@ -455,7 +455,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
             (role.Name, role.IsProductOwned).Should().Be(("Toppings", true));
         }
 
-        state.List.SubAssemblyTree.Folder(toppingRoleId)!.Title.Should().Be("Toppings");
+        state.View.List.SubAssemblyTree.Folder(toppingRoleId)!.Title.Should().Be("Toppings");
         state.EditingRole!.Name.Should().Be("Toppings");
         state.History.IsDirty.Should().BeFalse();
     });
@@ -476,24 +476,24 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         });
 
         // With a search on, the folder shows only one of them, but both keep the role.
-        state.List.SearchText = "Pandesal";
-        var doughMenu = state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(doughRoleId));
+        state.View.List.SearchText = "Pandesal";
+        var doughMenu = state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(doughRoleId));
         doughMenu.Single(i => i.Header.StartsWith("Delete Role", StringComparison.Ordinal)).Should()
             .Match<TreeMenuItem>(i => i.Header == "Delete Role (holds 2)" && !i.IsEnabled);
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Folder(doughRoleId);
-        state.List.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
-        state.List.SearchText = string.Empty;
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Folder(doughRoleId);
+        state.View.List.TreeShortcut("Del").Should().BeNull("Del does nothing where the menu's item is greyed");
+        state.View.List.SearchText = string.Empty;
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Folder(glazeRoleId)).Single(i => i.Header == "Delete Role"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Folder(glazeRoleId)).Single(i => i.Header == "Delete Role"));
 
         state.ErrorMessage.Should().BeNull();
         question.Should().Be("Delete the 'Glaze' role? It holds no sub-assemblies here. This can't be undone.");
         state.Roles.Select(r => r.Name).Should().Equal("Dough");
-        state.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough");
+        state.View.List.SubAssemblyTree.Roots.Select(f => f.Title).Should().Equal("Dough");
     });
 
     [Test]
-    public Task Delete_on_a_sub_assembly_asks_first_and_the_form_starts_afresh_only_if_it_was_showing_it() => UiThread.RunAsync(async () =>
+    public Task Delete_on_a_sub_assembly_asks_first_and_closes_its_tab_only_if_one_holds_it() => UiThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var pandesalId = await AddRecipeAsync("Pandesal Dough", doughRoleId);
@@ -506,17 +506,19 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
             interaction.SetOutput(true);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(ensaymadaId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(ensaymadaId)).Single(i => i.Header == "Delete"));
 
         question.Should().Be("Delete 'Ensaymada Dough'? This can't be undone.");
-        state.List.Rows.Select(r => r.Name).Should().Equal("Pandesal Dough");
+        state.View.List.Rows.Select(r => r.Name).Should().Equal("Pandesal Dough");
         state.SelectedRow!.Id.Should().Be(pandesalId, "the one showing wasn't the one deleted");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(pandesalId)).Single(i => i.Header == "Delete"));
+        state.View.Tabs.All.Should().ContainSingle("no tab held the one deleted");
 
-        state.List.Rows.Should().BeEmpty();
-        state.SelectedRow.Should().BeNull();
-        state.EditingName.Should().BeEmpty();
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(pandesalId)).Single(i => i.Header == "Delete"));
+
+        state.View.List.Rows.Should().BeEmpty();
+        state.View.Tabs.All.Should().BeEmpty("the tab holding the one deleted closed, as it's gone");
+        state.View.Form.Should().BeNull();
     });
 
     [Test]
@@ -527,20 +529,20 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var inHouseId = await MadeCategoryIdAsync();
         var state = await OpenedStateAsync(custardId);
         ChoicePromptRequest? asked = null;
-        state.List.PromptForMadeIngredient.RegisterHandler(interaction =>
+        state.View.List.PromptForMadeIngredient.RegisterHandler(interaction =>
         {
             asked = interaction.Input;
             interaction.SetOutput(new ChoicePromptResult("Custard Filling", interaction.Input.InitialChoice));
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
 
         state.ErrorMessage.Should().BeNull();
         asked!.Title.Should().Be("Make In-House Ingredient");
         asked.InitialValue.Should().Be("Custard", "the name starts as the sub-assembly's");
         asked.Choices[asked.InitialChoice].Should().Be("In-House");
         asked.Message.Should().Contain("Custard stays here as it is");
-        state.List.Rows.Should().ContainSingle(r => r.Id == custardId, "the recipe stays where it's written");
+        state.View.List.Rows.Should().ContainSingle(r => r.Id == custardId, "the recipe stays where it's written");
         state.SuccessMessage.Should().Be("Custard Filling was added to In-House, made from Custard.");
         var made = state.Ingredients.Should().ContainSingle(m => m.Name == "Custard Filling").Subject;
         made.Should().BeEquivalentTo(new { Source = RawMaterialSource.Made, CategoryId = inHouseId, WeightLossPercent = 0m, SubAssemblyId = (int?)custardId });
@@ -565,13 +567,13 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         await MadeCategoryIdAsync();
         var state = await OpenedStateAsync(baseId);
         string? message = null;
-        state.List.PromptForMadeIngredient.RegisterHandler(interaction =>
+        state.View.List.PromptForMadeIngredient.RegisterHandler(interaction =>
         {
             message = interaction.Input.Message;
             interaction.SetOutput(new ChoicePromptResult("Ube Filling", 0));
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(baseId)).Single(i => i.Header == "Make In-House Ingredient…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(baseId)).Single(i => i.Header == "Make In-House Ingredient…"));
 
         state.ErrorMessage.Should().BeNull();
         message.Should().Contain("Ube Base stays here as it is");
@@ -594,22 +596,22 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var flanId = await AddRecipeAsync("Leche Flan", fillingRoleId);
         var state = await OpenedStateAsync(custardId);
         var asked = 0;
-        state.List.PromptForMadeIngredient.RegisterHandler(interaction =>
+        state.View.List.PromptForMadeIngredient.RegisterHandler(interaction =>
         {
             asked++;
             interaction.SetOutput(null);
         });
         Edit(state, () => state.EditingName = "Custard Base");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(custardId)).Single(i => i.Header == "Make In-House Ingredient…"));
 
         state.ErrorMessage.Should().Be("Save Custard first, or undo its changes: the made ingredient is made from it as it's saved.");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(flanId)).Single(i => i.Header == "Make In-House Ingredient…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(flanId)).Single(i => i.Header == "Make In-House Ingredient…"));
 
         state.ErrorMessage.Should().Be(MadeIngredientPrompt.NoMadeCategoryMessage);
         asked.Should().Be(0);
-        state.List.Rows.Should().HaveCount(2);
+        state.View.List.Rows.Should().HaveCount(2);
     });
 
 
@@ -621,19 +623,19 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var pandesalId = await AddRecipeAsync("Pandesal Dough", doughRoleId);
         var ensaymadaId = await AddRecipeAsync("Ensaymada Dough", doughRoleId);
         var state = await LoadedStateAsync();
-        var pandesal = state.List.SubAssemblyTree.Find(pandesalId)!;
+        var pandesal = state.View.List.SubAssemblyTree.Find(pandesalId)!;
 
-        state.List.SelectedTreeNode = pandesal;
-        state.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.List.RenameSubAssemblyCommand && i.Parameter == pandesal);
-        state.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.List.DeleteSubAssemblyCommand && i.Parameter == pandesal);
+        state.View.List.SelectedTreeNode = pandesal;
+        state.View.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.RenameSubAssemblyCommand && i.Parameter == pandesal);
+        state.View.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.DeleteSubAssemblyCommand && i.Parameter == pandesal);
 
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Folder(glazeRoleId);
-        state.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.List.RenameRoleCommand);
-        state.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.List.DeleteRoleCommand);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Folder(glazeRoleId);
+        state.View.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.View.List.RenameRoleCommand);
+        state.View.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.View.List.DeleteRoleCommand);
 
-        state.List.SelectedTreeNode = pandesal;
-        state.List.SelectedTreeNodes.Add(state.List.SubAssemblyTree.Find(ensaymadaId)!);
-        state.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
+        state.View.List.SelectedTreeNode = pandesal;
+        state.View.List.SelectedTreeNodes.Add(state.View.List.SubAssemblyTree.Find(ensaymadaId)!);
+        state.View.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
     [Test]
@@ -645,18 +647,18 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var spanishId = await AddRecipeAsync("Spanish Bread Dough", doughRoleId);
         var state = await LoadedStateAsync();
 
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Find(pandesalId);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Find(pandesalId);
         state.SelectedRow!.Id.Should().Be(pandesalId);
 
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Folder(doughRoleId);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Folder(doughRoleId);
         state.SelectedRow!.Id.Should().Be(pandesalId, "a folder picked leaves the sub-assembly showing");
 
-        state.List.SelectedTreeNode = state.List.SubAssemblyTree.Find(pandesalId);
-        state.List.SelectedTreeNodes.Add(state.List.SubAssemblyTree.Find(ensaymadaId)!);
+        state.View.List.SelectedTreeNode = state.View.List.SubAssemblyTree.Find(pandesalId);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.SubAssemblyTree.Find(ensaymadaId)!);
         state.OpenRecord(spanishId);
 
-        state.List.SelectedTreeNodes.Should().Equal(state.List.SubAssemblyTree.Find(spanishId)!);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Find(spanishId));
+        state.View.List.SelectedTreeNodes.Should().Equal(state.View.List.SubAssemblyTree.Find(spanishId)!);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Find(spanishId));
     });
 
     [Test]
@@ -665,39 +667,39 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
         var store = new InMemoryViewStateStore();
-        (await LoadedStateAsync(store)).Dispose();
+        (await LoadedStateAsync(store)).View.Dispose();
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
         var first = await LoadedStateAsync(store);
 
-        first.List.SubAssemblyTree.Folder(doughRoleId)!.IsExpanded = false;
+        first.View.List.SubAssemblyTree.Folder(doughRoleId)!.IsExpanded = false;
 
         var doughKey = doughRoleId.ToString(CultureInfo.InvariantCulture);
         await Settle.EventuallyAsync(
             () => store.ReadList(SubAssembliesList.ClosedFoldersKey)?.Contains(doughKey) == true,
             () => string.Join(", ", store.ReadList(SubAssembliesList.ClosedFoldersKey) ?? []));
-        first.Dispose();
+        first.View.Dispose();
 
         var glazeRoleId = await AddRoleAsync("Glaze", sortOrder: 3);
         var next = await LoadedStateAsync(store);
-        next.List.SubAssemblyTree.Folder(doughRoleId)!.IsExpanded.Should().BeFalse();
-        next.List.SubAssemblyTree.Folder(fillingRoleId)!.IsExpanded.Should().BeTrue();
-        next.List.SubAssemblyTree.Folder(glazeRoleId)!.IsExpanded.Should().BeTrue("a role new since opens, as every folder first did");
+        next.View.List.SubAssemblyTree.Folder(doughRoleId)!.IsExpanded.Should().BeFalse();
+        next.View.List.SubAssemblyTree.Folder(fillingRoleId)!.IsExpanded.Should().BeTrue();
+        next.View.List.SubAssemblyTree.Folder(glazeRoleId)!.IsExpanded.Should().BeTrue("a role new since opens, as every folder first did");
 
         // One closed just before the app closes is written as it closes.
-        next.List.SubAssemblyTree.Folder(fillingRoleId)!.IsExpanded = false;
-        next.Dispose();
+        next.View.List.SubAssemblyTree.Folder(fillingRoleId)!.IsExpanded = false;
+        next.View.Dispose();
         store.ReadList(SubAssembliesList.ClosedFoldersKey).Should().Contain(fillingRoleId.ToString(CultureInfo.InvariantCulture));
     });
 
     private static IEnumerable<string> Headers(IEnumerable<TreeMenuItem> menu) => menu.Where(i => !i.IsSeparator).Select(i => i.Header);
 
     /// <summary>The sub-assembly's menu's Move To item for <paramref name="role"/>.</summary>
-    private static TreeMenuItem MoveToItem(SubAssembliesState state, int subAssemblyId, string role) =>
-        state.List.TreeMenuFor(state.List.SubAssemblyTree.Find(subAssemblyId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == role);
+    private static TreeMenuItem MoveToItem(SubAssemblyForm state, int subAssemblyId, string role) =>
+        state.View.List.TreeMenuFor(state.View.List.SubAssemblyTree.Find(subAssemblyId)).Single(i => i.Header == "Move to").Items.Single(i => i.Header == role);
 
     /// <summary>Runs the item's command with its parameter, as the menu does when it's clicked, and waits for it to finish.</summary>
     [Test]
-    public Task Picking_another_sub_assembly_over_unsaved_changes_asks_and_Cancel_stays_on_them() => UiThread.RunAsync(async () =>
+    public Task Picking_another_sub_assembly_over_unsaved_changes_opens_it_in_a_tab_of_its_own_and_asks_nothing() => UiThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
         var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
@@ -706,39 +708,106 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
         state.EditingName = "Sweeter Dough";
 
-        Click(state, state.List.SubAssemblyTree.Find(plainId)!);
-        await Settle.UntilAsync(state, () => asked.Count == 1, () => $"asked={asked.Count}");
+        Click(state, state.View.List.SubAssemblyTree.Find(plainId)!);
+        var plain = state.View.Form!;
+        await Settle.UntilAsync(plain, () => plain.SelectedRow?.Id == plainId && plain.EditingName == "Plain Dough", () => $"name={plain.EditingName}");
 
-        asked.Single().Should().StartWith("Save the changes to Sweeter Dough?");
+        asked.Should().BeEmpty("the changes stay in their own tab: nothing is left");
+        plain.Should().NotBeSameAs(state);
         state.SelectedRow!.Id.Should().Be(sweetId);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.SubAssemblyTree.Find(sweetId), "the list goes back to the row showing");
         state.EditingName.Should().Be("Sweeter Dough");
         state.History.IsDirty.Should().BeTrue();
+        state.View.Tabs.All.Select(tab => tab.Form).Should().Equal(state, plain);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.SubAssemblyTree.Find(plainId), "the list follows the tab showing");
     });
 
     [Test]
-    [Arguments(UnsavedChangesAnswer.Save, "Sweeter Dough")]
-    [Arguments(UnsavedChangesAnswer.DontSave, "Sweet Dough")]
-    public Task Picking_another_sub_assembly_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => UiThread.RunAsync(async () =>
+    public Task A_pick_takes_the_preview_tabs_place_while_it_holds_nothing_unsaved_and_a_tab_kept_or_edited_stays() => UiThread.RunAsync(async () =>
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var plainId = await AddRecipeAsync("Plain Dough", doughId);
+        var softId = await AddRecipeAsync("Soft Dough", doughId);
+        var state = await LoadedStateAsync();
+        var view = state.View;
+
+        // The blank form the view opens on is the preview tab: the first pick takes its place, and the next one's.
+        Click(state, view.List.SubAssemblyTree.Find(sweetId)!);
+        Click(state, view.List.SubAssemblyTree.Find(plainId)!);
+        await Settle.UntilAsync(state, () => state.SelectedRow?.Id == plainId && state.EditingName == "Plain Dough");
+        view.Tabs.All.Should().ContainSingle().Which.IsPreview.Should().BeTrue();
+
+        // Kept by a double-click: the next pick opens a tab of its own.
+        view.Keep(view.Tabs.Active!);
+        Click(state, view.List.SubAssemblyTree.Find(softId)!);
+        var soft = view.Form!;
+        await Settle.UntilAsync(soft, () => soft.EditingName == "Soft Dough");
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, soft);
+        view.Tabs.Preview!.Form.Should().BeSameAs(soft);
+
+        // An edit keeps the preview tab too: the next pick doesn't take its place.
+        soft.EditingName = "Softer Dough";
+        Click(state, view.List.SubAssemblyTree.Find(sweetId)!);
+        var sweet = view.Form!;
+        await Settle.UntilAsync(sweet, () => sweet.EditingName == "Sweet Dough");
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, soft, sweet);
+        soft.EditingName.Should().Be("Softer Dough");
+
+        // A sub-assembly open already shows in its own tab.
+        Click(state, view.List.SubAssemblyTree.Find(plainId)!);
+        view.Form.Should().BeSameAs(state);
+        view.Tabs.All.Should().HaveCount(3);
+    });
+
+    [Test]
+    [Arguments(UnsavedChangesAnswer.Save, "Sweeter Dough", true)]
+    [Arguments(UnsavedChangesAnswer.DontSave, "Sweet Dough", true)]
+    [Arguments(UnsavedChangesAnswer.Cancel, "Sweet Dough", false)]
+    public Task Closing_a_tab_with_changes_asks_about_them_first(UnsavedChangesAnswer answer, string savedName, bool closes) => UiThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
         var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
         var plainId = await AddRecipeAsync("Plain Dough", doughId);
         var state = await OpenedStateAsync(sweetId);
-        AnswerUnsavedChanges(state, answer);
+        var view = state.View;
+        var asked = AnswerUnsavedChanges(state, answer);
         state.EditingName = "Sweeter Dough";
+        Click(state, view.List.SubAssemblyTree.Find(plainId)!);
+        var sweetTab = view.Tabs.Holding(sweetId)!;
 
-        Click(state, state.List.SubAssemblyTree.Find(plainId)!);
-        await Settle.UntilAsync(state,
-            () => state.SelectedRow?.Id == plainId && state.EditingName == "Plain Dough" && !state.History.IsDirty,
-            () => $"selected={state.SelectedRow?.Id} name={state.EditingName}");
+        (await view.CloseTabAsync(sweetTab)).Should().Be(closes);
 
-        state.ErrorMessage.Should().BeNull();
+        asked.Should().ContainSingle().Which.Should().StartWith("Save the changes to Sweeter Dough?");
+        view.Tabs.All.Contains(sweetTab).Should().Be(!closes);
         (await NameOfAsync(sweetId)).Should().Be(savedName);
+        if (!closes)
+        {
+            view.Tabs.Active.Should().BeSameAs(sweetTab, "it's shown, so the question is about the form in view");
+            state.EditingName.Should().Be("Sweeter Dough");
+        }
     });
 
     [Test]
-    public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => UiThread.RunAsync(async () =>
+    public Task Closing_a_tab_with_nothing_unsaved_asks_nothing_and_shows_the_one_before() => UiThread.RunAsync(async () =>
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var plainId = await AddRecipeAsync("Plain Dough", doughId);
+        var state = await OpenedStateAsync(sweetId);
+        var view = state.View;
+        var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
+        view.Keep(view.Tabs.Active!);
+        Click(state, view.List.SubAssemblyTree.Find(plainId)!);
+
+        (await view.CloseTabAsync(view.Tabs.Active!)).Should().BeTrue();
+
+        asked.Should().BeEmpty();
+        view.Form.Should().BeSameAs(state);
+        view.List.SelectedTreeNode.Should().BeSameAs(view.List.SubAssemblyTree.Find(sweetId), "the list follows the tab showing");
+    });
+
+    [Test]
+    public Task New_over_unsaved_changes_opens_a_new_tab_and_keeps_them() => UiThread.RunAsync(async () =>
     {
         var doughId = await AddRoleAsync("Dough");
         var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
@@ -748,7 +817,9 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
 
         await state.NewCommand.ExecuteAsync();
 
-        asked.Should().ContainSingle();
+        asked.Should().BeEmpty();
+        state.View.Form.Should().NotBeSameAs(state);
+        state.View.Form!.EditingId.Should().Be(0);
         state.SelectedRow!.Id.Should().Be(sweetId);
         state.EditingName.Should().Be("Sweeter Dough");
     });
@@ -788,7 +859,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
     });
 
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
-    private static List<string> AnswerUnsavedChanges(SubAssembliesState state, UnsavedChangesAnswer answer)
+    private static List<string> AnswerUnsavedChanges(SubAssemblyForm state, UnsavedChangesAnswer answer)
     {
         List<string> asked = [];
         state.ConfirmUnsavedChanges.RegisterHandler(context =>
@@ -800,10 +871,10 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
-    private static void Click(SubAssembliesState state, object row)
+    private static void Click(SubAssemblyForm state, object row)
     {
-        state.List.SelectedTreeNodes.Clear();
-        state.List.SelectedTreeNodes.Add(row);
+        state.View.List.SelectedTreeNodes.Clear();
+        state.View.List.SelectedTreeNodes.Add(row);
     }
 
     private async Task<string> NameOfAsync(int subAssemblyId)
@@ -835,7 +906,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
-    private static void Edit(SubAssembliesState state, Action change)
+    private static void Edit(SubAssemblyForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -880,7 +951,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         return await dbContext.SubAssemblies.Where(s => s.Id == subAssemblyId).Select(s => s.RoleId).SingleAsync(Cancellation);
     }
 
-    private async Task<SubAssembliesState> LoadedStateAsync(IViewStateStore? viewStateStore = null)
+    private async Task<SubAssemblyForm> LoadedStateAsync(IViewStateStore? viewStateStore = null)
     {
         var state = CreateState(viewStateStore);
         await state.LoadCommand.ExecuteAsync();
@@ -888,7 +959,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>The screen with <paramref name="subAssemblyId"/> open on the form, its lines in.</summary>
-    private async Task<SubAssembliesState> OpenedStateAsync(int subAssemblyId)
+    private async Task<SubAssemblyForm> OpenedStateAsync(int subAssemblyId)
     {
         var state = await LoadedStateAsync();
         state.OpenRecord(subAssemblyId);
@@ -898,7 +969,7 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         return state;
     }
 
-    private SubAssembliesState CreateState(IViewStateStore? viewStateStore)
+    private SubAssemblyForm CreateState(IViewStateStore? viewStateStore)
     {
         var factory = CreateDbContextFactory();
 
@@ -912,6 +983,6 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
             new SubAssemblyRoleValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),
             VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

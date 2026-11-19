@@ -195,7 +195,8 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
   - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
-  - Going between **Products** and the **Print** tab doesn't ask, since Print shows the product with your changes. Leaving Print for any other screen asks about the product's changes, as leaving Products would. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
+  - The **Print** window doesn't ask, since it prints the item with your changes and leaves it as it was. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
+  - **On the Sub-Assemblies screen, each sub-assembly opens in a tab of its own** (see [Tabs](#tabs)), so going somewhere else doesn't ask: picking another in the list, **New**, another screen, **Back** or **Forward** leave the changes in their tab. Closing that tab asks, and so does closing the window, for each tab with changes, even one not showing.
 - **If another PC saves the same record while you have it open**, your **Save** is refused, so neither of you overwrites the other without knowing. So is renaming or moving that record in the list while you have unsaved changes on it. A red notice says so, and what you typed stays on the form. [Troubleshooting](#14-troubleshooting-and-questions) says what to do next.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again. A red notice stays until you close it or do something else, and goes when you open another item, answer **No** about unsaved changes, or leave the screen.
 - If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, the screen gives way to a panel saying **This screen ran into a problem it didn't expect**: press **Open It Again**, and the screen comes back as it was, changes you haven't saved included. The other screens keep working meanwhile. Only rarely, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
@@ -582,6 +583,19 @@ The Sub-Assemblies screen keeps the sub-assemblies that products **link**: share
 
 Sections that belong to a single product, in a product-owned role, aren't listed here. They're edited in that product's recipe instead.
 
+### Tabs
+
+The list is on the left. To its right, **each sub-assembly you open has a tab of its own**, along the top, as in Visual Studio Code, so you can have several open at once and go between them. Each keeps what you've typed into it, and its **Undo**, while another shows, and while you're on another screen.
+
+- **A click on a sub-assembly in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A sub-assembly that's open already just shows its own tab.
+- **To keep a tab open**, double-click the sub-assembly in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
+- **New** starts a blank new sub-assembly in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new one, in the preview tab, as it always has.
+- **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
+- **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
+- **Back** and **Forward** go through the tabs you've shown, like a web browser. Going back to a sub-assembly whose tab you've closed opens it again, in the preview tab.
+- **Delete** closes the deleted sub-assembly's tab.
+- With every tab closed, the screen says so, with **New** beside it. Click a sub-assembly in the list to open it.
+
 ### The list
 
 The list has a folder for each role, in the order set in Settings → Roles, with the sub-assemblies in that role inside it, by name. Each folder shows how many it holds. When a product saves a new section, it's saved here under a name made from the product and the role, such as *Cheese Roll Dough*. If the section has its own name, that's added after them, as in *Cheese Roll Filling: Ube*.
@@ -596,9 +610,9 @@ The same commands are buttons under the search box. Each button shows only its i
 
 Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
 
-**Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the sub-assembly you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in the form, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
+**Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the sub-assembly you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in a tab, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
 
-**New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New**, **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New**, the first role's): type its name and press **Enter**. The name goes into the form, but **it isn't saved yet**: add its lines and press **Save**. **Esc**, or clicking away before you've typed a name, adds nothing: the form stays on the new sub-assembly.
+**New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New**, **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New**, the first role's): type its name and press **Enter**. The name goes into the new sub-assembly's tab, but **it isn't saved yet**: add its lines and press **Save**. **Esc**, or clicking away before you've typed a name, adds nothing: the tab stays on the new sub-assembly.
 
 A new role from the list goes after the others and isn't product-owned. Change its place and **Product-owned** in Settings → Roles.
 
@@ -610,12 +624,12 @@ A new role from the list goes after the others and isn't product-owned. Change i
 - The sub-assembly stays here exactly as it is, and you still change its lines here. The products that link it don't change.
 - If the recipe really does lose weight while it's made, set its Weight Loss % on the Raw Materials screen afterwards. Every product that uses the made ingredient then follows.
 
-If the sub-assembly is open in the form with changes you haven't saved, save or undo them first: the made ingredient is made from it as it's saved. To remove the made ingredient again, delete it on the Raw Materials screen.
+If the sub-assembly is open in a tab with changes you haven't saved, save or undo them first: the made ingredient is made from it as it's saved. To remove the made ingredient again, delete it on the Raw Materials screen.
 
 
 ### The form
 
-The form has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo**, **Print** and **Delete**, then:
+Each tab holds the sub-assembly's form, which has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo**, **Print** and **Delete**, then:
 
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
 - **Name** and **Role**.
@@ -625,17 +639,17 @@ The card under it has two tabs along its bottom. Each scrolls while the header s
 - **Recipe**: the **Lines**, with **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base** (tick it for baker's percentages).
 - **Dependents**: a tile for each product that links this sub-assembly. Click one to open it.
 
-The tab you were on stays picked when you pick another sub-assembly, and when you go to another screen and come back, as on Products and Raw Materials.
+Each sub-assembly's tab stays on the card tab you left it on (Recipe or Dependents), when you show another sub-assembly's and when you go to another screen and come back.
 
 **Scale**, under the lines, resizes the recipe. Pick **the whole batch** or **the base (ticked lines)**, type the grams it should weigh, and press **Scale**: every line is multiplied by the same amount, so each keeps its percentage. For example, a 1,200 g batch scaled to 2,400 g doubles every line, and a dough whose ticked flour is 1,000 g, scaled on the base to 500 g, halves. It's one step for **Undo**, and **Save** keeps it. Scaling the base needs at least one line's **Base** ticked. It isn't offered for a packaging set.
 
 **Print** shows the sub-assembly on its own in the Print window, as the form shows it: its name and role, the base and whole formula, each line's grams, percentage, cost per gram and cost, and the batch's total. A packaging set prints its materials, each set's quantity and cost. Changes you haven't saved are in it, marked **Draft**. **Print** there prints it, **Export to PDF** saves it as a PDF file, and its **✕** or **Esc** closes it, leaving the sub-assembly as it was, unsaved changes and all. It's laid out on the paper in [Settings → Printing](#printing), with the shop's heading.
 
-**Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
+**Copy** turns the tab into a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was last saved.
 
 **New Product** starts a new product from the sub-assembly picked in the list. The Products screen opens with a new, unsaved product named after the sub-assembly, and its recipe already **links** the sub-assembly. Type the piece size (and rename the product if you like), then press Save there. New Product isn't offered for a packaging set. If the sub-assembly has changes you haven't saved, save or undo them first, because the product links the sub-assembly as it's saved.
 
-Changing a sub-assembly here changes every product that links it, and every made ingredient made from it. When saving new lines would change what any of those products cost, **Save** asks first and lists each one's base cost now and after, for one sellable unit, such as *Pandesal x 8: 2.58 → 2.32 (-0.26)*, biggest change first. **No** leaves the changes unsaved in the form. When made ingredients are made from it, the question says they change too. A sub-assembly that a product links, or that a made ingredient is made from, **can't be deleted**. The message names them.
+Changing a sub-assembly here changes every product that links it, and every made ingredient made from it. When saving new lines would change what any of those products cost, **Save** asks first and lists each one's base cost now and after, for one sellable unit, such as *Pandesal x 8: 2.58 → 2.32 (-0.26)*, biggest change first. **No** leaves the changes unsaved in the tab. When made ingredients are made from it, the question says they change too. A sub-assembly that a product links, or that a made ingredient is made from, **can't be deleted**. The message names them.
 
 The **Dependents** tab shows a tile for each product that links the sub-assembly, then one for each made ingredient made from it. Click a product's tile to open it on the Products screen, and a made ingredient's to open it on the Raw Materials screen. Saving lines here refuses a line that's a made ingredient made from this sub-assembly, directly or further down, because that ingredient would contain itself.
 

@@ -36,6 +36,124 @@
     gap: 4px;
 }
 
+/* ---- A record view's tabs (Shared/RecordTabStrip), over the form of the one showing, as Visual Studio Code's editors:
+   a darker strip, the tab showing in the card's colour under a line of the accent, the preview tab's name in italics, and
+   a dot for unsaved changes where the ✕ is, the ✕ under the pointer. A tab's ✕ shows on the tab showing or under the
+   pointer. ---- */
+
+.record-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: none;
+    min-height: 30px;
+    padding: 4px 4px 0;
+    overflow-x: auto;
+    background: var(--card-border);
+    border-radius: 8px;
+}
+
+.record-tab {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 240px;
+    flex: none;
+    border-top: 2px solid transparent;
+    border-radius: 6px 6px 0 0;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+}
+
+.record-tab:hover {
+    background: var(--card-background);
+}
+
+.record-tab.active {
+    background: var(--card-background);
+    border-top-color: var(--color-sf-primary);
+    color: var(--heading-foreground);
+}
+
+.record-tab-link {
+    min-width: 0;
+    padding: 4px 4px 6px 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: inherit;
+    text-decoration: none;
+}
+
+.record-tab.preview .record-tab-link {
+    font-style: italic;
+}
+
+.record-tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.record-tab:not(.active):not(:hover):not(.dirty) .record-tab-close {
+    visibility: hidden;
+}
+
+.record-tab-close:hover,
+.record-tab-close:focus-visible {
+    background: rgba(76, 79, 105, 0.14);
+    opacity: 1;
+}
+
+.record-tab-dot {
+    display: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.record-tab.dirty .record-tab-close {
+    opacity: 0.85;
+}
+
+.record-tab.dirty .record-tab-dot {
+    display: block;
+}
+
+.record-tab.dirty .record-tab-close .glyph,
+.record-tab.dirty .record-tab-close:hover .record-tab-dot,
+.record-tab.dirty .record-tab-close:focus-visible .record-tab-dot {
+    display: none;
+}
+
+.record-tab.dirty .record-tab-close:hover .glyph,
+.record-tab.dirty .record-tab-close:focus-visible .glyph {
+    display: inline;
+}
+
+/* The view with no tab open: what to do, and New. */
+.empty-record {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted-foreground);
+}
+
 .tree-card {
     width: 404px;
     flex: none;

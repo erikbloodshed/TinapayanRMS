@@ -164,16 +164,16 @@ public class SubAssembliesStateVersionTests(DatabaseFixture fixture) : Persisten
         await new ProductVersionRepository(factory).AddAsync(productId, content, DateTime.Now, null, Cancellation);
     }
 
-    private async Task<SubAssembliesState> OpenAsync(int subAssemblyId, bool asksAboutCosts = false)
+    private async Task<SubAssemblyForm> OpenAsync(int subAssemblyId, bool asksAboutCosts = false)
     {
         var state = CreateState(asksAboutCosts);
         await state.LoadCommand.ExecuteAsync();
-        state.Pick(state.List.Rows.Single(r => r.Id == subAssemblyId));
+        state.Pick(state.View.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 1, () => $"lines={state.Batch.Lines.Count}, error={state.ErrorMessage}");
         return state;
     }
 
-    private SubAssembliesState CreateState(bool asksAboutCosts = false)
+    private SubAssemblyForm CreateState(bool asksAboutCosts = false)
     {
         var factory = CreateDbContextFactory();
         var productRepository = new ProductRepository(factory);
@@ -202,6 +202,6 @@ public class SubAssembliesStateVersionTests(DatabaseFixture fixture) : Persisten
                         productRepository,
                         new CostingDefaultsRepository(factory),
                         CreateUnitOfWork()))
-                : null);
+                : null).Form!;
     }
 }

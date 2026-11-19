@@ -43,8 +43,13 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
         _redraws = new RedrawGate(InvokeAsync, StateHasChanged);
     }
 
-    /// <summary>The screen's state: the page's own, as they're scoped.</summary>
-    [Inject] public TState? State { get; set; }
+    /// <summary>
+    /// The screen's state: the page's own, as they're scoped (<see cref="ResolveState"/>), or the one it's given, a record
+    /// view's form (FormBase).
+    /// </summary>
+    public TState? State { get; set; }
+
+    [Inject] private IServiceProvider Services { get; set; } = null!;
 
     [Inject] private Notices Notices { get; set; } = null!;
 
@@ -63,10 +68,13 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
     /// <summary>The command that loads the screen, run each time it's opened; null for a screen with nothing to load.</summary>
     protected abstract ScreenCommand? LoadCommand { get; }
 
+    /// <summary>The state the screen shows: the page's own, from its services.</summary>
+    protected virtual TState ResolveState() => Services.GetRequiredService<TState>();
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var state = State!;
+        var state = State ??= ResolveState();
 
         _subscriptions.Add(state.ConfirmDelete.RegisterHandler(async interaction =>
             interaction.SetOutput(await Confirmations.AskAsync(interaction.Input))));
@@ -96,7 +104,6 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
         {
             _subscriptions.Add(ClosingGuard.Watch(form));
             _subscriptions.Add(Navigator.RegisterLocationChangingHandler(OnLocationChangingAsync));
-            _subscriptions.Add(new Unsubscriber(() => SetLeaveWarningAsync(false).Forget(Logger)));
         }
     }
 
@@ -108,13 +115,12 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
         }
     }
 
+    // The web view's own warning before the page reloads, for any form with unsaved changes, on show or not: a record
+    // view's tabs not showing included.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        if (UnsavedChangesForm is { } form)
-        {
-            await SetLeaveWarningAsync(form.HasUnsavedChanges);
-        }
+        await SetLeaveWarningAsync(ClosingGuard.HasUnsavedChanges);
     }
 
     /// <summary>Keeps <paramref name="subscription"/> (an Interaction handler, say) until the screen goes.</summary>
@@ -125,16 +131,20 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
 
     /// <summary>
     /// Moves the screen's address to <paramref name="path"/>, as its form shows another record: no question about the
-    /// form's changes, which the screen state has already asked about if there was one to ask.
+    /// form's changes, which the screen state has already asked about if there was one to ask. With
+    /// <paramref name="replace"/>, it takes the place of the address in the history, so Back doesn't come back to it.
     /// </summary>
-    protected void MoveAddressTo(string path)
+    protected void MoveAddressTo(string path, bool replace = false)
     {
         _ownMove = Navigator.ToAbsoluteUri(path).AbsoluteUri;
-        Navigator.NavigateTo(path);
+        Navigator.NavigateTo(path, replace: replace);
     }
 
-    /// <summary>The form this screen keeps from being left with unsaved changes: its own state's, when it has one.</summary>
-    private IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
+    /// <summary>
+    /// The form this screen keeps from being left with unsaved changes: its own state's, when it has one. A record view's
+    /// forms have none: each stays in its tab, and the window asks about them as it closes (IOpenForms).
+    /// </summary>
+    protected virtual IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
 
     /// <summary>Whether <paramref name="path"/> is this screen's own, a record's of it included (products/42).</summary>
     protected virtual bool IsOwnAddress(string path) => false;
