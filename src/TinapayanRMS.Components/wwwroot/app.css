@@ -49,7 +49,7 @@ html, body {
     color: var(--muted-foreground);
 }
 
-/* The shell: the title bar, then the screen, with the menu floating over the screen when summoned. */
+/* The shell: the title bar, then the activity bar down the left edge with the screen beside it. */
 
 .app-shell {
     display: flex;
@@ -57,9 +57,8 @@ html, body {
     height: 100vh;
 }
 
-/* The window's title bar, which the page draws (Layout/TitleBar.razor): 32px in the card colour, the menu toggle and
-   the heading on the left, and on the right glyph
-   buttons 40×32, with the theme's faint wash on hover, Close red. Windows drags the rest of the bar (IAppWindow). */
+/* The window's title bar, which the page draws (Layout/TitleBar.razor): 32px in the card colour, the heading on the
+   left, and on the right glyph buttons 40×32, with the theme's faint wash on hover, Close red. Windows drags the rest of the bar (IAppWindow). */
 .app-titlebar {
     display: flex;
     align-items: center;
@@ -70,7 +69,7 @@ html, body {
 }
 
 .app-heading {
-    margin-left: 8px;
+    margin-left: 14px;
     font-size: 15px;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -149,6 +148,7 @@ html, body {
 
 .app-body {
     position: relative;
+    display: flex;
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -157,7 +157,62 @@ html, body {
 .app-screen {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-width: 0;
     height: 100%;
+}
+
+/* The activity bar (Layout/ActivityBar.razor), as Visual Studio Code's: a 32px column of the screens' icons down the
+   left edge, each a 32×32 square with a 16px glyph, as the title bar's are, in the card colour, Settings at its foot. The screen showing is in the heading colour, marked by a line of
+   the accent on its left edge; the rest are a lighter grey, and darken to the heading colour under the pointer. */
+
+/* The host and the SfTooltip's element between it and the bar pass the window's height down to the bar. */
+.activity-bar-host,
+.activity-bar-host > .e-tooltip {
+    display: flex;
+    flex: none;
+}
+
+.activity-bar {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    width: 32px;
+    box-sizing: border-box;
+    background: var(--card-background);
+    border-right: 1px solid var(--card-border);
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    height: 32px;
+    color: #7c7f93; /* Latte Overlay 2: light enough that hovering, to the heading colour, plainly darkens it */
+    text-decoration: none;
+}
+
+.activity-item .glyph {
+    font-size: 16px;
+}
+
+.activity-item:hover {
+    color: var(--heading-foreground);
+}
+
+.activity-item.active {
+    color: var(--heading-foreground);
+    box-shadow: inset 2px 0 0 var(--color-sf-primary);
+}
+
+.activity-item:focus-visible {
+    outline: 2px solid var(--color-sf-primary);
+    outline-offset: -2px;
+}
+
+.activity-fill {
+    flex: 1;
 }
 
 /* The screens' tabs, a darker strip under the header: the tab showing is the page's colour, so it joins the screen
@@ -231,67 +286,6 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 4px;
-}
-
-.app-nav.e-sidebar {
-    background: var(--card-background);
-    border-right: 1px solid var(--card-border);
-    box-shadow: 4px 0 16px rgba(76, 79, 105, 0.18);
-}
-
-.nav-menu {
-    display: flex;
-    flex-direction: column;
-    padding: 8px;
-}
-
-.nav-section {
-    padding: 8px 12px 4px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--muted-foreground);
-}
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    color: var(--heading-foreground);
-    text-decoration: none;
-}
-
-.nav-item .glyph {
-    font-size: 16px;
-    width: 20px;
-}
-
-.nav-item:hover {
-    background: var(--card-border);
-}
-
-.nav-item.active {
-    background: var(--accent-soft);
-    color: var(--accent-foreground);
-    font-weight: 600;
-}
-
-.nav-item-pending {
-    color: var(--muted-foreground);
-    opacity: 0.55;
-    cursor: default;
-}
-
-.nav-item-pending:hover {
-    background: none;
-}
-
-.nav-separator {
-    height: 1px;
-    margin: 8px 4px;
-    background: var(--card-border);
 }
 
 /* Cards: rounded, bordered, on the page's darker background. */

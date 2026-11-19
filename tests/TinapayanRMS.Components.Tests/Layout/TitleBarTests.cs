@@ -22,19 +22,7 @@ public class TitleBarTests
 
         bar.Find(".app-heading").TextContent.Should().Be("TINAPAYAN FESTIVAL BAKESHOPPE — RECIPE & COSTING");
         bar.FindAll("button").Select(b => b.GetAttribute("aria-label")).Should().Equal(
-            "Navigation menu", "Find", "Lock", "Back", "Forward", "Minimize", "Maximize", "Close");
-    }
-
-    [Test]
-    public async Task The_menu_button_opens_the_menu()
-    {
-        await using var context = AppServices.NewContext().RenderingAsTheWebView();
-        var clicks = 0;
-
-        var bar = context.Render<TitleBar>(parameters => parameters.Add(b => b.OnMenu, () => clicks++));
-        await bar.Find("button[aria-label='Navigation menu']").ClickAsync(new());
-
-        clicks.Should().Be(1);
+            "Find", "Lock", "Back", "Forward", "Minimize", "Maximize", "Close");
     }
 
     [Test]

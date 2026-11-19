@@ -65,7 +65,8 @@ does. To check the build the shop will run, install it into a trial folder (`scr
 Addresses: `raw-materials`, `sub-assemblies`, `products` (`products/<id>` opens one), `reports`, `price-simulator`,
 `print`, `settings` (`settings/units-of-measure`, `material-categories`, `product-categories`, `roles`,
 `costing-defaults`, `printing`, `keyboard`, `database`). Useful selectors: `text=<label>`, `button[aria-label='Close']` (the title
-bar's buttons are named: Navigation menu, Find, Lock, Back, Forward, Minimize, Maximize, Close), `.screen-tab-link[href='reports']`,
+bar's buttons are named: Find, Lock, Back, Forward, Minimize, Maximize, Close), `.activity-item[aria-label='Reports']` (the
+activity bar's icons, down the left edge), `.screen-tab-link[href='reports']`,
 `.tree-row` (a list's rows; folders carry `aria-expanded`, `.tree-expander` opens one), `.e-dialog .e-footer-content
 button:has-text('No')` (a dialog's button), and the fields' ids (`eval "[...document.querySelectorAll('input[id]')].map(i => i.id)"`).
 

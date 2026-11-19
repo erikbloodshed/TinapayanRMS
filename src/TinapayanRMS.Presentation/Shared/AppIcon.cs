@@ -46,7 +46,7 @@ public enum AppIcon
     /// <summary>A composite product, made of other products.</summary>
     Composite,
 
-    // The screens, as the navigation menu shows them.
+    // The screens, as the activity bar shows them.
     RawMaterials,
     SubAssemblies,
     Products,
@@ -79,7 +79,6 @@ public enum AppIcon
     Forward,
     Download,
     Upload,
-    Menu,
 
     /// <summary>The title bar's Lock, which puts the sign-in panel over the window (AppLock).</summary>
     Lock,

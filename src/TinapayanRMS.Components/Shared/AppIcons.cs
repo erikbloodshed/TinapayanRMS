@@ -63,7 +63,6 @@ public static class AppIcons
         AppIcon.Forward => IconName.ArrowRight,
         AppIcon.Download => IconName.Download,
         AppIcon.Upload => IconName.Upload,
-        AppIcon.Menu => IconName.Menu,
         AppIcon.Lock => IconName.Lock,
         AppIcon.Cut => IconName.Cut,
         AppIcon.Paste => IconName.Paste,

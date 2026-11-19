@@ -1,0 +1,44 @@
+@* The activity bar, down the window's left edge beside the screens, as Visual Studio Code's: an icon for each screen, its
+   name in a tooltip to its right, the one showing marked (NavLink's active, by the address's start, so a record's address
+   marks its screen), and Settings on its own at the bottom. Print isn't listed: it opens from Products, with what to
+   print chosen there. Locked (AppLock), it takes no click or focus, as the screens beside it don't, under the sign-in
+   panel.
+
+   One SfTooltip serves every icon (Target): Syncfusion's script reads the name from the icon's data-title, the way its
+   own multi-target tooltips do. A title attribute would also bring up the browser's own tooltip. WindowCollision: with
+   a Target and without it, the script takes the SfTooltip's own element (the 32px bar) as the edge a tooltip mustn't
+   cross, so one to the right of an icon collides and moves above it. The host holds the
+   SfTooltip's element and its popup's placeholder, so the bar is still one item in the window's row. *@
+<div class="activity-bar-host" inert="@Locked">
+    <SfTooltip Target=".activity-item" Position="Position.RightCenter" WindowCollision="true" CssClass="activity-tooltip">
+        <nav class="activity-bar" aria-label="Screens">
+            @foreach (var item in Items)
+            {
+                <NavLink class="activity-item" href="@item.Href" Match="NavLinkMatch.Prefix" data-title="@item.Label" aria-label="@item.Label">
+                    <Icon Of="item.Icon" />
+                </NavLink>
+            }
+
+            <span class="activity-fill"></span>
+            <NavLink class="activity-item" href="settings" Match="NavLinkMatch.Prefix" data-title="Settings" aria-label="Settings">
+                <Icon Of="AppIcon.Settings" />
+            </NavLink>
+        </nav>
+    </SfTooltip>
+</div>
+
+@code {
+    /// <summary>Whether the window is locked (AppLock): the bar is inert under the sign-in panel.</summary>
+    [Parameter] public bool Locked { get; set; }
+
+    private sealed record NavItem(string Label, AppIcon Icon, string Href);
+
+    private static readonly NavItem[] Items =
+    [
+        new("Raw Materials", AppIcon.RawMaterials, "raw-materials"),
+        new("Sub-Assemblies", AppIcon.SubAssemblies, "sub-assemblies"),
+        new("Products", AppIcon.Products, "products"),
+        new("Reports", AppIcon.Reports, "reports"),
+        new("Price Simulator", AppIcon.PriceSimulator, "price-simulator"),
+    ];
+}

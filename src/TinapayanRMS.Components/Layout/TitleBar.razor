@@ -4,28 +4,18 @@
 @inject AppLock Lock
 @inject IJSRuntime JS
 
-@* The window's title bar, drawn by the page: the window has none of Windows' (IAppWindow). On the left, the menu toggle
-   and the heading; on the right, the Vim keys' mode, Find, Lock, Back and Forward, then Minimize, Maximize (Restore while
-   maximized) and Close. The rest of the bar is the window's caption, which Windows itself drags, double-clicks and
-   right-clicks (wwwroot/app.js, watchTitleBar). The menu opens under it, so its toggle stays where it is to put the
-   menu away again. Lock puts the sign-in panel over the window (AppLock); while it's locked the bar keeps only the app's
-   name and the window's own buttons, so the window can still be moved, sized and closed. *@
+@* The window's title bar, drawn by the page: the window has none of Windows' (IAppWindow). On the left, the heading;
+   on the right, the Vim keys' mode, Find, Lock, Back and Forward, then Minimize, Maximize (Restore while maximized) and
+   Close. The rest of the bar is the window's caption, which Windows itself drags, double-clicks and right-clicks
+   (wwwroot/app.js, watchTitleBar). The screens are reached from the activity bar down the left edge (ActivityBar).
+   Lock puts the sign-in panel over the window (AppLock); while it's locked the bar keeps only the app's name and the
+   window's own buttons, so the window can still be moved, sized and closed. *@
 @{
     // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
     _redraws?.Drawn();
 }
 <header class="app-titlebar" @ref="_bar">
-    @if (Locked)
-    {
-        <span class="app-heading">@Shell.Title</span>
-    }
-    else
-    {
-        <button type="button" class="titlebar-button" title="Show the navigation menu" aria-label="Navigation menu" @onclick="OnMenu">
-            <Icon Of="AppIcon.Menu" />
-        </button>
-        <span class="app-heading">@Shell.Heading</span>
-    }
+    <span class="app-heading">@(Locked ? Shell.Title : Shell.Heading)</span>
 
     <span class="titlebar-fill"></span>
 
@@ -65,9 +55,6 @@
     private RedrawGate? _redraws;
     private bool _canGoBack;
     private bool _canGoForward;
-
-    /// <summary>The menu toggle's click: MainLayout opens or closes the menu.</summary>
-    [Parameter] public EventCallback OnMenu { get; set; }
 
     /// <summary>Whether the window is locked (AppLock): the bar keeps only the app's name and the window's buttons.</summary>
     [Parameter] public bool Locked { get; set; }

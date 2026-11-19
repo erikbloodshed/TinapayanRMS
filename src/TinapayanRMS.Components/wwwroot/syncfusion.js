@@ -22,9 +22,9 @@ const components = [
     "sfdropdownlist",
     "sfgrid",
     "sfmultiselect",
-    "sfsidebar",
     "sftab",
     "sftoast",
+    "sftooltip",
 ];
 
 async function load() {

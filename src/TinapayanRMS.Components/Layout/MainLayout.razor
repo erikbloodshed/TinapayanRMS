@@ -16,7 +16,7 @@
 <div class="app-shell">
     @* The window's title bar, which the page draws: the window has none of Windows' own. Locked, it keeps only what moves,
        sizes and closes the window. *@
-    <TitleBar OnMenu="ToggleNavigation" Locked="_locked" />
+    <TitleBar Locked="_locked" />
 
     @if (!_locked && Status.DatabaseWarning is { } warning)
     {
@@ -39,14 +39,9 @@
            and all, but take no click or focus (inert) and are covered by the sign-in panel. *@
         @if (_signedIn)
         {
-            @* The menu floats over the screen: summoned by the title bar's button, gone on a click away. *@
-            <SfSidebar @bind-IsOpen="_navigationOpen" Type="SidebarType.Over" CloseOnDocumentClick="true" Width="260px" Target=".app-body" CssClass="app-nav">
-                <ChildContent>
-                    <NavMenu Navigated="CloseNavigation" />
-                </ChildContent>
-            </SfSidebar>
+            @* The activity bar down the left edge, always out, and the screen with its tabs beside it. *@
+            <ActivityBar Locked="_locked" />
 
-            @* The tabs are under the menu when it's out. *@
             <div class="app-screen" inert="@_locked">
                 <ScreenTabStrip />
 
@@ -79,7 +74,6 @@
     private DotNetObjectReference<MainLayout>? _self;
     private IJSObjectReference? _activity;
     private bool _disposed;
-    private bool _navigationOpen;
     private bool _locked;
     private bool _signedIn;
 
@@ -136,14 +130,13 @@
         }
     }
 
-    // On whichever thread locked or unlocked: drawn with the state it's in by then. The menu goes as the window locks, and
-    // so does a print dialog, which would otherwise stay up over the sign-in panel, showing the printout.
+    // On whichever thread locked or unlocked: drawn with the state it's in by then. A print dialog goes as the window
+    // locks, as it would otherwise stay up over the sign-in panel, showing the printout.
     private void OnLockChanged() => InvokeAsync(() =>
     {
         (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
         if (_locked)
         {
-            _navigationOpen = false;
             Window.ClosePrintDialog();
         }
 
@@ -154,10 +147,6 @@
 
     // A restore replaced what every screen holds: load the window's page again, which builds every screen afresh.
     private void OnRestored() => InvokeAsync(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true)).Forget(Logger);
-
-    private void ToggleNavigation() => _navigationOpen = !_navigationOpen;
-
-    private void CloseNavigation() => _navigationOpen = false;
 
     public async ValueTask DisposeAsync()
     {

@@ -73,7 +73,7 @@ window.tinapayanVim = (() => {
     }
 
     function isOutOfReach(element) {
-        return element.closest(".e-sidebar.e-close, #blazor-error-ui, .vim-layer") !== null;
+        return element.closest("#blazor-error-ui, .vim-layer") !== null;
     }
 
     function popupIsOpen() {
