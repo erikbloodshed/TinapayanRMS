@@ -48,4 +48,52 @@ public class PrintRulesTests
         margins.Should().Throw<BusinessRuleException>().WithMessage("Choose margins from the list.");
         PrintRules.EnsureValid(new PrintSettings { PaperSize = PaperSize.Legal, Margins = PageMargins.Narrow });
     }
+
+    [Test]
+    public void Compact_type_is_a_tenth_smaller_and_large_a_fifth_larger()
+    {
+        PrintRules.TypeScaleOf(PrintTypeSize.Normal).Should().Be(1m);
+        PrintRules.TypeScaleOf(PrintTypeSize.Compact).Should().Be(0.9m);
+        PrintRules.TypeScaleOf(PrintTypeSize.Large).Should().Be(1.2m);
+        var other = () => PrintRules.TypeScaleOf((PrintTypeSize)99);
+        other.Should().Throw<BusinessRuleException>().WithMessage("Choose a type size from the list.");
+    }
+
+    [Test]
+    public void A_logo_is_a_PNG_or_JPEG_by_its_first_bytes_and_at_most_half_a_megabyte()
+    {
+        PrintRules.LogoContentTypeOf([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]).Should().Be("image/png");
+        PrintRules.LogoContentTypeOf([0xFF, 0xD8, 0xFF, 0xE0]).Should().Be("image/jpeg");
+
+        var gif = () => PrintRules.LogoContentTypeOf("GIF89a"u8.ToArray());
+        var tooBig = () => PrintRules.LogoContentTypeOf([0x89, 0x50, 0x4E, 0x47, .. new byte[PrintRules.MaxLogoBytes]]);
+
+        gif.Should().Throw<BusinessRuleException>().WithMessage("A logo must be a PNG or JPEG picture.");
+        tooBig.Should().Throw<BusinessRuleException>().WithMessage("That picture is 513 KB: a logo can be at most 512 KB. Save a smaller copy of it.");
+    }
+
+    [Test]
+    public void A_name_address_or_note_is_kept_without_spaces_around_it_and_too_long_a_one_is_refused()
+    {
+        PrintRules.Tidy("  Tinapayan Festival Bakeshoppe ").Should().Be("Tinapayan Festival Bakeshoppe");
+        PrintRules.Tidy("   ").Should().BeNull();
+        PrintRules.Tidy(null).Should().BeNull();
+
+        var name = () => PrintRules.EnsureValid(new PrintSettings { ShopName = new string('a', 101) });
+        var note = () => PrintRules.EnsureValid(new PrintSettings { FooterNote = new string('a', 151) });
+
+        name.Should().Throw<BusinessRuleException>().WithMessage("The shop's name can be at most 100 characters.");
+        note.Should().Throw<BusinessRuleException>().WithMessage("The note at the foot of each page can be at most 150 characters.");
+    }
+
+    [Test]
+    public void A_logo_goes_with_its_own_type_or_not_at_all()
+    {
+        var mismatched = () => PrintRules.EnsureValid(new PrintSettings { Logo = [0xFF, 0xD8, 0xFF], LogoContentType = "image/png" });
+        var typeAlone = () => PrintRules.EnsureValid(new PrintSettings { LogoContentType = "image/png" });
+
+        mismatched.Should().Throw<BusinessRuleException>().WithMessage("The logo's picture and its type don't match.");
+        typeAlone.Should().Throw<BusinessRuleException>().WithMessage("A logo's type was given with no picture.");
+        PrintRules.EnsureValid(new PrintSettings { Logo = [0xFF, 0xD8, 0xFF], LogoContentType = "image/jpeg" });
+    }
 }

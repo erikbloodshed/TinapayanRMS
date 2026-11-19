@@ -61,6 +61,89 @@ public class PrintingStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
     });
 
     [Test]
+    public Task The_heading_note_type_size_and_what_prints_are_saved_and_put_in_use() => UiThread.RunAsync(async () =>
+    {
+        var (state, page) = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        (state.PrintsUnitCosts, state.PrintsPercentages, state.PrintsFigures, state.PrintsPriceComparison)
+            .Should().Be((true, true, true, true), "everything prints until something's left out");
+        state.EditingShopName = " Tinapayan Festival Bakeshoppe ";
+        state.EditingShopAddress = "Poblacion, Tagum City";
+        state.EditingFooterNote = "For internal use only";
+        state.EditingTypeSize = PrintTypeSize.Compact;
+        state.PrintsUnitCosts = false;
+        state.PrintsPriceComparison = false;
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        state.EditingShopName.Should().Be("Tinapayan Festival Bakeshoppe", "the field shows the name as it's kept");
+        page.Settings.ShopName.Should().Be("Tinapayan Festival Bakeshoppe");
+        page.HasHeading.Should().BeTrue();
+        page.TypeScale.Should().Be(0.9m);
+        var (reloaded, _) = CreateState();
+        await reloaded.LoadCommand.ExecuteAsync();
+        (reloaded.EditingShopAddress, reloaded.EditingFooterNote, reloaded.EditingTypeSize)
+            .Should().Be(("Poblacion, Tagum City", "For internal use only", PrintTypeSize.Compact));
+        (reloaded.PrintsUnitCosts, reloaded.PrintsPercentages, reloaded.PrintsFigures, reloaded.PrintsPriceComparison)
+            .Should().Be((false, true, true, false));
+    });
+
+    [Test]
+    public Task Choose_reads_a_picture_into_the_logo_and_Save_keeps_it_until_Remove() => UiThread.RunAsync(async () =>
+    {
+        var (state, page) = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        var file = Path.Combine(Path.GetTempPath(), $"tinapayanrms-logo-{Guid.NewGuid():N}.png");
+        byte[] picture = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7, 7];
+        await File.WriteAllBytesAsync(file, picture, Cancellation);
+        try
+        {
+            using var _ = state.ChooseLogoFile.RegisterHandler(interaction => interaction.SetOutput(file));
+            state.RemoveLogoCommand.CanExecute().Should().BeFalse("there's no logo to remove");
+
+            await state.ChooseLogoCommand.ExecuteAsync();
+            await state.SaveCommand.ExecuteAsync();
+
+            state.LogoSource.Should().Be("data:image/png;base64," + Convert.ToBase64String(picture));
+            page.LogoSource.Should().Be(state.LogoSource);
+            state.RemoveLogoCommand.CanExecute().Should().BeTrue();
+
+            await state.RemoveLogoCommand.ExecuteAsync();
+            await state.SaveCommand.ExecuteAsync();
+
+            page.Settings.Logo.Should().BeNull();
+            page.LogoSource.Should().BeNull();
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    });
+
+    [Test]
+    public Task A_file_that_is_not_a_PNG_or_JPEG_is_refused_and_the_logo_stays() => UiThread.RunAsync(async () =>
+    {
+        var (state, _) = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        var file = Path.Combine(Path.GetTempPath(), $"tinapayanrms-logo-{Guid.NewGuid():N}.png");
+        await File.WriteAllTextAsync(file, "not a picture", Cancellation);
+        try
+        {
+            using var _ = state.ChooseLogoFile.RegisterHandler(interaction => interaction.SetOutput(file));
+
+            await state.ChooseLogoCommand.ExecuteAsync();
+
+            state.ErrorMessage.Should().Be("A logo must be a PNG or JPEG picture.");
+            state.LogoSource.Should().BeNull();
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    });
+
+    [Test]
     public Task The_printed_area_follows_each_pick_before_it_is_saved() => UiThread.RunAsync(async () =>
     {
         var (state, page) = CreateState();

@@ -40,7 +40,11 @@ internal static class Columns
             ["id", "product_id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent"],
         [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent", "price_rounding_step"],
         [typeof(AccessSettings)] = ["id", "password_hash", "password_salt", "password_iterations", "password_changed_at", "auto_lock_minutes"],
-        [typeof(PrintSettings)] = ["id", "paper_size", "orientation", "margins"],
+        [typeof(PrintSettings)] =
+        [
+            "id", "paper_size", "orientation", "margins", "shop_name", "shop_address", "logo", "logo_content_type", "footer_note",
+            "type_size", "omit_unit_costs", "omit_percentages", "omit_figures", "omit_price_comparison",
+        ],
         [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id"],
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],

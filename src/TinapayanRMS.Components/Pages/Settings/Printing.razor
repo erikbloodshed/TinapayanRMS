@@ -6,11 +6,13 @@
 
 <SettingsTabs />
 
-@* How printouts are laid out: the paper, which way up, and the margins, kept in the database for every computer the shop
-   prints from (PrintSettings). Print, Export to PDF and the Price Simulator's report lay their pages out on it. *@
+@* How printouts are laid out, kept in the database for every computer the shop prints from (PrintSettings): the paper,
+   which way up and the margins; then what's on each printout: the shop's heading and the note at each page's foot, the
+   type's size, and what's left out. Print, Export to PDF and the Price Simulator's report all use it; one Save keeps both
+   cards. *@
 <div class="card-wrap">
     <section class="card fixed-card">
-        <h2 class="section-header">Printing</h2>
+        <h2 class="section-header">Paper</h2>
         <p class="caption">The paper printouts are laid out for: Print, Export to PDF and the Price Simulator's report. The pages break for it, so "Continued on page" names the right page. Choose the same paper in the print window.</p>
 
         <FormRow Label="Paper" For="paper-size">
@@ -34,8 +36,65 @@
             <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
         </div>
     </section>
+
+    <section class="card fixed-card">
+        <h2 class="section-header">On Each Printout</h2>
+        <p class="caption">The shop's heading starts each product's pages, and the note is printed at the foot of every page, opposite its number. Leave them empty for none.</p>
+
+        <FormRow Label="Shop Name" For="shop-name">
+            <TextField ID="shop-name" @bind-Value="State!.EditingShopName" Placeholder="Tinapayan Festival Bakeshoppe" Tooltip="The heading's first line, in large type." />
+        </FormRow>
+        <FormRow Label="Address Line" For="shop-address">
+            <TextField ID="shop-address" @bind-Value="State!.EditingShopAddress" Tooltip="A line under the name: the address, a phone number." />
+        </FormRow>
+        <FormRow Label="Logo">
+            <div class="print-logo-row">
+                @if (State!.LogoSource is { } logo)
+                {
+                    <img class="print-logo-preview" src="@logo" alt="The shop's logo" />
+                }
+                else
+                {
+                    <span class="caption">None</span>
+                }
+                <CommandButton Command="State!.ChooseLogoCommand" Icon="AppIcon.Upload" Label="Choose…" />
+                <CommandButton Command="State!.RemoveLogoCommand" Icon="AppIcon.Remove" Label="Remove" />
+            </div>
+        </FormRow>
+        <FormRow Label="Note at the Foot" For="footer-note">
+            <TextField ID="footer-note" @bind-Value="State!.EditingFooterNote" Placeholder="For internal use only" Tooltip="Printed at the foot of every page, at the left." />
+        </FormRow>
+        <FormRow Label="Type Size" For="type-size">
+            <PickField ID="type-size" TItem="KeyValuePair<PrintTypeSize, string>" Items="State!.TypeSizes" TextOf="s => s.Value"
+                       Value="State!.TypeSizes.FirstOrDefault(s => s.Key == State!.EditingTypeSize)" ValueChanged="s => State!.EditingTypeSize = s.Key"
+                       Tooltip="Compact fits more rows on each page; Large is easier to read at arm's length." />
+        </FormRow>
+        <FormRow Label="Print">
+            <div class="print-parts">
+                <SfCheckBox Label="Cost/g and Unit Cost" @bind-Checked="State!.PrintsUnitCosts" title="Each recipe line's cost per gram and each packaging line's unit cost, beside their costs." />
+                <SfCheckBox Label="Baker's % and Absolute %" @bind-Checked="State!.PrintsPercentages" title="Each recipe line's share of its formula." />
+                <SfCheckBox Label="Figure tiles" @bind-Checked="State!.PrintsFigures" title="Material Cost, Base Cost, Current Price and Markup under each product's title." />
+                <SfCheckBox Label="Suggested beside current price" @bind-Checked="State!.PrintsPriceComparison" title="The suggested price's markup, VAT and price beside the current price's, under the costing." />
+            </div>
+        </FormRow>
+
+        <div class="button-row form-extra">
+            <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />
+        </div>
+    </section>
 </div>
 
 @code {
+    [Inject] private IFileDialogs Dialogs { get; set; } = null!;
+
     protected override ScreenCommand LoadCommand => State!.LoadCommand;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        // Choose…: the computer's Open dialog, for a picture.
+        AddSubscription(State!.ChooseLogoFile.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Dialogs.ChooseFileToOpenAsync([".png", ".jpg", ".jpeg"], "Picture"))));
+    }
 }

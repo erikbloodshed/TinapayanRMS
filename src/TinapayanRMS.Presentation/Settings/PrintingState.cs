@@ -1,3 +1,4 @@
+using System.Reactive;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -9,8 +10,9 @@ using ILogger = Serilog.ILogger;
 namespace TinapayanRMS.Presentation.Settings;
 
 /// <summary>
-/// Settings' Printing tab: the paper printouts are laid out for, which way up, and the margins. Kept in the database
-/// (PrintSettings), for every computer the shop prints from; Save puts them in use at once (PrintPage).
+/// Settings' Printing tab: the paper printouts are laid out for, which way up and the margins; the shop's heading (name,
+/// address line, logo) and the note at each page's foot; the type's size; and the columns and parts left out. Kept in the
+/// database (PrintSettings), for every computer the shop prints from; Save puts them in use at once (PrintPage).
 /// </summary>
 public sealed class PrintingState : ScreenState
 {
@@ -38,6 +40,13 @@ public sealed class PrintingState : ScreenState
         KeyValuePair.Create(PageMargins.Normal, "Normal (14 mm)"),
         KeyValuePair.Create(PageMargins.Narrow, "Narrow (8 mm)"),
         KeyValuePair.Create(PageMargins.Wide, "Wide (20 mm)"),
+    ];
+
+    public IReadOnlyList<KeyValuePair<PrintTypeSize, string>> TypeSizes { get; } =
+    [
+        KeyValuePair.Create(PrintTypeSize.Compact, "Compact"),
+        KeyValuePair.Create(PrintTypeSize.Normal, "Normal"),
+        KeyValuePair.Create(PrintTypeSize.Large, "Large"),
     ];
 
     private PaperSize _editingPaperSize;
@@ -89,8 +98,94 @@ public sealed class PrintingState : ScreenState
         }
     }
 
+    private string? _editingShopName;
+    public string? EditingShopName
+    {
+        get => _editingShopName;
+        set => RaiseAndSetIfChanged(ref _editingShopName, value);
+    }
+
+    private string? _editingShopAddress;
+    public string? EditingShopAddress
+    {
+        get => _editingShopAddress;
+        set => RaiseAndSetIfChanged(ref _editingShopAddress, value);
+    }
+
+    private string? _editingFooterNote;
+    public string? EditingFooterNote
+    {
+        get => _editingFooterNote;
+        set => RaiseAndSetIfChanged(ref _editingFooterNote, value);
+    }
+
+    private (byte[] Picture, string ContentType)? _editingLogo;
+    /// <summary>The logo picked, with its media type; null for none.</summary>
+    public (byte[] Picture, string ContentType)? EditingLogo
+    {
+        get => _editingLogo;
+        private set
+        {
+            if (RaiseAndSetIfChanged(ref _editingLogo, value))
+            {
+                RaisePropertyChanged(nameof(LogoSource));
+            }
+        }
+    }
+
+    /// <summary>The logo picked as a picture's address the page can show; null for none.</summary>
+    public string? LogoSource => EditingLogo is { } logo ? $"data:{logo.ContentType};base64,{Convert.ToBase64String(logo.Picture)}" : null;
+
+    private PrintTypeSize _editingTypeSize;
+    public PrintTypeSize EditingTypeSize
+    {
+        get => _editingTypeSize;
+        set => RaiseAndSetIfChanged(ref _editingTypeSize, value);
+    }
+
+    private bool _printsUnitCosts = true;
+    /// <summary>Each recipe line's Cost/g and each packaging line's Unit Cost.</summary>
+    public bool PrintsUnitCosts
+    {
+        get => _printsUnitCosts;
+        set => RaiseAndSetIfChanged(ref _printsUnitCosts, value);
+    }
+
+    private bool _printsPercentages = true;
+    /// <summary>The recipe's Baker's % or Absolute % column.</summary>
+    public bool PrintsPercentages
+    {
+        get => _printsPercentages;
+        set => RaiseAndSetIfChanged(ref _printsPercentages, value);
+    }
+
+    private bool _printsFigures = true;
+    /// <summary>The figure tiles under each product's title.</summary>
+    public bool PrintsFigures
+    {
+        get => _printsFigures;
+        set => RaiseAndSetIfChanged(ref _printsFigures, value);
+    }
+
+    private bool _printsPriceComparison = true;
+    /// <summary>The suggested price beside the current one, under the costing.</summary>
+    public bool PrintsPriceComparison
+    {
+        get => _printsPriceComparison;
+        set => RaiseAndSetIfChanged(ref _printsPriceComparison, value);
+    }
+
     public ScreenCommand LoadCommand { get; }
     public ScreenCommand SaveCommand { get; }
+
+    /// <summary>Choose Logo: a PNG or JPEG picture, through <see cref="ChooseLogoFile"/>, shown until Save keeps it.</summary>
+    public ScreenCommand ChooseLogoCommand { get; }
+
+    /// <summary>Remove Logo: none, once saved.</summary>
+    public ScreenCommand RemoveLogoCommand { get; }
+
+    /// <summary>Answered with the picture file chosen, or null when cancelled.</summary>
+    public Interaction<Unit, string?> ChooseLogoFile { get; } = new();
 
     public PrintingState(IPrintSettingsRepository repository, PrintPage page, ILogger logger)
         : base(logger)
@@ -105,15 +200,43 @@ public sealed class PrintingState : ScreenState
             EditingPaperSize = settings.PaperSize;
             EditingOrientation = settings.Orientation;
             EditingMargins = settings.Margins;
+            EditingShopName = settings.ShopName;
+            EditingShopAddress = settings.ShopAddress;
+            EditingFooterNote = settings.FooterNote;
+            EditingLogo = settings.Logo is { } logo ? (logo, settings.LogoContentType!) : null;
+            EditingTypeSize = settings.TypeSize;
+            PrintsUnitCosts = !settings.OmitUnitCosts;
+            PrintsPercentages = !settings.OmitPercentages;
+            PrintsFigures = !settings.OmitFigures;
+            PrintsPriceComparison = !settings.OmitPriceComparison;
         }));
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var settings = Editing;
             await _repository.SetAsync(settings, CancellationToken.None);
+            // As it's kept, names tidied: what the printouts use, and what the fields show.
+            settings = await _repository.GetAsync(CancellationToken.None);
+            EditingShopName = settings.ShopName;
+            EditingShopAddress = settings.ShopAddress;
+            EditingFooterNote = settings.FooterNote;
             _page.Use(settings);
             SuccessMessage = "Printing saved. Print, Export to PDF and the Price Simulator's report use it from now on.";
         }));
+
+        ChooseLogoCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
+        {
+            if (await ChooseLogoFile.Handle(Unit.Default) is not { } path)
+            {
+                return;
+            }
+
+            PrintRules.EnsureLogoSize(new FileInfo(path).Length);
+            var picture = await File.ReadAllBytesAsync(path);
+            EditingLogo = (picture, PrintRules.LogoContentTypeOf(picture));
+        }));
+
+        RemoveLogoCommand = ScreenCommand.Of(() => EditingLogo = null, () => EditingLogo is not null);
     }
 
     private PrintSettings Editing => new()
@@ -121,5 +244,15 @@ public sealed class PrintingState : ScreenState
         PaperSize = EditingPaperSize,
         Orientation = EditingOrientation,
         Margins = EditingMargins,
+        ShopName = EditingShopName,
+        ShopAddress = EditingShopAddress,
+        FooterNote = EditingFooterNote,
+        Logo = EditingLogo?.Picture,
+        LogoContentType = EditingLogo?.ContentType,
+        TypeSize = EditingTypeSize,
+        OmitUnitCosts = !PrintsUnitCosts,
+        OmitPercentages = !PrintsPercentages,
+        OmitFigures = !PrintsFigures,
+        OmitPriceComparison = !PrintsPriceComparison,
     };
 }

@@ -188,7 +188,8 @@ const printBoxes = sheet => {
 const printPageStarts = (boxes, height) => {
     const limit = height - printPage.slack;
     const starts = [0];
-    let first = 0, top = boxes.length ? boxes[0].top : 0, header = 0;
+    // The first page from the top of the part, the shop's heading (not a box) included.
+    let first = 0, top = 0, header = 0;
     const fits = bottom => bottom - top + header <= limit;
     const startPage = at => {
         starts.push(at);

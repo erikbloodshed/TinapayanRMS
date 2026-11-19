@@ -17,7 +17,13 @@ public sealed class PrintSettingsRepository(IDbContextFactory<TinapayanRMSDbCont
 
     public async Task SetAsync(PrintSettings settings, CancellationToken cancellationToken)
     {
-        PrintRules.EnsureValid(settings);
+        // Checked as it's kept: a name of spaces is no name, and a long one is measured without them.
+        PrintRules.EnsureValid(new PrintSettings
+        {
+            PaperSize = settings.PaperSize, Orientation = settings.Orientation, Margins = settings.Margins, TypeSize = settings.TypeSize,
+            ShopName = PrintRules.Tidy(settings.ShopName), ShopAddress = PrintRules.Tidy(settings.ShopAddress),
+            FooterNote = PrintRules.Tidy(settings.FooterNote), Logo = settings.Logo, LogoContentType = settings.LogoContentType,
+        });
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var existing = await dbContext.PrintSettings.FirstOrDefaultAsync(s => s.Id == PrintSettings.SingletonId, cancellationToken);
@@ -30,6 +36,16 @@ public sealed class PrintSettingsRepository(IDbContextFactory<TinapayanRMSDbCont
         existing.PaperSize = settings.PaperSize;
         existing.Orientation = settings.Orientation;
         existing.Margins = settings.Margins;
+        existing.ShopName = PrintRules.Tidy(settings.ShopName);
+        existing.ShopAddress = PrintRules.Tidy(settings.ShopAddress);
+        existing.FooterNote = PrintRules.Tidy(settings.FooterNote);
+        existing.Logo = settings.Logo;
+        existing.LogoContentType = settings.LogoContentType;
+        existing.TypeSize = settings.TypeSize;
+        existing.OmitUnitCosts = settings.OmitUnitCosts;
+        existing.OmitPercentages = settings.OmitPercentages;
+        existing.OmitFigures = settings.OmitFigures;
+        existing.OmitPriceComparison = settings.OmitPriceComparison;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }

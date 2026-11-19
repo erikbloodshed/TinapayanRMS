@@ -16,7 +16,16 @@ public sealed class FakeFileDialogs : IFileDialogs
         return Task.FromResult(SaveAnswer);
     }
 
-    public Task<string?> ChooseFileToOpenAsync(string extension, string kind) => throw new NotSupportedException();
+    /// <summary>The file the user chooses to open; null cancels the dialog.</summary>
+    public string? OpenAnswer { get; set; }
+
+    public List<(IReadOnlyList<string> Extensions, string Kind)> OpensAsked { get; } = [];
+
+    public Task<string?> ChooseFileToOpenAsync(IReadOnlyList<string> extensions, string kind)
+    {
+        OpensAsked.Add((extensions, kind));
+        return Task.FromResult(OpenAnswer);
+    }
 
     public Task<string?> ChooseFolderAsync() => throw new NotSupportedException();
 

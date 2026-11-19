@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261119105907_PrintSettings";
+    public override string LastMigrationId => "20261119114520_PrintoutLook";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -421,11 +421,43 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("integer")
                     .HasColumnName("id");
 
+                b.Property<string>("FooterNote")
+                    .HasMaxLength(150)
+                    .HasColumnType("character varying(150)")
+                    .HasColumnName("footer_note")
+                    .UseCollation("case_insensitive");
+
+                b.Property<byte[]>("Logo")
+                    .HasColumnType("bytea")
+                    .HasColumnName("logo");
+
+                b.Property<string>("LogoContentType")
+                    .HasMaxLength(30)
+                    .HasColumnType("character varying(30)")
+                    .HasColumnName("logo_content_type")
+                    .UseCollation("case_insensitive");
+
                 b.Property<string>("Margins")
                     .IsRequired()
                     .HasMaxLength(20)
                     .HasColumnType("character varying(20)")
                     .HasColumnName("margins");
+
+                b.Property<bool>("OmitFigures")
+                    .HasColumnType("boolean")
+                    .HasColumnName("omit_figures");
+
+                b.Property<bool>("OmitPercentages")
+                    .HasColumnType("boolean")
+                    .HasColumnName("omit_percentages");
+
+                b.Property<bool>("OmitPriceComparison")
+                    .HasColumnType("boolean")
+                    .HasColumnName("omit_price_comparison");
+
+                b.Property<bool>("OmitUnitCosts")
+                    .HasColumnType("boolean")
+                    .HasColumnName("omit_unit_costs");
 
                 b.Property<string>("Orientation")
                     .IsRequired()
@@ -439,11 +471,35 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("character varying(20)")
                     .HasColumnName("paper_size");
 
+                b.Property<string>("ShopAddress")
+                    .HasMaxLength(200)
+                    .HasColumnType("character varying(200)")
+                    .HasColumnName("shop_address")
+                    .UseCollation("case_insensitive");
+
+                b.Property<string>("ShopName")
+                    .HasMaxLength(100)
+                    .HasColumnType("character varying(100)")
+                    .HasColumnName("shop_name")
+                    .UseCollation("case_insensitive");
+
+                b.Property<string>("TypeSize")
+                    .IsRequired()
+                    .ValueGeneratedOnAdd()
+                    .HasMaxLength(20)
+                    .HasColumnType("character varying(20)")
+                    .HasDefaultValue("Normal")
+                    .HasColumnName("type_size");
+
                 b.HasKey("Id")
                     .HasName("pk_print_settings");
 
                 b.ToTable("print_settings", t =>
                     {
+                        t.HasCheckConstraint("CK_PrintSettings_LogoSize", "logo IS NULL OR octet_length(logo) <= 524288");
+
+                        t.HasCheckConstraint("CK_PrintSettings_LogoWhole", "(logo IS NULL AND logo_content_type IS NULL) OR (logo IS NOT NULL AND logo_content_type IS NOT NULL AND logo_content_type IN ('image/png', 'image/jpeg'))");
+
                         t.HasCheckConstraint("CK_PrintSettings_Margins", "margins IN ('Normal', 'Narrow', 'Wide')");
 
                         t.HasCheckConstraint("CK_PrintSettings_Orientation", "orientation IN ('Portrait', 'Landscape')");
@@ -451,6 +507,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                         t.HasCheckConstraint("CK_PrintSettings_PaperSize", "paper_size IN ('A4', 'Letter', 'LongBond', 'Legal')");
 
                         t.HasCheckConstraint("CK_PrintSettings_SingleRow", "id = 1");
+
+                        t.HasCheckConstraint("CK_PrintSettings_TypeSize", "type_size IN ('Normal', 'Compact', 'Large')");
                     });
             });
 

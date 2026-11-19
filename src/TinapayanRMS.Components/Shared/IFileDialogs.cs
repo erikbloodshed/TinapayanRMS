@@ -11,8 +11,8 @@ public interface IFileDialogs
     /// <param name="kind">What the file is, for the dialog's list of kinds ("Excel workbook").</param>
     Task<string?> ChooseSaveFileAsync(string fileName, string kind);
 
-    /// <summary>A file to open, of the kind <paramref name="extension"/> names (".backup").</summary>
-    Task<string?> ChooseFileToOpenAsync(string extension, string kind);
+    /// <summary>A file to open, of the kind <paramref name="extensions"/> name ([".backup"], or [".png", ".jpg"]).</summary>
+    Task<string?> ChooseFileToOpenAsync(IReadOnlyList<string> extensions, string kind);
 
     Task<string?> ChooseFolderAsync();
 

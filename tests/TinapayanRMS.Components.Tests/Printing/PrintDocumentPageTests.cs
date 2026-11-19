@@ -11,7 +11,8 @@ namespace TinapayanRMS.Components.Tests.Printing;
 
 /// <summary>
 /// The page a printout is laid out on: Settings → Printing's paper and margins in its @page rule, its sheets on the screen
-/// as wide as the paper, and the height app.js fills each page to.
+/// as wide as the paper, and the height app.js fills each page to; the shop's heading at the top of each part, the note at
+/// each page's foot, and the type's size.
 /// </summary>
 public class PrintDocumentPageTests
 {
@@ -26,7 +27,30 @@ public class PrintDocumentPageTests
         var printout = document.Find(".print-document");
         printout.GetAttribute("data-page-height").Should().Be("267");
         printout.GetAttribute("style").Should().Be(
-            "--paper-width: 210mm; --paper-height: 297mm; --margin-top: 14mm; --margin-side: 14mm; --margin-bottom: 16mm");
+            "--paper-width: 210mm; --paper-height: 297mm; --margin-top: 14mm; --margin-side: 14mm; --margin-bottom: 16mm; --type-scale: 1");
+        document.FindAll(".print-shop").Should().BeEmpty("there's no heading until Settings has one");
+    }
+
+    [Test]
+    public async Task The_shop_heading_starts_each_part_and_the_note_is_at_each_page_foot()
+    {
+        await using var context = AppServices.NewContext();
+        context.Services.GetRequiredService<PrintPage>().Use(new PrintSettings
+        {
+            ShopName = "Tinapayan Festival Bakeshoppe", ShopAddress = "Poblacion, Tagum City",
+            Logo = [0x89, 0x50, 0x4E, 0x47], LogoContentType = "image/png",
+            FooterNote = "For \"internal\" use only", TypeSize = PrintTypeSize.Large,
+        });
+
+        var document = Render(context);
+
+        var heading = document.Find(".print-product > .print-shop");
+        heading.QuerySelector(".print-shop-name")!.TextContent.Should().Be("Tinapayan Festival Bakeshoppe");
+        heading.QuerySelector(".print-shop-address")!.TextContent.Should().Be("Poblacion, Tagum City");
+        heading.QuerySelector("img")!.GetAttribute("src").Should().Be("data:image/png;base64,iVBORw==");
+        document.Find("style").TextContent.Should().Contain(
+            "@bottom-left { content: \"For \\\"internal\\\" use only\";", "the note is a CSS string, its quotes escaped");
+        document.Find(".print-document").GetAttribute("style").Should().EndWith("--type-scale: 1.2");
     }
 
     [Test]

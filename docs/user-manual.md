@@ -368,13 +368,25 @@ Each product keeps its own stage and percentages, and each raw material its own 
 
 ### Printing
 
-How printouts are laid out: [Print](#8-printing-recipes-and-costings), [Export to PDF](#exporting-a-product-to-pdf) and the [Price Simulator's report](#printing-a-price-simulator-report) all use it. Pick each, then press **Save**:
+How printouts are laid out and what's on them: [Print](#8-printing-recipes-and-costings), [Export to PDF](#exporting-a-product-to-pdf) and the [Price Simulator's report](#printing-a-price-simulator-report) all use it. It has two cards, and either card's **Save** keeps both.
+
+**Paper**:
 
 - **Paper**: **A4 (210 × 297 mm)**, **Letter, short (8.5 × 11 in)**, **Long (8.5 × 13 in)** (long bond) or **Legal (8.5 × 14 in)**.
 - **Orientation**: **Portrait**, or **Landscape** for the paper on its side: wider tables, fewer rows on each page.
 - **Margins**: **Normal (14 mm)**, **Narrow (8 mm)** for more on each page, or **Wide (20 mm)** for room to write notes. The foot's margin is a little deeper, as the page number is printed in it.
 
-Under them, a line says how much of the paper each page prints on, such as *Each page prints on 182 × 267 mm of the paper*. The pages break for the paper picked, so a **Continued on page** note names the right page. Choose the same paper in the print window when you print. The setting is kept in the database, so every computer the shop prints from uses it. Before it's saved, printouts are A4, portrait, with normal margins.
+Under them, a line says how much of the paper each page prints on, such as *Each page prints on 182 × 267 mm of the paper*. The pages break for the paper picked, so a **Continued on page** note names the right page. Choose the same paper in the print window when you print.
+
+**On Each Printout**:
+
+- **Shop Name** and **Address Line**: a heading at the top of each product's pages, and of a set's contents page, under a thin rule. The address line can hold anything that fits on one line, such as an address and a phone number. Leave both empty for no heading.
+- **Logo**: press **Choose…** to pick a PNG or JPEG picture of at most 512 KB. It's printed at the heading's left, at most 16 mm tall. **Remove** takes it away. Either takes effect when you press **Save**.
+- **Note at the Foot**: a short line, such as *For internal use only*, printed at the bottom left of every page, opposite the page number. It shows only on paper and in the PDF, not in the preview.
+- **Type Size**: **Compact** (a tenth smaller, more rows on each page), **Normal** or **Large** (a fifth larger, easier to read at arm's length in the kitchen).
+- **Print**: untick what you don't want on the paper. **Cost/g and Unit Cost** is each recipe line's cost per gram and each packaging line's unit cost; the lines' costs and totals still print. **Baker's % and Absolute %** is the recipe's percentage column. **Figure tiles** are Material Cost, Base Cost, Current Price and Markup under each product's title. **Suggested beside current price** is the table of the suggested price's and the current price's markup, VAT and selling price under the costing.
+
+These settings are kept in the database, so every computer the shop prints from uses them. Before they're saved, printouts are A4, portrait, with normal margins and normal type, with no heading or note, and with everything printed.
 
 ### Keyboard
 
@@ -934,7 +946,7 @@ Press **Print** in the Products header to open the **Print** tab. It shows the p
 
 - **Print** (the list at the top left) chooses the products to print. With none ticked it reads **This product** and prints the product open on the Products screen, as described above. Open it, type part of a name in **Search products** to find a product, and tick it; tick as many as you like, from any folders, or **Select All** for every product the list shows. When the list closes, the pages show the products ticked, as saved, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
 - **Categories** (the list beside it) narrows **Print** to the products of the categories you tick, such as **Breads**; **No category** is the products without one. A product ticked under **Print** that isn't in them is unticked. To print every bread, tick **Breads** here, then **Select All** under **Print**. With no category ticked (**All categories**), **Print** lists every product.
-- **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections.
+- **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections. The ticks stay as you leave them for the next time you print on this computer, for your Windows account. To leave out single columns, such as Cost/g, or the figure tiles, see [Settings → Printing](#printing).
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.
 - The printed costing is laid out as the Costing tab is: the breakdown down to the **Subtotal (base cost)**, then the **Suggested Price** beside the **Current Price**, each with its Markup (the amount, then its percentage in brackets, lighter), VAT and selling price, and the rounded suggested price when Settings sets a price rounding. The current price's Markup prints amber below the Markup Metric and red below the base cost. A Price Simulator report keeps its own layout (see [Printing a Price Simulator report](#printing-a-price-simulator-report)).
 - **Print** (the button at the top right) opens Windows' print window. Choose the printer there. The pages are already laid out on the paper, orientation and margins set in [Settings → Printing](#printing), which the print window starts with. To make a PDF, choose **Microsoft Print to PDF** (or **Save as PDF**) as the printer.

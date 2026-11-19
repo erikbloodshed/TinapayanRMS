@@ -9,13 +9,15 @@
    Each part that starts a page on paper is a print-sheet, which the preview draws as a sheet of paper of its own. Within
    one, app.js works out the pages as it's printed (a heading kept with its table, a table's totals once, after its last
    row, and "Continued on page n" under a table that goes on), and the browser repeats table headings and numbers the
-   pages. The page is Settings → Printing's (PrintPage): the paper's size and margins for @page, each sheet's on the screen,
-   and the height app.js fills each page to. *@
-<style>@@page { size: @Mm(PageSetup.Paper.Width) @Mm(PageSetup.Paper.Height); margin: @Mm(PageSetup.Margins.Top) @Mm(PageSetup.Margins.Side) @Mm(PageSetup.Margins.Bottom); }</style>
+   pages. The page is Settings → Printing's (PrintPage): the paper's size and margins, and the note at each page's foot,
+   for @page; each sheet's size on the screen and the type's; the height app.js fills each page to; the shop's heading at
+   the top of each part; and the columns and parts it leaves out. *@
+<style>@PageRule</style>
 <div class="print-document" style="@SheetStyle" data-page-height="@PageSetup.PrintedArea.Height.ToString("0.##", CultureInfo.InvariantCulture)">
     @if (Set.Title is { } title)
     {
         <section class="print-sheet">
+            @ShopHeading
             <header class="print-title">
                 <h1>@title</h1>
                 <p class="print-muted">@Set.Products.Count @(Set.Products.Count == 1 ? "product" : "products") · @Parts · Printed @Printed(Set.PrintedAt)</p>
@@ -66,7 +68,7 @@
 
     @foreach (var product in Set.Products)
     {
-        <article class="print-sheet print-product">@ProductPart(product)</article>
+        <article class="print-sheet print-product">@ShopHeading@ProductPart(product)</article>
     }
 </div>
 
@@ -81,10 +83,62 @@
 
     private static string Mm(decimal millimetres) => millimetres.ToString("0.##", CultureInfo.InvariantCulture) + "mm";
 
-    // Each sheet on the screen as the paper is, with what's printed at the page's width (print.css).
+    // Each sheet on the screen as the paper is, with what's printed at the page's width, and the type's size (print.css).
     private string SheetStyle =>
         $"--paper-width: {Mm(PageSetup.Paper.Width)}; --paper-height: {Mm(PageSetup.Paper.Height)}; " +
-        $"--margin-top: {Mm(PageSetup.Margins.Top)}; --margin-side: {Mm(PageSetup.Margins.Side)}; --margin-bottom: {Mm(PageSetup.Margins.Bottom)}";
+        $"--margin-top: {Mm(PageSetup.Margins.Top)}; --margin-side: {Mm(PageSetup.Margins.Side)}; --margin-bottom: {Mm(PageSetup.Margins.Bottom)}; " +
+        $"--type-scale: {PageSetup.TypeScale.ToString("0.##", CultureInfo.InvariantCulture)}";
+
+    // The paper and margins, and the note at the foot of each page, opposite its number (print.css's @bottom-right). It
+    // comes after print.css's @page, so it wins.
+    private string PageRule
+    {
+        get
+        {
+            var rule = $"@page {{ size: {Mm(PageSetup.Paper.Width)} {Mm(PageSetup.Paper.Height)}; " +
+                       $"margin: {Mm(PageSetup.Margins.Top)} {Mm(PageSetup.Margins.Side)} {Mm(PageSetup.Margins.Bottom)}; ";
+            if (PageSetup.Settings.FooterNote is { } note)
+            {
+                rule += $"@bottom-left {{ content: {CssString(note)}; font-family: \"Segoe UI\", sans-serif; font-size: 8.5pt; color: #5c5f77; }} ";
+            }
+
+            return rule + "}";
+        }
+    }
+
+    /// <summary>Text as a quoted CSS string: its quotes and backslashes escaped, and a line break as one.</summary>
+    public static string CssString(string text) =>
+        "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\A ") + "\"";
+
+    // What's left out (Settings → Printing): the recipe's unit costs (Cost/g, packaging's Unit Cost) go with the costing
+    // too, and the figure tiles and price comparison are only ever the costing's.
+    private bool ShowsUnitCosts => IncludeCosting && !PageSetup.Settings.OmitUnitCosts;
+    private bool ShowsPercentages => !PageSetup.Settings.OmitPercentages;
+    private bool ShowsFigures => IncludeCosting && !PageSetup.Settings.OmitFigures;
+    private bool ShowsPriceComparison => !PageSetup.Settings.OmitPriceComparison;
+
+    // The shop's name, address line and logo at the top of each part, when Settings has any of them.
+    private RenderFragment ShopHeading => @<text>
+        @if (PageSetup.HasHeading)
+        {
+            <header class="print-shop">
+                @if (PageSetup.LogoSource is { } logo)
+                {
+                    <img class="print-shop-logo" src="@logo" alt="" />
+                }
+                <div class="print-shop-text">
+                    @if (PageSetup.Settings.ShopName is { } name)
+                    {
+                        <div class="print-shop-name">@name</div>
+                    }
+                    @if (PageSetup.Settings.ShopAddress is { } address)
+                    {
+                        <div class="print-shop-address">@address</div>
+                    }
+                </div>
+            </header>
+        }
+    </text>;
 
     private bool IsSimulation => Set.PriceChanges is not null || Set.Products.Any(p => p.Simulation is not null);
 
@@ -148,7 +202,7 @@
             <p class="print-small">Last updated @printout.LastUpdatedText · Printed @Printed(Set.PrintedAt)@(printout.SaveNote is { } note ? " · " + note : "")</p>
         </header>
 
-        @if (IncludeCosting)
+        @if (ShowsFigures)
         {
             @Figures(printout)
         }
@@ -292,8 +346,10 @@
         <table class="print-table">
             <thead>
                 <tr>
-                    <th>Ingredient</th><th class="n">Grams</th><th class="n">@section.PercentHeader</th>
-                    @if (IncludeCosting) { <th class="n">Cost/g</th><th class="n">Cost</th> }
+                    <th>Ingredient</th><th class="n">Grams</th>
+                    @if (ShowsPercentages) { <th class="n">@section.PercentHeader</th> }
+                    @if (ShowsUnitCosts) { <th class="n">Cost/g</th> }
+                    @if (IncludeCosting) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
                 </tr>
             </thead>
@@ -304,7 +360,7 @@
                 }
                 @if (section.AddIns.Count > 0)
                 {
-                    <tr class="print-subheading"><td colspan="@(3 + (IncludeCosting ? 2 : 0) + (withNow ? 1 : 0))">Add-ins</td></tr>
+                    <tr class="print-subheading"><td colspan="@(2 + (ShowsPercentages ? 1 : 0) + (ShowsUnitCosts ? 1 : 0) + (IncludeCosting ? 1 : 0) + (withNow ? 1 : 0))">Add-ins</td></tr>
                     @foreach (var line in section.AddIns)
                     {
                         @LineRow(line, withNow)
@@ -313,8 +369,10 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td>Total</td><td class="n">@Grams(section.TotalWeight)</td><td class="n">@Percent(section.TotalPercent)</td>
-                    @if (IncludeCosting) { <td></td><td class="n">@Money(section.BatchCost)</td> }
+                    <td>Total</td><td class="n">@Grams(section.TotalWeight)</td>
+                    @if (ShowsPercentages) { <td class="n">@Percent(section.TotalPercent)</td> }
+                    @if (ShowsUnitCosts) { <td></td> }
+                    @if (IncludeCosting) { <td class="n">@Money(section.BatchCost)</td> }
                     @if (withNow) { <td class="n">@(section.NowBatchCost is { } now ? Money(now) : "")</td> }
                 </tr>
             </tfoot>
@@ -323,8 +381,10 @@
     </section>;
 
     private RenderFragment LineRow(PrintedLine line, bool withNow) => @<tr>
-        <td>@line.Ingredient</td><td class="n">@Grams(line.Grams)</td><td class="n">@Percent(line.Percent)</td>
-        @if (IncludeCosting) { <td class="n">@line.CostPerGram.ToString("N4")</td><td class="n">@Money(line.Cost)</td> }
+        <td>@line.Ingredient</td><td class="n">@Grams(line.Grams)</td>
+        @if (ShowsPercentages) { <td class="n">@Percent(line.Percent)</td> }
+        @if (ShowsUnitCosts) { <td class="n">@line.CostPerGram.ToString("N4")</td> }
+        @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
     </tr>;
 
@@ -335,7 +395,8 @@
             <thead>
                 <tr>
                     <th>Material</th><th class="n">Qty</th><th>Unit</th>
-                    @if (IncludeCosting) { <th class="n">Unit Cost</th><th class="n">Cost</th> }
+                    @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
+                    @if (IncludeCosting) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
                 </tr>
             </thead>
@@ -344,7 +405,8 @@
                 {
                     <tr>
                         <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
-                        @if (IncludeCosting) { <td class="n">@line.UnitCost.ToString("N4")</td><td class="n">@Money(line.Cost)</td> }
+                        @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
+                        @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
                         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
                     </tr>
                 }
@@ -353,7 +415,9 @@
             {
                 <tfoot>
                     <tr>
-                        <td>Total</td><td></td><td></td><td></td><td class="n">@Money(packaging.Total)</td>
+                        <td>Total</td><td></td><td></td>
+                        @if (ShowsUnitCosts) { <td></td> }
+                        <td class="n">@Money(packaging.Total)</td>
                         @if (withNow) { <td class="n">@(packaging.Lines.Any(l => l.NowCost is not null) ? Money(packaging.Lines.Sum(l => l.NowCost ?? l.Cost)) : "")</td> }
                     </tr>
                 </tfoot>
@@ -366,7 +430,8 @@
                 <thead>
                     <tr>
                         <th>Material</th><th class="n">Qty per Pack</th><th>Unit</th>
-                        @if (IncludeCosting) { <th class="n">Unit Cost</th><th class="n">Cost per Pack</th> }
+                        @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
+                        @if (IncludeCosting) { <th class="n">Cost per Pack</th> }
                     </tr>
                 </thead>
                 <tbody>
@@ -374,15 +439,16 @@
                     {
                         <tr>
                             <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
-                            @if (IncludeCosting) { <td class="n">@line.UnitCost.ToString("N4")</td><td class="n">@Money(line.Cost)</td> }
+                            @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
+                            @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
                         </tr>
                     }
                 </tbody>
                 @if (IncludeCosting)
                 {
                     <tfoot>
-                        <tr><td>Pack cost</td><td></td><td></td><td></td><td class="n">@Money(bulk.PackCost)</td></tr>
-                        <tr><td>Per unit</td><td></td><td></td><td></td><td class="n">@Money(bulk.CostPerUnit)</td></tr>
+                        <tr><td>Pack cost</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.PackCost)</td></tr>
+                        <tr><td>Per unit</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.CostPerUnit)</td></tr>
                     </tfoot>
                 }
             </table>
@@ -429,7 +495,7 @@
                 }
             </tbody>
         </table>
-        @if (now is null)
+        @if (now is null && ShowsPriceComparison)
         {
             @PriceComparison(costs)
         }

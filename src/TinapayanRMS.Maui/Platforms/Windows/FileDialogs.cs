@@ -22,10 +22,14 @@ public sealed class FileDialogs : IFileDialogs
         return (await picker.PickSaveFileAsync())?.Path;
     }
 
-    public async Task<string?> ChooseFileToOpenAsync(string extension, string kind)
+    public async Task<string?> ChooseFileToOpenAsync(IReadOnlyList<string> extensions, string kind)
     {
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
-        picker.FileTypeFilter.Add(extension);
+        foreach (var extension in extensions)
+        {
+            picker.FileTypeFilter.Add(extension);
+        }
+
         OverWindow(picker);
         return (await picker.PickSingleFileAsync())?.Path;
     }

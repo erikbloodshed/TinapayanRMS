@@ -80,7 +80,7 @@
         AddSubscription(State!.ChooseCopyDestination.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseSaveFileAsync(interaction.Input, BackupKind))));
         AddSubscription(State!.ChooseBackupFile.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Dialogs.ChooseFileToOpenAsync(BackupRules.Extension, BackupKind))));
+            interaction.SetOutput(await Dialogs.ChooseFileToOpenAsync([BackupRules.Extension], BackupKind))));
         AddSubscription(State!.ChooseCopyFolder.RegisterHandler(async interaction =>
             interaction.SetOutput(await Dialogs.ChooseFolderAsync())));
     }

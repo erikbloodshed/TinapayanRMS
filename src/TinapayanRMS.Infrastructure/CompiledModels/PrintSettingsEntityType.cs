@@ -21,7 +21,7 @@ public partial class PrintSettingsEntityType
             "TinapayanRMS.Domain.Entities.PrintSettings",
             typeof(PrintSettings),
             baseEntityType,
-            propertyCount: 4,
+            propertyCount: 14,
             keyCount: 1);
 
         var id = runtimeEntityType.AddProperty(
@@ -34,6 +34,35 @@ public partial class PrintSettingsEntityType
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         id.AddAnnotation("Relational:ColumnName", "id");
 
+        var footerNote = runtimeEntityType.AddProperty(
+            "FooterNote",
+            typeof(string),
+            propertyInfo: typeof(PrintSettings).GetProperty("FooterNote", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<FooterNote>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            maxLength: 150);
+        footerNote.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        footerNote.AddAnnotation("Relational:ColumnName", "footer_note");
+
+        var logo = runtimeEntityType.AddProperty(
+            "Logo",
+            typeof(byte[]),
+            propertyInfo: typeof(PrintSettings).GetProperty("Logo", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<Logo>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true);
+        logo.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        logo.AddAnnotation("Relational:ColumnName", "logo");
+
+        var logoContentType = runtimeEntityType.AddProperty(
+            "LogoContentType",
+            typeof(string),
+            propertyInfo: typeof(PrintSettings).GetProperty("LogoContentType", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<LogoContentType>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            maxLength: 30);
+        logoContentType.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        logoContentType.AddAnnotation("Relational:ColumnName", "logo_content_type");
+
         var margins = runtimeEntityType.AddProperty(
             "Margins",
             typeof(PageMargins),
@@ -44,6 +73,42 @@ public partial class PrintSettingsEntityType
         margins.SetSentinelFromProviderValue("Normal");
         margins.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         margins.AddAnnotation("Relational:ColumnName", "margins");
+
+        var omitFigures = runtimeEntityType.AddProperty(
+            "OmitFigures",
+            typeof(bool),
+            propertyInfo: typeof(PrintSettings).GetProperty("OmitFigures", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<OmitFigures>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        omitFigures.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        omitFigures.AddAnnotation("Relational:ColumnName", "omit_figures");
+
+        var omitPercentages = runtimeEntityType.AddProperty(
+            "OmitPercentages",
+            typeof(bool),
+            propertyInfo: typeof(PrintSettings).GetProperty("OmitPercentages", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<OmitPercentages>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        omitPercentages.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        omitPercentages.AddAnnotation("Relational:ColumnName", "omit_percentages");
+
+        var omitPriceComparison = runtimeEntityType.AddProperty(
+            "OmitPriceComparison",
+            typeof(bool),
+            propertyInfo: typeof(PrintSettings).GetProperty("OmitPriceComparison", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<OmitPriceComparison>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        omitPriceComparison.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        omitPriceComparison.AddAnnotation("Relational:ColumnName", "omit_price_comparison");
+
+        var omitUnitCosts = runtimeEntityType.AddProperty(
+            "OmitUnitCosts",
+            typeof(bool),
+            propertyInfo: typeof(PrintSettings).GetProperty("OmitUnitCosts", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<OmitUnitCosts>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        omitUnitCosts.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        omitUnitCosts.AddAnnotation("Relational:ColumnName", "omit_unit_costs");
 
         var orientation = runtimeEntityType.AddProperty(
             "Orientation",
@@ -66,6 +131,39 @@ public partial class PrintSettingsEntityType
         paperSize.SetSentinelFromProviderValue("A4");
         paperSize.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         paperSize.AddAnnotation("Relational:ColumnName", "paper_size");
+
+        var shopAddress = runtimeEntityType.AddProperty(
+            "ShopAddress",
+            typeof(string),
+            propertyInfo: typeof(PrintSettings).GetProperty("ShopAddress", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<ShopAddress>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            maxLength: 200);
+        shopAddress.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        shopAddress.AddAnnotation("Relational:ColumnName", "shop_address");
+
+        var shopName = runtimeEntityType.AddProperty(
+            "ShopName",
+            typeof(string),
+            propertyInfo: typeof(PrintSettings).GetProperty("ShopName", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<ShopName>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            maxLength: 100);
+        shopName.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        shopName.AddAnnotation("Relational:ColumnName", "shop_name");
+
+        var typeSize = runtimeEntityType.AddProperty(
+            "TypeSize",
+            typeof(PrintTypeSize),
+            propertyInfo: typeof(PrintSettings).GetProperty("TypeSize", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PrintSettings).GetField("<TypeSize>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            valueGenerated: ValueGenerated.OnAdd,
+            maxLength: 20,
+            providerPropertyType: typeof(string));
+        typeSize.SetSentinelFromProviderValue("Normal");
+        typeSize.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        typeSize.AddAnnotation("Relational:ColumnName", "type_size");
+        typeSize.AddAnnotation("Relational:DefaultValue", PrintTypeSize.Normal);
 
         var key = runtimeEntityType.AddKey(
             new[] { id });

@@ -78,6 +78,7 @@ public static class ServiceRegistration
         services.AddScoped<PriceSimulatorState>();
         services.AddScoped<PrintTabState>();
         services.AddScoped<PrintPage>();
+        services.AddScoped<PrintIncludes>();
         services.AddScoped<UnitsOfMeasureState>();
         services.AddScoped<RawMaterialCategoriesState>();
         services.AddScoped<ProductCategoriesState>();
