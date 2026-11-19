@@ -5,7 +5,11 @@
    price (the markup one row, each price's amount with its percentage in a column of its own beside it, with no
    heading, so the amounts stay in line), the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
 <div class="costing">
-    <h2 class="panel-header">Costing Summary</h2>
+    <div class="costing-heading">
+        <h2 class="panel-header">Costing Summary</h2>
+        <CommandButton Command="State.ExportCostingCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
+                       Tooltip="Saves this product's costing and recipe to an Excel workbook, as the screen shows them: unsaved changes and Unbuffered too." />
+    </div>
     <div class="costing-columns">
         <div class="costing-metrics">
             <div class="cost-tile cost-labor">

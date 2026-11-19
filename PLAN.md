@@ -89,7 +89,8 @@ TinapayanRMS.slnx
 │   │   ├── Settings/                 — one screen state per Settings tab; the list tabs' share LookupListState
 │   │   ├── Reports/, PriceSimulator/ — those screens' states and what they work out
 │   │   ├── Printing/                 — the Print screen's state, and ProductPrintout: what's printed, for Products and the
-│   │   │                               Price Simulator too
+│   │   │                               Price Simulator too; TablePrintout for tables (Reports, a sub-assembly); PrintPage
+│   │   │                               and PrintIncludes
 │   │   ├── App/                      — around the screens: the main window, sign-in, AppLock, DatabaseReadiness,
 │   │   │                               AutomaticBackups, and Find (QuickFindState)
 │   │   ├── Shared/                   — what the screens build on: ObservableState, ScreenState, ScreenCommand, Interaction,
@@ -101,7 +102,8 @@ TinapayanRMS.slnx
 │   │   ├── Layout/                   — MainLayout, TitleBar (the chromeless window's title bar), NavMenu, ScreenTabStrip, FindHost, VimKeys
 │   │   ├── Shared/                   — ScreenBase, RedrawGate, the shared fields and tables (TextField, NumberField, PickField, LineGrid, FolderTree…),
 │   │   │                               the hosts, AppIcons, and what only the window can do (IAppWindow, IFileDialogs, IPagePrinter)
-│   │   ├── Printing/                 — PrintDocument (a printout as HTML), PdfExport (Products' Export to PDF) and PrintPreviews
+│   │   ├── Printing/                 — PrintDocument (a printout as HTML), PrintPane, PdfExport (Products' Export to PDF),
+│   │   │                               PrintPreviews, GridPrints (a Reports table printed) and CostingWorkbook
 │   │   ├── Vim/                      — the Vim keys' C#: the key table, the command line, the hint labels, the sums
 │   │   └── wwwroot/                  — the screens' styles and scripts, served at _content/TinapayanRMS.Components/: app.css and css/,
 │   │                                   app.js (page helpers, the title bar's caption), vim.js, and syncfusion.js (the screens' Syncfusion

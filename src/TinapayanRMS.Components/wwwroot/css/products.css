@@ -327,6 +327,19 @@
     padding: 12px;
 }
 
+/* The Costing Summary heading, with Export to Excel at its right. */
+.costing-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 0 8px;
+}
+
+.costing-heading .panel-header {
+    margin: 0;
+}
+
 .costing-columns {
     display: grid;
     grid-template-columns: 400px minmax(0, 1fr);

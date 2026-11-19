@@ -264,6 +264,16 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
                 }
             }));
 
+        ExportCostingCommand = new ScreenCommand(
+            () => RunSafelyAsync(async () =>
+            {
+                if (IsReadyToPrint("export") && PreparePrintout() is ProductPrintout printout
+                    && await ExportCosting.Handle(printout) is { } path)
+                {
+                    SuccessMessage = $"Saved {Path.GetFileName(path)} in {Path.GetDirectoryName(path)}.";
+                }
+            }));
+
         ToggleCostBasisCommand = ScreenCommand.Of(ToggleCostBasis);
     }
 
@@ -595,6 +605,16 @@ public sealed class ProductsState : RecordScreenState<ProductFormSnapshot>, IDis
 
     /// <summary>Input: the pages to save. Output: where they were saved, or null when the user cancelled. The screen answers it (PdfExport).</summary>
     public Interaction<ProductPrintSet, string?> ExportPdf { get; } = new();
+
+    /// <summary>
+    /// The Costing tab's Export to Excel: the product's costing and recipe as the screen shows them, unsaved edits and the
+    /// cost basis included, to a workbook through <see cref="ExportCosting"/>, and says where it went. The same checks as
+    /// Print first.
+    /// </summary>
+    public ScreenCommand ExportCostingCommand { get; }
+
+    /// <summary>Input: the product as it would print. Output: where the workbook was saved, or null when cancelled. The screen answers it (CostingWorkbook).</summary>
+    public Interaction<ProductPrintout, string?> ExportCosting { get; } = new();
 
     /// <summary>Unbuffered: switches every cost on the screen between the materials' buffered costs and their true ones (ProductCosting.CostBasis).</summary>
     public ScreenCommand ToggleCostBasisCommand { get; }

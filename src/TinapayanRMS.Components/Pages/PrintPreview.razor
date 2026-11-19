@@ -5,10 +5,10 @@
 
 <PageTitle>Print preview · TinapayanRMS</PageTitle>
 
-@* The preview a screen opens for its own report: the Price Simulator's products, picked
-   or all shown. Back returns to the screen that asked. *@
+@* The preview a screen opens for its own printout: the Price Simulator's products, picked or all shown; a Reports table as
+   it's shown; a sub-assembly's recipe. Back returns to the screen that asked. *@
 <section class="card print-card">
-    <PrintPane Set="_choice?.Set" Empty="Nothing to preview. Print a report from the Price Simulator.">
+    <PrintPane Set="_choice?.Set" Tables="Previews.Tables" Empty="Nothing to preview. Print from the Price Simulator, Reports or Sub-Assemblies.">
         <Options>
             <ActionButton Icon="AppIcon.Back" Label="Back" OnClick="() => Navigation.NavigateTo(Previews.ReturnTo)" />
             @if (Previews.Choices.Count > 1)

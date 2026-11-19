@@ -79,7 +79,14 @@
         // Move to In-House: the made ingredient's name and the Made category it goes in.
         AddSubscription(state.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
+
+        // The Costing tab's Export to Excel: the costing and recipe as they'd print, saved where the Save dialog says.
+        AddSubscription(state.ExportCosting.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Dialogs.SaveAsync(
+                CostingWorkbook.FileNameOf(interaction.Input, DateTime.Today), ExcelWorkbook.Kind, CostingWorkbook.Build(interaction.Input)))));
     }
+
+    [Inject] private IFileDialogs Dialogs { get; set; } = null!;
 
     protected override string AddressRoot => "products";
 

@@ -289,6 +289,11 @@
     text-align: center;
 }
 
+/* A date, which reads badly broken over two lines. */
+.print-table .nw {
+    white-space: nowrap;
+}
+
 /* A table's totals once, after its last row: as a footer the browser repeated them at the foot of each page. */
 .print-table tfoot {
     display: table-row-group;

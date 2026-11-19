@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Subjects;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
@@ -7,6 +8,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
+using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.SubAssemblies;
@@ -119,6 +121,7 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
         NewProductCommand = ScreenCommand.Of(AskForNewProduct, () => SelectedRow is { } row && row.SubAssembly.Role?.IsPackaging != true);
         DeleteCommand = new ScreenCommand(() => DeleteSubAssemblyAsync(SelectedRow!), () => SelectedRow is not null);
         SaveCommand = new ScreenCommand(() => RunSaveAsync(SaveAsync), () => History.IsDirty);
+        PrintCommand = new ScreenCommand(() => RunSafelyAsync(async () => await ShowPrint.Handle(PrintoutNow(DateTime.Now))));
 
         // The line selected in whichever table is showing.
         RemoveLineCommand = ScreenCommand.Of(
@@ -250,6 +253,58 @@ public sealed class SubAssembliesState : RecordScreenState<SubAssemblyFormSnapsh
 
     /// <summary>Remove Line on whichever table shows: the recipe's lines, or a packaging set's.</summary>
     public ScreenCommand RemoveLineCommand { get; }
+
+    /// <summary>Print: the form as it shows, unsaved edits included, in the print preview (<see cref="ShowPrint"/>).</summary>
+    public ScreenCommand PrintCommand { get; }
+
+    /// <summary>Input: the pages, which the screen shows in the print preview (PrintPreviews).</summary>
+    public Interaction<TablePrintout, System.Reactive.Unit> ShowPrint { get; } = new();
+
+    /// <summary>
+    /// The sub-assembly as the form shows it, on its own: a recipe's lines with their grams, share of the formula, cost per
+    /// gram and cost, and the batch's total; or a packaging set's materials, each set's quantity and cost. Its edits not
+    /// saved yet are in it, which it says (a draft).
+    /// </summary>
+    public TablePrintout PrintoutNow(DateTime printedAt)
+    {
+        var title = string.IsNullOrWhiteSpace(EditingName) ? HeaderTitle : EditingName.Trim();
+        var role = EditingRole?.Name ?? "No role";
+        PrintedTable table;
+        List<string> lines;
+        if (IsPackaging)
+        {
+            var priced = PackagingSet.Lines.Where(l => l.PackagingMaterial is not null).Select(l => (l.PackagingMaterial!.Name, Priced: l.ToPriced())).ToList();
+            lines = [$"{role} · Sub-Assemblies · a packaging set: what one set takes of each material"];
+            table = new PrintedTable(
+                null,
+                [new("Material"), new("Qty", true), new("Unit"), new("Unit Cost", true), new("Cost per Set", true)],
+                [.. priced.Select(p => (IReadOnlyList<string>)[
+                    p.Name, p.Priced.QtyPerUnit?.ToString("#,0.####", CultureInfo.CurrentCulture) ?? "", p.Priced.UnitAbbreviation ?? "",
+                    p.Priced.UnitCost.ToString("N4", CultureInfo.CurrentCulture), p.Priced.CostPerUnit.ToString("N2", CultureInfo.CurrentCulture)])])
+            {
+                Total = ["Total", "", "", "", PackagingSet.Cost.ToString("N2", CultureInfo.CurrentCulture)],
+            };
+        }
+        else
+        {
+            lines = [$"{role} · Sub-Assemblies", Batch.FormulaBaseCaption];
+            table = new PrintedTable(
+                null,
+                [new("Ingredient"), new("Grams", true), new(Batch.PercentHeader, true), new("Cost/g", true), new("Cost", true)],
+                [.. Batch.Lines.Where(l => l.Ingredient is not null).Select(l => (IReadOnlyList<string>)[
+                    l.Ingredient!.Name, l.Grams?.ToString("N1", CultureInfo.CurrentCulture) ?? "", l.Percent?.ToString("N1", CultureInfo.CurrentCulture) ?? "—",
+                    l.CostPerGram.ToString("N4", CultureInfo.CurrentCulture), l.Cost.ToString("N2", CultureInfo.CurrentCulture)])])
+            {
+                Total = ["Total", Batch.BatchWeight.ToString("N1", CultureInfo.CurrentCulture), "", "", Batch.BatchCost.ToString("N2", CultureInfo.CurrentCulture)],
+                Note = $"Cost per gram of the batch {Batch.CostPerGram.ToString("N4", CultureInfo.CurrentCulture)}",
+            };
+        }
+
+        return new TablePrintout(title, lines, [table], printedAt)
+        {
+            SaveNote = _editingId == 0 ? ProductPrintout.NotSavedNote : HasUnsavedChanges ? ProductPrintout.UnsavedChangesNote : null,
+        };
+    }
 
     /// <summary>
     /// Starts a new product that links the picked sub-assembly, through <see cref="NewProductRequests"/>. Not for a packaging

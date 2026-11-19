@@ -16,7 +16,30 @@
    the top of each part; and the columns and parts it leaves out. *@
 <style>@PageRule</style>
 <div class="print-document" style="@SheetStyle" data-page-height="@PageSetup.PrintedArea.Height.ToString("0.##", CultureInfo.InvariantCulture)">
-    @if (Set.Title is { } title)
+    @if (Tables is { } tables)
+    {
+        <section class="print-sheet print-tables">
+            @ShopHeading
+            <header class="print-title">
+                <h1>@tables.Title</h1>
+                @foreach (var line in tables.Lines)
+                {
+                    <p class="print-muted">@line</p>
+                }
+                <p class="print-small">Printed @Printed(tables.PrintedAt)@(tables.SaveNote is { } note ? " · " + note : "")</p>
+            </header>
+            @if (tables.SaveNote == ProductPrintout.UnsavedChangesNote || tables.SaveNote == ProductPrintout.NotSavedNote)
+            {
+                <p class="print-draft">Draft: @(tables.SaveNote == ProductPrintout.NotSavedNote ? "this hasn't been saved yet" : "it includes changes not yet saved"). Save it before it's used.</p>
+                <div class="print-draft-mark" aria-hidden="true">Draft</div>
+            }
+            @foreach (var table in tables.Tables)
+            {
+                @TablePart(table)
+            }
+        </section>
+    }
+    else if (Set.Title is { } title)
     {
         <section class="print-sheet">
             @ShopHeading
@@ -68,14 +91,77 @@
         </section>
     }
 
-    @foreach (var product in Set.Products)
+    @if (Tables is null)
     {
-        <article class="print-sheet print-product">@ShopHeading@ProductPart(product)</article>
+        @foreach (var product in Set.Products)
+        {
+            <article class="print-sheet print-product">@ShopHeading@ProductPart(product)</article>
+        }
     }
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ProductPrintSet Set { get; set; } = null!;
+    /// <summary>The products to print; or set <see cref="Tables"/> instead.</summary>
+    [Parameter] public ProductPrintSet Set { get; set; } = null!;
+
+    /// <summary>Tables to print instead of products: a Reports table as it's shown, a sub-assembly's recipe.</summary>
+    [Parameter] public TablePrintout? Tables { get; set; }
+
+    // A table printout's cell: a figure at the right, a date on one line.
+    private static string? CellClass(PrintedColumn column) => (column.IsNumber, column.KeepsToOneLine) switch
+    {
+        (true, _) => "n",
+        (false, true) => "nw",
+        _ => null,
+    };
+
+    // A table of a table printout, under its heading, with its total once after its rows and a note under it.
+    private RenderFragment TablePart(PrintedTable table) => @<section class="print-block">
+        @if (table.Heading is { } heading)
+        {
+            <h2 class="print-section">@heading</h2>
+        }
+        <table class="print-table">
+            <thead>
+                <tr>
+                    @foreach (var column in table.Columns)
+                    {
+                        <th class="@CellClass(column)">@column.Header</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (table.Rows.Count == 0)
+                {
+                    <tr><td colspan="@table.Columns.Count" class="print-muted">Nothing to show.</td></tr>
+                }
+                @foreach (var row in table.Rows)
+                {
+                    <tr>
+                        @for (var c = 0; c < table.Columns.Count; c++)
+                        {
+                            <td class="@CellClass(table.Columns[c])">@(c < row.Count ? row[c] : "")</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+            @if (table.Total is { } total)
+            {
+                <tfoot>
+                    <tr>
+                        @for (var c = 0; c < table.Columns.Count; c++)
+                        {
+                            <td class="@CellClass(table.Columns[c])">@(c < total.Count ? total[c] : "")</td>
+                        }
+                    </tr>
+                </tfoot>
+            }
+        </table>
+        @if (table.Note is { } note)
+        {
+            <p class="print-small">@note</p>
+        }
+    </section>;
 
     /// <summary>Each sub-assembly's ingredients and piece size, then the packaging.</summary>
     [Parameter] public bool IncludeRecipe { get; set; } = true;

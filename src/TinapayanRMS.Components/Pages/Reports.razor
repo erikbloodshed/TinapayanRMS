@@ -1,5 +1,6 @@
 @page "/reports"
 @using Syncfusion.Blazor.Calendars
+@using TinapayanRMS.Components.Printing
 @inherits ScreenBase<ReportsState>
 @inject IViewStateStore ViewState
 @inject IFileDialogs Dialogs
@@ -28,6 +29,7 @@
                             <div class="button-row">
                                 <CommandButton Command="State!.ExportProductCostsCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown: in its order, with its filters, and with only the columns showing." />
+                                <ActionButton Icon="AppIcon.Print" Label="Print" Tooltip="Shows this table as it's shown, in its order, with its filters and only the columns showing, in the print preview: print it there or save it as a PDF." OnClick="() => PrintAsync(_productCosts, ReportsState.ProductCostSummaryTitle, ProductCostsCaption)" />
                                 <ActionButton Icon="AppIcon.Columns" Label="Columns" Tooltip="Choose which columns show. Product always does." OnClick="OpenColumnChooserAsync" />
                             </div>
                         </div>
@@ -71,8 +73,11 @@
                     <div class="report">
                         <div class="report-heading">
                             <h2 class="section-header">Raw Materials Price Summary</h2>
-                            <CommandButton Command="State!.ExportRawMaterialPricesCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
-                                           Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                            <div class="button-row">
+                                <CommandButton Command="State!.ExportRawMaterialPricesCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
+                                               Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                                <ActionButton Icon="AppIcon.Print" Label="Print" Tooltip="Shows this table as it's shown, in its order, with its filters and only the columns showing, in the print preview: print it there or save it as a PDF." OnClick="() => PrintAsync(_rawMaterialPrices, ReportsState.RawMaterialPriceSummaryTitle, RawMaterialPricesCaption)" />
+                            </div>
                         </div>
                         <p class="caption">Every purchased material's latest price, from its price history. Change % is how far that price moved its cost from the price before it. Double-click a material to open it.</p>
                         <SelfDrawn>
@@ -108,6 +113,7 @@
                                                Tooltip="Puts the target buffer back on top of the brand each one is costed at (its Basis brand, else the dearest) for the materials picked, or for every one shown below target. Asks first." />
                                 <CommandButton Command="State!.ExportCostBuffersCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                                <ActionButton Icon="AppIcon.Print" Label="Print" Tooltip="Shows this table as it's shown, in its order, with its filters and only the columns showing, in the print preview: print it there or save it as a PDF." OnClick="() => PrintAsync(_costBuffers, ReportsState.CostBuffersTitle, CostBuffersCaption)" />
                             </div>
                         </div>
                         <p class="caption">Every purchased material's buffered cost against the brand it's costed at now (its Basis brand, else the dearest). Brand prices don't move the buffered cost, so a rise wears the buffer down; Target % is the buffer last typed for it. Pick materials (Ctrl or Shift for several), or none for all shown, and Re-apply Target Buffer puts it back on top. Double-click one to open it.</p>
@@ -141,8 +147,11 @@
                     <div class="report">
                         <div class="report-heading">
                             <h2 class="section-header">Cost Drivers</h2>
-                            <CommandButton Command="State!.ExportCostDriversCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
-                                           Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                            <div class="button-row">
+                                <CommandButton Command="State!.ExportCostDriversCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
+                                               Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                                <ActionButton Icon="AppIcon.Print" Label="Print" Tooltip="Shows this table as it's shown, in its order, with its filters and only the columns showing, in the print preview: print it there or save it as a PDF." OnClick="() => PrintAsync(_costDrivers, ReportsState.CostDriversTitle, CostDriversCaption)" />
+                            </div>
                         </div>
                         <p class="caption">The purchased materials that make up most of the products in Production's material cost, one sellable unit of each, at buffered costs: a material is counted however it gets into a product, through a made or linked ingredient too. Cumulative % adds each row to those above it, so the top few that make up most of the cost show where a price rise would hurt. Double-click a material to open it.</p>
                         <SelfDrawn>
@@ -180,6 +189,7 @@
                                 <SfCheckBox Label="Only dropped" @bind-Checked="State!.OnlyDropped" />
                                 <CommandButton Command="State!.ExportMarginErosionCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
                                                Tooltip="Saves this table to an Excel workbook as it's shown, in its order." />
+                                <ActionButton Icon="AppIcon.Print" Label="Print" Tooltip="Shows this table as it's shown, in its order, with its filters and only the columns showing, in the print preview: print it there or save it as a PDF." OnClick="() => PrintAsync(_marginErosion, ReportsState.MarginErosionTitle, MarginErosionCaption)" />
                             </div>
                         </div>
                         <p class="caption">Each product's markup at its Current Price as it stood on the day picked, its latest version saved by then at its costs then, against now. A product with no version by then, or no Current Price then or now, isn't listed. Change is in percentage points: below 0 means it earns less now. Double-click a product to open it.</p>
@@ -227,7 +237,41 @@
     private SfGrid<CostDriverRow>? _costDrivers;
     private SfGrid<MarginErosionRow>? _marginErosion;
 
+    // What each printed table is, under its title.
+    private const string ProductCostsCaption = "Every product as it's saved, costed at today's prices, for one sellable unit of the pieces shown.";
+    private const string RawMaterialPricesCaption = "Every purchased material's latest price, from its price history.";
+    private const string CostBuffersCaption = "Every purchased material's buffered cost against the brand it's costed at now.";
+    private const string CostDriversCaption = "The purchased materials that make up most of the material cost of the products in Production, at buffered costs.";
+    private string MarginErosionCaption => $"Each product's markup at its Current Price on {State!.MarginErosionSince:MMM d, yyyy}, against now, in percentage points.";
+
+    [Inject] private PrintPreviews Previews { get; set; } = null!;
+    [Inject] private PrintPage PageSetup { get; set; } = null!;
+    [Inject] private NavigationManager Navigation { get; set; } = null!;
+    [Inject] private Serilog.ILogger PrintLogger { get; set; } = null!;
+
     protected override ScreenCommand LoadCommand => State!.LoadCommand;
+
+    // Print: the table as it's shown, in the print preview, on Settings → Printing's page as it's saved now; Back returns
+    // here. A grid that can't be read says so in a toast.
+    private async Task PrintAsync<TRow>(SfGrid<TRow>? grid, string title, string caption)
+    {
+        if (grid is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await PageSetup.RefreshAsync(CancellationToken.None);
+            Previews.ShowTables(await GridPrints.PrintoutAsync(grid, title, caption, DateTime.Now), "reports");
+            Navigation.NavigateTo("print/preview");
+        }
+        catch (Exception exception)
+        {
+            PrintLogger.Warning(exception, "Printing the {Report} report failed", title);
+            ScreenNotices.ShowError($"{title} couldn't be printed: {exception.Message}");
+        }
+    }
 
     protected override void OnInitialized()
     {

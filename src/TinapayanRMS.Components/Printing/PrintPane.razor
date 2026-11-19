@@ -12,7 +12,7 @@
 <div class="print-pane">
     <div class="print-bar no-print">
         @Options
-        @if (Set is not null)
+        @if (Set is not null && Tables is null)
         {
             <span class="form-label">Include</span>
             <SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing || Includes.ProductionCopy"
@@ -27,12 +27,16 @@
         {
             <span class="busy-text">@Status</span>
         }
-        <ActionButton Icon="AppIcon.ExportToPdf" Label="Export to PDF" Disabled="Set is null || _exporting" OnClick="ExportPdfAsync" />
-        <ActionButton Icon="AppIcon.Print" Label="Print" Primary="true" Disabled="Set is null" OnClick="PrintAsync" />
+        <ActionButton Icon="AppIcon.ExportToPdf" Label="Export to PDF" Disabled="!HasPages || _exporting" OnClick="ExportPdfAsync" />
+        <ActionButton Icon="AppIcon.Print" Label="Print" Primary="true" Disabled="!HasPages" OnClick="PrintAsync" />
     </div>
 
     <div class="print-stage">
-        @if (Set is not null)
+        @if (Tables is not null)
+        {
+            <PrintDocument Tables="Tables" />
+        }
+        else if (Set is not null)
         {
             <PrintDocument Set="Set" IncludeRecipe="Includes.ProductionCopy || Includes.Recipe"
                            IncludeCosting="!Includes.ProductionCopy && Includes.Costing" ProductionCopy="Includes.ProductionCopy" />
@@ -54,6 +58,11 @@
 
     [Parameter] public ProductPrintSet? Set { get; set; }
 
+    /// <summary>Tables to show instead of products (a Reports table, a sub-assembly's recipe), with no Include ticks.</summary>
+    [Parameter] public TablePrintout? Tables { get; set; }
+
+    private bool HasPages => Set is not null || Tables is not null;
+
     /// <summary>What the bar starts with: the screen's own choice of what to print.</summary>
     [Parameter] public RenderFragment? Options { get; set; }
 
@@ -68,7 +77,10 @@
     // does (Page.printToPDF, which keeps print.css's paper). A failure says so in a toast, as a screen's would.
     private async Task ExportPdfAsync()
     {
-        if (Set is not { } set)
+        var fileName = Tables is { } tables
+            ? PdfExport.FileNameOf($"{tables.Title} {tables.PrintedAt:yyyy-MM-dd}")
+            : Set is { } set ? PdfExport.FileNameOf(set) : null;
+        if (fileName is null)
         {
             return;
         }
@@ -76,7 +88,7 @@
         _exporting = true;
         try
         {
-            if (await Dialogs.ChooseSaveFileAsync(PdfExport.FileNameOf(set), Kind) is { } path)
+            if (await Dialogs.ChooseSaveFileAsync(fileName, Kind) is { } path)
             {
                 await Window.SavePageAsPdfAsync(path);
                 Notices.ShowSuccess($"Saved {Path.GetFileName(path)} in {Path.GetDirectoryName(path)}.");

@@ -617,7 +617,7 @@ If the sub-assembly is open in the form with changes you haven't saved, save or 
 
 ### The form
 
-The form has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo** and **Delete**, then:
+The form has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo**, **Print** and **Delete**, then:
 
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
 - **Name** and **Role**.
@@ -630,6 +630,8 @@ The card under it has two tabs along its bottom. Each scrolls while the header s
 The tab you were on stays picked when you pick another sub-assembly, and when you go to another screen and come back, as on Products and Raw Materials.
 
 **Scale**, under the lines, resizes the recipe. Pick **the whole batch** or **the base (ticked lines)**, type the grams it should weigh, and press **Scale**: every line is multiplied by the same amount, so each keeps its percentage. For example, a 1,200 g batch scaled to 2,400 g doubles every line, and a dough whose ticked flour is 1,000 g, scaled on the base to 500 g, halves. It's one step for **Undo**, and **Save** keeps it. Scaling the base needs at least one line's **Base** ticked. It isn't offered for a packaging set.
+
+**Print** shows the sub-assembly on its own in a print preview, as the form shows it: its name and role, the base and whole formula, each line's grams, percentage, cost per gram and cost, and the batch's total. A packaging set prints its materials, each set's quantity and cost. Changes you haven't saved are in it, marked **Draft**. **Print** there prints it, **Export to PDF** saves it as a PDF file, and **Back** returns to the sub-assembly, unsaved changes and all. It's laid out on the paper in [Settings → Printing](#printing), with the shop's heading.
 
 **Copy** starts a new, unsaved sub-assembly with the same role and lines, named "… Copy". Rename it if you like, then press Save. The original stays as it was.
 
@@ -876,6 +878,8 @@ The percentages sit in a narrow column of their own after each price, in lighter
 
 Everything updates as you type, before you save. See [How costs are worked out](#12-how-costs-are-worked-out).
 
+**Export to Excel**, at the Costing Summary's top right, saves the product's costing to an Excel workbook, named after the product and today's date (such as *Asado Roll 60g Costing 2026-11-19.xlsx*). It's the product as the screen shows it, changes you haven't saved and **Unbuffered** included, and it has the same checks as **Print**. It has a **Costing** sheet, each part of the breakdown down to the base cost with its share of the price, then the markup, VAT and selling price beside the current price's; a **Recipe** sheet, each section's ingredients with their grams, percentage, cost per gram and cost; and a **Packaging** sheet when the product has packaging. The figures are real numbers, to add up or chart in Excel.
+
 ### Clone tab
 
 The Clone tab is shown for saved products only. Type a **New Product Name**, then choose:
@@ -1072,6 +1076,14 @@ A **Save** window asks where to put the file, suggesting a name after the report
 The figures are real numbers in Excel, kept to every decimal the app works with, and shown to 2 decimal places as on the screen. So you can add them up or chart them in Excel.
 
 If a file of that name is open in Excel, the app can't replace it. Close it in Excel first, or save under another name.
+
+### Printing a report
+
+Each tab also has **Print** beside **Export to Excel**. It opens a print preview of the table as it's shown, as Export to Excel takes it: in your sort, with your filters, and with only the columns showing. Above the table are the report's name, what it shows, how many rows, and when it was printed. **Print** there opens Windows' print window, **Export to PDF** saves it as a PDF file (named after the report and today's date), and **Back** returns to Reports.
+
+It prints on the paper in [Settings → Printing](#printing), with the shop's heading, and a table longer than a page goes on with its name and column headings at the top of the next. A wide table such as Product Cost Summary fits better on **Landscape** paper, or with fewer columns ticked under **Columns**.
+
+**A raw materials price list** is the **Raw Materials Price Summary** printed: filter its **Category** or **Type** from the funnel in the heading to print, say, the flours, or only the packaging.
 
 ---
 

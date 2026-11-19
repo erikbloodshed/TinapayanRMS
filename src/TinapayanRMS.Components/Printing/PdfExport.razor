@@ -61,9 +61,11 @@
 
     // The set's title or the product's name, less what Windows refuses in a file's name ("Ube/Cheese Roll" is
     // "Ube-Cheese Roll.pdf"). The print preview's Export to PDF suggests the same.
-    internal static string FileNameOf(ProductPrintSet set)
+    internal static string FileNameOf(ProductPrintSet set) => FileNameOf(set.Title ?? set.Products[0].ProductName);
+
+    // A name, less what Windows refuses in a file's name, as a PDF's.
+    internal static string FileNameOf(string name)
     {
-        var name = set.Title ?? set.Products[0].ProductName;
         foreach (var refused in Path.GetInvalidFileNameChars())
         {
             name = name.Replace(refused, '-');

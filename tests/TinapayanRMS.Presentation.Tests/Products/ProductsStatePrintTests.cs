@@ -200,6 +200,43 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         asked.Should().Be(0);
     });
 
+    [Test]
+    public Task The_Costing_tabs_Export_to_Excel_gives_the_product_as_the_screen_shows_it_and_says_where() => UiThread.RunAsync(async () =>
+    {
+        var (state, sugarId) = await OpenOneSubAssemblyProductAsync();
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId, Grams = 500m });
+        ProductPrintout? asked = null;
+        using var handler = state.ExportCosting.RegisterHandler(interaction =>
+        {
+            asked = interaction.Input;
+            interaction.SetOutput(@"C:\Exports\Ube Roll Costing.xlsx");
+        });
+
+        await state.ExportCostingCommand.ExecuteAsync();
+
+        asked!.ProductName.Should().Be("Ube Roll");
+        asked.Sections.Single().Lines.Select(l => l.Ingredient).Should().Equal("Flour", "Sugar");
+        state.SuccessMessage.Should().Be(@"Saved Ube Roll Costing.xlsx in C:\Exports.");
+    });
+
+    [Test]
+    public Task The_Costing_tabs_Export_to_Excel_of_a_form_a_rule_refuses_shows_why_and_asks_nothing() => UiThread.RunAsync(async () =>
+    {
+        var (state, sugarId) = await OpenOneSubAssemblyProductAsync();
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = sugarId });
+        var asked = 0;
+        using var handler = state.ExportCosting.RegisterHandler(interaction =>
+        {
+            asked++;
+            interaction.SetOutput(null);
+        });
+
+        await state.ExportCostingCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Contain("Sugar");
+        asked.Should().Be(0);
+    });
+
     /// <summary>Runs Print, then asks for the printout as the main window's Print tab does once Print has asked for it.</summary>
     private static async Task<ProductPrintout> PrintAsync(ProductsState state)
     {
