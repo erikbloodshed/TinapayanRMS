@@ -82,7 +82,7 @@
     <PackageVersion Include="Respawn" Version="7.0.0" />
     <!-- TUnit.Engine runs the tests, TUnit.Core has their attributes (all the shared fixtures library needs): the TUnit
          package would add its own assertions beside AwesomeAssertions. Move both together. -->
-    <PackageVersion Include="TUnit.Core" Version="1.86.6" />
-    <PackageVersion Include="TUnit.Engine" Version="1.86.6" />
+    <PackageVersion Include="TUnit.Core" Version="1.87.12" />
+    <PackageVersion Include="TUnit.Engine" Version="1.87.12" />
   </ItemGroup>
 </Project>
