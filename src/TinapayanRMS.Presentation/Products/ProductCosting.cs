@@ -8,7 +8,8 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// The Products screen's costing and costs (through ProductsState.Costing; the Costing tab and the header draw them):
+/// A product's costing as its form edits it (ADR 0002), the Costing part's draft, and its costs (through ProductForm.Costing;
+/// the Costing tab and the header draw them):
 /// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
 /// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
 /// materials have risen past their buffered cost. The figures are worked out as they're read, from what the screen gathers
@@ -142,19 +143,19 @@ public sealed class ProductCosting : ObservableState
     }
 
     /// <summary>Something the costs are worked out from changed (the recipe, the packaging, the product's fields): they're worked out again when next read.</summary>
-    internal void InputsChanged() => _figures.Invalidate();
+    public void InputsChanged() => _figures.Invalidate();
 
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
     /// button (ProductsState.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
     /// isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the
-    /// next until the app closes. Print prints at it too. Only the screen switches it, as it prices its tables' rows again.
+    /// next until the app closes. Print prints at it too. Only the form switches it, as it prices its tables' rows again.
     /// </summary>
     public CostBasis CostBasis
     {
         get => _costBasis;
-        internal set
+        set
         {
             if (RaiseAndSetIfChanged(ref _costBasis, value))
             {
@@ -271,6 +272,24 @@ public sealed class ProductCosting : ObservableState
         _vatPercent = defaults.VatPercent;
         _priceRoundingStep = defaults.PriceRoundingStep;
         _figures.Invalidate();
+    }
+
+    /// <summary>
+    /// Takes up the defaults as a load read them (<see cref="SetDefaults"/>). A new product still showing the ones it started
+    /// with (the screen's first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed
+    /// into keeps it. True when the new ones landed on it: not the user's change, so the form moves what Save measures
+    /// against along with them.
+    /// </summary>
+    public bool TakeDefaults(CostingDefaults defaults, bool isNewProduct)
+    {
+        var untouchedNewProduct = isNewProduct && ShowsDefaults;
+        SetDefaults(defaults);
+        if (untouchedNewProduct)
+        {
+            ApplyDefaults();
+        }
+
+        return untouchedNewProduct;
     }
 
     /// <summary>
