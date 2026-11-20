@@ -17,12 +17,9 @@ public class ConstructorDependencyTests
     {
         ["TinapayanRMS.Presentation.PriceSimulator.PriceSimulatorState"] = 7,
         ["TinapayanRMS.Presentation.Printing.PrintDialogState"] = 7,
-        ["TinapayanRMS.Presentation.Products.ProductForm"] = 14,
-        ["TinapayanRMS.Presentation.Products.ProductRecipe"] = 7,
         ["TinapayanRMS.Presentation.Products.ProductsList"] = 7,
-        ["TinapayanRMS.Presentation.Products.ProductsState"] = 21,
         ["TinapayanRMS.Presentation.Products.ProductUsageEdit"] = 13,
-        ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 11,
+        ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 7,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 7,
     };
 
