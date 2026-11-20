@@ -23,7 +23,10 @@ public sealed class RawMaterialDependents : ObservableState, IDisposable
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<Unit> _sharesWanted = new();
 
-    /// <param name="queries">What each product's share is read from (ReadCostSharesAsync); none, in a screen built without it.</param>
+    /// <param name="queries">
+    /// What each product's share is read from (ReadCostSharesAsync), which gives none when the queries were built without
+    /// MaterialCostShares (some tests): the tiles then show no shares.
+    /// </param>
     public RawMaterialDependents(IRawMaterialQueries queries)
     {
         _queries = queries;
