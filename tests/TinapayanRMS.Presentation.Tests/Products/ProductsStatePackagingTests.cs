@@ -468,7 +468,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>A new screen open on Ensaymada's Packaging tab, its linked lines in.</summary>
-    private async Task<ProductsState> OpenLinkedAsync()
+    private async Task<ProductForm> OpenLinkedAsync()
     {
         var state = await CreateLoadedStateAsync();
         state.Pick(state.Products.Single(p => p.Name == "Ensaymada"));
@@ -478,7 +478,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>Ensaymada, with one <paramref name="boxId"/> a piece as its own packaging, open on its Packaging tab.</summary>
-    private async Task<ProductsState> OpenWithOwnPackagingAsync(int boxId)
+    private async Task<ProductForm> OpenWithOwnPackagingAsync(int boxId)
     {
         var productId = await AddProductAsync("Ensaymada");
         await new PackagingLineRepository(CreateDbContextFactory())
@@ -493,7 +493,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
 
     /// <summary>Picks <paramref name="name"/> in the Packaging tab's open Link or Copy picker, and waits for its lines to go in.</summary>
-    private static async Task PickAsync(ProductsState state, string name)
+    private static async Task PickAsync(ProductForm state, string name)
     {
         state.Packaging.PickSource(state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == name));
         await Settle.UntilAsync(state,
@@ -547,7 +547,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         return material.Id;
     }
 
-    private async Task<ProductsState> CreateLoadedStateAsync()
+    private async Task<ProductForm> CreateLoadedStateAsync()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -573,7 +573,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
         await state.LoadCommand.ExecuteAsync();
         return state;
     }

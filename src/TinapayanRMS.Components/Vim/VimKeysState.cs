@@ -83,13 +83,13 @@ public sealed class VimKeysState(IViewStateStore viewState, ProductsState produc
         _ => "settings",
     };
 
-    // Print what Products has open, as its Print button does (which opens the Print dialog with that choice); with
-    // nothing open there, the Print dialog with nothing ticked.
+    // Print the product of the Products tab showing, as its Print button does (which opens the Print dialog with that
+    // choice); with no tab open there, the Print dialog with nothing ticked.
     private VimCommandResult Print()
     {
-        if (products.PrintCommand.CanExecute())
+        if (products.Form?.PrintCommand is { } print && print.CanExecute())
         {
-            ((ICommand)products.PrintCommand).Execute(null);
+            ((ICommand)print).Execute(null);
         }
         else
         {

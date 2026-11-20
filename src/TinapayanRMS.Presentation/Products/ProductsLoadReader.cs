@@ -5,15 +5,15 @@ using TinapayanRMS.Pricing;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// Everything the Products screen's LoadCommand reads, as <see cref="ProductsLoadReader.ReadAsync"/> reads it, for the
-/// screen to merge in (ProductsState.LoadAsync).
+/// Everything the Products view's LoadCommand reads, as <see cref="ProductsLoadReader.ReadAsync"/> reads it, for the
+/// view to merge into its lists and every open form (ProductsState.LoadAsync).
 /// </summary>
 /// <param name="PackagingSets">The packaging sets: the standalone sub-assemblies whose role is a packaging one.</param>
-/// <param name="LinkedSubAssemblies">The sub-assemblies the form's saved sections are, as they're saved now.</param>
+/// <param name="LinkedSubAssemblies">The sub-assemblies the open forms' saved sections are, as they're saved now.</param>
 /// <param name="LinkedLines">Those sub-assemblies' lines.</param>
-/// <param name="PackagingLink">The product showing's packaging link as saved, or null: none, or no product showing.</param>
+/// <param name="PackagingLinks">The open products' packaging links as saved, by product; one with none isn't there.</param>
 /// <param name="ComponentLinks">Every composite's products, which the Products table's lines point at.</param>
-/// <param name="ComponentCosts">What each product the form's composite holds brings, by id.</param>
+/// <param name="ComponentCosts">What each product the open composites hold brings, by id.</param>
 public sealed record ProductsLoad(
     IReadOnlyList<SubAssemblyRole> Roles,
     IReadOnlyList<ProductCategory> Categories,
@@ -26,15 +26,15 @@ public sealed record ProductsLoad(
     CostingDefaults CostingDefaults,
     IReadOnlyList<SubAssembly> LinkedSubAssemblies,
     IReadOnlyList<SubAssemblyLine> LinkedLines,
-    PackagingLink? PackagingLink,
+    IReadOnlyDictionary<int, PackagingLink> PackagingLinks,
     IReadOnlyList<ProductComponent> ComponentLinks,
     IReadOnlyDictionary<int, ComponentCosts> ComponentCosts);
 
 /// <summary>
-/// The Products screen's reads for its LoadCommand, apart from the merge into the screen that follows them: the lists the
-/// form and its parts pick from, the products and their folders, Settings' defaults, and what the form shows from elsewhere
-/// (its linked sections, its packaging link, a composite's products' costs). It touches no screen state, as
-/// SavedProductReader doesn't for a product's detail.
+/// The Products view's reads for its LoadCommand, apart from the merge into the view that follows them: the lists the
+/// forms and their parts pick from, the products and their folders, Settings' defaults, and what the open forms show from
+/// elsewhere (their linked sections, their packaging links, a composite's products' costs), for every open form at once.
+/// It touches no screen state, as SavedProductReader doesn't for a product's detail.
 /// </summary>
 internal sealed class ProductsLoadReader(
     IProductRepository productRepository,
@@ -50,11 +50,12 @@ internal sealed class ProductsLoadReader(
     SavedProductReader savedProducts)
 {
     /// <summary>
-    /// Everything a load reads: the sub-assemblies <paramref name="linkedIds"/> and their lines, the packaging link of
-    /// <paramref name="detailProductId"/> (the product showing, or null for none) and what each of
+    /// Everything a load reads: the sub-assemblies <paramref name="linkedIds"/> and their lines, the packaging links of
+    /// <paramref name="detailProductIds"/> (the products the open forms show) and what each of
     /// <paramref name="componentIds"/> brings to a composite, with the lists every load reads.
     /// </summary>
-    public async Task<ProductsLoad> ReadAsync(int? detailProductId, IReadOnlyCollection<int> linkedIds, IReadOnlyCollection<int> componentIds)
+    public async Task<ProductsLoad> ReadAsync(
+        IReadOnlyCollection<int> detailProductIds, IReadOnlyCollection<int> linkedIds, IReadOnlyCollection<int> componentIds)
     {
         // All at once, on the thread pool: each read is mostly a round trip's wait, so one after another they took
         // several times as long as the slowest of them, and the UI thread came back after each to start the next.
@@ -70,14 +71,23 @@ internal sealed class ProductsLoadReader(
         var costingDefaultsRead = Task.Run(() => costingDefaultsRepository.GetAsync(CancellationToken.None));
         var linkedSubAssembliesRead = Task.Run(() => subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
         var linkedLinesRead = Task.Run(() => subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
-        var packagingLinkRead = detailProductId is { } linkProductId
-            ? Task.Run(() => packagingLinkRepository.GetForProductAsync(linkProductId, CancellationToken.None))
-            : Task.FromResult<PackagingLink?>(null);
+        var packagingLinkReads = detailProductIds
+            .Select(productId => Task.Run(() => packagingLinkRepository.GetForProductAsync(productId, CancellationToken.None)))
+            .ToList();
         var componentLinksRead = Task.Run(() => productRepository.GetAllComponentsAsync(CancellationToken.None));
         var componentCostsRead = Task.Run(() => savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
         await Task.WhenAll(
             rolesRead, categoriesRead, foldersRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
-            linkedSubAssembliesRead, linkedLinesRead, packagingLinkRead, componentLinksRead, componentCostsRead);
+            linkedSubAssembliesRead, linkedLinesRead, Task.WhenAll(packagingLinkReads), componentLinksRead, componentCostsRead);
+
+        Dictionary<int, PackagingLink> packagingLinks = [];
+        foreach (var read in packagingLinkReads)
+        {
+            if (await read is { } link)
+            {
+                packagingLinks[link.ProductId] = link;
+            }
+        }
 
         return new ProductsLoad(
             Roles: await rolesRead,
@@ -91,7 +101,7 @@ internal sealed class ProductsLoadReader(
             CostingDefaults: await costingDefaultsRead,
             LinkedSubAssemblies: await linkedSubAssembliesRead,
             LinkedLines: await linkedLinesRead,
-            PackagingLink: await packagingLinkRead,
+            PackagingLinks: packagingLinks,
             ComponentLinks: await componentLinksRead,
             ComponentCosts: await componentCostsRead);
     }

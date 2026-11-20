@@ -369,10 +369,11 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         Edit(state, () => state.EditingName = "Renamed again");
         state.History.CanUndo.Should().BeTrue();
 
-        // New over unsaved changes asks about them first: not saving them is how they're left behind.
-        state.ConfirmUnsavedChanges.RegisterHandler(context => context.SetOutput(UnsavedChangesAnswer.DontSave));
+        // New over unsaved changes opens a tab of its own, with no history; this one keeps its own.
         await state.NewCommand.ExecuteAsync();
-        state.History.CanUndo.Should().BeFalse("a new product has no history of its own");
+        state.View.Form.Should().NotBeSameAs(state);
+        state.View.Form!.History.CanUndo.Should().BeFalse("a new product has no history of its own");
+        state.History.CanUndo.Should().BeTrue("each tab keeps its own");
     });
 
     [Test]
@@ -683,12 +684,12 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static bool CanSave(ProductsState state) => state.SaveCommand.CanExecute();
+    private static bool CanSave(ProductForm state) => state.SaveCommand.CanExecute();
 
     // ---- seeding and driving ----
 
     /// <summary>One finished change, as the fields and line tables bracket a gesture in the app.</summary>
-    private static void Edit(ProductsState state, Action change)
+    private static void Edit(ProductForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -701,7 +702,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     private sealed record Seeded(int ProductId, int DoughRoleId, SeededIngredients Ingredients);
 
     /// <summary>A saved product with one Dough of 1,000 g of flour, opened with its form showing.</summary>
-    private async Task<(ProductsState State, Seeded Seeded)> OpenOneSubAssemblyProductAsync()
+    private async Task<(ProductForm State, Seeded Seeded)> OpenOneSubAssemblyProductAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -715,7 +716,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>A product linking House Dough from the Sub-Assemblies screen (1,000 g of flour), opened with its form showing.</summary>
-    private async Task<(ProductsState State, int DoughId)> OpenLinkedDoughProductAsync()
+    private async Task<(ProductForm State, int DoughId)> OpenLinkedDoughProductAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -729,7 +730,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>The same product, with a second line so one can be the base and the other typed as a percentage.</summary>
-    private async Task<(ProductsState State, SeededIngredients Ingredients)> OpenTwoLineProductAsync()
+    private async Task<(ProductForm State, SeededIngredients Ingredients)> OpenTwoLineProductAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -747,7 +748,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>A product with a Dough and a Filling, so tabs can be moved between, and a box a piece if asked.</summary>
-    private async Task<(ProductsState State, int ProductId)> OpenTwoSectionProductAsync(bool withPackaging = false)
+    private async Task<(ProductForm State, int ProductId)> OpenTwoSectionProductAsync(bool withPackaging = false)
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
@@ -789,7 +790,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private async Task<ProductsState> OpenAsync(int productId, Func<ProductsState, bool> ready)
+    private async Task<ProductForm> OpenAsync(int productId, Func<ProductForm, bool> ready)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -802,7 +803,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -828,6 +829,6 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

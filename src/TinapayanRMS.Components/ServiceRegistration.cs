@@ -77,6 +77,7 @@ public static class ServiceRegistration
         services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<RawMaterialsState>());
         services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<SubAssembliesState>());
         services.AddScoped<ProductsState>();
+        services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<ProductsState>());
         services.AddScoped<ReportsState>();
         services.AddScoped<QuickFindState>();
         services.AddScoped<PriceSimulatorState>();

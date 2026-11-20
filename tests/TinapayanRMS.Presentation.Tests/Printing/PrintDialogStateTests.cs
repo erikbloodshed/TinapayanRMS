@@ -32,7 +32,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.ExecuteAsync();
 
         tab.PrintSet!.Title.Should().Be("Production › Breads");
@@ -49,11 +49,11 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
 
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Production)));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.StageFolder(ProductStage.Production)));
         await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal("Cheese Roll", "Pan de Coco", "Mocha Roll", "Loaf");
 
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.StageFolder(ProductStage.Innovation)));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.StageFolder(ProductStage.Innovation)));
         await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Title.Should().Be("Innovation");
         tab.PrintSet.Products.Select(p => p.ProductName).Should().Equal("Test Bread");
@@ -84,7 +84,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         tab.ChosenProductIds = [IdOf(products, "Pan de Coco")];
         await Settle.UntilAsync(tab, () => tab.PrintSet?.Products is [{ ProductName: "Pan de Coco" }], () => $"pages: {tab.PrintSet?.Products.Count}");
 
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(cakes.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(cakes.Id)!));
         tab.ChosenCategoryIds.Should().BeEmpty("a folder's products may be in any category");
         await tab.LoadCommand.ExecuteAsync();
 
@@ -104,13 +104,13 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var products = await OpenProductsAsync("Loaf");
         var tab = CreatePrintTab(products);
         List<PrintScope> asked = [];
-        using var _ = products.PrintRequests.Subscribe(asked.Add);
+        using var _ = products.View.PrintRequests.Subscribe(asked.Add);
 
         // Ctrl+clicks, from three folders and both stages, in an order of their own.
-        var tree = products.List.ProductTree;
-        products.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Test Bread"))!);
-        products.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Cheese Roll"))!);
-        var print = products.List.TreeMenuFor(tree.Find(IdOf(products, "Loaf"))).Single(i => i.Header == "Print 3 Products");
+        var tree = products.View.List.ProductTree;
+        products.View.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Test Bread"))!);
+        products.View.List.SelectedTreeNodes.Add(tree.Find(IdOf(products, "Cheese Roll"))!);
+        var print = products.View.List.TreeMenuFor(tree.Find(IdOf(products, "Loaf"))).Single(i => i.Header == "Print 3 Products");
         await ((ScreenCommand<IReadOnlyList<Product>>)print.Command!).ExecuteAsync((IReadOnlyList<Product>)print.Parameter!);
 
         var scope = asked.Should().ContainSingle().Which.Should().BeOfType<PrintScope.Products>().Subject;
@@ -144,7 +144,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var (breads, _) = await AddCatalogueAsync();
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Title.Should().Be("Production › Breads");
 
@@ -250,7 +250,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         tab.ProductChoices.Select(c => c.Name).Should().NotContain("Mocha Roll");
     });
 
-    private static int IdOf(ProductsState products, string name) => products.Products.Single(p => p.Name == name).Id;
+    private static int IdOf(ProductForm products, string name) => products.Products.Single(p => p.Name == name).Id;
 
     [Test]
     public Task A_folder_prints_a_folder_made_in_it_after_it_was_picked() => UiThread.RunAsync(async () =>
@@ -258,7 +258,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var (breads, _) = await AddCatalogueAsync();
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(breads.Id)!));
 
         var holiday = new ProductFolder { Name = "Holiday", Stage = ProductStage.Production, ParentId = breads.Id };
         await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(holiday, Cancellation);
@@ -290,7 +290,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
             await dbContext.SaveChangesAsync(Cancellation);
         }
 
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(breads.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(breads.Id)!));
         await tab.LoadCommand.ExecuteAsync();
         tab.PrintSet!.Products.Select(p => p.ProductName).Should().Equal(["Bibingka", "Cheese Roll", "Pan de Coco"], "Bibingka is in Breads › Holiday");
 
@@ -306,7 +306,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         var (_, cakes) = await AddCatalogueAsync();
         var products = await OpenProductsAsync();
         var tab = CreatePrintTab(products);
-        tab.Pick(PrintScope.Folder.Of(products.List.ProductTree.Folder(cakes.Id)!));
+        tab.Pick(PrintScope.Folder.Of(products.View.List.ProductTree.Folder(cakes.Id)!));
 
         // Its products go with it (ProductFolderRepository.MoveAsync).
         await new ProductFolderRepository(CreateDbContextFactory()).MoveAsync(new ProductFolderMove(cakes.Id, ProductStage.Innovation, null), Cancellation);
@@ -477,11 +477,11 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private PrintDialogState CreatePrintTab(ProductsState products)
+    private PrintDialogState CreatePrintTab(ProductForm products)
     {
         var factory = CreateDbContextFactory();
         return new PrintDialogState(
-            products, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(),
+            products.View, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(),
             new PrintPage(new PrintSettingsRepository(factory)), new LoggerConfiguration().CreateLogger());
     }
 
@@ -501,7 +501,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
     }
 
     /// <summary>The Products screen, loaded, with <paramref name="productName"/> open when one is given.</summary>
-    private async Task<ProductsState> OpenProductsAsync(string? productName = null, Func<ProductsState, bool>? ready = null)
+    private async Task<ProductForm> OpenProductsAsync(string? productName = null, Func<ProductForm, bool>? ready = null)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -516,7 +516,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -542,6 +542,6 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

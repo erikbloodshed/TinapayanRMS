@@ -50,7 +50,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
             Cancellation);
 
     /// <summary>A line as the table's add row makes one, filled in as typing it would.</summary>
-    private static ProductComponentRow Line(ProductsState state, int productId, int? quantity)
+    private static ProductComponentRow Line(ProductForm state, int productId, int? quantity)
     {
         var row = state.ComponentsTable.NewComponentRow();
         row.ComponentProductId = productId;
@@ -491,10 +491,10 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
     {
         await AddTwoProductsAsync();
         var state = await CreateLoadedStateAsync();
-        var production = state.List.ProductTree.StageFolder(ProductStage.Production);
+        var production = state.View.List.ProductTree.StageFolder(ProductStage.Production);
 
-        state.List.TreeMenuFor(null).Select(i => i.Header).Should().StartWith(["New Product", "New Composite Product"]);
-        var here = state.List.TreeMenuFor(production).Single(i => i.Header == "New Composite Product Here");
+        state.View.List.TreeMenuFor(null).Select(i => i.Header).Should().StartWith(["New Product", "New Composite Product"]);
+        var here = state.View.List.TreeMenuFor(production).Single(i => i.Header == "New Composite Product Here");
 
         await ((ScreenCommand<ProductFolderNode?>)here.Command!).ExecuteAsync((ProductFolderNode?)here.Parameter);
 
@@ -504,9 +504,9 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
     });
 
     /// <summary>Whether the Save button would be enabled: the command's own CanExecute, as the page's button reads it.</summary>
-    private static bool CanSave(ProductsState state) => state.SaveCommand.CanExecute();
+    private static bool CanSave(ProductForm state) => state.SaveCommand.CanExecute();
 
-    private async Task<ProductsState> CreateLoadedStateAsync()
+    private async Task<ProductForm> CreateLoadedStateAsync()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -532,7 +532,7 @@ public class ProductsStateCompositeTests(DatabaseFixture fixture) : PersistenceT
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
         await state.LoadCommand.ExecuteAsync();
         return state;
     }

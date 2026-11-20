@@ -141,7 +141,7 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public ProductsState State { get; set; } = null!;
+    [Parameter, EditorRequired] public ProductForm State { get; set; } = null!;
 
     private ProductCostSummary Costs => State.Costing.Costs;
 

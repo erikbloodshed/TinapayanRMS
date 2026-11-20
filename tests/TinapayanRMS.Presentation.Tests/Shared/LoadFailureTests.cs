@@ -287,7 +287,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         state.EditingName.Should().Be("Salted Butter");
     });
 
-    private ProductsState CreateProductsState(FailingDbContextFactory factory)
+    private ProductForm CreateProductsState(FailingDbContextFactory factory)
     {
         var packagingLineRepository = new PackagingLineRepository(factory);
         return new ProductsState(
@@ -311,7 +311,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     private static RawMaterialForm CreateRawMaterialsState(FailingDbContextFactory factory)

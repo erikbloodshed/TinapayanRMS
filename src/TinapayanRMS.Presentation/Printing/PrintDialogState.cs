@@ -96,8 +96,8 @@ public sealed record PrintableCategory(int Id, string Name)
 /// <summary>
 /// The Print dialog's products: what it prints and the pages for it (<see cref="PrintSet"/>), prepared each time the dialog
 /// opens on them (<see cref="LoadCommand"/>, which the dialog runs as a screen runs its load) and each time the products
-/// or categories ticked change. With no product ticked it prints the Products screen's product as it shows it, unsaved
-/// edits included; the products ticked are read as they're saved (SavedProductReader), each starting a page of its own
+/// or categories ticked change. With no product ticked it prints the product of the Products tab showing, as it shows it,
+/// unsaved edits included; the products ticked are read as they're saved (SavedProductReader), each starting a page of its own
 /// after a contents page, or on their own with no contents page for one.
 /// </summary>
 public sealed class PrintDialogState : ScreenState
@@ -372,7 +372,7 @@ public sealed class PrintDialogState : ScreenState
 
     private void PrepareThisProduct()
     {
-        switch (_products.PreparePrintout())
+        switch (_products.Form?.PreparePrintout() ?? default)
         {
             case ProductPrintout printout:
                 Note = null;
@@ -431,13 +431,15 @@ public sealed class PrintDialogState : ScreenState
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the
         // same dozen or so queries however many products the set holds.
         Progress = products.Count == 1 ? "Preparing 1 product…" : $"Preparing {products.Count} products…";
-        var saved = await _savedProducts.ReadAllAsync(products, _products.Costing.CostBasis, cancellationToken);
+        var saved = await _savedProducts.ReadAllAsync(products, _products.Form?.Costing.CostBasis ?? CostBasis.Buffered, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         List<ProductPrintout> printouts = [.. saved.Select(s => s.ToPrintout(printedAt))];
 
-        // The Products screen's product prints as it's saved; its edits there don't reach a set.
-        Note = _products.History.IsDirty && _products.SelectedProduct is { } open && products.Any(p => p.Id == open.Id)
-            ? $"{open.Name} has unsaved changes on Products; it's printed as saved."
+        // A product open on Products prints as it's saved; its edits there don't reach a set.
+        Note = _products.Tabs.All
+            .Select(tab => tab.Form)
+            .FirstOrDefault(form => form.HasUnsavedChanges && form.SelectedProduct is { } open && products.Any(p => p.Id == open.Id))?.SelectedProduct is { } edited
+            ? $"{edited.Name} has unsaved changes on Products; it's printed as saved."
             : null;
         PrintSet = new ProductPrintSet(SetTitle(products.Count, folders), printouts, printedAt);
     }

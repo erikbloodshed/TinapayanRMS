@@ -34,10 +34,10 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         await AddFolderAsync("Rolls", ProductStage.Production, bakeryId);
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await LoadedStateAsync();
-        var leaf = state.List.ProductTree.Find(mamonId)!;
-        state.List.SelectedTreeNode = leaf;
+        var leaf = state.View.List.ProductTree.Find(mamonId)!;
+        state.View.List.SelectedTreeNode = leaf;
 
-        var menu = state.List.TreeMenuFor(leaf);
+        var menu = state.View.List.TreeMenuFor(leaf);
 
         Headers(menu).Should().Equal("Promote to Production", "Move to", "Cut", "Paste", "Apply Costing Defaults…", "Print", "Rename", "Clone…", "Create Variant…", "Delete");
         menu.Single(i => i.Header == "Cut").Gesture.Should().Be("Ctrl+X");
@@ -54,9 +54,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         await RunAsync(moveTo[0].Items.Single(i => i.Header == "Bakery").Items.Single(i => i.Header == "Rolls"));
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, await FolderIdAsync("Rolls")));
-        state.List.MoveNotice.Should().Be("Moved Mamon to Production › Bakery › Rolls");
+        state.View.List.MoveNotice.Should().Be("Moved Mamon to Production › Bakery › Rolls");
 
-        state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId))[0].Header
+        state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId))[0].Header
             .Should().Be("Send Back to Innovation", "in Production it can only go back");
     });
 
@@ -67,25 +67,25 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var cakesId = await AddFolderAsync("Cakes");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
-        var mamon = state.List.ProductTree.Find(mamonId)!;
-        var breads = state.List.ProductTree.Folder(breadsId)!;
-        var cakes = state.List.ProductTree.Folder(cakesId)!;
-        var production = state.List.ProductTree.StageFolder(ProductStage.Production);
+        IListTreeScreen screen = state.View.List;
+        var mamon = state.View.List.ProductTree.Find(mamonId)!;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
+        var cakes = state.View.List.ProductTree.Folder(cakesId)!;
+        var production = state.View.List.ProductTree.StageFolder(ProductStage.Production);
 
         screen.CanDrag(mamon).Should().BeTrue();
         screen.CanDrag(cakes).Should().BeTrue("one folder is dragged with all it holds");
         screen.CanDrop([mamon, cakes], production).Should().BeFalse("not a folder and products together");
         screen.CanDrag(production).Should().BeFalse("a stage is fixed");
         screen.CanDrop([mamon], breads).Should().BeFalse("it's there already");
-        screen.CanDrop([mamon], state.List.ProductTree.DeletedFolder).Should().BeFalse("nothing is dropped into Deleted");
+        screen.CanDrop([mamon], state.View.List.ProductTree.DeletedFolder).Should().BeFalse("nothing is dropped into Deleted");
         screen.CanDrop([mamon], cakes).Should().BeTrue();
 
         (await DropAsync(state, [mamon], cakes)).Should().BeSameAs(mamon, "its row keeps its node, in its new folder");
 
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
         cakes.Products.Should().ContainSingle();
-        state.List.MoveNotice.Should().Be("Moved Mamon to Innovation › Cakes");
+        state.View.List.MoveNotice.Should().Be("Moved Mamon to Innovation › Cakes");
         (await DropAsync(state, [mamon], cakes)).Should().BeNull("a drop that moves nothing has no row to show");
 
         // A folder dropped in the other stage takes what it holds there.
@@ -94,15 +94,15 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         state.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, cakesId), "a product goes with its folder");
-        state.List.MoveNotice.Should().Be("Moved Cakes to Production");
+        state.View.List.MoveNotice.Should().Be("Moved Cakes to Production");
         production.Folders.Should().Contain(cakes);
         cakes.Stage.Should().Be(ProductStage.Production);
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
-        state.List.ProductTree.StageFolder(ProductStage.Innovation).Folders.Should().Contain(cakes, "Undo puts the folder back with it");
+        state.View.List.ProductTree.StageFolder(ProductStage.Innovation).Folders.Should().Contain(cakes, "Undo puts the folder back with it");
     });
 
     [Test]
@@ -112,13 +112,13 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var cakesId = await AddFolderAsync("Cakes");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await LoadedStateAsync();
-        IListTreeScreen screen = state.List;
+        IListTreeScreen screen = state.View.List;
 
         // Breads to Production: it saves, then reads the list again. A drop meanwhile would be judged against the list as
         // it was, and the two would take each other's Undo.
-        var folderMove = state.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
-        state.List.MoveProductsCommand.CanExecute([]).Should().BeFalse("the folder's move is under way, as a drop would find it");
-        (await screen.DropAsync([state.List.ProductTree.Find(mamonId)!], state.List.ProductTree.Folder(cakesId))).Should().BeNull("a move is still saving");
+        var folderMove = state.View.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
+        state.View.List.MoveProductsCommand.CanExecute([]).Should().BeFalse("the folder's move is under way, as a drop would find it");
+        (await screen.DropAsync([state.View.List.ProductTree.Find(mamonId)!], state.View.List.ProductTree.Folder(cakesId))).Should().BeNull("a move is still saving");
         await folderMove;
 
         state.ErrorMessage.Should().BeNull();
@@ -134,26 +134,26 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var mamonId = await SaveProductAsync("Mamon", holidayId);
         var state = await LoadedStateAsync();
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Promote to Production"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Promote to Production"));
 
         state.ErrorMessage.Should().BeNull();
         var (stage, folderId) = await PlaceOfAsync(mamonId);
         stage.Should().Be(ProductStage.Production);
-        var made = state.List.ProductTree.Folder(folderId!.Value)!;
+        var made = state.View.List.ProductTree.Folder(folderId!.Value)!;
         made.Title.Should().Be("Holiday", "Holiday was made in Production's Breads, which was there already");
         made.ParentFolderId.Should().Be(productionBreadsId);
         made.Products.Should().ContainSingle();
-        state.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads › Holiday");
+        state.View.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads › Holiday");
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, holidayId));
-        state.List.ProductTree.Folder(holidayId)!.Products.Should().ContainSingle();
-        state.List.ProductTree.Folder(made.FolderId!.Value).Should().BeNull("the folder the Promote made goes, empty again");
-        state.List.ProductTree.Folder(productionBreadsId).Should().NotBeNull("one it found there stays");
-        state.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
-        state.List.UndoMoveCommand.CanExecute().Should().BeFalse();
+        state.View.List.ProductTree.Folder(holidayId)!.Products.Should().ContainSingle();
+        state.View.List.ProductTree.Folder(made.FolderId!.Value).Should().BeNull("the folder the Promote made goes, empty again");
+        state.View.List.ProductTree.Folder(productionBreadsId).Should().NotBeNull("one it found there stays");
+        state.View.List.MoveNotice.Should().BeNull("an undone move leaves nothing to undo");
+        state.View.List.UndoMoveCommand.CanExecute().Should().BeFalse();
     });
 
     [Test]
@@ -163,27 +163,27 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var pandesalId = await SaveProductAsync("Pandesal", breadsId);
         var state = await LoadedStateAsync();
-        state.List.SelectedTreeNode = state.List.ProductTree.Find(mamonId);
-        state.List.SelectedTreeNodes.Add(state.List.ProductTree.Find(pandesalId)!);
-        var promote = state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Promote 2 Products to Production");
+        state.View.List.SelectedTreeNode = state.View.List.ProductTree.Find(mamonId);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.ProductTree.Find(pandesalId)!);
+        var promote = state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Promote 2 Products to Production");
 
         // Promoted elsewhere while this list still shows them in Innovation.
         await new ProductRepository(CreateDbContextFactory()).MoveToStageAsync([pandesalId], ProductStage.Production, Cancellation);
         await RunAsync(promote);
 
         state.ErrorMessage.Should().BeNull();
-        state.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads");
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        state.View.List.MoveNotice.Should().Be("Moved Mamon to Production › Breads");
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
         (await PlaceOfAsync(pandesalId)).Stage.Should().Be(ProductStage.Production, "Undo puts back only what this Promote moved");
 
         // With nothing left to move, nothing is said and there's nothing to undo.
-        var again = state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header.StartsWith("Promote", StringComparison.Ordinal));
+        var again = state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header.StartsWith("Promote", StringComparison.Ordinal));
         await new ProductRepository(CreateDbContextFactory()).MoveToStageAsync([mamonId], ProductStage.Production, Cancellation);
         await RunAsync(again);
 
         state.ErrorMessage.Should().BeNull();
-        state.List.MoveNotice.Should().BeNull();
+        state.View.List.MoveNotice.Should().BeNull();
     });
 
     [Test]
@@ -195,53 +195,53 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var pandesalId = await SaveProductAsync("Pandesal", breadsId);
         var ensaymadaId = await SaveProductAsync("Ensaymada", breadsId);
         var state = await LoadedStateAsync();
-        var tree = state.List.ProductTree;
+        var tree = state.View.List.ProductTree;
         var cakes = tree.Folder(cakesId)!;
-        state.List.SelectedTreeNode = tree.Find(mamonId);
-        state.List.SelectedTreeNodes.Add(tree.Find(pandesalId)!);
+        state.View.List.SelectedTreeNode = tree.Find(mamonId);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(pandesalId)!);
 
         // Ctrl+X with both picked: the menu of the first, which covers both.
-        await RunAsync(state.List.TreeShortcut("Ctrl+X")!);
+        await RunAsync(state.View.List.TreeShortcut("Ctrl+X")!);
 
-        state.List.CutNodes.Should().Equal(tree.Find(mamonId)!, tree.Find(pandesalId)!);
+        state.View.List.CutNodes.Should().Equal(tree.Find(mamonId)!, tree.Find(pandesalId)!);
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId), "nothing moves until the paste");
-        state.List.TreeMenuFor(tree.Find(ensaymadaId)).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse("they're in that folder already");
-        var paste = state.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste");
+        state.View.List.TreeMenuFor(tree.Find(ensaymadaId)).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse("they're in that folder already");
+        var paste = state.View.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste");
         paste.IsEnabled.Should().BeTrue();
 
         // Ctrl+V with the folder picked: what its menu's Paste does.
-        state.List.SelectedTreeNode = cakes;
-        state.List.TreeShortcut("Ctrl+V").Should().Match<TreeMenuItem>(i => i.Command == state.List.PasteCommand && i.Parameter == cakes);
+        state.View.List.SelectedTreeNode = cakes;
+        state.View.List.TreeShortcut("Ctrl+V").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.PasteCommand && i.Parameter == cakes);
         await RunAsync(paste);
 
         state.ErrorMessage.Should().BeNull();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, cakesId));
         (await PlaceOfAsync(pandesalId)).Should().Be((ProductStage.Production, cakesId));
         (await PlaceOfAsync(ensaymadaId)).Should().Be((ProductStage.Innovation, breadsId));
-        state.List.CutNodes.Should().BeEmpty("a paste uses up the cut");
-        state.List.MoveNotice.Should().Be("Moved 2 products to Production › Cakes");
-        state.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse();
+        state.View.List.CutNodes.Should().BeEmpty("a paste uses up the cut");
+        state.View.List.MoveNotice.Should().Be("Moved 2 products to Production › Cakes");
+        state.View.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse();
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
         await MovesOfferedAgainAsync(state);
 
         // A folder is cut with all it holds, alone; Esc forgets a cut.
         var breads = tree.Folder(breadsId)!;
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "Cut"));
-        state.List.CutNodes.Should().Equal(breads);
-        state.List.TreeMenuFor(tree.Find(mamonId)).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse("not inside itself");
-        state.List.SelectedTreeNode = breads;
-        await RunAsync(state.List.TreeShortcut("Esc")!);
-        state.List.CutNodes.Should().BeEmpty();
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "Cut"));
+        state.View.List.CutNodes.Should().Equal(breads);
+        state.View.List.TreeMenuFor(tree.Find(mamonId)).Single(i => i.Header == "Paste").IsEnabled.Should().BeFalse("not inside itself");
+        state.View.List.SelectedTreeNode = breads;
+        await RunAsync(state.View.List.TreeShortcut("Esc")!);
+        state.View.List.CutNodes.Should().BeEmpty();
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, breadsId));
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "Cut"));
-        await RunAsync(state.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste"));
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "Cut"));
+        await RunAsync(state.View.List.TreeMenuFor(cakes).Single(i => i.Header == "Paste"));
         state.ErrorMessage.Should().BeNull();
         breads.ParentFolder.Should().BeSameAs(cakes);
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, breadsId), "its products go with it, to the other stage");
-        state.List.TreeShortcut("Esc").Should().BeNull("there's nothing cut to forget");
+        state.View.List.TreeShortcut("Esc").Should().BeNull("there's nothing cut to forget");
     });
 
     [Test]
@@ -253,15 +253,15 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var pandesalId = await SaveProductAsync("Pandesal", breadsId);
         var sansRivalId = await SaveProductAsync("Sans Rival", cakesId, ProductStage.Production);
         var state = await OpenedStateAsync(mamonId);
-        var tree = state.List.ProductTree;
+        var tree = state.View.List.ProductTree;
 
         // Ctrl+clicks: the rows join the first, which stays the one showing.
-        state.List.SelectedTreeNodes.Add(tree.Find(pandesalId)!);
-        state.List.SelectedTreeNodes.Add(tree.Find(sansRivalId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(pandesalId)!);
+        state.View.List.SelectedTreeNodes.Add(tree.Find(sansRivalId)!);
         state.SelectedProduct!.Id.Should().Be(mamonId);
-        state.List.SelectedTreeNode.Should().BeSameAs(tree.Find(mamonId));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(tree.Find(mamonId));
 
-        var menu = state.List.TreeMenuFor(tree.Find(pandesalId));
+        var menu = state.View.List.TreeMenuFor(tree.Find(pandesalId));
 
         Headers(menu).Should().Equal(
             "Promote 2 Products to Production", "Send 1 Product Back to Innovation", "Move 3 Products to", "Cut 3 Products", "Paste",
@@ -273,8 +273,8 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, productionBreadsId));
         (await PlaceOfAsync(pandesalId)).Should().Be(((ProductStage, int?))(ProductStage.Production, productionBreadsId), "one folder is made for both");
         (await PlaceOfAsync(sansRivalId)).Should().Be((ProductStage.Production, cakesId), "it was in Production already");
-        state.List.MoveNotice.Should().Be("Moved 2 products to Production › Breads");
-        state.List.SelectedTreeProducts.Select(l => l.Product.Id).Should().Equal(mamonId, pandesalId, sansRivalId);
+        state.View.List.MoveNotice.Should().Be("Moved 2 products to Production › Breads");
+        state.View.List.SelectedTreeProducts.Select(l => l.Product.Id).Should().Equal(mamonId, pandesalId, sansRivalId);
         state.SelectedProduct!.Id.Should().Be(mamonId);
     });
 
@@ -292,9 +292,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
             asked = interaction.Input;
             interaction.SetOutput(true);
         });
-        state.List.SelectedTreeNodes.Add(state.List.ProductTree.Find(pandesalId)!);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.ProductTree.Find(pandesalId)!);
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(pandesalId)).Single(i => i.Header == "Apply Costing Defaults to 2 Products…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(pandesalId)).Single(i => i.Header == "Apply Costing Defaults to 2 Products…"));
 
         state.ErrorMessage.Should().BeNull();
         asked.Should().StartWith("Set the costing of Mamon and Pandesal to the costing defaults: labor 35%, overhead 25%, administrative 15% and markup 60%?");
@@ -318,14 +318,14 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var bibingkaId = await SaveProductAsync("Bibingka", holidayId);
         var testLoafId = await SaveProductAsync("Test Loaf", null);
         var state = await LoadedStateAsync();
-        var breads = state.List.ProductTree.Folder(breadsId)!;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
 
-        var menu = state.List.TreeMenuFor(breads);
+        var menu = state.View.List.TreeMenuFor(breads);
 
         Headers(menu).Should().Equal(
             "New Product Here", "New Composite Product Here", "New Folder", "Promote All to Production", "Move to", "Cut", "Paste", "Print Folder",
             "Rename", "Delete", "Expand All", "Collapse All");
-        Headers(state.List.TreeMenuFor(state.List.ProductTree.Folder(cakesId)))
+        Headers(state.View.List.TreeMenuFor(state.View.List.ProductTree.Folder(cakesId)))
             .Should().NotContain("Promote All to Production", "there's nothing in it to promote");
         var moveTo = menu.Single(i => i.Header == "Move to").Items;
         Headers(moveTo.Single(i => i.Header == "Innovation").Items).Should().Equal(["Innovation"], "not itself, nor the folders in it");
@@ -337,9 +337,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var productionBreadsId = await FolderIdAsync("Breads", ProductStage.Production);
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Production, productionBreadsId));
         (await PlaceOfAsync(bibingkaId)).Stage.Should().Be(ProductStage.Production, "the folders in it go too");
-        state.List.ProductTree.Find(bibingkaId)!.Should().Match<ProductLeafNode>(l => state.List.ProductTree.Folder(l.Product.FolderId!.Value)!.Title == "Holiday");
+        state.View.List.ProductTree.Find(bibingkaId)!.Should().Match<ProductLeafNode>(l => state.View.List.ProductTree.Folder(l.Product.FolderId!.Value)!.Title == "Holiday");
         (await PlaceOfAsync(testLoafId)).Should().Be((ProductStage.Innovation, (int?)null));
-        state.List.MoveNotice.Should().Be("Moved 2 products to Production");
+        state.View.List.MoveNotice.Should().Be("Moved 2 products to Production");
     });
 
     [Test]
@@ -349,22 +349,22 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         await AddFolderAsync("Holiday", ProductStage.Production, breadsId);
         await AddFolderAsync("Trials");
         var state = await LoadedStateAsync();
-        var production = state.List.ProductTree.StageFolder(ProductStage.Production);
-        var innovation = state.List.ProductTree.StageFolder(ProductStage.Innovation);
+        var production = state.View.List.ProductTree.StageFolder(ProductStage.Production);
+        var innovation = state.View.List.ProductTree.StageFolder(ProductStage.Innovation);
 
-        Headers(state.List.TreeMenuFor(production)).Should().Equal("New Product Here", "New Composite Product Here", "New Folder", "Paste", "Print Stage", "Expand All", "Collapse All");
-        Headers(state.List.TreeMenuFor(null)).Should().Equal("New Product", "New Composite Product", "New Folder", "Print All Products", "Expand All", "Collapse All");
+        Headers(state.View.List.TreeMenuFor(production)).Should().Equal("New Product Here", "New Composite Product Here", "New Folder", "Paste", "Print Stage", "Expand All", "Collapse All");
+        Headers(state.View.List.TreeMenuFor(null)).Should().Equal("New Product", "New Composite Product", "New Folder", "Print All Products", "Expand All", "Collapse All");
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "Collapse All"));
-        state.Folders.Select(f => state.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => !f.IsExpanded);
-        state.List.ProductTree.Stages.Should().OnlyContain(r => r.IsExpanded);
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "Collapse All"));
+        state.Folders.Select(f => state.View.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => !f.IsExpanded);
+        state.View.List.ProductTree.Stages.Should().OnlyContain(r => r.IsExpanded);
 
-        await RunAsync(state.List.TreeMenuFor(production).Single(i => i.Header == "Expand All"));
-        state.Folders.Where(f => f.Stage == ProductStage.Production).Select(f => state.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => f.IsExpanded, "however deep");
+        await RunAsync(state.View.List.TreeMenuFor(production).Single(i => i.Header == "Expand All"));
+        state.Folders.Where(f => f.Stage == ProductStage.Production).Select(f => state.View.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => f.IsExpanded, "however deep");
         innovation.Folders.Should().OnlyContain(f => !f.IsExpanded, "the other stage's folders are left as they were");
 
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "Expand All"));
-        state.Folders.Select(f => state.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => f.IsExpanded);
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "Expand All"));
+        state.Folders.Select(f => state.View.List.ProductTree.Folder(f.Id)!).Should().OnlyContain(f => f.IsExpanded);
     });
 
     [Test]
@@ -374,27 +374,27 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var cakesId = await AddFolderAsync("Cakes");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await LoadedStateAsync();
-        await state.List.MoveProductsCommand.ExecuteAsync([new ProductMove(mamonId, ProductStage.Innovation, cakesId)]);
-        state.List.MoveNotice.Should().NotBeNull("there's a move to undo");
+        await state.View.List.MoveProductsCommand.ExecuteAsync([new ProductMove(mamonId, ProductStage.Innovation, cakesId)]);
+        state.View.List.MoveNotice.Should().NotBeNull("there's a move to undo");
         static bool CanRun(ICommand command) => command.CanExecute(null);
 
         // Breads to Production: it saves, then reads the list again. Meanwhile a menu's Promote, Send Back or Move to, a
         // folder's own move, and the notice's Undo are all off, as each would be judged against the list as it was.
-        var folderMove = state.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
-        state.List.MoveFolderCommand.CanExecute(new ProductFolderMove(breadsId, ProductStage.Production, null)).Should().BeFalse();
-        CanRun(state.List.MoveToStageCommand).Should().BeFalse();
-        CanRun(state.List.MoveProductsCommand).Should().BeFalse();
-        CanRun(state.List.MoveFolderCommand).Should().BeFalse();
-        CanRun(state.List.UndoMoveCommand).Should().BeFalse();
+        var folderMove = state.View.List.MoveFolderCommand.ExecuteAsync(new ProductFolderMove(breadsId, ProductStage.Production, null));
+        state.View.List.MoveFolderCommand.CanExecute(new ProductFolderMove(breadsId, ProductStage.Production, null)).Should().BeFalse();
+        CanRun(state.View.List.MoveToStageCommand).Should().BeFalse();
+        CanRun(state.View.List.MoveProductsCommand).Should().BeFalse();
+        CanRun(state.View.List.MoveFolderCommand).Should().BeFalse();
+        CanRun(state.View.List.UndoMoveCommand).Should().BeFalse();
 
         await folderMove;
         state.ErrorMessage.Should().BeNull();
 
         // The moves are free again once the folder's move has ended.
-        CanRun(state.List.MoveToStageCommand).Should().BeTrue();
-        CanRun(state.List.MoveProductsCommand).Should().BeTrue();
-        CanRun(state.List.MoveFolderCommand).Should().BeTrue();
-        CanRun(state.List.UndoMoveCommand).Should().BeTrue("the folder's move has a notice to undo");
+        CanRun(state.View.List.MoveToStageCommand).Should().BeTrue();
+        CanRun(state.View.List.MoveProductsCommand).Should().BeTrue();
+        CanRun(state.View.List.MoveFolderCommand).Should().BeTrue();
+        CanRun(state.View.List.UndoMoveCommand).Should().BeTrue("the folder's move has a notice to undo");
     });
 
     [Test]
@@ -402,8 +402,8 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     {
         var breadsId = await AddFolderAsync("Breads");
         var state = await LoadedStateAsync();
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Folder(breadsId)!).Single(i => i.Header == "New Product Here"));
-        state.List.CancelTreeName();
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Folder(breadsId)!).Single(i => i.Header == "New Product Here"));
+        state.View.List.CancelTreeName();
         state.NewProductTag.Should().Be("Goes in Innovation › Breads");
 
         // Renamed and sent to Production, from another computer, then read again here.
@@ -427,10 +427,10 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var breadsId = await AddFolderAsync("Breads");
         var state = await LoadedStateAsync();
         state.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
-        var breads = state.List.ProductTree.Folder(breadsId)!;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
         state.NewProductTag.Should().Be("Goes in Production", "the blank form is a new product too, in Settings' stage");
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
 
         state.SelectedProduct.Should().BeNull();
         state.EditingCategory.Should().BeNull("a folder isn't a category");
@@ -438,7 +438,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         state.History.IsDirty.Should().BeFalse("nothing is typed yet");
 
         // Revert keeps the folder it was started from.
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
         TypeName(state, "Something Else");
         await state.RevertCommand.ExecuteAsync();
         state.EditingName.Should().BeEmpty();
@@ -456,7 +456,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         // New, from the header, starts one in the stage Settings gives a new product: Production, to start with.
         await state.NewCommand.ExecuteAsync();
         state.NewProductTag.Should().Be("Goes in Production");
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
         TypeName(state, "Test Loaf");
         await state.SaveCommand.ExecuteAsync();
 
@@ -489,7 +489,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         state.NewProductTag.Should().Be("Goes in Production");
 
         // A product started from a folder keeps that folder's stage whatever the setting says.
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.StageFolder(ProductStage.Innovation)).Single(i => i.Header == "New Product Here"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.StageFolder(ProductStage.Innovation)).Single(i => i.Header == "New Product Here"));
         await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
         await state.LoadCommand.ExecuteAsync();
         state.NewProductTag.Should().Be("Goes in Innovation");
@@ -501,24 +501,24 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var mamonId = await SaveProductAsync("Mamon", null);
         var state = await OpenedStateAsync(mamonId);
         TypeDescription(state, "Toasted and sugared");
-        var mamon = state.List.ProductTree.Find(mamonId)!;
+        var mamon = state.View.List.ProductTree.Find(mamonId)!;
 
-        await RunAsync(state.List.TreeMenuFor(mamon).Single(i => i.Header == "Rename"));
+        await RunAsync(state.View.List.TreeMenuFor(mamon).Single(i => i.Header == "Rename"));
 
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(mamon, "Mamon"));
-        state.List.SelectedTreeNode.Should().BeSameAs(mamon);
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(mamon, "Mamon"));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(mamon);
 
-        await state.List.CommitTreeNameAsync("  Mamon Tostado ");
-        await state.List.CommitTreeNameAsync("Mamon Again");
+        await state.View.List.CommitTreeNameAsync("  Mamon Tostado ");
+        await state.View.List.CommitTreeNameAsync("Mamon Again");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
         var saved = await ProductNamedAsync("Mamon Tostado");
         saved.Description.Should().BeNull("the rename saves the name alone");
         state.Products.Should().NotContain(p => p.Name == "Mamon Again", "leaving the box after Enter saves nothing more");
         state.EditingName.Should().Be("Mamon Tostado");
         state.EditingCloneName.Should().Be("Mamon Tostado Copy", "the clone's name was still the one it started with");
-        state.List.ProductTree.Find(mamonId)!.Title.Should().Be("Mamon Tostado");
+        state.View.List.ProductTree.Find(mamonId)!.Title.Should().Be("Mamon Tostado");
         state.History.IsDirty.Should().BeTrue("the description is still to be saved");
 
         state.TryUndo().Should().BeTrue();
@@ -533,31 +533,31 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     {
         var mamonId = await SaveProductAsync("Mamon", null);
         var state = await LoadedStateAsync();
-        var mamon = state.List.ProductTree.Find(mamonId)!;
-        state.List.SelectedTreeNode = mamon;
+        var mamon = state.View.List.ProductTree.Find(mamonId)!;
+        state.View.List.SelectedTreeNode = mamon;
 
         // F2 does what the menu's Rename does.
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(mamon);
-        state.List.CancelTreeName();
-        state.List.TreeNameEdit.Should().BeNull();
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(mamon);
+        state.View.List.CancelTreeName();
+        state.View.List.TreeNameEdit.Should().BeNull();
 
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync("   ");
-        state.List.TreeNameEdit.Should().BeNull("an empty name is an Esc");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync("   ");
+        state.View.List.TreeNameEdit.Should().BeNull("an empty name is an Esc");
 
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        await state.List.CommitTreeNameAsync("Mamon");
-        state.List.TreeNameEdit.Should().BeNull();
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        await state.View.List.CommitTreeNameAsync("Mamon");
+        state.View.List.TreeNameEdit.Should().BeNull();
 
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        state.List.SearchText = "mam";
-        state.List.TreeNameEdit.Should().BeNull("a search may hide the row");
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        state.View.List.SearchText = "mam";
+        state.View.List.TreeNameEdit.Should().BeNull("a search may hide the row");
 
-        state.List.SearchText = string.Empty;
-        await RunAsync(state.List.TreeShortcut("F2")!);
-        state.List.CategoryFilter = new ProductCategoryFilter.Uncategorized();
-        state.List.TreeNameEdit.Should().BeNull("and so may the category filter");
+        state.View.List.SearchText = string.Empty;
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
+        state.View.List.CategoryFilter = new ProductCategoryFilter.Uncategorized();
+        state.View.List.TreeNameEdit.Should().BeNull("and so may the category filter");
 
         state.ErrorMessage.Should().BeNull();
         (await NameOfAsync(mamonId)).Should().Be("Mamon");
@@ -574,35 +574,35 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         // A new product named as another is.
         await state.NewCommand.ExecuteAsync();
-        var row = state.List.ProductTree.PendingProduct!;
-        await state.List.CommitTreeNameAsync("Mamon");
+        var row = state.View.List.ProductTree.PendingProduct!;
+        await state.View.List.CommitTreeNameAsync("Mamon");
 
         state.ErrorMessage.Should().NotBeNull();
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "Mamon"));
-        state.List.ProductTree.PendingProduct.Should().BeSameAs(row);
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "Mamon"));
+        state.View.List.ProductTree.PendingProduct.Should().BeSameAs(row);
         state.SelectedProduct.Should().BeNull();
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
         state.EditingName.Should().BeEmpty("Esc leaves the new product blank, as New does");
         state.Products.Should().HaveCount(2);
 
         // A product renamed as another is.
-        var pandesal = state.List.ProductTree.Find(pandesalId)!;
-        await RunAsync(state.List.TreeMenuFor(pandesal).Single(i => i.Header == "Rename"));
-        await state.List.CommitTreeNameAsync("Mamon");
+        var pandesal = state.View.List.ProductTree.Find(pandesalId)!;
+        await RunAsync(state.View.List.TreeMenuFor(pandesal).Single(i => i.Header == "Rename"));
+        await state.View.List.CommitTreeNameAsync("Mamon");
 
         state.ErrorMessage.Should().NotBeNull();
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(pandesal, "Mamon"));
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(pandesal, "Mamon"));
         (await NameOfAsync(pandesalId)).Should().Be("Pandesal");
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
 
         // A folder renamed as one beside it is, whatever the case.
-        var breads = state.List.ProductTree.Folder(breadsId)!;
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "Rename"));
-        await state.List.CommitTreeNameAsync("cakes");
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "Rename"));
+        await state.View.List.CommitTreeNameAsync("cakes");
 
         state.ErrorMessage.Should().Be("Innovation already has a folder named cakes.");
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(breads);
-        state.List.TreeNameEdit.InitialText.Should().Be("cakes");
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(breads);
+        state.View.List.TreeNameEdit.InitialText.Should().Be("cakes");
         state.Folders.Select(f => f.Name).Should().Equal("Breads", "Cakes");
     });
 
@@ -614,24 +614,26 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var state = await LoadedStateAsync();
         var answer = (string?)"Mamon Mini";
         TextPromptRequest? asked = null;
-        state.List.PromptForName.RegisterHandler(interaction =>
+        state.View.List.PromptForName.RegisterHandler(interaction =>
         {
             asked = interaction.Input;
             interaction.SetOutput(answer);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Clone…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Clone…"));
 
+        // The clone opens in a tab of its own.
         state.ErrorMessage.Should().BeNull();
         asked!.Title.Should().Be("Clone Product");
         asked.InitialValue.Should().Be("Mamon Copy");
-        state.SelectedProduct!.Name.Should().Be("Mamon Mini");
-        state.SelectedProduct.Stage.Should().Be(ProductStage.Innovation);
-        state.SelectedProduct.FolderId.Should().Be(await FolderIdAsync("Breads", ProductStage.Innovation), "a Breads folder is made in Innovation for it");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(state.SelectedProduct.Id));
+        var clone = state.View.Form!;
+        clone.SelectedProduct!.Name.Should().Be("Mamon Mini");
+        clone.SelectedProduct.Stage.Should().Be(ProductStage.Innovation);
+        clone.SelectedProduct.FolderId.Should().Be(await FolderIdAsync("Breads", ProductStage.Innovation), "a Breads folder is made in Innovation for it");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(clone.SelectedProduct.Id));
 
         answer = null;
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Create Variant…"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Create Variant…"));
 
         asked.Title.Should().Be("Create Variant");
         state.Products.Should().HaveCount(2, "a cancelled prompt makes nothing");
@@ -643,46 +645,46 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var breadsId = await AddFolderAsync("Breads", ProductStage.Production);
         var pandesalId = await SaveProductAsync("Pandesal", breadsId, ProductStage.Production);
         var state = await LoadedStateAsync();
-        var breads = state.List.ProductTree.Folder(breadsId)!;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "New Folder"));
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "New Folder"));
 
-        var folder = state.List.ProductTree.PendingFolder!;
+        var folder = state.View.List.ProductTree.PendingFolder!;
         TitlesIn(breads).Should().Equal("New folder", "Pandesal");
-        state.List.SelectedTreeNode.Should().BeSameAs(folder);
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
-        state.List.TreeNameEdit.InitialText.Should().Be("New folder");
-        state.List.TreeNameEdit.Hint.Should().Contain("isn't a category");
-        state.List.TreeMenuFor(folder).Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(folder);
+        state.View.List.TreeNameEdit.InitialText.Should().Be("New folder");
+        state.View.List.TreeNameEdit.Hint.Should().Contain("isn't a category");
+        state.View.List.TreeMenuFor(folder).Should().BeEmpty();
 
         await state.LoadCommand.ExecuteAsync();
         TitlesIn(breads).Should().Equal(["New folder", "Pandesal"], "a load keeps it");
 
-        await state.List.CommitTreeNameAsync("Holiday");
+        await state.View.List.CommitTreeNameAsync("Holiday");
 
         state.ErrorMessage.Should().BeNull();
-        state.List.ProductTree.PendingFolder.Should().BeNull();
+        state.View.List.ProductTree.PendingFolder.Should().BeNull();
         var holiday = await SingleFolderAsync("Holiday");
         (holiday.Stage, holiday.ParentId).Should().Be((ProductStage.Production, breadsId));
         TitlesIn(breads).Should().Equal("Holiday", "Pandesal");
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Folder(holiday.Id));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Folder(holiday.Id));
         state.Categories.Should().BeEmpty("a folder adds no category");
 
         // From the list's empty space, in the folder of the product picked; a name taken there is refused.
-        state.List.SelectedTreeNode = state.List.ProductTree.Find(pandesalId);
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
-        state.List.ProductTree.PendingFolder!.ParentFolderId.Should().Be(breadsId);
-        await state.List.CommitTreeNameAsync("holiday");
+        state.View.List.SelectedTreeNode = state.View.List.ProductTree.Find(pandesalId);
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        state.View.List.ProductTree.PendingFolder!.ParentFolderId.Should().Be(breadsId);
+        await state.View.List.CommitTreeNameAsync("holiday");
 
         state.ErrorMessage.Should().Be("Production › Breads already has a folder named holiday.");
-        state.List.TreeNameEdit!.InitialText.Should().Be("holiday", "the box comes back with it");
-        state.List.ProductTree.PendingFolder!.ParentFolderId.Should().Be(breadsId);
-        state.List.CancelTreeName();
+        state.View.List.TreeNameEdit!.InitialText.Should().Be("holiday", "the box comes back with it");
+        state.View.List.ProductTree.PendingFolder!.ParentFolderId.Should().Be(breadsId);
+        state.View.List.CancelTreeName();
 
         // With a stage picked, at the top of that stage.
-        state.List.SelectedTreeNode = state.List.ProductTree.StageFolder(ProductStage.Innovation);
-        await RunAsync(state.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
-        state.List.ProductTree.PendingFolder!.Should().Match<ProductFolderNode>(f => f.Stage == ProductStage.Innovation && f.ParentFolderId == null);
+        state.View.List.SelectedTreeNode = state.View.List.ProductTree.StageFolder(ProductStage.Innovation);
+        await RunAsync(state.View.List.TreeMenuFor(null).Single(i => i.Header == "New Folder"));
+        state.View.List.ProductTree.PendingFolder!.Should().Match<ProductFolderNode>(f => f.Stage == ProductStage.Innovation && f.ParentFolderId == null);
     });
 
     [Test]
@@ -691,19 +693,19 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var breadsId = await AddFolderAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await OpenedStateAsync(mamonId);
-        var breads = state.List.ProductTree.Folder(breadsId)!;
-        state.List.SelectedTreeNode = breads;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
+        state.View.List.SelectedTreeNode = breads;
 
-        await RunAsync(state.List.TreeShortcut("F2")!);
+        await RunAsync(state.View.List.TreeShortcut("F2")!);
 
-        state.List.TreeNameEdit!.Node.Should().BeSameAs(breads);
-        state.List.TreeNameEdit.InitialText.Should().Be("Breads");
+        state.View.List.TreeNameEdit!.Node.Should().BeSameAs(breads);
+        state.View.List.TreeNameEdit.InitialText.Should().Be("Breads");
 
-        await state.List.CommitTreeNameAsync("Bread");
+        await state.View.List.CommitTreeNameAsync("Bread");
 
         state.ErrorMessage.Should().BeNull();
         (await SingleFolderAsync("Bread")).Id.Should().Be(breadsId);
-        state.List.ProductTree.Folder(breadsId).Should().BeSameAs(breads);
+        state.View.List.ProductTree.Folder(breadsId).Should().BeSameAs(breads);
         breads.Title.Should().Be("Bread");
         breads.Products.Should().ContainSingle();
         state.History.IsDirty.Should().BeFalse();
@@ -714,26 +716,26 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     {
         var breadsId = await AddFolderAsync("Breads");
         var state = await LoadedStateAsync();
-        var breads = state.List.ProductTree.Folder(breadsId)!;
-        state.List.SearchText = "nothing like it";
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
+        state.View.List.SearchText = "nothing like it";
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
 
-        state.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
-        var row = state.List.ProductTree.PendingProduct!;
+        state.View.List.SearchText.Should().BeEmpty("the search is cleared, so the new row shows");
+        var row = state.View.List.ProductTree.PendingProduct!;
         breads.Children.Should().Equal(row);
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
-        state.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New product"));
-        state.List.TreeMenuFor(row).Should().BeEmpty();
-        state.List.SelectedTreeProducts.Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.TreeNameEdit.Should().Be(new TreeNameEdit(row, "New product"));
+        state.View.List.TreeMenuFor(row).Should().BeEmpty();
+        state.View.List.SelectedTreeProducts.Should().BeEmpty();
         state.SelectedProduct.Should().BeNull();
         state.History.IsDirty.Should().BeFalse();
 
         await state.LoadCommand.ExecuteAsync();
         breads.Children.Should().Equal([row], "a load keeps it");
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
 
-        await state.List.CommitTreeNameAsync("Pan de Coco");
+        await state.View.List.CommitTreeNameAsync("Pan de Coco");
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
 
         state.ErrorMessage.Should().BeNull();
@@ -745,10 +747,10 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         }
 
         state.SelectedProduct!.Id.Should().Be(saved.Id, "the form opens on it");
-        state.List.ProductTree.PendingProduct.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
-        breads.Children.Should().Equal(state.List.ProductTree.Find(saved.Id)!);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(saved.Id));
+        state.View.List.ProductTree.PendingProduct.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
+        breads.Children.Should().Equal(state.View.List.ProductTree.Find(saved.Id)!);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(saved.Id));
         state.History.IsDirty.Should().BeFalse();
     });
 
@@ -756,32 +758,32 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     public Task A_new_composite_named_in_the_list_keeps_its_row_and_the_name_on_the_form_until_it_can_be_saved() => UiThread.RunAsync(async () =>
     {
         var state = await LoadedStateAsync();
-        var production = state.List.ProductTree.StageFolder(ProductStage.Production);
+        var production = state.View.List.ProductTree.StageFolder(ProductStage.Production);
 
         await state.NewCompositeCommand.ExecuteAsync();
 
-        var row = state.List.ProductTree.PendingProduct!;
+        var row = state.View.List.ProductTree.PendingProduct!;
         production.Children.Should().Equal(row);
         row.Product.IsComposite.Should().BeTrue();
         state.IsEditingComposite.Should().BeTrue();
 
-        await state.List.CommitTreeNameAsync("Pasalubong Box");
+        await state.View.List.CommitTreeNameAsync("Pasalubong Box");
 
         // It needs two products before it can be saved: the name is the form's, unsaved, and the row keeps it.
         state.ErrorMessage.Should().BeNull();
         state.SuccessMessage.Should().Contain("Products table");
         state.Products.Should().BeEmpty();
-        state.List.TreeNameEdit.Should().BeNull();
-        state.List.ProductTree.PendingProduct.Should().BeSameAs(row);
+        state.View.List.TreeNameEdit.Should().BeNull();
+        state.View.List.ProductTree.PendingProduct.Should().BeSameAs(row);
         row.Title.Should().Be("Pasalubong Box");
-        state.List.SelectedTreeNode.Should().BeSameAs(row);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(row);
         state.EditingName.Should().Be("Pasalubong Box");
         state.History.IsDirty.Should().BeTrue("Save is offered for it");
 
         state.ConfirmDelete.RegisterHandler(interaction => interaction.SetOutput(true));
         await state.RevertCommand.ExecuteAsync();
 
-        state.List.ProductTree.PendingProduct.Should().BeNull("put back blank, it has no row");
+        state.View.List.ProductTree.PendingProduct.Should().BeNull("put back blank, it has no row");
         production.Children.Should().BeEmpty();
     });
 
@@ -790,30 +792,30 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     {
         var breadsId = await AddFolderAsync("Breads");
         var state = await LoadedStateAsync();
-        var breads = state.List.ProductTree.Folder(breadsId)!;
-        var innovation = state.List.ProductTree.StageFolder(ProductStage.Innovation);
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
+        var innovation = state.View.List.ProductTree.StageFolder(ProductStage.Innovation);
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
-        state.List.CancelTreeName();
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
+        state.View.List.CancelTreeName();
 
         breads.Children.Should().BeEmpty();
-        state.List.ProductTree.PendingProduct.Should().BeNull();
-        state.List.TreeNameEdit.Should().BeNull();
-        state.List.SelectedTreeNode.Should().BeNull();
+        state.View.List.ProductTree.PendingProduct.Should().BeNull();
+        state.View.List.TreeNameEdit.Should().BeNull();
+        state.View.List.SelectedTreeNode.Should().BeNull();
         state.SelectedProduct.Should().BeNull("the form stays on the blank new product");
 
-        await RunAsync(state.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
-        await state.List.CommitTreeNameAsync("  ");
+        await RunAsync(state.View.List.TreeMenuFor(breads).Single(i => i.Header == "New Product Here"));
+        await state.View.List.CommitTreeNameAsync("  ");
         breads.Children.Should().BeEmpty();
 
-        await RunAsync(state.List.TreeMenuFor(innovation).Single(i => i.Header == "New Folder"));
-        state.List.CancelTreeName();
+        await RunAsync(state.View.List.TreeMenuFor(innovation).Single(i => i.Header == "New Folder"));
+        state.View.List.CancelTreeName();
         TitlesIn(innovation).Should().Equal("Breads");
-        state.List.ProductTree.PendingFolder.Should().BeNull();
-        state.List.SelectedTreeNode.Should().BeNull();
+        state.View.List.ProductTree.PendingFolder.Should().BeNull();
+        state.View.List.SelectedTreeNode.Should().BeNull();
 
-        await RunAsync(state.List.TreeMenuFor(innovation).Single(i => i.Header == "New Folder"));
-        await state.List.CommitTreeNameAsync(string.Empty);
+        await RunAsync(state.View.List.TreeMenuFor(innovation).Single(i => i.Header == "New Folder"));
+        await state.View.List.CommitTreeNameAsync(string.Empty);
         TitlesIn(innovation).Should().Equal("Breads");
 
         state.ErrorMessage.Should().BeNull();
@@ -837,20 +839,20 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
             interaction.SetOutput(true);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Folder(breadsId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Folder(breadsId)).Single(i => i.Header == "Delete"));
 
         state.ErrorMessage.Should().BeNull();
         question.Should().Be("Delete the 'Breads' folder? Its 1 product and 1 folder move up to Innovation.");
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, (int?)null));
         (await PlaceOfAsync(bibingkaId)).Should().Be((ProductStage.Innovation, holidayId));
-        state.List.ProductTree.Folder(breadsId).Should().BeNull();
-        TitlesIn(state.List.ProductTree.StageFolder(ProductStage.Innovation)).Should().Equal("Holiday", "Mamon");
+        state.View.List.ProductTree.Folder(breadsId).Should().BeNull();
+        TitlesIn(state.View.List.ProductTree.StageFolder(ProductStage.Innovation)).Should().Equal("Holiday", "Mamon");
         state.SelectedProduct!.Id.Should().Be(mamonId);
         state.History.IsDirty.Should().BeFalse("the folder went in the database: there's nothing to save");
     });
 
     [Test]
-    public Task Delete_on_a_product_asks_first_moves_it_to_Deleted_and_the_form_starts_afresh_only_if_it_was_showing_it() => UiThread.RunAsync(async () =>
+    public Task Delete_on_a_product_asks_first_moves_it_to_Deleted_and_closes_its_tab_only_if_one_holds_it() => UiThread.RunAsync(async () =>
     {
         var mamonId = await SaveProductAsync("Mamon", null);
         var ensaymadaId = await SaveProductAsync("Ensaymada", null);
@@ -862,20 +864,21 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
             interaction.SetOutput(true);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(ensaymadaId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(ensaymadaId)).Single(i => i.Header == "Delete"));
 
         question.Should().Be("Delete 'Ensaymada'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.");
         state.Products.Select(p => p.Name).Should().Equal("Mamon");
         state.DeletedProducts.Select(p => p.Name).Should().Equal("Ensaymada");
-        TitlesIn(state.List.ProductTree.DeletedFolder).Should().Equal("Ensaymada");
+        TitlesIn(state.View.List.ProductTree.DeletedFolder).Should().Equal("Ensaymada");
         state.SelectedProduct!.Id.Should().Be(mamonId, "the one showing wasn't the one deleted");
+        state.View.Tabs.All.Should().ContainSingle("no tab held the one deleted");
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete"));
 
-        state.Products.Should().BeEmpty();
-        TitlesIn(state.List.ProductTree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
-        state.SelectedProduct.Should().BeNull();
-        state.EditingName.Should().BeEmpty();
+        state.View.Products.Should().BeEmpty();
+        TitlesIn(state.View.List.ProductTree.DeletedFolder).Should().Equal("Ensaymada", "Mamon");
+        state.View.Tabs.All.Should().BeEmpty("the tab holding the one deleted closed, as it's gone");
+        state.View.Form.Should().BeNull();
     });
 
     [Test]
@@ -886,26 +889,26 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var pandesalId = await SaveProductAsync("Pandesal", null);
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
         var state = await OpenedStateAsync(pandesalId);
-        var mamon = state.List.ProductTree.Find(mamonId)!;
+        var mamon = state.View.List.ProductTree.Find(mamonId)!;
 
-        state.List.SelectedTreeNode = mamon;
+        state.View.List.SelectedTreeNode = mamon;
 
         state.SelectedProduct!.Id.Should().Be(pandesalId, "a deleted product isn't opened");
-        state.List.SelectedTreeNode.Should().BeSameAs(mamon, "and its row stays picked");
-        state.List.SelectedTreeProducts.Should().BeEmpty("no live product's menu takes it in");
-        var menu = state.List.TreeMenuFor(mamon);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(mamon, "and its row stays picked");
+        state.View.List.SelectedTreeProducts.Should().BeEmpty("no live product's menu takes it in");
+        var menu = state.View.List.TreeMenuFor(mamon);
         Headers(menu).Should().Equal("Restore", "Delete Permanently");
-        state.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.List.DeletePermanentlyCommand && i.Parameter == mamon);
-        state.List.TreeShortcut("F2").Should().BeNull();
-        state.List.TreeMenuFor(state.List.ProductTree.DeletedFolder).Should().BeEmpty("the folder itself has nothing to offer");
+        state.View.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.DeletePermanentlyCommand && i.Parameter == mamon);
+        state.View.List.TreeShortcut("F2").Should().BeNull();
+        state.View.List.TreeMenuFor(state.View.List.ProductTree.DeletedFolder).Should().BeEmpty("the folder itself has nothing to offer");
         state.ComponentsTable.ComponentProductOptions.Select(p => p.Id).Should().NotContain(mamonId);
 
         await RunAsync(menu.Single(i => i.Header == "Restore"));
 
         state.ErrorMessage.Should().BeNull();
         state.DeletedProducts.Should().BeEmpty();
-        state.List.ProductTree.Folder(breadsId)!.Products.Should().ContainSingle(l => l.Product.Id == mamonId, "back where it was");
-        state.List.ProductTree.Find(mamonId).Should().BeSameAs(mamon, "its row moves back with it");
+        state.View.List.ProductTree.Folder(breadsId)!.Products.Should().ContainSingle(l => l.Product.Id == mamonId, "back where it was");
+        state.View.List.ProductTree.Find(mamonId).Should().BeSameAs(mamon, "its row moves back with it");
         state.SelectedProduct!.Id.Should().Be(mamonId, "a restored product is opened");
 
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
@@ -917,11 +920,11 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
             interaction.SetOutput(true);
         });
 
-        await RunAsync(state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete Permanently"));
+        await RunAsync(state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Delete Permanently"));
 
         question.Should().StartWith("Delete 'Mamon' permanently?").And.EndWith("This can't be undone.");
         state.DeletedProducts.Should().BeEmpty();
-        state.List.ProductTree.Find(mamonId).Should().BeNull();
+        state.View.List.ProductTree.Find(mamonId).Should().BeNull();
         (await new ProductRepository(CreateDbContextFactory()).GetByIdAsync(mamonId, Cancellation)).Should().BeNull();
     });
 
@@ -932,18 +935,18 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var pandesalId = await SaveProductAsync("Pandesal", null);
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(mamonId, Cancellation);
         var state = await OpenedStateAsync(pandesalId);
-        state.List.ProductTree.DeletedFolder.IsExpanded.Should().BeFalse();
+        state.View.List.ProductTree.DeletedFolder.IsExpanded.Should().BeFalse();
 
         state.OpenRecord(mamonId);
 
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(mamonId));
-        state.List.ProductTree.DeletedFolder.IsExpanded.Should().BeTrue("the row picked shows");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(mamonId));
+        state.View.List.ProductTree.DeletedFolder.IsExpanded.Should().BeTrue("the row picked shows");
         state.SelectedProduct!.Id.Should().Be(pandesalId, "the form stays on what it showed");
 
-        state.List.SearchText = "Pan";
-        TitlesIn(state.List.ProductTree.DeletedFolder).Should().BeEmpty();
-        state.List.SearchText = "Mam";
-        TitlesIn(state.List.ProductTree.DeletedFolder).Should().Equal("Mamon");
+        state.View.List.SearchText = "Pan";
+        TitlesIn(state.View.List.ProductTree.DeletedFolder).Should().BeEmpty();
+        state.View.List.SearchText = "Mam";
+        TitlesIn(state.View.List.ProductTree.DeletedFolder).Should().Equal("Mamon");
     });
 
     [Test]
@@ -961,49 +964,49 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var oldBunId = await SaveProductAsync("Old Bun", null, categoryId: breadsCategory);
         await new ProductRepository(CreateDbContextFactory()).DeleteAsync(oldBunId, Cancellation);
         var state = await LoadedStateAsync();
-        var tree = state.List.ProductTree;
+        var tree = state.View.List.ProductTree;
 
-        state.List.CategoryFilters.Select(f => f.Label).Should().Equal("All categories", "Breads", "Cakes", "Uncategorized");
-        state.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
+        state.View.List.CategoryFilters.Select(f => f.Label).Should().Equal("All categories", "Breads", "Cakes", "Uncategorized");
+        state.View.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
 
-        state.List.CategoryFilter = state.List.CategoryFilters.Single(f => f.Label == "Breads");
+        state.View.List.CategoryFilter = state.View.List.CategoryFilters.Single(f => f.Label == "Breads");
 
-        state.List.VisibleProducts.Select(p => p.Id).Should().BeEquivalentTo([pandesalId, testBunId]);
+        state.View.List.VisibleProducts.Select(p => p.Id).Should().BeEquivalentTo([pandesalId, testBunId]);
         TitlesIn(tree.StageFolder(ProductStage.Production)).Should().Equal(["Bakery"], "only the folders holding a match show");
         TitlesIn(tree.Folder(bakeryId)!).Should().Equal("Pandesal");
         TitlesIn(tree.Folder(trialsId)!).Should().Equal("Test Bun");
         TitlesIn(tree.DeletedFolder).Should().Equal(["Old Bun"], "the Deleted folder is filtered too");
         tree.Folder(bakeryId)!.Count.Should().Be(1);
 
-        state.List.SearchText = "test";
-        state.List.VisibleProducts.Select(p => p.Id).Should().Equal([testBunId], "with a search, both have to match");
-        state.List.SearchText = string.Empty;
+        state.View.List.SearchText = "test";
+        state.View.List.VisibleProducts.Select(p => p.Id).Should().Equal([testBunId], "with a search, both have to match");
+        state.View.List.SearchText = string.Empty;
 
-        state.List.CategoryFilter = new ProductCategoryFilter.Uncategorized();
-        state.List.VisibleProducts.Select(p => p.Id).Should().Equal(looseId);
+        state.View.List.CategoryFilter = new ProductCategoryFilter.Uncategorized();
+        state.View.List.VisibleProducts.Select(p => p.Id).Should().Equal(looseId);
         TitlesIn(tree.StageFolder(ProductStage.Production)).Should().Equal("Loose Loaf");
 
         // A product opened from elsewhere that the filter hides shows: the filter goes.
         state.OpenRecord(bibingkaId);
-        state.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
-        state.List.SelectedTreeNode.Should().BeSameAs(tree.Find(bibingkaId));
+        state.View.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
+        state.View.List.SelectedTreeNode.Should().BeSameAs(tree.Find(bibingkaId));
 
         // Renamed in Settings, the category keeps its place picked; deleted, the filter goes back to All categories.
-        state.List.CategoryFilter = state.List.CategoryFilters.Single(f => f.Label == "Cakes");
+        state.View.List.CategoryFilter = state.View.List.CategoryFilters.Single(f => f.Label == "Cakes");
         await new ProductCategoryRepository(CreateDbContextFactory()).UpdateAsync(new ProductCategory { Id = cakesCategory, Name = "Cakes & Tortes" }, Cancellation);
         await state.LoadCommand.ExecuteAsync();
-        state.List.CategoryFilter.Should().Be(new ProductCategoryFilter.Category(cakesCategory, "Cakes & Tortes"));
-        state.List.VisibleProducts.Select(p => p.Id).Should().Equal(bibingkaId);
+        state.View.List.CategoryFilter.Should().Be(new ProductCategoryFilter.Category(cakesCategory, "Cakes & Tortes"));
+        state.View.List.VisibleProducts.Select(p => p.Id).Should().Equal(bibingkaId);
 
         await new ProductCategoryRepository(CreateDbContextFactory()).DeleteAsync(cakesCategory, Cancellation);
         await state.LoadCommand.ExecuteAsync();
-        state.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
-        state.List.CategoryFilters.Select(f => f.Label).Should().Equal("All categories", "Breads", "Uncategorized");
+        state.View.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
+        state.View.List.CategoryFilters.Select(f => f.Label).Should().Equal("All categories", "Breads", "Uncategorized");
 
         // New Folder clears the filters, so its row shows.
-        state.List.CategoryFilter = state.List.CategoryFilters.Single(f => f.Label == "Breads");
-        await RunAsync(state.List.TreeMenuFor(tree.StageFolder(ProductStage.Production)).Single(i => i.Header == "New Folder"));
-        state.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
+        state.View.List.CategoryFilter = state.View.List.CategoryFilters.Single(f => f.Label == "Breads");
+        await RunAsync(state.View.List.TreeMenuFor(tree.StageFolder(ProductStage.Production)).Single(i => i.Header == "New Folder"));
+        state.View.List.CategoryFilter.Should().Be(new ProductCategoryFilter.All());
         TitlesIn(tree.StageFolder(ProductStage.Production)).Should().Contain("New folder");
     });
 
@@ -1014,24 +1017,24 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var pandesalId = await SaveProductAsync("Pandesal", breadsId);
         var state = await LoadedStateAsync();
-        var mamon = state.List.ProductTree.Find(mamonId)!;
-        var breads = state.List.ProductTree.Folder(breadsId)!;
+        var mamon = state.View.List.ProductTree.Find(mamonId)!;
+        var breads = state.View.List.ProductTree.Folder(breadsId)!;
 
-        state.List.SelectedTreeNode = mamon;
-        state.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.List.RenameProductCommand && i.Parameter == mamon);
-        state.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.List.DeleteProductCommand && i.Parameter == mamon);
+        state.View.List.SelectedTreeNode = mamon;
+        state.View.List.TreeShortcut("F2").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.RenameProductCommand && i.Parameter == mamon);
+        state.View.List.TreeShortcut("Del").Should().Match<TreeMenuItem>(i => i.Command == state.View.List.DeleteProductCommand && i.Parameter == mamon);
 
-        state.List.SelectedTreeNode = breads;
-        state.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.List.RenameFolderCommand);
-        state.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.List.DeleteFolderCommand);
+        state.View.List.SelectedTreeNode = breads;
+        state.View.List.TreeShortcut("F2")!.Command.Should().BeSameAs(state.View.List.RenameFolderCommand);
+        state.View.List.TreeShortcut("Del")!.Command.Should().BeSameAs(state.View.List.DeleteFolderCommand);
 
-        state.List.SelectedTreeNode = state.List.ProductTree.StageFolder(ProductStage.Production);
-        state.List.TreeShortcut("F2").Should().BeNull("a stage can't be renamed");
-        state.List.TreeShortcut("Del").Should().BeNull("nor deleted");
+        state.View.List.SelectedTreeNode = state.View.List.ProductTree.StageFolder(ProductStage.Production);
+        state.View.List.TreeShortcut("F2").Should().BeNull("a stage can't be renamed");
+        state.View.List.TreeShortcut("Del").Should().BeNull("nor deleted");
 
-        state.List.SelectedTreeNode = mamon;
-        state.List.SelectedTreeNodes.Add(state.List.ProductTree.Find(pandesalId)!);
-        state.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
+        state.View.List.SelectedTreeNode = mamon;
+        state.View.List.SelectedTreeNodes.Add(state.View.List.ProductTree.Find(pandesalId)!);
+        state.View.List.TreeShortcut("Del").Should().BeNull("with several picked, a key could take the wrong one");
     });
 
     [Test]
@@ -1041,12 +1044,12 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var pandesalId = await SaveProductAsync("Pandesal", null);
         var ensaymadaId = await SaveProductAsync("Ensaymada", null);
         var state = await OpenedStateAsync(mamonId);
-        state.List.SelectedTreeNodes.Add(state.List.ProductTree.Find(pandesalId)!);
+        state.View.List.SelectedTreeNodes.Add(state.View.List.ProductTree.Find(pandesalId)!);
 
         state.OpenRecord(ensaymadaId);
 
-        state.List.SelectedTreeNodes.Should().Equal(state.List.ProductTree.Find(ensaymadaId)!);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(ensaymadaId));
+        state.View.List.SelectedTreeNodes.Should().Equal(state.View.List.ProductTree.Find(ensaymadaId)!);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(ensaymadaId));
     });
 
     [Test]
@@ -1056,11 +1059,11 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var cakesId = await AddFolderAsync("Cakes");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var state = await LoadedStateAsync();
-        var moveTo = state.List.TreeMenuFor(state.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Move to");
+        var moveTo = state.View.List.TreeMenuFor(state.View.List.ProductTree.Find(mamonId)).Single(i => i.Header == "Move to");
         await RunAsync(moveTo.Items.Single(i => i.Header == "Innovation").Items.Single(i => i.Header == "Cakes"));
         await new ProductFolderRepository(CreateDbContextFactory()).DeleteAsync(breadsId, Cancellation);
 
-        await state.List.UndoMoveCommand.ExecuteAsync();
+        await state.View.List.UndoMoveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().Be("The folder to move it to no longer exists.");
         (await PlaceOfAsync(mamonId)).Should().Be((ProductStage.Innovation, cakesId));
@@ -1072,26 +1075,26 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var breadsId = await AddFolderAsync("Breads", ProductStage.Production);
         var cakesId = await AddFolderAsync("Cakes", ProductStage.Production);
         var store = new InMemoryViewStateStore();
-        (await LoadedStateAsync(store)).Dispose();
+        (await LoadedStateAsync(store)).View.Dispose();
         store.WriteCount.Should().Be(0, "nothing opened or closed is nothing to remember");
         var first = await LoadedStateAsync(store);
 
-        first.List.ProductTree.Folder(breadsId)!.IsExpanded = false;
+        first.View.List.ProductTree.Folder(breadsId)!.IsExpanded = false;
 
         await Settle.EventuallyAsync(
             () => store.ReadList(ProductsList.ClosedFoldersKey)?.Contains($"Folder/{breadsId}") == true,
             () => string.Join(", ", store.ReadList(ProductsList.ClosedFoldersKey) ?? []));
-        first.Dispose();
+        first.View.Dispose();
 
         var pastriesId = await AddFolderAsync("Pastries", ProductStage.Production);
         var next = await LoadedStateAsync(store);
-        next.List.ProductTree.Folder(breadsId)!.IsExpanded.Should().BeFalse();
-        next.List.ProductTree.Folder(cakesId)!.IsExpanded.Should().BeTrue();
-        next.List.ProductTree.Folder(pastriesId)!.IsExpanded.Should().BeTrue("a folder new since opens, as every folder first did");
+        next.View.List.ProductTree.Folder(breadsId)!.IsExpanded.Should().BeFalse();
+        next.View.List.ProductTree.Folder(cakesId)!.IsExpanded.Should().BeTrue();
+        next.View.List.ProductTree.Folder(pastriesId)!.IsExpanded.Should().BeTrue("a folder new since opens, as every folder first did");
 
         // One closed just before the app closes is written as it closes.
-        next.List.ProductTree.Folder(cakesId)!.IsExpanded = false;
-        next.Dispose();
+        next.View.List.ProductTree.Folder(cakesId)!.IsExpanded = false;
+        next.View.Dispose();
         store.ReadList(ProductsList.ClosedFoldersKey).Should().Contain($"Folder/{cakesId}");
     });
 
@@ -1105,12 +1108,12 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         var state = await LoadedStateAsync(store);
 
-        state.List.ProductTree.Folder(breadsId)!.IsExpanded.Should().BeTrue();
-        state.List.ProductTree.Folder(cakesId)!.IsExpanded.Should().BeFalse();
-        state.List.ProductTree.StageFolder(ProductStage.Innovation).IsExpanded.Should().BeFalse();
+        state.View.List.ProductTree.Folder(breadsId)!.IsExpanded.Should().BeTrue();
+        state.View.List.ProductTree.Folder(cakesId)!.IsExpanded.Should().BeFalse();
+        state.View.List.ProductTree.StageFolder(ProductStage.Innovation).IsExpanded.Should().BeFalse();
 
         // Kept as closed folders from then on.
-        state.Dispose();
+        state.View.Dispose();
         store.ReadList(ProductsList.ClosedFoldersKey).Should().Contain($"Folder/{cakesId}").And.NotContain($"Folder/{breadsId}");
     });
 
@@ -1123,11 +1126,11 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         var state = await LoadedStateAsync(store);
 
-        state.List.ProductTree.StageFolder(ProductStage.Innovation).IsExpanded.Should().BeFalse("it was left closed before the rename");
+        state.View.List.ProductTree.StageFolder(ProductStage.Innovation).IsExpanded.Should().BeFalse("it was left closed before the rename");
 
         // Kept by its key now once a folder is opened or closed.
-        state.List.ProductTree.StageFolder(ProductStage.Production).IsExpanded = false;
-        state.Dispose();
+        state.View.List.ProductTree.StageFolder(ProductStage.Production).IsExpanded = false;
+        state.View.Dispose();
         store.ReadList(ProductsList.ClosedFoldersKey).Should().Contain("Innovation").And.NotContain("ResearchAndDevelopment");
     });
 
@@ -1148,9 +1151,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         await PriceAsync(enoughId, currentPrice: 10m, targetMarkupPercent: 30m);
 
         var state = await LoadedStateAsync();
-        await Settle.UntilAsync(state, () => state.List.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
+        await Settle.UntilAsync(state, () => state.View.List.ProductTree.Find(shortId)!.IsBelowTargetMarkup, () => "not flagged yet");
 
-        state.List.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
+        state.View.List.ProductTree.Find(enoughId)!.IsBelowTargetMarkup.Should().BeFalse();
     });
 
     [Test]
@@ -1164,9 +1167,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var (sizedId, _) = await AddProductWithSubAssemblyAsync("Ube Roll", fillingId, [(ubeId, 100m)], weightPerPiece: 10m);
 
         var state = await LoadedStateAsync();
-        await Settle.UntilAsync(state, () => state.List.ProductTree.Find(unsizedId)!.HasSectionWithoutPieceSize, () => "not flagged yet");
+        await Settle.UntilAsync(state, () => state.View.List.ProductTree.Find(unsizedId)!.HasSectionWithoutPieceSize, () => "not flagged yet");
 
-        state.List.ProductTree.Find(sizedId)!.HasSectionWithoutPieceSize.Should().BeFalse();
+        state.View.List.ProductTree.Find(sizedId)!.HasSectionWithoutPieceSize.Should().BeFalse();
     });
 
     private async Task PriceAsync(int productId, decimal currentPrice, decimal targetMarkupPercent)
@@ -1187,7 +1190,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     [Test]
-    public Task Picking_another_product_over_unsaved_changes_asks_and_Cancel_stays_on_them() => UiThread.RunAsync(async () =>
+    public Task Picking_another_product_over_unsaved_changes_opens_it_in_a_tab_of_its_own_and_asks_nothing() => UiThread.RunAsync(async () =>
     {
         var breadsId = await AddFolderAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
@@ -1196,40 +1199,89 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         var asked = AnswerUnsavedChanges(state, UnsavedChangesAnswer.Cancel);
         state.EditingName = "Mamon Tostado";
 
-        Click(state, state.List.ProductTree.Find(pandesalId)!);
-        await Settle.UntilAsync(state, () => asked.Count == 1, () => $"asked={asked.Count}");
+        Click(state, state.View.List.ProductTree.Find(pandesalId)!);
+        var pandesal = state.View.Form!;
+        await Settle.UntilAsync(pandesal, () => pandesal.SelectedProduct?.Id == pandesalId && pandesal.AreDetailsReady, () => $"selected={pandesal.SelectedProduct?.Id}");
 
-        asked.Single().Should().StartWith("Save the changes to Mamon Tostado?");
+        asked.Should().BeEmpty("the changes stay in their own tab: nothing is left");
+        pandesal.Should().NotBeSameAs(state);
+        pandesal.EditingName.Should().Be("Pandesal");
         state.SelectedProduct!.Id.Should().Be(mamonId);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(mamonId), "the list goes back to the row showing");
         state.EditingName.Should().Be("Mamon Tostado");
         state.History.IsDirty.Should().BeTrue();
+        state.View.Tabs.All.Select(tab => tab.Form).Should().Equal(state, pandesal);
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(pandesalId), "the list follows the tab showing");
     });
 
     [Test]
-    [Arguments(UnsavedChangesAnswer.Save, "Mamon Tostado")]
-    [Arguments(UnsavedChangesAnswer.DontSave, "Mamon")]
-    public Task Picking_another_product_over_unsaved_changes_opens_it_once_they_are_saved_or_not(UnsavedChangesAnswer answer, string savedName) => UiThread.RunAsync(async () =>
+    public Task A_pick_takes_the_preview_tabs_place_while_it_holds_nothing_unsaved_and_a_tab_kept_or_edited_stays() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddFolderAsync("Breads");
+        var mamonId = await SaveProductAsync("Mamon", breadsId);
+        var pandesalId = await SaveProductAsync("Pandesal", breadsId);
+        var ensaymadaId = await SaveProductAsync("Ensaymada", breadsId);
+        var state = await LoadedStateAsync();
+        var view = state.View;
+
+        // The blank form the view opens on is the preview tab: the first pick takes its place, and the next one's.
+        Click(state, view.List.ProductTree.Find(mamonId)!);
+        Click(state, view.List.ProductTree.Find(pandesalId)!);
+        await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == pandesalId && state.AreDetailsReady);
+        view.Tabs.All.Should().ContainSingle().Which.IsPreview.Should().BeTrue();
+
+        // Kept by a double-click on its row: the next pick opens a tab of its own.
+        view.List.KeepOpen(view.List.ProductTree.Find(pandesalId)!);
+        view.Tabs.Active!.IsPreview.Should().BeFalse();
+        Click(state, view.List.ProductTree.Find(ensaymadaId)!);
+        var ensaymada = view.Form!;
+        await Settle.UntilAsync(ensaymada, () => ensaymada.SelectedProduct?.Id == ensaymadaId && ensaymada.AreDetailsReady);
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, ensaymada);
+        view.Tabs.Preview!.Form.Should().BeSameAs(ensaymada);
+
+        // An edit keeps the preview tab too: the next pick doesn't take its place.
+        ensaymada.EditingName = "Ensaymada Special";
+        Click(state, view.List.ProductTree.Find(mamonId)!);
+        var mamon = view.Form!;
+        await Settle.UntilAsync(mamon, () => mamon.SelectedProduct?.Id == mamonId && mamon.AreDetailsReady);
+        view.Tabs.All.Select(tab => tab.Form).Should().Equal(state, ensaymada, mamon);
+        ensaymada.EditingName.Should().Be("Ensaymada Special");
+
+        // A product open already shows in its own tab.
+        Click(state, view.List.ProductTree.Find(pandesalId)!);
+        view.Form.Should().BeSameAs(state);
+        view.Tabs.All.Should().HaveCount(3);
+    });
+
+    [Test]
+    [Arguments(UnsavedChangesAnswer.Save, "Mamon Tostado", true)]
+    [Arguments(UnsavedChangesAnswer.DontSave, "Mamon", true)]
+    [Arguments(UnsavedChangesAnswer.Cancel, "Mamon", false)]
+    public Task Closing_a_tab_with_changes_asks_about_them_first(UnsavedChangesAnswer answer, string savedName, bool closes) => UiThread.RunAsync(async () =>
     {
         var breadsId = await AddFolderAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
         var pandesalId = await SaveProductAsync("Pandesal", breadsId);
         var state = await OpenedStateAsync(mamonId);
-        AnswerUnsavedChanges(state, answer);
+        var view = state.View;
+        var asked = AnswerUnsavedChanges(state, answer);
         state.EditingName = "Mamon Tostado";
+        Click(state, view.List.ProductTree.Find(pandesalId)!);
+        var mamonTab = view.Tabs.Holding(mamonId)!;
 
-        Click(state, state.List.ProductTree.Find(pandesalId)!);
-        await Settle.UntilAsync(state,
-            () => state.SelectedProduct?.Id == pandesalId && state.AreDetailsReady && !state.History.IsDirty,
-            () => $"selected={state.SelectedProduct?.Id} ready={state.AreDetailsReady}");
+        (await view.CloseTabAsync(mamonTab)).Should().Be(closes);
 
-        state.ErrorMessage.Should().BeNull();
-        state.EditingName.Should().Be("Pandesal");
+        asked.Should().ContainSingle().Which.Should().StartWith("Save the changes to Mamon Tostado?");
+        view.Tabs.All.Contains(mamonTab).Should().Be(!closes);
         (await NameOfAsync(mamonId)).Should().Be(savedName);
+        if (!closes)
+        {
+            view.Tabs.Active.Should().BeSameAs(mamonTab, "it's shown, so the question is about the form in view");
+            state.EditingName.Should().Be("Mamon Tostado");
+        }
     });
 
     [Test]
-    public Task New_over_unsaved_changes_asks_and_Cancel_keeps_them() => UiThread.RunAsync(async () =>
+    public Task New_over_unsaved_changes_opens_a_new_tab_and_keeps_them() => UiThread.RunAsync(async () =>
     {
         var breadsId = await AddFolderAsync("Breads");
         var mamonId = await SaveProductAsync("Mamon", breadsId);
@@ -1239,11 +1291,13 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
 
         await state.NewCommand.ExecuteAsync();
 
-        asked.Should().ContainSingle();
+        asked.Should().BeEmpty();
+        var fresh = state.View.Form!;
+        fresh.Should().NotBeSameAs(state);
+        fresh.EditingId.Should().Be(0);
         state.SelectedProduct!.Id.Should().Be(mamonId);
         state.EditingName.Should().Be("Mamon Tostado");
-        state.List.ProductTree.PendingProduct.Should().BeNull("no new product's row is added");
-        state.List.TreeNameEdit.Should().BeNull();
+        state.View.List.ProductTree.PendingProduct.Should().NotBeNull("the new product's row is added for its name");
     });
 
     [Test]
@@ -1302,7 +1356,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     });
 
     /// <summary>Answers the question about unsaved changes with <paramref name="answer"/>, collecting each question asked.</summary>
-    private static List<string> AnswerUnsavedChanges(ProductsState state, UnsavedChangesAnswer answer)
+    private static List<string> AnswerUnsavedChanges(ProductForm state, UnsavedChangesAnswer answer)
     {
         List<string> asked = [];
         state.ConfirmUnsavedChanges.RegisterHandler(context =>
@@ -1314,10 +1368,10 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>A click on <paramref name="row"/>, as the tree makes one: the rows picked replaced by it.</summary>
-    private static void Click(ProductsState state, object row)
+    private static void Click(ProductForm state, object row)
     {
-        state.List.SelectedTreeNodes.Clear();
-        state.List.SelectedTreeNodes.Add(row);
+        state.View.List.SelectedTreeNodes.Clear();
+        state.View.List.SelectedTreeNodes.Add(row);
     }
 
     private async Task<string> NameOfAsync(int productId)
@@ -1327,9 +1381,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>Drops <paramref name="nodes"/> on <paramref name="target"/> as the list does, then waits for the moves to be offered again.</summary>
-    private static async Task<object?> DropAsync(ProductsState state, IEnumerable<object> nodes, object? target)
+    private static async Task<object?> DropAsync(ProductForm state, IEnumerable<object> nodes, object? target)
     {
-        var shown = await ((IListTreeScreen)state.List).DropAsync(nodes, target);
+        var shown = await ((IListTreeScreen)state.View.List).DropAsync(nodes, target);
         await MovesOfferedAgainAsync(state);
         return shown;
     }
@@ -1338,9 +1392,9 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     /// The moves are offered again once a move or its Undo is done, before a drop or a paste: a command's run is over as
     /// its ExecuteAsync ends.
     /// </summary>
-    private static Task MovesOfferedAgainAsync(ProductsState state)
+    private static Task MovesOfferedAgainAsync(ProductForm state)
     {
-        ((System.Windows.Input.ICommand)state.List.MoveFolderCommand).CanExecute(null).Should().BeTrue("the move is done");
+        ((System.Windows.Input.ICommand)state.View.List.MoveFolderCommand).CanExecute(null).Should().BeTrue("the move is done");
         return Task.CompletedTask;
     }
 
@@ -1382,7 +1436,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>A name typed into the header and left, as one undo step, the way the name box records it.</summary>
-    private static void TypeName(ProductsState state, string name)
+    private static void TypeName(ProductForm state, string name)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -1390,7 +1444,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         recorder.EndUndoStep();
     }
 
-    private static void TypeDescription(ProductsState state, string description)
+    private static void TypeDescription(ProductForm state, string description)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -1448,7 +1502,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         return await dbContext.Products.SingleAsync(p => p.Name == name, Cancellation);
     }
 
-    private async Task<ProductsState> LoadedStateAsync(IViewStateStore? viewStateStore = null)
+    private async Task<ProductForm> LoadedStateAsync(IViewStateStore? viewStateStore = null)
     {
         var state = CreateState(viewStateStore);
         await state.LoadCommand.ExecuteAsync();
@@ -1456,7 +1510,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>The screen with <paramref name="productId"/> open on the form, its details in.</summary>
-    private async Task<ProductsState> OpenedStateAsync(int productId)
+    private async Task<ProductForm> OpenedStateAsync(int productId)
     {
         var state = await LoadedStateAsync();
         state.OpenRecord(productId);
@@ -1464,7 +1518,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         return state;
     }
 
-    private ProductsState CreateState(IViewStateStore? viewStateStore)
+    private ProductForm CreateState(IViewStateStore? viewStateStore)
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -1490,6 +1544,6 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

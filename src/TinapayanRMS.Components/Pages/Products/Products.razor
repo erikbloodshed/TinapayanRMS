@@ -1,96 +1,49 @@
 @page "/products"
 @page "/products/{Id:int}"
-@using TinapayanRMS.Components.Printing
-@inherits RecordScreenBase<ProductsState>
+@page "/products/new/{Number:int}"
+@inherits RecordViewBase<ProductsState, ProductForm>
 @inject Prompts Prompts
 
-<PageTitle>@(State!.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
+<PageTitle>@(State!.Form?.SelectedProduct?.Name ?? "Products") · TinapayanRMS</PageTitle>
 
-<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
+@* The Products view: every product, the list by stage and folder, beside a strip of tabs, a product open in each, as Visual
+   Studio Code's editors are; under it, the form of the tab showing (ProductFormView), drawn afresh as another tab shows,
+   each keeping what's typed into it. A product picked in the list opens in the preview tab, which the next one picked
+   replaces while it holds nothing unsaved. *@
+<div class="record-screen">
+    <ProductsListCard List="State!.List" />
 
-@* The Products screen: the list beside the picked product's header and its tabs along the bottom.
-   Every tab but Clone and History is part of the one form Save writes. Clone and History only apply to a saved
-   product. Between
-   picking a product and its details arriving, the tabs ignore the mouse (AreDetailsReady). Each product has its own
-   address, so the browser's Back and Forward step between the products opened. *@
-<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
-    <div class="record-screen">
-        <ProductsListCard List="State!.List" />
+    <div class="record-details">
+        <RecordTabStrip TForm="ProductForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseAsync" Keep="State!.Keep" Label="Products open" />
 
-        <div class="record-details">
-            <ProductHeader State="State!" />
-
-            <section class="card tabs-card @(State!.AreDetailsReady ? "" : "details-pending")">
-                <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
-                    <TabItems>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Recipe" /></ChildContent>
-                            <ContentTemplate><RecipeStructure State="State!" /></ContentTemplate>
-                        </TabItem>
-                        <TabItem>
-                            <ChildContent><TabHeader Text="Costing" /></ChildContent>
-                            <ContentTemplate><Costing State="State!" /></ContentTemplate>
-                        </TabItem>
-                        <TabItem Visible="State!.ShowLinks">
-                            <ChildContent><TabHeader Text="Clone" /></ChildContent>
-                            <ContentTemplate>
-                                <div class="tab-card narrow-card">
-                                    <h2 class="panel-header">Clone This Product</h2>
-                                    <FormRow Label="New Product Name" For="clone-name">
-                                        <TextField ID="clone-name" @bind-Value="State!.EditingCloneName" />
-                                    </FormRow>
-                                    <div class="button-row">
-                                        <CommandButton Command="State!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
-                                        <CommandButton Command="State!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
-                                    </div>
-                                    <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Innovation.</p>
-                                </div>
-                            </ContentTemplate>
-                        </TabItem>
-                        <TabItem Visible="State!.ShowLinks">
-                            <ChildContent><TabHeader Text="History" /></ChildContent>
-                            <ContentTemplate><History State="State!" /></ContentTemplate>
-                        </TabItem>
-                    </TabItems>
-                </SfTab>
+        @if (State!.Form is { } form)
+        {
+            <ProductFormView @key="form" Form="form" />
+        }
+        else
+        {
+            <section class="card empty-record">
+                <p>No product is open. Pick one in the list, or start a new one.</p>
+                <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
             </section>
-        </div>
+        }
     </div>
-</CascadingValue>
-
-<PdfExport Export="State!.ExportPdf" />
+</div>
 
 @code {
     protected override ScreenCommand LoadCommand => State!.LoadCommand;
 
+    protected override string AddressRoot => "products";
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        var state = State!;
-
-        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
-        AddSubscription(state.PromptForNewCategory.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
 
         // A name asked for by the list's menu: a clone's or a variant's. The list names everything else in place.
-        AddSubscription(state.List.PromptForName.RegisterHandler(async interaction =>
+        AddSubscription(State!.List.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
-
-        // Move to In-House: the made ingredient's name and the Made category it goes in.
-        AddSubscription(state.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
-
-        // The Costing tab's Export to Excel: the costing and recipe as they'd print, saved where the Save dialog says.
-        AddSubscription(state.ExportCosting.RegisterHandler(async interaction =>
-            interaction.SetOutput(await Dialogs.SaveAsync(
-                CostingWorkbook.FileNameOf(interaction.Input, DateTime.Today), ExcelWorkbook.Kind, CostingWorkbook.Build(interaction.Input)))));
     }
 
-    [Inject] private IFileDialogs Dialogs { get; set; } = null!;
-
-    protected override string AddressRoot => "products";
-
-    protected override int? ShownId => State!.SelectedProduct?.Id;
-
-    protected override string ShownProperty => nameof(ProductsState.SelectedProduct);
+    // A tab's ✕: asks about its changes first, showing it, and stays on Cancel.
+    private async Task CloseAsync(RecordTab<ProductForm> tab) => await State!.CloseTabAsync(tab);
 }

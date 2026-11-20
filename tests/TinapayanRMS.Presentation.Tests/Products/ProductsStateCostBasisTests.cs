@@ -221,7 +221,7 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
         return await dbContext.RawMaterials.Where(m => m.Name == name).Select(m => m.Id).SingleAsync(Cancellation);
     }
 
-    private static void Edit(ProductsState state, Action change)
+    private static void Edit(ProductForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -230,7 +230,7 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
     }
 
     /// <summary>The Products screen, loaded, with the product open and its first section's form showing.</summary>
-    private async Task<ProductsState> OpenAsync(int productId, Func<ProductsState, bool>? ready = null)
+    private async Task<ProductForm> OpenAsync(int productId, Func<ProductForm, bool>? ready = null)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -241,7 +241,7 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -267,6 +267,6 @@ public class ProductsStateCostBasisTests(DatabaseFixture fixture) : PersistenceT
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

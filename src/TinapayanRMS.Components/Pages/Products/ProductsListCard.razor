@@ -49,7 +49,8 @@
                 CanDrop="(dragged, target) => Screen.CanDrop(dragged, target)"
                 OnDrop="(dragged, target) => Screen.DropAsync(dragged, target)"
                 MenuFor="List.TreeMenuFor"
-                Shortcut="List.TreeShortcut">
+                Shortcut="List.TreeShortcut"
+                DoubleClick="List.KeepOpen">
         <RowTemplate Context="node">@RowContent(node, List, FlagsOf(node))</RowTemplate>
     </FolderTree>
 

@@ -1,0 +1,73 @@
+@inherits FormBase<ProductForm>
+@using TinapayanRMS.Components.Printing
+@inject Prompts Prompts
+
+<UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
+
+@* One tab of the Products view: the product's header and its tabs along the bottom. Every tab but Clone and History is
+   part of the one form Save writes. Clone and History only apply to a saved product. Between picking a product and its
+   details arriving, the tabs ignore the mouse (AreDetailsReady). Drawn afresh each time its tab shows (keyed by its form),
+   which keeps everything typed. *@
+<CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
+    <ProductHeader State="State!" />
+
+    <section class="card tabs-card @(State!.AreDetailsReady ? "" : "details-pending")">
+        <SfTab @bind-SelectedItem="State!.SelectedDetailsTab" HeaderPlacement="HeaderPosition.Bottom" LoadOn="ContentLoad.Init" CssClass="details-tabs">
+            <TabItems>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Recipe" /></ChildContent>
+                    <ContentTemplate><RecipeStructure State="State!" /></ContentTemplate>
+                </TabItem>
+                <TabItem>
+                    <ChildContent><TabHeader Text="Costing" /></ChildContent>
+                    <ContentTemplate><Costing State="State!" /></ContentTemplate>
+                </TabItem>
+                <TabItem Visible="State!.ShowLinks">
+                    <ChildContent><TabHeader Text="Clone" /></ChildContent>
+                    <ContentTemplate>
+                        <div class="tab-card narrow-card">
+                            <h2 class="panel-header">Clone This Product</h2>
+                            <FormRow Label="New Product Name" For="clone-name">
+                                <TextField ID="clone-name" @bind-Value="State!.EditingCloneName" />
+                            </FormRow>
+                            <div class="button-row">
+                                <CommandButton Command="State!.CloneCommand" Icon="AppIcon.Copy" Label="Clone" />
+                                <CommandButton Command="State!.CreateVariantCommand" Icon="AppIcon.Link" Label="Create Variant" />
+                            </div>
+                            <p class="caption form-extra">Clone links the same sub-assemblies from the Sub-Assemblies screen and copies this product's own, and its packaging. Create Variant links every sub-assembly this product uses, its own included, so the new product follows every change made to them, and gets no packaging: give it its own. Both start in Innovation, each in a tab of its own.</p>
+                        </div>
+                    </ContentTemplate>
+                </TabItem>
+                <TabItem Visible="State!.ShowLinks">
+                    <ChildContent><TabHeader Text="History" /></ChildContent>
+                    <ContentTemplate><History State="State!" /></ContentTemplate>
+                </TabItem>
+            </TabItems>
+        </SfTab>
+    </section>
+</CascadingValue>
+
+<PdfExport Export="State!.ExportPdf" />
+
+@code {
+    [Inject] private IFileDialogs Dialogs { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        var form = State!;
+
+        // A name typed into the Category picker that isn't a category yet: asks whether to add it, starting with the name.
+        AddSubscription(form.PromptForNewCategory.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskAsync(new TextPromptRequest("New Category", "Name", interaction.Input, $"“{interaction.Input}” isn't a category yet. Add it?")))));
+
+        // Move to In-House: the made ingredient's name and the Made category it goes in.
+        AddSubscription(form.Recipe.PromptForMadeIngredient.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
+
+        // The Costing tab's Export to Excel: the costing and recipe as they'd print, saved where the Save dialog says.
+        AddSubscription(form.ExportCosting.RegisterHandler(async interaction =>
+            interaction.SetOutput(await Dialogs.SaveAsync(
+                CostingWorkbook.FileNameOf(interaction.Input, DateTime.Today), ExcelWorkbook.Kind, CostingWorkbook.Build(interaction.Input)))));
+    }
+}

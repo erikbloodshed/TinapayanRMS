@@ -159,9 +159,9 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         TypeDescription(state, "Toasted and sugared");
 
         // Promoting it, then moving it back: the two ways a product moves, neither of which loads the screen again.
-        await state.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
+        await state.View.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
         (await StoredStageAsync(id)).Should().Be(ProductStage.Production);
-        await state.List.MoveProductsCommand.ExecuteAsync([new ProductMove(id, ProductStage.Innovation, null)]);
+        await state.View.List.MoveProductsCommand.ExecuteAsync([new ProductMove(id, ProductStage.Innovation, null)]);
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().BeNull();
@@ -175,7 +175,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         var id = await SaveProductAsync("Mamon");
         var state = await OpenedStateAsync(id);
 
-        await state.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
+        await state.View.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
         await ShowingAsync(state, id);
         TypeDescription(state, "Toasted");
         await state.SaveCommand.ExecuteAsync();
@@ -199,7 +199,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         (await StoredAsync(id)).Should().Be(("Mamon Classic", (string?)null));
 
         // The form's Save is refused in its turn: the refused rename took up nothing.
-        state.List.CancelTreeName();
+        state.View.List.CancelTreeName();
         await state.SaveCommand.ExecuteAsync();
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
@@ -213,7 +213,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         TypeDescription(state, "Toasted and sugared");
 
         await AnotherPcRenamesAsync(id, "Mamon Classic");
-        await state.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
+        await state.View.List.MoveToStageCommand.ExecuteAsync(new StageMoveRequest([state.SelectedProduct!], ProductStage.Production));
 
         state.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Mamon Classic"));
         state.EditingDescription.Should().Be("Toasted and sugared");
@@ -234,9 +234,9 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         await AnotherPcRenamesAsync(id, "Mamon Classic");
 
         // Another product moved, and a folder deleted, which reads the screen's lists again.
-        await state.List.MoveProductsCommand.ExecuteAsync([new ProductMove(otherId, ProductStage.Production, null)]);
+        await state.View.List.MoveProductsCommand.ExecuteAsync([new ProductMove(otherId, ProductStage.Production, null)]);
         state.ErrorMessage.Should().BeNull("the move is of another product, which nobody has saved");
-        await state.List.DeleteFolderCommand.ExecuteAsync(state.List.ProductTree.Folder(folder.Id)!);
+        await state.View.List.DeleteFolderCommand.ExecuteAsync(state.View.List.ProductTree.Folder(folder.Id)!);
         state.ErrorMessage.Should().BeNull();
 
         await state.SaveCommand.ExecuteAsync();
@@ -319,7 +319,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     });
 
     /// <summary>One field typed and left, as the form brackets it in the app.</summary>
-    private static void TypeDescription(ProductsState state, string description)
+    private static void TypeDescription(ProductForm state, string description)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -327,13 +327,13 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         recorder.EndUndoStep();
     }
 
-    private static Task ShowingAsync(ProductsState state, int id) =>
+    private static Task ShowingAsync(ProductForm state, int id) =>
         Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedProduct?.Id == id, () => $"ready={state.AreDetailsReady}");
 
-    private static async Task RenameFromTheListAsync(ProductsState state, int id, string name)
+    private static async Task RenameFromTheListAsync(ProductForm state, int id, string name)
     {
-        await state.List.RenameProductCommand.ExecuteAsync((ProductLeafNode)state.List.ProductTree.Find(id)!);
-        await state.List.CommitTreeNameAsync(name);
+        await state.View.List.RenameProductCommand.ExecuteAsync((ProductLeafNode)state.View.List.ProductTree.Find(id)!);
+        await state.View.List.CommitTreeNameAsync(name);
     }
 
     private Task<int> SaveProductAsync(string name) =>
@@ -371,7 +371,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     }
 
     /// <summary>The screen with <paramref name="id"/> open on the form, its details in.</summary>
-    private async Task<ProductsState> OpenedStateAsync(int id)
+    private async Task<ProductForm> OpenedStateAsync(int id)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -380,7 +380,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -405,6 +405,6 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

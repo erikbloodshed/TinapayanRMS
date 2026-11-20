@@ -14,12 +14,13 @@ using TinapayanRMS.Presentation.Trees;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// What the Products list asks of its screen, on top of what any record screen's list asks: the product the form shows and
-/// the lists as the screen last loaded them, and what the list's actions do to the form and to the products.
+/// What the Products list asks of its view, on top of what any record view's list asks: the form showing and the lists as
+/// the view last loaded them, and what the list's actions do to the forms holding the products they act on, and to the
+/// products themselves.
 /// </summary>
 public interface IProductsListHost : IRecordListHost
 {
-    /// <summary>The product picked, which the form shows; null for a new one.</summary>
+    /// <summary>The product the form showing is about; null for a new one, or with no tab open.</summary>
     Product? SelectedProduct { get; }
 
     /// <summary>The products in the Deleted folder, as last loaded.</summary>
@@ -28,32 +29,50 @@ public interface IProductsListHost : IRecordListHost
     /// <summary>The user's folders, in both stages, as last read: the list reads them again after a change of its own.</summary>
     IReadOnlyList<ProductFolder> Folders { get; set; }
 
-    /// <summary>The form is a composite product's.</summary>
+    /// <summary>The form showing is a composite product's.</summary>
     bool IsEditingComposite { get; }
 
-    /// <summary>Reads the screen's lists again (its LoadCommand), keeping the form and what's typed into it.</summary>
+    /// <summary>Where the form showing files its new product, which the new product's row is filed under; null with no tab open.</summary>
+    NewProductPlace? NewProductPlace { get; }
+
+    /// <summary>Reads the view's lists again (its LoadCommand), keeping every form and what's typed into it.</summary>
     Task LoadAsync();
 
-    /// <summary>A product's row picked in the list: it opens, once the form's unsaved changes are saved or let go.</summary>
+    /// <summary>A product's row picked in the list: it shows in its tab, or the preview tab.</summary>
     void Pick(Product product);
 
-    /// <summary>A fresh form for a new product (a composite one with <paramref name="isComposite"/>), filed in <paramref name="stage"/> and <paramref name="folderId"/>, or Settings' stage for none.</summary>
+    /// <summary>A product's row double-clicked in the list: it shows in a tab that stays, not the preview tab.</summary>
+    void KeepOpen(Product product);
+
+    /// <summary>A fresh form for a new product (a composite one with <paramref name="isComposite"/>), filed in <paramref name="stage"/> and <paramref name="folderId"/>, or Settings' stage for none, in the preview tab.</summary>
     void StartNew(ProductStage? stage, int? folderId, bool isComposite);
 
-    /// <summary>The name typed into the new product's row: the form, as New left it, is saved under it, and opened.</summary>
+    /// <summary>The name typed into the new product's row: the form showing, as New left it, is saved under it, and opened.</summary>
     Task SaveNewAsync(string name);
 
-    /// <summary>The name typed into a new composite's row goes into the form, as typed there: one undo step.</summary>
+    /// <summary>The name typed into a new composite's row goes into the form showing, as typed there: one undo step.</summary>
     void NameNew(string name);
 
     /// <summary>The new product's row went with Esc: the name its form was given goes too, as no edit of the user's.</summary>
     void ClearNewName();
 
-    /// <summary><paramref name="product"/>, as it was, renamed in the list, saved: the form and its undo steps take the name as given if it's the one showing.</summary>
-    void RenamedOnForm(Product product, string name);
+    /// <summary><paramref name="product"/>, as it was, renamed in the list, saved: a form holding it, and its undo steps, take the name as given.</summary>
+    void Renamed(Product product, string name);
 
-    /// <summary>The products a move took, read again, within the refresh that files them: the form's product is re-pointed at its fresh copy.</summary>
+    /// <summary>The products a move took, read again, within the refresh that files them: each form's product is re-pointed at its fresh copy.</summary>
     void ShowMoved(IReadOnlyList<Product> moved);
+
+    /// <summary>Whether a form holds one of <paramref name="ids"/> with nothing typed, which a load then reads again as it's saved now.</summary>
+    bool ShowsUnchanged(IReadOnlyCollection<int> ids);
+
+    /// <summary>A folder of the user's was deleted, what it held moved to <paramref name="parentId"/>: each form's new product filed there goes there too.</summary>
+    void FolderDeleted(int folderId, int? parentId);
+
+    /// <summary>
+    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
+    /// and the time it took it, so the write is refused over a save made since; null when none does.
+    /// </summary>
+    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
 
     /// <summary>Clones <paramref name="product"/> as saved under <paramref name="name"/>, as the Clone tab does, and opens the clone.</summary>
     Task CloneAsync(Product product, string name);
@@ -81,8 +100,8 @@ public interface IProductsListHost : IRecordListHost
 /// The Products list (through ProductsState.List; ProductsListCard draws it): every product, filed in its stage and the
 /// user's folders, with the Deleted folder last; searched by name and filtered by category; the rows picked, their menus and
 /// keys, moves to other folders and the other stage and their Undo, Cut and Paste, the folders themselves, and names typed in
-/// place. The products, folders and categories are the screen's, which loads them; what the list's actions do to the
-/// product the form shows, or to a product as a record (a clone, a delete), it asks of the screen
+/// place. The products, folders and categories are the view's, which loads them; what the list's actions do to the forms
+/// holding the products, or to a product as a record (a clone, a delete), it asks of the view
 /// (<see cref="IProductsListHost"/>).
 /// </summary>
 public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
@@ -102,7 +121,6 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private readonly IProductsListHost _host;
     private readonly SourceCache<Product, int> _productCache;
     private readonly IReadOnlyList<ProductCategory> _categories;
-    private readonly NewProductPlace _newProductPlace;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
     private readonly IProductRepository _productRepository;
     private readonly IProductFolderRepository _folderRepository;
@@ -114,17 +132,15 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <summary>Each change to the search or the category filter, what the list's filter follows (SearchText, CategoryFilter).</summary>
     private readonly BehaviorSubject<System.Reactive.Unit> _filterChanges = new(System.Reactive.Unit.Default);
 
-    /// <param name="host">The screen, which the list asks for the product its form shows, the lists it loaded, and what to do to them.</param>
-    /// <param name="productCache">The screen's products, which the list searches, filters and moves.</param>
-    /// <param name="categoryCache">The screen's categories, whose changes the category filter's choices follow.</param>
-    /// <param name="categories">Every category, by name, as the screen binds them: the category filter's choices.</param>
-    /// <param name="newProductPlace">Where Save files the new product: its row starts there, and a folder deleted moves it.</param>
+    /// <param name="host">The view, which the list asks for the form showing, the lists it loaded, and what to do to them.</param>
+    /// <param name="productCache">The view's products, which the list searches, filters and moves.</param>
+    /// <param name="categoryCache">The view's categories, whose changes the category filter's choices follow.</param>
+    /// <param name="categories">Every category, by name, as the view binds them: the category filter's choices.</param>
     public ProductsList(
         IProductsListHost host,
         SourceCache<Product, int> productCache,
         SourceCache<ProductCategory, int> categoryCache,
         IReadOnlyList<ProductCategory> categories,
-        NewProductPlace newProductPlace,
         IProductRepository productRepository,
         IProductFolderRepository folderRepository,
         IViewStateStore viewStateStore)
@@ -132,7 +148,6 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         _host = host;
         _productCache = productCache;
         _categories = categories;
-        _newProductPlace = newProductPlace;
         _productRepository = productRepository;
         _folderRepository = folderRepository;
 
@@ -466,6 +481,15 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         }
     }
 
+    /// <summary>A row double-clicked: a product's shows in a tab that stays, as a file double-clicked does in Visual Studio Code.</summary>
+    public void KeepOpen(ProductTreeNode node)
+    {
+        if (node is ProductLeafNode { IsDeleted: false, IsNew: false } leaf)
+        {
+            _host.KeepOpen(leaf.Product);
+        }
+    }
+
     /// <summary>Whether a row picked before a move is still the list's own row, to pick again after it.</summary>
     private bool IsStillListed(object row) => row switch
     {
@@ -489,8 +513,9 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             .ToList();
         var picked = SelectedTreeNodes.ToList();
 
-        await _productRepository.MoveAsync(moves, _host.ShowingSavedVersion, CancellationToken.None);
-        await ShowMovedAsync([.. moves.Select(m => m.ProductId)], picked);
+        List<int> ids = [.. moves.Select(m => m.ProductId)];
+        await _productRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
+        await ShowMovedAsync(ids, picked);
 
         _moveUndo = isUndo ? null : new MoveUndo.Products(undo, []);
         MoveNotice = isUndo ? null : MoveNoticeFor(moves);
@@ -513,7 +538,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             .ToDictionary(p => p.Id, p => new ProductMove(p.Id, p.Stage, p.FolderId));
         var picked = SelectedTreeNodes.ToList();
 
-        var moved = await _productRepository.MoveToStageAsync([.. products.Select(p => p.Id)], request.Stage, _host.ShowingSavedVersion, CancellationToken.None);
+        List<int> ids = [.. products.Select(p => p.Id)];
+        var moved = await _productRepository.MoveToStageAsync(ids, request.Stage, _host.SavedVersionFor(ids), CancellationToken.None);
         // Read again whether or not this move made any: the folder it found may be one another computer made.
         _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
         await ShowMovedAsync([.. products.Select(p => p.Id)], picked);
@@ -530,11 +556,11 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     }
 
     /// <summary>
-    /// The products moved, read again and filed in their new folders. A selection is only re-pointed at the fresh copy, as
-    /// a load re-points it: the form isn't loaded again, so whatever's typed into it stays, and no undo step changes, since
-    /// Save never writes a saved product's stage or folder. With nothing typed on the product showing, the screen loads, so
-    /// the form has what's saved now, whoever saved it. Then the rows the tree dropped from its selection as they moved are
-    /// picked again.
+    /// The products moved, read again and filed in their new folders. A form's selection is only re-pointed at the fresh
+    /// copy, as a load re-points it: the form isn't loaded again, so whatever's typed into it stays, and no undo step
+    /// changes, since Save never writes a saved product's stage or folder. With nothing typed on a form holding one, the
+    /// view loads, so that form has what's saved now, whoever saved it. Then the rows the tree dropped from its selection as
+    /// they moved are picked again.
     /// </summary>
     private async Task ShowMovedAsync(IReadOnlyCollection<int> productIds, IReadOnlyList<object> picked)
     {
@@ -546,7 +572,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             _host.ShowMoved(moved);
         });
 
-        if (!_host.IsDirty && _host.SelectedProduct is { } showing && productIds.Contains(showing.Id))
+        if (_host.ShowsUnchanged(productIds))
         {
             await _host.LoadAsync();
         }
@@ -1017,7 +1043,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         CancelTreeName();
         ClearListFilters();
         _host.StartNew(stage, folderId, isComposite);
-        var row = ProductTree.BeginNewProduct(_newProductPlace.Stage, _newProductPlace.FolderId, _host.IsEditingComposite);
+        var place = _host.NewProductPlace!;
+        var row = ProductTree.BeginNewProduct(place.Stage, place.FolderId, _host.IsEditingComposite);
         ListNaming.Start(row, row.Product.Name);
     }
 
@@ -1151,11 +1178,11 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameProductToAsync(ProductLeafNode leaf, string name)
     {
         var product = leaf.Product;
-        await _productRepository.RenameAsync(product.Id, name, _host.ShowingSavedVersion, CancellationToken.None);
+        await _productRepository.RenameAsync(product.Id, name, _host.SavedVersionFor([product.Id]), CancellationToken.None);
 
         // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
         await _host.LoadAfterSavingAsync([product.Id]);
-        _host.RenamedOnForm(product, name);
+        _host.Renamed(product, name);
     }
 
     /// <summary>
@@ -1185,7 +1212,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             async () =>
             {
                 await _folderRepository.DeleteAsync(id, CancellationToken.None);
-                _newProductPlace.FolderDeleted(id, parentId);
+                _host.FolderDeleted(id, parentId);
                 await _host.LoadAsync();
             });
 

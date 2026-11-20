@@ -79,7 +79,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         // Sugar doubles after both were saved: the versions' costs then stay, today's follow.
         await SetCostAsync(seeded.SugarId, 0.2m);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedDetailsTab = ProductsState.HistoryTab;
+        state.SelectedDetailsTab = ProductForm.HistoryTab;
         await Settle.UntilAsync(state, () => state.VersionHistory.Rows.Count == 2, () => $"rows={state.VersionHistory.Rows.Count}");
 
         var (latest, first) = (state.VersionHistory.Rows[0], state.VersionHistory.Rows[1]);
@@ -111,7 +111,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
 
         await SetWastageAsync(10m);
         await state.LoadCommand.ExecuteAsync();
-        state.SelectedDetailsTab = ProductsState.HistoryTab;
+        state.SelectedDetailsTab = ProductForm.HistoryTab;
         await Settle.UntilAsync(state, () => state.VersionHistory.Rows.Count == 2, () => $"rows={state.VersionHistory.Rows.Count}");
 
         var (latest, first) = (state.VersionHistory.Rows[0], state.VersionHistory.Rows[1]);
@@ -270,7 +270,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         await state.SaveCommand.ExecuteAsync();
         await OpenHistoryAsync(state, rows: 2);
 
-        state.SelectedDetailsTab = ProductsState.RecipeTab;
+        state.SelectedDetailsTab = ProductForm.RecipeTab;
         Edit(state, () => state.EditingCurrentPrice = 30m);
         await state.SaveCommand.ExecuteAsync();
         await OpenHistoryAsync(state, rows: 3);
@@ -332,11 +332,13 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         Edit(state, () => state.EditingCurrentPrice = 25m);
         await state.SaveCommand.ExecuteAsync();
 
-        // The source as saved is its version 2.
+        // The source as saved is its version 2. The clone opens in a tab of its own.
         state.EditingCloneName = "Ube Roll Copy";
         await state.CloneCommand.ExecuteAsync();
         state.ErrorMessage.Should().BeNull();
-        var cloneId = state.SelectedProduct!.Id;
+        var cloneForm = state.View.Form!;
+        cloneForm.Should().NotBeSameAs(state);
+        var cloneId = cloneForm.SelectedProduct!.Id;
         var clone = (await VersionsAsync(cloneId)).Should().ContainSingle().Subject;
         clone.Note.Should().Be("Cloned from Ube Roll, version 2");
         ProductVersionContent.FromJson(clone.Content).CurrentPrice.Should().Be(25m);
@@ -349,13 +351,12 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         state.EditingCloneName = "Pan de Coco Variant";
         await state.CreateVariantCommand.ExecuteAsync();
         state.ErrorMessage.Should().BeNull();
-        (await VersionsAsync(state.SelectedProduct!.Id)).Single().Note.Should().Be("Variant of Pan de Coco");
+        (await VersionsAsync(state.View.Form!.SelectedProduct!.Id)).Single().Note.Should().Be("Variant of Pan de Coco");
 
         // The clone's first Save adds only what it changed: its history began when it was made.
-        state.Pick(state.Products.Single(p => p.Id == cloneId));
-        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.UsageForm.FormLines.Count == 1, () => $"lines={state.UsageForm.FormLines.Count}");
-        Edit(state, () => state.EditingCurrentPrice = 28m);
-        await state.SaveCommand.ExecuteAsync();
+        await Settle.UntilAsync(cloneForm, () => cloneForm.AreDetailsReady && cloneForm.UsageForm.FormLines.Count == 1, () => $"lines={cloneForm.UsageForm.FormLines.Count}");
+        Edit(cloneForm, () => cloneForm.EditingCurrentPrice = 28m);
+        await cloneForm.SaveCommand.ExecuteAsync();
         (await VersionsAsync(cloneId)).Select(v => v.Number).Should().Equal(2, 1);
     });
 
@@ -380,7 +381,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         await Settle.UntilAsync(state,
             () => state.VersionHistory.ProductId == seeded.ProductId && state.VersionHistory.Rows.Count == 2,
             () => $"showing={state.VersionHistory.ProductId}, rows={state.VersionHistory.Rows.Count}, error={state.ErrorMessage}");
-        state.SelectedDetailsTab.Should().Be(ProductsState.HistoryTab);
+        state.SelectedDetailsTab.Should().Be(ProductForm.HistoryTab);
     });
 
     [Test]
@@ -482,7 +483,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         return commands;
     }
 
-    private static void Edit(ProductsState state, Action change)
+    private static void Edit(ProductForm state, Action change)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -510,7 +511,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
     /// A saved product whose only section is its own Topping of 100 g of sugar at 0.10 a gram, the whole batch one piece,
     /// opened with its form showing. A product-owned role, so the section is the product's own.
     /// </summary>
-    private async Task<(ProductsState State, Seeded Seeded)> OpenToppedProductAsync()
+    private async Task<(ProductForm State, Seeded Seeded)> OpenToppedProductAsync()
     {
         var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
         var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.1m);
@@ -522,15 +523,15 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         return (state, new Seeded(productId, sugarId));
     }
 
-    private static async Task OpenHistoryAsync(ProductsState state, int rows)
+    private static async Task OpenHistoryAsync(ProductForm state, int rows)
     {
-        state.SelectedDetailsTab = ProductsState.HistoryTab;
+        state.SelectedDetailsTab = ProductForm.HistoryTab;
         await Settle.UntilAsync(state,
             () => state.VersionHistory.Rows.Count == rows,
             () => $"rows={state.VersionHistory.Rows.Count}, error={state.ErrorMessage}");
     }
 
-    private async Task<ProductsState> OpenAsync(int productId, Func<ProductsState, bool> ready)
+    private async Task<ProductForm> OpenAsync(int productId, Func<ProductForm, bool> ready)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -541,7 +542,7 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
 
@@ -566,6 +567,6 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

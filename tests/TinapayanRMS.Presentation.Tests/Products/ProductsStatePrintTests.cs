@@ -238,7 +238,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
     });
 
     /// <summary>Runs Print, then asks for the printout as the Print dialog does once Print has asked for it.</summary>
-    private static async Task<ProductPrintout> PrintAsync(ProductsState state)
+    private static async Task<ProductPrintout> PrintAsync(ProductForm state)
     {
         var requests = 0;
         using (state.PrintRequests.Subscribe(_ => requests++))
@@ -252,7 +252,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
     }
 
     /// <summary>A saved product with one Dough of 1,000 g of flour, opened with its form showing, and the id of an ingredient it doesn't use.</summary>
-    private async Task<(ProductsState State, int SugarId)> OpenOneSubAssemblyProductAsync()
+    private async Task<(ProductForm State, int SugarId)> OpenOneSubAssemblyProductAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
@@ -284,7 +284,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         await dbContext.SaveChangesAsync(Cancellation);
     }
 
-    private async Task<ProductsState> OpenAsync(int productId, Func<ProductsState, bool> ready)
+    private async Task<ProductForm> OpenAsync(int productId, Func<ProductForm, bool> ready)
     {
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
@@ -295,7 +295,7 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
         return state;
     }
 
-    private ProductsState CreateState()
+    private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -321,6 +321,6 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 }

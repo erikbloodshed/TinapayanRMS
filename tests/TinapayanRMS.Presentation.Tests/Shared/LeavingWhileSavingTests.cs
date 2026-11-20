@@ -173,7 +173,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
         return (waited, await leaving);
     }
 
-    private ProductsState CreateProductsState(FailingDbContextFactory factory)
+    private ProductForm CreateProductsState(FailingDbContextFactory factory)
     {
         return new ProductsState(
             new ProductRepository(factory),
@@ -196,7 +196,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     private static RawMaterialForm CreateRawMaterialsState(FailingDbContextFactory factory)

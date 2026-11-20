@@ -1375,15 +1375,15 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.SelectedProduct!.Id.Should().Be(ensaymadaId);
         state.EditingName.Should().Be("Ensaymada", "the product's form is loaded, as picking it in the list would");
 
-        state.List.SearchText = "Cream";
+        state.View.List.SearchText = "Cream";
         state.OpenRecord(creamLoafId);
         state.SelectedProduct!.Id.Should().Be(creamLoafId);
-        state.List.SearchText.Should().Be("Cream", "a search showing the product is left alone");
+        state.View.List.SearchText.Should().Be("Cream", "a search showing the product is left alone");
 
         state.OpenRecord(ensaymadaId);
         state.SelectedProduct!.Id.Should().Be(ensaymadaId);
-        state.List.SearchText.Should().BeEmpty("a search hiding the product is cleared, so the list shows the row picked");
-        state.List.VisibleProducts.Should().Contain(state.SelectedProduct);
+        state.View.List.SearchText.Should().BeEmpty("a search hiding the product is cleared, so the list shows the row picked");
+        state.View.List.VisibleProducts.Should().Contain(state.SelectedProduct);
     });
 
     [Test]
@@ -1400,7 +1400,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
 
         // As Sub-Assemblies' New Product does: nothing changes until the load that showing the screen starts.
-        state.StartNewProductFrom(doughId);
+        state.View.StartNewProductFrom(doughId);
         state.SelectedProduct!.Id.Should().Be(creamLoafId);
 
         await state.LoadCommand.ExecuteAsync();
@@ -2118,31 +2118,31 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var ensaymadaId = await SaveProductInAsync("Ensaymada", breadsId);
         var state = CreateState();
         await state.LoadCommand.ExecuteAsync();
-        var tree = state.List.ProductTree;
+        var tree = state.View.List.ProductTree;
         var breads = tree.Folder(breadsId)!;
         breads.Children.Should().Equal(tree.Find(ensaymadaId)!, tree.Find(mamonId)!);
 
-        state.List.SelectedTreeNode = tree.Find(mamonId);
+        state.View.List.SelectedTreeNode = tree.Find(mamonId);
         state.SelectedProduct!.Id.Should().Be(mamonId, "picking a product's row picks the product");
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
 
-        state.List.SelectedTreeNode = breads;
+        state.View.List.SelectedTreeNode = breads;
         state.SelectedProduct!.Id.Should().Be(mamonId, "a folder picked leaves the product showing");
 
         state.OpenRecord(ensaymadaId);
-        state.List.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "a product opened from elsewhere takes the row with it");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "a product opened from elsewhere takes the row with it");
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
 
-        state.List.SearchText = "mam";
+        state.View.List.SearchText = "mam";
         tree.Find(ensaymadaId).Should().BeNull();
-        state.List.SelectedTreeNode.Should().BeNull("the search hides the product picked");
-        state.List.SearchText = string.Empty;
-        state.List.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "its row comes back with it");
+        state.View.List.SelectedTreeNode.Should().BeNull("the search hides the product picked");
+        state.View.List.SearchText = string.Empty;
+        state.View.List.SelectedTreeNode.Should().BeSameAs(tree.Find(ensaymadaId), "its row comes back with it");
 
         await state.NewCommand.ExecuteAsync();
-        state.List.SelectedTreeNode.Should().BeSameAs(tree.PendingProduct, "New picks the new product's row, its name to be typed");
-        state.List.CancelTreeName();
-        state.List.SelectedTreeNode.Should().BeNull("Esc takes the row away, and the blank form has none");
+        state.View.List.SelectedTreeNode.Should().BeSameAs(tree.PendingProduct, "New picks the new product's row, its name to be typed");
+        state.View.List.CancelTreeName();
+        state.View.List.SelectedTreeNode.Should().BeNull("Esc takes the row away, and the blank form has none");
     });
 
     [Test]
@@ -2158,8 +2158,8 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         await Settle.UntilAsync(state, () => state.AreDetailsReady, () => $"ready={state.AreDetailsReady}");
         TypeName(state, "Mamon Special");
 
-        var move = ProductTree.MoveTo(state.List.ProductTree.Folder(cakesId), state.SelectedProduct!);
-        await state.List.MoveProductsCommand.ExecuteAsync([move!]);
+        var move = ProductTree.MoveTo(state.View.List.ProductTree.Folder(cakesId), state.SelectedProduct!);
+        await state.View.List.MoveProductsCommand.ExecuteAsync([move!]);
 
         state.ErrorMessage.Should().BeNull();
         await using (var dbContext = CreateDbContext())
@@ -2171,10 +2171,10 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             saved.Name.Should().Be("Mamon", "the move saves nothing typed into the form");
         }
 
-        var leaf = state.List.ProductTree.Find(mamonId);
-        state.List.ProductTree.Folder(cakesId)!.Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
-        state.List.ProductTree.Folder(breadsId)!.Children.Should().BeEmpty();
-        state.List.SelectedTreeNode.Should().BeSameAs(leaf);
+        var leaf = state.View.List.ProductTree.Find(mamonId);
+        state.View.List.ProductTree.Folder(cakesId)!.Children.Should().ContainSingle().Which.Should().BeSameAs(leaf);
+        state.View.List.ProductTree.Folder(breadsId)!.Children.Should().BeEmpty();
+        state.View.List.SelectedTreeNode.Should().BeSameAs(leaf);
         state.SelectedProduct!.Stage.Should().Be(ProductStage.Production, "the selection is the product as it's saved now");
         state.EditingCategory!.Name.Should().Be("Breads", "the Category picker stays as it was");
         state.EditingName.Should().Be("Mamon Special", "what's typed into the form stays");
@@ -2200,15 +2200,15 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         TypeName(state, "Mamon Special");
 
         var ensaymada = state.Products.Single(p => p.Id == ensaymadaId);
-        var production = state.List.ProductTree.StageFolder(ProductStage.Production);
+        var production = state.View.List.ProductTree.StageFolder(ProductStage.Production);
         var move = ProductTree.MoveTo(production, ensaymada);
-        await state.List.MoveProductsCommand.ExecuteAsync([move!]);
+        await state.View.List.MoveProductsCommand.ExecuteAsync([move!]);
 
         state.ErrorMessage.Should().BeNull();
         production.Children.Should().ContainSingle()
-            .Which.Should().BeSameAs(state.List.ProductTree.Find(ensaymadaId), "dropped on the stage's folder, it goes to the top of the stage");
+            .Which.Should().BeSameAs(state.View.List.ProductTree.Find(ensaymadaId), "dropped on the stage's folder, it goes to the top of the stage");
         state.SelectedProduct!.Id.Should().Be(mamonId);
-        state.List.SelectedTreeNode.Should().BeSameAs(state.List.ProductTree.Find(mamonId));
+        state.View.List.SelectedTreeNode.Should().BeSameAs(state.View.List.ProductTree.Find(mamonId));
         state.EditingName.Should().Be("Mamon Special");
         state.EditingCategory!.Name.Should().Be("Breads");
         state.History.CanUndo.Should().BeTrue();
@@ -2232,29 +2232,34 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.EditingCloneName = "Ensaymada Small";
         await state.CreateVariantCommand.ExecuteAsync();
 
+        // The variant opens in a tab of its own, kept, beside the source's.
         state.ErrorMessage.Should().BeNull();
-        state.SelectedProduct!.Name.Should().Be("Ensaymada Small");
-        var variantId = state.SelectedProduct.Id;
-        await Settle.UntilAsync(state,
-            () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1,
-            () => $"ready={state.AreDetailsReady}, usages={state.Recipe.UsageEdits.Count}");
-        var usage = state.Recipe.UsageEdits.Single();
+        var variant = state.View.Form!;
+        variant.Should().NotBeSameAs(state);
+        state.View.Tabs.Active!.IsPreview.Should().BeFalse();
+        variant.SelectedProduct!.Name.Should().Be("Ensaymada Small");
+        var variantId = variant.SelectedProduct.Id;
+        await Settle.UntilAsync(variant,
+            () => variant.AreDetailsReady && variant.Recipe.UsageEdits.Count == 1,
+            () => $"ready={variant.AreDetailsReady}, usages={variant.Recipe.UsageEdits.Count}");
+        var usage = variant.Recipe.UsageEdits.Single();
         usage.IsLinked.Should().BeTrue();
         usage.SubAssemblyId.Should().Be(doughId);
         usage.LinkedOwner.Should().Be((sourceId, "Ensaymada Big"));
         usage.LinkedFromText.Should().Be("Ensaymada Big Dough, from Ensaymada Big");
-        state.Packaging.IsPackagingLinked.Should().BeFalse();
-        state.Packaging.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
+        variant.Packaging.IsPackagingLinked.Should().BeFalse();
+        variant.Packaging.LineEdits.Should().BeEmpty("a variant's packaging is neither linked nor copied");
 
         // Its Save keeps the link to the source's own, which no other product could link.
-        state.EditingCurrentPrice = 20m;
-        await state.SaveCommand.ExecuteAsync();
-        state.ErrorMessage.Should().BeNull();
+        variant.EditingCurrentPrice = 20m;
+        await variant.SaveCommand.ExecuteAsync();
+        variant.ErrorMessage.Should().BeNull();
         (await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetForProductAsync(variantId, Cancellation))
             .Should().ContainSingle().Which.SubAssemblyId.Should().Be(doughId);
 
-        // The badge opens the source, where the dough is kept.
-        await state.Recipe.OpenLinkedSourceCommand.ExecuteAsync(usage);
+        // The badge opens the source, where the dough is kept: its own tab.
+        await variant.Recipe.OpenLinkedSourceCommand.ExecuteAsync(usage);
+        state.View.Form.Should().BeSameAs(state);
         state.SelectedProduct!.Id.Should().Be(sourceId);
     });
 
@@ -2371,7 +2376,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             new Product { Name = name, CategoryId = categoryId }, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
 
     /// <summary>A name typed into the header and left, as one undo step, the way the name box records it.</summary>
-    private static void TypeName(ProductsState state, string name)
+    private static void TypeName(ProductForm state, string name)
     {
         var recorder = (IUndoRecorder)state;
         recorder.BeginUndoStep();
@@ -2407,7 +2412,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         return boxId;
     }
 
-    private ProductsState CreateState(IViewStateStore? viewStateStore = null)
+    private ProductForm CreateState(IViewStateStore? viewStateStore = null)
     {
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
@@ -2433,7 +2438,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
             new CostingParametersValidator(),
             new ProductCategoryValidator(),
             viewStateStore ?? new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger());
+            new LoggerConfiguration().CreateLogger()).Form!;
     }
 
     [Test]
@@ -2529,7 +2534,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
     /// Links the dough into the product <paramref name="state"/> shows, with <paramref name="addInGrams"/> of ube and
     /// <paramref name="weightPerPiece"/> a piece, and saves it.
     /// </summary>
-    private static async Task LinkWithUbeAsync(ProductsState state, int ubeId, decimal addInGrams, decimal weightPerPiece)
+    private static async Task LinkWithUbeAsync(ProductForm state, int ubeId, decimal addInGrams, decimal weightPerPiece)
     {
         await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
         state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
@@ -3065,7 +3070,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         var state = CreateState();
 
         // As Sub-Assemblies' New Product does, and then New before the load that showing the screen runs is back.
-        state.StartNewProductFrom(doughId);
+        state.View.StartNewProductFrom(doughId);
         var loading = state.LoadCommand.ExecuteAsync();
         await state.NewCommand.ExecuteAsync();
         state.EditingName = "Mamon";

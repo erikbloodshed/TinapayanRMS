@@ -196,7 +196,7 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
   - **No** throws them away, then goes on. If you were leaving the screen, the item is put back as it was last saved, so the changes aren't there when you come back. If it can't be put back, for example because the database isn't answering, the red notice says why and you stay.
   - **Cancel** keeps them, and you stay where you were.
   - The **Print** window doesn't ask, since it prints the item with your changes and leaves it as it was. Nor does **Copy** on the Sub-Assemblies screen, since the copy holds them.
-  - **On the Raw Materials and Sub-Assemblies screens, each record opens in a tab of its own** (see Raw Materials' [Tabs](#tabs) and Sub-Assemblies' [Tabs](#tabs-1)), so going somewhere else doesn't ask: picking another in the list, **New**, **Copy**, another screen, **Back** or **Forward** leave the changes in their tab. Closing that tab asks, and so does closing the window, for each tab with changes, even one not showing.
+  - **On the Raw Materials, Sub-Assemblies and Products screens, each record opens in a tab of its own** (see Raw Materials' [Tabs](#tabs), Sub-Assemblies' [Tabs](#tabs-1) and Products' [Tabs](#tabs-2)), so going somewhere else doesn't ask: picking another in the list, **New**, **Copy**, another screen, **Back** or **Forward** leave the changes in their tab. Closing that tab asks, and so does closing the window, for each tab with changes, even one not showing. **Clone**, **Create Variant** and **Apply Costing Defaults** still ask about a product's unsaved changes, since what they make or change is the product as saved.
 - **If another PC saves the same record while you have it open**, your **Save** is refused, so neither of you overwrites the other without knowing. So is renaming or moving that record in the list while you have unsaved changes on it. A red notice says so, and what you typed stays on the form. [Troubleshooting](#14-troubleshooting-and-questions) says what to do next.
 - A green notice confirms a save. A red notice explains anything the app refused, such as a missing field, a name already taken, or something that can't be deleted because it's in use. It also says when the app couldn't reach its database, or the database didn't answer in time. Nothing is saved then, and the screen keeps working: once the database answers again, try again, or pick the record again. A red notice stays until you close it or do something else, and goes when you open another item, answer **No** about unsaved changes, or leave the screen.
 - If something goes wrong that the app didn't expect, a red notice says what happened, the screen keeps working, and the details go in the [log files](#14-troubleshooting-and-questions). Nothing you haven't saved is lost. If it was worse than that, the screen gives way to a panel saying **This screen ran into a problem it didn't expect**: press **Open It Again**, and the screen comes back as it was, changes you haven't saved included. The other screens keep working meanwhile. Only rarely, a bar at the bottom of the window says the page needs reloading: see [Troubleshooting](#14-troubleshooting-and-questions).
@@ -274,7 +274,7 @@ Type **:**, then a command, then **Enter**. A bar opens at the bottom of the win
 - **:delete** deletes the one open, asking first.
 - **:e** and a name opens the one whose name matches. For example, **:e pandesal** opens Pandesal on the Products screen.
 - **:revert** throws away a product's changes since the last Save.
-- **:raw**, **:sub**, **:products**, **:reports** and **:simulator** switch screens. **:print** opens the Print window on what Products has open, as its **Print** button does.
+- **:raw**, **:sub**, **:products**, **:reports** and **:simulator** switch screens. **:print** opens the Print window on the product of the Products tab showing, as its **Print** button does.
 - **:settings** opens Settings.
 - **:help** lists every key.
 
@@ -678,7 +678,22 @@ A sub-assembly can't be switched between a recipe role and the Packaging role on
 
 ## 7. Products
 
-The Products screen has the product list on the left. On the right are the selected product's header, its details, and four tabs: **Recipe**, **Costing**, **Clone** and **History**.
+The Products screen has the product list on the left, and to its right a tab for each product you open, with its header, its details, and four tabs of its own along the bottom: **Recipe**, **Costing**, **Clone** and **History**.
+
+### Tabs
+
+**Each product you open has a tab of its own**, along the top, as on the Raw Materials and Sub-Assemblies screens, so you can have several open at once and go between them. Each keeps what you've typed into it, its **Undo**, the tab it was on along the bottom, and **Unbuffered**, while another shows, and while you're on another screen.
+
+- **A click on a product in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A product that's open already just shows its own tab.
+- **To keep a tab open**, double-click the product in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
+- **New** and **New composite product** start the new product in the preview tab, so a tab with changes stays as it is. So does Sub-Assemblies' **New Product**. The screen opens on a blank new product, in the preview tab, as it always has.
+- **Clone** and **Create Variant** open the new product in a tab of its own, beside the one it came from.
+- **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
+- **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
+- **Back** and **Forward** go through the tabs you've shown, like a web browser. Going back to a product whose tab you've closed opens it again, in the preview tab.
+- **Delete** closes the deleted product's tab. **Restore** opens the product it brings back in the preview tab.
+- With every tab closed, the screen says so, with **New** beside it. Click a product in the list to open it.
+- **Print**, and the Vim keys' `:print`, print the product of the tab showing.
 
 ### The list
 
@@ -700,7 +715,7 @@ Right-click menus:
   - **Promote to Production** or **Send Back to Innovation**: puts the product in the other stage, in the folder with the same path there (Innovation › Breads › Holiday goes to Production › Breads › Holiday). Any of those folders that isn't there yet is made. **Undo** on the notice moves the product back, and takes away any folder the move made, if nothing else has gone in it since.
   - **Move to**: any stage, then the top of the stage or any folder in it. A folder that holds others opens a further menu, starting with the folder itself. The place the product is in already is greyed.
   - **Cut** (Ctrl+X) and **Paste** (Ctrl+V): see Cut and paste above. Paste on a product moves what was cut into that product's folder.
-  - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If the product open on the form has unsaved changes, you're asked to save or discard them first.
+  - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If a tab holds one of the products with unsaved changes, it shows, and you're asked to save or discard them first.
   - **Print**: the product as saved, in the Print window.
   - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
@@ -743,11 +758,11 @@ Below the header are the fields you fill in:
 - **Quantity Required**: how many finished pieces make one sellable unit. A composite product doesn't have one.
 - **Current Price**: the price the shop charges now, per sellable unit, VAT included. It's for comparison only and doesn't change the computed selling price.
 
-**Unbuffered** switches every cost on the Products screen to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the packaging pickers. While it's on, the button reads **Buffered** and an **Unbuffered costs** badge shows beside the product's name. Press **Buffered** to go back to buffered costs.
+**Unbuffered** switches every cost in the product's tab to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the packaging pickers. While it's on, the button reads **Buffered** and an **Unbuffered costs** badge shows beside the product's name. Press **Buffered** to go back to buffered costs.
 
 - It only changes what you see. Nothing is saved, **Save** and **Undo** aren't affected, and **Reports** still use buffered costs.
-- It stays on when you open another product, until you switch it off, close the window or reload the page. The app always starts on buffered costs.
-- **Print** uses whichever costs the screen shows (see [Printing](#8-printing-recipes-and-costings)).
+- It's the tab's own: it stays on when the tab shows another product, until you switch it off, close the window or reload the page. A new tab starts on buffered costs, and so does the app.
+- **Print** uses whichever costs the tab shows (see [Printing](#8-printing-recipes-and-costings)).
 
 A **Priced below cost** badge in the header means prices have risen past the buffered cost of a purchased material in the recipe or packaging. Every cost here is at buffered costs, so the product is priced under what that material costs. Point at the badge to see which materials. Re-apply their target buffers on Raw Materials, or in Reports' **Cost Buffers**, to carry their new prices in. A composite product's own products aren't checked here; each shows its badge when you open it.
 
@@ -755,7 +770,7 @@ A **No piece size** badge in the header means a section of the recipe has neithe
 
 Deleting a product asks first, then moves it to the **Deleted** folder at the bottom of the list. Nothing of it is lost there: its recipe, packaging, costing, stage, folder and category are all kept. Until you restore it, no picker, report, print or Price Simulator includes it, and TinapayanBMS's copy leaves it out.
 
-- **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it. If its folder was deleted in the meantime, it comes back where that folder's products went. If its category was deleted, it comes back uncategorized.
+- **Restore** (right-click it in the Deleted folder) puts it back in its folder and opens it in the preview tab. If its folder was deleted in the meantime, it comes back where that folder's products went. If its category was deleted, it comes back uncategorized.
 - **Delete Permanently** asks first and can't be undone. The product's own sub-assemblies are deleted with it. Its linked sub-assemblies stay on the Sub-Assemblies screen. Deleting a composite product leaves the products it holds as they are.
 - A deleted product **still holds everything it uses**, so it can come back whole. A sub-assembly it links, an ingredient in its recipe, or a product it holds or whose packaging it links can't be deleted until you delete the deleted product permanently. **Dependents** tiles and refusal messages name it with "(deleted)" after its name. Clicking its tile picks it in the Deleted folder.
 - A deleted product keeps its name, so no other product can take that name until it's deleted permanently.
@@ -916,7 +931,7 @@ A section that's this product's own shows in the variant with a badge such as "E
 
 While a variant links one of this product's own sub-assemblies, this product can't remove that sub-assembly and can't be deleted. Make a copy of it in the variant, or remove it there, first.
 
-The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Innovation, and you can change its piece sizes. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
+The category, Quantity Required, Current Price and costing percentages are copied with both. The new product starts in Innovation, opens in a tab of its own, and you can change its piece sizes. Both copy the product as saved: if it has changes you haven't saved, you're asked about them first. Its History tab starts with one version that says where it came from (see [History tab](#history-tab)).
 
 A composite product's clone or variant is a composite too, holding the same products at the same quantities. A clone copies its own sections and a variant links them, as for any product.
 
@@ -971,9 +986,9 @@ A product moved to the Deleted folder keeps its history. **Delete Permanently** 
 
 ## 8. Printing recipes and costings
 
-Press **Print** in the Products header to open the **Print** window over the Products screen. It shows the product's recipe and costing on a sheet of paper, as the Products screen shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
+Press **Print** in a product's header to open the **Print** window over the Products screen. It shows the product's recipe and costing on a sheet of paper, as its tab shows them, including changes you haven't saved yet. On the History tab, it shows the version picked there, at its costs then (see [History tab](#history-tab)).
 
-- **Print** (the list at the top left) chooses the products to print. With none ticked it reads **This product** and prints the product open on the Products screen, as described above. Open it, type part of a name in **Search products** to find a product, and tick it; tick as many as you like, from any folders, or **Select All** for every product the list shows. When the list closes, the pages show the products ticked, as saved, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
+- **Print** (the list at the top left) chooses the products to print. With none ticked it reads **This product** and prints the product of the Products tab showing, as described above. Open it, type part of a name in **Search products** to find a product, and tick it; tick as many as you like, from any folders, or **Select All** for every product the list shows. When the list closes, the pages show the products ticked, as saved, in the Products list's order. Untick them all and it goes back to **This product**. One product ticked prints on its own, with no contents list.
 - **Categories** (the list beside it) narrows **Print** to the products of the categories you tick, such as **Breads**; **No category** is the products without one. A product ticked under **Print** that isn't in them is unticked. To print every bread, tick **Breads** here, then **Select All** under **Print**. With no category ticked (**All categories**), **Print** lists every product.
 - **Include**: tick **Recipe**, **Costing** or both. Without the costing, the recipe prints with no costs, which is useful for the kitchen. A composite product's recipe prints as its products table, then its own sections. The ticks stay as you leave them for the next time you print on this computer, for your Windows account. To leave out single columns, such as Cost/g, or the figure tiles, see [Settings → Printing](#printing).
 - Each printed section lists its ingredients with their **Grams** and **Baker's %** (or **Absolute %**), and with the costing their **Cost/g** and **Cost**. The **Base** ticks aren't printed.

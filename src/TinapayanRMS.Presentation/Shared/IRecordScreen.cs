@@ -21,8 +21,9 @@ public interface IRecordScreen
 }
 
 /// <summary>
-/// A screen of records with an address each (products/42): what its page (RecordScreenBase) opens the record in the address
-/// through. The three record screens, through RecordScreenState.
+/// A screen of records with an address each (products/42): what its page (RecordViewBase) opens the record in the address
+/// through. The three record views, each opening it in its tab or the preview tab; each form, through RecordScreenState,
+/// opens one in itself.
 /// </summary>
 public interface IRecordOpener
 {
