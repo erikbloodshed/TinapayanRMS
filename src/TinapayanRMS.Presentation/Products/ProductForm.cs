@@ -816,6 +816,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         /// <summary>The product showing, saved since the form took it, with nothing typed: it's read into the form again.</summary>
         public bool SavedSince { get; set; }
 
+        /// <summary>The form held nothing to save as the load set out, so whatever the load brings leaves it so.</summary>
+        public bool WasClean { get; set; }
+
         // Ids first: a picker whose item gets replaced can clear its own selection mid-merge.
         public int? SelectedId { get; set; }
 
@@ -867,7 +870,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         var detailProductId = load.DetailProductId;
         var ownershipChanged = Recipe.UsageEdits.Any(u => read.LinkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
             && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
-        load.ReloadDetails = ownershipChanged && !History.IsDirty && detailProductId is not null;
+        load.WasClean = !History.IsDirty;
+        load.ReloadDetails = ownershipChanged && load.WasClean && detailProductId is not null;
 
         load.SelectedId = SelectedProduct?.Id;
         load.CategoryId = EditingCategory?.Id;
@@ -934,6 +938,15 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// <summary>The view's load is merged: what follows it on the form.</summary>
     internal async Task EndLoadAsync(Load load)
     {
+        // What the load brought from where it's kept (a linked section's lines and name, a linked packaging's lines, the name
+        // of what it links) is no edit: a form with nothing to save as the load set out has nothing to save after it, or a
+        // set or sub-assembly saved on the Sub-Assemblies screen had each product showing it offer Save, and closing the
+        // window ask about it. The merge never touches what's typed, so a form with something typed keeps it to save.
+        if (load.WasClean && History.IsDirty)
+        {
+            History.MarkClean();
+        }
+
         if ((load.ReloadDetails || load.SavedSince) && SelectedProduct is { } reloaded && reloaded.Id == load.DetailProductId)
         {
             if (load.SavedSince)

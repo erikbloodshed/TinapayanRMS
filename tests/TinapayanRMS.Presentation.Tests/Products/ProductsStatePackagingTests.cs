@@ -244,7 +244,8 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     });
 
     // The view's load reads every open tab's linked packaging together: each tab still showing its link as saved shows its
-    // set's lines as they're saved now, and one whose set didn't change keeps its rows.
+    // set's lines and name as they're saved now, with nothing to save, as they were saved on the Sub-Assemblies screen, not
+    // typed here; and one whose set didn't change keeps its rows.
     [Test]
     public Task Each_tab_linking_a_packaging_set_shows_its_lines_as_saved_now_after_a_load() => UiThread.RunAsync(async () =>
     {
@@ -265,12 +266,22 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         var partyRow = party.Packaging.LineEdits.Single();
 
         await sets.SaveStandalonePackagingAsync(
-            new SubAssembly { Id = giftSetId, Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 3m)], Cancellation);
+            new SubAssembly { Id = giftSetId, Name = "Gift Box Set Deluxe", RoleId = packagingRoleId }, [(boxId, null, 3m)], Cancellation);
         await view.LoadCommand.ExecuteAsync();
         await Settle.UntilAsync(gift, () => gift.Packaging.LineEdits.Single().QtyPerUnit == 3m, () => $"qty={gift.Packaging.LineEdits.Single().QtyPerUnit}");
 
+        gift.Packaging.PackagingLinkedToText.Should().Be("Linked to Gift Box Set Deluxe (Sub-Assemblies)");
+        gift.SaveCommand.CanExecute().Should().BeFalse("the set was saved on the Sub-Assemblies screen, not typed here");
+        gift.HasUnsavedChanges.Should().BeFalse();
         party.Packaging.LineEdits.Should().ContainSingle().Which.Should().BeSameAs(partyRow, "its set didn't change, so its rows stay");
         partyRow.QtyPerUnit.Should().Be(2m);
+
+        // What's typed here still counts.
+        var recorder = (IUndoRecorder)gift;
+        recorder.BeginUndoStep();
+        gift.EditingName = "Ensaymada Special";
+        recorder.EndUndoStep();
+        gift.SaveCommand.CanExecute().Should().BeTrue();
     });
 
     /// <summary>Opens <paramref name="productId"/> in a tab of the view that stays, its details in.</summary>

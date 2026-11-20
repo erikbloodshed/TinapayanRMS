@@ -842,6 +842,8 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.Recipe.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().Be(3.6m, "30 g of a ₱150, 1,250 g batch");
         state.UsageForm.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should()
             .Equal([("Flour", 1000m), ("Butter", 250m)], "the read-only lines show the sub-assembly's, as they now are");
+        state.SaveCommand.CanExecute().Should().BeFalse("the lines were saved on the Sub-Assemblies screen, not typed here");
+        state.HasUnsavedChanges.Should().BeFalse();
 
         // Make a Copy: the mini gets a dough of its own to change, at the same weight, and stops following.
         await state.Recipe.MakeCopyCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
