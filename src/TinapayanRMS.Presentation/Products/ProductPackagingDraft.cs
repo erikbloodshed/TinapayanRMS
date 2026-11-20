@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using DynamicData;
+using System.Reactive.Linq;
 using DynamicData.Binding;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
@@ -57,11 +58,12 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
         _subscriptions.Add(LineEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe());
         _subscriptions.Add(BulkEdits.ToObservableChangeSet().OnItemAdded(r => r.CostBasis = host.CostBasis).Subscribe());
 
-        // A material picked on a row points it at the screen's copy at once, its units and cost with it: a row the table
-        // made has its own lookup, but one shown from a save or the picker doesn't, and would go on pricing (and offering
-        // the units of) the material it had until the next load.
-        _subscriptions.Add(LineEdits.ToObservableChangeSet().AutoRefresh(r => r.PackagingMaterialId).Subscribe(_ => ResolveRows()));
-        _subscriptions.Add(BulkEdits.ToObservableChangeSet().AutoRefresh(r => r.PackagingMaterialId).Subscribe(_ => ResolveRows()));
+        // A material picked on a row points that row at the screen's copy at once, its units and cost with it: a row the
+        // table made has its own lookup, but one shown from a save or the picker doesn't, and would go on pricing (and
+        // offering the units of) the material it had. Only a pick: a row added or taken out, a load's or an undo's, is the
+        // form's to resolve (PackagingLinesEdited), as it always was.
+        _subscriptions.Add(LineEdits.ToObservableChangeSet().MergeMany(MaterialPicks).Subscribe(ResolveRow));
+        _subscriptions.Add(BulkEdits.ToObservableChangeSet().MergeMany(MaterialPicks).Subscribe(ResolveRow));
 
         // Whatever it holds changing, its fields, its tables or a row typed into: what the form's dirty check follows.
         PropertyChanged += (_, _) => Changed?.Invoke();
@@ -145,6 +147,16 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
     /// does to the draft (ADR 0007), which changes nothing typed.
     /// </summary>
     public void ResolveRows() => PackagingLineRow.Resolve(AllLineEdits, _packagingMaterials.ToDictionary(m => m.Id));
+
+    /// <summary>A row's material picked, after it joined its table: not the one it had as it joined.</summary>
+    private static IObservable<PackagingLineRow> MaterialPicks(PackagingLineRow row) =>
+        row.WhenPropertyChanged(r => r.PackagingMaterialId, notifyOnInitialValue: false).Select(change => change.Sender);
+
+    /// <summary><paramref name="row"/> pointed at the material picked on it, as the screen last loaded it.</summary>
+    private void ResolveRow(PackagingLineRow row) =>
+        PackagingLineRow.Resolve(
+            [row],
+            row.PackagingMaterialId is { } id && FindMaterial(id) is { } material ? new Dictionary<int, RawMaterial> { [id] = material } : []);
 
     /// <summary>Every row priced at the form's cost basis again: Unbuffered or Buffered was pressed.</summary>
     public void Reprice()
