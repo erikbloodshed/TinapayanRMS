@@ -234,7 +234,7 @@ public sealed record SectionFormSnapshot
 }
 
 /// <summary>
-/// The Packaging tab's share of an undo step (ProductPackaging.Capture): what its packaging links, whether Move to
+/// The Packaging tab's share of an undo step (ProductPackagingDraft.Capture): what its packaging links, whether Move to
 /// Sub-Assemblies was pressed, its lines for each piece and its bulk packaging.
 /// </summary>
 public sealed record PackagingSnapshot

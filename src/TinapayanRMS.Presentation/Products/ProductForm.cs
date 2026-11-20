@@ -31,7 +31,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, ITabForm,
-    IProductRecipeHost, IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
+    IProductRecipeHost, IProductPackagingHost, IProductPackagingDraftHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -99,7 +99,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         _categoryEditor = categoryEditor;
 
         // The lists the parts read are the view's, which each load merges into.
-        Packaging = new ProductPackaging(this, PackagingMaterials, queries);
+        Packaging = new ProductPackaging(this, new ProductPackagingDraft(this, PackagingMaterials), queries);
         UsageForm = new ProductUsageForm(this, Ingredients);
         ComponentsTable = new ProductComponents(this, Products, queries);
         VersionHistory = new ProductVersionHistory(this, Products, Ingredients, PackagingMaterials, Roles, queries, editor);
@@ -704,14 +704,14 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     private void WireCosts()
     {
         // A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.
-        Packaging.LineEdits.ToObservableChangeSet()
+        Packaging.Draft.LineEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ => _updates.Run(PackagingLinesEdited));
 
         // The same for a bulk packaging line, and the products a bulk pack holds.
-        Packaging.BulkQuantityChanged += () => _updates.Run(PackagingLinesEdited);
-        Packaging.BulkEdits.ToObservableChangeSet()
+        Packaging.Draft.BulkQuantityChanged += () => _updates.Run(PackagingLinesEdited);
+        Packaging.Draft.BulkEdits.ToObservableChangeSet()
             .AutoRefresh(l => l.PackagingMaterialId)
             .AutoRefresh(l => l.CostPerUnit)
             .Subscribe(_ => _updates.Run(PackagingLinesEdited));
@@ -736,8 +736,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         ComponentsTable.IncludesPackagingChanged += InvalidateCosts;
 
         // Broadly besides: any change to a packaging or a composite's table is something the costs may be worked out from.
-        RowChanges.OnAnyChange(Packaging.LineEdits, InvalidateCosts);
-        RowChanges.OnAnyChange(Packaging.BulkEdits, InvalidateCosts);
+        RowChanges.OnAnyChange(Packaging.Draft.LineEdits, InvalidateCosts);
+        RowChanges.OnAnyChange(Packaging.Draft.BulkEdits, InvalidateCosts);
         RowChanges.OnAnyChange(ComponentsTable.ComponentEdits, InvalidateCosts);
     }
 
@@ -750,7 +750,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         PropertyChanged += (_, _) => History.RefreshDirty();
         Recipe.PropertyChanged += (_, _) => History.RefreshDirty();
         Costing.PropertyChanged += (_, _) => History.RefreshDirty();
-        Packaging.PropertyChanged += (_, _) => History.RefreshDirty();
+        Packaging.Draft.Changed += History.RefreshDirty;
         ComponentsTable.PropertyChanged += (_, _) => History.RefreshDirty();
         UsageForm.PropertyChanged += (_, _) => History.RefreshDirty();
         WatchForSave(Recipe.UsageEdits);
@@ -758,8 +758,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // The tables typed into, on their rows themselves: a quantity or grams typed while the cell has the cursor. Not
         // through the figures they move (the costs, the section form's), which raise nothing until they've been read.
         // Marking the dirty check stale is cheap, so a pass through every row costs one comparison, when Save is drawn.
-        RowChanges.OnAnyChange(Packaging.LineEdits, History.RefreshDirty);
-        RowChanges.OnAnyChange(Packaging.BulkEdits, History.RefreshDirty);
         RowChanges.OnAnyChange(ComponentsTable.ComponentEdits, History.RefreshDirty);
         RowChanges.OnAnyChange(UsageForm.FormLines, History.RefreshDirty);
         RowChanges.OnAnyChange(UsageForm.FormAddIns, History.RefreshDirty);
@@ -835,7 +833,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         }
 
         var savedLink = PackagingLinkTarget.From(packagingLink);
-        if (!Packaging.ShowsSavedLink(savedLink))
+        if (!Packaging.Draft.ShowsSavedLink(savedLink))
         {
             return null;
         }
@@ -896,11 +894,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         if (load.DetailProductId == _detailProductId && load.LinkedPackagingLines is { } linkedPackagingLines)
         {
             // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
-            var renamed = !Equals(Packaging.LinkTarget, load.SavedLink);
-            Packaging.ShowLink(load.SavedLink);
-            if (Packaging.RefreshLinkedLines(linkedPackagingLines) || renamed)
+            var renamed = !Equals(Packaging.Draft.LinkTarget, load.SavedLink);
+            Packaging.Draft.ShowLink(load.SavedLink);
+            if (Packaging.Draft.RefreshLinkedLines(linkedPackagingLines) || renamed)
             {
-                linkedPackagingNow = Packaging.Capture();
+                linkedPackagingNow = Packaging.Draft.Capture();
             }
         }
 
@@ -923,7 +921,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         }
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
-        Packaging.ResolveRows();
+        Packaging.Draft.ResolveRows();
         UsageForm.ResolveRows();
 
         // The section form's choices, built again only if the view's lists they come from changed.
@@ -1224,9 +1222,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         ComponentsTable.Load(detail.Components);
 
         // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
-        Packaging.LoadLink(detail.PackagingLink);
-        Packaging.LoadLines(detail.Lines);
-        Packaging.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
+        Packaging.Draft.LoadLink(detail.PackagingLink);
+        Packaging.Draft.LoadLines(detail.Lines);
+        Packaging.Draft.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
         Recipe.ShowSaved(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         Costing.Load(detail.Costing);
         Recipe.RefreshLinkableOptions();
@@ -1298,9 +1296,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // sections' lines or linking its packaging each get one if this Save changes them. Only linked lines edited
         // here and the packaging reach those, so a Save of neither reads none: a price-only Save would
         // otherwise spend half a second reading every product sharing its dough, twice.
-        var packagingLink = Packaging.ChangedLink();
-        var packagingLines = Packaging.ChangedLines();
-        var bulkToSave = Packaging.ChangedBulk();
+        var packagingLink = Packaging.Draft.ChangedLink();
+        var packagingLines = Packaging.Draft.ChangedLines();
+        var bulkToSave = Packaging.Draft.ChangedBulk();
         var changesSharing = Recipe.UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
         var request = new ProductSaveRequest(
             product, costing, Costing.IsChanged, Recipe.IsAsSaved(recipe) ? null : recipe, packagingLink, packagingLines, bulkToSave, changesSharing);
@@ -1393,8 +1391,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// <summary>A packaging line picked, typed or deleted in its table: it's priced, and the product's costs follow.</summary>
     private void PackagingLinesEdited()
     {
-        Packaging.ResolveRows();
-        Packaging.RaiseCostsChanged();
+        Packaging.Draft.ResolveRows();
+        Packaging.Draft.RaiseCostsChanged();
         InvalidateCosts();
     }
 
@@ -1465,7 +1463,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     {
         Costing.CostBasis = Costing.CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
         UsageForm.Reprice();
-        Packaging.Reprice();
+        Packaging.Draft.Reprice();
         ComponentsTable.Reprice();
 
         InvalidateCosts();
@@ -1501,7 +1499,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             {
                 Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(Costing.CostBasis)))],
                 QuantityRequired = EditingQuantityRequired,
-                PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
+                PackagingCosts = [.. Packaging.Draft.LineEdits.Select(l => l.CostPerUnit), .. Packaging.Draft.BulkEdits.Count > 0 ? [Packaging.Draft.BulkCostPerUnit] : Array.Empty<decimal>()],
                 ComponentPackaging = componentPackaging,
                 CurrentPrice = EditingCurrentPrice,
                 IsComposite = IsEditingComposite,
@@ -1509,7 +1507,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             },
             EditingCategory?.WastagePercent,
             [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
+                .Concat(Packaging.Draft.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
         {
             SectionsWithoutPieceSize = [.. usages.Where(u => !ProductRules.HasPieceSize(u.AuthoredValue)).Select(u => u.SectionName)],
         };
@@ -1565,11 +1563,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
         DateTime.Now,
         [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), Costing.CostBasis))],
-        Packaging.LineEdits.Count > 0 || Packaging.BulkEdits.Count > 0
+        Packaging.Draft.LineEdits.Count > 0 || Packaging.Draft.BulkEdits.Count > 0
             ? PrintedPackaging.From(
-                Packaging.LineEdits.Select(l => l.ToPriced()),
-                Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null,
-                Packaging.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.BulkEdits.Select(l => l.ToPriced())], Packaging.BulkQuantity))
+                Packaging.Draft.LineEdits.Select(l => l.ToPriced()),
+                Packaging.Draft.IsPackagingLinked ? Packaging.Draft.PackagingLinkedToText : null,
+                Packaging.Draft.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.Draft.BulkEdits.Select(l => l.ToPriced())], Packaging.Draft.BulkQuantity))
             : null,
         Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(ComponentsTable.ComponentEdits) : null)
@@ -1706,7 +1704,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         CloneName = EditingCloneName,
         Costing = Costing.Percentages,
         Recipe = Recipe.Capture(),
-        Packaging = Packaging.Capture(),
+        Packaging = Packaging.Draft.Capture(),
         Components = ComponentsTable.Capture(),
     };
 
@@ -1745,8 +1743,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             // 3. Costing.
             Costing.Percentages = snapshot.Costing;
 
-            // 4. Packaging (ProductPackaging.Restore), the link as saved left alone: it's what Save compares against.
-            Packaging.Restore(snapshot.Packaging);
+            // 4. Packaging (ProductPackagingDraft.Restore), the link as saved left alone: it's what Save compares against.
+            Packaging.Draft.Restore(snapshot.Packaging);
 
             // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
             // read now, and prices the line when it arrives).
@@ -1859,8 +1857,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     void IProductRecipeHost.OpenSubAssembly(int subAssemblyId) => _subAssemblyOpenRequests.OnNext(subAssemblyId);
 
-    // What the Packaging tab asks of the screen (IProductPackagingHost); its cost basis is the Costing part's.
-    CostBasis IProductPackagingHost.CostBasis => Costing.CostBasis;
+    // What the Packaging tab asks of the screen (IProductPackagingHost), and its draft the cost basis, the Costing part's.
+    CostBasis IProductPackagingDraftHost.CostBasis => Costing.CostBasis;
 
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
@@ -1945,5 +1943,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         _picks.Dispose();
         UsageForm.Dispose();
         Packaging.Dispose();
+        Packaging.Draft.Dispose();
     }
 }
