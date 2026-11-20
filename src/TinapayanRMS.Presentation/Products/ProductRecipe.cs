@@ -11,7 +11,7 @@ using TinapayanRMS.UseCases.Products;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>What the Products screen's recipe asks of its screen, on top of what any part of its form asks.</summary>
-public interface IProductRecipeHost : IFormPartHost
+public interface IProductRecipeHost : IFormPartHost, IProductRecipeDraftHost
 {
     /// <summary>
     /// The form's undo history: a section applied, as a tab is left or the form is printed, is one step measured by what it
@@ -27,15 +27,6 @@ public interface IProductRecipeHost : IFormPartHost
     /// and built again only when this has moved since (ProductsState.LinkableVersion).
     /// </summary>
     int LinkableVersion { get; }
-
-    /// <summary>The form is a composite product's, whose own sections are only in product-owned roles.</summary>
-    bool IsEditingComposite { get; }
-
-    /// <summary>The product whose recipe the form holds; null for a new one.</summary>
-    int? DetailProductId { get; }
-
-    /// <summary>The product's name as typed, which a section saved from it is named after.</summary>
-    string EditingName { get; }
 
     /// <summary>The recipe changed: the product's costs are worked out again, from it as it now is, as they're next read.</summary>
     void InvalidateCosts();
@@ -55,12 +46,10 @@ public interface IProductRecipeHost : IFormPartHost
 /// recipe Save writes. What spans the form (the undo history, the costs, the lists loaded) it asks of the screen
 /// (<see cref="IProductRecipeHost"/>); the screen wires the section form's picks and lines to it.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductRecipe : ObservableState
 {
     private readonly IProductRecipeHost _host;
     private readonly ProductUsageForm _usageForm;
-    private readonly ProductComponents _components;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
     private readonly IReadOnlyList<SubAssemblyRole> _roles;
     private readonly IProductQueries _queries;
@@ -74,28 +63,21 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     private bool _isRecipeClearedForAnother;
 
-    // What the product had when it was loaded, so Save only sends the parts that changed.
-    private RecipeDraft _savedRecipe = new([], []);
-
     /// <param name="host">The screen: its undo history, what can be linked, the product's name and costs.</param>
     /// <param name="usageForm">The section form, which the recipe opens on a section's tab and applies as the tab is left.</param>
-    /// <param name="components">A composite's Products table, whose lines are part of the recipe Save writes.</param>
-    /// <param name="ingredients">Every ingredient, as the screen last loaded them: what a section's lines point at.</param>
-    /// <param name="roles">Every sub-assembly role, as the screen last loaded them.</param>
+    /// <param name="draft">The recipe's sections and what Save writes of them, with the ingredients and roles they point at.</param>
     /// <param name="queries">What reads a sub-assembly's lines for a section, and the Made categories for Make In-House Ingredient.</param>
     public ProductRecipe(
         IProductRecipeHost host,
         ProductUsageForm usageForm,
-        ProductComponents components,
-        IReadOnlyList<RawMaterial> ingredients,
-        IReadOnlyList<SubAssemblyRole> roles,
+        ProductRecipeDraft draft,
         IProductQueries queries)
     {
         _host = host;
         _usageForm = usageForm;
-        _components = components;
-        _ingredients = ingredients;
-        _roles = roles;
+        Draft = draft;
+        _ingredients = draft.Ingredients;
+        _roles = draft.Roles;
         _queries = queries;
 
         // The recipe's tabs follow its sections as they're added, taken out and moved. The Packaging tab is always there,
@@ -107,10 +89,11 @@ public sealed class ProductRecipe : ObservableState
         // The blank form shows it from the start, so its tables are there to type into before anything else happens. Picked
         // below, once the form's own tabs are wired up.
         _selectedRecipeTab = PackagingTab;
+        // The draft marks the sections sharing a role as they change, first; the tabs follow, their headers with them.
         UsageEdits.CollectionChanged += (_, e) =>
         {
             MirrorUsageTabs(e);
-            MarkRepeatedRoles();
+            RefreshTabHeaders();
         };
 
         // A recipe tab shown: leaving one applies its form, and showing one opens its form (RecipeTabShown). The Packaging
@@ -172,11 +155,11 @@ public sealed class ProductRecipe : ObservableState
         // A linked sub-assembly becomes a new section in the same role and at the same piece size, whose lines the form
         // edits; Save makes it the product's own in a product-owned role, and otherwise keeps it on the Sub-Assemblies
         // screen as a sub-assembly of its own, and links that instead.
-        MakeCopyCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: false))));
+        MakeCopyCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, ProductRecipeDraft.CopyOfLinked(usage, isOwn: false))));
 
         // The same copy, but the product's own whatever its role: Save keeps it with the product, off the
         // Sub-Assemblies screen, and the one it was linked to stays there as it is.
-        UnlinkCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, CopyOfLinked(usage, isOwn: true))));
+        UnlinkCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() => ReplaceUsage(usage, ProductRecipeDraft.CopyOfLinked(usage, isOwn: true))));
 
         // Anything typed into its form goes in first, so what moves is what shows; a form a rule refuses stays as it
         // is, with the message. It's still edited here until Save, which moves it and links it.
@@ -199,7 +182,7 @@ public sealed class ProductRecipe : ObservableState
             }
 
             var moving = applied.Released();
-            ReplaceInRecipeOrder(applied, moving);
+            Draft.ReplaceInRecipeOrder(applied, moving);
             host.InvalidateCosts();
             if (wasEditing)
             {
@@ -239,8 +222,11 @@ public sealed class ProductRecipe : ObservableState
             () => SelectedRecipeTab is SubAssemblyRecipeTab);
     }
 
-    /// <summary>Every sub-assembly, saved or not, its own and linked, in recipe order (ProductUsageEdit.RecipeOrder).</summary>
-    public ObservableCollection<ProductUsageEdit> UsageEdits { get; } = [];
+    /// <summary>The recipe's sections and what it was saved as: what Save writes of it (<see cref="ProductRecipeDraft"/>).</summary>
+    public ProductRecipeDraft Draft { get; }
+
+    /// <summary>Every sub-assembly, saved or not, its own and linked, in recipe order (the draft's).</summary>
+    public ObservableCollection<ProductUsageEdit> UsageEdits => Draft.UsageEdits;
 
     /// <summary>
     /// The Recipe Structure's tabs: a composite's ComponentsTab first, then a sub-assembly's for each of UsageEdits, in
@@ -324,20 +310,6 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     public Interaction<ChoicePromptRequest, ChoicePromptResult?> PromptForMadeIngredient { get; } = new();
 
-    /// <summary>The sections the product keeps as its own, as it was saved: the ids a restored version's own sections are told by.</summary>
-    internal IReadOnlySet<int> SavedOwnSectionIds => _savedRecipe.New.Select(n => n.Id).Where(id => id != 0).ToHashSet();
-
-    /// <summary>
-    /// A linked section as a new one whose lines the form edits, at the same role and piece size (Make a Copy, Unlink):
-    /// <paramref name="isOwn"/> makes it the product's own whatever its role.
-    /// </summary>
-    private static ProductUsageEdit CopyOfLinked(ProductUsageEdit usage, bool isOwn) =>
-        // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
-        // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
-        // In a role the recipe has more than one in, it keeps what it went by, so it's still told apart.
-        new(0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue,
-            linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn);
-
     /// <summary>
     /// A composite's Products tab, first, before its sections' tabs, for a composite; none for a product of sub-assemblies.
     /// The screen sets IsEditingComposite first.
@@ -385,19 +357,6 @@ public sealed class ProductRecipe : ObservableState
     internal void ShowSaved(
         IReadOnlyList<ProductSubAssemblyUsage> usages, IReadOnlyList<SubAssemblyLine> subAssemblyLines, IReadOnlyList<UsageAddInLine> addIns)
     {
-        var linesBySubAssembly = subAssemblyLines.ToLookup(l => l.SubAssemblyId);
-
-        // Add-ins key on the usage, not the sub-assembly: they're this product's own, so two products
-        // linking the same one have different sets.
-        var addInsByUsage = addIns.ToLookup(a => a.UsageId);
-        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
-        List<ProductUsageEdit> sections =
-        [
-            .. usages
-                .Select(u => ToUsageEdit(u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], ingredientsById))
-                .Order(ProductUsageEdit.RecipeOrder),
-        ];
-
         // Another product's recipe opens on its first tab; the same product's, reloaded, keeps the tab it showed. Its
         // section is read now, before the tabs take on the new sections.
         var previousTab = _isRecipeClearedForAnother ? null : SelectedRecipeTab;
@@ -405,8 +364,7 @@ public sealed class ProductRecipe : ObservableState
         HashSet<int> previousIds = [.. UsageEdits.Select(u => u.SubAssemblyId)];
         _isRecipeClearedForAnother = false;
 
-        ReplaceUsageItems(sections);
-        _savedRecipe = CurrentDraft();
+        Draft.Show(usages, subAssemblyLines, addIns);
         ReselectRecipeTab(previousTab, previousUsage, previousIds);
     }
 
@@ -417,13 +375,8 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     internal void Clear(bool keepRecipeTabs)
     {
-        if (!keepRecipeTabs)
-        {
-            UsageEdits.Clear();
-        }
-
+        Draft.Clear(keepSections: keepRecipeTabs);
         RemoveAddSubAssemblyTab();
-        _savedRecipe = new RecipeDraft([], []);
     }
 
     /// <summary>
@@ -704,103 +657,8 @@ public sealed class ProductRecipe : ObservableState
     }
 
     /// <summary>
-    /// Points the recipe's sections, saved or not, at the refreshed ingredients and roles, and a linked
-    /// section at its refreshed sub-assembly and lines, keeping each section's own piece size, so costs
-    /// changed on other tabs reach the recipe and the cost summary. Only a section that shows something
-    /// different is rebuilt. The screen points the packaging rows at their refreshed materials the same way after. True when
-    /// a linked section came in changed from where it's kept, which the undo history then follows (<see cref="WithLinkedAsSavedNow"/>).
-    /// </summary>
-    internal bool RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
-    {
-        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
-        var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
-        var linkedLinesById = linkedLines.ToLookup(l => l.SubAssemblyId);
-        var roles = _roles;
-        var productId = _host.DetailProductId;
-
-        var changed = false;
-        var linkedChanged = false;
-        for (var i = 0; i < UsageEdits.Count; i++)
-        {
-            var edit = UsageEdits[i];
-            ProductUsageEdit fresh;
-            var saved = edit.SubAssemblyId > 0 ? linkedById.GetValueOrDefault(edit.SubAssemblyId) : null;
-            var isOwnNow = saved is not null && saved.OwnerProductId is { } ownerId && ownerId == productId;
-            if (saved is not null && edit.IsLinked && isOwnNow)
-            {
-                // Its role was made product-owned: the product owns it now, with any add-ins it had merged into its lines.
-                var role = roles.FirstOrDefault(r => r.Id == saved.RoleId) ?? saved.Role;
-                fresh = new ProductUsageEdit(
-                    saved.Id,
-                    role,
-                    [.. linkedLinesById[saved.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                    edit.AuthoredField,
-                    edit.AuthoredValue,
-                    linkedName: null,
-                    name: saved.SectionName);
-            }
-            else if (edit.IsLinked || (edit.IsOwned && saved is not null && !isOwnNow))
-            {
-                // A linked one, or one of its own whose role is no longer product-owned, which it links now.
-                if (saved is not { } subAssembly)
-                {
-                    continue;
-                }
-
-                fresh = AsSavedNow(edit, subAssembly, linkedLinesById, ingredientsById);
-            }
-            else
-            {
-                fresh = edit.With(roles.FirstOrDefault(r => r.Id == edit.RoleId) ?? edit.Role, Repriced(edit.Lines, ingredientsById));
-            }
-
-            if (!fresh.ShowsSameAs(edit))
-            {
-                UsageEdits[i] = fresh;
-                changed = true;
-                linkedChanged |= edit.IsLinked;
-            }
-        }
-
-        // A renamed role or sub-assembly can move a section.
-        if (changed)
-        {
-            var sorted = UsageEdits.Order(ProductUsageEdit.RecipeOrder).ToList();
-            for (var i = 0; i < sorted.Count; i++)
-            {
-                var from = UsageEdits.IndexOf(sorted[i]);
-                if (from != i)
-                {
-                    UsageEdits.Move(from, i);
-                }
-            }
-        }
-
-        return linkedChanged;
-    }
-
-    /// <summary>
-    /// A linked section as the sub-assembly where it's kept is saved now (<paramref name="subAssembly"/>): its lines, name
-    /// and role come from there; its add-ins are this product's own, so they only need their ingredients' new costs; lines
-    /// changed here and not saved yet stay, repriced; its piece size stays the product's.
-    /// </summary>
-    private ProductUsageEdit AsSavedNow(
-        ProductUsageEdit edit, SubAssembly subAssembly, ILookup<int, SubAssemblyLine> linkedLinesById, Dictionary<int, RawMaterial> ingredientsById)
-    {
-        var role = _roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
-        return edit.WithLinked(
-            subAssembly.Name,
-            SectionLabelOf(subAssembly.Name, role),
-            role,
-            [.. linkedLinesById[subAssembly.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-            edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
-            Repriced(edit.AddIns, ingredientsById),
-            PricedSection.LinkedOwnerOf(subAssembly));
-    }
-
-    /// <summary>
     /// <paramref name="snapshot"/>, an undo step's recipe, with its linked sections as a load just found them saved where
-    /// they're kept (as <see cref="RefreshRows"/> brought them into the form), and the section form open on one of them
+    /// they're kept (as <see cref="ProductRecipeDraft.RefreshRows"/> brought them into the form), and the section form open on one of them
     /// showing its lines as saved now, unless they're typed into there. What the product holds of its own (a piece size,
     /// add-ins, lines edited here) stays as the step had it. An undo or a redo then never puts back a sub-assembly's lines as
     /// they were before it was saved on the Sub-Assemblies screen.
@@ -824,7 +682,7 @@ public sealed class ProductRecipe : ObservableState
                 continue;
             }
 
-            var fresh = AsSavedNow(edit, saved, linkedLinesById, ingredientsById);
+            var fresh = Draft.AsSavedNow(edit, saved, linkedLinesById, ingredientsById);
             if (fresh.ShowsSameAs(edit))
             {
                 continue;
@@ -862,12 +720,6 @@ public sealed class ProductRecipe : ObservableState
             && pair.First.Grams == pair.Second.Grams
             && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
             && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
-
-    /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
-    private static IReadOnlyList<SectionLine> Repriced(IReadOnlyList<SectionLine> lines, Dictionary<int, RawMaterial> ingredientsById) =>
-        [.. lines.Select(l => ingredientsById.TryGetValue(l.Ingredient.Id, out var fresh) && !CollectionMerge.HasSameValues(fresh, l.Ingredient)
-            ? new SectionLine(fresh, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)
-            : l)];
 
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     internal void StartUsageFormMode()
@@ -945,8 +797,8 @@ public sealed class ProductRecipe : ObservableState
                 _usageForm.AuthoredValue,
                 subAssembly.Name,
                 [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SectionLine(a.Ingredient, a.Grams))],
-                SectionLabelOf(subAssembly.Name, role));
-            EnsureSectionsDistinct(replacement, linked);
+                Draft.SectionLabelOf(subAssembly.Name, role));
+            Draft.EnsureSectionsDistinct(replacement, linked);
 
             _host.AsUndoStep(() => ReplaceUsage(linked, replacement));
             if (dropped.Count > 0)
@@ -1050,7 +902,7 @@ public sealed class ProductRecipe : ObservableState
             }
 
             var moving = applied.MovedToInHouse(made);
-            ReplaceInRecipeOrder(applied, moving);
+            Draft.ReplaceInRecipeOrder(applied, moving);
             _host.InvalidateCosts();
             if (wasEditing)
             {
@@ -1123,7 +975,7 @@ public sealed class ProductRecipe : ObservableState
                 authoredValue,
                 source.Name,
                 CompleteAddIns(sourceName, sourceLines),
-                SectionLabelOf(source.Name, role));
+                Draft.SectionLabelOf(source.Name, role));
         }
 
         if (_usageForm.EditingUsage is { } unchanged && usage.ShowsSameAs(unchanged))
@@ -1137,16 +989,16 @@ public sealed class ProductRecipe : ObservableState
         // through, and Save says what's wrong when it's next changed.
         if (_usageForm.EditingUsage is not { IsLinked: true })
         {
-            EnsureSectionsDistinct(usage, _usageForm.EditingUsage);
+            Draft.EnsureSectionsDistinct(usage, _usageForm.EditingUsage);
         }
 
         if (_usageForm.EditingUsage is { } editing)
         {
-            ReplaceInRecipeOrder(editing, usage);
+            Draft.ReplaceInRecipeOrder(editing, usage);
         }
         else
         {
-            InsertInRecipeOrder(usage);
+            Draft.InsertInRecipeOrder(usage);
         }
 
         CloseUsageForm();
@@ -1251,30 +1103,11 @@ public sealed class ProductRecipe : ObservableState
     }
 
     /// <summary>
-    /// Refuses <paramref name="usage"/> in place of <paramref name="replacing"/> when the recipe could no longer tell its
-    /// sections apart: two in one role by the same name, or both without one (SubAssemblyRules.EnsureSectionsDistinct),
-    /// or a name too long. SetRecipeAsync checks the same as it saves; this is what puts the message up the moment
-    /// Apply is pressed, or the tab is left.
+    /// Each section's tab reads what it's called again: whether the recipe has others in its role, which the draft marks
+    /// first (ProductRecipeDraft.MarkRepeatedRoles), names it too ("Filling: Ube"). Run whenever the recipe's sections change.
     /// </summary>
-    private void EnsureSectionsDistinct(ProductUsageEdit usage, ProductUsageEdit? replacing)
+    private void RefreshTabHeaders()
     {
-        List<ProductUsageEdit> sections = [.. UsageEdits.Where(u => !ReferenceEquals(u, replacing)), usage];
-        SubAssemblyRules.EnsureSectionsDistinct([.. sections.Select(u => (u.RoleId, u.RoleName, u.Label))]);
-        SubAssemblyRules.EnsureValidSectionName(usage.IsEditable ? usage.Name : null);
-    }
-
-    /// <summary>
-    /// Tells each section whether the recipe has others in its role, so it's called by its name too ("Filling: Ube"),
-    /// and its tab reads so. Run whenever the recipe's sections change.
-    /// </summary>
-    private void MarkRepeatedRoles()
-    {
-        var countsByRole = UsageEdits.CountBy(u => u.RoleId).ToDictionary();
-        foreach (var usage in UsageEdits)
-        {
-            usage.IsRoleRepeated = countsByRole[usage.RoleId] > 1;
-        }
-
         foreach (var tab in RecipeTabs.OfType<SubAssemblyRecipeTab>())
         {
             tab.RefreshHeader();
@@ -1389,17 +1222,6 @@ public sealed class ProductRecipe : ObservableState
         _usageForm.FollowPieceSize();
     }
 
-    private void InsertInRecipeOrder(ProductUsageEdit usage)
-    {
-        var index = 0;
-        while (index < UsageEdits.Count && ProductUsageEdit.RecipeOrder.Compare(UsageEdits[index], usage) <= 0)
-        {
-            index++;
-        }
-
-        UsageEdits.Insert(index, usage);
-    }
-
     private void ReplaceUsage(ProductUsageEdit old, ProductUsageEdit replacement)
     {
         var wasEditing = ReferenceEquals(old, _usageForm.EditingUsage);
@@ -1408,7 +1230,7 @@ public sealed class ProductRecipe : ObservableState
             CloseUsageForm();
         }
 
-        ReplaceInRecipeOrder(old, replacement);
+        Draft.ReplaceInRecipeOrder(old, replacement);
         RefreshLinkableOptions();
         _host.InvalidateCosts();
 
@@ -1416,27 +1238,6 @@ public sealed class ProductRecipe : ObservableState
         if (wasEditing)
         {
             OpenUsageForm(replacement);
-        }
-    }
-
-    /// <summary>
-    /// Puts <paramref name="replacement"/> in <paramref name="old"/>'s place, then moves it to where it sorts
-    /// (a new name or role can move it). Replacing rather than removing keeps its tab, and the tab showing.
-    /// </summary>
-    private void ReplaceInRecipeOrder(ProductUsageEdit old, ProductUsageEdit replacement)
-    {
-        var index = UsageEdits.IndexOf(old);
-        if (index < 0)
-        {
-            InsertInRecipeOrder(replacement);
-            return;
-        }
-
-        UsageEdits[index] = replacement;
-        var sortedIndex = UsageEdits.Count(u => !ReferenceEquals(u, replacement) && ProductUsageEdit.RecipeOrder.Compare(u, replacement) <= 0);
-        if (sortedIndex != index)
-        {
-            UsageEdits.Move(index, sortedIndex);
         }
     }
 
@@ -1553,7 +1354,7 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     private void RestoreSections(IReadOnlyList<ProductUsageEdit> usages, bool hasAddSubAssemblyTab, RecipeTabChoice? tab)
     {
-        ReplaceUsageItems(usages);
+        Draft.ReplaceUsageItems(usages);
 
         if (hasAddSubAssemblyTab)
         {
@@ -1578,108 +1379,4 @@ public sealed class ProductRecipe : ObservableState
         _shownRecipeTab = SelectedRecipeTab;
     }
 
-    /// <summary>
-    /// Makes UsageEdits hold <paramref name="sections"/>, section for section and in place: each tab stays and shows its
-    /// new section (MirrorUsageTabs), so the tabs, the one showing included, stay the same objects, and only the
-    /// difference is added or taken away. Never Clear(), which the mirror reads as every tab going. It leaves _savedRecipe
-    /// alone, which is why an undo can use it and ShowSaved can't be reused.
-    /// </summary>
-    private void ReplaceUsageItems(IReadOnlyList<ProductUsageEdit> sections)
-    {
-        for (var i = 0; i < sections.Count; i++)
-        {
-            if (i < UsageEdits.Count)
-            {
-                UsageEdits[i] = sections[i];
-            }
-            else
-            {
-                UsageEdits.Add(sections[i]);
-            }
-        }
-
-        while (UsageEdits.Count > sections.Count)
-        {
-            UsageEdits.RemoveAt(UsageEdits.Count - 1);
-        }
-    }
-
-    /// <summary>A saved usage as its section, with the screen's own copies of its role and ingredients (ProductUsageEdit.FromSaved).</summary>
-    private ProductUsageEdit ToUsageEdit(
-        ProductSubAssemblyUsage usage,
-        IEnumerable<SubAssemblyLine> lines,
-        IEnumerable<UsageAddInLine> addIns,
-        IReadOnlyDictionary<int, RawMaterial> ingredientsById)
-    {
-        var subAssembly = usage.SubAssembly!;
-        var role = _roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
-        return ProductUsageEdit.FromSaved(usage, lines, addIns, role, _host.EditingName, ingredientsById);
-    }
-
-    /// <summary>
-    /// What a linked sub-assembly goes by beside its role in this product's recipe: its name, less the product's own and
-    /// the role it was saved under from here ("Ube" for "Cheese Roll Filling: Ube"), as SetRecipeAsync reads it.
-    /// </summary>
-    internal string? SectionLabelOf(string subAssemblyName, SubAssemblyRole? role) =>
-        SubAssemblyRules.SectionLabel(subAssemblyName, _host.EditingName, role?.Name ?? string.Empty);
-
-    /// <summary>
-    /// The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links; and a composite's
-    /// products, each with how many go in (a line half filled in is refused: ProductComponentRow.CompleteLines).
-    /// </summary>
-    internal RecipeDraft CurrentDraft() =>
-        new(
-            [.. UsageEdits.Where(u => u.IsEditable).Select(u => new NewSubAssemblyDraft(
-                u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
-            {
-                // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
-                Id = u.SubAssemblyId,
-                Placement = u.ToMadeIngredient is { } made ? new SectionPlacement.MoveToInHouse(made)
-                    : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
-                    : u.IsOwned ? new SectionPlacement.ProductsOwn()
-                    : new SectionPlacement.ByRole(),
-            })],
-            [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
-            {
-                AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
-
-                // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
-                // screen has changed since.
-                Lines = u.AreLinkedLinesEdited
-                    ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
-                    : null,
-            })])
-        {
-            Components = _host.IsEditingComposite ? [.. ProductComponentRow.CompleteLines(_components.ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
-        };
-
-    /// <summary>Whether <paramref name="draft"/> would save the recipe as it was loaded (IsSameRecipe), so Save needn't write it.</summary>
-    internal bool IsAsSaved(RecipeDraft draft) => IsSameRecipe(draft, _savedRecipe);
-
-    /// <summary>
-    /// Whether two recipes would save the same: the same sub-assemblies, roles, lines, add-ins and piece
-    /// sizes, and the same products at the same quantities, in the same order. A linked draft is compared field by
-    /// field rather than as a record, as a new one already is: a record's own Equals compares its AddIns list by
-    /// reference, which no two recipes built separately ever share, so Save would write the recipe every time.
-    /// </summary>
-    private static bool IsSameRecipe(RecipeDraft a, RecipeDraft b) =>
-        a.Components.SequenceEqual(b.Components)
-        && a.Linked.Count == b.Linked.Count
-        && a.Linked.Zip(b.Linked).All(pair =>
-            pair.First.SubAssemblyId == pair.Second.SubAssemblyId
-            && pair.First.AuthoredField == pair.Second.AuthoredField
-            && pair.First.AuthoredValue == pair.Second.AuthoredValue
-            && pair.First.AddIns.SequenceEqual(pair.Second.AddIns)
-            && (pair.First.Lines is null) == (pair.Second.Lines is null)
-            && (pair.First.Lines ?? []).SequenceEqual(pair.Second.Lines ?? []))
-        && a.New.Count == b.New.Count
-        && a.New.Zip(b.New).All(pair =>
-            pair.First.Id == pair.Second.Id
-            && pair.First.Placement == pair.Second.Placement
-
-            && pair.First.RoleId == pair.Second.RoleId
-            && pair.First.SectionName == pair.Second.SectionName
-            && pair.First.AuthoredField == pair.Second.AuthoredField
-            && pair.First.AuthoredValue == pair.Second.AuthoredValue
-            && pair.First.Lines.SequenceEqual(pair.Second.Lines));
 }
