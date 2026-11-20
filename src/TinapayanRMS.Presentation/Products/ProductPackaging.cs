@@ -521,9 +521,9 @@ public sealed class ProductPackaging : ObservableState, IDisposable
     /// (<see cref="ShowsSavedLink"/>): shown in place of the rows only when they differ from the lines last loaded. The view's
     /// load merges into every open tab, and a table rebuilt row by row each time, its changes running through every
     /// subscription to it, was a fifth of each tab's merge; the rows are pointed at their refreshed materials either way
-    /// (<see cref="ResolveRows"/>).
+    /// (<see cref="ResolveRows"/>). True when they were shown again.
     /// </summary>
-    public void RefreshLinkedLines(IReadOnlyList<PackagingLine> lines)
+    public bool RefreshLinkedLines(IReadOnlyList<PackagingLine> lines)
     {
         var fresh = lines.Select(line =>
         {
@@ -531,10 +531,13 @@ public sealed class ProductPackaging : ObservableState, IDisposable
             var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
             return (line.PackagingMaterialId, line.UnitId, PackagingLineAuthoredField.QtyPerUnit, qtyPerUnit);
         });
-        if (!fresh.SequenceEqual(_savedLines))
+        if (fresh.SequenceEqual(_savedLines))
         {
-            LoadLines(lines);
+            return false;
         }
+
+        LoadLines(lines);
+        return true;
     }
 
     /// <summary>

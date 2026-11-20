@@ -908,14 +908,35 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         load.SavedSince = FollowSavedVersion(
             SelectedProduct is { } showing && showing.Id == EditingId && EditingId == load.DetailProductId ? showing.UpdatedAt : SavedVersion);
 
+        PackagingSnapshot? linkedPackagingNow = null;
         if (load.DetailProductId == _detailProductId && load.LinkedPackagingLines is { } linkedPackagingLines)
         {
             // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
+            var renamed = !Equals(Packaging.LinkTarget, load.SavedLink);
             Packaging.ShowLink(load.SavedLink);
-            Packaging.RefreshLinkedLines(linkedPackagingLines);
+            if (Packaging.RefreshLinkedLines(linkedPackagingLines) || renamed)
+            {
+                linkedPackagingNow = Packaging.Capture();
+            }
         }
 
-        Recipe.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
+        var linkedSectionsChanged = Recipe.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
+
+        // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
+        // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked
+        // packaging's, as they were before they were saved on the Sub-Assemblies screen.
+        if (linkedSectionsChanged || linkedPackagingNow is not null)
+        {
+            History.RewriteAll(snapshot => snapshot with
+            {
+                Recipe = linkedSectionsChanged
+                    ? Recipe.WithLinkedAsSavedNow(snapshot.Recipe, read.LinkedSubAssemblies, read.LinkedLines)
+                    : snapshot.Recipe,
+                Packaging = linkedPackagingNow is { } now && snapshot.Packaging.Link?.Key == now.Link?.Key && !snapshot.Packaging.IsMoving
+                    ? snapshot.Packaging with { Link = now.Link, Lines = now.Lines }
+                    : snapshot.Packaging,
+            });
+        }
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
         Packaging.ResolveRows();

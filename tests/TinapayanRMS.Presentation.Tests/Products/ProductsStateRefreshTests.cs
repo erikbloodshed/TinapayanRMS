@@ -862,6 +862,54 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         miniUsage.AuthoredValue.Should().Be(30m);
     });
 
+    // Something typed before the load and undone after it, or redone: the linked dough, in its section and in the form
+    // open on it, stays as it's saved now, not as it was when the step was taken.
+    [Test]
+    public Task Undoing_an_edit_from_before_a_load_keeps_a_linked_sections_lines_as_saved_now() => UiThread.RunAsync(async () =>
+    {
+        await WithoutWastageAsync();
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (_, doughId) = await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var miniId = await AddProductAsync("Cream Loaf Mini");
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        state.Pick(state.Products.Single(p => p.Id == miniId));
+        await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == miniId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
+        await state.Recipe.AddUsageCommand.ExecuteAsync(UsageFormMode.Link);
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
+        await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 1, () => $"form lines={state.UsageForm.FormLines.Count}");
+        state.UsageForm.TypeWeightPerPiece(30m);
+        await state.SaveCommand.ExecuteAsync();
+        state.ErrorMessage.Should().BeNull();
+        await Settle.UntilAsync(state, () => state.Recipe.UsageEdits.Count == 1 && !state.HasUnsavedChanges, () => $"usage rows={state.Recipe.UsageEdits.Count}, dirty={state.HasUnsavedChanges}");
+
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        state.EditingName = "Cream Loaf Petite";
+        recorder.EndUndoStep();
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Id = doughId, Name = "Cream Loaf Dough", RoleId = roleId }, [(flourId, 1000m), (butterId, 250m)], Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+        state.Recipe.UsageEdits.Single().TotalWeight.Should().Be(1250m);
+
+        state.TryUndo().Should().BeTrue();
+
+        state.EditingName.Should().Be("Cream Loaf Mini");
+        state.Recipe.UsageEdits.Single().TotalWeight.Should().Be(1250m, "the dough as it's saved now, not as it was");
+        state.UsageForm.FormLines.Select(l => (l.Ingredient!.Name, l.Grams)).Should()
+            .Equal([("Flour", 1000m), ("Butter", 250m)], "the form open on it shows it as saved now too");
+        state.SaveCommand.CanExecute().Should().BeFalse("nothing typed is left");
+
+        state.TryRedo().Should().BeTrue();
+
+        state.EditingName.Should().Be("Cream Loaf Petite");
+        state.Recipe.UsageEdits.Single().TotalWeight.Should().Be(1250m);
+        state.UsageForm.FormLines.Select(l => l.Ingredient!.Name).Should().Equal("Flour", "Butter");
+    });
+
     [Test]
     public Task A_linked_sections_lines_are_edited_in_the_product_and_Save_writes_them_to_the_sub_assembly_after_asking() => UiThread.RunAsync(async () =>
     {

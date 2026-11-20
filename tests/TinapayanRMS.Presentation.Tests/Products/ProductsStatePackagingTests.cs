@@ -284,6 +284,37 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         gift.SaveCommand.CanExecute().Should().BeTrue();
     });
 
+    // Something typed before the load and undone after it: the linked set's lines stay as they're saved now, not as they
+    // were when the step was taken, and nothing is left to save.
+    [Test]
+    public Task Undoing_an_edit_from_before_a_load_keeps_the_linked_sets_lines_as_saved_now() => UiThread.RunAsync(async () =>
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var sets = new SubAssemblyRepository(CreateDbContextFactory());
+        var setId = await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(productId, setId, Cancellation);
+        var view = (await CreateLoadedStateAsync()).View;
+        var form = await OpenKeptAsync(view, productId);
+        var recorder = (IUndoRecorder)form;
+        recorder.BeginUndoStep();
+        form.EditingName = "Ensaymada Special";
+        recorder.EndUndoStep();
+
+        await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Id = setId, Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 3m)], Cancellation);
+        await view.LoadCommand.ExecuteAsync();
+        form.SaveCommand.CanExecute().Should().BeTrue("the new name is still to be saved");
+
+        form.TryUndo().Should().BeTrue();
+
+        form.EditingName.Should().Be("Ensaymada");
+        form.Packaging.LineEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(3m, "the set as it's saved now, not as it was");
+        form.SaveCommand.CanExecute().Should().BeFalse("nothing typed is left");
+    });
+
     /// <summary>Opens <paramref name="productId"/> in a tab of the view that stays, its details in.</summary>
     private static async Task<ProductForm> OpenKeptAsync(ProductsState view, int productId)
     {
