@@ -71,23 +71,16 @@ internal sealed class ProductsLoadReader(
         var costingDefaultsRead = Task.Run(() => costingDefaultsRepository.GetAsync(CancellationToken.None));
         var linkedSubAssembliesRead = Task.Run(() => subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
         var linkedLinesRead = Task.Run(() => subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
-        var packagingLinkReads = detailProductIds
-            .Select(productId => Task.Run(() => packagingLinkRepository.GetForProductAsync(productId, CancellationToken.None)))
-            .ToList();
+
+        // Every open form's packaging link in one query, however many tabs are open.
+        var packagingLinksRead = detailProductIds.Count == 0
+            ? Task.FromResult<IReadOnlyList<PackagingLink>>([])
+            : Task.Run(() => packagingLinkRepository.GetForProductsAsync(detailProductIds, CancellationToken.None));
         var componentLinksRead = Task.Run(() => productRepository.GetAllComponentsAsync(CancellationToken.None));
         var componentCostsRead = Task.Run(() => savedProducts.ReadComponentCostsAsync(componentIds, CancellationToken.None));
         await Task.WhenAll(
             rolesRead, categoriesRead, foldersRead, rawMaterialsRead, productsRead, deletedRead, linkableRead, standaloneRead, costingDefaultsRead,
-            linkedSubAssembliesRead, linkedLinesRead, Task.WhenAll(packagingLinkReads), componentLinksRead, componentCostsRead);
-
-        Dictionary<int, PackagingLink> packagingLinks = [];
-        foreach (var read in packagingLinkReads)
-        {
-            if (await read is { } link)
-            {
-                packagingLinks[link.ProductId] = link;
-            }
-        }
+            linkedSubAssembliesRead, linkedLinesRead, packagingLinksRead, componentLinksRead, componentCostsRead);
 
         return new ProductsLoad(
             Roles: await rolesRead,
@@ -101,15 +94,27 @@ internal sealed class ProductsLoadReader(
             CostingDefaults: await costingDefaultsRead,
             LinkedSubAssemblies: await linkedSubAssembliesRead,
             LinkedLines: await linkedLinesRead,
-            PackagingLinks: packagingLinks,
+            PackagingLinks: (await packagingLinksRead).ToDictionary(link => link.ProductId),
             ComponentLinks: await componentLinksRead,
             ComponentCosts: await componentCostsRead);
     }
 
     /// <summary>
-    /// The packaging lines <paramref name="productId"/> shows for one sellable unit as they're saved now: through its link,
-    /// the linked set's or product's (IPackagingLineRepository.GetEffectiveForProductAsync).
+    /// The packaging lines each of <paramref name="productIds"/> shows for one sellable unit as they're saved now, through
+    /// its link, the linked set's or product's, by product: for every open form at once, in a few queries however many
+    /// there are (IPackagingLineRepository.GetEffectiveForProductsAsync). A product whose links come round again, which only
+    /// an edit outside the app can leave, isn't among them: its form keeps the lines it shows.
     /// </summary>
-    public Task<IReadOnlyList<PackagingLine>> ReadLinkedPackagingAsync(int productId) =>
-        packagingLineRepository.GetEffectiveForProductAsync(productId, CancellationToken.None);
+    public async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ReadLinkedPackagingAsync(IReadOnlyCollection<int> productIds)
+    {
+        if (productIds.Count == 0)
+        {
+            return new Dictionary<int, IReadOnlyList<PackagingLine>>();
+        }
+
+        var effective = await packagingLineRepository.GetEffectiveForProductsAsync(productIds, CancellationToken.None);
+        return effective.Lines
+            .Where(lines => !effective.LinkedRoundInALoop.Contains(lines.Key))
+            .ToDictionary(lines => lines.Key, lines => lines.Value);
+    }
 }

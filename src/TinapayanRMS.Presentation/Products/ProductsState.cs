@@ -299,16 +299,19 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         // A form whose tab closed meanwhile takes nothing; one opened meanwhile read its own as it opened.
         loads = [.. loads.Where(l => Tabs.All.Any(tab => tab.Form == l.Form))];
 
-        // Each form's linked packaging, read again while it shows the link as saved, all at once.
-        var packagingReads = loads
+        // Each form's linked packaging, read again while it shows the link as saved: every form's in one read.
+        var packagingToRead = loads
             .Select(l => (l.Load, ProductId: l.Form.LinkedPackagingToRead(l.Load, read)))
             .Where(r => r.ProductId is not null)
-            .Select(r => (r.Load, Lines: Task.Run(() => _loadReader.ReadLinkedPackagingAsync(r.ProductId!.Value))))
+            .Select(r => (r.Load, ProductId: r.ProductId!.Value))
             .ToList();
-        await Task.WhenAll(packagingReads.Select(r => r.Lines));
-        foreach (var (load, lines) in packagingReads)
+        var linkedPackaging = await Task.Run(() => _loadReader.ReadLinkedPackagingAsync([.. packagingToRead.Select(r => r.ProductId).Distinct()]));
+        foreach (var (load, productId) in packagingToRead)
         {
-            load.LinkedPackagingLines = await lines;
+            if (linkedPackaging.TryGetValue(productId, out var lines))
+            {
+                load.LinkedPackagingLines = lines;
+            }
         }
 
         foreach (var (form, load) in loads)
