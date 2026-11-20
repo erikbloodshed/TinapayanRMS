@@ -1052,7 +1052,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// Takes the new product's row out of the list (<see cref="NewInList"/>), and the rows picked, and stops the naming in
     /// it. The form is left as it is.
     /// </summary>
-    public void EndNewRow() => ListNaming.EndNewRow(ProductTree.PendingProduct, ProductTree.EndNewProduct);
+    public override void EndNewRow() => ListNaming.EndNewRow(ProductTree.PendingProduct, ProductTree.EndNewProduct);
 
     /// <summary>Whether a row of the list is a new product's or a new folder's, still to be named.</summary>
     protected override bool IsNewRow(object node) => node is ProductLeafNode { IsNew: true } or ProductFolderNode { IsNewFolder: true };

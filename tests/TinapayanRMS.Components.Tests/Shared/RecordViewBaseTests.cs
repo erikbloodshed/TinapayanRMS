@@ -30,12 +30,16 @@ public class RecordViewBaseTests
 
         public Task<bool> ResolveUnsavedChangesAsync(bool revert) => Task.FromResult(true);
 
+        public void FollowOwnSaveOf(IEnumerable<int> ids)
+        {
+        }
+
         public void Dispose()
         {
         }
     }
 
-    private sealed class Things : RecordViewState<Thing>, IRecordOpener
+    private sealed class Things : RecordViewState<Thing>
     {
         private readonly ILogger _logger;
 
@@ -50,11 +54,17 @@ public class RecordViewBaseTests
 
         public override bool IsOpeningRecord => false;
 
+        public override ScreenCommand LoadCommand { get; } = ScreenCommand.Of(() => { });
+
+        public override ScreenCommand NewCommand { get; } = ScreenCommand.Of(() => { });
+
         protected override Thing NewForm() => new(_logger);
 
-        public void OpenRecord(int id) => OpenInTab(id, keep: false, form => form.RecordId = id);
+        public override bool OpenByName(string text) => false;
 
-        public void OpenRecordOnLoad(int id) => OpenedOnLoad.Add(id);
+        public override void OpenRecord(int id) => OpenInTab(id, keep: false, form => form.RecordId = id);
+
+        public override void OpenRecordOnLoad(int id) => OpenedOnLoad.Add(id);
 
         public void OpenKept(int id) => OpenInTab(id, keep: true, form => form.RecordId = id);
     }

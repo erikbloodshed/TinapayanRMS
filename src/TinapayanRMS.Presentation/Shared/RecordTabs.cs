@@ -14,6 +14,12 @@ public interface ITabForm : IUnsavedChangesScreen, INotifyPropertyChanged
 
     /// <summary>The name on the tab: the record's as saved, or "New sub-assembly" for a new one.</summary>
     string TabTitle { get; }
+
+    /// <summary>
+    /// The view's list has saved the records <paramref name="ids"/> itself (a rename, a move), before the view loads: the
+    /// form takes its record's new saved time at that load if it's one of them, keeping what's typed.
+    /// </summary>
+    void FollowOwnSaveOf(IEnumerable<int> ids);
 }
 
 /// <summary>

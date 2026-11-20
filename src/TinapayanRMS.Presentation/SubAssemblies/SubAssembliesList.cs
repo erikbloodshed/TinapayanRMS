@@ -585,7 +585,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// Takes the new sub-assembly's row out of the list (<see cref="NewInList"/>), and the rows picked, and stops the naming
     /// in it: the form no longer shows the new sub-assembly, or it's saved and has a row of its own. The form is left as it is.
     /// </summary>
-    public void EndNewRow() => ListNaming.EndNewRow(SubAssemblyTree.PendingSubAssembly, SubAssemblyTree.EndNewSubAssembly);
+    public override void EndNewRow() => ListNaming.EndNewRow(SubAssemblyTree.PendingSubAssembly, SubAssemblyTree.EndNewSubAssembly);
 
     /// <summary>Whether a row of the list is a new sub-assembly's or a new folder's, still to be named.</summary>
     protected override bool IsNewRow(object node) => node is SubAssemblyLeafNode { IsNew: true } or SubAssemblyFolderNode { IsNewFolder: true };

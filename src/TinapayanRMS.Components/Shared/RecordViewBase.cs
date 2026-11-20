@@ -13,7 +13,7 @@ namespace TinapayanRMS.Components.Shared;
 /// record saved, or the view's bare address, has its place taken.
 /// </summary>
 public abstract class RecordViewBase<TView, TForm> : ScreenBase<TView>
-    where TView : RecordViewState<TForm>, IRecordOpener
+    where TView : RecordViewState<TForm>
     where TForm : ScreenState, ITabForm, IDisposable
 {
     /// <summary>The address last acted on, so the same one given again opens nothing.</summary>
@@ -40,6 +40,9 @@ public abstract class RecordViewBase<TView, TForm> : ScreenBase<TView>
         { Form.RecordId: > 0 and var id } => $"{AddressRoot}/{id}",
         _ => $"{AddressRoot}/new/{tab.Number}",
     };
+
+    /// <summary>A tab's ✕ on the strip (RecordTabStrip): asks about its changes first, showing it, and stays on Cancel.</summary>
+    protected Task CloseTabAsync(RecordTab<TForm> tab) => State!.CloseTabAsync(tab);
 
     // The record in the address is the load's to open, at its end, its list fresh only then. A tab's number is shown now.
     protected override void OnInitialized()

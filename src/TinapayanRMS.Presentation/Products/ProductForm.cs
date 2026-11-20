@@ -390,7 +390,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     private void SelectionChanged()
     {
         // The view's list follows the product showing while this form shows, and one opened ends the new product's row.
-        _view.FormShowsAnother(this);
+        _view.FormShowsAnother(this, SelectedProduct is not null);
         RaisePropertyChanged(nameof(TabTitle));
         if (SelectedProduct is null && SelectedDetailsTab is LinksTab or HistoryTab)
         {

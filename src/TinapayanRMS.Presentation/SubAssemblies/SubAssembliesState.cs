@@ -22,7 +22,7 @@ namespace TinapayanRMS.Presentation.SubAssemblies;
 /// form, and what's typed into it, as it is. It opens on a blank new sub-assembly in the preview tab, as the screen always
 /// has.
 /// </summary>
-public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubAssembliesListHost, IScreenPartHost, IRecordOpener, IRecordScreen
+public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubAssembliesListHost
 {
     private readonly ISubAssemblyRepository _subAssemblyRepository;
     private readonly ISubAssemblyLineRepository _lineRepository;
@@ -39,12 +39,6 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<int> _rawMaterialOpenRequests = new();
     private readonly Subject<int> _newProductRequests = new();
-
-    /// <summary>What <see cref="IRecordScreen.SaveCommand"/> and its Delete are while no tab is open: nothing to do.</summary>
-    private readonly ScreenCommand _nothing = ScreenCommand.Of(() => { }, () => false);
-
-    /// <summary>A sub-assembly an address asked for before the list held it: the end of the next load opens it.</summary>
-    private int? _recordToOpen;
 
     public SubAssembliesState(
         ISubAssemblyRepository subAssemblyRepository,
@@ -81,17 +75,6 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
         // through the view (StartNew).
         NewCommand = ScreenCommand.Of(() => List.NewInList());
 
-        // The list's row follows the form showing, and a new sub-assembly's row being named in the list goes with its tab.
-        Tabs.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(RecordTabs<>.Active))
-            {
-                List.EndNewRow();
-                List.SyncTreeSelection();
-                RaisePropertyChanged(nameof(Form));
-            }
-        };
-
         // The view opens on a blank new sub-assembly, as the screen always has: the first one picked takes its place.
         Show(AddTab(isPreview: true));
     }
@@ -109,13 +92,13 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
 
     /// <summary>Reads the roles, the materials and the sub-assemblies again, and merges them into the list and every open form.</summary>
-    public ScreenCommand LoadCommand { get; }
+    public override ScreenCommand LoadCommand { get; }
 
     /// <summary>
     /// New, from a form's header, the list or the Vim keys' <c>:new</c>: a blank new sub-assembly in the preview tab, so a
     /// tab holding changes is left as it is, and one holding none is used for it.
     /// </summary>
-    public ScreenCommand NewCommand { get; }
+    public override ScreenCommand NewCommand { get; }
 
     /// <summary>The products a form's Dependents tile asks to open, by id. ScreenLinks opens each on Products.</summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
@@ -126,8 +109,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     /// <summary>The sub-assemblies a form's New Product asks a new product to link, by id. ScreenLinks starts it on Products.</summary>
     public IObservable<int> NewProductRequests => _newProductRequests;
 
-    /// <inheritdoc/>
-    public override bool IsOpeningRecord => _recordToOpen is not null;
+    protected override RecordList ViewList => List;
 
     protected override SubAssemblyForm NewForm() =>
         new(this, _subAssemblyRepository, _lineRepository, _subAssemblyValidator, _versionedSaves, _logger, _recipeImpact);
@@ -181,24 +163,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
             await form.EndLoadAsync(load);
         }
 
-        // An address that asked for a sub-assembly before the list held it: the list holds it now, or never will.
-        if (_recordToOpen is { } id)
-        {
-            _recordToOpen = null;
-            OpenRecord(id);
-        }
-    }
-
-    /// <summary>Runs <paramref name="merge"/> within each of <paramref name="forms"/>' own refresh, one inside another.</summary>
-    private static void RefreshingEach(IReadOnlyList<SubAssemblyForm> forms, Action merge, int from = 0)
-    {
-        if (from == forms.Count)
-        {
-            merge();
-            return;
-        }
-
-        forms[from].RefreshWith(() => RefreshingEach(forms, merge, from + 1));
+        OpenRecordWaiting();
     }
 
     /// <summary>A sub-assembly picked in the list: its tab, or the preview tab.</summary>
@@ -209,12 +174,12 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     /// in the list shows it, a search hiding its row cleared. A list that doesn't hold it yet opens it at the end of the next
     /// load, which showing the view runs.
     /// </summary>
-    public void OpenRecord(int id)
+    public override void OpenRecord(int id)
     {
-        _recordToOpen = null;
+        RecordToOpen = null;
         if (List.Rows.FirstOrDefault(r => r.Id == id) is not { } row)
         {
-            _recordToOpen = id;
+            RecordToOpen = id;
             return;
         }
 
@@ -226,11 +191,8 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
         OpenFromList(row);
     }
 
-    /// <summary>IRecordOpener: the sub-assembly in the address the view opens on, at the end of its load, the list fresh only then.</summary>
-    public void OpenRecordOnLoad(int id) => _recordToOpen = id;
-
     /// <summary>The Vim command line's <c>:e name</c>: opens the sub-assembly the name means best, as an address would.</summary>
-    public bool OpenByName(string text)
+    public override bool OpenByName(string text)
     {
         if (RecordNameMatch.Best(List.Rows, row => row.Name, text) is not { } row)
         {
@@ -242,52 +204,15 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     }
 
     /// <summary>
-    /// New: a blank new sub-assembly in <paramref name="role"/> (or the first role), in the preview tab. A sub-assembly still
-    /// waiting for the load to open it is no longer opened: New is the later word.
-    /// </summary>
-    private void NewDraft(SubAssemblyRole? role)
-    {
-        _recordToOpen = null;
-        var tab = PreviewSlot();
-        tab.Form.StartNew(role);
-        Show(tab);
-    }
-
-    /// <summary>
     /// Deletes <paramref name="row"/>'s sub-assembly once it's confirmed: a form's Delete, for its own, or the list's, for any,
     /// asked as <paramref name="asker"/>'s question (the view's own with none). The tab holding it closes, as it's gone.
     /// </summary>
     internal Task DeleteAsync(StandaloneSubAssemblyRow row, SubAssemblyForm? asker) =>
-        ConfirmedAsync(asker, $"Delete '{row.Name}'? This can't be undone.", async () =>
-        {
-            await _subAssemblyRepository.DeleteStandaloneAsync(row.Id, CancellationToken.None);
-            if (Tabs.Holding(row.Id) is { } open)
-            {
-                Drop(open);
-            }
-
-            await LoadCommand.ExecuteAsync();
-        });
-
-    /// <summary>Runs <paramref name="action"/> once <paramref name="question"/> is answered Yes, as <paramref name="asker"/>'s (the view's own with none).</summary>
-    private Task ConfirmedAsync(SubAssemblyForm? asker, string question, Func<Task> action) =>
-        asker is IFormPartHost form ? form.RunWithConfirmationAsync(question, action) : RunWithConfirmationAsync(question, action);
-
-    /// <summary>A form shows another sub-assembly, or none: the list follows it while it's the one showing.</summary>
-    internal void FormShowsAnother(SubAssemblyForm form)
-    {
-        if (form != Form)
-        {
-            return;
-        }
-
-        if (form.SelectedRow is not null)
-        {
-            List.EndNewRow();
-        }
-
-        List.SyncTreeSelection();
-    }
+        DeleteRecordAsync(
+            row.Id,
+            asker,
+            $"Delete '{row.Name}'? This can't be undone.",
+            () => _subAssemblyRepository.DeleteStandaloneAsync(row.Id, CancellationToken.None));
 
     protected override void Dispose(bool disposing)
     {
@@ -303,13 +228,8 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
         base.Dispose(disposing);
     }
 
-    // IRecordScreen, for the Vim command line while no form shows: New starts one, and nothing is there to save or delete.
-    ScreenCommand IRecordScreen.SaveCommand => Form?.SaveCommand ?? _nothing;
-
-    ScreenCommand IRecordScreen.DeleteCommand => Form?.DeleteCommand ?? _nothing;
-
-    // What the list asks of the view (ISubAssembliesListHost): the form showing, and what the list's actions do to the forms
-    // holding the sub-assemblies they act on. The list's own work runs as the form showing does, as the view's load does.
+    // What the list asks of the view (ISubAssembliesListHost) on top of what any record view's list asks (RecordViewState):
+    // the form showing, and what the list's actions do to the forms holding the sub-assemblies they act on.
     StandaloneSubAssemblyRow? ISubAssembliesListHost.SelectedRow => Form?.SelectedRow;
 
     SubAssemblyRole? ISubAssembliesListHost.EditingRole => Form?.EditingRole;
@@ -320,7 +240,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
 
     void ISubAssembliesListHost.KeepOpen(StandaloneSubAssemblyRow row) => OpenFromList(row, keep: true);
 
-    void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => NewDraft(role);
+    void ISubAssembliesListHost.StartNew(SubAssemblyRole? role) => OpenDraft(form => form.StartNew(role));
 
     Task ISubAssembliesListHost.DeleteAsync(StandaloneSubAssemblyRow row) => DeleteAsync(row, Form);
 
@@ -348,98 +268,5 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
 
     bool ISubAssembliesListHost.HasUnsavedChangesFor(int id) => Tabs.Holding(id)?.Form.HasUnsavedChanges == true;
 
-    SavedVersionCheck? ISubAssembliesListHost.SavedVersionFor(IEnumerable<int> ids) =>
-        ids.Select(id => Tabs.Holding(id)).OfType<RecordTab<SubAssemblyForm>>()
-            .Select(tab => ((IRecordListHost)tab.Form).ShowingSavedVersion)
-            .FirstOrDefault(check => check is not null);
-
-    bool IRecordListHost.IsDirty => Form?.HasUnsavedChanges == true;
-
-    string? IRecordListHost.ErrorMessage => Runner.ErrorMessage;
-
-    // A new sub-assembly takes a tab of its own, or the preview tab, and replaces no form with changes: nothing to ask.
-    Task IRecordListHost.AfterUnsavedChangesAsync(Action then)
-    {
-        then();
-        return Task.CompletedTask;
-    }
-
-    SavedVersionCheck? IRecordListHost.ShowingSavedVersion => (Form as IRecordListHost)?.ShowingSavedVersion;
-
-    Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
-    {
-        var saved = ids.ToList();
-        foreach (var tab in Tabs.All)
-        {
-            tab.Form.FollowOwnSaveOf(saved);
-        }
-
-        return LoadCommand.ExecuteAsync();
-    }
-
-    bool IFormPartHost.IsBusyApplying => Form is IFormPartHost form ? form.IsBusyApplying : IsBusyApplying;
-
-    Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => ConfirmedAsync(Form, question, action);
-
-    void IFormPartHost.ApplyRefresh(Action merge) => ApplyRefresh(merge);
-
-    BackgroundWork IScreenPartHost.Work => Form is IScreenPartHost form ? form.Work : Work;
-
-    Task IScreenPartHost.RunSafelyAsync(Func<Task> action) => Form is IScreenPartHost form ? form.RunSafelyAsync(action) : RunSafelyAsync(action);
-
-    void IScreenPartHost.LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load);
-
-    void IScreenPartHost.ShowError(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowError(message);
-        }
-        else
-        {
-            ErrorMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowSuccess(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowSuccess(message);
-        }
-        else
-        {
-            SuccessMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowFailure(Exception exception, string? context)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowFailure(exception, context);
-        }
-        else
-        {
-            ShowFailure(exception, context);
-        }
-    }
-
-    void IUndoRecorder.BeginUndoStep() => (Form as IUndoRecorder)?.BeginUndoStep();
-
-    void IUndoRecorder.EndUndoStep() => (Form as IUndoRecorder)?.EndUndoStep();
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => Form is IUndoRecorder form && form.IsEditPending;
-        set
-        {
-            if (Form is IUndoRecorder form)
-            {
-                form.IsEditPending = value;
-            }
-        }
-    }
-
-    int IUndoRecorder.FormVersion => (Form as IUndoRecorder)?.FormVersion ?? 0;
+    SavedVersionCheck? ISubAssembliesListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

@@ -355,7 +355,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     {
         // The view's list follows the material showing while this form shows, and a material opened, by its Save
         // included, ends the new one's row.
-        _view.FormShowsAnother(this);
+        _view.FormShowsAnother(this, SelectedRawMaterial is not null);
         RaisePropertyChanged(nameof(TabTitle));
         _selectedIds.OnNext(SelectedRawMaterial?.Id ?? 0);
 

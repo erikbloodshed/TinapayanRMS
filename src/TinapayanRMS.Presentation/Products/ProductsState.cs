@@ -29,7 +29,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// the list's actions on products as records (delete, restore, clone, the costing defaults, print). It opens on a blank new
 /// product in the preview tab, as the screen always has.
 /// </summary>
-public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListHost, IScreenPartHost, IRecordOpener, IRecordScreen
+public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListHost
 {
     /// <summary>How a clone's first version names where it came from: "Cloned from Pandesal, version 4".</summary>
     public const string ClonedFrom = "Cloned from";
@@ -71,12 +71,6 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     // What the forms and the list ask of other screens, passed on from whichever asks (Wire).
     private readonly Subject<PrintScope> _printRequests = new();
     private readonly Subject<int> _subAssemblyOpenRequests = new();
-
-    /// <summary>What <see cref="IRecordScreen.SaveCommand"/> and its Delete are while no tab is open: nothing to do.</summary>
-    private readonly ScreenCommand _nothing = ScreenCommand.Of(() => { }, () => false);
-
-    /// <summary>A product an address asked for before the list held it: the end of the next load opens it.</summary>
-    private int? _recordToOpen;
 
     /// <summary>
     /// A sub-assembly <see cref="StartNewProductFrom"/> was asked to link, for the load to start the new product with once
@@ -161,17 +155,6 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         NewCommand = ScreenCommand.Of(() => List.NewInList());
         NewCompositeCommand = ScreenCommand.Of(() => List.NewInList(isComposite: true));
 
-        // The list's row follows the form showing, and a new product's row being named in the list goes with its tab.
-        Tabs.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(RecordTabs<>.Active))
-            {
-                List.EndNewRow();
-                List.SyncTreeSelection();
-                RaisePropertyChanged(nameof(Form));
-            }
-        };
-
         // The view opens on a blank new product, as the screen always has: the first one picked takes its place.
         Show(AddTab(isPreview: true));
     }
@@ -229,13 +212,13 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     internal CostingDefaults? CostingDefaults { get; private set; }
 
     /// <summary>Reads everything the list and the forms show again, and merges it into the list and every open form.</summary>
-    public ScreenCommand LoadCommand { get; }
+    public override ScreenCommand LoadCommand { get; }
 
     /// <summary>
     /// New, from a form's header, the list or the Vim keys' <c>:new</c>: a blank new product in the preview tab, so a tab
     /// holding changes is left as it is, and one holding none is used for it.
     /// </summary>
-    public ScreenCommand NewCommand { get; }
+    public override ScreenCommand NewCommand { get; }
 
     /// <summary>New's New composite product: a new product made of other products, in the preview tab.</summary>
     public ScreenCommand NewCompositeCommand { get; }
@@ -249,8 +232,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// <summary>The sub-assemblies a form's linked badges ask to open, by id. ScreenLinks opens each on Sub-Assemblies.</summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
-    /// <inheritdoc/>
-    public override bool IsOpeningRecord => _recordToOpen is not null;
+    protected override RecordList ViewList => List;
 
     protected override ProductForm NewForm() => new(
         this, _productRepository, _packagingLineRepository, _subAssemblyRepository, _subAssemblyLineRepository, _rawMaterialCategoryRepository,
@@ -268,7 +250,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// </summary>
     public void StartNewProductFrom(int subAssemblyId)
     {
-        _recordToOpen = null;
+        RecordToOpen = null;
         _subAssemblyToStartFrom = subAssemblyId;
     }
 
@@ -360,30 +342,13 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             await form.EndLoadAsync(load);
         }
 
-        // An address that asked for a product before the list held it: the list holds it now, or never will.
-        if (_recordToOpen is { } id)
-        {
-            _recordToOpen = null;
-            OpenRecord(id);
-        }
+        OpenRecordWaiting();
 
         if (_subAssemblyToStartFrom is { } subAssemblyId)
         {
             _subAssemblyToStartFrom = null;
             StartNewProductLinking(subAssemblyId);
         }
-    }
-
-    /// <summary>Runs <paramref name="merge"/> within each of <paramref name="forms"/>' own refresh, one inside another.</summary>
-    private static void RefreshingEach(IReadOnlyList<ProductForm> forms, Action merge, int from = 0)
-    {
-        if (from == forms.Count)
-        {
-            merge();
-            return;
-        }
-
-        forms[from].RefreshWith(() => RefreshingEach(forms, merge, from + 1));
     }
 
     /// <summary>A form's own Save, or its Revert, read its product back: the list takes the fresh copy at once.</summary>
@@ -416,9 +381,9 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// opened, and opens no tab. A list that doesn't hold it yet opens it at the end of the next load, which showing the view
     /// runs.
     /// </summary>
-    public void OpenRecord(int id)
+    public override void OpenRecord(int id)
     {
-        _recordToOpen = null;
+        RecordToOpen = null;
         if (ShowDeleted(id))
         {
             return;
@@ -426,7 +391,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
         if (Products.FirstOrDefault(p => p.Id == id) is not { } product)
         {
-            _recordToOpen = id;
+            RecordToOpen = id;
             return;
         }
 
@@ -438,11 +403,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         OpenFromList(product);
     }
 
-    /// <summary>IRecordOpener: the product in the address the view opens on, at the end of its load, the list fresh only then.</summary>
-    public void OpenRecordOnLoad(int id) => _recordToOpen = id;
-
     /// <summary>The Vim command line's <c>:e name</c>: opens the product the name means best, as an address would.</summary>
-    public bool OpenByName(string text)
+    public override bool OpenByName(string text)
     {
         if (RecordNameMatch.Best(Products, product => product.Name, text) is not { } product)
         {
@@ -481,11 +443,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// </summary>
     private void NewDraft(Action<ProductForm> start)
     {
-        _recordToOpen = null;
         _subAssemblyToStartFrom = null;
-        var tab = PreviewSlot();
-        start(tab.Form);
-        Show(tab);
+        OpenDraft(start);
     }
 
     /// <summary>Sub-Assemblies' New Product, once the load has read the sub-assembly as it's saved now.</summary>
@@ -505,19 +464,11 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// list's, for any, asked as <paramref name="asker"/>'s question (the view's own with none). The tab holding it closes.
     /// </summary>
     internal Task DeleteAsync(Product product, ProductForm? asker) =>
-        ConfirmedAsync(
+        DeleteRecordAsync(
+            product.Id,
             asker,
             $"Delete '{product.Name}'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.",
-            async () =>
-            {
-                await _productRepository.DeleteAsync(product.Id, CancellationToken.None);
-                if (Tabs.Holding(product.Id) is { } open)
-                {
-                    Drop(open);
-                }
-
-                await LoadCommand.ExecuteAsync();
-            });
+            () => _productRepository.DeleteAsync(product.Id, CancellationToken.None));
 
     /// <summary>Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would.</summary>
     private Task RestoreAsync(Product product) => ((IScreenPartHost)this).RunSafelyAsync(async () =>
@@ -648,29 +599,6 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         }
     }
 
-    /// <summary>What runs <paramref name="asker"/>'s work and shows what it says: the form, or the view's own part host.</summary>
-    private IScreenPartHost PartOf(ProductForm? asker) => asker is not null ? asker : this;
-
-    /// <summary>Runs <paramref name="action"/> once <paramref name="question"/> is answered Yes, as <paramref name="asker"/>'s (the view's own with none).</summary>
-    private Task ConfirmedAsync(ProductForm? asker, string question, Func<Task> action) =>
-        asker is IFormPartHost form ? form.RunWithConfirmationAsync(question, action) : RunWithConfirmationAsync(question, action);
-
-    /// <summary>A form shows another product, or none: the list follows it while it's the one showing.</summary>
-    internal void FormShowsAnother(ProductForm form)
-    {
-        if (form != Form)
-        {
-            return;
-        }
-
-        if (form.SelectedProduct is not null)
-        {
-            List.EndNewRow();
-        }
-
-        List.SyncTreeSelection();
-    }
-
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -691,13 +619,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         }
     }
 
-    // IRecordScreen, for the Vim command line while no form shows: New starts one, and nothing is there to save or delete.
-    ScreenCommand IRecordScreen.SaveCommand => Form?.SaveCommand ?? _nothing;
-
-    ScreenCommand IRecordScreen.DeleteCommand => Form?.DeleteCommand ?? _nothing;
-
-    // What the list asks of the view (IProductsListHost): the form showing, the lists the view loaded, and what the list's
-    // actions do to the forms holding the products they act on. The list's own work runs as the form showing does.
+    // What the list asks of the view (IProductsListHost) on top of what any record view's list asks (RecordViewState): the
+    // form showing, the lists the view loaded, and what the list's actions do to the forms holding the products they act on.
     Product? IProductsListHost.SelectedProduct => Form?.SelectedProduct;
 
     IReadOnlyList<ProductFolder> IProductsListHost.Folders
@@ -761,98 +684,5 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
     void IProductsListHost.Print(PrintScope scope) => _printRequests.OnNext(scope);
 
-    SavedVersionCheck? IProductsListHost.SavedVersionFor(IEnumerable<int> ids) =>
-        ids.Select(id => Tabs.Holding(id)).OfType<RecordTab<ProductForm>>()
-            .Select(tab => ((IRecordListHost)tab.Form).ShowingSavedVersion)
-            .FirstOrDefault(check => check is not null);
-
-    bool IRecordListHost.IsDirty => Form?.HasUnsavedChanges == true;
-
-    string? IRecordListHost.ErrorMessage => Runner.ErrorMessage;
-
-    // A new product takes a tab of its own, or the preview tab, and replaces no form with changes: nothing to ask.
-    Task IRecordListHost.AfterUnsavedChangesAsync(Action then)
-    {
-        then();
-        return Task.CompletedTask;
-    }
-
-    SavedVersionCheck? IRecordListHost.ShowingSavedVersion => (Form as IRecordListHost)?.ShowingSavedVersion;
-
-    Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
-    {
-        var saved = ids.ToList();
-        foreach (var tab in Tabs.All)
-        {
-            tab.Form.FollowOwnSaveOf(saved);
-        }
-
-        return LoadCommand.ExecuteAsync();
-    }
-
-    bool IFormPartHost.IsBusyApplying => Form is IFormPartHost form ? form.IsBusyApplying : IsBusyApplying;
-
-    Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => ConfirmedAsync(Form, question, action);
-
-    void IFormPartHost.ApplyRefresh(Action merge) => ApplyRefresh(merge);
-
-    BackgroundWork IScreenPartHost.Work => Form is IScreenPartHost form ? form.Work : Work;
-
-    Task IScreenPartHost.RunSafelyAsync(Func<Task> action) => Form is IScreenPartHost form ? form.RunSafelyAsync(action) : RunSafelyAsync(action);
-
-    void IScreenPartHost.LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load);
-
-    void IScreenPartHost.ShowError(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowError(message);
-        }
-        else
-        {
-            ErrorMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowSuccess(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowSuccess(message);
-        }
-        else
-        {
-            SuccessMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowFailure(Exception exception, string? context)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowFailure(exception, context);
-        }
-        else
-        {
-            ShowFailure(exception, context);
-        }
-    }
-
-    void IUndoRecorder.BeginUndoStep() => (Form as IUndoRecorder)?.BeginUndoStep();
-
-    void IUndoRecorder.EndUndoStep() => (Form as IUndoRecorder)?.EndUndoStep();
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => Form is IUndoRecorder form && form.IsEditPending;
-        set
-        {
-            if (Form is IUndoRecorder form)
-            {
-                form.IsEditPending = value;
-            }
-        }
-    }
-
-    int IUndoRecorder.FormVersion => (Form as IUndoRecorder)?.FormVersion ?? 0;
+    SavedVersionCheck? IProductsListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

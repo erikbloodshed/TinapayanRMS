@@ -23,7 +23,7 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// brings them, which keeps each form, and what's typed into it, as it is. It opens on a blank new material in the preview
 /// tab, as the screen always has.
 /// </summary>
-public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMaterialsListHost, IScreenPartHost, IRecordOpener, IRecordScreen
+public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMaterialsListHost
 {
     private readonly IRawMaterialRepository _rawMaterialRepository;
     private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
@@ -47,12 +47,6 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     // What the forms ask of other screens, passed on from whichever form asks (Wire).
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<int> _subAssemblyOpenRequests = new();
-
-    /// <summary>What <see cref="IRecordScreen.SaveCommand"/> and its Delete are while no tab is open: nothing to do.</summary>
-    private readonly ScreenCommand _nothing = ScreenCommand.Of(() => { }, () => false);
-
-    /// <summary>A material an address asked for before the list held it: the end of the next load opens it.</summary>
-    private int? _recordToOpen;
 
     public RawMaterialsState(
         IRawMaterialRepository rawMaterialRepository,
@@ -115,17 +109,6 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
         // through the view (StartNew).
         NewCommand = ScreenCommand.Of(() => List.NewInList());
 
-        // The list's row follows the form showing, and a new material's row being named in the list goes with its tab.
-        Tabs.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(RecordTabs<>.Active))
-            {
-                List.EndNewRow();
-                List.SyncTreeSelection();
-                RaisePropertyChanged(nameof(Form));
-            }
-        };
-
         // The view opens on a blank new material, as the screen always has: the first one picked takes its place.
         Show(AddTab(isPreview: true));
     }
@@ -155,13 +138,13 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     internal decimal DefaultCostBufferPercent { get; private set; } = CostingDefaults.DefaultCostBufferPercent;
 
     /// <summary>Reads the materials, categories, units of measure and Settings' cost buffer again, and merges them into the list and every open form.</summary>
-    public ScreenCommand LoadCommand { get; }
+    public override ScreenCommand LoadCommand { get; }
 
     /// <summary>
     /// New, from a form's header, the list or the Vim keys' <c>:new</c>: a blank new material in the preview tab, so a tab
     /// holding changes is left as it is, and one holding none is used for it.
     /// </summary>
-    public ScreenCommand NewCommand { get; }
+    public override ScreenCommand NewCommand { get; }
 
     /// <summary>The products a form's Dependents tile asks to open, by id. ScreenLinks opens each on Products.</summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
@@ -169,8 +152,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     /// <summary>The sub-assemblies a made ingredient's Made from asks to open, by id. ScreenLinks opens each on Sub-Assemblies.</summary>
     public IObservable<int> SubAssemblyOpenRequests => _subAssemblyOpenRequests;
 
-    /// <inheritdoc/>
-    public override bool IsOpeningRecord => _recordToOpen is not null;
+    protected override RecordList ViewList => List;
 
     protected override RawMaterialForm NewForm() => new(
         this, _rawMaterialRepository, _priceHistoryRepository, _brandPriceRepository, _bomLineRepository, _subAssemblyLineRepository,
@@ -230,24 +212,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
             await form.EndLoadAsync(load, dependentsRead);
         }
 
-        // An address that asked for a material before the list held it: the list holds it now, or never will.
-        if (_recordToOpen is { } id)
-        {
-            _recordToOpen = null;
-            OpenRecord(id);
-        }
-    }
-
-    /// <summary>Runs <paramref name="merge"/> within each of <paramref name="forms"/>' own refresh, one inside another.</summary>
-    private static void RefreshingEach(IReadOnlyList<RawMaterialForm> forms, Action merge, int from = 0)
-    {
-        if (from == forms.Count)
-        {
-            merge();
-            return;
-        }
-
-        forms[from].RefreshWith(() => RefreshingEach(forms, merge, from + 1));
+        OpenRecordWaiting();
     }
 
     /// <summary>A form's own Save read its material back: the list takes the fresh copy at once.</summary>
@@ -261,12 +226,12 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     /// the list shows it, a search hiding its row cleared. A list that doesn't hold it yet opens it at the end of the next
     /// load, which showing the view runs.
     /// </summary>
-    public void OpenRecord(int id)
+    public override void OpenRecord(int id)
     {
-        _recordToOpen = null;
+        RecordToOpen = null;
         if (RawMaterials.FirstOrDefault(m => m.Id == id) is not { } material)
         {
-            _recordToOpen = id;
+            RecordToOpen = id;
             return;
         }
 
@@ -278,11 +243,8 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
         OpenFromList(material);
     }
 
-    /// <summary>IRecordOpener: the material in the address the view opens on, at the end of its load, the list fresh only then.</summary>
-    public void OpenRecordOnLoad(int id) => _recordToOpen = id;
-
     /// <summary>The Vim command line's <c>:e name</c>: opens the material the name means best, as an address would.</summary>
-    public bool OpenByName(string text)
+    public override bool OpenByName(string text)
     {
         if (RecordNameMatch.Best(RawMaterials, material => material.Name, text) is not { } material)
         {
@@ -294,52 +256,15 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     }
 
     /// <summary>
-    /// New, or the list's Copy: a fresh form in the preview tab, which <paramref name="start"/> fills. A material still
-    /// waiting for the load to open it is no longer opened: New is the later word.
-    /// </summary>
-    private void NewDraft(Action<RawMaterialForm> start)
-    {
-        _recordToOpen = null;
-        var tab = PreviewSlot();
-        start(tab.Form);
-        Show(tab);
-    }
-
-    /// <summary>
     /// Deletes <paramref name="material"/> once it's confirmed: a form's Delete, for its own, or the list's, for any, asked as
     /// <paramref name="asker"/>'s question (the view's own with none). The tab holding it closes, as it's gone.
     /// </summary>
     internal Task DeleteAsync(RawMaterial material, RawMaterialForm? asker) =>
-        ConfirmedAsync(asker, $"Delete '{material.Name}'? This can't be undone.", async () =>
-        {
-            await _rawMaterialRepository.DeleteAsync(material.Id, CancellationToken.None);
-            if (Tabs.Holding(material.Id) is { } open)
-            {
-                Drop(open);
-            }
-
-            await LoadCommand.ExecuteAsync();
-        });
-
-    /// <summary>Runs <paramref name="action"/> once <paramref name="question"/> is answered Yes, as <paramref name="asker"/>'s (the view's own with none).</summary>
-    private Task ConfirmedAsync(RawMaterialForm? asker, string question, Func<Task> action) =>
-        asker is IFormPartHost form ? form.RunWithConfirmationAsync(question, action) : RunWithConfirmationAsync(question, action);
-
-    /// <summary>A form shows another material, or none: the list follows it while it's the one showing.</summary>
-    internal void FormShowsAnother(RawMaterialForm form)
-    {
-        if (form != Form)
-        {
-            return;
-        }
-
-        if (form.SelectedRawMaterial is not null)
-        {
-            List.EndNewRow();
-        }
-
-        List.SyncTreeSelection();
-    }
+        DeleteRecordAsync(
+            material.Id,
+            asker,
+            $"Delete '{material.Name}'? This can't be undone.",
+            () => _rawMaterialRepository.DeleteAsync(material.Id, CancellationToken.None));
 
     protected override void Dispose(bool disposing)
     {
@@ -360,13 +285,8 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
         }
     }
 
-    // IRecordScreen, for the Vim command line while no form shows: New starts one, and nothing is there to save or delete.
-    ScreenCommand IRecordScreen.SaveCommand => Form?.SaveCommand ?? _nothing;
-
-    ScreenCommand IRecordScreen.DeleteCommand => Form?.DeleteCommand ?? _nothing;
-
-    // What the list asks of the view (IRawMaterialsListHost): the form showing, and what the list's actions do to the forms
-    // holding the materials they act on. The list's own work runs as the form showing does, as the view's load does.
+    // What the list asks of the view (IRawMaterialsListHost) on top of what any record view's list asks (RecordViewState):
+    // the form showing, and what the list's actions do to the forms holding the materials they act on.
     RawMaterial? IRawMaterialsListHost.SelectedRawMaterial => Form?.SelectedRawMaterial;
 
     RawMaterialCategory? IRawMaterialsListHost.EditingCategory => Form?.EditingCategory;
@@ -378,9 +298,9 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     void IRawMaterialsListHost.KeepOpen(RawMaterial material) => OpenFromList(material, keep: true);
 
     void IRawMaterialsListHost.StartNew(RawMaterialType type, int? categoryId, RawMaterialSource source) =>
-        NewDraft(form => form.StartNew(type, categoryId, source));
+        OpenDraft(form => form.StartNew(type, categoryId, source));
 
-    void IRawMaterialsListHost.StartCopyOf(RawMaterial material) => NewDraft(form => form.StartCopyOf(material));
+    void IRawMaterialsListHost.StartCopyOf(RawMaterial material) => OpenDraft(form => form.StartCopyOf(material));
 
     Task IRawMaterialsListHost.DeleteAsync(RawMaterial material) => DeleteAsync(material, Form);
 
@@ -406,98 +326,5 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
         }
     }
 
-    SavedVersionCheck? IRawMaterialsListHost.SavedVersionFor(IEnumerable<int> ids) =>
-        ids.Select(id => Tabs.Holding(id)).OfType<RecordTab<RawMaterialForm>>()
-            .Select(tab => ((IRecordListHost)tab.Form).ShowingSavedVersion)
-            .FirstOrDefault(check => check is not null);
-
-    bool IRecordListHost.IsDirty => Form?.HasUnsavedChanges == true;
-
-    string? IRecordListHost.ErrorMessage => Runner.ErrorMessage;
-
-    // A new material takes a tab of its own, or the preview tab, and replaces no form with changes: nothing to ask.
-    Task IRecordListHost.AfterUnsavedChangesAsync(Action then)
-    {
-        then();
-        return Task.CompletedTask;
-    }
-
-    SavedVersionCheck? IRecordListHost.ShowingSavedVersion => (Form as IRecordListHost)?.ShowingSavedVersion;
-
-    Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
-    {
-        var saved = ids.ToList();
-        foreach (var tab in Tabs.All)
-        {
-            tab.Form.FollowOwnSaveOf(saved);
-        }
-
-        return LoadCommand.ExecuteAsync();
-    }
-
-    bool IFormPartHost.IsBusyApplying => Form is IFormPartHost form ? form.IsBusyApplying : IsBusyApplying;
-
-    Task IFormPartHost.RunWithConfirmationAsync(string question, Func<Task> action) => ConfirmedAsync(Form, question, action);
-
-    void IFormPartHost.ApplyRefresh(Action merge) => ApplyRefresh(merge);
-
-    BackgroundWork IScreenPartHost.Work => Form is IScreenPartHost form ? form.Work : Work;
-
-    Task IScreenPartHost.RunSafelyAsync(Func<Task> action) => Form is IScreenPartHost form ? form.RunSafelyAsync(action) : RunSafelyAsync(action);
-
-    void IScreenPartHost.LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load);
-
-    void IScreenPartHost.ShowError(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowError(message);
-        }
-        else
-        {
-            ErrorMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowSuccess(string? message)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowSuccess(message);
-        }
-        else
-        {
-            SuccessMessage = message;
-        }
-    }
-
-    void IScreenPartHost.ShowFailure(Exception exception, string? context)
-    {
-        if (Form is IScreenPartHost form)
-        {
-            form.ShowFailure(exception, context);
-        }
-        else
-        {
-            ShowFailure(exception, context);
-        }
-    }
-
-    void IUndoRecorder.BeginUndoStep() => (Form as IUndoRecorder)?.BeginUndoStep();
-
-    void IUndoRecorder.EndUndoStep() => (Form as IUndoRecorder)?.EndUndoStep();
-
-    bool IUndoRecorder.IsEditPending
-    {
-        get => Form is IUndoRecorder form && form.IsEditPending;
-        set
-        {
-            if (Form is IUndoRecorder form)
-            {
-                form.IsEditPending = value;
-            }
-        }
-    }
-
-    int IUndoRecorder.FormVersion => (Form as IUndoRecorder)?.FormVersion ?? 0;
+    SavedVersionCheck? IRawMaterialsListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

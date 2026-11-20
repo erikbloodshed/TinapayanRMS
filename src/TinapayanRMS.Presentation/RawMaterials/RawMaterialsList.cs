@@ -565,7 +565,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     /// Takes the new material's row out of the list (<see cref="NewInList"/>), and the rows picked, and stops the naming in
     /// it: the form no longer shows the new material, or it's saved and has a row of its own. The form is left as it is.
     /// </summary>
-    public void EndNewRow() => ListNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
+    public override void EndNewRow() => ListNaming.EndNewRow(RawMaterialTree.PendingMaterial, RawMaterialTree.EndNewMaterial);
 
     /// <summary>Whether a row of the list is a new material's or a new folder's, still to be named.</summary>
     protected override bool IsNewRow(object node) => node is RawMaterialLeafNode { IsNew: true } or RawMaterialFolderNode { IsNewFolder: true };

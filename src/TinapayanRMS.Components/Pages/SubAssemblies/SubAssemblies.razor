@@ -14,7 +14,7 @@
     <SubAssembliesListCard List="State!.List" />
 
     <div class="record-details">
-        <RecordTabStrip TForm="SubAssemblyForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseAsync" Keep="State!.Keep" Label="Sub-assemblies open" />
+        <RecordTabStrip TForm="SubAssemblyForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseTabAsync" Keep="State!.Keep" Label="Sub-assemblies open" />
 
         @if (State!.Form is { } form)
         {
@@ -43,7 +43,4 @@
         AddSubscription(State!.List.PromptForMadeIngredient.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskChoiceAsync(interaction.Input))));
     }
-
-    // A tab's ✕: asks about its changes first, showing it, and stays on Cancel.
-    private async Task CloseAsync(RecordTab<SubAssemblyForm> tab) => await State!.CloseTabAsync(tab);
 }

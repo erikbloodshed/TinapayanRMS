@@ -14,7 +14,7 @@
     <ProductsListCard List="State!.List" />
 
     <div class="record-details">
-        <RecordTabStrip TForm="ProductForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseAsync" Keep="State!.Keep" Label="Products open" />
+        <RecordTabStrip TForm="ProductForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseTabAsync" Keep="State!.Keep" Label="Products open" />
 
         @if (State!.Form is { } form)
         {
@@ -43,7 +43,4 @@
         AddSubscription(State!.List.PromptForName.RegisterHandler(async interaction =>
             interaction.SetOutput(await Prompts.AskAsync(interaction.Input))));
     }
-
-    // A tab's ✕: asks about its changes first, showing it, and stays on Cancel.
-    private async Task CloseAsync(RecordTab<ProductForm> tab) => await State!.CloseTabAsync(tab);
 }

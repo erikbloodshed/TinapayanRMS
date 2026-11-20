@@ -177,9 +177,10 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
 
     /// <summary>
     /// A record view's list has saved the records <paramref name="ids"/> itself (a rename, a move), before the view loads: the
-    /// form takes its record's new saved time if it's one of them (<see cref="FollowOwnSaveOnNextLoad"/>).
+    /// form takes its record's new saved time if it's one of them (<see cref="FollowOwnSaveOnNextLoad"/>). A form's own
+    /// (ITabForm), for its view.
     /// </summary>
-    internal void FollowOwnSaveOf(IEnumerable<int> ids)
+    public void FollowOwnSaveOf(IEnumerable<int> ids)
     {
         if (ids.Contains(ShowingRecordId))
         {

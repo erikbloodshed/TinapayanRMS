@@ -14,7 +14,7 @@
     <RawMaterialsListCard List="State!.List" />
 
     <div class="record-details">
-        <RecordTabStrip TForm="RawMaterialForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseAsync" Keep="State!.Keep" Label="Raw materials open" />
+        <RecordTabStrip TForm="RawMaterialForm" Tabs="State!.Tabs" AddressOf="AddressOf" Close="CloseTabAsync" Keep="State!.Keep" Label="Raw materials open" />
 
         @if (State!.Form is { } form)
         {
@@ -45,9 +45,6 @@
         view.List.Copied += FocusName;
         AddSubscription(System.Reactive.Disposables.Disposable.Create(() => view.List.Copied -= FocusName));
     }
-
-    // A tab's ✕: asks about its changes first, showing it, and stays on Cancel.
-    private async Task CloseAsync(RecordTab<RawMaterialForm> tab) => await State!.CloseTabAsync(tab);
 
     private void FocusName() => _ = FocusNameAsync();
 

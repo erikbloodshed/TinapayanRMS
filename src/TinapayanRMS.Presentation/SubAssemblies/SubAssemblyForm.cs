@@ -211,7 +211,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// What follows the sub-assembly showing, a pick's or a load's fresh copy: the view's list follows it while this form
     /// shows, and one opened, by its Save included, ends the new one's row.
     /// </summary>
-    private void SelectionChanged() => _view.FormShowsAnother(this);
+    private void SelectionChanged() => _view.FormShowsAnother(this, SelectedRow is not null);
 
     private string _editingName = string.Empty;
     public string EditingName

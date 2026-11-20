@@ -117,6 +117,12 @@ public abstract class RecordList : ObservableState
     /// </summary>
     public void SyncTreeSelection() => ListSelection.BringFirst(ShowingRow);
 
+    /// <summary>
+    /// Takes the new record's row out of the list, and out of the rows picked, and stops the naming in it: the form showing
+    /// no longer holds the new record, or it's saved and has a row of its own. The form is left as it is.
+    /// </summary>
+    public abstract void EndNewRow();
+
     /// <summary>The row of the record the form shows, or the new record's row, or null for neither (or a search hiding it).</summary>
     protected abstract object? ShowingRow { get; }
 
