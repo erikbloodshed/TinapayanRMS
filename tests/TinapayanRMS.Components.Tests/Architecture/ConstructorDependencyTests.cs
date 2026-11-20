@@ -27,9 +27,6 @@ public class ConstructorDependencyTests
         ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsList"] = 9,
         ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsState"] = 16,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 7,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssembliesList"] = 9,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssembliesState"] = 11,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssemblyForm"] = 7,
     };
 
     [Test]

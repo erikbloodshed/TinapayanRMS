@@ -1,8 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -299,16 +297,6 @@ public class SubAssembliesStateUndoTests(DatabaseFixture fixture) : PersistenceT
     {
         var factory = CreateDbContextFactory();
 
-        return new SubAssembliesState(
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new SubAssemblyValidator(),
-            new SubAssemblyRoleValidator(),
-            new InMemoryViewStateStore(),
-            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return SubAssembliesViews.Create(factory, CreateUnitOfWork()).Form!;
     }
 }

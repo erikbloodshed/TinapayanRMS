@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The use cases (docs/adr/0002), over the real repositories, on the project's own database. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.UseCases\TinapayanRMS.UseCases.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
+  </ItemGroup>
+
+</Project>

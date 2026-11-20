@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Reactive.Subjects;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -9,16 +8,18 @@ using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
 /// One tab of the Sub-Assemblies view (<see cref="SubAssembliesState"/>): a standalone sub-assembly's form, a new one's, or
 /// a copy's. Products link standalone sub-assemblies (and follow every change saved here) or copy them, from their recipe
-/// on the Products screen. One Save writes the name, the role and the lines together. Its parts each hold a piece of it: a
-/// recipe's lines (<see cref="Batch"/>), a packaging set's (<see cref="PackagingSet"/>) and the Dependents tab
-/// (<see cref="Dependents"/>). The form keeps its own fields, which sub-assembly it shows, Save, and the undo history over
-/// them all; the view keeps the list, what the form's pickers offer, and the load that brings them (<see cref="View"/>).
+/// on the Products screen. One Save writes the name, the role and the lines together. What's edited is the draft
+/// (<see cref="Draft"/>: the name, the role, a recipe's lines in <see cref="Batch"/> or a packaging set's in
+/// <see cref="PackagingSet"/>); the Dependents tab is a part of its own (<see cref="Dependents"/>). The form keeps which
+/// sub-assembly it shows, Save through the editor (ISubAssemblyEditor), and the undo history over the draft; the view keeps
+/// the list, what the draft's pickers offer, and the load that brings them (<see cref="View"/>).
 /// </summary>
 public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>, IDisposable, IRecordScreen, ITabForm
 {
@@ -29,16 +30,8 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     public const int DependentsTab = 1;
 
     private readonly SubAssembliesState _view;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _lineRepository;
-    private readonly IValidator<SubAssembly> _subAssemblyValidator;
-    private readonly VersionedSaves _versionedSaves;
-
-    /// <summary>What a Save of a recipe products link is asked about with; null in a view built without it.</summary>
-    private readonly SharedRecipeImpact? _recipeImpact;
-
-    /// <summary>The form's derived updates, run as their inputs change, or once at the end of an undo's restore.</summary>
-    private readonly DerivedUpdates _updates = new();
+    private readonly ISubAssemblyEditor _editor;
+    private readonly ISubAssemblyQueries _queries;
 
     /// <summary>
     /// Each sub-assembly picked, by the user or for them (Open, a list pick), nothing picked included: what loads one into
@@ -51,29 +44,34 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
     private int _formLoadVersion;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
-    internal SubAssemblyForm(
-        SubAssembliesState view,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository lineRepository,
-        IValidator<SubAssembly> subAssemblyValidator,
-        VersionedSaves versionedSaves,
-        ILogger logger,
-        SharedRecipeImpact? recipeImpact)
+    internal SubAssemblyForm(SubAssembliesState view, ISubAssemblyEditor editor, ISubAssemblyQueries queries, ILogger logger)
         : base(logger)
     {
         _view = view;
-        _recipeImpact = recipeImpact;
-        _subAssemblyRepository = subAssemblyRepository;
-        _versionedSaves = versionedSaves;
-        _lineRepository = lineRepository;
-        _subAssemblyValidator = subAssemblyValidator;
+        _editor = editor;
+        _queries = queries;
 
-        // The parts first: the subscriptions below, and the blank form they start with, reach every one. Each makes its own
-        // subscriptions as it's made, to what it holds alone.
-        PackagingSet = new SubAssemblyPackagingSet(PackagingMaterials, _updates);
-        Batch = new SubAssemblyBatch(this, Ingredients, _updates, () => !IsPackaging);
+        // The draft and the parts first: the subscriptions below, and the blank form they start with, reach every one. Each
+        // makes its own subscriptions as it's made, to what it holds alone.
+        Draft = new SubAssemblyDraft(this, ((IScreenPartHost)this).ShowError, Roles, Ingredients, PackagingMaterials);
         Dependents = new SubAssemblyDependents();
+
+        // The form's own names for the draft's fields, which the page binds and the list reads, follow them.
+        Draft.PropertyChanged += (_, e) =>
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(SubAssemblyDraft.Name):
+                    RaisePropertyChanged(nameof(EditingName));
+                    break;
+                case nameof(SubAssemblyDraft.Role):
+                    RaisePropertyChanged(nameof(EditingRole));
+                    break;
+                case nameof(SubAssemblyDraft.IsPackaging):
+                    RaisePropertyChanged(nameof(IsPackaging));
+                    break;
+            }
+        };
 
         // What follows the form's fields as they change is called by their setters (SelectionChanged). What follows here
         // runs in this order: the last runs as it's made (_picks starts with nothing picked, which clears the form), so it
@@ -81,10 +79,10 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
 
         // Save offers itself only when the form holds something the saved sub-assembly doesn't. Re-read on every change
         // rather than only when an undo step settles: a step closes on the way out of a field, and a Save button still
-        // disabled under the cursor would swallow the very click that enabled it. The lines too, any change to one: grams
-        // typed into a recipe's line, or a quantity into a packaging set's, while the line's cell still has the cursor.
-        // Watched on the rows themselves, not through the figures they move: those are only worked out as they're read.
-        // Not on the form's own word that it has changes to save, which this answers.
+        // disabled under the cursor would swallow the very click that enabled it. The draft says when anything it holds
+        // changes, its lines' cells included, grams typed while the cell still has the cursor; the form's own fields (which
+        // sub-assembly it is) too. Not on the form's own word that it has changes to save, which this answers.
+        Draft.Changed += History.RefreshDirty;
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(HasUnsavedChanges))
@@ -92,10 +90,6 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
                 History.RefreshDirty();
             }
         };
-        Batch.PropertyChanged += (_, _) => History.RefreshDirty();
-        PackagingSet.PropertyChanged += (_, _) => History.RefreshDirty();
-        RowChanges.OnAnyChange(Batch.Lines, History.RefreshDirty);
-        RowChanges.OnAnyChange(PackagingSet.Lines, History.RefreshDirty);
 
         // The tab follows whether there's anything to save (its dot).
         History.PropertyChanged += (_, e) =>
@@ -136,11 +130,17 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// <summary>The view this form is a tab of: its list, where the form's sub-assembly is picked, and the load.</summary>
     public SubAssembliesState View => _view;
 
-    /// <summary>A recipe's lines in grams, their formula base and totals, and Scale.</summary>
-    public SubAssemblyBatch Batch { get; }
+    /// <summary>The sub-assembly as it's edited: its name, its role and its lines, with their rules.</summary>
+    public SubAssemblyDraft Draft { get; }
 
-    /// <summary>A packaging set's lines and what the set costs, the packaging table's.</summary>
-    public SubAssemblyPackagingSet PackagingSet { get; }
+    /// <summary>
+    /// A recipe's lines in grams, their formula base and totals, and Scale: the draft's, here too so the page watches it as a
+    /// part of the form (ScreenBase watches one level down).
+    /// </summary>
+    public SubAssemblyBatch Batch => Draft.Batch;
+
+    /// <summary>A packaging set's lines and what the set costs, the packaging table's: the draft's, as <see cref="Batch"/> is.</summary>
+    public SubAssemblyPackagingSet PackagingSet => Draft.PackagingSet;
 
     /// <summary>The Dependents tab: the products and made ingredients the sub-assembly goes into.</summary>
     public SubAssemblyDependents Dependents { get; }
@@ -158,7 +158,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// The form is a packaging set: its role is the Packaging role, so it takes packaging materials per set instead of
     /// ingredients in grams, and the screen shows the packaging table in place of the recipe's.
     /// </summary>
-    public bool IsPackaging => EditingRole?.IsPackaging == true;
+    public bool IsPackaging => Draft.IsPackaging;
 
     private int _editingId;
     /// <summary>The sub-assembly the form holds: 0 for a new one, or a copy, not saved yet.</summary>
@@ -219,18 +219,18 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// </summary>
     private void SelectionChanged() => _view.FormShowsAnother(this, SelectedRow is not null);
 
-    private string _editingName = string.Empty;
+    /// <summary>The draft's name, as the page binds it.</summary>
     public string EditingName
     {
-        get => _editingName;
-        set => RaiseAndSetIfChanged(ref _editingName, value);
+        get => Draft.Name;
+        set => Draft.Name = value;
     }
 
-    private SubAssemblyRole? _editingRole;
+    /// <summary>The draft's role, as the page binds it.</summary>
     public SubAssemblyRole? EditingRole
     {
-        get => _editingRole;
-        set => RaiseAndSetIfChanged(ref _editingRole, value);
+        get => Draft.Role;
+        set => Draft.Role = value;
     }
 
     private string _headerTitle = "New sub-assembly";
@@ -370,11 +370,9 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// </summary>
     internal void TakeLoad(Load load, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> linkedBy, IReadOnlyDictionary<int, IReadOnlyList<MadeIngredientUse>> madeFrom)
     {
-        // A form opened before the roles were loaded (a new one, shown at start) takes the first role.
-        EditingRole = Roles.FirstOrDefault(r => r.Id == load.RoleId) ?? (EditingId == 0 && load.RoleId is null ? Roles.FirstOrDefault() : null);
-
-        Batch.ResolveLines();
-        PackagingSet.ResolveRows();
+        // The draft takes the load's fresh copies of its role and its lines' materials. A form opened before the roles were
+        // loaded (a new one, shown at start) takes the first role.
+        Draft.Rebase(load.RoleId, newWithoutRole: EditingId == 0 && load.RoleId is null);
 
         SelectedRow = _view.List.Rows.FirstOrDefault(r => r.Id == load.SelectedId);
 
@@ -424,62 +422,22 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// <summary>Save: the name, the role and the lines together, with a version of each product it changes.</summary>
     private async Task SaveAsync()
     {
+        // The name and role first, then the lines as they're typed, read here on the UI thread: a line half filled in is
+        // refused, naming it. With when it had last been saved as the form took it: a save since, from another PC, refuses
+        // this one (SavedVersionRules).
         var name = EditingName.Trim();
-        var validation = _subAssemblyValidator.Validate(new SubAssembly { Name = name, RoleId = EditingRole?.Id ?? 0 });
-        if (!validation.IsValid)
+        _editor.EnsureValid(name, EditingRole?.Id);
+        var request = Draft.ToSaveRequest(EditingId, SavedVersionToSend);
+
+        // No lines is refused; a saved recipe that products link asks first what it does to their costs.
+        var impacts = await Task.Run(() => _editor.CheckSaveAsync(request, CancellationToken.None));
+        if (impacts.Count > 0 && !await ConfirmDelete.Handle(RecipeImpactQuestion.For(name, impacts, Dependents.MadeIngredients.Count)))
         {
-            ErrorMessage = validation.ToString(" ");
             return;
         }
 
-        // The lines as they're typed, read here on the UI thread, for the save below. With when it had last been saved as the
-        // form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-        var subAssembly = new SubAssembly { Id = EditingId, Name = name, RoleId = EditingRole!.Id, UpdatedAt = SavedVersionToSend };
-        Func<CancellationToken, Task<int>> save;
-        if (IsPackaging)
-        {
-            var packagingLines = PackagingSet.CurrentLines();
-            if (packagingLines.Count == 0)
-            {
-                ErrorMessage = $"Add the packaging materials that go into {name}, per set.";
-                return;
-            }
-
-            save = cancellationToken => _subAssemblyRepository.SaveStandalonePackagingAsync(subAssembly, packagingLines, cancellationToken);
-        }
-        else
-        {
-            var lines = IngredientLineRow.CompleteLines(Batch.Lines, name);
-            if (lines.Count == 0)
-            {
-                ErrorMessage = $"Add the ingredients that go into {name}, in grams.";
-                return;
-            }
-
-            List<RecipeLine> recipeLines = [.. lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-            save = cancellationToken => _subAssemblyRepository.SaveStandaloneAsync(subAssembly, recipeLines, cancellationToken);
-
-            // A saved one that products link: what it does to their costs is asked about first.
-            if (_recipeImpact is not null && subAssembly.Id != 0)
-            {
-                List<SubAssemblyLine> newLines =
-                [
-                    .. lines.Select((l, i) => new SubAssemblyLine
-                    {
-                        SubAssemblyId = subAssembly.Id, IngredientId = l.Ingredient.Id, Ingredient = l.Ingredient, Grams = l.Grams,
-                        IsFormulaBase = l.IsFormulaBase, AuthoredBakersPercent = l.AuthoredBakersPercent, SortOrder = i,
-                    }),
-                ];
-                var impacts = await Task.Run(() => _recipeImpact.ReadAsync(subAssembly.Id, newLines, CancellationToken.None));
-                if (impacts.Count > 0 && !await ConfirmDelete.Handle(SharedRecipeImpact.Question(name, impacts, Dependents.MadeIngredients.Count)))
-                {
-                    return;
-                }
-            }
-        }
-
         // Written with a version of each product using it that this Save changes, both or neither (VersionedSaves).
-        var saved = await Task.Run(() => _versionedSaves.SaveSubAssemblyAsync(subAssembly.Id, name, save, DateTime.Now, CancellationToken.None));
+        var saved = await Task.Run(() => _editor.SaveAsync(request, DateTime.Now, CancellationToken.None));
 
         // The list picks up the new totals; then the form reloads what was saved.
         await LoadCommand.ExecuteAsync();
@@ -517,10 +475,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         EditingId = 0;
         SavedVersion = null;
         HeaderTitle = "New sub-assembly";
-        EditingName = string.Empty;
-        EditingRole = role ?? Roles.FirstOrDefault();
-        Batch.Clear();
-        PackagingSet.Clear();
+        Draft.Clear(role);
         Dependents.Show([], [], IsPackaging);
 
         // The blank form is what Save's dirty check measures against, so nothing is offered until it's filled in.
@@ -560,13 +515,10 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
 
         // A sub-assembly has one kind of line or the other, as its role says.
         var version = ++_formLoadVersion;
-        var isSet = row.SubAssembly.Role?.IsPackaging == true;
-        IReadOnlyList<SubAssemblyLine> saved;
-        IReadOnlyList<SubAssemblyPackagingLine> savedSet;
+        SubAssemblyContent content;
         try
         {
-            saved = isSet ? [] : await _lineRepository.GetForSubAssembliesAsync([row.Id], CancellationToken.None);
-            savedSet = isSet ? await _subAssemblyRepository.GetPackagingLinesAsync(row.Id, CancellationToken.None) : [];
+            content = await _queries.ReadContentAsync(row.Id, isPackagingSet: row.SubAssembly.Role?.IsPackaging == true, CancellationToken.None);
         }
         catch (Exception) when (version == _formLoadVersion)
         {
@@ -592,10 +544,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         EditingId = row.Id;
         SavedVersion = row.SubAssembly.UpdatedAt;
         HeaderTitle = row.Name;
-        EditingName = row.Name;
-        EditingRole = Roles.FirstOrDefault(r => r.Id == row.SubAssembly.RoleId);
-        Batch.Show(saved);
-        PackagingSet.Show(savedSet);
+        Draft.Show(row.Name, row.SubAssembly.RoleId, content);
         Dependents.Show(row.GetDependents(), row.GetMadeIngredients(), IsPackaging);
 
         // The form now holds what was saved, so this is what Save's dirty check measures against. Taken at the
@@ -653,21 +602,9 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     internal void ForgetRole(int roleId) =>
         History.RewriteAll(snapshot => snapshot.RoleId == roleId ? snapshot with { RoleId = null } : snapshot);
 
-    protected override SubAssemblyFormSnapshot CaptureSnapshot() => new()
-    {
-        EditingId = EditingId,
-        Name = EditingName,
-        RoleId = EditingRole?.Id,
-        Lines = Batch.Capture(),
-        PackagingLines = PackagingSet.Capture(),
-        FormulaBase = Batch.FormulaBase,
-    };
+    protected override SubAssemblyFormSnapshot CaptureSnapshot() => Draft.Capture(EditingId);
 
-    /// <summary>
-    /// Puts the form back as <paramref name="snapshot"/> had it. The lines are rebuilt rather than written into —
-    /// IngredientLineRow's setters drop a typed percentage — and the lines are pointed at their ingredients and the formula
-    /// base applied once, at the end, from the form that was put back.
-    /// </summary>
+    /// <summary>Puts the form back as <paramref name="snapshot"/> had it: which sub-assembly it is, and the draft (SubAssemblyDraft.Restore).</summary>
     protected override void RestoreSnapshot(SubAssemblyFormSnapshot snapshot, SubAssemblyFormSnapshot? settledThen)
     {
         ErrorMessage = null;
@@ -675,24 +612,11 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         // A load still on its way would otherwise land on top of what's being put back.
         _formLoadVersion++;
 
-        ApplyRestore(() => _updates.Batch(() =>
+        ApplyRestore(() =>
         {
-            Batch.SelectedLine = null;
-            PackagingSet.SelectedLine = null;
-
             EditingId = snapshot.EditingId;
-            EditingName = snapshot.Name;
-            EditingRole = snapshot.RoleId is { } roleId ? Roles.FirstOrDefault(r => r.Id == roleId) : null;
-
-            Batch.Restore(snapshot.Lines, snapshot.FormulaBase);
-            PackagingSet.Restore(snapshot.PackagingLines);
-        }));
-
-        // Once more, in this order, from the form put back: an undo that leaves a table as it was asks for none of these.
-        // The figures need nothing: they're worked out from the lines as they're next read.
-        Batch.ResolveLines();
-        PackagingSet.ResolveRows();
-        Batch.RecomputeFormulaBase();
+            Draft.Restore(snapshot);
+        });
     }
 
     protected override string UnsavedChangesName =>

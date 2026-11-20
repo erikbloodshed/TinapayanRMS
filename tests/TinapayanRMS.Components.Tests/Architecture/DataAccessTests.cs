@@ -12,7 +12,7 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// </summary>
 public class DataAccessTests
 {
-    /// <summary>34 types holding 121 between them on 2026-11-20.</summary>
+    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1).</summary>
     private static readonly Dictionary<string, int> StillReaching = new(StringComparer.Ordinal)
     {
         ["TinapayanRMS.Presentation.App.AutomaticBackups"] = 1,
@@ -45,10 +45,6 @@ public class DataAccessTests
         ["TinapayanRMS.Presentation.Settings.SecurityState"] = 1,
         ["TinapayanRMS.Presentation.Settings.SubAssemblyRolesState"] = 1,
         ["TinapayanRMS.Presentation.Settings.UnitsOfMeasureState"] = 1,
-        ["TinapayanRMS.Presentation.SubAssemblies.SharedRecipeImpact"] = 3,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssembliesList"] = 3,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssembliesState"] = 6,
-        ["TinapayanRMS.Presentation.SubAssemblies.SubAssemblyForm"] = 3,
     };
 
     /// <summary>
@@ -100,7 +96,8 @@ public class DataAccessTests
     /// <summary>
     /// What reaches the database: the DbContext and anything of Infrastructure's or EF Core's; the ports Infrastructure
     /// implements (the repositories, the unit of work, the cloner, the backups); and a service below the screens built on
-    /// any of those (Pricing's SavedProductReader and VersionedSaves).
+    /// any of those (Pricing's SavedProductReader and VersionedSaves, and a use case's own class, SubAssemblyEditor: a screen
+    /// holds its interface, which a test can stand in for).
     /// </summary>
     private static readonly HashSet<Type> DataAccess = FindDataAccess();
 
@@ -113,7 +110,9 @@ public class DataAccessTests
             .ToHashSet();
 
         // Services built on those, as far as they go: a reader that takes a repository, a save that takes that reader.
-        var services = Codebase.WrittenTypes(Codebase.Pricing).Concat(Codebase.WrittenTypes(Codebase.ApplicationCore))
+        var services = Codebase.WrittenTypes(Codebase.Pricing)
+            .Concat(Codebase.WrittenTypes(Codebase.ApplicationCore))
+            .Concat(Codebase.WrittenTypes(Codebase.UseCases))
             .Where(type => type.IsClass && !type.IsAbstract)
             .ToList();
         bool grew;

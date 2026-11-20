@@ -72,6 +72,9 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <!-- Renders the MAUI app's Blazor components in a test, without a web view (TinapayanRMS.Components.Tests). -->
     <PackageVersion Include="bunit" Version="2.15.2" />
+    <!-- Property-based tests: random sequences of edits, loads and undos against a draft, shrunk to the shortest that fails
+         (Presentation.Tests' *DraftTests, docs/adr/0006). -->
+    <PackageVersion Include="CsCheck" Version="5.0.1" />
     <!-- ASP.NET Core ships with the .NET runtime too: the Recipe API's tests run it in memory on the same release. -->
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />

@@ -1,7 +1,5 @@
 using AwesomeAssertions;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Presentation.Printing;
@@ -69,17 +67,7 @@ public class SubAssembliesStatePrintTests(DatabaseFixture fixture) : Persistence
             Cancellation);
 
         var factory = CreateDbContextFactory();
-        var state = new SubAssembliesState(
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new SubAssemblyValidator(),
-            new SubAssemblyRoleValidator(),
-            new InMemoryViewStateStore(),
-            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        var state = SubAssembliesViews.Create(factory, CreateUnitOfWork()).Form!;
         await state.LoadCommand.ExecuteAsync();
         state.Pick(state.View.List.Rows.Single(r => r.Id == subAssemblyId));
         await Settle.UntilAsync(state, () => state.Batch.Lines.Count == 2, () => $"lines={state.Batch.Lines.Count}");

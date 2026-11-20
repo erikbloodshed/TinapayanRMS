@@ -336,17 +336,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private SubAssemblyForm CreateSubAssembliesState(FailingDbContextFactory factory)
     {
-        return new SubAssembliesState(
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new SubAssemblyValidator(),
-            new SubAssemblyRoleValidator(),
-            new InMemoryViewStateStore(),
-            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return SubAssembliesViews.Create(factory, CreateUnitOfWork()).Form!;
     }
 
     private ReportsState CreateReportsState(FailingDbContextFactory factory)

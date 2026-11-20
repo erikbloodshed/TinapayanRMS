@@ -4,6 +4,10 @@
        thread that runs one thing at a time, as either app's UI thread does. -->
 
   <ItemGroup>
+    <PackageReference Include="CsCheck" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TinapayanRMS.Presentation\TinapayanRMS.Presentation.csproj" />
     <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
   </ItemGroup>

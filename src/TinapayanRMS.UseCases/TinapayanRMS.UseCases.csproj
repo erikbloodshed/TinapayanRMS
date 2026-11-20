@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The application layer (docs/adr/0002-layers-use-cases-and-drafts.md): what the screens can do with the records, each
+       aggregate's editor (load, save, delete, the transaction, validation, the versioned saves) and the reads its screen
+       shows. Above the rules and the pricing, below the screens, and with no reference to Infrastructure: the composition
+       root (Components) hands it the repositories. Moved to it a screen at a time, Sub-Assemblies first. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
+  </ItemGroup>
+
+</Project>

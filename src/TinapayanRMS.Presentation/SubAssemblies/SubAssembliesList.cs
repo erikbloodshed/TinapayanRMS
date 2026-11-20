@@ -4,11 +4,11 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
@@ -56,6 +56,9 @@ public interface ISubAssembliesListHost : IRecordListHost
 
     /// <summary>Whether a form holds the sub-assembly <paramref name="id"/> with changes not saved yet.</summary>
     bool HasUnsavedChangesFor(int id);
+
+    /// <summary>Whether <paramref name="name"/> is a raw material's already, as the view last loaded them: a made ingredient's name can't be.</summary>
+    bool IsMaterialName(string name);
 }
 
 /// <summary>
@@ -75,12 +78,9 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
 
     private readonly ISubAssembliesListHost _host;
     private readonly ObservableCollection<SubAssemblyRole> _roles;
-    private readonly IReadOnlyList<RawMaterial> _ingredients;
-    private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyRoleRepository _roleRepository;
-    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
-    private readonly IValidator<SubAssemblyRole> _roleValidator;
+    private readonly ISubAssemblyQueries _queries;
+    private readonly ISubAssemblyEditor _editor;
+    private readonly ISubAssemblyRoleEditor _roleEditor;
     private readonly SourceCache<StandaloneSubAssemblyRow, int> _rowCache = new(r => r.Id);
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _rows;
     private readonly ReadOnlyObservableCollection<StandaloneSubAssemblyRow> _visibleRows;
@@ -94,39 +94,27 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
 
     /// <param name="host">The screen, which the list asks for the sub-assembly its form shows, and what to do to it.</param>
     /// <param name="roles">The roles as the screen last loaded them, which are the list's folders.</param>
-    /// <param name="ingredients">The ingredients as the screen last loaded them, which a made ingredient's name can't be.</param>
-    /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a made ingredient's name can't be either.</param>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+    /// <param name="queries">What the list reads: the Made categories, for Make In-House Ingredient.</param>
+    /// <param name="editor">What the list does to the sub-assemblies: moves, renames, made ingredients.</param>
+    /// <param name="roleEditor">What the list does to the roles, its folders.</param>
     public SubAssembliesList(
         ISubAssembliesListHost host,
         ObservableCollection<SubAssemblyRole> roles,
-        IReadOnlyList<RawMaterial> ingredients,
-        IReadOnlyList<RawMaterial> packagingMaterials,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyRoleRepository roleRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
-        IValidator<SubAssemblyRole> roleValidator,
+        ISubAssemblyQueries queries,
+        ISubAssemblyEditor editor,
+        ISubAssemblyRoleEditor roleEditor,
         IViewStateStore viewStateStore)
     {
         _host = host;
         _roles = roles;
-        _ingredients = ingredients;
-        _packagingMaterials = packagingMaterials;
-        _subAssemblyRepository = subAssemblyRepository;
-        _roleRepository = roleRepository;
-        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
-        _roleValidator = roleValidator;
+        _queries = queries;
+        _editor = editor;
+        _roleEditor = roleEditor;
 
-        // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
-        // for next time (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so
-        // nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
-        SubAssemblyTree = new SubAssemblyTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey));
-        _closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, SubAssemblyTree.ExpansionChanged, SubAssemblyTree.ClosedFolderKeys);
-
-        var byName = SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name);
+        SubAssemblyTree = NewTree(viewStateStore, out _closedFoldersWriter);
 
         _rowCache.Connect()
-            .SortAndBind(out _rows, byName)
+            .SortAndBind(out _rows, ByName)
             .Subscribe();
 
         // The list's own filter, as Raw Materials and Products filter theirs: by name, ignoring case.
@@ -139,7 +127,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         // renamed, moved or filtered out) and the roles (one added, renamed, reordered or deleted).
         _rowCache.Connect()
             .Filter(nameFilter)
-            .SortAndBind(out _visibleRows, byName)
+            .SortAndBind(out _visibleRows, ByName)
             .Subscribe(_ => RefreshTree());
 
         // Through PropertyChanged, which a role added, removed or replaced raises too, for the reason
@@ -162,6 +150,21 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         DeleteRoleCommand = new ScreenCommand<SubAssemblyFolderNode>(DeleteRoleAsync);
         ExpandAllCommand = ScreenCommand.Of(SubAssemblyTree.ExpandAll);
         CollapseAllCommand = ScreenCommand.Of(SubAssemblyTree.CollapseAll);
+    }
+
+    /// <summary>The order the rows are listed in, by name.</summary>
+    private static readonly SortExpressionComparer<StandaloneSubAssemblyRow> ByName = SortExpressionComparer<StandaloneSubAssemblyRow>.Ascending(r => r.Name);
+
+    /// <summary>
+    /// The list's tree, its folders open as they were left last time, a folder new since included, and what writes the ones
+    /// closed for next time (FolderStateWriter), as on Raw Materials; Dispose writes any change still waiting. As read, so
+    /// nothing is written until a folder is opened or closed: the folders aren't made until the roles are loaded.
+    /// </summary>
+    private static SubAssemblyTree NewTree(IViewStateStore viewStateStore, out FolderStateWriter closedFoldersWriter)
+    {
+        var tree = new SubAssemblyTree(FolderMemory.Read(viewStateStore, ClosedFoldersKey));
+        closedFoldersWriter = new FolderStateWriter(viewStateStore, ClosedFoldersKey, tree.ExpansionChanged, tree.ClosedFolderKeys);
+        return tree;
     }
 
     /// <summary>Every standalone sub-assembly, whatever the list is filtered to.</summary>
@@ -303,7 +306,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         var ids = moves.Select(m => m.SubAssemblyId).ToList();
-        await _subAssemblyRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
+        await _editor.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
 
         // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
         await _host.LoadAfterSavingAsync(ids);
@@ -476,7 +479,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             return;
         }
 
-        var categories = await MadeIngredientPrompt.MadeCategoriesAsync(_rawMaterialCategoryRepository);
+        var categories = await _queries.ReadMadeCategoriesAsync(CancellationToken.None);
         if (categories.Count == 0)
         {
             _host.ShowError(MadeIngredientPrompt.NoMadeCategoryMessage);
@@ -494,14 +497,14 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         }
 
         var name = answer.Text.Trim();
-        if (_ingredients.Concat(_packagingMaterials).Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (_host.IsMaterialName(name))
         {
             _host.ShowError(MadeIngredientPrompt.NameTakenMessage(name));
             return;
         }
 
         var category = categories[answer.Choice];
-        await _subAssemblyRepository.AddMadeIngredientAsync(row.Id, new MadeIngredientDraft(name, category.Id), CancellationToken.None);
+        await _editor.AddMadeIngredientAsync(row.Id, new MadeIngredientDraft(name, category.Id), CancellationToken.None);
 
         await _host.LoadAsync();
         _host.ShowSuccess($"{name} was added to {category.Name}, made from {row.Name}.");
@@ -664,7 +667,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// </summary>
     private async Task RenameSubAssemblyToAsync(StandaloneSubAssemblyRow row, string name)
     {
-        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.SavedVersionsFor([row.Id]), CancellationToken.None);
+        await _editor.RenameAsync(row.Id, name, _host.SavedVersionsFor([row.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([row.Id]);
         _host.Renamed(row.Id, name);
     }
@@ -678,16 +681,8 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         var role = _roles.FirstOrDefault(r => string.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase));
         if (role is null)
         {
-            var added = new SubAssemblyRole { Name = name };
-            var validation = _roleValidator.Validate(added);
-            if (!validation.IsValid)
-            {
-                _host.ShowError(validation.ToString(" "));
-                return;
-            }
-
-            // AddAsync fills in the saved Id, which the copy read back is found by.
-            await _roleRepository.AddAsync(added, CancellationToken.None);
+            // A name the roles can't take is refused with why; the copy read back is found by the id it was saved with.
+            var added = await _roleEditor.AddAsync(name, CancellationToken.None);
             await _host.LoadAsync();
             role = _roles.FirstOrDefault(r => r.Id == added.Id);
         }
@@ -706,24 +701,9 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             return;
         }
 
-        var renamed = new SubAssemblyRole
-        {
-            Id = role.Id,
-            Name = name,
-            SortOrder = role.SortOrder,
-            IsPackaging = role.IsPackaging,
-            IsProductOwned = role.IsProductOwned,
-        };
-        var validation = _roleValidator.Validate(renamed);
-        if (!validation.IsValid)
-        {
-            _host.ShowError(validation.ToString(" "));
-            return;
-        }
-
         // Everything is read again, the sub-assemblies with it, which carry their role's name. The Role picker keeps the
-        // role it holds (the screen's LoadCommand), under its new name.
-        await _roleRepository.UpdateAsync(renamed, CancellationToken.None);
+        // role it holds (the screen's LoadCommand), under its new name. A name the roles can't take is refused with why.
+        await _roleEditor.RenameAsync(role, name, CancellationToken.None);
         await _host.LoadAsync();
     }
 
@@ -745,7 +725,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             $"Delete the '{role.Name}' role? It holds no sub-assemblies here. This can't be undone.",
             async () =>
             {
-                await _roleRepository.DeleteAsync(role.Id, CancellationToken.None);
+                await _roleEditor.DeleteAsync(role.Id, CancellationToken.None);
 
                 // A new sub-assembly's form may have had it picked: the undo steps forget it, so none puts back a role
                 // there's no longer any of to save.
