@@ -6,7 +6,7 @@
     <!-- Npgsql.EntityFrameworkCore.PostgreSQL asks for exactly this EF Core: move both together. Held at rc.3, on the
          11.0.0 runtime, until Npgsql's provider and EFCore.NamingConventions have 11.0.0 releases: the provider asks for
          exactly rc.3, and NamingConventions 10.0.1 for anything under 11.0.0, which rc.3 is and 11.0.0 isn't. -->
-    <EFCoreVersion>11.0.0-rc.3.26522.148</EFCoreVersion>
+    <EFCoreVersion>11.0.0</EFCoreVersion>
     <!-- Microsoft.Extensions.* ships with the .NET runtime: keep it on the same release. -->
     <MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
     <!-- MAUI's packages (Controls, BlazorWebView): MAUI ships as these, and the maui-windows workload only builds with them,
