@@ -20,6 +20,12 @@ public interface IProductRecipeHost : IFormPartHost
     /// <summary>Every sub-assembly that could be linked or copied, as the screen last loaded them.</summary>
     IReadOnlyList<SubAssembly> Linkable { get; }
 
+    /// <summary>
+    /// Counts the loads that changed <see cref="Linkable"/> or the roles: the section form's choices are built from them,
+    /// and built again only when this has moved since (ProductsState.LinkableVersion).
+    /// </summary>
+    int LinkableVersion { get; }
+
     /// <summary>The form is a composite product's, whose own sections are only in product-owned roles.</summary>
     bool IsEditingComposite { get; }
 
@@ -630,6 +636,23 @@ public sealed class ProductRecipe : ObservableState
     }
 
     /// <summary>
+    /// The view's lists the section form's choices (<see cref="RefreshLinkableOptions"/>) were last built from
+    /// (IProductRecipeHost.LinkableVersion). The view's load merges into every open tab, and building the choices again,
+    /// every sub-assembly's option compared with the last, was most of what each tab's merge cost: so a load builds them
+    /// only when those lists changed. What the recipe holds changing builds them at once, as it always has.
+    /// </summary>
+    private int _optionsBuiltFrom = -1;
+
+    /// <summary>The view's load is merged: the section form's choices follow the lists it read, if they changed.</summary>
+    internal void RefreshLinkableOptionsAfterLoad()
+    {
+        if (_optionsBuiltFrom != _host.LinkableVersion)
+        {
+            RefreshLinkableOptions();
+        }
+    }
+
+    /// <summary>
     /// The sub-assemblies the form can link or copy. Linking offers only the Sub-Assemblies screen's (standalone) ones the
     /// recipe doesn't already link, never anything a product keeps; copying offers every other one. Never packaging,
     /// which the Packaging tab links and copies itself. A pick that's no longer offered is cleared. The roles the form
@@ -637,6 +660,7 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     internal void RefreshLinkableOptions()
     {
+        _optionsBuiltFrom = _host.LinkableVersion;
         var linking = _usageForm.EditingUsageMode == UsageFormMode.Link;
         var usedIds = UsageEdits.Select(u => u.SubAssemblyId).ToHashSet();
         var isComposite = _host.IsEditingComposite;

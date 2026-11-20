@@ -324,4 +324,26 @@ public class IngredientLineRowTests
         row.Ingredient.Should().BeSameAs(Flour);
         row.Cost.Should().Be(100m * Flour.BufferedCostPerBaseUnit);
     }
+
+    // The formula's base is set on every line each time it's worked out, every load of every open tab included: a base and
+    // a batch that didn't move change nothing that reads them, so the row says nothing, and each subscription to it is spared.
+    [Test]
+    public void A_formula_base_worked_out_again_the_same_raises_nothing_and_one_that_moved_raises_the_percentage()
+    {
+        var flour = new IngredientLineRow(Flour, 1000m, isFormulaBase: true);
+        var sugar = new IngredientLineRow(Sugar, 200m);
+        IngredientLineRow.ApplyFormulaBase([flour, sugar], 1000m, 1200m);
+        List<string?> changed = [];
+        sugar.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        IngredientLineRow.ApplyFormulaBase([flour, sugar], 1000m, 1200m);
+
+        changed.Should().BeEmpty();
+        sugar.Percent.Should().Be(20m);
+
+        IngredientLineRow.ApplyFormulaBase([flour, sugar], 800m, 1000m);
+
+        changed.Should().Contain(nameof(IngredientLineRow.Percent));
+        sugar.Percent.Should().Be(25m);
+    }
 }

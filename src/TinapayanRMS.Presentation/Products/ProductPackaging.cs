@@ -517,6 +517,27 @@ public sealed class ProductPackaging : ObservableState, IDisposable
     }
 
     /// <summary>
+    /// The linked packaging's lines as the view's load read them again, while the form shows the link as saved
+    /// (<see cref="ShowsSavedLink"/>): shown in place of the rows only when they differ from the lines last loaded. The view's
+    /// load merges into every open tab, and a table rebuilt row by row each time, its changes running through every
+    /// subscription to it, was a fifth of each tab's merge; the rows are pointed at their refreshed materials either way
+    /// (<see cref="ResolveRows"/>).
+    /// </summary>
+    public void RefreshLinkedLines(IReadOnlyList<PackagingLine> lines)
+    {
+        var fresh = lines.Select(line =>
+        {
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+            return (line.PackagingMaterialId, line.UnitId, PackagingLineAuthoredField.QtyPerUnit, qtyPerUnit);
+        });
+        if (!fresh.SequenceEqual(_savedLines))
+        {
+            LoadLines(lines);
+        }
+    }
+
+    /// <summary>
     /// Shows the bulk packaging as saved, its lines for one pack and how many products it holds, and makes it what Save
     /// compares against.
     /// </summary>

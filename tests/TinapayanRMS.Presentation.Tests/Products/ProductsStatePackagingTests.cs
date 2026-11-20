@@ -243,6 +243,47 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
             "the lines the link showed are written even though they match what was loaded");
     });
 
+    // The view's load reads every open tab's linked packaging together: each tab still showing its link as saved shows its
+    // set's lines as they're saved now, and one whose set didn't change keeps its rows.
+    [Test]
+    public Task Each_tab_linking_a_packaging_set_shows_its_lines_as_saved_now_after_a_load() => UiThread.RunAsync(async () =>
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Gift Box", 30m);
+        var sets = new SubAssemblyRepository(CreateDbContextFactory());
+        var giftSetId = await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var partySetId = await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Party Box Set", RoleId = packagingRoleId }, [(boxId, null, 2m)], Cancellation);
+        var giftId = await AddProductAsync("Ensaymada");
+        var partyId = await AddProductAsync("Mamon");
+        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(giftId, giftSetId, Cancellation);
+        await CreatePackagingLinkRepository().SetSubAssemblyLinkAsync(partyId, partySetId, Cancellation);
+        var view = (await CreateLoadedStateAsync()).View;
+        var gift = await OpenKeptAsync(view, giftId);
+        var party = await OpenKeptAsync(view, partyId);
+        var partyRow = party.Packaging.LineEdits.Single();
+
+        await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Id = giftSetId, Name = "Gift Box Set", RoleId = packagingRoleId }, [(boxId, null, 3m)], Cancellation);
+        await view.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(gift, () => gift.Packaging.LineEdits.Single().QtyPerUnit == 3m, () => $"qty={gift.Packaging.LineEdits.Single().QtyPerUnit}");
+
+        party.Packaging.LineEdits.Should().ContainSingle().Which.Should().BeSameAs(partyRow, "its set didn't change, so its rows stay");
+        partyRow.QtyPerUnit.Should().Be(2m);
+    });
+
+    /// <summary>Opens <paramref name="productId"/> in a tab of the view that stays, its details in.</summary>
+    private static async Task<ProductForm> OpenKeptAsync(ProductsState view, int productId)
+    {
+        view.OpenRecord(productId);
+        view.Keep(view.Tabs.Active!);
+        var form = view.Form!;
+        await Settle.UntilAsync(form, () => form.SelectedProduct?.Id == productId && form.AreDetailsReady && form.Packaging.LineEdits.Count == 1,
+            () => $"selected={form.SelectedProduct?.Id}, lines={form.Packaging.LineEdits.Count}");
+        return form;
+    }
+
     [Test]
     public Task Move_to_Sub_Assemblies_on_the_Packaging_tab_saves_its_lines_as_a_set_and_links_it() => UiThread.RunAsync(async () =>
     {

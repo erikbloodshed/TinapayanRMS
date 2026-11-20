@@ -886,9 +886,13 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         Packaging.TakePackagingSets(read.PackagingSets);
         RefreshCostingDefaults(read.CostingDefaults);
 
-        // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs.
+        // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs. Only a composite's
+        // Products table offers products: any other's are built if it becomes one (StartNew, a pick).
         ComponentsTable.TakeFresh(read.ComponentCosts, read.ComponentLinks);
-        RefreshComponentOptions();
+        if (IsEditingComposite)
+        {
+            RefreshComponentOptions();
+        }
 
         SelectedProduct = Products.FirstOrDefault(p => p.Id == load.SelectedId);
         if (SelectedProduct is not null)
@@ -902,9 +906,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
         if (load.DetailProductId == _detailProductId && load.LinkedPackagingLines is { } linkedPackagingLines)
         {
-            // A renamed product or set reads right in the banner too.
+            // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
             Packaging.ShowLink(load.SavedLink);
-            Packaging.LoadLines(linkedPackagingLines);
+            Packaging.RefreshLinkedLines(linkedPackagingLines);
         }
 
         Recipe.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
@@ -912,13 +916,17 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
         Packaging.ResolveRows();
         UsageForm.ResolveRows();
-        Recipe.RefreshLinkableOptions();
+
+        // The section form's choices, built again only if the view's lists they come from changed.
+        Recipe.RefreshLinkableOptionsAfterLoad();
 
         // An add form opened before the roles were loaded takes the first role it can have, as it would have.
         UsageForm.EditingUsageRole = UsageForm.FormRoleOptions.FirstOrDefault(r => r.Id == load.UsageRoleId)
             ?? (load.UsageRoleId is null && UsageForm.IsUsageFormOpen && UsageForm.IsAddingUsage ? UsageForm.FormRoleOptions.FirstOrDefault() : null);
         UsageForm.EditingUsageSource = UsageForm.LinkableSubAssemblies.FirstOrDefault(o => o.Key == load.UsageSourceKey);
 
+        // Its rows raise their percentages only when the base moved (IngredientLineRow), so a load that changed nothing in
+        // the form costs little here.
         UsageForm.Recompute();
         InvalidateCosts();
     }
@@ -1832,6 +1840,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     // What the recipe asks of the screen (IProductRecipeHost): what can be linked, the product showing and its costs.
     IReadOnlyList<SubAssembly> IProductRecipeHost.Linkable => _view.Linkable;
+
+    int IProductRecipeHost.LinkableVersion => _view.LinkableVersion;
 
     int? IProductRecipeHost.DetailProductId => _detailProductId;
 

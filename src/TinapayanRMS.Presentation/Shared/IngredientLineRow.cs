@@ -167,10 +167,14 @@ public sealed class IngredientLineRow : ObservableRow
         get => _baseWeight;
         private set
         {
-            RaiseAndSetIfChanged(ref _baseWeight, value);
-            RaisePropertyChanged(nameof(Percent));
-            RaisePropertyChanged(nameof(CanTypeBakersPercent));
-            RaisePropertyChanged(nameof(IsPercentTyped));
+            // Only a base that moved changes what reads it: the formula's base is set on every line each time it's worked
+            // out (ApplyFormulaBase), every load of every open tab included, and each raise runs every subscription to the row.
+            if (RaiseAndSetIfChanged(ref _baseWeight, value))
+            {
+                RaisePropertyChanged(nameof(Percent));
+                RaisePropertyChanged(nameof(CanTypeBakersPercent));
+                RaisePropertyChanged(nameof(IsPercentTyped));
+            }
         }
     }
 
@@ -184,8 +188,10 @@ public sealed class IngredientLineRow : ObservableRow
         get => _batchWeight;
         private set
         {
-            RaiseAndSetIfChanged(ref _batchWeight, value);
-            RaisePropertyChanged(nameof(Percent));
+            if (RaiseAndSetIfChanged(ref _batchWeight, value))
+            {
+                RaisePropertyChanged(nameof(Percent));
+            }
         }
     }
 

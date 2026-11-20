@@ -201,8 +201,18 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// <summary>The packaging materials only: ingredients never go on a packaging line.</summary>
     public ObservableCollection<RawMaterial> PackagingMaterials { get; } = [];
 
-    /// <summary>Every sub-assembly that could be linked or copied, as last loaded; a section form's LinkableSubAssemblies filters it.</summary>
+    /// <summary>
+    /// Every sub-assembly that could be linked or copied, as last loaded; a section form's LinkableSubAssemblies filters it.
+    /// A load that reads the same keeps the list it had, so the forms' choices built from it stay (<see cref="LinkableVersion"/>).
+    /// </summary>
     internal IReadOnlyList<SubAssembly> Linkable { get; private set; } = [];
+
+    /// <summary>
+    /// Counts the loads that changed <see cref="Linkable"/> or the roles, which each form's section choices are built from:
+    /// a form builds them again only when this has moved (ProductRecipe.RefreshLinkableOptionsAfterLoad), not on every
+    /// load for every tab.
+    /// </summary>
+    internal int LinkableVersion { get; private set; }
 
     /// <summary>The packaging sets, as last loaded, which a form's Packaging tab links.</summary>
     internal IReadOnlyList<SubAssembly> PackagingSets { get; private set; } = [];
@@ -306,6 +316,10 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             form.BeforeMerge(load, read);
         }
 
+        // What the forms' section choices are built from, compared once here before the roles are merged, rather than by
+        // every form as it builds its choices.
+        var linkableChanged = !HaveSameValues(Linkable, read.Linkable) || !HaveSameValues(Roles, read.Roles);
+
         // Within every form's refresh at once, so nothing the merge writes, into the lists or the forms, is taken for an edit.
         var forms = loads.Select(l => l.Form).ToList();
         RefreshingEach(forms, () =>
@@ -325,7 +339,12 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
                 _productCache.MergeFrom(read.Products);
                 List.RefreshTree();
                 _flagChecks.OnNext(read.Products);
-                Linkable = read.Linkable;
+                if (linkableChanged)
+                {
+                    Linkable = read.Linkable;
+                    LinkableVersion++;
+                }
+
                 PackagingSets = read.PackagingSets;
                 CostingDefaults = read.CostingDefaults;
             });
@@ -348,6 +367,25 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             _subAssemblyToStartFrom = null;
             StartNewProductLinking(subAssemblyId);
         }
+    }
+
+    /// <summary>Whether a list read again holds the same rows, in the same order, with the same values (CollectionMerge.HasSameValues).</summary>
+    private static bool HaveSameValues<T>(IReadOnlyList<T> current, IReadOnlyList<T> fresh)
+    {
+        if (current.Count != fresh.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < current.Count; i++)
+        {
+            if (!CollectionMerge.HasSameValues(current[i], fresh[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>A form's own Save, or its Revert, read its product back: the list takes the fresh copy at once.</summary>
