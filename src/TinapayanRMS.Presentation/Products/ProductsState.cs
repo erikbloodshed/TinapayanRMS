@@ -148,9 +148,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
         // The list's flags for a price short of its target markup and a section with no piece size, after each load: a newer
         // load cancels one still working. Each runs as the form showing does, as the load that asks for it did (Runner), so
-        // its work counts with that form's.
-        Observable.Switch(_flagChecks.Select(products => Observable.FromAsync(cancellationToken => FlagSafelyAsync(products, cancellationToken))))
-            .Subscribe();
+        // its work counts with that form's, and a failure shows there.
+        LoadLatest(_flagChecks, FlagProductsAsync, () => Runner);
 
         // Runs each time the page opens (ScreenBase) and after the forms' own saves. It merges rather than replaces, so each
         // form keeps its selection, pickers and unsaved edits while picking up what changed elsewhere: a repriced
@@ -271,31 +270,6 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     {
         _recordToOpen = null;
         _subAssemblyToStartFrom = subAssemblyId;
-    }
-
-    /// <summary>
-    /// <see cref="FlagProductsAsync"/>, counted with the work of the form showing as it starts (the view's own with none): a
-    /// newer load's flags cancelling it isn't a failure, and one that fails shows why, as a load's would, the next load
-    /// trying again.
-    /// </summary>
-    private Task FlagSafelyAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
-    {
-        var part = PartOf(Form);
-        return part.Work.RunAsync(async () =>
-        {
-            try
-            {
-                await FlagProductsAsync(products, cancellationToken);
-            }
-            catch (Exception) when (cancellationToken.IsCancellationRequested)
-            {
-                // A newer load took over.
-            }
-            catch (Exception ex)
-            {
-                part.ShowFailure(ex);
-            }
-        });
     }
 
     /// <summary>

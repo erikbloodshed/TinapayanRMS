@@ -241,26 +241,38 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     /// mid-read as its own exception). Nothing picked loads nothing, so it leaves a failed load's error showing: the
     /// failure itself can clear the pick, as Sub-Assemblies does.
     /// </summary>
-    protected void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) =>
-        Observable.Switch(values.Select(value => Observable.FromAsync(cancellationToken => Work.RunAsync(async () =>
+    protected void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load) => LoadLatest(values, load, () => this);
+
+    /// <summary>
+    /// <see cref="LoadLatest{T}(IObservable{T}, Func{T, CancellationToken, Task})"/>, each value's load run as
+    /// <paramref name="runAs"/>'s screen at the time the value comes: counted with its work, and a failure shown and
+    /// cleared there. For a record view, whose own work runs as the form showing does (RecordViewState.Runner), so what it
+    /// says shows where the user is looking, and whoever waits for that form waits for it too.
+    /// </summary>
+    protected static void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load, Func<ScreenState> runAs) =>
+        Observable.Switch(values.Select(value =>
             {
-                try
+                var runner = runAs();
+                return Observable.FromAsync(cancellationToken => runner.Work.RunAsync(async () =>
                 {
-                    await load(value, cancellationToken);
-                    if (value is not null)
+                    try
                     {
-                        ClearLoadFailure();
+                        await load(value, cancellationToken);
+                        if (value is not null)
+                        {
+                            runner.ClearLoadFailure();
+                        }
                     }
-                }
-                catch (Exception) when (cancellationToken.IsCancellationRequested)
-                {
-                    // A newer value took over.
-                }
-                catch (Exception ex)
-                {
-                    ShowLoadFailure(ex);
-                }
-            }))))
+                    catch (Exception) when (cancellationToken.IsCancellationRequested)
+                    {
+                        // A newer value took over.
+                    }
+                    catch (Exception ex)
+                    {
+                        runner.ShowLoadFailure(ex);
+                    }
+                }));
+            }))
             .Subscribe();
 
     /// <summary>
