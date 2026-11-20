@@ -5,7 +5,6 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -13,6 +12,7 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -38,13 +38,9 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     public const int DependentsTab = 3;
 
     private readonly RawMaterialsState _view;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
-    private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
-    private readonly IIngredientBomLineRepository _bomLineRepository;
-    private readonly IRawMaterialCategoryRepository _categoryRepository;
-    private readonly IValidator<RawMaterialCategory> _categoryValidator;
-    private readonly IValidator<RawMaterial> _rawMaterialValidator;
+    private readonly IRawMaterialQueries _queries;
+    private readonly IRawMaterialEditor _editor;
+    private readonly IRawMaterialCategoryEditor _categoryEditor;
     private readonly ReadOnlyObservableCollection<RawMaterial> _linkTargets;
     private readonly ReadOnlyObservableCollection<RawMaterial> _addInOptions;
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categoryOptions;
@@ -80,21 +76,16 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// <summary>The material whose price history, brand prices and BOM the tables hold; null for none (a new material).</summary>
     private int? _detailMaterialId;
 
+    /// <param name="queries">What the form reads: a material's details and the copy its Save reads back.</param>
+    /// <param name="editor">What the form saves, and checks its tables' rows with.</param>
+    /// <param name="categoryEditor">What adds a category named in the Category picker.</param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     internal RawMaterialForm(
         RawMaterialsState view,
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialPriceHistoryRepository priceHistoryRepository,
-        IRawMaterialBrandPriceRepository brandPriceRepository,
-        IIngredientBomLineRepository bomLineRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        IRawMaterialCategoryRepository categoryRepository,
-        IValidator<RawMaterialCategory> categoryValidator,
-        IValidator<RawMaterial> rawMaterialValidator,
-        IValidator<RawMaterialUnit> unitValidator,
-        IValidator<RawMaterialBrandPrice> brandPriceValidator,
-        ILogger logger,
-        MaterialCostShares? costShares)
+        IRawMaterialQueries queries,
+        IRawMaterialEditor editor,
+        IRawMaterialCategoryEditor categoryEditor,
+        ILogger logger)
         : base(logger)
     {
         _view = view;
@@ -102,24 +93,20 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
             () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => CategoryOptions, c => c.Name,
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
             SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
-        _rawMaterialRepository = rawMaterialRepository;
-        _priceHistoryRepository = priceHistoryRepository;
-        _brandPriceRepository = brandPriceRepository;
-        _bomLineRepository = bomLineRepository;
-        _categoryRepository = categoryRepository;
-        _categoryValidator = categoryValidator;
-        _rawMaterialValidator = rawMaterialValidator;
+        _queries = queries;
+        _editor = editor;
+        _categoryEditor = categoryEditor;
         _defaultCostBufferPercent = view.DefaultCostBufferPercent;
 
         // The parts. Each makes its commands, and subscribes to what it holds alone; what reaches from one part to another,
         // or to the form, is subscribed below, in the order it always ran. The lists they read are the view's.
         var byName = SortExpressionComparer<RawMaterial>.Ascending(m => m.Name);
-        Units = new RawMaterialUnits(this, UnitsOfMeasure, unitValidator);
-        PurchaseCost = new RawMaterialPurchaseCost(this, Units, UnitsOfMeasure, brandPriceValidator, _updates);
-        Recipe = new RawMaterialRecipe(this, Ingredients, subAssemblyLineRepository);
+        Units = new RawMaterialUnits(this, UnitsOfMeasure, editor.EnsureValid);
+        PurchaseCost = new RawMaterialPurchaseCost(this, Units, UnitsOfMeasure, editor.EnsureValid, _updates);
+        Recipe = new RawMaterialRecipe(this, Ingredients, queries);
         UsageExample = new RawMaterialUsageExample();
-        PriceLog = new RawMaterialPriceLog(this, priceHistoryRepository);
-        Dependents = new RawMaterialDependents(costShares);
+        PriceLog = new RawMaterialPriceLog(this, queries, editor);
+        Dependents = new RawMaterialDependents(queries);
 
         // What follows the form's fields as they change is called by their setters (SelectionChanged, TypeChanged and the
         // rest), in the order it has to run. What follows here runs once now, as the form starts, in the order it always
@@ -800,7 +787,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// The view's load is merged: what follows it on the form. <paramref name="dependentsRead"/> holds the products using
     /// each material whose details showed as the load set out, read with the lists.
     /// </summary>
-    internal async Task EndLoadAsync(Load load, IReadOnlyDictionary<int, Task<IReadOnlyList<LinkingProduct>>> dependentsRead)
+    internal async Task EndLoadAsync(Load load, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> dependentsRead)
     {
         // The Sub-Assemblies screen may have changed the recipe's lines. Pointing the recipe at its fresh copy reads them only
         // when the sub-assembly's own row changed, so they're read here every time.
@@ -810,13 +797,9 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         }
 
         // The products using the material, read with the lists: kept only if the details showing are still that material's.
-        if (_detailMaterialId is { } readFor && dependentsRead.TryGetValue(readFor, out var read))
+        if (_detailMaterialId is { } readFor && dependentsRead.TryGetValue(readFor, out var dependents))
         {
-            var dependents = await read;
-            if (_detailMaterialId == readFor)
-            {
-                Dependents.Show(dependents);
-            }
+            Dependents.Show(dependents);
         }
 
         if (load.SavedSince && SelectedRawMaterial is { } savedAgain)
@@ -829,7 +812,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         OpenRecordAskedFor();
     }
 
-    /// <summary>Save: the material with its units, brand prices or add-ins, all or nothing.</summary>
+    /// <summary>Save: the material with its units, brand prices or add-ins, all or nothing (IRawMaterialEditor.SaveAsync).</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     private async Task SaveAsync()
     {
@@ -870,12 +853,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
             UpdatedAt = SavedVersionToSend,
         };
 
-        var validation = _rawMaterialValidator.Validate(material);
-        if (!validation.IsValid)
-        {
-            ErrorMessage = validation.ToString(" ");
-            return;
-        }
+        _editor.EnsureValid(material);
 
         // The units and brand prices are typed straight into their tables, so a half-filled or repeated one is caught here.
         Units.EnsureValid();
@@ -891,7 +869,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
 
         var addIns = source == RawMaterialSource.Made ? Recipe.ChangedAddIns() : null;
 
-        var id = await _rawMaterialRepository.SaveAsync(material, [.. Units.Rows.Select(r => r.Unit)], brandPrices, addIns, CancellationToken.None);
+        var id = await _editor.SaveAsync(new RawMaterialSaveRequest(material, [.. Units.Rows.Select(r => r.Unit)], brandPrices, addIns), CancellationToken.None);
 
         // The list picks up any cost that cascaded to other materials; then the form reloads what
         // was saved, so new units get their ids and the brand prices, price history and BOM show the new rows.
@@ -1108,7 +1086,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         RawMaterialDetail detail;
         try
         {
-            detail = await Task.Run(() => ReadDetailAsync(material, cancellationToken), cancellationToken);
+            detail = await Task.Run(() => _queries.ReadDetailAsync(material, cancellationToken), cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested && material.Id != _detailMaterialId)
         {
@@ -1119,35 +1097,6 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
 
         cancellationToken.ThrowIfCancellationRequested();
         ShowDetails(material, detail);
-    }
-
-    /// <summary>A material's price history, brand prices, BOM lines and the products using it, as LoadDetailsAsync reads them.</summary>
-    private sealed record RawMaterialDetail(
-        IReadOnlyList<RawMaterialPriceHistory> PriceHistory,
-        IReadOnlyList<RawMaterialBrandPrice> BrandPrices,
-        IReadOnlyList<IngredientBomLine> BomLines,
-        IReadOnlyList<LinkingProduct> Dependents)
-    {
-        public static readonly RawMaterialDetail None = new([], [], [], []);
-    }
-
-    /// <summary>
-    /// Only the repositories: this runs off the UI thread. A purchased material has prices, a made one a BOM, and a linked
-    /// one neither; any of them can be used by products.
-    /// </summary>
-    private async Task<RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken)
-    {
-        var dependents = await _rawMaterialRepository.GetDependentsAsync(material.Id, cancellationToken);
-        return material.Source switch
-        {
-            RawMaterialSource.Purchased => new RawMaterialDetail(
-                await _priceHistoryRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
-                await _brandPriceRepository.GetForRawMaterialAsync(material.Id, cancellationToken),
-                [],
-                dependents),
-            RawMaterialSource.Made => new RawMaterialDetail([], [], await _bomLineRepository.GetForIngredientAsync(material.Id, cancellationToken), dependents),
-            _ => RawMaterialDetail.None with { Dependents = dependents },
-        };
     }
 
     /// <summary>
@@ -1210,7 +1159,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// </summary>
     private async Task ReloadSavedRawMaterialAsync(int id)
     {
-        var saved = await _rawMaterialRepository.GetByIdAsync(id, CancellationToken.None);
+        var saved = await _queries.ReadAsync(id, CancellationToken.None);
         if (saved is not null)
         {
             _view.TakeSaved(saved);
@@ -1225,16 +1174,19 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// </summary>
     private async Task<RawMaterialCategory?> SaveNewCategoryAsync(string name)
     {
-        var category = new RawMaterialCategory { Name = name, Type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource) };
-        var validation = _categoryValidator.Validate(category);
-        if (!validation.IsValid)
+        var type = RawMaterialRules.CategoryTypeFor(EditingType, EditingSource);
+        try
         {
-            ErrorMessage = validation.ToString(" ");
+            _categoryEditor.EnsureValid(name, type);
+        }
+        catch (BusinessRuleException refused)
+        {
+            ErrorMessage = refused.Message;
             return null;
         }
 
-        // AddAsync fills in the saved Id, which the reloaded copy to pick is found by.
-        await _categoryRepository.AddAsync(category, CancellationToken.None);
+        // Saved with its id, which the reloaded copy to pick is found by.
+        var category = await _categoryEditor.AddAsync(name, type, CancellationToken.None);
         await LoadCommand.ExecuteAsync();
         return Categories.FirstOrDefault(c => c.Id == category.Id);
     }

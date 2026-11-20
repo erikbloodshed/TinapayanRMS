@@ -1,10 +1,9 @@
-using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 
-namespace TinapayanRMS.Presentation.RawMaterials;
+namespace TinapayanRMS.UseCases.RawMaterials;
 
 /// <summary>
 /// What a raw material makes up of each product's material cost (its ingredients and packaging for one sellable unit, at
@@ -57,12 +56,4 @@ public sealed class MaterialCostShares(
 
         return shares;
     }
-
-    /// <summary>"38% of materials", "Under 0.1% of materials" for a trace; null with no share worked out.</summary>
-    public static string? Text(decimal? share) => share switch
-    {
-        null => null,
-        < 0.001m => "Under 0.1% of materials",
-        _ => string.Create(CultureInfo.CurrentCulture, $"{share.Value * 100m:0.#}% of materials"),
-    };
 }

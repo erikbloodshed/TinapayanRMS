@@ -12,7 +12,7 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// </summary>
 public class DataAccessTests
 {
-    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1).</summary>
+    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2).</summary>
     private static readonly Dictionary<string, int> StillReaching = new(StringComparer.Ordinal)
     {
         ["TinapayanRMS.Presentation.App.AutomaticBackups"] = 1,
@@ -30,12 +30,6 @@ public class DataAccessTests
         ["TinapayanRMS.Presentation.Products.ProductsLoadReader"] = 11,
         ["TinapayanRMS.Presentation.Products.ProductsState"] = 18,
         ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 6,
-        ["TinapayanRMS.Presentation.RawMaterials.MaterialCostShares"] = 4,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialForm"] = 6,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialPriceLog"] = 1,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialRecipe"] = 1,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsList"] = 2,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsState"] = 9,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 6,
         ["TinapayanRMS.Presentation.Settings.CostingDefaultsState"] = 2,
         ["TinapayanRMS.Presentation.Settings.DatabaseBackupsState"] = 1,

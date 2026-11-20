@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using DynamicData;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -50,7 +49,7 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
     private readonly IRawMaterialPurchaseCostHost _host;
     private readonly RawMaterialUnits _units;
     private readonly IReadOnlyList<UnitOfMeasure> _unitsOfMeasure;
-    private readonly IValidator<RawMaterialBrandPrice> _brandPriceValidator;
+    private readonly Action<RawMaterialBrandPrice> _ensureValid;
     private readonly DerivedUpdates _updates;
 
     /// <summary>
@@ -69,13 +68,13 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
         IRawMaterialPurchaseCostHost host,
         RawMaterialUnits units,
         IReadOnlyList<UnitOfMeasure> unitsOfMeasure,
-        IValidator<RawMaterialBrandPrice> brandPriceValidator,
+        Action<RawMaterialBrandPrice> ensureValid,
         DerivedUpdates updates)
     {
         _host = host;
         _units = units;
         _unitsOfMeasure = unitsOfMeasure;
-        _brandPriceValidator = brandPriceValidator;
+        _ensureValid = ensureValid;
         _updates = updates;
 
         ReapplyTargetBufferCommand = ScreenCommand.Of(
@@ -602,11 +601,7 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
                     $"{(brand is null ? "A price" : $"'{brand}'")} is in a unit this material doesn't have. Pick another, or add it in Alternative Units.");
             }
 
-            var validation = _brandPriceValidator.Validate(new RawMaterialBrandPrice { Brand = brand, Price = row.Price ?? 0m });
-            if (!validation.IsValid)
-            {
-                throw new BusinessRuleException(validation.ToString(" "));
-            }
+            _ensureValid(new RawMaterialBrandPrice { Brand = brand, Price = row.Price ?? 0m });
 
             prices.Add((brand, key == PurchaseUnitChoice.BaseUnitKey ? null : key, row.Price!.Value));
         }

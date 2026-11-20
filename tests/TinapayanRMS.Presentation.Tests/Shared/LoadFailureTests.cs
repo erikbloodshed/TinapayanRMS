@@ -316,22 +316,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
 
     private static RawMaterialForm CreateRawMaterialsState(FailingDbContextFactory factory)
     {
-        return new RawMaterialsState(
-            new RawMaterialRepository(factory),
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialBrandPriceRepository(factory),
-            new IngredientBomLineRepository(factory),
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new RawMaterialCategoryValidator(),
-            new RawMaterialValidator(),
-            new RawMaterialUnitValidator(),
-            new RawMaterialBrandPriceValidator(),
-            new UnitOfMeasureRepository(factory),
-            new InMemoryViewStateStore(),
-            new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return RawMaterialsViews.Create(factory).Form!;
     }
 
     private SubAssemblyForm CreateSubAssembliesState(FailingDbContextFactory factory)

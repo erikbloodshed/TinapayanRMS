@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Reactive.Subjects;
 using DynamicData;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -31,7 +31,7 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
 {
     private readonly IRawMaterialRecipeHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
+    private readonly IRawMaterialQueries _queries;
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
     /// <summary>Each sub-assembly picked or shown, nothing picked first: what reads the recipe's lines (<see cref="SubAssemblies"/>).</summary>
@@ -48,11 +48,11 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
 
     /// <param name="host">The screen, whose Weight Loss % the totals are less, and whose header follows them.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
-    public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients, ISubAssemblyLineRepository subAssemblyLineRepository)
+    public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients, IRawMaterialQueries queries)
     {
         _host = host;
         _ingredients = ingredients;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
+        _queries = queries;
 
         StartChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = true, () => IsShowingSubAssemblyBadge);
         CancelChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = false);
@@ -197,7 +197,7 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     {
         IReadOnlyList<SubAssemblyLine> lines = subAssembly is null
             ? []
-            : await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
+            : await _queries.ReadSubAssemblyLinesAsync(subAssembly.Id, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         Lines.Clear();
