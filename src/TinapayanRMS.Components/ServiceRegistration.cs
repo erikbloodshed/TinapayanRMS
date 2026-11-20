@@ -17,6 +17,7 @@ using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.SubAssemblies;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
+using TinapayanRMS.UseCases.RawMaterials;
 using TinapayanRMS.UseCases.SubAssemblies;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Shared;
@@ -50,19 +51,11 @@ public static class ServiceRegistration
         services.AddSingleton<IDatabaseUpdater, DatabaseUpdater>();
         services.AddSingleton<DatabaseReadiness>();
         services.AddSingleton<SavedProductReader>();
-        services.AddSingleton<MaterialCostShares>();
         services.AddSingleton<ProductVersionRecorder>();
         services.AddSingleton<VersionedSaves>();
 
         // The use cases (docs/adr/0002), what the screens do with the records, over the repositories registered above.
-        services.AddSingleton<SharedRecipeImpact>();
-        services.AddSingleton<ISubAssemblyQueries, SubAssemblyQueries>();
-        services.AddSingleton<ISubAssemblyEditor>(provider => new SubAssemblyEditor(
-            provider.GetRequiredService<ISubAssemblyRepository>(),
-            provider.GetRequiredService<IValidator<SubAssembly>>(),
-            provider.GetRequiredService<VersionedSaves>(),
-            provider.GetRequiredService<SharedRecipeImpact>()));
-        services.AddSingleton<ISubAssemblyRoleEditor, SubAssemblyRoleEditor>();
+        AddUseCases(services);
 
         // One store for the process, so its lock covers every page the web view loads.
         services.AddSingleton<IViewStateStore>(new JsonViewStateStore(viewStateFile));
@@ -140,5 +133,36 @@ public static class ServiceRegistration
         services.AddScoped<IPagePrinter, WebViewPagePrinter>();
 
         return services;
+    }
+
+    /// <summary>
+    /// The use cases (docs/adr/0002), a screen's at a time as each moves to them: its queries and editors, over the
+    /// repositories and services AddTinapayanRMS registers. Apart from it, so the composition root's coupling stays within
+    /// what CA1506 allows as screens move.
+    /// </summary>
+    private static void AddUseCases(IServiceCollection services)
+    {
+        services.AddSingleton<SharedRecipeImpact>();
+        services.AddSingleton<ISubAssemblyQueries, SubAssemblyQueries>();
+        services.AddSingleton<ISubAssemblyEditor>(provider => new SubAssemblyEditor(
+            provider.GetRequiredService<ISubAssemblyRepository>(),
+            provider.GetRequiredService<IValidator<SubAssembly>>(),
+            provider.GetRequiredService<VersionedSaves>(),
+            provider.GetRequiredService<SharedRecipeImpact>()));
+        services.AddSingleton<ISubAssemblyRoleEditor, SubAssemblyRoleEditor>();
+        services.AddSingleton<MaterialCostShares>();
+        services.AddSingleton<IRawMaterialQueries>(provider => new RawMaterialQueries(
+            provider.GetRequiredService<IRawMaterialRepository>(),
+            provider.GetRequiredService<IRawMaterialPriceHistoryRepository>(),
+            provider.GetRequiredService<IRawMaterialBrandPriceRepository>(),
+            provider.GetRequiredService<IIngredientBomLineRepository>(),
+            provider.GetRequiredService<ISubAssemblyRepository>(),
+            provider.GetRequiredService<ISubAssemblyLineRepository>(),
+            provider.GetRequiredService<IRawMaterialCategoryRepository>(),
+            provider.GetRequiredService<IUnitOfMeasureRepository>(),
+            provider.GetRequiredService<ICostingDefaultsRepository>(),
+            provider.GetRequiredService<MaterialCostShares>()));
+        services.AddSingleton<IRawMaterialEditor, RawMaterialEditor>();
+        services.AddSingleton<IRawMaterialCategoryEditor, RawMaterialCategoryEditor>();
     }
 }

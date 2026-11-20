@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Reactive;
 using System.Reactive.Subjects;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -17,14 +19,14 @@ public sealed class RawMaterialDependents : ObservableState, IDisposable
     private const string UsedText =
         "These products use it in their recipe or packaging, directly or through a made or linked ingredient, so a change to its cost reaches each of them.";
 
-    private readonly MaterialCostShares? _costShares;
+    private readonly IRawMaterialQueries _queries;
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<Unit> _sharesWanted = new();
 
-    /// <param name="costShares">What each product's share is worked out by; null in a screen built without it (tests that don't need it).</param>
-    public RawMaterialDependents(MaterialCostShares? costShares)
+    /// <param name="queries">What each product's share is read from (ReadCostSharesAsync); none, in a screen built without it.</param>
+    public RawMaterialDependents(IRawMaterialQueries queries)
     {
-        _costShares = costShares;
+        _queries = queries;
         OpenProductCommand = ScreenCommand.Of<int>(_productOpenRequests.OnNext);
     }
 
@@ -67,22 +69,30 @@ public sealed class RawMaterialDependents : ObservableState, IDisposable
 
     /// <summary>
     /// The tiles' "38% of materials", for material <paramref name="materialId"/>: worked out only while the tab shows, since it
-    /// reads every product the material goes into (MaterialCostShares). Kept on the tiles until they change.
+    /// reads every product the material goes into (IRawMaterialQueries.ReadCostSharesAsync). Kept on the tiles until they change.
     /// </summary>
     public async Task ShowCostSharesAsync(int materialId, CancellationToken cancellationToken)
     {
-        if (_costShares is not { } costShares || Products is not { Count: > 0 } tiles || tiles.All(t => t.CostShareText is not null))
+        if (Products is not { Count: > 0 } tiles || tiles.All(t => t.CostShareText is not null))
         {
             return;
         }
 
-        var shares = await Task.Run(() => costShares.ReadAsync(materialId, [.. tiles.Select(t => t.Id)], cancellationToken), cancellationToken);
+        var shares = await Task.Run(() => _queries.ReadCostSharesAsync(materialId, [.. tiles.Select(t => t.Id)], cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        if (ReferenceEquals(Products, tiles))
+        if (shares is not null && ReferenceEquals(Products, tiles))
         {
-            Products = [.. tiles.Select(t => t with { CostShareText = MaterialCostShares.Text(shares.GetValueOrDefault(t.Id)) })];
+            Products = [.. tiles.Select(t => t with { CostShareText = ShareText(shares.GetValueOrDefault(t.Id)) })];
         }
     }
+
+    /// <summary>"38% of materials", "Under 0.1% of materials" for a trace; null with no share worked out.</summary>
+    public static string? ShareText(decimal? share) => share switch
+    {
+        null => null,
+        < 0.001m => "Under 0.1% of materials",
+        _ => string.Create(CultureInfo.CurrentCulture, $"{share.Value * 100m:0.#}% of materials"),
+    };
 
     public void Dispose()
     {

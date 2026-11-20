@@ -23,9 +23,6 @@ public class ConstructorDependencyTests
         ["TinapayanRMS.Presentation.Products.ProductsState"] = 21,
         ["TinapayanRMS.Presentation.Products.ProductUsageEdit"] = 13,
         ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 11,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialForm"] = 13,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsList"] = 9,
-        ["TinapayanRMS.Presentation.RawMaterials.RawMaterialsState"] = 16,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 7,
     };
 

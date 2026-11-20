@@ -1,9 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -348,21 +346,6 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
     {
         var factory = CreateDbContextFactory();
 
-        return new RawMaterialsState(
-            new RawMaterialRepository(factory),
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialBrandPriceRepository(factory),
-            new IngredientBomLineRepository(factory),
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new RawMaterialCategoryValidator(),
-            new RawMaterialValidator(),
-            new RawMaterialUnitValidator(),
-            new RawMaterialBrandPriceValidator(),
-            new UnitOfMeasureRepository(factory),
-            new InMemoryViewStateStore(),
-            new CostingDefaultsRepository(factory),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return RawMaterialsViews.Create(factory).Form!;
     }
 }

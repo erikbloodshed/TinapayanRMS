@@ -3,13 +3,13 @@ using System.Reactive.Disposables;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -24,21 +24,10 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// </summary>
 public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMaterialsListHost
 {
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
-    private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
-    private readonly IIngredientBomLineRepository _bomLineRepository;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IRawMaterialCategoryRepository _categoryRepository;
-    private readonly IValidator<RawMaterialCategory> _categoryValidator;
-    private readonly IValidator<RawMaterial> _rawMaterialValidator;
-    private readonly IValidator<RawMaterialUnit> _unitValidator;
-    private readonly IValidator<RawMaterialBrandPrice> _brandPriceValidator;
-    private readonly IUnitOfMeasureRepository _unitOfMeasureRepository;
-    private readonly ICostingDefaultsRepository _costingDefaultsRepository;
+    private readonly IRawMaterialQueries _queries;
+    private readonly IRawMaterialEditor _editor;
+    private readonly IRawMaterialCategoryEditor _categoryEditor;
     private readonly ILogger _logger;
-    private readonly MaterialCostShares? _costShares;
     private readonly ReadOnlyObservableCollection<RawMaterial> _rawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterial> _ingredients;
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
@@ -47,41 +36,21 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+    /// <param name="queries">What the view and its forms read.</param>
+    /// <param name="editor">What the forms and the list save, delete, rename and move.</param>
+    /// <param name="categoryEditor">What the list and the forms' Category pickers do to the categories.</param>
     public RawMaterialsState(
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialPriceHistoryRepository priceHistoryRepository,
-        IRawMaterialBrandPriceRepository brandPriceRepository,
-        IIngredientBomLineRepository bomLineRepository,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        IRawMaterialCategoryRepository categoryRepository,
-        IValidator<RawMaterialCategory> categoryValidator,
-        IValidator<RawMaterial> rawMaterialValidator,
-        IValidator<RawMaterialUnit> unitValidator,
-        IValidator<RawMaterialBrandPrice> brandPriceValidator,
-        IUnitOfMeasureRepository unitOfMeasureRepository,
+        IRawMaterialQueries queries,
+        IRawMaterialEditor editor,
+        IRawMaterialCategoryEditor categoryEditor,
         IViewStateStore viewStateStore,
-        ICostingDefaultsRepository costingDefaultsRepository,
-        ILogger logger,
-        MaterialCostShares? costShares = null)
+        ILogger logger)
         : base(logger)
     {
-        _rawMaterialRepository = rawMaterialRepository;
-        _priceHistoryRepository = priceHistoryRepository;
-        _brandPriceRepository = brandPriceRepository;
-        _bomLineRepository = bomLineRepository;
-        _subAssemblyRepository = subAssemblyRepository;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _categoryRepository = categoryRepository;
-        _categoryValidator = categoryValidator;
-        _rawMaterialValidator = rawMaterialValidator;
-        _unitValidator = unitValidator;
-        _brandPriceValidator = brandPriceValidator;
-        _unitOfMeasureRepository = unitOfMeasureRepository;
-        _costingDefaultsRepository = costingDefaultsRepository;
+        _queries = queries;
+        _editor = editor;
+        _categoryEditor = categoryEditor;
         _logger = logger;
-        _costShares = costShares;
 
         // The lists the forms and the list read, bound first. The categories before the list's own subscriptions to them, so
         // its folders read them changed.
@@ -97,8 +66,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
             .SortAndBind(out _ingredients, byName)
             .Subscribe();
 
-        List = new RawMaterialsList(
-            this, RawMaterialCache, CategoryCache, RawMaterials, Categories, rawMaterialRepository, categoryRepository, categoryValidator, viewStateStore);
+        List = new RawMaterialsList(this, RawMaterialCache, CategoryCache, editor, categoryEditor, viewStateStore);
 
         // Runs each time the page opens (ScreenBase) and after the forms' own saves. It merges rather than replaces, so each
         // form keeps its selection, picker choices and unsaved edits while picking up what changed elsewhere, such as a unit
@@ -154,9 +122,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
 
     protected override RecordList ViewList => List;
 
-    protected override RawMaterialForm NewForm() => new(
-        this, _rawMaterialRepository, _priceHistoryRepository, _brandPriceRepository, _bomLineRepository, _subAssemblyLineRepository,
-        _categoryRepository, _categoryValidator, _rawMaterialValidator, _unitValidator, _brandPriceValidator, _logger, _costShares);
+    protected override RawMaterialForm NewForm() => new(this, _queries, _editor, _categoryEditor, _logger);
 
     protected override IDisposable Wire(RawMaterialForm form) => new CompositeDisposable(
         form.Dependents.ProductOpenRequests.Subscribe(_productOpenRequests.OnNext),
@@ -165,26 +131,13 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     /// <summary>The materials, categories, units of measure and cost buffer read again and merged, every form and its selection kept.</summary>
     private async Task LoadAsync()
     {
-        // All at once, on the thread pool, as Products reads its lists: one after another on the UI thread, each read came
-        // back to it before the next began, and waited its turn behind whatever the screen was drawing. The products using
-        // each form's material are read with them, since Products may have started or stopped using one meanwhile.
-        var categoriesRead = Task.Run(() => _categoryRepository.GetAllAsync(CancellationToken.None));
-        var unitsRead = Task.Run(() => _unitOfMeasureRepository.GetAllAsync(CancellationToken.None));
-        var rawMaterialsRead = Task.Run(() => _rawMaterialRepository.GetAllAsync(CancellationToken.None));
-        var costingDefaultsRead = Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
-        var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
-        var dependentsRead = Tabs.All
-            .Select(tab => tab.Form.DetailMaterialId)
-            .OfType<int>()
-            .Distinct()
-            .ToDictionary(id => id, id => Task.Run(() => _rawMaterialRepository.GetDependentsAsync(id, CancellationToken.None)));
-        await Task.WhenAll([categoriesRead, unitsRead, rawMaterialsRead, costingDefaultsRead, subAssembliesRead, .. dependentsRead.Values]);
-
-        var categories = await categoriesRead;
-        var units = await unitsRead;
-        var rawMaterials = await rawMaterialsRead;
-        var costingDefaults = await costingDefaultsRead;
-        var subAssemblies = await subAssembliesRead;
+        // Off the UI thread, the reads side by side (ReadCatalogAsync), as Products reads its lists: one after another on the
+        // UI thread, each read came back to it before the next began, and waited its turn behind whatever the screen was
+        // drawing. The products using each form's material are read with them, since Products may have started or stopped
+        // using one meanwhile.
+        int[] dependentsFor = [.. Tabs.All.Select(tab => tab.Form.DetailMaterialId).OfType<int>()];
+        var (categories, units, rawMaterials, costingDefaults, subAssemblies, dependentsRead) =
+            await Task.Run(() => _queries.ReadCatalogAsync(dependentsFor, CancellationToken.None));
 
         // What each form shows, by id, before anything it reads is replaced.
         var forms = Tabs.All.Select(tab => tab.Form).ToList();
@@ -264,7 +217,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
             material.Id,
             asker,
             $"Delete '{material.Name}'? This can't be undone.",
-            () => _rawMaterialRepository.DeleteAsync(material.Id, CancellationToken.None));
+            () => _editor.DeleteAsync(material.Id, CancellationToken.None));
 
     protected override void Dispose(bool disposing)
     {

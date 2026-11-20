@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using DynamicData;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -35,7 +34,7 @@ public sealed class RawMaterialUnits : ObservableState
 {
     private readonly IRawMaterialUnitsHost _host;
     private readonly IReadOnlyList<UnitOfMeasure> _unitsOfMeasure;
-    private readonly IValidator<RawMaterialUnit> _unitValidator;
+    private readonly Action<RawMaterialUnit> _ensureValid;
 
     /// <summary>
     /// The alternative units added by picking, on a brand row, a unit the material didn't have. Each goes again once no row is
@@ -45,11 +44,12 @@ public sealed class RawMaterialUnits : ObservableState
 
     /// <param name="host">The screen: the form's base unit, and the brands to price again when a unit goes.</param>
     /// <param name="unitsOfMeasure">Every unit of measure, as the screen last loaded them, which a row's unit is one of.</param>
-    public RawMaterialUnits(IRawMaterialUnitsHost host, IReadOnlyList<UnitOfMeasure> unitsOfMeasure, IValidator<RawMaterialUnit> unitValidator)
+    /// <param name="ensureValid">Refuses a unit its fields can't be saved as (IRawMaterialEditor.EnsureValid), as each row is checked.</param>
+    public RawMaterialUnits(IRawMaterialUnitsHost host, IReadOnlyList<UnitOfMeasure> unitsOfMeasure, Action<RawMaterialUnit> ensureValid)
     {
         _host = host;
         _unitsOfMeasure = unitsOfMeasure;
-        _unitValidator = unitValidator;
+        _ensureValid = ensureValid;
 
         // Nothing to confirm: the unit only leaves the list, and is deleted when the material is saved.
         DeleteCommand = ScreenCommand.Of(
@@ -232,11 +232,7 @@ public sealed class RawMaterialUnits : ObservableState
                 throw new BusinessRuleException($"Enter how many {_host.BaseUnitAbbreviation} are in one {unit.UnitOfMeasure?.Name ?? "unit"} ({where}).");
             }
 
-            var validation = _unitValidator.Validate(unit);
-            if (!validation.IsValid)
-            {
-                throw new BusinessRuleException(validation.ToString(" "));
-            }
+            _ensureValid(unit);
 
             RawMaterialRules.EnsureNotTheBaseUnit(_host.EditingType == RawMaterialType.Packaging ? _host.EditingBaseUnit?.Id : null, unit.UnitOfMeasureId);
             RawMaterialRules.EnsureUnitNotAlreadyAdded(units.Any(u => !ReferenceEquals(u, unit) && u.UnitOfMeasureId == unit.UnitOfMeasureId));

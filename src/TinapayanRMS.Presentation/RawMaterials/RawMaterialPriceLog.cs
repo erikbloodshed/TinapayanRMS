@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using DynamicData;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -25,16 +25,18 @@ public interface IRawMaterialPriceLogHost : IFormPartHost
 public sealed class RawMaterialPriceLog : ObservableState
 {
     /// <param name="host">The screen, which asks before an entry is deleted, and follows its base unit lock.</param>
-    public RawMaterialPriceLog(IRawMaterialPriceLogHost host, IRawMaterialPriceHistoryRepository priceHistoryRepository)
+    /// <param name="queries">What the history is read again from, once an entry is deleted.</param>
+    /// <param name="editor">What deletes an entry.</param>
+    public RawMaterialPriceLog(IRawMaterialPriceLogHost host, IRawMaterialQueries queries, IRawMaterialEditor editor)
     {
         DeleteCommand = new ScreenCommand(
             () => host.RunWithConfirmationAsync("Delete this price history entry? The material's cost stays as it is. This can't be undone.", async () =>
             {
-                await priceHistoryRepository.DeleteAsync(SelectedEntry!.Entry.Id, CancellationToken.None);
+                await editor.DeletePriceHistoryAsync(SelectedEntry!.Entry.Id, CancellationToken.None);
 
                 // The history is only a log, so the cost stays and the form keeps its unsaved edits. Only the history reloads.
                 var material = host.SelectedRawMaterial!;
-                Show(material, await priceHistoryRepository.GetForRawMaterialAsync(material.Id, CancellationToken.None));
+                Show(material, await queries.ReadPriceHistoryAsync(material.Id, CancellationToken.None));
                 host.PricesDeleted();
             }),
             () => SelectedEntry is not null);

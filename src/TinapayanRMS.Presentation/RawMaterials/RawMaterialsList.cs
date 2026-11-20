@@ -3,13 +3,13 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
@@ -19,6 +19,12 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// </summary>
 public interface IRawMaterialsListHost : IRecordListHost
 {
+    /// <summary>Every material, by name, as the view binds them.</summary>
+    ReadOnlyObservableCollection<RawMaterial> RawMaterials { get; }
+
+    /// <summary>Every category, by name, as the view binds them: the list's folders.</summary>
+    ReadOnlyObservableCollection<RawMaterialCategory> Categories { get; }
+
     /// <summary>The material the form showing is about; null for a new one, or with no tab open.</summary>
     RawMaterial? SelectedRawMaterial { get; }
 
@@ -82,9 +88,8 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     private readonly ReadOnlyObservableCollection<RawMaterial> _rawMaterials;
     private readonly ReadOnlyObservableCollection<RawMaterialCategory> _categories;
     private readonly ReadOnlyObservableCollection<RawMaterial> _visibleRawMaterials;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IRawMaterialCategoryRepository _categoryRepository;
-    private readonly IValidator<RawMaterialCategory> _categoryValidator;
+    private readonly IRawMaterialEditor _editor;
+    private readonly IRawMaterialCategoryEditor _categoryEditor;
     private readonly FolderStateWriter _closedFoldersWriter;
 
     /// <summary>Each search typed, what the list's filter follows: the materials whose name holds it.</summary>
@@ -96,26 +101,22 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     /// <param name="host">The screen, which the list asks for the material its form shows, and what to do to it.</param>
     /// <param name="rawMaterialCache">The screen's materials, which the list searches and moves.</param>
     /// <param name="categoryCache">The screen's categories, whose changes the list's folders follow.</param>
-    /// <param name="rawMaterials">Every material, by name, as the screen binds them.</param>
-    /// <param name="categories">Every category, by name, as the screen binds them: the list's folders.</param>
+    /// <param name="editor">What the list does to the materials: moves and renames.</param>
+    /// <param name="categoryEditor">What the list does to the categories, its folders.</param>
     public RawMaterialsList(
         IRawMaterialsListHost host,
         SourceCache<RawMaterial, int> rawMaterialCache,
         SourceCache<RawMaterialCategory, int> categoryCache,
-        ReadOnlyObservableCollection<RawMaterial> rawMaterials,
-        ReadOnlyObservableCollection<RawMaterialCategory> categories,
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialCategoryRepository categoryRepository,
-        IValidator<RawMaterialCategory> categoryValidator,
+        IRawMaterialEditor editor,
+        IRawMaterialCategoryEditor categoryEditor,
         IViewStateStore viewStateStore)
     {
         _host = host;
         _rawMaterialCache = rawMaterialCache;
-        _rawMaterials = rawMaterials;
-        _categories = categories;
-        _rawMaterialRepository = rawMaterialRepository;
-        _categoryRepository = categoryRepository;
-        _categoryValidator = categoryValidator;
+        _rawMaterials = host.RawMaterials;
+        _categories = host.Categories;
+        _editor = editor;
+        _categoryEditor = categoryEditor;
 
         // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
         // for next time (FolderStateWriter), as on the Products screen; Dispose writes any change still waiting.
@@ -294,7 +295,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         var ids = moves.Select(m => m.RawMaterialId).ToList();
-        await _rawMaterialRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
+        await _editor.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
 
         // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
         await _host.LoadAfterSavingAsync(ids);
@@ -645,7 +646,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameMaterialToAsync(RawMaterialLeafNode leaf, string name)
     {
         var material = leaf.RawMaterial;
-        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.SavedVersionsFor([material.Id]), CancellationToken.None);
+        await _editor.RenameAsync(material.Id, name, _host.SavedVersionsFor([material.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([material.Id]);
         _host.Renamed(material.Id, name);
     }
@@ -659,16 +660,8 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         var category = _categories.FirstOrDefault(c => c.Type == type && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
         if (category is null)
         {
-            var added = new RawMaterialCategory { Name = name, Type = type };
-            var validation = _categoryValidator.Validate(added);
-            if (!validation.IsValid)
-            {
-                _host.ShowError(validation.ToString(" "));
-                return;
-            }
-
-            // AddAsync fills in the saved Id, which the copy read back is found by.
-            await _categoryRepository.AddAsync(added, CancellationToken.None);
+            // A name the categories can't take is refused with why; the copy read back is found by the id it was saved with.
+            var added = await _categoryEditor.AddAsync(name, type, CancellationToken.None);
             await _host.LoadAsync();
             category = _categories.FirstOrDefault(c => c.Id == added.Id);
         }
@@ -689,17 +682,10 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
             return;
         }
 
-        var renamed = new RawMaterialCategory { Id = category.Id, Name = name, Type = category.Type };
-        var validation = _categoryValidator.Validate(renamed);
-        if (!validation.IsValid)
-        {
-            _host.ShowError(validation.ToString(" "));
-            return;
-        }
-
         // Everything is read again, the materials with it, which carry their category's name. The Category picker keeps
-        // the category it holds (the screen's LoadCommand), under its new name.
-        await _categoryRepository.UpdateAsync(renamed, CancellationToken.None);
+        // the category it holds (the screen's LoadCommand), under its new name. A name the categories can't take is refused
+        // with why.
+        await _categoryEditor.RenameAsync(category, name, CancellationToken.None);
         await _host.LoadAsync();
     }
 
@@ -719,7 +705,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
             $"Delete the '{category.Name}' category? It holds no materials. This can't be undone.",
             async () =>
             {
-                await _categoryRepository.DeleteAsync(category.Id, CancellationToken.None);
+                await _categoryEditor.DeleteAsync(category.Id, CancellationToken.None);
 
                 // A new material's form may have had it picked: the undo steps forget it, so none puts back a category
                 // there's no longer any of to save.
