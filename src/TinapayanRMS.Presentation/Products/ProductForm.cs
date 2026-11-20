@@ -31,8 +31,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, ITabForm,
-    IProductRecipeHost, IProductRecipeDraftHost, IProductPackagingHost, IProductPackagingDraftHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost,
-    IProductComponentsDraftHost
+    IProductDraftHost, IProductRecipeHost, IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
     public const int RecipeTab = 0;
@@ -89,8 +88,10 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     {
         _view = view;
 
-        // First, as the parts below read its cost basis. Its costs are worked out from the parts only as they're read.
-        Costing = new ProductCosting(CostingInputs);
+        // The product as it's edited: its own fields and its parts' drafts, the costing first among them. Its fields are the
+        // form's to the page, under the same names (DraftChanged).
+        Draft = new ProductDraft(this, new ProductLists(Ingredients, Roles, PackagingMaterials, Products));
+        Draft.PropertyChanged += DraftChanged;
         _categoryPicker = new CategoryPicker<ProductCategory>(
             () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
@@ -100,15 +101,15 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         _categoryEditor = categoryEditor;
 
         // The lists the parts read are the view's, which each load merges into.
-        Packaging = new ProductPackaging(this, new ProductPackagingDraft(this, PackagingMaterials), queries);
+        Packaging = new ProductPackaging(this, Draft.Packaging, queries);
         UsageForm = new ProductUsageForm(this, Ingredients);
-        ComponentsTable = new ProductComponents(this, new ProductComponentsDraft(this, Products), queries);
+        ComponentsTable = new ProductComponents(this, Draft.Components, queries);
         VersionHistory = new ProductVersionHistory(this, Products, Ingredients, PackagingMaterials, Roles, queries, editor);
 
         // The part that holds the recipe. It subscribes to what it holds alone (the recipe's tabs and which of its tables
         // shows), as it's made; what reaches from one part to another, or to the form, is subscribed below, in the order it
         // always ran.
-        Recipe = new ProductRecipe(this, UsageForm, new ProductRecipeDraft(this, Ingredients, Roles, ComponentsTable.Draft), queries);
+        Recipe = new ProductRecipe(this, UsageForm, Draft.Recipe, queries);
 
         // What follows the form's fields as they change is called by their setters (SelectionChanged and the rest), and what
         // follows a part's by the part's events, subscribed below. What follows here runs in this order: several run as
@@ -246,8 +247,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// <summary>The recipe: its sections and their tabs, the Packaging tab and a composite's Products tab, and the section form's flow.</summary>
     public ProductRecipe Recipe { get; }
 
-    /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs).</summary>
-    public ProductCosting Costing { get; }
+    /// <summary>The product as it's edited: its own fields, its parts' drafts and the costing (<see cref="ProductDraft"/>).</summary>
+    public ProductDraft Draft { get; }
+
+    /// <summary>The Costing tab: the costing percentages, each metric's amount, and the cost summary (Costs). The draft's.</summary>
+    public ProductCosting Costing => Draft.Costing;
 
     /// <summary>
     /// The Recipe Structure's Packaging tab, which every product has: the packaging lines for each piece, typed in or what
@@ -315,21 +319,15 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         Packaging.TakePackagingSets(_view.PackagingSets);
     }
 
-    private bool _isEditingComposite;
+
     /// <summary>
     /// The product showing is a composite: made of other products (its Products tab), its own packaging, and sections only
-    /// in product-owned roles (a topping, a filling), with no Quantity Required of its own. Picked by New composite product, and fixed once it's saved.
+    /// in product-owned roles (a topping, a filling), with no Quantity Required of its own (the draft's).
     /// </summary>
     public bool IsEditingComposite
     {
-        get => _isEditingComposite;
-        private set
-        {
-            if (RaiseAndSetIfChanged(ref _isEditingComposite, value))
-            {
-                RaisePropertyChanged(nameof(TabTitle));
-            }
-        }
+        get => Draft.IsEditingComposite;
+        private set => Draft.IsEditingComposite = value;
     }
 
     /// <summary>The product showing is made of sub-assemblies, as every product that isn't a composite is.</summary>
@@ -404,57 +402,31 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         }
     }
 
-    private string _editingName = string.Empty;
-    /// <summary>The name typed, which the header and the tab show.</summary>
+    /// <summary>The name typed, which the header and the tab show (the draft's).</summary>
     public string EditingName
     {
-        get => _editingName;
-        set
-        {
-            if (RaiseAndSetIfChanged(ref _editingName, value))
-            {
-                RaisePropertyChanged(nameof(TabTitle));
-            }
-        }
+        get => Draft.EditingName;
+        set => Draft.EditingName = value;
     }
 
-    private string _editingDescription = string.Empty;
     public string EditingDescription
     {
-        get => _editingDescription;
-        set => RaiseAndSetIfChanged(ref _editingDescription, value);
+        get => Draft.EditingDescription;
+        set => Draft.EditingDescription = value;
     }
 
-    private int _editingQuantityRequired = 1;
-    /// <summary>
-    /// How many finished pieces make one sellable unit (Product.QuantityRequired): 1 for a product sold by the
-    /// piece, 8 for a "Box of 8". The recipe stays per piece; every cost and price on this screen is for one
-    /// whole unit, so this multiplies the sub-assemblies' share of it.
-    /// </summary>
+    /// <summary>How many finished pieces make one sellable unit (the draft's).</summary>
     public int EditingQuantityRequired
     {
-        get => _editingQuantityRequired;
-        set
-        {
-            if (RaiseAndSetIfChanged(ref _editingQuantityRequired, value))
-            {
-                InvalidateCosts();
-            }
-        }
+        get => Draft.EditingQuantityRequired;
+        set => Draft.EditingQuantityRequired = value;
     }
 
-    private decimal? _editingCurrentPrice;
-    /// <summary>What the shop charges for one sellable unit now, with VAT (Product.CurrentPrice); null when not entered.</summary>
+    /// <summary>What the shop charges for one sellable unit now, with VAT; null when not entered (the draft's).</summary>
     public decimal? EditingCurrentPrice
     {
-        get => _editingCurrentPrice;
-        set
-        {
-            if (RaiseAndSetIfChanged(ref _editingCurrentPrice, value))
-            {
-                InvalidateCosts();
-            }
-        }
+        get => Draft.EditingCurrentPrice;
+        set => Draft.EditingCurrentPrice = value;
     }
 
     private string _categorySearchText = string.Empty;
@@ -468,18 +440,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         set => RaiseAndSetIfChanged(ref _categorySearchText, value);
     }
 
-    private ProductCategory? _editingCategory;
-    /// <summary>The product's category, or null for none: a product doesn't need one. It can set the Wastage % the product is priced with.</summary>
+    /// <summary>The product's category, or null for none (the draft's). It can set the Wastage % the product is priced with.</summary>
     public ProductCategory? EditingCategory
     {
-        get => _editingCategory;
-        set
-        {
-            if (RaiseAndSetIfChanged(ref _editingCategory, value))
-            {
-                InvalidateCosts();
-            }
-        }
+        get => Draft.EditingCategory;
+        set => Draft.EditingCategory = value;
     }
 
     /// <summary>The header's title, and the usage example's: the product's name, or "New product".</summary>
@@ -522,11 +487,23 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// <summary>A saved product: links and clones need one, so the tab only shows then.</summary>
     public bool ShowLinks => SelectedProduct is not null;
 
-    private string _editingCloneName = string.Empty;
     public string EditingCloneName
     {
-        get => _editingCloneName;
-        set => RaiseAndSetIfChanged(ref _editingCloneName, value);
+        get => Draft.EditingCloneName;
+        set => Draft.EditingCloneName = value;
+    }
+
+    /// <summary>
+    /// A field of the draft's changed: the form's own of that name, which the page binds, raised; the tab's title follows the
+    /// name and the kind.
+    /// </summary>
+    private void DraftChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        RaisePropertyChanged(e.PropertyName);
+        if (e.PropertyName is nameof(ProductDraft.EditingName) or nameof(ProductDraft.IsEditingComposite))
+        {
+            RaisePropertyChanged(nameof(TabTitle));
+        }
     }
 
     /// <summary>The view's load: its lists read again, and every open form kept as it is (ProductsState.LoadCommand).</summary>
@@ -1259,26 +1236,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // stays the tab showing through the reload.
         Recipe.ApplyFormForSave();
 
-        var product = new Product
-        {
-            Id = _editingId,
-            Name = EditingName.Trim(),
-            Description = string.IsNullOrWhiteSpace(EditingDescription) ? null : EditingDescription.Trim(),
-            CategoryId = EditingCategory?.Id,
-            QuantityRequired = EditingQuantityRequired,
-            CurrentPrice = EditingCurrentPrice,
-
-            // Only a new product's is written: a saved one's changes by moving it in the list.
-            Stage = NewProductPlace.Stage,
-            FolderId = NewProductPlace.FolderId,
-
-            // A new one's to say; a saved one's is the kind it was saved as, which the form never changes.
-            IsComposite = IsEditingComposite,
-            IncludesComponentPackaging = IsEditingComposite && ComponentsTable.Draft.IncludesPackaging,
-
-            // When it had last been saved as the form took it: a save since, from another PC, refuses this one (SavedVersionRules).
-            UpdatedAt = SavedVersionToSend,
-        };
+        // Filed where New put it (only a new product's place is written), as last saved when the form took it: a save
+        // since, from another PC, refuses this one (SavedVersionRules).
+        var product = Draft.ToProduct(_editingId, NewProductPlace.Stage, NewProductPlace.FolderId, SavedVersionToSend);
 
         // Refused before anything's asked: the product's fields, then its costing's percentages.
         _editor.EnsureValid(product);
@@ -1473,42 +1433,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     private void InvalidateCosts() => Costing.InputsChanged();
 
     /// <summary>
-    /// What the costs are worked out from, as the form has it now (ProductCosting.Costs reads it): the recipe and packaging,
-    /// the product's fields, and every material they use, for the below-cost warning.
-    /// </summary>
-    private ProductCostingInputs CostingInputs()
-    {
-        // A composite's recipe cost is what its products bring, each line its quantity at the product's recipe cost (a
-        // line still being filled in brings nothing yet), then its own sections, each per whole composite.
-        List<ProductComponentRow> lines = IsEditingComposite ? [.. ComponentsTable.Draft.CostedLines] : [];
-        List<(string Name, decimal Cost)> components = [.. lines.Select(r => (r.LineName, r.RecipeCostTotal))];
-
-        // With the box ticked, each product's own packaging for one sellable unit, times its quantity, joins the
-        // composite's packaging, not its recipe cost (a product whose costs haven't been read yet brings none until they are).
-        decimal? componentPackaging = IsEditingComposite && ComponentsTable.Draft.IncludesPackaging
-            ? lines.Sum(r => r.PackagingCostTotal)
-            : null;
-        var usages = Recipe.UsageEdits;
-        return new ProductCostingInputs(
-            new ProductCostInputs
-            {
-                Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(Costing.CostBasis)))],
-                QuantityRequired = EditingQuantityRequired,
-                PackagingCosts = [.. Packaging.Draft.LineEdits.Select(l => l.CostPerUnit), .. Packaging.Draft.BulkEdits.Count > 0 ? [Packaging.Draft.BulkCostPerUnit] : Array.Empty<decimal>()],
-                ComponentPackaging = componentPackaging,
-                CurrentPrice = EditingCurrentPrice,
-                IsComposite = IsEditingComposite,
-                HasOwnSections = IsEditingComposite && usages.Count > 0,
-            },
-            EditingCategory?.WastagePercent,
-            [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
-                .Concat(Packaging.Draft.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
-        {
-            SectionsWithoutPieceSize = [.. usages.Where(u => !ProductRules.HasPieceSize(u.AuthoredValue)).Select(u => u.SectionName)],
-        };
-    }
-
-    /// <summary>
     /// The product the screen has open, as the Print dialog shows it: asked for each time the dialog opens, so it follows
     /// the edits made here since, and the product opened here since. A sub-assembly form
     /// left open is applied first, as Print applies it. Empty while the details are still arriving, and a
@@ -1545,30 +1469,12 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     /// <summary>
     /// What Print puts on paper: the product as the screen shows it now, its details, every section in recipe order, its
-    /// packaging and its costing, with a note when that isn't what's saved.
+    /// packaging and its costing, with a note when that isn't what's saved (ProductDraft.ToPrintout).
     /// </summary>
-    private ProductPrintout CurrentPrintout() => new(
-        string.IsNullOrWhiteSpace(EditingName) ? (IsEditingComposite ? "New composite product" : "New product") : EditingName.Trim(),
-        EditingCategory?.Name ?? "Uncategorized",
+    private ProductPrintout CurrentPrintout() => Draft.ToPrintout(
         ProductRules.StageTitle(SelectedProduct?.Stage ?? NewProductPlace.Stage),
-        Costing.CostUnitCaption,
         LastUpdatedText,
-        _detailProductId is null
-            ? ProductPrintout.NotSavedNote
-            : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null,
-        DateTime.Now,
-        [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), Costing.CostBasis))],
-        Packaging.Draft.LineEdits.Count > 0 || Packaging.Draft.BulkEdits.Count > 0
-            ? PrintedPackaging.From(
-                Packaging.Draft.LineEdits.Select(l => l.ToPriced()),
-                Packaging.Draft.IsPackagingLinked ? Packaging.Draft.PackagingLinkedToText : null,
-                Packaging.Draft.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.Draft.BulkEdits.Select(l => l.ToPriced())], Packaging.Draft.BulkQuantity))
-            : null,
-        Costing.Costs,
-        IsEditingComposite ? PrintedComponent.From(ComponentsTable.Draft.ComponentEdits) : null)
-    {
-        CostBasis = Costing.CostBasis,
-    };
+        _detailProductId is null ? ProductPrintout.NotSavedNote : History.IsDirty ? ProductPrintout.UnsavedChangesNote : null);
 
     /// <summary>
     /// Reads the picked product's versions for the History tab, when it shows and they aren't showing already;
@@ -1687,21 +1593,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// The form as it stands: everything an undo step puts back, the product's own fields and its costing, and each part's
     /// own share. See ProductFormSnapshot for what's left out.
     /// </summary>
-    protected override ProductFormSnapshot CaptureSnapshot() => new()
-    {
-        EditingId = EditingId,
-        Name = EditingName,
-        Description = EditingDescription,
-        CurrentPrice = EditingCurrentPrice,
-        QuantityRequired = EditingQuantityRequired,
-        IncludesComponentPackaging = ComponentsTable.Draft.IncludesPackaging,
-        CategoryId = EditingCategory?.Id,
-        CloneName = EditingCloneName,
-        Costing = Costing.Percentages,
-        Recipe = Recipe.Capture(),
-        Packaging = Packaging.Draft.Capture(),
-        Components = ComponentsTable.Draft.Capture(),
-    };
+    protected override ProductFormSnapshot CaptureSnapshot() => Draft.Capture(EditingId, Recipe.Capture());
 
     /// <summary>
     /// Puts the whole form back as <paramref name="snapshot"/> had it. Order matters throughout, and is explained
@@ -1723,27 +1615,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             Packaging.SelectedBulkEdit = null;
             ComponentsTable.SelectedComponentEdit = null;
 
-            // 2. The product's own fields. The category goes back by id, as the reloaded list's own copy.
+            // 2 to 4. The product (ProductDraft.Restore): its own fields, the category by id as the reloaded list's own copy,
+            //    the costing, the packaging with its link as saved left alone (what Save compares against), and a
+            //    composite's lines.
             EditingId = snapshot.EditingId;
-            EditingName = snapshot.Name;
-            EditingDescription = snapshot.Description;
-            EditingCurrentPrice = snapshot.CurrentPrice;
-            EditingQuantityRequired = snapshot.QuantityRequired;
-            ComponentsTable.Draft.IncludesPackaging = snapshot.IncludesComponentPackaging;
-            EditingCloneName = snapshot.CloneName;
-            _editingCategory = snapshot.CategoryId is { } categoryId ? Categories.FirstOrDefault(c => c.Id == categoryId) : null;
-            RaisePropertyChanged(nameof(EditingCategory));
-            InvalidateCosts();
-
-            // 3. Costing.
-            Costing.Percentages = snapshot.Costing;
-
-            // 4. Packaging (ProductPackagingDraft.Restore), the link as saved left alone: it's what Save compares against.
-            Packaging.Draft.Restore(snapshot.Packaging);
-
-            // A composite's lines, each finding its product and the recipe cost read for it again (a cost not read yet is
-            // read now, and prices the line when it arrives).
-            ComponentsTable.Draft.Restore(snapshot.Components);
+            Draft.Restore(snapshot, Categories);
 
             // 5 and 6. The sections and their tabs, under the recipe's guard against applying the form the tab moves off,
             //    then the form itself, last, its option lists rebuilt before its pickers are put back (ProductRecipe.Restore).
@@ -1846,22 +1722,20 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     int? IProductRecipeDraftHost.DetailProductId => _detailProductId;
 
+    int? IProductDraftHost.DetailProductId => _detailProductId;
+
     void IProductRecipeHost.InvalidateCosts() => InvalidateCosts();
 
     void IProductRecipeHost.OpenProduct(int productId) => _view.OpenRecord(productId);
 
     void IProductRecipeHost.OpenSubAssembly(int subAssemblyId) => _subAssemblyOpenRequests.OnNext(subAssemblyId);
 
-    // What the Packaging tab asks of the screen (IProductPackagingHost), and its draft the cost basis, the Costing part's.
-    CostBasis IProductPackagingDraftHost.CostBasis => Costing.CostBasis;
+    // What the Packaging tab asks of the screen (IProductPackagingHost).
 
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
     void IProductPackagingHost.InvalidateCosts() => InvalidateCosts();
 
-    // What the composite's Products table's draft asks of the screen (IProductComponentsDraftHost): the cost basis, the
-    // Costing part's.
-    CostBasis IProductComponentsDraftHost.CostBasis => Costing.CostBasis;
 
     // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the Costing part's.
     CostBasis IProductUsageFormHost.CostBasis => Costing.CostBasis;
@@ -1939,8 +1813,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         _picks.Dispose();
         UsageForm.Dispose();
         Packaging.Dispose();
-        Packaging.Draft.Dispose();
         ComponentsTable.Dispose();
-        ComponentsTable.Draft.Dispose();
+        Draft.Dispose();
     }
 }

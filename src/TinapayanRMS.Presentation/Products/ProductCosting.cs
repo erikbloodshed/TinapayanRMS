@@ -351,7 +351,7 @@ public sealed class ProductCosting : ObservableState
 }
 
 /// <summary>
-/// What the screen has for a product's costs as they stand (ProductForm.CostingInputs): the recipe's and product's
+/// What the screen has for a product's costs as they stand (ProductDraft.CostingInputs): the recipe's and product's
 /// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
 /// </summary>
 public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials)
