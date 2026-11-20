@@ -44,7 +44,7 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
     /// <summary>The totals as last worked out from the material's own details, which show while another's are on their way.</summary>
     private (decimal Weight, decimal Cost) _heldBomTotals;
 
-    /// <param name="host">The screen, whose Weight Loss % the totals are less, and whose header follows them.</param>
+    /// <param name="host">The draft, whose Weight Loss % the totals are less, and whose form's header follows them.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
     public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients)
     {

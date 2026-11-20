@@ -81,7 +81,7 @@ public sealed class RawMaterialDraft : ObservableState, IDisposable, IRawMateria
         // Each brand's buffered price follows the fixed buffered cost (the Cost Setup's BufferEdited).
         _updates.Run(PurchaseCost.BufferedCostChanged);
 
-        // The alternative units and the purchase unit choices name the base unit (TypeChanged, BaseUnitChanged).
+        // The alternative units and the purchase unit choices name the base unit (Type's and BaseUnit's setters).
         RebuildUnitViews();
 
         // A unit's multiplier changed in the Alternative Units table reprices the brands bought in it straight away, and the

@@ -99,8 +99,8 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         PriceLog = new RawMaterialPriceLog(this, queries, editor);
         Dependents = new RawMaterialDependents(queries);
 
-        // What follows the form's fields as they change is called by their setters (SelectionChanged, TypeChanged and the
-        // rest), in the order it has to run. What follows here runs once now, as the form starts, in the order it always
+        // What follows the form's fields as they change is called by their setters (SelectionChanged here, the draft's own in
+        // the draft), in the order it has to run. What follows here runs once now, as the form starts, in the order it always
         // did: several of the subscriptions run as they're made, the picks' included, so each comes after what it reads.
 
         // The pickers' lists over the view's materials and categories (BindPickerLists).
@@ -887,7 +887,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         PriceLog.Show(material, detail.PriceHistory);
         ShowUpdatedAt(material);
 
-        // The recipe's own lines show from the sub-assembly picked (Recipe.LoadLinesAsync); only the add-ins are the form's.
+        // The recipe's own lines show from the sub-assembly picked (LoadRecipeLinesAsync); only the add-ins are the material's.
         Recipe.ShowAddIns(detail.BomLines);
         PurchaseCost.ShowBrandPrices(detail.BrandPrices);
         Dependents.Show(detail.Dependents);

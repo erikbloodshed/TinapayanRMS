@@ -9,7 +9,7 @@ using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
-/// <summary>What the Cost Setup tab asks of its screen, on top of what any part of its form asks.</summary>
+/// <summary>What the Cost Setup tab asks of its draft (RawMaterialDraft), on top of the undo recorder its steps go in.</summary>
 public interface IRawMaterialPurchaseCostHost : IUndoRecorder
 {
     /// <summary>The form's type: a packaging material's base unit is its own, an ingredient's the gram.</summary>
@@ -60,7 +60,7 @@ public sealed class RawMaterialPurchaseCost : ObservableState, IBrandPriceRowHos
 
     private bool _rebuildingCostFromOptions;
 
-    /// <param name="host">The screen: the form's type and base unit, the material picked, and a made ingredient's batch.</param>
+    /// <param name="host">The draft: its type and base unit, the material picked (its form's), and a made ingredient's batch.</param>
     /// <param name="units">The form's alternative units, which the brands are bought in.</param>
     /// <param name="unitsOfMeasure">Every unit of measure, as the screen last loaded them, for the purchase unit choices.</param>
     /// <param name="updates">The screen's derived updates, so an undo putting the form back works the texts out once.</param>
