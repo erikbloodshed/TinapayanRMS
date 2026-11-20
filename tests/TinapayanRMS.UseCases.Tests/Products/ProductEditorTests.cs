@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
@@ -108,19 +109,47 @@ public class ProductEditorTests(DatabaseFixture fixture) : PersistenceTestBase(f
     }
 
     [Test]
-    public async Task A_folder_is_added_renamed_and_deleted_as_the_list_reads_them()
+    public async Task A_folder_is_added_renamed_moved_and_deleted_as_the_list_reads_them()
     {
         var listEditor = CreateListEditor();
         var queries = CreateQueries();
-        var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Production };
+        var breads = new ProductFolder { Name = "Breads", Stage = ProductStage.Production };
+        var rolls = new ProductFolder { Name = "Rolls", Stage = ProductStage.Production };
 
-        await listEditor.AddFolderAsync(folder, Cancellation);
-        folder.Id.Should().BePositive("the folder is given its saved id");
-        await listEditor.RenameFolderAsync(folder.Id, "Bread", Cancellation);
-        (await queries.ReadFoldersAsync(Cancellation)).Select(f => f.Name).Should().Equal("Bread");
+        await listEditor.AddFolderAsync(breads, Cancellation);
+        await listEditor.AddFolderAsync(rolls, Cancellation);
+        breads.Id.Should().BePositive("the folder is given its saved id");
+        await listEditor.RenameFolderAsync(breads.Id, "Bread", Cancellation);
+        await listEditor.MoveFolderAsync(new ProductFolderMove(rolls.Id, ProductStage.Production, breads.Id), [], Cancellation);
+        (await queries.ReadFoldersAsync(Cancellation)).Select(f => (f.Name, f.ParentId)).Should().BeEquivalentTo([("Bread", (int?)null), ("Rolls", breads.Id)]);
 
-        await listEditor.DeleteFoldersIfEmptyAsync([folder.Id], Cancellation);
+        // Deleting a folder deletes nothing in it: what it held goes up into the folder it was in.
+        await listEditor.DeleteFolderAsync(breads.Id, Cancellation);
+        (await queries.ReadFoldersAsync(Cancellation)).Select(f => (f.Name, f.ParentId)).Should().Equal(("Rolls", (int?)null));
+
+        await listEditor.DeleteFoldersIfEmptyAsync([rolls.Id], Cancellation);
         (await queries.ReadFoldersAsync(Cancellation)).Should().BeEmpty();
+    }
+
+    [Test]
+    public async Task A_product_moved_to_a_folder_and_promoted_is_filed_as_the_list_reads_it()
+    {
+        var listEditor = CreateListEditor();
+        var queries = CreateQueries();
+        var id = await AddProductAsync("Ube Pandesal");
+        var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
+        await listEditor.AddFolderAsync(folder, Cancellation);
+
+        await listEditor.MoveAsync([new ProductMove(id, ProductStage.Innovation, folder.Id)], [], Cancellation);
+        (await queries.ReadAsync(id, Cancellation))!.FolderId.Should().Be(folder.Id);
+
+        var promoted = await listEditor.MoveToStageAsync([id], ProductStage.Production, [], Cancellation);
+
+        promoted.Moves.Select(m => m.ProductId).Should().Equal(id);
+        promoted.MadeFolderIds.Should().ContainSingle("Production had no Breads folder, so the Promote made one");
+        var moved = (await queries.ReadAsync(id, Cancellation))!;
+        moved.Stage.Should().Be(ProductStage.Production);
+        moved.FolderId.Should().Be(promoted.MadeFolderIds[0]);
     }
 
     [Test]
