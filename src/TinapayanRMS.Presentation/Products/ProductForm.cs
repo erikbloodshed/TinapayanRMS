@@ -4,7 +4,6 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
@@ -14,6 +13,7 @@ using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -21,7 +21,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// One tab of the Products view (<see cref="ProductsState"/>): a product's form, a new one's, or a new composite's. A
 /// product's recipe (the sub-assemblies it links and new ones not saved yet, each at its own piece size, and its packaging),
 /// its costing, its packaging link, and cloning it or making a variant of it. The name, description, recipe, packaging and
-/// costing are edited in memory, and Save writes them together (IProductRepository.SaveAsync). A composite product's recipe
+/// costing are edited in memory, and Save writes them together (IProductEditor.SaveAsync). A composite product's recipe
 /// is the products it holds instead, in its Products tab (<see cref="ProductComponents.ComponentEdits"/>), each bringing its
 /// recipe cost. Its parts each hold a piece of it: the recipe's sections and tabs (<see cref="Recipe"/>), the section form
 /// (<see cref="UsageForm"/>), the Packaging tab (<see cref="Packaging"/>), a composite's Products table
@@ -43,18 +43,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     public const int HistoryTab = 3;
 
     private readonly ProductsState _view;
-    private readonly IProductRepository _productRepository;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
 
-    // Reads the product opened here, as Reports and Print read theirs. The view's.
-    private readonly SavedProductReader _savedProducts;
-
-    // Save, written with the versions it records. The view's.
-    private readonly VersionedSaves _versionedSaves;
-    private readonly IValidator<Product> _productValidator;
-    private readonly IValidator<CostingParameters> _costingParametersValidator;
-    private readonly IProductCategoryRepository _categoryRepository;
-    private readonly IValidator<ProductCategory> _categoryValidator;
+    // What the form reads and writes, and the Category picker adds. The view's.
+    private readonly IProductQueries _queries;
+    private readonly IProductEditor _editor;
+    private readonly IProductCategoryEditor _categoryEditor;
 
     /// <summary>The form's derived updates, run as their inputs change, or once at the end of a restore.</summary>
     private readonly DerivedUpdates _updates = new();
@@ -87,18 +80,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     internal ProductForm(
         ProductsState view,
-        IProductRepository productRepository,
-        IPackagingLineRepository packagingLineRepository,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
-        IProductCategoryRepository categoryRepository,
-        IProductVersionRepository versionRepository,
-        SavedProductReader savedProducts,
-        VersionedSaves versionedSaves,
-        IValidator<Product> productValidator,
-        IValidator<CostingParameters> costingParametersValidator,
-        IValidator<ProductCategory> categoryValidator,
+        IProductQueries queries,
+        IProductEditor editor,
+        IProductCategoryEditor categoryEditor,
         ILogger logger)
         : base(logger)
     {
@@ -110,27 +94,20 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
             SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
-        _productRepository = productRepository;
-        _subAssemblyRepository = subAssemblyRepository;
-        _savedProducts = savedProducts;
-        _versionedSaves = versionedSaves;
+        _queries = queries;
+        _editor = editor;
+        _categoryEditor = categoryEditor;
 
         // The lists the parts read are the view's, which each load merges into.
-        Packaging = new ProductPackaging(this, PackagingMaterials, subAssemblyRepository, packagingLineRepository);
+        Packaging = new ProductPackaging(this, PackagingMaterials, queries);
         UsageForm = new ProductUsageForm(this, Ingredients);
-        ComponentsTable = new ProductComponents(this, Products, savedProducts);
-        VersionHistory = new ProductVersionHistory(
-            this, Products, Ingredients, PackagingMaterials, Roles, versionRepository, productRepository, savedProducts, subAssemblyRepository,
-            subAssemblyLineRepository, packagingLineRepository);
-        _productValidator = productValidator;
-        _costingParametersValidator = costingParametersValidator;
-        _categoryRepository = categoryRepository;
-        _categoryValidator = categoryValidator;
+        ComponentsTable = new ProductComponents(this, Products, queries);
+        VersionHistory = new ProductVersionHistory(this, Products, Ingredients, PackagingMaterials, Roles, queries, editor);
 
         // The part that holds the recipe. It subscribes to what it holds alone (the recipe's tabs and which of its tables
         // shows), as it's made; what reaches from one part to another, or to the form, is subscribed below, in the order it
         // always ran.
-        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, Ingredients, Roles, subAssemblyLineRepository, rawMaterialCategoryRepository);
+        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, Ingredients, Roles, queries);
 
         // What follows the form's fields as they change is called by their setters (SelectionChanged and the rest), and what
         // follows a part's by the part's events, subscribed below. What follows here runs in this order: several run as
@@ -621,7 +598,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     public ScreenCommand CloneCommand { get; }
 
-    /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductCloner.CreateVariantAsync).</summary>
+    /// <summary>Create Variant on the Clone tab: a new product that links this one's recipe and packaging (IProductEditor.MakeFromAsync).</summary>
     public ScreenCommand CreateVariantCommand { get; }
 
     /// <summary>
@@ -1216,7 +1193,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         {
             detail = _preloadedDetail is { } preloaded && preloaded.ProductId == product.Id
                 ? preloaded.Detail
-                : await Task.Run(() => _savedProducts.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
+                : await Task.Run(() => _queries.ReadDetailAsync(product.Id, cancellationToken), cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested && product.Id != _detailProductId)
         {
@@ -1305,20 +1282,10 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             UpdatedAt = SavedVersionToSend,
         };
 
-        var validation = _productValidator.Validate(product);
-        if (!validation.IsValid)
-        {
-            ErrorMessage = validation.ToString(" ");
-            return;
-        }
-
+        // Refused before anything's asked: the product's fields, then its costing's percentages.
+        _editor.EnsureValid(product);
         var costing = Costing.ToParameters();
-        var costingValidation = _costingParametersValidator.Validate(costing);
-        if (!costingValidation.IsValid)
-        {
-            ErrorMessage = costingValidation.ToString(" ");
-            return;
-        }
+        _editor.EnsureValid(costing);
 
         var recipe = Recipe.CurrentDraft();
         if (!await ConfirmSharedLinesAsync())
@@ -1335,10 +1302,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         var packagingLines = Packaging.ChangedLines();
         var bulkToSave = Packaging.ChangedBulk();
         var changesSharing = Recipe.UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
-        var recipeToSave = Recipe.IsAsSaved(recipe) ? null : recipe;
-        var costingToSave = Costing.IsChanged ? costing : null;
-        var saved = await Task.Run(() => _versionedSaves.SaveProductAsync(
-            product, recipeToSave, packagingLink, packagingLines, bulkToSave, costingToSave, changesSharing, DateTime.Now, CancellationToken.None));
+        var request = new ProductSaveRequest(
+            product, costing, Costing.IsChanged, Recipe.IsAsSaved(recipe) ? null : recipe, packagingLink, packagingLines, bulkToSave, changesSharing);
+        var saved = await Task.Run(() => _editor.SaveAsync(request, DateTime.Now, CancellationToken.None));
 
         // What's saved is the new starting point: stepping back past it would show changes already written.
         // Save's own reload keeps the product selected, so ClearDetails doesn't run and wouldn't clear this.
@@ -1381,13 +1347,12 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             return true;
         }
 
-        var dependents = await _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None);
-        var madeFrom = await _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None);
+        var users = await _queries.ReadSectionUsersAsync(CancellationToken.None);
         var shared = edited
             .Select(u => (u.LinkedName, Others: (IReadOnlyList<string>)
             [
-                .. OtherProductsUsing(u.SubAssemblyId, dependents),
-                .. (madeFrom.GetValueOrDefault(u.SubAssemblyId) ?? []).Select(m => m.Name),
+                .. OtherProductsUsing(u.SubAssemblyId, users.LinkedBy),
+                .. (users.MadeFrom.GetValueOrDefault(u.SubAssemblyId) ?? []).Select(m => m.Name),
             ]))
             .Where(s => s.Others.Count > 0)
             .Select(s => $"{s.LinkedName}, also used by {string.Join(", ", s.Others)}")
@@ -1451,9 +1416,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     internal async Task ShowAppliedCostingAsync()
     {
         if (_detailProductId is { } openId
-            && await Task.Run(() => _productRepository.GetByIdAsync(openId, CancellationToken.None)) is { } open)
+            && await Task.Run(() => _queries.ReadAsync(openId, CancellationToken.None)) is { } open)
         {
-            var detail = await Task.Run(() => _savedProducts.ReadDetailAsync(openId, CancellationToken.None));
+            var detail = await Task.Run(() => _queries.ReadDetailAsync(openId, CancellationToken.None));
             History.Clear();
             ShowSavedProduct(open, detail);
             if (SelectedDetailsTab == HistoryTab)
@@ -1634,16 +1599,18 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     private async Task<ProductCategory?> SaveNewCategoryAsync(string name)
     {
-        var category = new ProductCategory { Name = name };
-        var validation = _categoryValidator.Validate(category);
-        if (!validation.IsValid)
+        try
         {
-            ErrorMessage = validation.ToString(" ");
+            _categoryEditor.EnsureValid(name);
+        }
+        catch (BusinessRuleException refused)
+        {
+            ErrorMessage = refused.Message;
             return null;
         }
 
-        // AddAsync fills in the saved Id, which the copy read back is found by.
-        await _categoryRepository.AddAsync(category, CancellationToken.None);
+        // Saved with its id, which the copy read back is found by.
+        var category = await _categoryEditor.AddAsync(name, CancellationToken.None);
         await ReloadCategoriesAsync();
         return Categories.FirstOrDefault(c => c.Id == category.Id);
     }
@@ -1654,7 +1621,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     private async Task ReloadCategoriesAsync()
     {
-        var categories = await _categoryRepository.GetAllAsync(CancellationToken.None);
+        var categories = await _queries.ReadCategoriesAsync(CancellationToken.None);
         _view.TakeCategories(categories);
     }
 
@@ -1705,7 +1672,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
         // As it's saved now, not as the list last read it: another PC may have saved it since, which is what Revert shows after
         // a Save refused for it (SavedVersionRules), and whose time the form then takes, so its next Save goes through.
-        if (await Task.Run(() => _productRepository.GetByIdAsync(product.Id, CancellationToken.None)) is { } saved && saved.UpdatedAt != product.UpdatedAt)
+        if (await Task.Run(() => _queries.ReadAsync(product.Id, CancellationToken.None)) is { } saved && saved.UpdatedAt != product.UpdatedAt)
         {
             ApplyRefresh(() =>
             {

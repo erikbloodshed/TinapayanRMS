@@ -1,11 +1,7 @@
 using AwesomeAssertions;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Printing;
@@ -298,29 +294,6 @@ public class ProductsStatePrintTests(DatabaseFixture fixture) : PersistenceTestB
     private ProductForm CreateState()
     {
         var factory = CreateDbContextFactory();
-        var packagingLineRepository = new PackagingLineRepository(factory);
-
-        return new ProductsState(
-            new ProductRepository(factory),
-            new ProductSubAssemblyUsageRepository(factory),
-            packagingLineRepository,
-            new CostingParametersRepository(factory),
-            new CostingDefaultsRepository(factory),
-            new PackagingLinkRepository(factory),
-            new ProductCloner(factory),
-            CreateUnitOfWork(),
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new ProductCategoryRepository(factory),
-            new ProductFolderRepository(factory),
-            new ProductVersionRepository(factory),
-            new ProductValidator(),
-            new CostingParametersValidator(),
-            new ProductCategoryValidator(),
-            new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return ProductsViews.Create(factory, CreateUnitOfWork()).Form!;
     }
 }

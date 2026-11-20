@@ -1,7 +1,5 @@
 using AwesomeAssertions;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
@@ -175,28 +173,7 @@ public class LeavingWhileSavingTests(DatabaseFixture fixture) : PersistenceTestB
 
     private ProductForm CreateProductsState(FailingDbContextFactory factory)
     {
-        return new ProductsState(
-            new ProductRepository(factory),
-            new ProductSubAssemblyUsageRepository(factory),
-            new PackagingLineRepository(factory),
-            new CostingParametersRepository(factory),
-            new CostingDefaultsRepository(factory),
-            new PackagingLinkRepository(factory),
-            new ProductCloner(factory),
-            CreateUnitOfWork(),
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new ProductCategoryRepository(factory),
-            new ProductFolderRepository(factory),
-            new ProductVersionRepository(factory),
-            new ProductValidator(),
-            new CostingParametersValidator(),
-            new ProductCategoryValidator(),
-            new InMemoryViewStateStore(),
-            new LoggerConfiguration().CreateLogger()).Form!;
+        return ProductsViews.Create(factory, CreateUnitOfWork()).Form!;
     }
 
     private static RawMaterialForm CreateRawMaterialsState(FailingDbContextFactory factory)

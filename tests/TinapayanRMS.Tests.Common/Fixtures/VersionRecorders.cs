@@ -21,6 +21,10 @@ public static class VersionRecorders
         return new ProductVersionRecorder(Reader(factory, productRepository, unitOfWork), productRepository, new ProductVersionRepository(factory));
     }
 
+    /// <summary>A SavedProductReader over real repositories, as the app registers it.</summary>
+    public static SavedProductReader CreateReader(IDbContextFactory<TinapayanRMSDbContext> factory, IUnitOfWork unitOfWork) =>
+        Reader(factory, new ProductRepository(factory), unitOfWork);
+
     public static VersionedSaves CreateSaves(IDbContextFactory<TinapayanRMSDbContext> factory, IUnitOfWork unitOfWork)
     {
         var productRepository = new ProductRepository(factory);

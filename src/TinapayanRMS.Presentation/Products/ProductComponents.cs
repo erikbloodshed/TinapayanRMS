@@ -5,6 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -31,7 +32,7 @@ public sealed class ProductComponents : ObservableState
 {
     private readonly IProductComponentsHost _host;
     private readonly IReadOnlyList<Product> _products;
-    private readonly SavedProductReader _savedProducts;
+    private readonly IProductQueries _queries;
 
     /// <summary>
     /// What one of each product in the table brings, by product id: its recipe and packaging costs as saved, read with the
@@ -49,11 +50,12 @@ public sealed class ProductComponents : ObservableState
 
     /// <param name="host">The Products screen: its cost basis, its runners and messages, and its undo steps.</param>
     /// <param name="products">Every product in use, as the screen holds them now: what a line's product cell finds and offers.</param>
-    public ProductComponents(IProductComponentsHost host, IReadOnlyList<Product> products, SavedProductReader savedProducts)
+    /// <param name="queries">What reads what each product brings to a composite (its recipe and packaging costs as saved).</param>
+    public ProductComponents(IProductComponentsHost host, IReadOnlyList<Product> products, IProductQueries queries)
     {
         _host = host;
         _products = products;
-        _savedProducts = savedProducts;
+        _queries = queries;
 
         RemoveLineCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() => ComponentEdits.Remove(SelectedComponentEdit!)),
@@ -289,7 +291,7 @@ public sealed class ProductComponents : ObservableState
     {
         try
         {
-            var costs = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(productIds, CancellationToken.None));
+            var costs = await Task.Run(() => _queries.ReadComponentCostsAsync(productIds, CancellationToken.None));
             foreach (var (productId, cost) in costs)
             {
                 _costs[productId] = cost;

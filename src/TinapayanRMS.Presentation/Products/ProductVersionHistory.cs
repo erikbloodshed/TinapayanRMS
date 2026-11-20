@@ -8,6 +8,7 @@ using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -204,12 +205,8 @@ public sealed class ProductVersionHistory : ObservableState
     private readonly IReadOnlyList<RawMaterial> _ingredients;
     private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
     private readonly IReadOnlyList<SubAssemblyRole> _roles;
-    private readonly IProductVersionRepository _versionRepository;
-    private readonly IProductRepository _productRepository;
-    private readonly SavedProductReader _savedProducts;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IPackagingLineRepository _packagingLineRepository;
+    private readonly IProductQueries _queries;
+    private readonly IProductEditor _editor;
 
     private int _productId;
     private CostBasis _basis;
@@ -228,30 +225,24 @@ public sealed class ProductVersionHistory : ObservableState
     /// <param name="ingredients">The ingredients as the screen last loaded them, at today's costs.</param>
     /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, at today's costs.</param>
     /// <param name="roles">The sub-assembly roles as the screen last loaded them.</param>
+    /// <param name="queries">What reads the versions, the product as saved now, and what a version linked as it is now.</param>
+    /// <param name="editor">What saves a version's note.</param>
     public ProductVersionHistory(
         IProductVersionHistoryHost host,
         IReadOnlyList<Product> products,
         IReadOnlyList<RawMaterial> ingredients,
         IReadOnlyList<RawMaterial> packagingMaterials,
         IReadOnlyList<SubAssemblyRole> roles,
-        IProductVersionRepository versionRepository,
-        IProductRepository productRepository,
-        SavedProductReader savedProducts,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        IPackagingLineRepository packagingLineRepository)
+        IProductQueries queries,
+        IProductEditor editor)
     {
         _host = host;
         _products = products;
         _ingredients = ingredients;
         _packagingMaterials = packagingMaterials;
         _roles = roles;
-        _versionRepository = versionRepository;
-        _productRepository = productRepository;
-        _savedProducts = savedProducts;
-        _subAssemblyRepository = subAssemblyRepository;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _packagingLineRepository = packagingLineRepository;
+        _queries = queries;
+        _editor = editor;
 
         // Restore puts the picked version into the form, as Revert puts the saved product there, but as an undo step of
         // unsaved edits rather than by reloading: Save keeps it, and Undo takes it back.
@@ -415,20 +406,15 @@ public sealed class ProductVersionHistory : ObservableState
     /// </summary>
     public async Task ReadAsync(int productId, Func<bool> stillWanted, CancellationToken cancellationToken)
     {
-        var versionsRead = Task.Run(() => _versionRepository.GetForProductAsync(productId, cancellationToken), cancellationToken);
-        var productRead = Task.Run(() => _productRepository.GetByIdAsync(productId, cancellationToken), cancellationToken);
-        var detailRead = Task.Run(() => _savedProducts.ReadDetailAsync(productId, cancellationToken), cancellationToken);
-        await Task.WhenAll(versionsRead, productRead, detailRead);
-        if (await productRead is not { } product)
+        if (await Task.Run(() => _queries.ReadHistoryAsync(productId, cancellationToken), cancellationToken) is not { } history)
         {
             return;
         }
 
-        var versions = await versionsRead;
         List<(ProductVersion Version, ProductVersionContent Content)> contents =
-            [.. versions.Select(v => (v, ProductVersionContent.FromJson(v.Content)))];
+            [.. history.Versions.Select(v => (v, ProductVersionContent.FromJson(v.Content)))];
         IReadOnlyCollection<int> componentIds = [.. contents.SelectMany(c => c.Content.Components.Select(p => p.ProductId)).Distinct()];
-        var componentCostsNow = await Task.Run(() => _savedProducts.ReadComponentCostsAsync(componentIds, cancellationToken), cancellationToken);
+        var componentCostsNow = await Task.Run(() => _queries.ReadComponentCostsAsync(componentIds, cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         // The product picked since, or the tab left: what was read is someone else's, or not wanted.
@@ -440,7 +426,7 @@ public sealed class ProductVersionHistory : ObservableState
         Show(
             productId,
             [.. contents.Select(c => new ProductVersionRow(c.Version, c.Content, NoteTyped))],
-            ProductVersionSnapshot.From(product, await detailRead),
+            ProductVersionSnapshot.From(history.Product, history.Detail),
             MaterialsNow(),
             componentCostsNow,
             _host.CostBasis);
@@ -464,7 +450,7 @@ public sealed class ProductVersionHistory : ObservableState
         {
             try
             {
-                await _versionRepository.SetNoteAsync(row.Id, row.Note, CancellationToken.None);
+                await _editor.SetVersionNoteAsync(row.Id, row.Note, CancellationToken.None);
                 var stored = ProductVersionRules.NormalizeNote(row.Note);
                 if (!string.Equals(stored, row.Note, StringComparison.Ordinal))
                 {
@@ -590,11 +576,9 @@ public sealed class ProductVersionHistory : ObservableState
                 .Concat(content.PackagingLink?.SubAssemblyId is { } linkedSetId ? [linkedSetId] : Enumerable.Empty<int>())
                 .Distinct(),
         ];
-        var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetByIdsAsync(linkedIds, CancellationToken.None));
-        var linesRead = Task.Run(() => _subAssemblyLineRepository.GetForSubAssembliesAsync(linkedIds, CancellationToken.None));
-        await Task.WhenAll(subAssembliesRead, linesRead);
-        var subAssembliesNow = (await subAssembliesRead).ToDictionary(s => s.Id);
-        var linesNow = (await linesRead).ToLookup(l => l.SubAssemblyId);
+        var linkedNow = await _queries.ReadLinkedSectionsAsync(linkedIds, CancellationToken.None);
+        var subAssembliesNow = linkedNow.SubAssemblies.ToDictionary(s => s.Id);
+        var linesNow = linkedNow.Lines.ToLookup(l => l.SubAssemblyId);
 
         PackagingLinkTarget? link = null;
         if (content.PackagingLink is { } versionLink)
@@ -658,9 +642,9 @@ public sealed class ProductVersionHistory : ObservableState
         {
             packagingLines = link switch
             {
-                PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _subAssemblyRepository.GetPackagingLinesAsync(setId, CancellationToken.None)))
+                PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _queries.ReadPackagingSetLinesAsync(setId, CancellationToken.None)))
                     .Select(l => new PackagingLineSnapshot(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
-                PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _packagingLineRepository.GetEffectiveForProductAsync(linkedProductId, CancellationToken.None)))
+                PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _queries.ReadEffectivePackagingAsync(linkedProductId, CancellationToken.None)))
                     .Select(l => PackagingLineRow.FromSaved(l))
                     .Select(PackagingLineSnapshot.Of)],
             };

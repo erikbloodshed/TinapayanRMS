@@ -6,6 +6,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -62,8 +63,7 @@ public sealed class ProductRecipe : ObservableState
     private readonly ProductComponents _components;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
     private readonly IReadOnlyList<SubAssemblyRole> _roles;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
+    private readonly IProductQueries _queries;
 
     /// <summary>The tab whose form is open: the one a change of tab is leaving, whose form is applied on the way out.</summary>
     private RecipeTab? _shownRecipeTab;
@@ -82,22 +82,21 @@ public sealed class ProductRecipe : ObservableState
     /// <param name="components">A composite's Products table, whose lines are part of the recipe Save writes.</param>
     /// <param name="ingredients">Every ingredient, as the screen last loaded them: what a section's lines point at.</param>
     /// <param name="roles">Every sub-assembly role, as the screen last loaded them.</param>
+    /// <param name="queries">What reads a sub-assembly's lines for a section, and the Made categories for Make In-House Ingredient.</param>
     public ProductRecipe(
         IProductRecipeHost host,
         ProductUsageForm usageForm,
         ProductComponents components,
         IReadOnlyList<RawMaterial> ingredients,
         IReadOnlyList<SubAssemblyRole> roles,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository)
+        IProductQueries queries)
     {
         _host = host;
         _usageForm = usageForm;
         _components = components;
         _ingredients = ingredients;
         _roles = roles;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
+        _queries = queries;
 
         // The recipe's tabs follow its sections as they're added, taken out and moved. The Packaging tab is always there,
         // last: the packaging per piece is typed, linked and copied on the tab itself, and the bulk packaging typed there,
@@ -914,7 +913,7 @@ public sealed class ProductRecipe : ObservableState
             return;
         }
 
-        var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
+        var saved = await _queries.ReadSubAssemblyLinesAsync(subAssembly.Id, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         // The form moved on while the lines loaded: another section, or the change was cancelled.
@@ -970,7 +969,7 @@ public sealed class ProductRecipe : ObservableState
         IReadOnlyList<SectionLine> lines = [];
         if (source?.SubAssembly is { } subAssembly)
         {
-            var saved = await _subAssemblyLineRepository.GetForSubAssembliesAsync([subAssembly.Id], cancellationToken);
+            var saved = await _queries.ReadSubAssemblyLinesAsync(subAssembly.Id, cancellationToken);
             var ingredientsById = _ingredients.ToDictionary(m => m.Id);
             lines = [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))];
         }
@@ -1006,7 +1005,7 @@ public sealed class ProductRecipe : ObservableState
     private async Task MoveToInHouseAsync(ProductUsageEdit usage)
     {
         _host.ShowError(null);
-        var categories = await MadeIngredientPrompt.MadeCategoriesAsync(_rawMaterialCategoryRepository);
+        var categories = await _queries.ReadMadeCategoriesAsync(CancellationToken.None);
         if (categories.Count == 0)
         {
             _host.ShowError(MadeIngredientPrompt.NoMadeCategoryMessage);

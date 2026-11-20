@@ -4,16 +4,14 @@ using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using DynamicData;
 using DynamicData.Binding;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Pricing;
-using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -28,37 +26,13 @@ namespace TinapayanRMS.Presentation.Products;
 /// the list's actions on products as records (delete, restore, clone, the costing defaults, print). It opens on a blank new
 /// product in the preview tab, as the screen always has.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListHost
 {
-    /// <summary>How a clone's first version names where it came from: "Cloned from Pandesal, version 4".</summary>
-    public const string ClonedFrom = "Cloned from";
-
-    /// <summary>How a variant's first version names where it came from: "Variant of Pandesal, version 4".</summary>
-    public const string VariantOf = "Variant of";
-
-    private readonly IProductRepository _productRepository;
-    private readonly IPackagingLineRepository _packagingLineRepository;
-    private readonly ICostingDefaultsRepository _costingDefaultsRepository;
-    private readonly IProductCloner _productCloner;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _subAssemblyLineRepository;
-    private readonly IRawMaterialCategoryRepository _rawMaterialCategoryRepository;
-    private readonly IProductCategoryRepository _categoryRepository;
-    private readonly IProductVersionRepository _versionRepository;
-    private readonly IValidator<Product> _productValidator;
-    private readonly IValidator<CostingParameters> _costingParametersValidator;
-    private readonly IValidator<ProductCategory> _categoryValidator;
+    // What the view and its forms read and write: every form's.
+    private readonly IProductQueries _queries;
+    private readonly IProductEditor _editor;
+    private readonly IProductCategoryEditor _categoryEditor;
     private readonly ILogger _logger;
-
-    // Reads the products opened here, as Reports and Print read theirs: every form's.
-    private readonly SavedProductReader _savedProducts;
-
-    // What a load reads, apart from its merge into the view and the forms (LoadAsync).
-    private readonly ProductsLoadReader _loadReader;
-
-    // Save, Clone, Create Variant and the costing defaults, each written with the versions it records: every form's.
-    private readonly VersionedSaves _versionedSaves;
 
     private readonly SourceCache<Product, int> _productCache = new(p => p.Id);
     private readonly ReadOnlyObservableCollection<Product> _products;
@@ -78,57 +52,19 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// </summary>
     private int? _subAssemblyToStartFrom;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public ProductsState(
-        IProductRepository productRepository,
-        IProductSubAssemblyUsageRepository usageRepository,
-        IPackagingLineRepository packagingLineRepository,
-        ICostingParametersRepository costingParametersRepository,
-        ICostingDefaultsRepository costingDefaultsRepository,
-        IPackagingLinkRepository packagingLinkRepository,
-        IProductCloner productCloner,
-        IUnitOfWork unitOfWork,
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository subAssemblyLineRepository,
-        ISubAssemblyRoleRepository subAssemblyRoleRepository,
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
-        IProductCategoryRepository categoryRepository,
-        IProductFolderRepository folderRepository,
-        IProductVersionRepository versionRepository,
-        IValidator<Product> productValidator,
-        IValidator<CostingParameters> costingParametersValidator,
-        IValidator<ProductCategory> categoryValidator,
+        IProductQueries queries,
+        IProductEditor editor,
+        IProductListEditor listEditor,
+        IProductCategoryEditor categoryEditor,
         IViewStateStore viewStateStore,
         ILogger logger)
         : base(logger)
     {
-        _productRepository = productRepository;
-        _packagingLineRepository = packagingLineRepository;
-        _costingDefaultsRepository = costingDefaultsRepository;
-        _productCloner = productCloner;
-        _subAssemblyRepository = subAssemblyRepository;
-        _subAssemblyLineRepository = subAssemblyLineRepository;
-        _rawMaterialCategoryRepository = rawMaterialCategoryRepository;
-        _categoryRepository = categoryRepository;
-        _versionRepository = versionRepository;
-        _productValidator = productValidator;
-        _costingParametersValidator = costingParametersValidator;
-        _categoryValidator = categoryValidator;
+        _queries = queries;
+        _editor = editor;
+        _categoryEditor = categoryEditor;
         _logger = logger;
-        _savedProducts = new SavedProductReader(
-            packagingLinkRepository, usageRepository, packagingLineRepository, costingParametersRepository, subAssemblyLineRepository, productRepository,
-            costingDefaultsRepository, unitOfWork);
-        _loadReader = new ProductsLoadReader(
-            productRepository, subAssemblyRoleRepository, categoryRepository, folderRepository, rawMaterialRepository, subAssemblyRepository,
-            subAssemblyLineRepository, costingDefaultsRepository, packagingLinkRepository, packagingLineRepository, _savedProducts);
-        _versionedSaves = new VersionedSaves(
-            unitOfWork,
-            productRepository,
-            versionRepository,
-            costingParametersRepository,
-            _savedProducts,
-            new ProductVersionRecorder(_savedProducts, productRepository, versionRepository));
 
         // The lists the forms and the list read, bound first: each load merges into them rather than replacing them. The
         // categories before the list's own subscription to them, so the category filter's choices read them changed.
@@ -139,7 +75,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             .SortAndBind(out _categories, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name))
             .Subscribe();
 
-        List = new ProductsList(this, _productCache, _categoryCache, Categories, productRepository, folderRepository, viewStateStore);
+        List = new ProductsList(this, _productCache, _categoryCache, Categories, queries, listEditor, viewStateStore);
 
         // The list's flags for a price short of its target markup and a section with no piece size, after each load: a newer
         // load cancels one still working. Each runs as the form showing does, as the load that asks for it did (Runner), so
@@ -245,10 +181,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
     protected override RecordList ViewList => List;
 
-    protected override ProductForm NewForm() => new(
-        this, _productRepository, _packagingLineRepository, _subAssemblyRepository, _subAssemblyLineRepository, _rawMaterialCategoryRepository,
-        _categoryRepository, _versionRepository, _savedProducts, _versionedSaves, _productValidator, _costingParametersValidator, _categoryValidator,
-        _logger);
+    protected override ProductForm NewForm() => new(this, _queries, _editor, _categoryEditor, _logger);
 
     protected override IDisposable Wire(ProductForm form) => new CompositeDisposable(
         form.PrintRequests.Subscribe(_printRequests.OnNext),
@@ -267,12 +200,12 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
     /// <summary>
     /// Flags each product in the list whose current price earns less than its target markup, and each with a recipe section
-    /// that has no piece size: every product priced as saved, as Reports prices them (SavedProductReader.ReadAllAsync, a
+    /// that has no piece size: every product priced as saved, as Reports prices them (IProductQueries.PriceAsSavedAsync, a
     /// dozen or so queries however many there are), off the UI thread. A product's flags follow its Save at the next load.
     /// </summary>
     private async Task FlagProductsAsync(IReadOnlyList<Product> products, CancellationToken cancellationToken)
     {
-        var saved = await Task.Run(() => _savedProducts.ReadAllAsync(products, CostBasis.Buffered, cancellationToken), cancellationToken);
+        var saved = await Task.Run(() => _queries.PriceAsSavedAsync(products, CostBasis.Buffered, cancellationToken), cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         var below = saved.Where(s => s.Costs.IsBelowTargetMarkup).Select(s => s.Product.Id).ToHashSet();
         var unsized = saved.Where(s => s.SectionsWithoutPieceSize.Count > 0).Select(s => s.Product.Id).ToHashSet();
@@ -292,11 +225,12 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         // What each form needs read from elsewhere: its linked sections, its packaging link, a composite's products.
         var loads = Tabs.All.Select(tab => (tab.Form, Load: tab.Form.BeginLoad())).ToList();
 
-        // Everything at once, on the thread pool (ProductsLoadReader), touching no screen state.
-        var read = await _loadReader.ReadAsync(
+        // Everything at once, on the thread pool (IProductQueries.ReadLoadAsync), touching no screen state.
+        var read = await _queries.ReadLoadAsync(
             [.. loads.Select(l => l.Load.DetailProductId).OfType<int>().Distinct()],
             [.. loads.SelectMany(l => l.Load.LinkedIds).Distinct()],
-            [.. loads.SelectMany(l => l.Load.ComponentIds).Distinct()]);
+            [.. loads.SelectMany(l => l.Load.ComponentIds).Distinct()],
+            CancellationToken.None);
 
         // A form whose tab closed meanwhile takes nothing; one opened meanwhile read its own as it opened.
         loads = [.. loads.Where(l => Tabs.All.Any(tab => tab.Form == l.Form))];
@@ -307,7 +241,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             .Where(r => r.ProductId is not null)
             .Select(r => (r.Load, ProductId: r.ProductId!.Value))
             .ToList();
-        var linkedPackaging = await Task.Run(() => _loadReader.ReadLinkedPackagingAsync([.. packagingToRead.Select(r => r.ProductId).Distinct()]));
+        var linkedPackaging = await Task.Run(() => _queries.ReadLinkedPackagingAsync([.. packagingToRead.Select(r => r.ProductId).Distinct()], CancellationToken.None));
         foreach (var (load, productId) in packagingToRead)
         {
             if (linkedPackaging.TryGetValue(productId, out var lines))
@@ -510,12 +444,12 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             product.Id,
             asker,
             $"Delete '{product.Name}'? It moves to the Deleted folder at the bottom of the list, where it can be restored as it is.",
-            () => _productRepository.DeleteAsync(product.Id, CancellationToken.None));
+            () => _editor.DeleteAsync(product.Id, CancellationToken.None));
 
     /// <summary>Takes <paramref name="product"/> out of the Deleted folder, back to its own, and opens it, as a click on it would.</summary>
     private Task RestoreAsync(Product product) => ((IScreenPartHost)this).RunSafelyAsync(async () =>
     {
-        await _productRepository.RestoreAsync(product.Id, CancellationToken.None);
+        await _editor.RestoreAsync(product.Id, CancellationToken.None);
         await LoadCommand.ExecuteAsync();
         OpenRecord(product.Id);
     });
@@ -529,14 +463,14 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
                 : $"Delete '{product.Name}' permanently? Its own sub-assemblies go with it; the ones it links stay on the Sub-Assemblies screen. This can't be undone.",
             async () =>
             {
-                await _productRepository.DeletePermanentlyAsync(product.Id, CancellationToken.None);
+                await _editor.DeletePermanentlyAsync(product.Id, CancellationToken.None);
                 await LoadCommand.ExecuteAsync();
             });
 
     /// <summary>
     /// Makes a product named <paramref name="name"/> from <paramref name="sourceProductId"/> as saved (a clone, or a variant
     /// with <paramref name="isVariant"/>) with its first version, noting where it came from, both or neither
-    /// (VersionedSaves.MakeProductFromAsync), and opens it in a tab of its own. A tab holding the product with changes not
+    /// (IProductEditor.MakeFromAsync), and opens it in a tab of its own. A tab holding the product with changes not
     /// saved is shown and asked about first, as what's made is the product as saved: saved, they're in it; not, they go.
     /// </summary>
     internal async Task MakeFromAsync(int sourceProductId, string name, bool isVariant, ProductForm? asker)
@@ -552,13 +486,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
         await PartOf(asker).RunSafelyAsync(async () =>
         {
-            var newId = await Task.Run(() => _versionedSaves.MakeProductFromAsync(
-                sourceProductId,
-                name,
-                isVariant ? _productCloner.CreateVariantAsync : _productCloner.CloneAsync,
-                isVariant ? VariantOf : ClonedFrom,
-                DateTime.Now,
-                CancellationToken.None));
+            var newId = await Task.Run(() => _editor.MakeFromAsync(sourceProductId, name, isVariant, DateTime.Now, CancellationToken.None));
 
             await LoadCommand.ExecuteAsync();
             if (Products.FirstOrDefault(p => p.Id == newId) is { } made)
@@ -593,7 +521,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         var part = (IScreenPartHost)this;
         await part.RunSafelyAsync(async () =>
         {
-            var defaults = await Task.Run(() => _costingDefaultsRepository.GetAsync(CancellationToken.None));
+            var defaults = await Task.Run(() => _queries.ReadCostingDefaultsAsync(CancellationToken.None));
             var question = $"Set the costing of {ProductNames(products)} to the costing defaults: labor {defaults.LaborPercent:0.##}%, overhead "
                 + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarginPercent:0.##}%?"
                 + "\n\nA version is recorded of each one this changes.";
@@ -609,7 +537,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
                 AdministrativePercent = defaults.AdministrativePercent,
                 MarginPercent = defaults.MarginPercent,
             };
-            var changed = await Task.Run(() => _versionedSaves.ApplyCostingAsync([.. ids], costing, DateTime.Now, CancellationToken.None));
+            var changed = await Task.Run(() => _editor.ApplyCostingAsync([.. ids], costing, DateTime.Now, CancellationToken.None));
 
             // The window's own save: each form showing one takes its new time, and its new costing below, as after its own Save.
             List<ProductForm> showing = [.. Tabs.All.Select(tab => tab.Form).Where(form => form.DetailProductId is { } id && ids.Contains(id))];

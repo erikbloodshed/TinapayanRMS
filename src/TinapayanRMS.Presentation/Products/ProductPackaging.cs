@@ -9,6 +9,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -48,8 +49,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 {
     private readonly IProductPackagingHost _host;
     private readonly IReadOnlyList<RawMaterial> _packagingMaterials;
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly IPackagingLineRepository _packagingLineRepository;
+    private readonly IProductQueries _queries;
 
     /// <summary>The standalone packaging sets (sub-assemblies in the Packaging role), by name, as last loaded, for Link and Copy.</summary>
     private IReadOnlyList<SubAssembly> _packagingSets = [];
@@ -71,16 +71,15 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
     /// <param name="host">The Products screen: its cost basis, its runners and messages, and its undo steps.</param>
     /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a row prices itself from.</param>
+    /// <param name="queries">What reads the lines of the packaging picked, a set's or another product's.</param>
     public ProductPackaging(
         IProductPackagingHost host,
         IReadOnlyList<RawMaterial> packagingMaterials,
-        ISubAssemblyRepository subAssemblyRepository,
-        IPackagingLineRepository packagingLineRepository)
+        IProductQueries queries)
     {
         _host = host;
         _packagingMaterials = packagingMaterials;
-        _subAssemblyRepository = subAssemblyRepository;
-        _packagingLineRepository = packagingLineRepository;
+        _queries = queries;
 
         // Every row put in a table, however it got there (a product read, an undo, a link or copy), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -420,10 +419,10 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         var target = source.PackagingTarget!;
         IReadOnlyList<PackagingLineRow> rows = target switch
         {
-            PackagingLinkTarget.Set(var setId, _) => [.. (await _subAssemblyRepository.GetPackagingLinesAsync(setId, cancellationToken))
+            PackagingLinkTarget.Set(var setId, _) => [.. (await _queries.ReadPackagingSetLinesAsync(setId, cancellationToken))
                 .Select(l => new PackagingLineRow(FindMaterial(l.PackagingMaterialId) ?? l.PackagingMaterial!, l.QtyPerSet, l.UnitId))],
             PackagingLinkTarget.OtherProduct(var productId, _) =>
-                [.. (await _packagingLineRepository.GetEffectiveForProductAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
+                [.. (await _queries.ReadEffectivePackagingAsync(productId, cancellationToken)).Select(PackagingLineRow.FromSaved)],
         };
         cancellationToken.ThrowIfCancellationRequested();
 

@@ -10,6 +10,7 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -116,8 +117,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private readonly SourceCache<Product, int> _productCache;
     private readonly IReadOnlyList<ProductCategory> _categories;
     private readonly ReadOnlyObservableCollection<Product> _visibleProducts;
-    private readonly IProductRepository _productRepository;
-    private readonly IProductFolderRepository _folderRepository;
+    private readonly IProductQueries _queries;
+    private readonly IProductListEditor _editor;
     private readonly FolderStateWriter _closedFoldersWriter;
 
     /// <summary>Where what the last move took was before it: what Undo on the notice puts back. Null with nothing to undo.</summary>
@@ -130,21 +131,23 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <param name="productCache">The view's products, which the list searches, filters and moves.</param>
     /// <param name="categoryCache">The view's categories, whose changes the category filter's choices follow.</param>
     /// <param name="categories">Every category, by name, as the view binds them: the category filter's choices.</param>
+    /// <param name="queries">What the list reads again after a move: the folders, and the products moved.</param>
+    /// <param name="editor">What the list's moves, renames and folders write.</param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public ProductsList(
         IProductsListHost host,
         SourceCache<Product, int> productCache,
         SourceCache<ProductCategory, int> categoryCache,
         IReadOnlyList<ProductCategory> categories,
-        IProductRepository productRepository,
-        IProductFolderRepository folderRepository,
+        IProductQueries queries,
+        IProductListEditor editor,
         IViewStateStore viewStateStore)
     {
         _host = host;
         _productCache = productCache;
         _categories = categories;
-        _productRepository = productRepository;
-        _folderRepository = folderRepository;
+        _queries = queries;
+        _editor = editor;
 
         // The list's folders open as they were left last time, a folder new since included, and the ones closed are written
         // for next time (FolderStateWriter); Dispose writes any change still waiting.
@@ -295,14 +298,14 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
     /// <summary>
     /// Promote to Production, Send Back to Innovation, and a folder's Promote All: files the products in the other stage,
-    /// each in the folder at the same path as its own there, made if it isn't (IProductRepository.MoveToStageAsync), with
+    /// each in the folder at the same path as its own there, made if it isn't (IProductListEditor.MoveToStageAsync), with
     /// the notice bar's Undo, which takes away again the folders it made while they're still empty.
     /// </summary>
     public ScreenCommand<StageMoveRequest> MoveToStageCommand { get; }
 
     /// <summary>
     /// A folder of the user's dragged, or moved by its Move to: puts it, with all it holds, in another folder or at the top
-    /// of a stage, straight away (IProductFolderRepository.MoveAsync), with the notice bar's Undo. Moved to the other stage,
+    /// of a stage, straight away (IProductListEditor.MoveFolderAsync), with the notice bar's Undo. Moved to the other stage,
     /// the folders and products in it go too.
     /// </summary>
     public ScreenCommand<ProductFolderMove> MoveFolderCommand { get; }
@@ -340,7 +343,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
     /// <summary>
     /// Rename on a product of the list: its name becomes a box to type into, in place (TreeNameEdit), and the name typed is
-    /// saved at once, like a move (IProductRepository.RenameAsync).
+    /// saved at once, like a move (IProductListEditor.RenameAsync).
     /// </summary>
     public ScreenCommand<ProductLeafNode> RenameProductCommand { get; }
 
@@ -509,7 +512,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         List<int> ids = [.. moves.Select(m => m.ProductId)];
-        await _productRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
+        await _editor.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
         await ShowMovedAsync(ids, picked);
 
         _moveUndo = isUndo ? null : new MoveUndo.Products(undo, []);
@@ -534,9 +537,9 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         List<int> ids = [.. products.Select(p => p.Id)];
-        var moved = await _productRepository.MoveToStageAsync(ids, request.Stage, _host.SavedVersionsFor(ids), CancellationToken.None);
+        var moved = await _editor.MoveToStageAsync(ids, request.Stage, _host.SavedVersionsFor(ids), CancellationToken.None);
         // Read again whether or not this move made any: the folder it found may be one another computer made.
-        _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
+        _host.Folders = await _queries.ReadFoldersAsync(CancellationToken.None);
         await ShowMovedAsync([.. products.Select(p => p.Id)], picked);
 
         // What the database moved, not what this screen thought would move: one already in that stage there (moved from
@@ -559,7 +562,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// </summary>
     private async Task ShowMovedAsync(IReadOnlyCollection<int> productIds, IReadOnlyList<object> picked)
     {
-        var moved = await _productRepository.GetByIdsAsync(productIds, CancellationToken.None);
+        var moved = await _queries.ReadManyAsync(productIds, CancellationToken.None);
         _host.ApplyRefresh(() =>
         {
             _productCache.AddOrUpdate(moved.Where(p => !p.IsDeleted));
@@ -588,7 +591,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
         var back = new ProductFolderMove(folder.Id, folder.Stage, folder.ParentId);
         var picked = SelectedTreeNodes.ToList();
-        var restaged = await _folderRepository.MoveAsync(move, _host.SavedVersionsFor(null), CancellationToken.None);
+        var restaged = await _editor.MoveFolderAsync(move, _host.SavedVersionsFor(null), CancellationToken.None);
         await _host.LoadAfterSavingAsync(restaged);
         if (ProductTree.Folder(folder.Id) is { ParentFolder: { } parent })
         {
@@ -612,8 +615,8 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
                 await MoveProductsAsync(back, isUndo: true);
                 if (madeFolderIds.Count > 0)
                 {
-                    await _folderRepository.DeleteIfEmptyAsync(madeFolderIds, CancellationToken.None);
-                    _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
+                    await _editor.DeleteFoldersIfEmptyAsync(madeFolderIds, CancellationToken.None);
+                    _host.Folders = await _queries.ReadFoldersAsync(CancellationToken.None);
                     _host.ApplyRefresh(RefreshTree);
                 }
 
@@ -1091,7 +1094,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
                 await _host.RunSafelyAsync(async () =>
                 {
                     var adding = new ProductFolder { Name = name, Stage = stage, ParentId = parentId };
-                    await _folderRepository.AddAsync(adding, CancellationToken.None);
+                    await _editor.AddFolderAsync(adding, CancellationToken.None);
                     await ReloadFoldersAsync();
                     added = adding;
                 });
@@ -1109,7 +1112,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             case ProductFolderNode { FolderId: { } folderId }:
                 await _host.RunSafelyAsync(async () =>
                 {
-                    await _folderRepository.RenameAsync(folderId, name, CancellationToken.None);
+                    await _editor.RenameFolderAsync(folderId, name, CancellationToken.None);
                     await ReloadFoldersAsync();
                 });
                 if (_host.ErrorMessage is not null && ProductTree.Folder(folderId) is { } stillThere)
@@ -1124,7 +1127,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <summary>Reads the folders again, and files the list's rows in them: only the folders change.</summary>
     private async Task ReloadFoldersAsync()
     {
-        _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
+        _host.Folders = await _queries.ReadFoldersAsync(CancellationToken.None);
         _host.ApplyRefresh(RefreshTree);
     }
 
@@ -1173,7 +1176,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameProductToAsync(ProductLeafNode leaf, string name)
     {
         var product = leaf.Product;
-        await _productRepository.RenameAsync(product.Id, name, _host.SavedVersionsFor([product.Id]), CancellationToken.None);
+        await _editor.RenameAsync(product.Id, name, _host.SavedVersionsFor([product.Id]), CancellationToken.None);
 
         // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
         await _host.LoadAfterSavingAsync([product.Id]);
@@ -1206,7 +1209,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
             $"Delete the '{folder.Title}' folder? {holds}",
             async () =>
             {
-                await _folderRepository.DeleteAsync(id, CancellationToken.None);
+                await _editor.DeleteFolderAsync(id, CancellationToken.None);
                 _host.FolderDeleted(id, parentId);
                 await _host.LoadAsync();
             });
