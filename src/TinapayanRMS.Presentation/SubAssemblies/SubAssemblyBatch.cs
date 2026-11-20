@@ -8,7 +8,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
 /// <summary>
-/// A recipe's lines on the Sub-Assemblies screen (through SubAssembliesState.Batch): its ingredients in grams, typed
+/// A recipe's lines on the Sub-Assemblies screen (SubAssemblyDraft.Batch): its ingredients in grams, typed
 /// straight into the table, the formula's base and the batch's totals that follow them, and Scale. It shows the lines as
 /// saved, keeps and puts them back for an undo step, and prices them; Save reads them as typed. The screen keeps the undo
 /// history, the Remove Line its two tables share, and says when the ingredients were read again.
@@ -18,22 +18,25 @@ public sealed class SubAssemblyBatch : ObservableState
     /// <summary>With nothing ticked as the base, the percentages are absolute: each line's share of the batch.</summary>
     internal const string NoBaseCaption = "Absolute %: each line's share of the batch. Tick the base — usually the flour — for baker's %.";
 
-    private readonly IFormPartHost _host;
+    private readonly IUndoRecorder _recorder;
+    private readonly Action<string?> _showError;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
 
     /// <summary>The batch's figures, worked out from the lines when read (<see cref="BatchFigures"/>).</summary>
     private readonly Derived<BatchFigures> _figures;
 
-    /// <param name="host">The screen, which shows Scale's message and records it as an undo step.</param>
+    /// <param name="recorder">The undo history Scale is recorded in as one step.</param>
+    /// <param name="showError">Where Scale says why it can't scale, and clears what it said.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
     /// <param name="updates">
-    /// The screen's derived updates, so an undo putting the lines back points them at their ingredients and applies the
-    /// formula base once, from the whole form.
+    /// The draft's derived updates, so an undo putting the lines back points them at their ingredients and applies the
+    /// formula base once, from the whole draft.
     /// </param>
     /// <param name="isShowing">Whether the recipe's table shows: not for a packaging set, which Scale has nothing to do with.</param>
-    public SubAssemblyBatch(IFormPartHost host, IReadOnlyList<RawMaterial> ingredients, DerivedUpdates updates, Func<bool> isShowing)
+    public SubAssemblyBatch(IUndoRecorder recorder, Action<string?> showError, IReadOnlyList<RawMaterial> ingredients, DerivedUpdates updates, Func<bool> isShowing)
     {
-        _host = host;
+        _recorder = recorder;
+        _showError = showError;
         _ingredients = ingredients;
 
         // An ingredient picked in the table is pointed at the screen's copy of it, which prices the line.
@@ -206,15 +209,15 @@ public sealed class SubAssemblyBatch : ObservableState
 
     private void Scale()
     {
-        _host.ShowError(null);
+        _showError(null);
         var from = ScaleOption.Basis == BatchScaleBasis.Base ? FormulaBase : BatchWeight;
         if (from <= 0m || ScaleTo is not { } to || to <= 0m)
         {
-            _host.ShowError("Nothing is ticked as the base, so there's no base to scale. Tick the base lines, or scale the whole batch.");
+            _showError("Nothing is ticked as the base, so there's no base to scale. Tick the base lines, or scale the whole batch.");
             return;
         }
 
-        _host.AsUndoStep(() =>
+        _recorder.AsUndoStep(() =>
         {
             // Lines typed in grams are scaled; a line typed as a percentage follows the base, which is among them.
             foreach (var line in Lines.Where(l => l.Ingredient is not null && l.AuthoredBakersPercent is null && l.Grams is not null))

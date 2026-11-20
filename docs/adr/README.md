@@ -7,11 +7,12 @@ written. A decision that changes gets a new record that supersedes the old one, 
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-layers-use-cases-and-drafts.md) | Layers, use cases and drafts | Accepted; migration in progress (phase 0 done) |
+| [0002](0002-layers-use-cases-and-drafts.md) | Layers, use cases and drafts | Accepted; migration in progress (phases 0 and 1 done); `Rebase` narrowed by 0007 |
 | [0003](0003-mutable-observable-screen-state.md) | Mutable, observable screen state | Accepted |
 | [0004](0004-quality-gates.md) | Quality gates the build enforces | Accepted |
 | [0005](0005-change-control-and-dependencies.md) | Change control and dependencies | Accepted |
 | [0006](0006-testing-strategy.md) | Testing strategy | Accepted |
+| [0007](0007-a-load-repoints-a-draft.md) | A load re-points a draft; it doesn't merge saves made elsewhere | Accepted |
 
 ## Writing one
 

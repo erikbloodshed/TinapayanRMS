@@ -16,6 +16,7 @@ internal static class Codebase
     public static readonly Assembly ApplicationCore = typeof(ApplicationCore.Rules.CostingRules).Assembly;
     public static readonly Assembly Infrastructure = typeof(TinapayanRMSDbContext).Assembly;
     public static readonly Assembly Pricing = typeof(Pricing.SavedProductReader).Assembly;
+    public static readonly Assembly UseCases = typeof(UseCases.SubAssemblies.ISubAssemblyEditor).Assembly;
     public static readonly Assembly Presentation = typeof(ScreenState).Assembly;
     public static readonly Assembly Components = typeof(ServiceRegistration).Assembly;
 

@@ -22,7 +22,8 @@ public class LayerTests
         ["ApplicationCore"] = ["Domain"],
         ["Pricing"] = ["ApplicationCore"],
         ["Infrastructure"] = ["Domain", "ApplicationCore"],
-        ["Presentation"] = ["Domain", "ApplicationCore", "Pricing"],
+        ["UseCases"] = ["ApplicationCore", "Pricing"],
+        ["Presentation"] = ["Domain", "ApplicationCore", "Pricing", "UseCases"],
         ["Components"] = ["Presentation", "Infrastructure"],
         ["Maui"] = ["Components"],
         ["Mcp"] = ["Infrastructure", "Pricing"],
@@ -76,6 +77,7 @@ public class LayerTests
         (Codebase.ApplicationCore, [.. UiFrameworks, .. ScreenLibraries]),
         (Codebase.Pricing, [.. UiFrameworks, .. ScreenLibraries]),
         (Codebase.Infrastructure, [.. UiFrameworks, .. ScreenLibraries]),
+        (Codebase.UseCases, [.. UiFrameworks, .. ScreenLibraries, "Microsoft.EntityFrameworkCore"]),
         (Codebase.Presentation, UiFrameworks),
     ];
 

@@ -17,6 +17,7 @@ using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.SubAssemblies;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
+using TinapayanRMS.UseCases.SubAssemblies;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Components.Vim;
@@ -50,9 +51,18 @@ public static class ServiceRegistration
         services.AddSingleton<DatabaseReadiness>();
         services.AddSingleton<SavedProductReader>();
         services.AddSingleton<MaterialCostShares>();
-        services.AddSingleton<SharedRecipeImpact>();
         services.AddSingleton<ProductVersionRecorder>();
         services.AddSingleton<VersionedSaves>();
+
+        // The use cases (docs/adr/0002), what the screens do with the records, over the repositories registered above.
+        services.AddSingleton<SharedRecipeImpact>();
+        services.AddSingleton<ISubAssemblyQueries, SubAssemblyQueries>();
+        services.AddSingleton<ISubAssemblyEditor>(provider => new SubAssemblyEditor(
+            provider.GetRequiredService<ISubAssemblyRepository>(),
+            provider.GetRequiredService<IValidator<SubAssembly>>(),
+            provider.GetRequiredService<VersionedSaves>(),
+            provider.GetRequiredService<SharedRecipeImpact>()));
+        services.AddSingleton<ISubAssemblyRoleEditor, SubAssemblyRoleEditor>();
 
         // One store for the process, so its lock covers every page the web view loads.
         services.AddSingleton<IViewStateStore>(new JsonViewStateStore(viewStateFile));

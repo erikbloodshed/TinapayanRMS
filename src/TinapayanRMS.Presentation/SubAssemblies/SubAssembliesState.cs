@@ -1,14 +1,13 @@
 ﻿using System.Collections.ObjectModel;
 using System.Reactive.Disposables;
 using System.Reactive.Subjects;
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Pricing.Versions;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.SubAssemblies;
 
@@ -23,47 +22,31 @@ namespace TinapayanRMS.Presentation.SubAssemblies;
 /// </summary>
 public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubAssembliesListHost
 {
-    private readonly ISubAssemblyRepository _subAssemblyRepository;
-    private readonly ISubAssemblyLineRepository _lineRepository;
-    private readonly ISubAssemblyRoleRepository _roleRepository;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IValidator<SubAssembly> _subAssemblyValidator;
-    private readonly VersionedSaves _versionedSaves;
+    private readonly ISubAssemblyQueries _queries;
+    private readonly ISubAssemblyEditor _editor;
     private readonly ILogger _logger;
-
-    /// <summary>What a Save of a recipe products link is asked about with; null in a view built without it.</summary>
-    private readonly SharedRecipeImpact? _recipeImpact;
 
     // What the forms ask of other screens, passed on from whichever form asks (Wire).
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<int> _rawMaterialOpenRequests = new();
     private readonly Subject<int> _newProductRequests = new();
 
+    /// <param name="queries">What the view and its forms read.</param>
+    /// <param name="editor">What the forms and the list save, delete, rename and move.</param>
+    /// <param name="roleEditor">What the list does to the roles, its folders.</param>
     public SubAssembliesState(
-        ISubAssemblyRepository subAssemblyRepository,
-        ISubAssemblyLineRepository lineRepository,
-        ISubAssemblyRoleRepository roleRepository,
-        IRawMaterialRepository rawMaterialRepository,
-        IRawMaterialCategoryRepository rawMaterialCategoryRepository,
-        IValidator<SubAssembly> subAssemblyValidator,
-        IValidator<SubAssemblyRole> roleValidator,
+        ISubAssemblyQueries queries,
+        ISubAssemblyEditor editor,
+        ISubAssemblyRoleEditor roleEditor,
         IViewStateStore viewStateStore,
-        VersionedSaves versionedSaves,
-        ILogger logger,
-        SharedRecipeImpact? recipeImpact = null)
+        ILogger logger)
         : base(logger)
     {
-        _subAssemblyRepository = subAssemblyRepository;
-        _lineRepository = lineRepository;
-        _roleRepository = roleRepository;
-        _rawMaterialRepository = rawMaterialRepository;
-        _subAssemblyValidator = subAssemblyValidator;
-        _versionedSaves = versionedSaves;
+        _queries = queries;
+        _editor = editor;
         _logger = logger;
-        _recipeImpact = recipeImpact;
 
-        List = new SubAssembliesList(
-            this, Roles, Ingredients, PackagingMaterials, subAssemblyRepository, roleRepository, rawMaterialCategoryRepository, roleValidator, viewStateStore);
+        List = new SubAssembliesList(this, Roles, queries, editor, roleEditor, viewStateStore);
 
         // Runs each time the page opens (ScreenBase) and after the forms' own saves. It merges rather than replaces, so each
         // form keeps its selection and unsaved lines while picking up what changed elsewhere: a repriced ingredient, a
@@ -110,8 +93,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
 
     protected override RecordList ViewList => List;
 
-    protected override SubAssemblyForm NewForm() =>
-        new(this, _subAssemblyRepository, _lineRepository, _subAssemblyValidator, _versionedSaves, _logger, _recipeImpact);
+    protected override SubAssemblyForm NewForm() => new(this, _editor, _queries, _logger);
 
     protected override IDisposable Wire(SubAssemblyForm form) => new CompositeDisposable(
         form.Dependents.ProductOpenRequests.Subscribe(_productOpenRequests.OnNext),
@@ -121,20 +103,9 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     /// <summary>The roles, materials and sub-assemblies read again and merged, every form and its selection kept.</summary>
     private async Task LoadAsync()
     {
-        // All at once, on the thread pool, as Products reads its lists: one after another on the UI thread, each read came
-        // back to it before the next began, and waited its turn behind whatever the screen was drawing.
-        var rolesRead = Task.Run(() => _roleRepository.GetAllAsync(CancellationToken.None));
-        var rawMaterialsRead = Task.Run(() => _rawMaterialRepository.GetAllAsync(CancellationToken.None));
-        var subAssembliesRead = Task.Run(() => _subAssemblyRepository.GetStandaloneAsync(CancellationToken.None));
-        var linkedByRead = Task.Run(() => _subAssemblyRepository.GetStandaloneLinkedByAsync(CancellationToken.None));
-        var madeFromRead = Task.Run(() => _subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(CancellationToken.None));
-        await Task.WhenAll(rolesRead, rawMaterialsRead, subAssembliesRead, linkedByRead, madeFromRead);
-
-        var roles = await rolesRead;
-        var rawMaterials = await rawMaterialsRead;
-        var subAssemblies = await subAssembliesRead;
-        var linkedBy = await linkedByRead;
-        var madeFrom = await madeFromRead;
+        // Off the UI thread, the reads side by side (ReadCatalogAsync), as Products reads its lists: one after another on the
+        // UI thread, each read came back to it before the next began, and waited its turn behind whatever the screen was drawing.
+        var (roles, rawMaterials, subAssemblies, linkedBy, madeFrom) = await Task.Run(() => _queries.ReadCatalogAsync(CancellationToken.None));
 
         // What each form shows, by id, before anything it reads is replaced.
         var forms = Tabs.All.Select(tab => tab.Form).ToList();
@@ -211,7 +182,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
             row.Id,
             asker,
             $"Delete '{row.Name}'? This can't be undone.",
-            () => _subAssemblyRepository.DeleteStandaloneAsync(row.Id, CancellationToken.None));
+            () => _editor.DeleteAsync(row.Id, CancellationToken.None));
 
     protected override void Dispose(bool disposing)
     {
@@ -266,4 +237,7 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     }
 
     bool ISubAssembliesListHost.HasUnsavedChangesFor(int id) => Tabs.Holding(id)?.Form.HasUnsavedChanges == true;
+
+    bool ISubAssembliesListHost.IsMaterialName(string name) =>
+        Ingredients.Concat(PackagingMaterials).Any(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
 }

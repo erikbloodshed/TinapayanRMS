@@ -9,6 +9,7 @@
     <Project Path="src/TinapayanRMS.Presentation/TinapayanRMS.Presentation.csproj" />
     <Project Path="src/TinapayanRMS.Pricing/TinapayanRMS.Pricing.csproj" />
     <Project Path="src/TinapayanRMS.RecipeApi/TinapayanRMS.RecipeApi.csproj" />
+    <Project Path="src/TinapayanRMS.UseCases/TinapayanRMS.UseCases.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TinapayanRMS.ApplicationCore.Tests/TinapayanRMS.ApplicationCore.Tests.csproj" />
@@ -19,5 +20,6 @@
     <Project Path="tests/TinapayanRMS.Pricing.Tests/TinapayanRMS.Pricing.Tests.csproj" />
     <Project Path="tests/TinapayanRMS.RecipeApi.Tests/TinapayanRMS.RecipeApi.Tests.csproj" />
     <Project Path="tests/TinapayanRMS.Tests.Common/TinapayanRMS.Tests.Common.csproj" />
+    <Project Path="tests/TinapayanRMS.UseCases.Tests/TinapayanRMS.UseCases.Tests.csproj" />
   </Folder>
 </Solution>

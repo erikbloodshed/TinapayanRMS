@@ -1,9 +1,7 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -12,6 +10,7 @@ using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.SubAssemblies;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.Tests.SubAssemblies;
 
@@ -178,18 +177,10 @@ public class SubAssembliesStateVersionTests(DatabaseFixture fixture) : Persisten
         var factory = CreateDbContextFactory();
         var productRepository = new ProductRepository(factory);
 
-        return new SubAssembliesState(
-            new SubAssemblyRepository(factory),
-            new SubAssemblyLineRepository(factory),
-            new SubAssemblyRoleRepository(factory),
-            new RawMaterialRepository(factory),
-            new RawMaterialCategoryRepository(factory),
-            new SubAssemblyValidator(),
-            new SubAssemblyRoleValidator(),
-            new InMemoryViewStateStore(),
-            VersionRecorders.CreateSaves(factory, CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger(),
-            asksAboutCosts
+        return SubAssembliesViews.Create(
+            factory,
+            CreateUnitOfWork(),
+            recipeImpact: asksAboutCosts
                 ? new SharedRecipeImpact(
                     new SubAssemblyRepository(factory),
                     productRepository,
