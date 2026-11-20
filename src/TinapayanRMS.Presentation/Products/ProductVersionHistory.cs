@@ -634,9 +634,9 @@ public sealed class ProductVersionHistory : ObservableState
         {
             packagingLines = [.. content.PackagingLines.Where(l => !l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
         }
-        else if (link.Key == _host.Packaging.LinkTarget?.Key)
+        else if (link.Key == _host.Packaging.Draft.LinkTarget?.Key)
         {
-            packagingLines = [.. _host.Packaging.LineEdits.Select(PackagingLineSnapshot.Of)];
+            packagingLines = [.. _host.Packaging.Draft.LineEdits.Select(PackagingLineSnapshot.Of)];
         }
         else
         {
