@@ -96,6 +96,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// <param name="roles">The roles as the screen last loaded them, which are the list's folders.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a made ingredient's name can't be.</param>
     /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a made ingredient's name can't be either.</param>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public SubAssembliesList(
         ISubAssembliesListHost host,
         ObservableCollection<SubAssemblyRole> roles,

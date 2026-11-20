@@ -24,6 +24,13 @@
     <Features>$(Features);runtime-async=on</Features>
   </PropertyGroup>
 
+  <!-- APIs the codebase's rules forbid, listed in BannedSymbols.txt, are refused by the build (RS0030) rather than left
+       to review (docs/adr/0004-quality-gates.md). -->
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
   <!-- Everyday builds leave the commit out. The SDK otherwise puts the commit's hash into each
        assembly's version and its Source Link file, so the first build after any commit would recompile
        every project, even after a commit that changed only docs, and the MCP server, which builds as it

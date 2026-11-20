@@ -44,6 +44,8 @@ dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-
 
 ## Architecture in brief
 
+- **Architecture decisions are records in `docs/adr/`** (since 2026-11-20): read the ones a change touches before it, and write one before adding a project, a layer, a framework or a library the code is built around. The screens are moving, a screen at a time, to a `UseCases` project and a draft, a form and a view per record screen (ADR 0002, the build plan's open items); one structural change at a time, never mixed with features (ADR 0005).
+- **The build and Components.Tests' `Architecture/` enforce the rules as ratchets** (ADR 0004): the layers, no data-access type held by a screen but as many as `DataAccessTests.StillReaching` lists, at most six things through a screen state's constructor but as `ConstructorDependencyTests.StillOver` lists, `BannedSymbols.txt` (RS0030), and CA1502/CA1506 with each place over them suppressed with why. **Never raise a listed number, add a type to a list or add a suppression to make the build or a test pass**: split the class, or go through a use case. When work lowers a number, lower it in the same commit (the test says to).
 - **Layers:**
   - `Domain` holds the entities and has no dependencies.
   - `ApplicationCore` holds the business and costing rules (static `*Rules` classes), the repository interfaces and the FluentValidation validators.

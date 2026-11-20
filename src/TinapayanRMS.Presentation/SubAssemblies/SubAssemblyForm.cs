@@ -51,6 +51,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
     /// <summary>Counts form loads, so a load overtaken by a newer one drops its lines instead of adding them too.</summary>
     private int _formLoadVersion;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     internal SubAssemblyForm(
         SubAssembliesState view,
         ISubAssemblyRepository subAssemblyRepository,

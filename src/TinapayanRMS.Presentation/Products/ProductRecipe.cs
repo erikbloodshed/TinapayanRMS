@@ -54,6 +54,7 @@ public interface IProductRecipeHost : IFormPartHost
 /// recipe Save writes. What spans the form (the undo history, the costs, the lists loaded) it asks of the screen
 /// (<see cref="IProductRecipeHost"/>); the screen wires the section form's picks and lines to it.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductRecipe : ObservableState
 {
     private readonly IProductRecipeHost _host;

@@ -47,6 +47,7 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
     private readonly Subject<int> _productOpenRequests = new();
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public RawMaterialsState(
         IRawMaterialRepository rawMaterialRepository,
         IRawMaterialPriceHistoryRepository priceHistoryRepository,

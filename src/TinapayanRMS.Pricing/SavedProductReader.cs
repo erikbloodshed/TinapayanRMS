@@ -143,6 +143,7 @@ public sealed class SavedProductReader(
     public Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         unitOfWork.ReadSnapshotAsync(() => ReadDetailsInSnapshotAsync(productIds, cancellationToken), cancellationToken);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     private async Task<IReadOnlyDictionary<int, ProductDetail>> ReadDetailsInSnapshotAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
         // The products the composites among them hold, and the ones those hold: one read for each level of holding.

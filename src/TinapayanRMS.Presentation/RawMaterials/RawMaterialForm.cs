@@ -27,6 +27,7 @@ namespace TinapayanRMS.Presentation.RawMaterials;
 /// view keeps the list, the materials, categories and units of measure its pickers offer, and the load that brings them
 /// (<see cref="View"/>).
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>, IDisposable, IRecordScreen, ITabForm,
     IRawMaterialUnitsHost, IRawMaterialPurchaseCostHost, IRawMaterialRecipeHost, IRawMaterialPriceLogHost
 {
@@ -79,6 +80,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// <summary>The material whose price history, brand prices and BOM the tables hold; null for none (a new material).</summary>
     private int? _detailMaterialId;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     internal RawMaterialForm(
         RawMaterialsState view,
         IRawMaterialRepository rawMaterialRepository,
@@ -828,6 +830,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     }
 
     /// <summary>Save: the material with its units, brand prices or add-ins, all or nothing.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     private async Task SaveAsync()
     {
         // The picked material's details haven't replaced the previous one's yet: saving now would write that material's

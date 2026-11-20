@@ -29,6 +29,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// The form keeps its own fields, which product it shows, Save, the costs, and the undo history over them all; the view keeps
 /// the list, the products, categories, roles and materials its pickers offer, and the load that brings them (<see cref="View"/>).
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, ITabForm,
     IProductRecipeHost, IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
@@ -83,6 +84,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     private (int ProductId, ProductDetail Detail)? _preloadedDetail;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     internal ProductForm(
         ProductsState view,
         IProductRepository productRepository,

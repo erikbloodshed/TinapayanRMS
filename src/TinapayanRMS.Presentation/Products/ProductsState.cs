@@ -28,6 +28,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// the list's actions on products as records (delete, restore, clone, the costing defaults, print). It opens on a blank new
 /// product in the preview tab, as the screen always has.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListHost
 {
     /// <summary>How a clone's first version names where it came from: "Cloned from Pandesal, version 4".</summary>
@@ -77,6 +78,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     /// </summary>
     private int? _subAssemblyToStartFrom;
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public ProductsState(
         IProductRepository productRepository,
         IProductSubAssemblyUsageRepository usageRepository,

@@ -56,6 +56,10 @@
     <PackageVersion Include="Syncfusion.XlsIO.Net.Core" Version="$(SyncfusionVersion)" />
     <PackageVersion Include="Syncfusion.Licensing" Version="$(SyncfusionVersion)" />
   </ItemGroup>
+  <ItemGroup Label="Build">
+    <!-- Refuses the APIs listed in BannedSymbols.txt (Directory.Build.props, docs/adr/0004). -->
+    <PackageVersion Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
   <ItemGroup Label="Installer">
     <!-- The MSI's WiX extensions (installer/TinapayanRMS.Installer.wixproj), at the WiX SDK's version in global.json
          (msbuild-sdks): move them together. Held at 5.0.2, the last WiX under the plain MS-RL licence: from 6.0 its

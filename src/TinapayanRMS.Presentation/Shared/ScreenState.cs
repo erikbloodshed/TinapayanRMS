@@ -249,6 +249,8 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
     /// cleared there. For a record view, whose own work runs as the form showing does (RecordViewState.Runner), so what it
     /// says shows where the user is looking, and whoever waits for that form waits for it too.
     /// </summary>
+    // The one Switch BannedSymbols.txt allows: every other load driven by a selection comes through here.
+#pragma warning disable RS0030
     protected static void LoadLatest<T>(IObservable<T> values, Func<T, CancellationToken, Task> load, Func<ScreenState> runAs) =>
         Observable.Switch(values.Select(value =>
             {
@@ -274,6 +276,7 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
                 }));
             }))
             .Subscribe();
+#pragma warning restore RS0030
 
     /// <summary>
     /// Shows <paramref name="exception"/> as ErrorMessage, in <see cref="Failure"/>'s words after <paramref name="context"/>

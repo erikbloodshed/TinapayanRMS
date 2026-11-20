@@ -1,0 +1,9 @@
+M:System.Convert.ToDecimal(System.Double);Since .NET 11 it keeps the double's binary noise (28.35 becomes 28.3499…): take the decimal from text or a literal (PLAN.md, Conventions, "Decimal precision")
+M:System.Convert.ToDecimal(System.Single);Since .NET 11 it keeps the float's binary noise: take the decimal from text or a literal (PLAN.md, Conventions, "Decimal precision")
+M:System.Decimal.#ctor(System.Double);Since .NET 11 it keeps the double's binary noise (28.35 becomes 28.3499…): take the decimal from text or a literal (PLAN.md, Conventions, "Decimal precision")
+M:System.Decimal.#ctor(System.Single);Since .NET 11 it keeps the float's binary noise: take the decimal from text or a literal (PLAN.md, Conventions, "Decimal precision")
+M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.IObservable{``0}});A failure that reaches Switch ends the subscription for good: load through ScreenState.LoadLatest
+M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.Threading.Tasks.Task{``0}});A failure that reaches Switch ends the subscription for good: load through ScreenState.LoadLatest
+P:System.Threading.Tasks.Task`1.Result;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.Wait;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.WaitAll;Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll

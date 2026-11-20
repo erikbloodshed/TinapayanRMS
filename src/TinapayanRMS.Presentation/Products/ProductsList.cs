@@ -130,6 +130,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <param name="productCache">The view's products, which the list searches, filters and moves.</param>
     /// <param name="categoryCache">The view's categories, whose changes the category filter's choices follow.</param>
     /// <param name="categories">Every category, by name, as the view binds them: the category filter's choices.</param>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
     public ProductsList(
         IProductsListHost host,
         SourceCache<Product, int> productCache,

@@ -62,6 +62,7 @@ public sealed class CostingTools(
         "What-if: tries new prices for purchased raw materials and shows every product they reach, with its base cost, suggested " +
         "price and markup now and with the changes, as the Price Simulator screen does. A change reaches made and linked " +
         "ingredients and the composites holding a product as a real price change would. Nothing is saved.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     public Task<PriceSimulation> SimulatePriceChangesAsync(
         [Description("The price changes to try together, one per material.")] IReadOnlyList<PriceChangeInput> changes,
         [Description(UnbufferedDescription)] bool unbuffered = false,

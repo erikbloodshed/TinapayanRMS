@@ -34,6 +34,7 @@ public static class RecipeApiHost
     public const string UnexpectedText = "The Recipe API hit a problem it didn't expect. Its log has the details.";
 
     /// <param name="configureWeb">More web host setup after the API's own, such as the tests' in-memory server.</param>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "A composition root couples to everything it registers, by design.")]
     public static IHostBuilder AddRecipeApi(this IHostBuilder builder, Action<IWebHostBuilder>? configureWeb = null) =>
         builder
             .ConfigureAppConfiguration(config => config.AddJsonFile("recipeapi.json", optional: true, reloadOnChange: false))

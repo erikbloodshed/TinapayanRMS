@@ -4,7 +4,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Presentation.Products;
 
-namespace TinapayanRMS.Components.Tests;
+namespace TinapayanRMS.Components.Tests.Architecture;
 
 /// <summary>
 /// Every amount, quantity and percentage is a decimal: a double can't hold 0.1 or 28.35 exactly, and since .NET 11 a

@@ -8,6 +8,12 @@ dotnet_diagnostic.CA1716.severity = none
 # A using nothing needs: every build reports it (Directory.Build.props), and CI's fails on it.
 dotnet_diagnostic.IDE0005.severity = warning
 
+# Code metrics (docs/adr/0004): a method's cyclomatic complexity over 25 (CA1502), and a type coupled to over 95 types
+# or a member to over 40 (CA1506), the analyzers' own thresholds. What was over them on 2026-11-20 carries a
+# SuppressMessage saying why, so CI's build (warnings as errors) refuses anything new over them.
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
+
 # Migrations are scaffolded by `dotnet ef migrations add` and never edited by hand,
 # so analyzer warnings in them can't be acted on.
 [src/TinapayanRMS.Infrastructure/Migrations/**.cs]
@@ -16,3 +22,7 @@ generated_code = true
 [tests/**.cs]
 # Test methods are named Method_Scenario_Result.
 dotnet_diagnostic.CA1707.severity = none
+
+# A test class reaches into whatever its scenarios need: the code metrics are for the app's code.
+dotnet_diagnostic.CA1502.severity = none
+dotnet_diagnostic.CA1506.severity = none

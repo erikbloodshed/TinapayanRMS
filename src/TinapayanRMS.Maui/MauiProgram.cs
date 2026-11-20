@@ -53,6 +53,7 @@ public static class MauiProgram
     /// </summary>
     public static string WebViewFolder { get; } = Path.Combine(DataFolder, "WebView2", CopyKey);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "A composition root couples to everything it registers, by design.")]
     public static MauiApp CreateMauiApp()
     {
         // Syncfusion's grid and charts report their use to Syncfusion, over HTTPS (Syncfusion.Telemetry). Off before any

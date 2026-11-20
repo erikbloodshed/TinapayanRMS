@@ -94,6 +94,8 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
     /// Create Variant's recipe, which links its source's own sub-assemblies. Only a variant links another product's own;
     /// the links it's made with stay through every later save of it, and a dropped one can't be linked again.
     /// </param>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     internal static async Task SetRecipeAsync(
         TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, bool linksOthersOwn, CancellationToken cancellationToken)
     {

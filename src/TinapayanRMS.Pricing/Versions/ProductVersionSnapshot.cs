@@ -13,6 +13,7 @@ namespace TinapayanRMS.Pricing.Versions;
 public static class ProductVersionSnapshot
 {
     /// <summary><paramref name="product"/> as <paramref name="detail"/> has it saved, with its materials at their costs now.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     public static ProductVersionContent From(Product product, ProductDetail detail)
     {
         Dictionary<int, RawMaterial> materials = [];

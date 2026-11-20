@@ -1,0 +1,39 @@
+# Dependency updates as pull requests, each checked by the build workflow before it's merged (docs/adr/0005).
+# Weekly and grouped, so a week's updates are a few pull requests rather than one per package: the repository is
+# private, and each run costs Windows minutes. Packages that must move together are grouped together, as
+# Directory.Packages.props says they must.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      syncfusion:
+        patterns: ["Syncfusion.*"]
+      maui:
+        patterns: ["Microsoft.Maui.*", "Microsoft.AspNetCore.Components.WebView*"]
+      ef-core-and-npgsql:
+        patterns: ["Microsoft.EntityFrameworkCore*", "Npgsql*", "EFCore.*"]
+      dotnet-runtime:
+        patterns: ["Microsoft.Extensions.*", "Microsoft.AspNetCore.*"]
+      testing:
+        patterns: ["TUnit*", "Microsoft.Testing.*", "AwesomeAssertions", "bunit", "Respawn"]
+    ignore:
+      # Held at 5.0.2, the last WiX under the plain MS-RL licence (Directory.Packages.props, the user's choice, 2026-11-15).
+      - dependency-name: "WixToolset.*"
+        versions: [">= 6.0.0"]
+
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

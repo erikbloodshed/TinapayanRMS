@@ -5,7 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Presentation.Products;
 
-namespace TinapayanRMS.Components.Tests;
+namespace TinapayanRMS.Components.Tests.Architecture;
 
 /// <summary>
 /// Every rounding below the screens names its midpoint mode. Math.Round and decimal.Round take a half to the even digit
