@@ -17,7 +17,10 @@ public static class MadeIngredientPrompt
     public const string NoMadeCategoryMessage =
         "There's no Made category to put it in. Add one on the Raw Materials screen first, with New Made Category.";
 
-    /// <summary>Every Made category, by name.</summary>
+    /// <summary>
+    /// Every Made category, by name, for Products' Make In-House Ingredient. Sub-Assemblies' reads the same through its use
+    /// case (ISubAssemblyQueries.ReadMadeCategoriesAsync); this one goes when Products moves to use cases (ADR 0002, phase 3).
+    /// </summary>
     public static async Task<IReadOnlyList<RawMaterialCategory>> MadeCategoriesAsync(IRawMaterialCategoryRepository repository) =>
         [.. (await repository.GetAllAsync(CancellationToken.None)).Where(c => c.Type == RawMaterialCategoryType.Made)];
 

@@ -42,8 +42,9 @@ public sealed class SubAssemblyEditor(
         return await recipeImpact.ReadAsync(request.Id, newLines, cancellationToken);
     }
 
-    public Task<SubAssemblySaved> SaveAsync(SubAssemblySaveRequest request, DateTime savedAt, CancellationToken cancellationToken)
+    public async Task<SubAssemblySaved> SaveAsync(SubAssemblySaveRequest request, DateTime savedAt, CancellationToken cancellationToken)
     {
+        // Async, so a refusal fails the task, as CheckSaveAsync's does, rather than throwing as it's called.
         EnsureValid(request.Name, request.RoleId);
         EnsureHasLines(request);
 
@@ -54,7 +55,7 @@ public sealed class SubAssemblyEditor(
             : token => subAssemblyRepository.SaveStandaloneAsync(
                 subAssembly, [.. request.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], token);
 
-        return versionedSaves.SaveSubAssemblyAsync(request.Id, request.Name, save, savedAt, cancellationToken);
+        return await versionedSaves.SaveSubAssemblyAsync(request.Id, request.Name, save, savedAt, cancellationToken);
     }
 
     public Task DeleteAsync(int subAssemblyId, CancellationToken cancellationToken) =>

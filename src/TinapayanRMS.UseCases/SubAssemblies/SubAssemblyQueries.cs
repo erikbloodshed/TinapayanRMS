@@ -14,12 +14,13 @@ public sealed class SubAssemblyQueries(
 {
     public async Task<SubAssembliesCatalog> ReadCatalogAsync(CancellationToken cancellationToken)
     {
-        // Side by side: each read makes its own short-lived context.
-        var roles = roleRepository.GetAllAsync(cancellationToken);
-        var rawMaterials = rawMaterialRepository.GetAllAsync(cancellationToken);
-        var subAssemblies = subAssemblyRepository.GetStandaloneAsync(cancellationToken);
-        var linkedBy = subAssemblyRepository.GetStandaloneLinkedByAsync(cancellationToken);
-        var madeFrom = subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(cancellationToken);
+        // Side by side, each on the thread pool from its start: each read makes its own short-lived context, and what each
+        // does before its first await (making the context, compiling the query, opening the connection) runs at once.
+        var roles = Task.Run(() => roleRepository.GetAllAsync(cancellationToken), cancellationToken);
+        var rawMaterials = Task.Run(() => rawMaterialRepository.GetAllAsync(cancellationToken), cancellationToken);
+        var subAssemblies = Task.Run(() => subAssemblyRepository.GetStandaloneAsync(cancellationToken), cancellationToken);
+        var linkedBy = Task.Run(() => subAssemblyRepository.GetStandaloneLinkedByAsync(cancellationToken), cancellationToken);
+        var madeFrom = Task.Run(() => subAssemblyRepository.GetMadeIngredientsBySubAssemblyAsync(cancellationToken), cancellationToken);
         await Task.WhenAll(roles, rawMaterials, subAssemblies, linkedBy, madeFrom);
 
         return new SubAssembliesCatalog(await roles, await rawMaterials, await subAssemblies, await linkedBy, await madeFrom);

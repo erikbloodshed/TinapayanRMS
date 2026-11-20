@@ -103,8 +103,8 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     /// <summary>The roles, materials and sub-assemblies read again and merged, every form and its selection kept.</summary>
     private async Task LoadAsync()
     {
-        // On the thread pool, where the reads go side by side, as Products reads its lists: one after another on the UI
-        // thread, each read came back to it before the next began, and waited its turn behind whatever the screen was drawing.
+        // Off the UI thread, the reads side by side (ReadCatalogAsync), as Products reads its lists: one after another on the
+        // UI thread, each read came back to it before the next began, and waited its turn behind whatever the screen was drawing.
         var (roles, rawMaterials, subAssemblies, linkedBy, madeFrom) = await Task.Run(() => _queries.ReadCatalogAsync(CancellationToken.None));
 
         // What each form shows, by id, before anything it reads is replaced.

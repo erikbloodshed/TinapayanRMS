@@ -81,11 +81,12 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         // rather than only when an undo step settles: a step closes on the way out of a field, and a Save button still
         // disabled under the cursor would swallow the very click that enabled it. The draft says when anything it holds
         // changes, its lines' cells included, grams typed while the cell still has the cursor; the form's own fields (which
-        // sub-assembly it is) too. Not on the form's own word that it has changes to save, which this answers.
+        // sub-assembly it is) too, but not the draft's fields it only passes on, which the draft has said already, nor its
+        // own word that it has changes to save, which this answers.
         Draft.Changed += History.RefreshDirty;
         PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(HasUnsavedChanges))
+            if (e.PropertyName is not (nameof(HasUnsavedChanges) or nameof(EditingName) or nameof(EditingRole) or nameof(IsPackaging)))
             {
                 History.RefreshDirty();
             }

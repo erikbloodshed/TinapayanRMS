@@ -34,8 +34,9 @@ public sealed class SubAssemblyRoleEditor(ISubAssemblyRoleRepository roleReposit
         return added;
     }
 
-    public Task RenameAsync(SubAssemblyRole role, string name, CancellationToken cancellationToken)
+    public async Task RenameAsync(SubAssemblyRole role, string name, CancellationToken cancellationToken)
     {
+        // Async, so a refusal fails the task, as AddAsync's does, rather than throwing as it's called.
         var renamed = new SubAssemblyRole
         {
             Id = role.Id,
@@ -45,7 +46,7 @@ public sealed class SubAssemblyRoleEditor(ISubAssemblyRoleRepository roleReposit
             IsProductOwned = role.IsProductOwned,
         };
         EnsureValid(renamed);
-        return roleRepository.UpdateAsync(renamed, cancellationToken);
+        await roleRepository.UpdateAsync(renamed, cancellationToken);
     }
 
     public Task DeleteAsync(int roleId, CancellationToken cancellationToken) => roleRepository.DeleteAsync(roleId, cancellationToken);
