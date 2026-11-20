@@ -91,6 +91,26 @@ public class ProductCostingTests
         }, iter: 300);
 
     [Test]
+    public void A_new_product_still_on_the_defaults_follows_every_change_to_them() =>
+        Steps.Array[0, 40].Sample(steps =>
+        {
+            var world = new World(isNew: true);
+
+            // The rule, as a model: new defaults land on the costing only while it shows the ones before them.
+            var model = world.Costing.Percentages;
+            foreach (var step in steps)
+            {
+                var defaultsBefore = world.DefaultsAsPercentages;
+                world.Apply(step);
+                model = step is ReadDefaults && model == defaultsBefore ? world.DefaultsAsPercentages : world.Costing.Percentages;
+
+                world.Costing.Percentages.Should().Be(model, $"after {step}");
+                world.History.IsDirty.Should().Be(world.Costing.Percentages != world.Baseline, $"after {step}, defaults landing aren't the user's change");
+                world.ShouldPriceAsNow($"after {step}");
+            }
+        }, iter: 300);
+
+    [Test]
     public void A_new_product_still_on_the_defaults_takes_new_ones_and_one_typed_into_keeps_its_costing()
     {
         var untouched = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
@@ -147,6 +167,9 @@ public class ProductCostingTests
 
     private sealed record ToggleCostBasis : Step;
 
+    /// <summary>Butter priced past its buffer or not, and the dough's piece size taken out or not: the header's warnings.</summary>
+    private sealed record EditMaterials(bool ButterBelowCost, bool DoughUnsized) : Step;
+
     /// <summary>A load read Settings' defaults and the shop's rates again, moved or not.</summary>
     private sealed record ReadDefaults(int Labor, int Vat, int Rounding) : Step;
 
@@ -156,6 +179,7 @@ public class ProductCostingTests
         Gen.Select(Gen.Int[0, 2], Gen.Int[0, 5000], (part, cents) => (Step)new EditRecipe(part, cents)),
         Gen.Select(Gen.Int[-1, 10], Gen.Int[1, 12], (wastage, quantity) => (Step)new EditProduct(wastage, quantity)),
         Gen.Const<Step>(new ToggleCostBasis()),
+        Gen.Select(Gen.Bool, Gen.Bool, (below, unsized) => (Step)new EditMaterials(below, unsized)),
         Gen.Select(Gen.Int[0, 50], Gen.Int[0, 20], Gen.Int[0, 5], (labor, vat, rounding) => (Step)new ReadDefaults(labor, vat, rounding)));
 
     /// <summary>The percentages an undo step keeps (ProductFormSnapshot.Costing), as a class for the undo history.</summary>
@@ -171,23 +195,44 @@ public class ProductCostingTests
         private readonly decimal[] _parts = [12.86m, 10.81m, 21.36m];
         private decimal? _categoryWastage;
         private int _quantity = 1;
+        private readonly bool _isNew;
         private CostingDefaults _defaults = Defaults(labor: 35m);
+        private bool _butterBelowCost = true;
+        private bool _doughUnsized;
         private bool _restoring;
 
-        public World()
+        /// <param name="isNew">A new product, on Settings' defaults, as New starts one; else a saved one, at its own costing.</param>
+        public World(bool isNew = false)
         {
+            _isNew = isNew;
             Costing = new ProductCosting(Inputs);
             Costing.SetDefaults(_defaults);
-            Costing.Load(new CostingParameters { LaborPercent = 25m, OverheadPercent = 20m, AdministrativePercent = 15m, MarginPercent = 60m });
+            if (isNew)
+            {
+                Costing.Load(null);
+                Costing.ApplyDefaults();
+            }
+            else
+            {
+                Costing.Load(new CostingParameters { LaborPercent = 25m, OverheadPercent = 20m, AdministrativePercent = 15m, MarginPercent = 60m });
+            }
+
             History = new UndoHistory<Snapshot>(
                 () => new Snapshot(Costing.Percentages), (a, b) => a.Percentages == b.Percentages, () => !_restoring);
             Costing.PropertyChanged += (_, _) => History.RefreshDirty();
             History.MarkClean();
+            Baseline = Costing.Percentages;
         }
 
         public ProductCosting Costing { get; }
 
         public UndoHistory<Snapshot> History { get; }
+
+        /// <summary>What the dirty check measures against: as loaded, or the defaults that landed on a new product since.</summary>
+        public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Baseline { get; private set; }
+
+        public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) DefaultsAsPercentages =>
+            (_defaults.LaborPercent, _defaults.OverheadPercent, _defaults.AdministrativePercent, _defaults.MarginPercent);
 
         public decimal Percent(int metric) => metric switch
         {
@@ -222,6 +267,10 @@ public class ProductCostingTests
             (shown.SubAssemblies, shown.Packaging, shown.Wastage, shown.Labor, shown.Overhead, shown.Administrative, shown.BaseCost, shown.SellingPrice, shown.RoundedSellingPrice)
                 .Should().Be((now.SubAssemblies, now.Packaging, now.Wastage, now.Labor, now.Overhead, now.Administrative, now.BaseCost, now.SellingPrice, now.RoundedSellingPrice), when);
             Costing.CostUnitCaption.Should().Be(_quantity == 1 ? "Per piece" : $"Per unit of {_quantity} pieces", when);
+            (Costing.BelowCostText?.Contains("Butter", StringComparison.Ordinal) ?? false).Should().Be(_butterBelowCost, when);
+            (Costing.BelowCostText is null).Should().Be(!_butterBelowCost, when);
+            (Costing.NoPieceSizeText?.StartsWith("Dough has no weight per piece", StringComparison.Ordinal) ?? false).Should().Be(_doughUnsized, when);
+            (Costing.NoPieceSizeText is null).Should().Be(!_doughUnsized, when);
         }
 
         public void Apply(Step step)
@@ -248,9 +297,21 @@ public class ProductCostingTests
                 case ToggleCostBasis:
                     Costing.CostBasis = Costing.CostBasis == CostBasis.Buffered ? CostBasis.Unbuffered : CostBasis.Buffered;
                     break;
+                case EditMaterials(var below, var unsized):
+                    _butterBelowCost = below;
+                    _doughUnsized = unsized;
+                    Costing.InputsChanged();
+                    break;
                 case ReadDefaults(var labor, var vat, var rounding):
                     _defaults = Defaults(labor, vat: vat, rounding: rounding);
-                    Costing.TakeDefaults(_defaults, isNewProduct: false);
+                    if (Costing.TakeDefaults(_defaults, isNewProduct: _isNew))
+                    {
+                        // As the form does (RefreshCostingDefaults): the defaults landing aren't the user's change, so what
+                        // the dirty check measures against moves with them.
+                        History.Rebase((settled, now) => settled with { Percentages = now.Percentages });
+                        Baseline = Costing.Percentages;
+                    }
+
                     break;
             }
         }
@@ -304,7 +365,10 @@ public class ProductCostingTests
         private ProductCostingInputs Inputs() => new(
             Recipe(),
             _categoryWastage,
-            [new RawMaterial { Id = 1, Name = "Butter", CostPerBaseUnit = 0.6m, BufferedCostPerBaseUnit = 0.5m }]);
+            [new RawMaterial { Id = 1, Name = "Butter", CostPerBaseUnit = 0.6m, BufferedCostPerBaseUnit = _butterBelowCost ? 0.5m : 0.66m }])
+        {
+            SectionsWithoutPieceSize = _doughUnsized ? ["Dough"] : [],
+        };
 
         private ProductCostInputs Recipe()
         {

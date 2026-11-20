@@ -143,19 +143,20 @@ public sealed class ProductCosting : ObservableState
     }
 
     /// <summary>Something the costs are worked out from changed (the recipe, the packaging, the product's fields): they're worked out again when next read.</summary>
-    public void InputsChanged() => _figures.Invalidate();
+    internal void InputsChanged() => _figures.Invalidate();
 
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
-    /// button (ProductsState.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
+    /// button (ProductForm.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
     /// isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the
-    /// next until the app closes. Print prints at it too. Only the form switches it, as it prices its tables' rows again.
+    /// next until the app closes. Print prints at it too. Only the form switches it (ToggleCostBasis), as it prices its
+    /// tables' rows again, so the setter is internal: set anywhere else, the tables would stay at the other basis.
     /// </summary>
     public CostBasis CostBasis
     {
         get => _costBasis;
-        set
+        internal set
         {
             if (RaiseAndSetIfChanged(ref _costBasis, value))
             {
@@ -350,7 +351,7 @@ public sealed class ProductCosting : ObservableState
 }
 
 /// <summary>
-/// What the screen has for a product's costs as they stand (ProductsState.CostingInputs): the recipe's and product's
+/// What the screen has for a product's costs as they stand (ProductForm.CostingInputs): the recipe's and product's
 /// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
 /// </summary>
 public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials)
