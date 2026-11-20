@@ -8,7 +8,8 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
-/// The Products screen's costing and costs (through ProductsState.Costing; the Costing tab and the header draw them):
+/// A product's costing as its form edits it (ADR 0002), the Costing part's draft, and its costs (through ProductForm.Costing;
+/// the Costing tab and the header draw them):
 /// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
 /// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
 /// materials have risen past their buffered cost. The figures are worked out as they're read, from what the screen gathers
@@ -147,9 +148,10 @@ public sealed class ProductCosting : ObservableState
     private CostBasis _costBasis;
     /// <summary>
     /// Which of the materials' costs every figure on the screen is at: buffered, as always, until the header's Unbuffered
-    /// button (ProductsState.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
+    /// button (ProductForm.ToggleCostBasisCommand) switches it to their true costs for a look without the buffer. It
     /// isn't part of the product, so it's no edit: nothing to undo or save, and it stays as it is from one product to the
-    /// next until the app closes. Print prints at it too. Only the screen switches it, as it prices its tables' rows again.
+    /// next until the app closes. Print prints at it too. Only the form switches it (ToggleCostBasis), as it prices its
+    /// tables' rows again, so the setter is internal: set anywhere else, the tables would stay at the other basis.
     /// </summary>
     public CostBasis CostBasis
     {
@@ -274,6 +276,24 @@ public sealed class ProductCosting : ObservableState
     }
 
     /// <summary>
+    /// Takes up the defaults as a load read them (<see cref="SetDefaults"/>). A new product still showing the ones it started
+    /// with (the screen's first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed
+    /// into keeps it. True when the new ones landed on it: not the user's change, so the form moves what Save measures
+    /// against along with them.
+    /// </summary>
+    public bool TakeDefaults(CostingDefaults defaults, bool isNewProduct)
+    {
+        var untouchedNewProduct = isNewProduct && ShowsDefaults;
+        SetDefaults(defaults);
+        if (untouchedNewProduct)
+        {
+            ApplyDefaults();
+        }
+
+        return untouchedNewProduct;
+    }
+
+    /// <summary>
     /// The cost summary from the screen's recipe and product figures as they are now (<see cref="ProductCostingInputs.Recipe"/>),
     /// with the shop's VAT and price rounding and the product's category's own wastage, or the shop's when it sets none, at
     /// the percentages as typed here; the captions follow the quantity and kind the figures are for, and the below-cost
@@ -331,7 +351,7 @@ public sealed class ProductCosting : ObservableState
 }
 
 /// <summary>
-/// What the screen has for a product's costs as they stand (ProductsState.CostingInputs): the recipe's and product's
+/// What the screen has for a product's costs as they stand (ProductForm.CostingInputs): the recipe's and product's
 /// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
 /// </summary>
 public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials)

@@ -16,8 +16,15 @@
     <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
     <!-- What a saved product costs, read the one way the screens and the two servers read it. -->
     <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
-    <!-- What the screens can do with the records, a screen at a time (docs/adr/0002): Sub-Assemblies' so far. -->
+    <!-- What the screens can do with the records, a screen at a time (docs/adr/0002): Sub-Assemblies', Raw Materials'
+         and Products' so far. -->
     <ProjectReference Include="..\TinapayanRMS.UseCases\TinapayanRMS.UseCases.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A draft's property tests change what it's worked out from as only its form may (ProductCostingTests: the costing's
+         inputs and cost basis), through members kept internal so nothing else can. -->
+    <InternalsVisibleTo Include="TinapayanRMS.Presentation.Tests" />
   </ItemGroup>
 
 </Project>
