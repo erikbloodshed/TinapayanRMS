@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Windows.Input;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Components.Vim;
@@ -21,10 +20,10 @@ namespace TinapayanRMS.Components.Shared;
 /// screen state changing. However many of them change together, the screen is drawn once for them all
 /// (<see cref="RedrawGate"/>).
 /// <para>
-/// A screen whose form can hold unsaved changes (<see cref="IUnsavedChangesScreen"/>) is never left with them: a
-/// move to another address (the activity bar, a link, Find, Back and Forward) asks
-/// about them first, and Cancel stays; closing the window asks the same (<see cref="UnsavedChangesGuard"/>), and
-/// reloading its page has the web view ask.
+/// A move to another address asks nothing: every form that can hold unsaved changes is a record view's tab, which stays
+/// as it is while another screen shows. Closing the window asks about each one with changes
+/// (<see cref="UnsavedChangesGuard"/>), and reloading the page has the web view ask, its leave warning turned on here
+/// while any of them holds changes.
 /// </para>
 /// </summary>
 public abstract class ScreenBase<TState> : ComponentBase, IDisposable
@@ -34,9 +33,6 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
     private readonly RedrawGate _redraws;
     private bool _redrawingNow;
     private bool? _leaveWarning;
-
-    /// <summary>The address the screen moves itself to as its form shows another record, which isn't a move away from it.</summary>
-    private string? _ownMove;
 
     protected ScreenBase()
     {
@@ -99,12 +95,6 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
                 WatchListsAndCommands(part);
             }
         }
-
-        if (UnsavedChangesForm is { } form)
-        {
-            _subscriptions.Add(ClosingGuard.Watch(form));
-            _subscriptions.Add(Navigator.RegisterLocationChangingHandler(OnLocationChangingAsync));
-        }
     }
 
     protected override async Task OnInitializedAsync()
@@ -130,24 +120,10 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
     protected Notices ScreenNotices => Notices;
 
     /// <summary>
-    /// Moves the screen's address to <paramref name="path"/>, as its form shows another record: no question about the
-    /// form's changes, which the screen state has already asked about if there was one to ask. With
+    /// Moves the screen's address to <paramref name="path"/>, as it shows another tab or record. With
     /// <paramref name="replace"/>, it takes the place of the address in the history, so Back doesn't come back to it.
     /// </summary>
-    protected void MoveAddressTo(string path, bool replace = false)
-    {
-        _ownMove = Navigator.ToAbsoluteUri(path).AbsoluteUri;
-        Navigator.NavigateTo(path, replace: replace);
-    }
-
-    /// <summary>
-    /// The form this screen keeps from being left with unsaved changes: its own state's, when it has one. A record view's
-    /// forms have none: each stays in its tab, and the window asks about them as it closes (IOpenForms).
-    /// </summary>
-    protected virtual IUnsavedChangesScreen? UnsavedChangesForm => State as IUnsavedChangesScreen;
-
-    /// <summary>Whether <paramref name="path"/> is this screen's own, a record's of it included (products/42).</summary>
-    protected virtual bool IsOwnAddress(string path) => false;
+    protected void MoveAddressTo(string path, bool replace = false) => Navigator.NavigateTo(path, replace: replace);
 
     /// <summary>
     /// A redraw asked for while one is queued is left to it, whoever asks: Blazor asks after each event the screen
@@ -233,32 +209,6 @@ public abstract class ScreenBase<TState> : ComponentBase, IDisposable
     private static readonly ConcurrentDictionary<Type, Watched> WatchedTypes = new();
 
     private sealed record Watched(PropertyInfo[] Lists, PropertyInfo[] Commands, PropertyInfo[] Parts);
-
-    // A move away while the form holds unsaved changes: asked about first. Another record of this screen's replaces the
-    // form, so No leaves it for that one; another screen leaves it showing, so No puts it back as it was saved.
-    // NavigateTo hands this the address as it was given, relative to the app (products/26) when the app gave it, and the
-    // browser in full, so it's made whole before anything compares it.
-    private async ValueTask OnLocationChangingAsync(LocationChangingContext context)
-    {
-        var own = _ownMove;
-        _ownMove = null;
-        var target = Navigator.ToAbsoluteUri(context.TargetLocation).AbsoluteUri;
-        if (UnsavedChangesForm is not { HasUnsavedChanges: true } form || target == own)
-        {
-            return;
-        }
-
-        var path = Navigator.ToBaseRelativePath(target);
-        if (target == Navigator.Uri)
-        {
-            return;
-        }
-
-        if (!await form.ResolveUnsavedChangesAsync(revert: !IsOwnAddress(path)))
-        {
-            context.PreventNavigation();
-        }
-    }
 
     private async Task SetLeaveWarningAsync(bool on)
     {

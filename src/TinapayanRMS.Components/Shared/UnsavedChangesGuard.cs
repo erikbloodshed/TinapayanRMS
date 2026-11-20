@@ -3,14 +3,14 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Components.Shared;
 
 /// <summary>
-/// What the window asks before it closes. Closing a window isn't a move to another address, so
-/// ScreenBase's own question never sees it. Two things keep it open: work that closing would cut short (<see cref="IBusyWork"/>:
-/// a backup or restore running in Settings → Database), which the window waits for, saying why; and a form's unsaved
-/// changes, asked about as leaving the form asks. ScreenBase keeps its form here while its screen is up. A form whose
-/// screen went while it still held unsaved changes is kept too: a screen that failed gives way to its error panel
-/// (ScreenErrorBoundary) without the question leaving it would have asked, and what it held is still its state's. A record
-/// view's forms are asked of the view (<see cref="IOpenForms"/>), every tab's, whether the view shows or not. One per page
-/// the window loads: the newest page's is the one <see cref="AppStatus.KeepsWindowOpen"/> asks, for Windows.
+/// What the window asks before it closes. Closing a window isn't a move to another address, and no move asks anything
+/// anyway: every form that can hold unsaved changes is a record view's tab, which stays as it is while another screen
+/// shows. Two things keep it open: work that closing would cut short (<see cref="IBusyWork"/>: a backup or restore running
+/// in Settings → Database), which the window waits for, saying why; and a form's unsaved changes, asked about as closing
+/// its tab asks. The forms are the record views' (<see cref="IOpenForms"/>), every tab's, whether a page shows the view or
+/// not: a screen that failed and gave way to its error panel (ScreenErrorBoundary) still has its view, and the view its
+/// forms. One per page the window loads: the newest page's is the one <see cref="AppStatus.KeepsWindowOpen"/> asks, for
+/// Windows.
 /// </summary>
 public sealed class UnsavedChangesGuard : IDisposable
 {
@@ -22,11 +22,11 @@ public sealed class UnsavedChangesGuard : IDisposable
     private readonly Confirmations _confirmations;
     private readonly AppStatus _app;
 
-    /// <summary>The forms on show, by how many screens show each (Products and Print show the same one).</summary>
-    private readonly Dictionary<IUnsavedChangesScreen, int> _shown = new(ReferenceEqualityComparer.Instance);
-
-    /// <summary>Forms whose screens went while they held unsaved changes.</summary>
-    private readonly HashSet<IUnsavedChangesScreen> _leftUnsaved = new(ReferenceEqualityComparer.Instance);
+    /// <summary>
+    /// The page's record views, found the first time they're asked about: the same ones as long as the page lasts. Every
+    /// screen asks after each drawing (its leave warning), which fetched them from the services each time.
+    /// </summary>
+    private IOpenForms[]? _views;
 
     /// <param name="services">The page's services, for the screens that may be busy and the record views' open forms.</param>
     /// <param name="notices">The page's notices, to say why the window stays open.</param>
@@ -41,8 +41,25 @@ public sealed class UnsavedChangesGuard : IDisposable
         app.Follow(this);
     }
 
-    /// <summary>Whether a form on show, or one left with them, holds anything a Save would write.</summary>
-    public bool HasUnsavedChanges => Forms().Any(form => form.HasUnsavedChanges);
+    /// <summary>Whether a record view's form, in any tab, holds anything a Save would write.</summary>
+    public bool HasUnsavedChanges
+    {
+        get
+        {
+            foreach (var view in Views)
+            {
+                foreach (var form in view.OpenForms)
+                {
+                    if (form.HasUnsavedChanges)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+    }
 
     /// <summary>
     /// Why the window mustn't close without asking, in words for the user, found at once and asking nothing: what's
@@ -50,14 +67,6 @@ public sealed class UnsavedChangesGuard : IDisposable
     /// question before it ends the app, which wants its answer there and then (<see cref="AppStatus.KeepsWindowOpen"/>).
     /// </summary>
     public string? KeepsWindowOpen => BusyWith() ?? (HasUnsavedChanges ? UnsavedChangesReason : null);
-
-    /// <summary>Keeps <paramref name="form"/> as one on show until the returned subscription goes.</summary>
-    public IDisposable Watch(IUnsavedChangesScreen form)
-    {
-        _shown[form] = _shown.GetValueOrDefault(form) + 1;
-        _leftUnsaved.Remove(form);
-        return new Release(this, form);
-    }
 
     /// <summary>
     /// True when the window may close: nothing is running that closing would cut short, and every form with unsaved
@@ -72,7 +81,7 @@ public sealed class UnsavedChangesGuard : IDisposable
             return false;
         }
 
-        foreach (var form in Forms().Where(form => form.HasUnsavedChanges).ToList())
+        foreach (var form in Views.SelectMany(view => view.OpenForms).Where(form => form.HasUnsavedChanges).ToList())
         {
             if (!await ResolveAsync(form))
             {
@@ -80,7 +89,6 @@ public sealed class UnsavedChangesGuard : IDisposable
             }
         }
 
-        _leftUnsaved.RemoveWhere(form => !form.HasUnsavedChanges);
         return true;
     }
 
@@ -111,40 +119,9 @@ public sealed class UnsavedChangesGuard : IDisposable
     /// <summary>The app's status lets go of this guard as its page goes (the scope ends).</summary>
     public void Dispose() => _app.Forget(this);
 
+    private IOpenForms[] Views => _views ??= [.. _services.GetServices<IOpenForms>()];
+
     /// <summary>Why something running keeps the window open (<see cref="IBusyWork"/>); null while nothing does.</summary>
     private string? BusyWith() =>
         _services.GetServices<IBusyWork>().Select(work => work.KeepsWindowOpen).FirstOrDefault(why => why is not null);
-
-    private IEnumerable<IUnsavedChangesScreen> Forms() =>
-        _shown.Keys
-            .Concat(_leftUnsaved)
-            .Concat(_services.GetServices<IOpenForms>().SelectMany(view => view.OpenForms))
-            .Distinct<IUnsavedChangesScreen>(ReferenceEqualityComparer.Instance);
-
-    private sealed class Release(UnsavedChangesGuard guard, IUnsavedChangesScreen form) : IDisposable
-    {
-        private bool _released;
-
-        public void Dispose()
-        {
-            if (_released)
-            {
-                return;
-            }
-
-            _released = true;
-            if (guard._shown.GetValueOrDefault(form) <= 1)
-            {
-                guard._shown.Remove(form);
-                if (form.HasUnsavedChanges)
-                {
-                    guard._leftUnsaved.Add(form);
-                }
-            }
-            else
-            {
-                guard._shown[form]--;
-            }
-        }
-    }
 }

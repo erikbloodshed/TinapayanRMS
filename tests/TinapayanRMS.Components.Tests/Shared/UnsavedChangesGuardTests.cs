@@ -11,6 +11,7 @@ namespace TinapayanRMS.Components.Tests.Shared;
 /// <summary>
 /// UnsavedChangesGuard, as the window closes: work that closing would cut short keeps it open, and the page's notices say
 /// why. The window ends the process as it closes, and a restore cut short could leave the database under another name.
+/// The forms it asks about are the record views' tabs (IOpenForms), whether a page shows them or not.
 /// </summary>
 public class UnsavedChangesGuardTests
 {
@@ -51,51 +52,52 @@ public class UnsavedChangesGuardTests
         }
     }
 
-    // A screen that failed gives way to its error panel, which takes the screen away without the question leaving it
-    // would have asked: what the form held is still its state's, so the window still asks about it as it closes.
+    /// <summary>A record view's tabs, as the guard finds them: the forms open in it, one a tab.</summary>
+    private sealed class OpenForms : IOpenForms
+    {
+        public List<Form> Forms { get; } = [];
+
+        IReadOnlyList<IUnsavedChangesScreen> IOpenForms.OpenForms => Forms;
+    }
+
+    private static OpenForms AddView(BunitContext context)
+    {
+        context.Services.AddScoped<OpenForms>();
+        context.Services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<OpenForms>());
+        return context.Services.GetRequiredService<OpenForms>();
+    }
+
     [Test]
-    public async Task A_form_whose_screen_went_with_unsaved_changes_is_still_asked_about_as_the_window_closes()
+    public async Task Each_form_with_unsaved_changes_is_asked_about_as_the_window_closes()
     {
         await using var context = AppServices.NewContext();
+        var view = AddView(context);
+        var edited = new Form { HasUnsavedChanges = true };
+        var untouched = new Form();
+        view.Forms.AddRange([untouched, edited]);
         var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
-        var form = new Form { HasUnsavedChanges = true };
-
-        guard.Watch(form).Dispose();
 
         guard.HasUnsavedChanges.Should().BeTrue();
         (await guard.ResolveBeforeClosingAsync()).Should().BeTrue();
-        form.Asked.Should().Be(1);
+        edited.Asked.Should().Be(1);
+        untouched.Asked.Should().Be(0, "it has nothing to save");
     }
 
+    // A tab opened after the window first asked is asked about too: the guard keeps the views, not their forms.
     [Test]
-    public async Task A_form_whose_screen_went_with_nothing_unsaved_is_let_go_of()
+    public async Task A_tab_opened_since_the_last_question_is_asked_about_too()
     {
         await using var context = AppServices.NewContext();
+        var view = AddView(context);
         var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
-        var form = new Form();
+        guard.HasUnsavedChanges.Should().BeFalse();
 
-        guard.Watch(form).Dispose();
-        form.HasUnsavedChanges = true;
+        var opened = new Form { HasUnsavedChanges = true };
+        view.Forms.Add(opened);
 
+        guard.HasUnsavedChanges.Should().BeTrue();
         (await guard.ResolveBeforeClosingAsync()).Should().BeTrue();
-        form.Asked.Should().Be(0, "a screen showing it would watch it again");
-    }
-
-    // Products and Print show the same form: the one going leaves it watched by the other.
-    [Test]
-    public async Task A_form_two_screens_show_stays_watched_while_one_of_them_shows_it()
-    {
-        await using var context = AppServices.NewContext();
-        var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
-        var form = new Form();
-
-        var print = guard.Watch(form);
-        guard.Watch(form).Dispose();
-        form.HasUnsavedChanges = true;
-
-        (await guard.ResolveBeforeClosingAsync()).Should().BeTrue();
-        form.Asked.Should().Be(1);
-        print.Dispose();
+        opened.Asked.Should().Be(1);
     }
 
     // Windows asks before a sign-out, a shutdown or an install ends the app, and wants its answer there and then
@@ -106,12 +108,13 @@ public class UnsavedChangesGuardTests
         await using var context = AppServices.NewContext();
         var busy = new Busy();
         context.Services.AddScoped<IBusyWork>(_ => busy);
+        var view = AddView(context);
         var app = context.Services.GetRequiredService<AppStatus>();
         app.KeepsWindowOpen.Should().BeNull("no screen is up yet");
 
-        var guard = context.Services.GetRequiredService<UnsavedChangesGuard>();
+        context.Services.GetRequiredService<UnsavedChangesGuard>();
         var form = new Form();
-        using var watching = guard.Watch(form);
+        view.Forms.Add(form);
         app.KeepsWindowOpen.Should().BeNull("the form has nothing unsaved");
 
         form.HasUnsavedChanges = true;
@@ -128,18 +131,21 @@ public class UnsavedChangesGuardTests
     public async Task The_newest_pages_guard_answers_for_the_window()
     {
         await using var context = AppServices.NewContext();
+        context.Services.AddScoped<OpenForms>();
+        context.Services.AddScoped<IOpenForms>(provider => provider.GetRequiredService<OpenForms>());
         var app = context.Services.GetRequiredService<AppStatus>();
         var firstPage = context.Services.CreateScope();
-        using var firstForm = firstPage.ServiceProvider.GetRequiredService<UnsavedChangesGuard>().Watch(new Form { HasUnsavedChanges = true });
+        firstPage.ServiceProvider.GetRequiredService<UnsavedChangesGuard>();
+        firstPage.ServiceProvider.GetRequiredService<OpenForms>().Forms.Add(new Form { HasUnsavedChanges = true });
         app.KeepsWindowOpen.Should().NotBeNull();
 
         using (var reloaded = context.Services.CreateScope())
         {
-            var guard = reloaded.ServiceProvider.GetRequiredService<UnsavedChangesGuard>();
+            reloaded.ServiceProvider.GetRequiredService<UnsavedChangesGuard>();
             app.KeepsWindowOpen.Should().BeNull("the reloaded page has nothing unsaved");
 
             firstPage.Dispose();
-            using var reloadedForm = guard.Watch(new Form { HasUnsavedChanges = true });
+            reloaded.ServiceProvider.GetRequiredService<OpenForms>().Forms.Add(new Form { HasUnsavedChanges = true });
             app.KeepsWindowOpen.Should().NotBeNull("the old page went, and the reloaded one's guard still answers");
         }
 
