@@ -1,6 +1,6 @@
 # 0002. Layers, use cases and drafts
 
-**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails) and 1 (Sub-Assemblies) done. What
+**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies) and 2 (Raw Materials) done. What
 `Rebase` does is narrowed by [ADR 0007](0007-a-load-repoints-a-draft.md): it re-points a draft, and merges nothing.
 
 ## Context

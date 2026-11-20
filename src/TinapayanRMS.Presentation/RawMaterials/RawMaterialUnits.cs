@@ -8,8 +8,8 @@ using TinapayanRMS.Presentation.Shared;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
-/// <summary>What the Alternative Units tab asks of its screen, on top of what any part of its form asks.</summary>
-public interface IRawMaterialUnitsHost : IFormPartHost
+/// <summary>What the Alternative Units tab asks of its draft (RawMaterialDraft), on top of the undo recorder its steps go in.</summary>
+public interface IRawMaterialUnitsHost : IUndoRecorder
 {
     /// <summary>The form's type: a packaging material's base unit is its own, an ingredient's the gram.</summary>
     RawMaterialType EditingType { get; }
@@ -42,7 +42,7 @@ public sealed class RawMaterialUnits : ObservableState
     /// </summary>
     private readonly HashSet<RawMaterialUnit> _brandAddedUnits = [];
 
-    /// <param name="host">The screen: the form's base unit, and the brands to price again when a unit goes.</param>
+    /// <param name="host">The draft: its type and base unit, and the brands to price again when a unit goes.</param>
     /// <param name="unitsOfMeasure">Every unit of measure, as the screen last loaded them, which a row's unit is one of.</param>
     /// <param name="ensureValid">Refuses a unit its fields can't be saved as (IRawMaterialEditor.EnsureValid), as each row is checked.</param>
     public RawMaterialUnits(IRawMaterialUnitsHost host, IReadOnlyList<UnitOfMeasure> unitsOfMeasure, Action<RawMaterialUnit> ensureValid)
