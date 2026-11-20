@@ -209,9 +209,9 @@ public class ProductDraftTests
         {
             if (moved)
             {
+                // The restore marks the costs stale itself: nothing here does, so one that stopped would fail the pricing checks.
                 _restoring = true;
                 Draft.Restore(snapshot, _categories);
-                Draft.Costing.InputsChanged();
                 _restoring = false;
             }
 

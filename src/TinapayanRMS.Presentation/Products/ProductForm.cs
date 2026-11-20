@@ -319,7 +319,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         Packaging.TakePackagingSets(_view.PackagingSets);
     }
 
-
     /// <summary>
     /// The product showing is a composite: made of other products (its Products tab), its own packaging, and sections only
     /// in product-owned roles (a topping, a filling), with no Quantity Required of its own (the draft's).
@@ -710,7 +709,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             .Subscribe(_ => _updates.Run(ComponentsEdited));
 
         // A composite's products' packaging joining its own or leaving it. The costing percentages say so themselves, and
-        // the form's price, quantity and category through their setters.
+        // the product's price, quantity and category through their setters (ProductDraft).
         ComponentsTable.Draft.IncludesPackagingChanged += InvalidateCosts;
 
         // Broadly besides: any change to a packaging or a composite's table is something the costs may be worked out from.
@@ -1735,7 +1734,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     IEnumerable<Product> IProductPackagingHost.OtherProducts => Products.Where(p => p.Id != _detailProductId);
 
     void IProductPackagingHost.InvalidateCosts() => InvalidateCosts();
-
 
     // What the section form asks of the screen (IProductUsageFormHost); its cost basis is the Costing part's.
     CostBasis IProductUsageFormHost.CostBasis => Costing.CostBasis;

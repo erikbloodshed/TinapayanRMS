@@ -225,13 +225,16 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
         EditingCloneName = snapshot.CloneName;
         _editingCategory = snapshot.CategoryId is { } categoryId ? categories.FirstOrDefault(c => c.Id == categoryId) : null;
         RaisePropertyChanged(nameof(EditingCategory));
-        Costing.InputsChanged();
 
         // The costing, then the packaging, then a composite's lines, each finding its product and the recipe cost read for it
         // again (a cost not read yet is wanted now, and prices the line when it arrives).
         Costing.Percentages = snapshot.Costing;
         Packaging.Restore(snapshot.Packaging);
         Components.Restore(snapshot.Components);
+
+        // The category went back past its setter, and the packaging's and the composite's lines tell the costing nothing
+        // themselves: the costs are worked out again from all of it, once, as they're next read.
+        Costing.InputsChanged();
     }
 
     /// <summary>
