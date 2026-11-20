@@ -5,6 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
 
@@ -62,6 +63,31 @@ public class ProductDraftTests
         (product.Id, product.Name, product.Description, product.QuantityRequired, product.CategoryId, product.Stage, product.FolderId, product.UpdatedAt)
             .Should().Be((9, "Ube Loaf", null, 4, 62, ProductStage.Innovation, 3, saved));
         (product.IsComposite, product.IncludesComponentPackaging).Should().Be((false, false));
+    }
+
+    [Test]
+    public void A_saved_product_shows_its_fields_a_new_one_clears_them_and_a_load_re_points_the_category()
+    {
+        var world = new World();
+        var loaves = new ProductCategory { Id = 62, Name = "Loaves", WastagePercent = 5m };
+        var product = new Product { Id = 7, Name = "Ube Loaf", Description = null, CategoryId = 62, QuantityRequired = 2, CurrentPrice = 95m };
+
+        world.Draft.ShowFields(product, [loaves]);
+        (world.Draft.EditingName, world.Draft.EditingDescription, world.Draft.EditingCategory, world.Draft.EditingQuantityRequired, world.Draft.EditingCurrentPrice, world.Draft.EditingCloneName)
+            .Should().Be(("Ube Loaf", string.Empty, loaves, 2, 95m, "Ube Loaf Copy"));
+        world.Draft.Costing.Costs.WastagePercent.Should().Be(5m, "the category's own wastage prices it at once");
+
+        var freshLoaves = new ProductCategory { Id = 62, Name = "Loaves", WastagePercent = 4m };
+        world.Draft.Rebase(62, [freshLoaves], new Dictionary<int, ComponentCosts>(), []);
+        world.Draft.EditingCategory.Should().BeSameAs(freshLoaves, "a load re-points the category at its fresh copy, by id");
+        world.Draft.Costing.Costs.WastagePercent.Should().Be(4m);
+
+        world.Draft.ClearFields();
+        world.Draft.EditingName.Should().BeEmpty();
+        world.Draft.EditingCategory.Should().BeNull();
+        world.Draft.EditingQuantityRequired.Should().Be(1);
+        world.Draft.EditingCurrentPrice.Should().BeNull();
+        world.Draft.EditingCloneName.Should().BeEmpty();
     }
 
     /// <summary>One thing a user does to the product, as one undo step.</summary>

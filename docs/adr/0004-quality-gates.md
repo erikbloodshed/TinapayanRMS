@@ -26,6 +26,8 @@ that goes down must be lowered where it's listed, so it can't creep back up.
   (`IViewStateStore`) is a file of the user's, not the database.
 - **Constructor size** (`ConstructorDependencyTests`): a screen's state, part or row takes at most six things through
   its constructor, except the 15 listed with their counts.
+- **File size** (`FileSizeTests`, from 2026-11-21, ADR 0002's amendment): a file of the screens' states (Presentation) is
+  at most 700 lines, except the nine listed with their lengths, each lowered once it's 25 lines shorter.
 - **Code metrics** (.editorconfig): a method's cyclomatic complexity over 25 (CA1502), a type coupled to over 95 types or
   a member to over 40 (CA1506), the analyzers' own thresholds, as warnings, which CI's build refuses. The 22 places over
   them on 2026-11-20 carry a `SuppressMessage` saying why: a screen's state until its phase moves it, a composition root

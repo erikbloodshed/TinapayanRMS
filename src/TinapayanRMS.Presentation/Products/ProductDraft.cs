@@ -140,6 +140,87 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     }
 
     /// <summary>
+    /// A saved product's own fields, as <paramref name="product"/> holds them, its category <paramref name="categories"/>'
+    /// own copy; the Create Variant name starts as the product's own, with " Copy".
+    /// </summary>
+    public void ShowFields(Product product, IReadOnlyList<ProductCategory> categories)
+    {
+        EditingName = product.Name;
+        EditingDescription = product.Description ?? string.Empty;
+        EditingCategory = categories.FirstOrDefault(c => c.Id == product.CategoryId);
+        EditingQuantityRequired = product.QuantityRequired;
+        Components.IncludesPackaging = product.IncludesComponentPackaging;
+        EditingCurrentPrice = product.CurrentPrice;
+        EditingCloneName = $"{product.Name} Copy";
+    }
+
+    /// <summary>A new product's own fields: no name, description or category, one piece to a unit, no price.</summary>
+    public void ClearFields()
+    {
+        EditingName = string.Empty;
+        EditingDescription = string.Empty;
+        EditingCategory = null;
+        EditingQuantityRequired = 1;
+        Components.IncludesPackaging = false;
+        EditingCurrentPrice = null;
+        EditingCloneName = string.Empty;
+    }
+
+    /// <summary>
+    /// A saved product's parts as <paramref name="detail"/> holds them and what Save compares them against: a composite's
+    /// lines first (the recipe's baseline, which the recipe part settles next, includes them), then the packaging, its link,
+    /// its lines and its bulk packaging for <paramref name="bulkPackagingQuantity"/> products. The recipe's sections and the
+    /// costing are the form's to show after, in that order (the recipe part's ShowSaved reselects its tabs).
+    /// </summary>
+    public void ShowParts(ProductDetail detail, int? bulkPackagingQuantity)
+    {
+        Components.Load(detail.Components);
+        Packaging.LoadLink(detail.PackagingLink);
+        Packaging.LoadLines(detail.Lines);
+        Packaging.LoadBulk(detail.BulkLines, bulkPackagingQuantity);
+    }
+
+    /// <summary>
+    /// A load's fresh lists taken up, nothing typed changed (ADR 0007): the category back on <paramref name="categoryId"/>'s
+    /// fresh copy among <paramref name="categories"/>, and a composite's lines pointed at the fresh products at their fresh
+    /// costs, with every composite's lines as saved for the product cell's choices.
+    /// </summary>
+    public void Rebase(int? categoryId, IReadOnlyList<ProductCategory> categories, IReadOnlyDictionary<int, ComponentCosts> componentCosts, IReadOnlyList<ProductComponent> componentLinks)
+    {
+        EditingCategory = categories.FirstOrDefault(c => c.Id == categoryId);
+        Components.TakeFresh(componentCosts, componentLinks);
+    }
+
+    /// <summary>
+    /// What a load brought from where it's kept, nothing typed changed (ADR 0007): the linked packaging's link and lines as
+    /// saved now (<paramref name="savedLink"/>, <paramref name="linkedPackagingLines"/>, read again while the form still shows
+    /// the link as saved), the recipe's sections at the fresh ingredients, roles and linked sub-assemblies, and the packaging's
+    /// rows at their materials' refreshed costs and units. What changed of what's linked, for the form's undo history to take
+    /// in too: whether a linked section did, and the packaging as it shows now when its linked lines or name did.
+    /// </summary>
+    public (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
+        PackagingLinkTarget? savedLink,
+        IReadOnlyList<PackagingLine>? linkedPackagingLines,
+        IReadOnlyList<SubAssembly> linkedSubAssemblies,
+        IReadOnlyList<SubAssemblyLine> linkedLines)
+    {
+        PackagingSnapshot? linkedPackagingNow = null;
+        if (linkedPackagingLines is not null)
+        {
+            // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
+            var renamed = !Equals(Packaging.LinkTarget, savedLink);
+            Packaging.ShowLink(savedLink);
+            if (Packaging.RefreshLinkedLines(linkedPackagingLines) || renamed)
+            {
+                linkedPackagingNow = Packaging.Capture();
+            }
+        }
+
+        var linkedSectionsChanged = Recipe.RefreshRows(linkedSubAssemblies, linkedLines);
+        return (linkedSectionsChanged, linkedPackagingNow);
+    }
+
+    /// <summary>
     /// The product as Save writes it, with <paramref name="id"/> (0 for a new one), filed in <paramref name="stage"/> and
     /// <paramref name="folderId"/> (only a new one's is written: a saved one's changes by moving it in the list), as last
     /// saved at <paramref name="savedVersion"/> when the form took it, so a save made since from another PC refuses this one.
