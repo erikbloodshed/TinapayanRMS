@@ -31,7 +31,7 @@ namespace TinapayanRMS.Presentation.Products;
 /// </summary>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
 public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, ITabForm,
-    IProductRecipeHost, IProductPackagingHost, IProductPackagingDraftHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost,
+    IProductRecipeHost, IProductRecipeDraftHost, IProductPackagingHost, IProductPackagingDraftHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost,
     IProductComponentsDraftHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
@@ -108,7 +108,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // The part that holds the recipe. It subscribes to what it holds alone (the recipe's tabs and which of its tables
         // shows), as it's made; what reaches from one part to another, or to the form, is subscribed below, in the order it
         // always ran.
-        Recipe = new ProductRecipe(this, UsageForm, ComponentsTable, Ingredients, Roles, queries);
+        Recipe = new ProductRecipe(this, UsageForm, new ProductRecipeDraft(this, Ingredients, Roles, ComponentsTable.Draft), queries);
 
         // What follows the form's fields as they change is called by their setters (SelectionChanged and the rest), and what
         // follows a part's by the part's events, subscribed below. What follows here runs in this order: several run as
@@ -902,7 +902,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             }
         }
 
-        var linkedSectionsChanged = Recipe.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
+        var linkedSectionsChanged = Recipe.Draft.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
 
         // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
         // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked
@@ -1285,7 +1285,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         var costing = Costing.ToParameters();
         _editor.EnsureValid(costing);
 
-        var recipe = Recipe.CurrentDraft();
+        var recipe = Recipe.Draft.CurrentDraft();
         if (!await ConfirmSharedLinesAsync())
         {
             return;
@@ -1301,7 +1301,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         var bulkToSave = Packaging.Draft.ChangedBulk();
         var changesSharing = Recipe.UsageEdits.Any(u => u.AreLinkedLinesEdited) || packagingLines is not null || packagingLink is not null;
         var request = new ProductSaveRequest(
-            product, costing, Costing.IsChanged, Recipe.IsAsSaved(recipe) ? null : recipe, packagingLink, packagingLines, bulkToSave, changesSharing);
+            product, costing, Costing.IsChanged, Recipe.Draft.IsAsSaved(recipe) ? null : recipe, packagingLink, packagingLines, bulkToSave, changesSharing);
         var saved = await Task.Run(() => _editor.SaveAsync(request, DateTime.Now, CancellationToken.None));
 
         // What's saved is the new starting point: stepping back past it would show changes already written.
@@ -1844,7 +1844,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     int IProductRecipeHost.LinkableVersion => _view.LinkableVersion;
 
-    int? IProductRecipeHost.DetailProductId => _detailProductId;
+    int? IProductRecipeDraftHost.DetailProductId => _detailProductId;
 
     void IProductRecipeHost.InvalidateCosts() => InvalidateCosts();
 
@@ -1876,9 +1876,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     CostBasis IProductVersionHistoryHost.CostBasis => Costing.CostBasis;
 
-    IReadOnlySet<int> IProductVersionHistoryHost.OwnedSectionIds => Recipe.SavedOwnSectionIds;
+    IReadOnlySet<int> IProductVersionHistoryHost.OwnedSectionIds => Recipe.Draft.SavedOwnSectionIds;
 
-    string? IProductVersionHistoryHost.SectionLabelOf(string subAssemblyName, SubAssemblyRole? role) => Recipe.SectionLabelOf(subAssemblyName, role);
+    string? IProductVersionHistoryHost.SectionLabelOf(string subAssemblyName, SubAssemblyRole? role) => Recipe.Draft.SectionLabelOf(subAssemblyName, role);
 
     /// <summary>
     /// A version Restore worked out (ProductVersionHistory.RestoreCommand), into the form as unsaved edits in one undo step:
