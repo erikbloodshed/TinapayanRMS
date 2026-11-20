@@ -91,18 +91,29 @@ public abstract class RecordViewBase<TView, TForm> : ScreenBase<TView>
         FollowTab(replace: true);
     }
 
+    /// <summary>The page has gone: the window shows another view, or another visit's page shows this one.</summary>
+    private bool _isGone;
+
     // The tab showing changed, or its record did: on whichever thread changed it.
     private void OnTabsChanged() => _ = InvokeAsync(() => FollowTab(replace: false));
 
     /// <summary>
     /// Moves the address to the tab showing. A tab shown, opened or showing another record adds to the history, so Back
     /// returns to the one before; a new record that's been saved, or the view's bare address, has its place taken
-    /// (<paramref name="replace"/> too), so Back doesn't come back to an address that names the same tab.
+    /// (<paramref name="replace"/> too), so Back doesn't come back to an address that names the same tab. Only while the
+    /// address is still this view's: a change that comes in after a link, Back or the activity bar has left it (a load
+    /// still running, a change queued before the page went) would otherwise take the window back to the view.
     /// </summary>
     private void FollowTab(bool replace)
     {
         var view = State!;
-        if (view.IsOpeningRecord)
+        if (_isGone || view.IsOpeningRecord)
+        {
+            return;
+        }
+
+        var current = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+        if (!IsOwnAddress(current))
         {
             return;
         }
@@ -110,7 +121,6 @@ public abstract class RecordViewBase<TView, TForm> : ScreenBase<TView>
         var tab = view.Tabs.Active;
         var recordId = tab?.Form.RecordId ?? 0;
         var address = AddressOf(tab);
-        var current = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
         var saved = tab is not null && tab == _followed.Tab && _followed.RecordId == 0 && recordId > 0;
         _followed = (tab, recordId);
         if (!string.Equals(current, address, StringComparison.OrdinalIgnoreCase))
@@ -119,5 +129,16 @@ public abstract class RecordViewBase<TView, TForm> : ScreenBase<TView>
         }
 
         _addressOpened = tab is null ? (null, null) : recordId > 0 ? (recordId, null) : (null, tab.Number);
+    }
+
+    /// <summary>Whether <paramref name="path"/> is this view's: "sub-assemblies", or under it.</summary>
+    private bool IsOwnAddress(string path) =>
+        string.Equals(path, AddressRoot, StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(AddressRoot + "/", StringComparison.OrdinalIgnoreCase);
+
+    protected override void Dispose(bool disposing)
+    {
+        _isGone = true;
+        base.Dispose(disposing);
     }
 }

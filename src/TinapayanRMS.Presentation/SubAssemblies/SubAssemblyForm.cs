@@ -173,8 +173,12 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         }
     }
 
-    /// <summary>ITabForm: the sub-assembly the form holds, as its tab knows it.</summary>
-    public int RecordId => EditingId;
+    /// <summary>
+    /// ITabForm: the sub-assembly the tab is for, as its tab and its address know it: the one picked, from the pick on, not
+    /// only once its details are read (<see cref="EditingId"/>), or a link opening another in the preview tab gave the tab
+    /// the one before's address meanwhile.
+    /// </summary>
+    public int RecordId => SelectedRow?.Id ?? EditingId;
 
     /// <summary>ITabForm: the name on the tab, the header's.</summary>
     public string TabTitle => HeaderTitle;
@@ -192,6 +196,7 @@ public sealed class SubAssemblyForm : RecordScreenState<SubAssemblyFormSnapshot>
         {
             if (RaiseAndSetIfChanged(ref _selectedRow, value))
             {
+                RaisePropertyChanged(nameof(RecordId));
                 SelectionChanged();
             }
         }

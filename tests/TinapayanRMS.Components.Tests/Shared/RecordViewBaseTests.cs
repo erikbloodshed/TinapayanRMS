@@ -127,6 +127,21 @@ public class RecordViewBaseTests
         await page.WaitForAssertionAsync(() => navigation.Uri.Should().EndWith($"/things/new/{blank.Number}"));
     }
 
+    // A link, Back or the activity bar has left the view while its tabs still change (a load running, a pick's details read):
+    // the window stays where it went, not back on the view.
+    [Test]
+    public async Task A_tab_changing_once_the_address_is_another_views_leaves_the_address_alone()
+    {
+        await using var context = AppServices.NewContext();
+        var (page, things, navigation) = Render(context, null);
+
+        navigation.NavigateTo("elsewhere/4");
+        await page.InvokeAsync(() => things.OpenKept(26));
+        await page.InvokeAsync(() => things.Form!.RecordId = 27);
+
+        navigation.Uri.Should().EndWith("/elsewhere/4");
+    }
+
     [Test]
     public async Task With_every_tab_closed_the_address_is_the_views_own()
     {

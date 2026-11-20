@@ -759,6 +759,27 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
         view.Tabs.All.Should().HaveCount(3);
     });
 
+    // The tab's record is the one picked from the pick on, before its details are read: it's what the tab's address names,
+    // and a link opening another sub-assembly in the preview tab otherwise put the one before's address in the history.
+    [Test]
+    public Task A_preview_tab_is_for_the_sub_assembly_picked_from_the_pick_on() => UiThread.RunAsync(async () =>
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var sweetId = await AddRecipeAsync("Sweet Dough", doughId);
+        var plainId = await AddRecipeAsync("Plain Dough", doughId);
+        var state = await OpenedStateAsync(sweetId);
+        var view = state.View;
+
+        view.OpenRecord(plainId);
+
+        view.Form.Should().BeSameAs(state, "the preview tab takes its place");
+        state.RecordId.Should().Be(plainId, "picked, its details not read yet");
+        view.Tabs.Holding(plainId)!.Form.Should().BeSameAs(state);
+        view.Tabs.Holding(sweetId).Should().BeNull();
+        await Settle.UntilAsync(state, () => state.EditingName == "Plain Dough");
+        state.RecordId.Should().Be(plainId);
+    });
+
     [Test]
     [Arguments(UnsavedChangesAnswer.Save, "Sweeter Dough", true)]
     [Arguments(UnsavedChangesAnswer.DontSave, "Sweet Dough", true)]

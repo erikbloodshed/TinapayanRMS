@@ -250,8 +250,12 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         }
     }
 
-    /// <summary>ITabForm: the product the form holds, as its tab knows it.</summary>
-    public int RecordId => EditingId;
+    /// <summary>
+    /// ITabForm: the product the tab is for, as its tab and its address know it: the one picked, from the pick on, not only
+    /// once its details are read (<see cref="EditingId"/>), or a link opening another in the preview tab gave the tab the one
+    /// before's address meanwhile.
+    /// </summary>
+    public int RecordId => SelectedProduct?.Id ?? EditingId;
 
     /// <summary>ITabForm: the name on the tab, the header's.</summary>
     public string TabTitle => HeaderTitle;
@@ -363,6 +367,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         {
             if (RaiseAndSetIfChanged(ref _selectedProduct, value))
             {
+                RaisePropertyChanged(nameof(RecordId));
                 SelectionChanged();
             }
         }

@@ -235,8 +235,12 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     /// <summary>The view this form is a tab of: its list, where the form's material is picked, and the load.</summary>
     public RawMaterialsState View => _view;
 
-    /// <summary>ITabForm: the material the form holds, as its tab knows it: 0 for a new one not saved yet.</summary>
-    public int RecordId => EditingId;
+    /// <summary>
+    /// ITabForm: the material the tab is for, as its tab and its address know it: the one picked, from the pick on, not only
+    /// once its details are read (<see cref="EditingId"/>), or a link opening another in the preview tab gave the tab the one
+    /// before's address meanwhile; 0 for a new one not saved yet.
+    /// </summary>
+    public int RecordId => SelectedRawMaterial?.Id ?? EditingId;
 
     /// <summary>ITabForm: the name on the tab, the header's.</summary>
     public string TabTitle => HeaderTitle;
@@ -314,6 +318,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         {
             if (RaiseAndSetIfChanged(ref _selectedRawMaterial, value))
             {
+                RaisePropertyChanged(nameof(RecordId));
                 SelectionChanged();
             }
         }
