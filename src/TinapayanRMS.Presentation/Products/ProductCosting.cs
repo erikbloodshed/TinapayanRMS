@@ -12,9 +12,9 @@ namespace TinapayanRMS.Presentation.Products;
 /// the Costing tab and the header draw them):
 /// the costing percentages as typed, each metric's amount, the cost summary worked out from them and the recipe, which of
 /// the materials' costs every figure is at (<see cref="CostBasis"/>), what the figures are for (the captions), and which
-/// materials have risen past their buffered cost. The figures are worked out as they're read, from what the screen gathers
+/// materials have risen past their buffered cost. The figures are worked out as they're read, from what the product's draft gathers
 /// (<see cref="ProductCostingInputs"/>), and again once anything they come from changed: the percentages and the cost basis
-/// here say so themselves, and the screen says so for the rest (<see cref="InputsChanged"/>). The screen also keeps the undo
+/// here say so themselves, and the product's draft and form say so for the rest (<see cref="InputsChanged"/>). The screen also keeps the undo
 /// history, which these percentages are part of. What Save compares against, the costing as loaded, a new product's
 /// defaults, and the shop's wastage, VAT and price rounding every product is priced with are here.
 /// </summary>
@@ -23,7 +23,7 @@ public sealed class ProductCosting : ObservableState
     /// <summary>The costs and what goes with them, worked out when read (<see cref="Figures"/>).</summary>
     private readonly Derived<CostingFigures> _figures;
 
-    /// <param name="inputs">What the screen has for the costs now: its recipe, packaging, fields and materials.</param>
+    /// <param name="inputs">What the product's draft has for the costs now: its recipe, packaging, fields and materials (ProductDraft.CostingInputs).</param>
     public ProductCosting(Func<ProductCostingInputs> inputs)
     {
         _figures = new Derived<CostingFigures>(() => Figures(inputs()), RaiseFiguresChanged);
@@ -351,7 +351,7 @@ public sealed class ProductCosting : ObservableState
 }
 
 /// <summary>
-/// What the screen has for a product's costs as they stand (ProductForm.CostingInputs): the recipe's and product's
+/// What the screen has for a product's costs as they stand (ProductDraft.CostingInputs): the recipe's and product's
 /// figures, the product's category's own Wastage %, if it sets one, and every material its recipe and packaging use.
 /// </summary>
 public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? CategoryWastagePercent, IReadOnlyList<RawMaterial> Materials)

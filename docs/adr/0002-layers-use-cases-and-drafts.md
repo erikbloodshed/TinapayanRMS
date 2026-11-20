@@ -1,6 +1,6 @@
 # 0002. Layers, use cases and drafts
 
-**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies) and 2 (Raw Materials) done; phase 3 (Products) begun, its use cases in place and its Packaging, Components, Costing and Recipe drafts, the product's own draft over them to come. What
+**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies) and 2 (Raw Materials) done; phase 3 (Products) begun, its use cases in place and its Packaging, Components, Costing and Recipe drafts, and the product's own draft over them; `ProductForm` still over 700 lines. What
 `Rebase` does is narrowed by [ADR 0007](0007-a-load-repoints-a-draft.md): it re-points a draft, and merges nothing.
 
 ## Context
