@@ -9,7 +9,7 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.RawMaterials;
 
 /// <summary>What the Alternative Units tab asks of its screen, on top of what any part of its form asks.</summary>
-public interface IRawMaterialUnitsHost : IFormPartHost
+public interface IRawMaterialUnitsHost : IUndoRecorder
 {
     /// <summary>The form's type: a packaging material's base unit is its own, an ingredient's the gram.</summary>
     RawMaterialType EditingType { get; }

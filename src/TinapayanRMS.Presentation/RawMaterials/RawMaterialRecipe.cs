@@ -4,12 +4,11 @@ using DynamicData;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Presentation.Shared;
-using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.RawMaterials;
 
-/// <summary>What a made ingredient's recipe asks of its screen, on top of what any part of its form asks.</summary>
-public interface IRawMaterialRecipeHost : IFormPartHost
+/// <summary>What a made ingredient's recipe asks of its draft (RawMaterialDraft), on top of the undo recorder its steps go in.</summary>
+public interface IRawMaterialRecipeHost : IUndoRecorder
 {
     /// <summary>The details showing are the picked material's (RawMaterialForm.AreDetailsReady): the totals wait until they are.</summary>
     bool AreDetailsReady { get; }
@@ -31,7 +30,6 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
 {
     private readonly IRawMaterialRecipeHost _host;
     private readonly IReadOnlyList<RawMaterial> _ingredients;
-    private readonly IRawMaterialQueries _queries;
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
     /// <summary>Each sub-assembly picked or shown, nothing picked first: what reads the recipe's lines (<see cref="SubAssemblies"/>).</summary>
@@ -48,11 +46,10 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
 
     /// <param name="host">The screen, whose Weight Loss % the totals are less, and whose header follows them.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a line prices itself from.</param>
-    public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients, IRawMaterialQueries queries)
+    public RawMaterialRecipe(IRawMaterialRecipeHost host, IReadOnlyList<RawMaterial> ingredients)
     {
         _host = host;
         _ingredients = ingredients;
-        _queries = queries;
 
         StartChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = true, () => IsShowingSubAssemblyBadge);
         CancelChangingSubAssemblyCommand = ScreenCommand.Of(() => IsChangingSubAssembly = false);
@@ -190,16 +187,11 @@ public sealed class RawMaterialRecipe : ObservableState, IDisposable
         SubAssemblyOptions.MergeFrom([.. subAssemblies.Where(s => s.Role is not { IsPackaging: true })], s => s.Id);
 
     /// <summary>
-    /// The recipe's lines: <paramref name="subAssembly"/>'s as it's saved, each priced at the screen's copy of its ingredient,
-    /// as the add-ins are. None for no pick.
+    /// The recipe's lines: the picked sub-assembly's as it's saved, which the form reads, each priced at the screen's copy of
+    /// its ingredient, as the add-ins are. None for no pick.
     /// </summary>
-    public async Task LoadLinesAsync(SubAssembly? subAssembly, CancellationToken cancellationToken)
+    public void ShowLines(IReadOnlyList<SubAssemblyLine> lines)
     {
-        IReadOnlyList<SubAssemblyLine> lines = subAssembly is null
-            ? []
-            : await _queries.ReadSubAssemblyLinesAsync(subAssembly.Id, cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
-
         Lines.Clear();
         Lines.AddRange(lines.Select(l => new IngredientLineRow(_ingredients.FirstOrDefault(m => m.Id == l.IngredientId) ?? l.Ingredient!, l.Grams)));
     }
