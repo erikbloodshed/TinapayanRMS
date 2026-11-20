@@ -62,13 +62,17 @@ does. To check the build the shop will run, install it into a trial folder (`scr
 -InstallFolder <scratch folder> -NoDesktopShortcut -NoStartMenuShortcut`), start that exe with the debugging port as
 `launch` does (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`), and set `TINAPAYANRMS_EXE` to its path for every `driver.ps1` call.
 
-Addresses: `raw-materials`, `sub-assemblies`, `products` (`products/<id>` opens one), `reports`, `price-simulator`,
+Addresses: `raw-materials`, `sub-assemblies`, `products` (each a record view: `products/<id>` opens a record in its tab, or
+the preview tab, and `products/new/<n>` shows a new record's tab), `reports`, `price-simulator`,
 `settings` (`settings/units-of-measure`, `material-categories`, `product-categories`, `roles`,
 `costing-defaults`, `printing`, `keyboard`, `database`). Print has no address: it's a dialog over the screen
 (`.print-dialog.e-popup-open`), opened by a screen's Print button and closed by Escape. Useful selectors: `text=<label>`,
 `button[aria-label='Close']` (the title bar's buttons are named: Find, Lock, Back, Forward, Minimize, Maximize, Close),
 `.activity-item[aria-label='Reports']` (the activity bar's icons, down the left edge, the only way between screens),
-`.tree-row` (a list's rows; folders carry `aria-expanded`, `.tree-expander` opens one), `.e-dialog .e-footer-content
+`.tree-row` (a list's rows; folders carry `aria-expanded`, `.tree-expander` opens one; a record's row is
+`#tree-product-<id>`, `#tree-material-<id>` or `#tree-sub-assembly-<id>`: a click opens the preview tab, a double-click a
+tab that stays), `.record-tab` (a record view's tabs, classed `active`, `preview` and `dirty`; `.record-tab-link` shows
+one, `.record-tab-close` closes it), `.e-dialog .e-footer-content
 button:has-text('No')` (a dialog's button), and the fields' ids (`eval "[...document.querySelectorAll('input[id]')].map(i => i.id)"`).
 
 To find data worth looking at, query the dev database read-only, e.g. the composite products:
@@ -112,7 +116,9 @@ dotnet test --solution TinapayanRMS.slnx
 - **`launch` reuses a copy it started**, and refuses one started without the debugging port (a `dotnet run`, or the user's):
   close that first.
 - **`close` asks, as the user's Close does.** With unsaved changes the window asks Save, Don't Save (No) or Cancel and
-  stays: shot, then click No. Never Yes.
+  stays: shot, then click No. Never Yes. It asks for each record tab with changes, on any screen.
+- **Edits stay in their tab.** Another record, New or another screen asks nothing and leaves an edit where it was: close
+  the tab (`.record-tab.dirty .record-tab-close`) and answer No, so nothing is left to save by accident.
 - **The lists remember which folders were open** between runs, in `%LocalAppData%\TinapayanRMS\Maui\view-state.json`. If
   you close a folder, open it again before you finish: it's the user's view.
 - **Vim keys**: with them on (the title bar shows NORMAL), letters typed while no field has the cursor are commands.
