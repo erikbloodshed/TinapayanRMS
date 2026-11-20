@@ -28,27 +28,31 @@ public class ProductRecipeDraftTests
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-            var start = world.Capture();
 
             foreach (var step in steps)
             {
                 world.Apply(step);
                 world.ShouldHoldItsRules($"after {step}");
-                world.History.IsDirty.Should().Be(!SavesSameAs(start, world.Capture()), $"after {step}, the dirty check says whether Save would write it");
+                world.History.IsDirty.Should().Be(!SavesSameAs(world.Start, world.Capture()), $"after {step}, the dirty check says whether Save would write it");
             }
 
             // Exactly, with no load between the steps; with one, as Save would write it: a step keeps the ingredients it was
             // taken with, so an undo across a load that moved their costs shows those costs until the next load (the build
             // plan's open items).
-            Func<IReadOnlyList<ProductUsageEdit>, IReadOnlyList<ProductUsageEdit>, bool> same = steps.Any(s => s is Load) ? SavesSameAs : ShowsSameAs;
+            Func<IReadOnlyList<ProductUsageEdit>, IReadOnlyList<ProductUsageEdit>, bool> same = steps.Any(s => s is Load or ChangedElsewhere) ? SavesSameAs : ShowsSameAs;
             var end = world.Capture();
             while (world.TryUndo())
             {
             }
 
-            same(world.Capture(), start).Should().BeTrue("undoing every step gives back where it started");
+            same(world.Capture(), world.Start).Should().BeTrue("undoing every step gives back where it started");
             world.History.IsDirty.Should().BeFalse();
-            world.Draft.IsAsSaved(world.Draft.CurrentDraft()).Should().BeTrue("undone back to how it was loaded, Save needn't write it");
+            if (!steps.Any(s => s is ChangedElsewhere(3)))
+            {
+                // Unless the load made a linked section the product's own, which Save then writes as such.
+                world.Draft.IsAsSaved(world.Draft.CurrentDraft()).Should().BeTrue("undone back to how it was loaded, Save needn't write it");
+            }
+
             world.ShouldHoldItsRules("undone");
 
             while (world.TryRedo())
@@ -146,7 +150,13 @@ public class ProductRecipeDraftTests
     /// <summary>The view's load: fresh copies of the ingredients, the roles and the sub-assemblies, the costs moved or not.</summary>
     private sealed record Load(bool CostsChanged) : Step;
 
-    private static readonly string?[] Names = [null, "Ube", "Cheese"];
+    /// <summary>
+    /// A load bringing what was saved elsewhere since: the butter icing's lines changed (0), the ube filling renamed (1) or put
+    /// in the Topping role (2), or the cheese filling's role made product-owned, so this product owns it (3).
+    /// </summary>
+    private sealed record ChangedElsewhere(int Kind) : Step;
+
+    private static readonly string?[] Names = [null, "Ube", "Pandan"];
 
     private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
         Gen.Select(Gen.Int[0, 2], Gen.Int[0, 2], Gen.Int[0, 3], Gen.Int[1, 900], (role, name, ingredient, grams) => (Step)new AddOwn(role, name, ingredient, grams)),
@@ -156,7 +166,8 @@ public class ProductRecipeDraftTests
         Gen.Select(Gen.Int[0, 9], Gen.Int[0, 3], Gen.Int[1, 900], (row, ingredient, grams) => (Step)new EditLines(row, ingredient, grams)),
         Gen.Select(Gen.Int[0, 9], Gen.Bool, Gen.Int[1, 120], (row, yield, value) => (Step)new PieceSize(row, yield, value)),
         Gen.Int[0, 9].Select(row => (Step)new Remove(row)),
-        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)));
+        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)),
+        Gen.Int[0, 3].Select(kind => (Step)new ChangedElsewhere(kind)));
 
     /// <summary>The sections as an undo step keeps them (RecipeSnapshot.Usages), as a class for the undo history.</summary>
     private sealed class Snapshot(IReadOnlyList<ProductUsageEdit> usages)
@@ -173,6 +184,7 @@ public class ProductRecipeDraftTests
     {
         private readonly List<SubAssembly> _kept = [];
         private readonly List<SubAssemblyLine> _keptLines = [];
+        private readonly HashSet<int> _changedElsewhere = [];
         private bool _restoring;
         private int _loads;
 
@@ -190,7 +202,11 @@ public class ProductRecipeDraftTests
                 [.. _keptLines.Where(l => l.SubAssemblyId is 51 or 41)],
                 [new UsageAddInLine { UsageId = 82, IngredientId = 24, Ingredient = Ingredients.First(i => i.Id == 24), Grams = 5m }]);
             History.MarkClean();
+            Start = Capture();
         }
+
+        /// <summary>Where the history started, as it keeps it: rewritten, as every step is, when a load brings what was saved elsewhere.</summary>
+        public IReadOnlyList<ProductUsageEdit> Start { get; private set; }
 
         public ObservableCollection<RawMaterial> Ingredients { get; } = [];
 
@@ -225,12 +241,24 @@ public class ProductRecipeDraftTests
 
         public void Apply(Step step)
         {
-            if (step is Load load)
+            if (step is ProductRecipeDraftTests.Load or ChangedElsewhere)
             {
                 // Not the part's: written as a load writes, recording nothing.
-                Load(load.CostsChanged);
+                if (step is ChangedElsewhere(var kind))
+                {
+                    _changedElsewhere.Add(kind);
+                }
+
+                Load(step is ProductRecipeDraftTests.Load { CostsChanged: true });
                 _restoring = true;
-                Draft.RefreshRows(_kept, _keptLines);
+                if (Draft.RefreshRows(_kept, _keptLines))
+                {
+                    // As the form does (ProductForm.TakeLoad): what came in from where it's kept goes into every step too, so
+                    // an undo never puts back a linked sub-assembly's lines as they were before they were saved there.
+                    History.RewriteAll(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
+                    Start = AsSavedNow(Start);
+                }
+
                 _restoring = false;
                 return;
             }
@@ -278,7 +306,7 @@ public class ProductRecipeDraftTests
                     break;
 
                 // A sub-assembly the recipe doesn't hold yet, linked as the form links one, from its lines as kept.
-                case Link(var index) when _kept.Where(s => s.OwnerProductId is null).ElementAt(index) is var subAssembly && sections.All(u => u.SubAssemblyId != subAssembly.Id):
+                case Link(var index) when _kept.Where(s => s.OwnerProductId is null).ElementAtOrDefault(index) is { } subAssembly && sections.All(u => u.SubAssemblyId != subAssembly.Id):
                     var linkRole = Roles.First(r => r.Id == subAssembly.RoleId);
                     var linked = new ProductUsageEdit(
                         subAssembly.Id, linkRole, [.. KeptLines(subAssembly.Id)], UsageAuthoredField.Yield, 1m,
@@ -303,6 +331,16 @@ public class ProductRecipeDraftTests
                     sections.Remove(usage);
                     break;
             }
+        }
+
+        /// <summary>An undo step's linked sections as the sub-assemblies are kept now (ProductRecipe.WithLinkedAsSavedNow's sections).</summary>
+        private IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages)
+        {
+            var ingredientsById = Ingredients.ToDictionary(i => i.Id);
+            var linesById = _keptLines.ToLookup(l => l.SubAssemblyId);
+            return [.. usages.Select(u => u.IsLinked && _kept.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved && saved.OwnerProductId != ProductId
+                ? Draft.AsSavedNow(u, saved, linesById, ingredientsById)
+                : u)];
         }
 
         private IEnumerable<SectionLine> KeptLines(int subAssemblyId) =>
@@ -341,14 +379,22 @@ public class ProductRecipeDraftTests
             Roles.Add(new SubAssemblyRole { Id = 32, Name = "Filling", SortOrder = 2 });
             Roles.Add(new SubAssemblyRole { Id = 33, Name = "Topping", SortOrder = 3 });
 
+            // What was saved elsewhere since stays saved: each later load reads it too.
+            var ubeMoved = _changedElsewhere.Contains(2);
             _kept.Clear();
             _kept.Add(new SubAssembly { Id = 51, Name = "Ube Loaf Dough", RoleId = 31, Role = Roles[0], OwnerProductId = ProductId });
             _kept.Add(new SubAssembly { Id = 41, Name = "Butter Icing", RoleId = 33, Role = Roles[2] });
-            _kept.Add(new SubAssembly { Id = 42, Name = "Ube Filling", RoleId = 32, Role = Roles[1] });
-            _kept.Add(new SubAssembly { Id = 43, Name = "Cheese Filling", RoleId = 32, Role = Roles[1] });
+            _kept.Add(new SubAssembly
+            {
+                Id = 42, Name = _changedElsewhere.Contains(1) ? "Ube Halaya Filling" : "Ube Filling", RoleId = ubeMoved ? 33 : 32, Role = Roles[ubeMoved ? 2 : 1],
+            });
+            _kept.Add(_changedElsewhere.Contains(3)
+                ? new SubAssembly { Id = 43, Name = "Cheese Filling", RoleId = 32, Role = Roles[1], OwnerProductId = ProductId, SectionName = "Cheese" }
+                : new SubAssembly { Id = 43, Name = "Cheese Filling", RoleId = 32, Role = Roles[1] });
 
             _keptLines.Clear();
-            foreach (var (subAssemblyId, ingredientId, grams) in new[] { (51, 21, 1000m), (51, 22, 120m), (41, 23, 300m), (41, 22, 200m), (42, 22, 150m), (43, 24, 250m) })
+            var icing = _changedElsewhere.Contains(0) ? 350m : 300m;
+            foreach (var (subAssemblyId, ingredientId, grams) in new[] { (51, 21, 1000m), (51, 22, 120m), (41, 23, icing), (41, 22, 200m), (42, 22, 150m), (43, 24, 250m) })
             {
                 _keptLines.Add(new SubAssemblyLine { SubAssemblyId = subAssemblyId, IngredientId = ingredientId, Ingredient = Ingredients.First(i => i.Id == ingredientId), Grams = grams });
             }

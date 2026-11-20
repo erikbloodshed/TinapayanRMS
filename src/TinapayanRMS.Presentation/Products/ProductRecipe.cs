@@ -89,12 +89,10 @@ public sealed class ProductRecipe : ObservableState
         // The blank form shows it from the start, so its tables are there to type into before anything else happens. Picked
         // below, once the form's own tabs are wired up.
         _selectedRecipeTab = PackagingTab;
-        // The draft marks the sections sharing a role as they change, first; the tabs follow, their headers with them.
-        UsageEdits.CollectionChanged += (_, e) =>
-        {
-            MirrorUsageTabs(e);
-            RefreshTabHeaders();
-        };
+        // The tabs follow the sections as they change, before the draft marks the ones sharing a role, and read their
+        // headers again after (ProductRecipeDraft.SectionsChanged, RepeatedRolesMarked).
+        draft.SectionsChanged += MirrorUsageTabs;
+        draft.RepeatedRolesMarked += RefreshTabHeaders;
 
         // A recipe tab shown: leaving one applies its form, and showing one opens its form (RecipeTabShown). The Packaging
         // tab the blank form starts on, now.
