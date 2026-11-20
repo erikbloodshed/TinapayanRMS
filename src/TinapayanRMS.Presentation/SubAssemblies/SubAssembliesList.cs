@@ -6,7 +6,6 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
@@ -57,12 +56,6 @@ public interface ISubAssembliesListHost : IRecordListHost
 
     /// <summary>Whether a form holds the sub-assembly <paramref name="id"/> with changes not saved yet.</summary>
     bool HasUnsavedChangesFor(int id);
-
-    /// <summary>
-    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
-    /// and the time it took it, so the write is refused over a save made since; null when none does.
-    /// </summary>
-    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
 }
 
 /// <summary>
@@ -309,7 +302,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         var ids = moves.Select(m => m.SubAssemblyId).ToList();
-        await _subAssemblyRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
+        await _subAssemblyRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
 
         // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
         await _host.LoadAfterSavingAsync(ids);
@@ -670,7 +663,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     /// </summary>
     private async Task RenameSubAssemblyToAsync(StandaloneSubAssemblyRow row, string name)
     {
-        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.SavedVersionFor([row.Id]), CancellationToken.None);
+        await _subAssemblyRepository.RenameAsync(row.Id, name, _host.SavedVersionsFor([row.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([row.Id]);
         _host.Renamed(row.Id, name);
     }

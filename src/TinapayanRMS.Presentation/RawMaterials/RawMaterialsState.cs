@@ -5,7 +5,6 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
@@ -325,6 +324,4 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
             tab.Form.ForgetCategory(categoryId);
         }
     }
-
-    SavedVersionCheck? IRawMaterialsListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

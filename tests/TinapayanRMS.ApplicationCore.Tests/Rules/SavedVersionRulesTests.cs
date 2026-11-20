@@ -58,17 +58,21 @@ public class SavedVersionRulesTests
         act.Should().Throw<SavedSinceException>();
     }
 
+    // Each form holding a record with unsaved changes sends its check (a record view has a tab for each): a list's write
+    // is checked on every record a form holds, and no other.
     [Test]
-    public void A_list_write_is_checked_on_the_record_the_form_shows_and_no_other()
+    public void A_list_write_is_checked_on_each_record_a_form_holds_with_changes_and_no_other()
     {
-        var showing = new SavedVersionCheck(7, Opened);
+        SavedVersionCheck[] held = [new(7, Opened), new(9, Opened)];
         var savedSince = Opened.AddMinutes(1);
 
-        var onIt = () => SavedVersionRules.EnsureNotSavedSince(showing, 7, "Pandesal", savedSince);
-        var onAnother = () => SavedVersionRules.EnsureNotSavedSince(showing, 8, "Ensaymada", savedSince);
-        var withNothingTyped = () => SavedVersionRules.EnsureNotSavedSince(showing: null, 7, "Pandesal", savedSince);
+        var onOne = () => SavedVersionRules.EnsureNotSavedSince(held, 7, "Pandesal", savedSince);
+        var onTheOther = () => SavedVersionRules.EnsureNotSavedSince(held, 9, "Monay", savedSince);
+        var onAnother = () => SavedVersionRules.EnsureNotSavedSince(held, 8, "Ensaymada", savedSince);
+        var withNothingTyped = () => SavedVersionRules.EnsureNotSavedSince([], 7, "Pandesal", savedSince);
 
-        onIt.Should().Throw<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Pandesal"));
+        onOne.Should().Throw<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Pandesal"));
+        onTheOther.Should().Throw<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Monay"));
         onAnother.Should().NotThrow();
         withNothingTyped.Should().NotThrow();
     }

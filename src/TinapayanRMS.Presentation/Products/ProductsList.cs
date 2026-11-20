@@ -68,12 +68,6 @@ public interface IProductsListHost : IRecordListHost
     /// <summary>A folder of the user's was deleted, what it held moved to <paramref name="parentId"/>: each form's new product filed there goes there too.</summary>
     void FolderDeleted(int folderId, int? parentId);
 
-    /// <summary>
-    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
-    /// and the time it took it, so the write is refused over a save made since; null when none does.
-    /// </summary>
-    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
-
     /// <summary>Clones <paramref name="product"/> as saved under <paramref name="name"/>, as the Clone tab does, and opens the clone.</summary>
     Task CloneAsync(Product product, string name);
 
@@ -514,7 +508,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         List<int> ids = [.. moves.Select(m => m.ProductId)];
-        await _productRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
+        await _productRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
         await ShowMovedAsync(ids, picked);
 
         _moveUndo = isUndo ? null : new MoveUndo.Products(undo, []);
@@ -539,7 +533,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         List<int> ids = [.. products.Select(p => p.Id)];
-        var moved = await _productRepository.MoveToStageAsync(ids, request.Stage, _host.SavedVersionFor(ids), CancellationToken.None);
+        var moved = await _productRepository.MoveToStageAsync(ids, request.Stage, _host.SavedVersionsFor(ids), CancellationToken.None);
         // Read again whether or not this move made any: the folder it found may be one another computer made.
         _host.Folders = await _folderRepository.GetAllAsync(CancellationToken.None);
         await ShowMovedAsync([.. products.Select(p => p.Id)], picked);
@@ -593,7 +587,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
         var back = new ProductFolderMove(folder.Id, folder.Stage, folder.ParentId);
         var picked = SelectedTreeNodes.ToList();
-        var restaged = await _folderRepository.MoveAsync(move, _host.ShowingSavedVersion, CancellationToken.None);
+        var restaged = await _folderRepository.MoveAsync(move, _host.SavedVersionsFor(null), CancellationToken.None);
         await _host.LoadAfterSavingAsync(restaged);
         if (ProductTree.Folder(folder.Id) is { ParentFolder: { } parent })
         {
@@ -1178,7 +1172,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameProductToAsync(ProductLeafNode leaf, string name)
     {
         var product = leaf.Product;
-        await _productRepository.RenameAsync(product.Id, name, _host.SavedVersionFor([product.Id]), CancellationToken.None);
+        await _productRepository.RenameAsync(product.Id, name, _host.SavedVersionsFor([product.Id]), CancellationToken.None);
 
         // What's named after it follows: its own sub-assemblies, as other products' pickers list them.
         await _host.LoadAfterSavingAsync([product.Id]);

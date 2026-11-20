@@ -262,15 +262,6 @@ public abstract class RecordViewState<TForm> : ScreenState, IOpenForms, IRecordS
         ViewList?.SyncTreeSelection();
     }
 
-    /// <summary>
-    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
-    /// and the time it took it, so the write is refused over a save made since; null when none does.
-    /// </summary>
-    protected SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids) =>
-        ids.Select(id => Tabs.Holding(id)).OfType<RecordTab<TForm>>()
-            .Select(tab => (tab.Form as IRecordListHost)?.ShowingSavedVersion)
-            .FirstOrDefault(check => check is not null);
-
     /// <summary>Runs <paramref name="merge"/> within each of <paramref name="forms"/>' own refresh, one inside another, so nothing the view's load writes is taken for an edit.</summary>
     protected static void RefreshingEach(IReadOnlyList<TForm> forms, Action merge) => RefreshingEach(forms, merge, 0);
 
@@ -327,7 +318,12 @@ public abstract class RecordViewState<TForm> : ScreenState, IOpenForms, IRecordS
         return Task.CompletedTask;
     }
 
-    SavedVersionCheck? IRecordListHost.ShowingSavedVersion => (Form as IRecordListHost)?.ShowingSavedVersion;
+    // Every tab's check for the records a write takes: a move of several can take records two tabs hold with changes.
+    IReadOnlyList<SavedVersionCheck> IRecordListHost.SavedVersionsFor(IEnumerable<int>? ids)
+    {
+        var wanted = ids?.ToHashSet();
+        return [.. Tabs.All.SelectMany(tab => (tab.Form as IRecordListHost)?.SavedVersionsFor(wanted) ?? [])];
+    }
 
     // The list saved these records itself (a rename, a move): each form holding one takes its new saved time at the load.
     Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)

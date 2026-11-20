@@ -52,9 +52,9 @@ public sealed class ProductFolderRepository(IDbContextFactory<TinapayanRMSDbCont
     }
 
     public Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, CancellationToken cancellationToken) =>
-        MoveAsync(move, showing: null, cancellationToken);
+        MoveAsync(move, [], cancellationToken);
 
-    public async Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, SavedVersionCheck? showing, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
@@ -91,10 +91,15 @@ public sealed class ProductFolderRepository(IDbContextFactory<TinapayanRMSDbCont
                 .OrderBy(p => p.Id)
                 .Select(p => p.Id)
                 .ToListAsync(cancellationToken);
-            if (showing is { } check && restaged.Contains(check.RecordId))
+            // Each product restaged that a tab holds with unsaved changes, against that tab's check.
+            var held = checks.Select(c => c.RecordId).Where(restaged.Contains).ToList();
+            if (held.Count > 0)
             {
-                var stored = await dbContext.Products.Where(p => p.Id == check.RecordId).Select(p => new { p.Name, p.UpdatedAt }).SingleAsync(cancellationToken);
-                SavedVersionRules.EnsureNotSavedSince(showing, check.RecordId, stored.Name, stored.UpdatedAt);
+                var stored = await dbContext.Products.Where(p => held.Contains(p.Id)).Select(p => new { p.Id, p.Name, p.UpdatedAt }).ToListAsync(cancellationToken);
+                foreach (var product in stored)
+                {
+                    SavedVersionRules.EnsureNotSavedSince(checks, product.Id, product.Name, product.UpdatedAt);
+                }
             }
 
             var now = dbContext.LocalNow();

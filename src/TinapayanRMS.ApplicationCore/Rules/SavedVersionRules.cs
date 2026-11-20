@@ -38,14 +38,18 @@ public static class SavedVersionRules
     }
 
     /// <summary>
-    /// A rename or a move from a list, of the record <paramref name="id"/>: refused as the form's Save would be when it's
-    /// the record the form shows with unsaved changes (<paramref name="showing"/>). Any other record isn't checked.
+    /// A rename or a move from a list, of the record <paramref name="id"/>: refused as the form's Save would be when a form
+    /// holds it with unsaved changes (its check among <paramref name="checks"/>, one from each tab holding one of the
+    /// records the write takes). A record no form holds with changes isn't checked.
     /// </summary>
-    public static void EnsureNotSavedSince(SavedVersionCheck? showing, int id, string name, DateTime? storedSavedAt)
+    public static void EnsureNotSavedSince(IReadOnlyCollection<SavedVersionCheck> checks, int id, string name, DateTime? storedSavedAt)
     {
-        if (showing is not null && showing.RecordId == id)
+        foreach (var check in checks)
         {
-            EnsureNotSavedSince(name, storedSavedAt, showing.OpenedSavedAt);
+            if (check.RecordId == id)
+            {
+                EnsureNotSavedSince(name, storedSavedAt, check.OpenedSavedAt);
+            }
         }
     }
 

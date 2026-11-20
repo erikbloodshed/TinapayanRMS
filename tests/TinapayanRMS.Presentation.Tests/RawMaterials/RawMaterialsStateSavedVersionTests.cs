@@ -178,6 +178,32 @@ public class RawMaterialsStateSavedVersionTests(DatabaseFixture fixture) : Persi
         (await dbContext.RawMaterials.SingleAsync(m => m.Id == id, Cancellation)).CategoryId.Should().NotBe(flourId);
     });
 
+    // A tab for each material open: a move of two materials, each typed into in its own tab, checks both, so a save from
+    // another PC of the one in the tab behind refuses the move, though the tab showing holds the other.
+    [Test]
+    public Task A_move_of_materials_two_tabs_hold_with_changes_is_refused_over_a_save_of_the_one_not_showing() => UiThread.RunAsync(async () =>
+    {
+        var id = await SaveMaterialAsync("Bread Flour");
+        var otherId = await SaveMaterialAsync("Cake Flour");
+        var flourId = await AddCategoryAsync("Flours");
+        var behind = await OpenedStateAsync(id);
+        TypeBuffer(behind, 5m);
+        var view = behind.View;
+        view.OpenRecord(otherId);
+        var showing = view.Form!;
+        showing.Should().NotBeSameAs(behind, "the first tab holds changes, so the second material opens in a tab of its own");
+        await ShowingAsync(showing, otherId);
+        TypeBuffer(showing, 6m);
+
+        await AnotherPcRenamesAsync(id, "Strong Flour");
+        await view.List.MoveMaterialsCommand.ExecuteAsync([new RawMaterialMove(otherId, flourId), new RawMaterialMove(id, flourId)]);
+
+        showing.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Strong Flour"), "the list's work runs as the tab showing");
+        await using var dbContext = CreateDbContext();
+        (await dbContext.RawMaterials.Where(m => m.Id == id || m.Id == otherId).Select(m => m.CategoryId).ToListAsync(Cancellation))
+            .Should().NotContain(flourId, "a move refused moves nothing");
+    });
+
     [Test]
     public Task Moving_another_material_from_the_list_doesnt_let_what_is_typed_over_a_save_from_another_pc() => UiThread.RunAsync(async () =>
     {

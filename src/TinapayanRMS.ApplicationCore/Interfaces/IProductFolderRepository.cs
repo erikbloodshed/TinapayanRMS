@@ -37,8 +37,8 @@ public interface IProductFolderRepository
     /// </summary>
     Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, CancellationToken cancellationToken);
 
-    /// <summary>The same from the Products list: refused, with nothing moved, when it would change the stage of a product saved since the form showing opened it (<paramref name="showing"/>).</summary>
-    Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, SavedVersionCheck? showing, CancellationToken cancellationToken);
+    /// <summary>The same from the Products list: refused, with nothing moved, when it would change the stage of a product saved since a tab holding it with unsaved changes opened it (its check among <paramref name="checks"/>).</summary>
+    Task<IReadOnlyList<int>> MoveAsync(ProductFolderMove move, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the folder and nothing in it: its products (deleted ones too) and folders go up into the folder it was in,

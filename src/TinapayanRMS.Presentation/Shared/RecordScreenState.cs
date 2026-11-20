@@ -384,8 +384,10 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
 
     Task IRecordListHost.AfterUnsavedChangesAsync(Action then) => AfterUnsavedChangesAsync(then);
 
-    SavedVersionCheck? IRecordListHost.ShowingSavedVersion =>
-        ShowingRecordId != 0 && History.IsDirty ? new SavedVersionCheck(ShowingRecordId, SavedVersionRules.OpenedAs(SavedVersion)) : null;
+    IReadOnlyList<SavedVersionCheck> IRecordListHost.SavedVersionsFor(IEnumerable<int>? ids) =>
+        ShowingRecordId != 0 && History.IsDirty && (ids is null || ids.Contains(ShowingRecordId))
+            ? [new SavedVersionCheck(ShowingRecordId, SavedVersionRules.OpenedAs(SavedVersion))]
+            : [];
 
     Task IRecordListHost.LoadAfterSavingAsync(IEnumerable<int> ids)
     {

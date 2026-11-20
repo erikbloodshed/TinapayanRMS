@@ -6,7 +6,6 @@ using DynamicData;
 using DynamicData.Binding;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -683,6 +682,4 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     Task IProductsListHost.ApplyCostingDefaultsAsync(IReadOnlyList<Product> products) => ApplyCostingDefaultsAsync(products);
 
     void IProductsListHost.Print(PrintScope scope) => _printRequests.OnNext(scope);
-
-    SavedVersionCheck? IProductsListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

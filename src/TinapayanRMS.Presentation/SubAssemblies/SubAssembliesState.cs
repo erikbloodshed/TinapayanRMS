@@ -3,7 +3,6 @@ using System.Reactive.Disposables;
 using System.Reactive.Subjects;
 using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing.Versions;
@@ -267,6 +266,4 @@ public sealed class SubAssembliesState : RecordViewState<SubAssemblyForm>, ISubA
     }
 
     bool ISubAssembliesListHost.HasUnsavedChangesFor(int id) => Tabs.Holding(id)?.Form.HasUnsavedChanges == true;
-
-    SavedVersionCheck? ISubAssembliesListHost.SavedVersionFor(IEnumerable<int> ids) => SavedVersionFor(ids);
 }

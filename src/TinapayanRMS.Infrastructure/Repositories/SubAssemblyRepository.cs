@@ -207,9 +207,9 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
     }
 
     public Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, CancellationToken cancellationToken) =>
-        MoveAsync(moves, showing: null, cancellationToken);
+        MoveAsync(moves, [], cancellationToken);
 
-    public async Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken)
+    public async Task MoveAsync(IReadOnlyCollection<SubAssemblyMove> moves, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         if (moves.Count == 0)
         {
@@ -223,7 +223,7 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
         // into the same role are checked against each other.
         foreach (var move in moves)
         {
-            await RestageAsync(dbContext, move.SubAssemblyId, name: null, move.RoleId, showing, cancellationToken);
+            await RestageAsync(dbContext, move.SubAssemblyId, name: null, move.RoleId, checks, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -231,26 +231,26 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
     }
 
     public Task RenameAsync(int id, string name, CancellationToken cancellationToken) =>
-        RenameAsync(id, name, showing: null, cancellationToken);
+        RenameAsync(id, name, [], cancellationToken);
 
-    public async Task RenameAsync(int id, string name, SavedVersionCheck? showing, CancellationToken cancellationToken)
+    public async Task RenameAsync(int id, string name, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // One turn for the check and the write, so no save lands between them.
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
-        await RestageAsync(dbContext, id, name, roleId: null, showing, cancellationToken);
+        await RestageAsync(dbContext, id, name, roleId: null, checks, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>
     /// A saved sub-assembly with a new name or role and everything else as it is, through every check a Save of the form
-    /// makes (StageStandaloneAsync), not yet saved: <paramref name="showing"/>, when it's the one the form shows, says when
-    /// the form opened it, as the form's own Save does.
+    /// makes (StageStandaloneAsync), not yet saved: its check among <paramref name="checks"/>, when a tab holds it with
+    /// unsaved changes, says when that form opened it, as the form's own Save does.
     /// </summary>
     private static async Task RestageAsync(
-        TinapayanRMSDbContext dbContext, int id, string? name, int? roleId, SavedVersionCheck? showing, CancellationToken cancellationToken)
+        TinapayanRMSDbContext dbContext, int id, string? name, int? roleId, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         var stored = await dbContext.SubAssemblies
             .Where(s => s.Id == id)
@@ -265,7 +265,7 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
                 Id = id,
                 Name = name ?? stored.Name,
                 RoleId = roleId ?? stored.RoleId,
-                UpdatedAt = showing?.RecordId == id ? showing.OpenedSavedAt : null,
+                UpdatedAt = checks.FirstOrDefault(c => c.RecordId == id)?.OpenedSavedAt,
             },
             stored.IsPackaging,
             cancellationToken);

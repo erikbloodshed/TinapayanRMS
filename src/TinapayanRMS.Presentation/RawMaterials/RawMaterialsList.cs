@@ -57,12 +57,6 @@ public interface IRawMaterialsListHost : IRecordListHost
 
     /// <summary>A category was deleted: every form's undo steps forget it, so none puts back a category there's no longer any of.</summary>
     void CategoryDeleted(int categoryId);
-
-    /// <summary>
-    /// What a rename or a move of <paramref name="ids"/> sends with its write: a form holding one of them with unsaved changes,
-    /// and the time it took it, so the write is refused over a save made since; null when none does.
-    /// </summary>
-    SavedVersionCheck? SavedVersionFor(IEnumerable<int> ids);
 }
 
 /// <summary>
@@ -300,7 +294,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         var picked = SelectedTreeNodes.ToList();
 
         var ids = moves.Select(m => m.RawMaterialId).ToList();
-        await _rawMaterialRepository.MoveAsync(moves, _host.SavedVersionFor(ids), CancellationToken.None);
+        await _rawMaterialRepository.MoveAsync(moves, _host.SavedVersionsFor(ids), CancellationToken.None);
 
         // The load only re-points each form's selection at the fresh copy: with something typed, a form isn't loaded again.
         await _host.LoadAfterSavingAsync(ids);
@@ -651,7 +645,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     private async Task RenameMaterialToAsync(RawMaterialLeafNode leaf, string name)
     {
         var material = leaf.RawMaterial;
-        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.SavedVersionFor([material.Id]), CancellationToken.None);
+        await _rawMaterialRepository.RenameAsync(material.Id, name, _host.SavedVersionsFor([material.Id]), CancellationToken.None);
         await _host.LoadAfterSavingAsync([material.Id]);
         _host.Renamed(material.Id, name);
     }

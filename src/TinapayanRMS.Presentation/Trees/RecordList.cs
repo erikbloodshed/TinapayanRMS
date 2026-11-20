@@ -22,11 +22,12 @@ public interface IRecordListHost : IFormPartHost
     Task AfterUnsavedChangesAsync(Action then);
 
     /// <summary>
-    /// What a rename or a move from the list sends with its write: the record the form shows and the time the form took, while
-    /// it holds unsaved changes, so the write is refused over a save made since. Null with nothing typed, as there's nothing to
-    /// lose: the form then loads what's saved.
+    /// What a rename or a move from the list sends with its write: for each form holding one of the records
+    /// <paramref name="ids"/> (any record, with null: a folder's move, whose products aren't known before it) with unsaved
+    /// changes, its record and the time it took it, so the write is refused over a save made since. None for a form with
+    /// nothing typed, as there's nothing to lose: it then loads what's saved.
     /// </summary>
-    SavedVersionCheck? ShowingSavedVersion { get; }
+    IReadOnlyList<SavedVersionCheck> SavedVersionsFor(IEnumerable<int>? ids);
 
     /// <summary>
     /// The screen's load after the list has saved the records <paramref name="ids"/> itself: the record showing, if it's one of

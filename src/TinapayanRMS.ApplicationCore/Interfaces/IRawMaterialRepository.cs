@@ -55,14 +55,14 @@ public interface IRawMaterialRepository
     /// </summary>
     Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, CancellationToken cancellationToken);
 
-    /// <summary>The same from the Raw Materials list: refused, with nothing moved, over a save made since the form showing opened its material (<paramref name="showing"/>).</summary>
-    Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken);
+    /// <summary>The same from the Raw Materials list: refused, with nothing moved, over a save made since a tab holding one of its materials with unsaved changes opened it (<paramref name="checks"/>, one a tab).</summary>
+    Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken);
 
     /// <summary>Renames the material and nothing else, stamping UpdatedAt.</summary>
     Task RenameAsync(int id, string name, CancellationToken cancellationToken);
 
-    /// <summary>The same from the Raw Materials list: refused over a save made since the form showing opened the material (<paramref name="showing"/>).</summary>
-    Task RenameAsync(int id, string name, SavedVersionCheck? showing, CancellationToken cancellationToken);
+    /// <summary>The same from the Raw Materials list: refused over a save made since a tab holding the material with unsaved changes opened it (<paramref name="checks"/>).</summary>
+    Task RenameAsync(int id, string name, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken);
 
     /// <summary>
     /// Saves everything the Raw Materials screen edits in one transaction, so nothing is saved unless

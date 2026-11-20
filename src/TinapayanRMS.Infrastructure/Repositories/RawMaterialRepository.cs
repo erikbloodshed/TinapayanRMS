@@ -195,9 +195,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     }
 
     public Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, CancellationToken cancellationToken) =>
-        MoveAsync(moves, showing: null, cancellationToken);
+        MoveAsync(moves, [], cancellationToken);
 
-    public async Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, SavedVersionCheck? showing, CancellationToken cancellationToken)
+    public async Task MoveAsync(IReadOnlyCollection<RawMaterialMove> moves, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         if (moves.Count == 0)
         {
@@ -231,7 +231,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         {
             var material = materials[move.RawMaterialId];
             var category = categories[move.CategoryId];
-            SavedVersionRules.EnsureNotSavedSince(showing, material.Id, material.Name, material.UpdatedAt);
+            SavedVersionRules.EnsureNotSavedSince(checks, material.Id, material.Name, material.UpdatedAt);
             RawMaterialRules.EnsureCategoryMatchesType(material.Type, material.Source, category.Type, category.Name);
             material.CategoryId = move.CategoryId;
             material.UpdatedAt = now;
@@ -242,9 +242,9 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     }
 
     public Task RenameAsync(int id, string name, CancellationToken cancellationToken) =>
-        RenameAsync(id, name, showing: null, cancellationToken);
+        RenameAsync(id, name, [], cancellationToken);
 
-    public async Task RenameAsync(int id, string name, SavedVersionCheck? showing, CancellationToken cancellationToken)
+    public async Task RenameAsync(int id, string name, IReadOnlyCollection<SavedVersionCheck> checks, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
@@ -252,7 +252,7 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
         var existing = await dbContext.RawMaterials.FirstOrDefaultAsync(m => m.Id == id, cancellationToken)
             ?? throw new BusinessRuleException($"Raw material {id} does not exist.");
-        SavedVersionRules.EnsureNotSavedSince(showing, id, existing.Name, existing.UpdatedAt);
+        SavedVersionRules.EnsureNotSavedSince(checks, id, existing.Name, existing.UpdatedAt);
 
         existing.Name = RawMaterialRules.StoredName(name);
         existing.UpdatedAt = dbContext.LocalNow();

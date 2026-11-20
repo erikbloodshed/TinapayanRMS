@@ -212,7 +212,7 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
     {
         var id = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation });
         var otherId = await SaveAsync(new Product { Name = "Ensaymada", Stage = ProductStage.Innovation });
-        var showing = new SavedVersionCheck(id, (await ProductAsync(id)).UpdatedAt!.Value);
+        SavedVersionCheck[] showing = [new(id, (await ProductAsync(id)).UpdatedAt!.Value)];
 
         AMinuteLater();
         var theirs = await ProductAsync(id);
@@ -233,8 +233,34 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
 
         // Another product isn't checked, and the one showing is once the form has the time it's saved at.
         await Products.RenameAsync(otherId, "Ensaymada Especial", showing, Cancellation);
-        await Products.RenameAsync(id, "Mamon Tostado", new SavedVersionCheck(id, stored.UpdatedAt!.Value), Cancellation);
+        await Products.RenameAsync(id, "Mamon Tostado", [new SavedVersionCheck(id, stored.UpdatedAt!.Value)], Cancellation);
         (await ProductAsync(id)).Name.Should().Be("Mamon Tostado");
+    }
+
+    // A record view has a tab for each product open: a move of several sends each tab's check, and one product saved
+    // elsewhere since its tab took it refuses the whole move, though another tab's product is the one picked first.
+    [Test]
+    public async Task A_move_of_products_two_tabs_hold_with_changes_is_refused_over_a_save_of_either()
+    {
+        var firstId = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation });
+        var secondId = await SaveAsync(new Product { Name = "Ensaymada", Stage = ProductStage.Innovation });
+        SavedVersionCheck[] tabs =
+        [
+            new(firstId, (await ProductAsync(firstId)).UpdatedAt!.Value),
+            new(secondId, (await ProductAsync(secondId)).UpdatedAt!.Value),
+        ];
+
+        AMinuteLater();
+        var theirs = await ProductAsync(secondId);
+        theirs.Description = "Saved on the other PC";
+        await SaveAsync(theirs);
+
+        var move = () => Products.MoveAsync(
+            [new ProductMove(firstId, ProductStage.Production, null), new ProductMove(secondId, ProductStage.Production, null)], tabs, Cancellation);
+
+        await move.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Ensaymada"));
+        (await ProductAsync(firstId)).Stage.Should().Be(ProductStage.Innovation, "a move refused moves nothing");
+        (await ProductAsync(secondId)).Stage.Should().Be(ProductStage.Innovation);
     }
 
     [Test]
@@ -244,7 +270,7 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
         var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
         await folders.AddAsync(folder, Cancellation);
         var id = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation, FolderId = folder.Id });
-        var showing = new SavedVersionCheck(id, (await ProductAsync(id)).UpdatedAt!.Value);
+        SavedVersionCheck[] showing = [new(id, (await ProductAsync(id)).UpdatedAt!.Value)];
 
         AMinuteLater();
         var theirs = await ProductAsync(id);
@@ -257,13 +283,43 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
         (await ProductAsync(id)).Stage.Should().Be(ProductStage.Innovation);
     }
 
+    // A folder's move takes every tab's check, as its products aren't known before it: each it restages is checked against
+    // its own tab's, so a save from another PC of any of them refuses it.
+    [Test]
+    public async Task A_folder_moved_to_the_other_stage_is_refused_over_a_save_of_any_product_a_tab_holds_in_it()
+    {
+        var folders = new ProductFolderRepository(CreateDbContextFactory(_clock));
+        var folder = new ProductFolder { Name = "Breads", Stage = ProductStage.Innovation };
+        await folders.AddAsync(folder, Cancellation);
+        var firstId = await SaveAsync(new Product { Name = "Mamon", Stage = ProductStage.Innovation, FolderId = folder.Id });
+        var secondId = await SaveAsync(new Product { Name = "Ensaymada", Stage = ProductStage.Innovation, FolderId = folder.Id });
+        var elsewhereId = await SaveAsync(new Product { Name = "Pandesal", Stage = ProductStage.Innovation });
+        SavedVersionCheck[] tabs =
+        [
+            new(elsewhereId, (await ProductAsync(elsewhereId)).UpdatedAt!.Value),
+            new(firstId, (await ProductAsync(firstId)).UpdatedAt!.Value),
+            new(secondId, (await ProductAsync(secondId)).UpdatedAt!.Value),
+        ];
+
+        AMinuteLater();
+        var theirs = await ProductAsync(secondId);
+        theirs.Description = "Saved on the other PC";
+        await SaveAsync(theirs);
+
+        var act = () => folders.MoveAsync(new ProductFolderMove(folder.Id, ProductStage.Production, null), tabs, Cancellation);
+
+        await act.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Ensaymada"));
+        (await ProductAsync(firstId)).Stage.Should().Be(ProductStage.Innovation);
+        (await ProductAsync(secondId)).Stage.Should().Be(ProductStage.Innovation);
+    }
+
     [Test]
     public async Task A_raw_materials_rename_and_move_from_the_list_are_refused_over_a_save_made_since_the_form_opened_it()
     {
         var id = await AddIngredientAsync("Flour", 0.05m);
         await SaveAsync(await RawMaterialAsync(id));
         var opened = await RawMaterialAsync(id);
-        var showing = new SavedVersionCheck(id, opened.UpdatedAt!.Value);
+        SavedVersionCheck[] showing = [new(id, opened.UpdatedAt!.Value)];
         int categoryId;
         await using (var dbContext = CreateDbContext())
         {
@@ -293,7 +349,7 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
     {
         var (id, flourId) = await AddDoughAsync();
         var opened = await SubAssemblyAsync(id);
-        var showing = new SavedVersionCheck(id, opened.UpdatedAt!.Value);
+        SavedVersionCheck[] showing = [new(id, opened.UpdatedAt!.Value)];
         var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
 
         AMinuteLater();
