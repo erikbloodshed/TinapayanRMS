@@ -62,7 +62,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
         // The draft's fields are the tab's to the page, under the same names; a row picked that leaves its table, however it
         // went (removed, the table shown afresh, an undo), is picked no longer.
-        draft.PropertyChanged += (_, e) => RaisePropertyChanged(e.PropertyName);
+        draft.PropertyChanged += DraftChanged;
         draft.LineEdits.CollectionChanged += LinesChanged;
         draft.BulkEdits.CollectionChanged += BulkLinesChanged;
 
@@ -351,6 +351,8 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         });
     }
 
+    private void DraftChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => RaisePropertyChanged(e.PropertyName);
+
     private void LinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (SelectedLineEdit is { } picked && !Draft.LineEdits.Contains(picked))
@@ -369,6 +371,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
     public void Dispose()
     {
+        Draft.PropertyChanged -= DraftChanged;
         Draft.LineEdits.CollectionChanged -= LinesChanged;
         Draft.BulkEdits.CollectionChanged -= BulkLinesChanged;
         _pickedSources.Dispose();

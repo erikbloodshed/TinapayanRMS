@@ -41,14 +41,7 @@ public sealed class ProductComponents : ObservableState, IDisposable
 
         // The draft's fields are the tab's to the page, under the same names; a line picked that leaves the table, however
         // it went (removed, the composite shown afresh, an undo), is picked no longer; a cost a line wants is read.
-        draft.PropertyChanged += (_, e) =>
-        {
-            RaisePropertyChanged(e.PropertyName);
-            if (e.PropertyName == nameof(ProductComponentsDraft.IncludesPackaging))
-            {
-                RaisePropertyChanged(nameof(IsPackagingTicked));
-            }
-        };
+        draft.PropertyChanged += DraftChanged;
         draft.ComponentEdits.CollectionChanged += LinesChanged;
         draft.CostWanted += ReadCost;
 
@@ -134,6 +127,8 @@ public sealed class ProductComponents : ObservableState, IDisposable
 
     private async Task FetchCostsAsync(IReadOnlyList<int> productIds)
     {
+        // The load the costs held came with: one since makes what's read here stale (TakeCosts).
+        var generation = Draft.Generation;
         IReadOnlyDictionary<int, ComponentCosts> costs = new Dictionary<int, ComponentCosts>();
         try
         {
@@ -153,7 +148,20 @@ public sealed class ProductComponents : ObservableState, IDisposable
             }
         }
 
-        Draft.TakeCosts(costs);
+        if (!Draft.TakeCosts(costs, generation))
+        {
+            // A load came while it read: what the lines still hold and the load didn't bring is read again.
+            ReadMissingCosts();
+        }
+    }
+
+    private void DraftChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        RaisePropertyChanged(e.PropertyName);
+        if (e.PropertyName == nameof(ProductComponentsDraft.IncludesPackaging))
+        {
+            RaisePropertyChanged(nameof(IsPackagingTicked));
+        }
     }
 
     private void LinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -166,6 +174,7 @@ public sealed class ProductComponents : ObservableState, IDisposable
 
     public void Dispose()
     {
+        Draft.PropertyChanged -= DraftChanged;
         Draft.ComponentEdits.CollectionChanged -= LinesChanged;
         Draft.CostWanted -= ReadCost;
     }

@@ -144,6 +144,41 @@ public class ProductComponentsDraftTests
         pandesal.RecipeCost.Should().Be(world.CostsOf(102).RecipeBuffered, "the cost read before the load is gone with the line, and read again as it's picked");
     }
 
+    [Test]
+    public void A_cost_read_that_a_load_overtook_is_let_go()
+    {
+        var world = new World();
+        world.Apply(new AddLine(Product: 2, Quantity: 1));
+        var line = world.Draft.ComponentEdits[^1];
+        var readBefore = world.Draft.Generation;
+        var costBefore = world.CostsOf(103);
+
+        // The load brings Ube Roll's cost as it is now, moved; then the read started before it lands.
+        world.Apply(new Load(CostsChanged: true));
+        world.Draft.TakeCosts(new Dictionary<int, ComponentCosts> { [103] = costBefore }, readBefore).Should().BeFalse();
+
+        line.RecipeCost.Should().Be(world.CostsOf(103).RecipeBuffered, "the load's cost stands");
+    }
+
+    [Test]
+    public void The_add_row_keeps_its_cost_through_a_load_and_wants_it_read_again()
+    {
+        var world = new World();
+        var adding = world.Draft.NewRow();
+        adding.ComponentProductId = 103;
+        world.Apply(new CostsArrive());
+        var shown = adding.RecipeCost;
+        shown.Should().NotBeNull();
+
+        world.Apply(new Load(CostsChanged: true));
+        world.Draft.Reprice();
+
+        adding.RecipeCost.Should().Be(shown, "nothing it shows goes blank while it's typed");
+        world.Wanted.Should().Contain(103, "its cost went with the load, so it's read again");
+        world.Apply(new CostsArrive());
+        adding.RecipeCost.Should().Be(world.CostsOf(103).RecipeBuffered);
+    }
+
     private const int CompositeId = 100;
 
     /// <summary>One thing a user does to the table, as one undo step, or something that arrives between them.</summary>
@@ -245,7 +280,7 @@ public class ProductComponentsDraftTests
                 case CostsArrive:
                     var arrived = Wanted.ToDictionary(id => id, id => _costs[id]);
                     Wanted.Clear();
-                    Unrecorded(() => Draft.TakeCosts(arrived));
+                    Unrecorded(() => Draft.TakeCosts(arrived, Draft.Generation));
                     return;
             }
 

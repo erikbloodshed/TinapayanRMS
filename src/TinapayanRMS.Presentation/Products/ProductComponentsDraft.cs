@@ -39,6 +39,8 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
     /// <summary>Every composite's lines as saved, without their products: which composites hold which products, for the picker.</summary>
     private IReadOnlyList<ProductComponent> _links = [];
 
+    private int _generation;
+
     private ProductComponentRow? _addingRow;
 
     /// <param name="host">The form: the cost basis what each product brings is priced at.</param>
@@ -127,6 +129,12 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
     /// <summary>The products the lines hold, each once.</summary>
     public IReadOnlyList<int> ProductIds => [.. ComponentEdits.Select(r => r.ComponentProductId).OfType<int>().Distinct()];
 
+    /// <summary>
+    /// Which load the costs held came with, counted up by each (<see cref="TakeFresh"/>) and each composite cleared: a read
+    /// the tab starts takes it, and hands it back with what it read (<see cref="TakeCosts"/>), which a load since makes stale.
+    /// </summary>
+    public int Generation => _generation;
+
     /// <summary>The products the lines hold whose costs haven't been read: what the tab reads after a pick or an undo.</summary>
     public IReadOnlyList<int> MissingCosts => [.. ProductIds.Where(id => !_costs.ContainsKey(id))];
 
@@ -159,6 +167,7 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
     {
         ComponentEdits.Clear();
         _costs.Clear();
+        _generation++;
     }
 
     /// <summary>The lines as an undo step keeps them.</summary>
@@ -188,8 +197,10 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
     public void TakeFresh(IReadOnlyDictionary<int, ComponentCosts> costs, IReadOnlyList<ProductComponent> links)
     {
         _links = links;
+        _generation++;
+
         // The lines' products alone: the add row is the last one made, typed in or committed and taken out since. One still
-        // being typed keeps the cost it has, and is read again as it's committed (the form's ComponentsEdited).
+        // being typed keeps the cost it has, and wants it read again as it's next priced (Reprice).
         var held = ProductIds.ToHashSet();
         foreach (var stale in _costs.Keys.Where(id => !held.Contains(id)).ToList())
         {
@@ -204,15 +215,26 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
         ResolveRows();
     }
 
-    /// <summary>What products brings, read since they were wanted: the lines, and the add row, priced with them.</summary>
-    public void TakeCosts(IReadOnlyDictionary<int, ComponentCosts> costs)
+    /// <summary>
+    /// What products bring, read since they were wanted while the costs held came with <paramref name="generation"/>: the
+    /// lines, and the add row, priced with them. A read a load overtook (<see cref="Generation"/> moved on) is let go, as
+    /// the load brought fresher costs, or dropped the product's: false then, and what's still missing is the tab's to read
+    /// again.
+    /// </summary>
+    public bool TakeCosts(IReadOnlyDictionary<int, ComponentCosts> costs, int generation)
     {
+        if (generation != _generation)
+        {
+            return false;
+        }
+
         foreach (var (productId, cost) in costs)
         {
             _costs[productId] = cost;
         }
 
         Reprice();
+        return true;
     }
 
     /// <summary>
@@ -237,9 +259,19 @@ public sealed class ProductComponentsDraft : ObservableState, IDisposable
     {
         var products = ProductsById();
         ProductComponentRow.Resolve(ComponentEdits, products, CostsAtBasis());
+
+        // The add row, unless its product's cost went with a load: it keeps the one it shows, and wants it read again, as
+        // nothing else would read it before it's committed.
         if (_addingRow is { } adding)
         {
-            ProductComponentRow.Resolve([adding], products, CostsAtBasis());
+            if (adding.ComponentProductId is { } id && !_costs.ContainsKey(id))
+            {
+                CostWanted?.Invoke(id);
+            }
+            else
+            {
+                ProductComponentRow.Resolve([adding], products, CostsAtBasis());
+            }
         }
     }
 
