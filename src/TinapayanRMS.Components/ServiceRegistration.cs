@@ -19,6 +19,7 @@ using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.UseCases.Access;
 using TinapayanRMS.UseCases.Database;
+using TinapayanRMS.UseCases.PriceSimulator;
 using TinapayanRMS.UseCases.Products;
 using TinapayanRMS.UseCases.QuickFind;
 using TinapayanRMS.UseCases.RawMaterials;
@@ -182,5 +183,7 @@ public static class ServiceRegistration
         services.AddSingleton<IDatabaseUpdates, DatabaseUpdates>();
         services.AddSingleton<IQuickFindQueries, QuickFindQueries>();
         services.AddSingleton<IReportQueries, ReportQueries>();
+        services.AddSingleton<IPriceSimulatorQueries, PriceSimulatorQueries>();
+        services.AddSingleton<IPriceScenarioEditor, PriceScenarioEditor>();
     }
 }

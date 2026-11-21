@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -12,6 +11,7 @@ using TinapayanRMS.Pricing;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.PriceSimulator;
 
 namespace TinapayanRMS.Presentation.PriceSimulator;
 
@@ -25,12 +25,8 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
 {
     public const string ExportTitle = "Price Simulator";
 
-    private readonly IProductRepository _productRepository;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IIngredientBomLineRepository _bomLineRepository;
-    private readonly IRawMaterialBrandPriceRepository _brandPriceRepository;
-    private readonly IPriceScenarioRepository _scenarioRepository;
-    private readonly SavedProductReader _savedProducts;
+    private readonly IPriceSimulatorQueries _queries;
+    private readonly IPriceScenarioEditor _scenarioEditor;
 
     /// <summary>The scenario whose changes the table holds, as last opened or saved; null for none.</summary>
     private PriceScenario? _openScenario;
@@ -226,28 +222,18 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
     /// <summary>The products asked to be opened, by id, which the main window opens on Products.</summary>
     public IObservable<int> ProductOpenRequests => _productOpenRequests;
 
-    public PriceSimulatorState(
-        IProductRepository productRepository,
-        IRawMaterialRepository rawMaterialRepository,
-        IIngredientBomLineRepository bomLineRepository,
-        IRawMaterialBrandPriceRepository brandPriceRepository,
-        IPriceScenarioRepository scenarioRepository,
-        SavedProductReader savedProducts,
-        ILogger logger)
+    public PriceSimulatorState(IPriceSimulatorQueries queries, IPriceScenarioEditor scenarioEditor, ILogger logger)
         : base(logger)
     {
-        _productRepository = productRepository;
-        _rawMaterialRepository = rawMaterialRepository;
-        _bomLineRepository = bomLineRepository;
-        _brandPriceRepository = brandPriceRepository;
-        _scenarioRepository = scenarioRepository;
-        _savedProducts = savedProducts;
+        _queries = queries;
+        _scenarioEditor = scenarioEditor;
 
         Changes.CollectionChanged += ChangesChanged;
 
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            _data = await Task.Run(ReadAsync);
+            // Read, and every product priced at both bases, off the UI thread.
+            _data = await Task.Run(async () => DataOf(await _queries.ReadAsync(CancellationToken.None)));
             Materials = [.. _data.Materials.Values.Where(m => m.Source == RawMaterialSource.Purchased).OrderBy(m => m.Name)];
             ShowScenarios(_data.Scenarios);
 
@@ -428,8 +414,8 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
             return;
         }
 
-        var id = await _scenarioRepository.SaveAsync(name, lines, DateTime.Now, CancellationToken.None);
-        ShowScenarios(await _scenarioRepository.GetAllAsync(CancellationToken.None));
+        var id = await _scenarioEditor.SaveAsync(name, lines, DateTime.Now, CancellationToken.None);
+        ShowScenarios(await _queries.ReadScenariosAsync(CancellationToken.None));
         var saved = Scenarios.Single(s => s.Id == id);
         ShowOpenScenario(saved);
         SuccessMessage = $"Saved the scenario {saved.Name}.";
@@ -438,9 +424,9 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
     private async Task DeleteScenarioAsync()
     {
         var scenario = _selectedScenario!;
-        await _scenarioRepository.DeleteAsync(scenario.Id, CancellationToken.None);
+        await _scenarioEditor.DeleteAsync(scenario.Id, CancellationToken.None);
         ShowOpenScenario(null);
-        ShowScenarios(await _scenarioRepository.GetAllAsync(CancellationToken.None));
+        ShowScenarios(await _queries.ReadScenariosAsync(CancellationToken.None));
         SuccessMessage = $"Deleted the scenario {scenario.Name}.";
     }
 
@@ -535,27 +521,19 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
     private static PrintedPriceChange Printed(SimulatedPriceChange change) =>
         new(change.Material!.Name, change.UnitName, change.CurrentPrice, change.ChangePercent, change.NewPrice!.Value);
 
-    /// <summary>Every product, read and priced as saved, and every material, BOM line and brand price, read at once.</summary>
-    private async Task<Data> ReadAsync()
+    /// <summary>What a load read (IPriceSimulatorQueries: every product as saved, and every material, BOM line, brand price and scenario), each product priced as saved at both bases.</summary>
+    private static Data DataOf(PriceSimulatorRead read)
     {
-        var productsRead = _productRepository.GetAllAsync(CancellationToken.None);
-        var materialsRead = _rawMaterialRepository.GetAllAsync(CancellationToken.None);
-        var bomLinesRead = _bomLineRepository.GetAllAsync(CancellationToken.None);
-        var pricesRead = _brandPriceRepository.GetAllAsync(CancellationToken.None);
-        var scenariosRead = _scenarioRepository.GetAllAsync(CancellationToken.None);
-        await Task.WhenAll(productsRead, materialsRead, bomLinesRead, pricesRead, scenariosRead);
-
-        var products = await productsRead;
-        var details = await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None);
+        var (products, details) = (read.Products, read.Details);
         return new Data(
             products,
             details,
             products.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id], CostBasis.Buffered)),
             products.ToDictionary(p => p.Id, p => SavedProductReader.Build(p, details[p.Id], CostBasis.Unbuffered)),
-            (await materialsRead).ToDictionary(m => m.Id),
-            [.. await bomLinesRead],
-            (await pricesRead).ToLookup(p => p.RawMaterialId),
-            await scenariosRead);
+            read.Materials.ToDictionary(m => m.Id),
+            [.. read.BomLines],
+            read.BrandPrices.ToLookup(p => p.RawMaterialId),
+            read.Scenarios);
     }
 
     /// <summary>A purchased material by id, with what it's bought in; null for one that's gone or isn't purchased.</summary>

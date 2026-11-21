@@ -12,10 +12,9 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// </summary>
 public class DataAccessTests
 {
-    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3); 9 holding 24 once Settings' lists, Costing Defaults and Printing did (phase 4's first step); 4 holding 19 once the password and the backups did (its second); 2 holding 10 once Quick Find and Reports did (its third).</summary>
+    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3); 9 holding 24 once Settings' lists, Costing Defaults and Printing did (phase 4's first step); 4 holding 19 once the password and the backups did (its second); 2 holding 10 once Quick Find and Reports did (its third); 1 holding 4 once the Price Simulator did (its fourth).</summary>
     private static readonly Dictionary<string, int> StillReaching = new(StringComparer.Ordinal)
     {
-        ["TinapayanRMS.Presentation.PriceSimulator.PriceSimulatorState"] = 6,
         ["TinapayanRMS.Presentation.Printing.PrintDialogState"] = 4,
     };
 
