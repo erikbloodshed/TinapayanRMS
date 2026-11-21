@@ -15,7 +15,6 @@ public class ConstructorDependencyTests
 
     private static readonly Dictionary<string, int> StillOver = new(StringComparer.Ordinal)
     {
-        ["TinapayanRMS.Presentation.Printing.PrintDialogState"] = 7,
         ["TinapayanRMS.Presentation.Products.ProductsList"] = 7,
         ["TinapayanRMS.Presentation.Products.ProductUsageEdit"] = 13,
         ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 7,

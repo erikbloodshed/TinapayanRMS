@@ -10,6 +10,7 @@ using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Printing;
 using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Tests.Printing;
@@ -480,8 +481,10 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
     {
         var factory = CreateDbContextFactory();
         return new PrintDialogState(
-            products.View, new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader(),
-            new PrintPage(new PrintSettingsEditor(new PrintSettingsRepository(factory))), new LoggerConfiguration().CreateLogger());
+            products.View,
+            new PrintQueries(new ProductRepository(factory), new ProductFolderRepository(factory), new ProductCategoryRepository(factory), CreateReader()),
+            new PrintPage(new PrintSettingsEditor(new PrintSettingsRepository(factory))),
+            new LoggerConfiguration().CreateLogger());
     }
 
     private SavedProductReader CreateReader()
