@@ -27,7 +27,7 @@ Npgsql's provider has an 11.0.0 release.
   request the build workflow checks. WiX stays below 6.0 (its licence, 2026-11-15). An update is merged on its own, never
   inside another change.
 - **No prerelease package in a release build**, but one named in Directory.Packages.props with what it waits for. On
-  2026-11-20 those are EF Core and Npgsql's provider at 11.0.0-rc.3, which move to 11.0.0 in the week it's out; and the
+  2026-11-20 those were EF Core and Npgsql's provider at 11.0.0-rc.3, which moved to 11.0.0 on 2026-11-21; and the
   Maui project imports the Satori GC experiment's SDK (`PublishWithSatoriGC`, `11.0.1-satori.…`) in every build, off
   unless asked for, which is to be named so or taken out (the build plan's open items).
 

@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("43bd1cd3-a5ef-42bd-8234-213adbf2f24f"), entityTypeCount: 27)
+        : base(skipDetectChanges: false, modelId: new Guid("584552a7-fd14-4884-880b-a7486424a6ae"), entityTypeCount: 27)
     {
     }
 
@@ -115,7 +115,7 @@ public partial class TinapayanRMSDbContextModel
 
         AddAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False");
         AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
-        AddAnnotation("ProductVersion", "11.0.0-rc.3.26522.148");
+        AddAnnotation("ProductVersion", "11.0.0");
         AddAnnotation("Relational:MaxIdentifierLength", 63);
     }
 }
