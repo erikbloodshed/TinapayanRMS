@@ -6,8 +6,10 @@ namespace TinapayanRMS.UseCases.PriceSimulator;
 
 /// <summary>
 /// What the Price Simulator does to a scenario, its price changes kept under a name: saves one, replacing the changes of one
-/// of the same name, and deletes one. No real price changes. A refusal is a <see cref="BusinessRuleException"/>, in words
-/// for the shop's staff.
+/// of the same name, and deletes one. No real price changes. A scenario its rules refuse (PriceScenarioRules) is a
+/// <see cref="BusinessRuleException"/>, in words for the shop's staff. Two computers saving a new scenario of the same name
+/// at the same moment both find none, and the second is refused by the database's unique name, shown as what it couldn't
+/// do rather than as a rule.
 /// </summary>
 public interface IPriceScenarioEditor
 {

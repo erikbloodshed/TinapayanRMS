@@ -9,7 +9,7 @@ using TinapayanRMS.UseCases.Tests.Fixtures;
 namespace TinapayanRMS.UseCases.Tests.PriceSimulator;
 
 /// <summary>
-/// What the Price Simulator reads (every product with what prices it, the materials and their brand prices) and what it
+/// What the Price Simulator reads (every product with what prices it, the materials, their brand prices and the BOM lines) and what it
 /// does to a scenario: saved under a name, replacing one of that name's, read back, and deleted. No real price changes.
 /// </summary>
 [NotInParallel(DatabaseCollection.Name)]
@@ -17,9 +17,12 @@ namespace TinapayanRMS.UseCases.Tests.PriceSimulator;
 public class PriceSimulatorUseCasesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Test]
-    public async Task A_load_reads_every_product_with_its_details_and_every_material()
+    public async Task A_load_reads_every_product_with_its_details_every_material_its_brand_prices_and_the_BOM_lines()
     {
         var flourId = await AddIngredientAsync("Bread Flour", costPerGram: 0.05m);
+        await new RawMaterialBrandPriceRepository(CreateDbContextFactory())
+            .SetAsync(flourId, [new RawMaterialBrandPrice { RawMaterialId = flourId, Brand = "Wellington", Price = 1200m }], Cancellation);
+        var custardId = await AddMadeIngredientAsync("Custard Filling", [(flourId, 200m)]);
         var doughRoleId = await AddRoleAsync("Dough");
         var (productId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(flourId, 100m)]);
 
@@ -27,7 +30,9 @@ public class PriceSimulatorUseCasesTests(DatabaseFixture fixture) : PersistenceT
 
         read.Products.Select(p => p.Id).Should().Equal(productId);
         read.Details.Keys.Should().Equal(productId);
-        read.Materials.Select(m => m.Id).Should().Contain(flourId);
+        read.Materials.Select(m => m.Id).Should().Contain([flourId, custardId]);
+        read.BrandPrices.Should().ContainSingle(p => p.RawMaterialId == flourId && p.Price == 1200m);
+        read.BomLines.Should().Contain(l => l.IngredientId == custardId && l.ComponentIngredientId == flourId);
         read.Scenarios.Should().BeEmpty();
     }
 

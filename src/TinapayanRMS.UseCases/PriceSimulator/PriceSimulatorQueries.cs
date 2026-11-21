@@ -13,7 +13,7 @@ public interface IPriceSimulatorQueries
     /// </summary>
     Task<PriceSimulatorRead> ReadAsync(CancellationToken cancellationToken);
 
-    /// <summary>The scenarios saved, by name.</summary>
+    /// <summary>The scenarios saved, newest first, then by name, as the Scenarios list shows them.</summary>
     Task<IReadOnlyList<PriceScenario>> ReadScenariosAsync(CancellationToken cancellationToken);
 }
 
