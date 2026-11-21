@@ -140,7 +140,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
     private ReportsState CreateReports()
     {
         var factory = CreateDbContextFactory();
-        return ReportsViews.Create(factory, SavedProducts());
+        return ReportsViews.Create(factory, SavedProducts(), readsVersions: true);
     }
 
     private async Task<IReadOnlyList<CostDriverRow>> AnalyseCostDriversAsync()
