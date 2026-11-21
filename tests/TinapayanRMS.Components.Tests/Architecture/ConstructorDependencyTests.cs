@@ -20,7 +20,6 @@ public class ConstructorDependencyTests
         ["TinapayanRMS.Presentation.Products.ProductsList"] = 7,
         ["TinapayanRMS.Presentation.Products.ProductUsageEdit"] = 13,
         ["TinapayanRMS.Presentation.Products.ProductVersionHistory"] = 7,
-        ["TinapayanRMS.Presentation.Reports.ReportsState"] = 7,
     };
 
     [Test]

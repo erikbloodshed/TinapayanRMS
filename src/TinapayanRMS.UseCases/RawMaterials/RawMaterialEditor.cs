@@ -38,6 +38,13 @@ public interface IRawMaterialEditor
 
     /// <summary>Deletes a price history entry, which is only a log: the material's cost stays as it is.</summary>
     Task DeletePriceHistoryAsync(int entryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Puts each material's target buffer back on top of the brand it's costed at (Reports' Re-apply Target Buffer), with the
+    /// cascade a Save runs, in one transaction; a material with no price, not purchased or at its target already is passed
+    /// over. How many were changed.
+    /// </summary>
+    Task<int> ReapplyTargetBuffersAsync(IReadOnlyCollection<int> rawMaterialIds, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc cref="IRawMaterialEditor"/>
@@ -69,6 +76,9 @@ public sealed class RawMaterialEditor(
         rawMaterialRepository.RenameAsync(rawMaterialId, name, checks, cancellationToken);
 
     public Task DeletePriceHistoryAsync(int entryId, CancellationToken cancellationToken) => priceHistoryRepository.DeleteAsync(entryId, cancellationToken);
+
+    public Task<int> ReapplyTargetBuffersAsync(IReadOnlyCollection<int> rawMaterialIds, CancellationToken cancellationToken) =>
+        rawMaterialRepository.ReapplyTargetBuffersAsync(rawMaterialIds, cancellationToken);
 
     private static void Ensure(FluentValidation.Results.ValidationResult validation)
     {

@@ -558,12 +558,7 @@ public class PriceSimulatorStateTests(DatabaseFixture fixture) : PersistenceTest
     private ReportsState CreateReportsState()
     {
         var factory = CreateDbContextFactory();
-        return new ReportsState(
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialRepository(factory),
-            new ProductRepository(factory),
-            SavedProducts(factory),
-            new LoggerConfiguration().CreateLogger());
+        return ReportsViews.Create(factory, SavedProducts(factory));
     }
 
     private SavedProductReader SavedProducts(Microsoft.EntityFrameworkCore.IDbContextFactory<Infrastructure.TinapayanRMSDbContext> factory) => new(
