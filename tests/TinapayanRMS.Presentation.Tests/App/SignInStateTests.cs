@@ -9,6 +9,8 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Tests.Common.Fixtures;
+using TinapayanRMS.UseCases.Access;
+using TinapayanRMS.UseCases.Database;
 
 namespace TinapayanRMS.Presentation.Tests.App;
 
@@ -33,7 +35,7 @@ public class SignInStateTests(DatabaseFixture fixture) : PersistenceTestBase(fix
         // The real updater over the test database, which the fixture keeps up to date: it finds nothing to do, and backs
         // nothing up. Its backups' folder is only ever made for a backup.
         updater ??= new DatabaseUpdater(factory, new DatabaseBackups(factory, BackupsFolder));
-        return new SignInState(new AccessSettingsRepository(factory), appLock, new DatabaseReadiness(updater, logger), logger);
+        return new SignInState(new AccessSettingsEditor(new AccessSettingsRepository(factory)), appLock, new DatabaseReadiness(new DatabaseUpdates(updater), logger), logger);
     }
 
     /// <summary>A database a newer copy of the app has updated.</summary>

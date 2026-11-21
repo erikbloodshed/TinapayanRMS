@@ -1,15 +1,15 @@
-using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.UseCases.Database;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.App;
 
 /// <summary>
-/// The database made ready once per start, before anything reads it (IDatabaseUpdater: a restore cut short put back, then
+/// The database made ready once per start, before anything reads it (IDatabaseUpdates: a restore cut short put back, then
 /// the database made if it isn't there, backed up and updated if it's behind, refused if a newer copy updated it). The
 /// sign-in panel waits for it before it reads the password (SignInState), and StartupTasks before the day's backup;
 /// both share the one run. A run that failed is run again by the next ask (the panel's Try Again). One for the process.
 /// </summary>
-public sealed class DatabaseReadiness(IDatabaseUpdater updater, ILogger logger)
+public sealed class DatabaseReadiness(IDatabaseUpdates updater, ILogger logger)
 {
     private readonly Lock _lock = new();
     private Task? _ready;

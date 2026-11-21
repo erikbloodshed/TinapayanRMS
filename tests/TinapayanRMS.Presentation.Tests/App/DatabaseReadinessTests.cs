@@ -4,6 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.App;
+using TinapayanRMS.UseCases.Database;
 
 namespace TinapayanRMS.Presentation.Tests.App;
 
@@ -39,7 +40,7 @@ public class DatabaseReadinessTests
         }
     }
 
-    private static DatabaseReadiness Readiness(IDatabaseUpdater updater) => new(updater, new LoggerConfiguration().CreateLogger());
+    private static DatabaseReadiness Readiness(IDatabaseUpdater updater) => new(new DatabaseUpdates(updater), new LoggerConfiguration().CreateLogger());
 
     [Test]
     public async Task Everyone_who_asks_waits_for_the_one_run()

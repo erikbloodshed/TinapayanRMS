@@ -1,8 +1,8 @@
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Access;
 
 namespace TinapayanRMS.Presentation.Settings;
 
@@ -13,7 +13,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// </summary>
 public sealed class SecurityState : ScreenState
 {
-    private readonly IAccessSettingsRepository _repository;
+    private readonly IAccessSettingsEditor _access;
     private readonly AppLock _appLock;
 
     private bool _hasPassword = true;
@@ -60,10 +60,10 @@ public sealed class SecurityState : ScreenState
 
     public ScreenCommand SaveAutoLockCommand { get; }
 
-    public SecurityState(IAccessSettingsRepository repository, AppLock appLock, ILogger logger)
+    public SecurityState(IAccessSettingsEditor access, AppLock appLock, ILogger logger)
         : base(logger)
     {
-        _repository = repository;
+        _access = access;
         _appLock = appLock;
 
         LoadCommand = new ScreenCommand(() =>
@@ -71,7 +71,7 @@ public sealed class SecurityState : ScreenState
             ClearPasswords();
             return LoadSafelyAsync(async () =>
             {
-                var settings = await _repository.GetAsync(CancellationToken.None);
+                var settings = await _access.GetAsync(CancellationToken.None);
                 HasPassword = settings.HasPassword;
                 EditingAutoLockMinutes = settings.AutoLockMinutes;
             });
@@ -85,12 +85,12 @@ public sealed class SecurityState : ScreenState
             PasswordRules.EnsureMatches(typed, again);
             if (HasPassword)
             {
-                await _repository.ChangePasswordAsync(current, typed, CancellationToken.None);
+                await _access.ChangePasswordAsync(current, typed, CancellationToken.None);
                 SuccessMessage = "The password was changed: use the new one from now on.";
             }
             else
             {
-                await _repository.CreatePasswordAsync(typed, CancellationToken.None);
+                await _access.CreatePasswordAsync(typed, CancellationToken.None);
                 HasPassword = true;
                 SuccessMessage = "The password was set: the app asks for it as it opens and when it's locked.";
             }
@@ -99,7 +99,7 @@ public sealed class SecurityState : ScreenState
         SaveAutoLockCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var minutes = EditingAutoLockMinutes;
-            await _repository.SetAutoLockMinutesAsync(minutes, CancellationToken.None);
+            await _access.SetAutoLockMinutesAsync(minutes, CancellationToken.None);
             _appLock.SetAutoLockMinutes(minutes);
             SuccessMessage = minutes == 0
                 ? "Auto-lock saved: the window locks only when you click Lock."

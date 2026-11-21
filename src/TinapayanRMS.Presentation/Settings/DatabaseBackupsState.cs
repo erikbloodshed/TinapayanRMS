@@ -4,6 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Database;
 
 namespace TinapayanRMS.Presentation.Settings;
 
@@ -34,7 +35,7 @@ public sealed class DatabaseBackupRow(DatabaseBackup backup)
 /// </summary>
 public sealed class DatabaseBackupsState : ScreenState, IBusyWork
 {
-    private readonly IDatabaseBackups _backups;
+    private readonly IBackupLibrary _backups;
     private readonly Action<string> _restartApp;
 
     /// <summary>Set while a restore runs: closing then would cut it short, and the app restarts by itself once it's done.</summary>
@@ -109,7 +110,7 @@ public sealed class DatabaseBackupsState : ScreenState, IBusyWork
     public ScreenCommand ClearCopyFolderCommand { get; }
 
     /// <param name="restartApp">Closes the app and starts it again, after showing the message it's given.</param>
-    public DatabaseBackupsState(IDatabaseBackups backups, Action<string> restartApp, ILogger logger, AutomaticBackups? automatic = null)
+    public DatabaseBackupsState(IBackupLibrary backups, Action<string> restartApp, ILogger logger, AutomaticBackups? automatic = null)
         : base(logger)
     {
         _backups = backups;
@@ -164,7 +165,7 @@ public sealed class DatabaseBackupsState : ScreenState, IBusyWork
         BackUpNowCommand = new ScreenCommand(
             () => RunSafelyAsync(() => WhileBusyAsync("Backing up…", async () =>
             {
-                var backup = await Task.Run(() => _backups.BackUpAsync(BackupKind.Manual, CancellationToken.None));
+                var backup = await Task.Run(() => _backups.BackUpNowAsync(CancellationToken.None));
                 await RefreshAsync(backup.Path);
                 SuccessMessage = $"Backed up to {Path.GetFileName(backup.Path)}.";
             })),

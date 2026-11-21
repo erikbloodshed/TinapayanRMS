@@ -1,7 +1,7 @@
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Access;
 
 namespace TinapayanRMS.Presentation.App;
 
@@ -15,7 +15,7 @@ namespace TinapayanRMS.Presentation.App;
 /// </summary>
 public sealed class SignInState : ScreenState
 {
-    private readonly IAccessSettingsRepository _repository;
+    private readonly IAccessSettingsEditor _access;
     private readonly AppLock _appLock;
     private readonly DatabaseReadiness _readiness;
 
@@ -57,10 +57,10 @@ public sealed class SignInState : ScreenState
 
     public ScreenCommand SetPasswordCommand { get; }
 
-    public SignInState(IAccessSettingsRepository repository, AppLock appLock, DatabaseReadiness readiness, ILogger logger)
+    public SignInState(IAccessSettingsEditor access, AppLock appLock, DatabaseReadiness readiness, ILogger logger)
         : base(logger)
     {
-        _repository = repository;
+        _access = access;
         _appLock = appLock;
         _readiness = readiness;
 
@@ -72,7 +72,7 @@ public sealed class SignInState : ScreenState
             return LoadSafelyAsync(async () =>
             {
                 await _readiness.EnsureReadyAsync();
-                var settings = await _repository.GetAsync(CancellationToken.None);
+                var settings = await _access.GetAsync(CancellationToken.None);
                 IsSettingUp = !settings.HasPassword;
                 IsLoaded = true;
             });
@@ -98,14 +98,14 @@ public sealed class SignInState : ScreenState
             return;
         }
 
-        if (await _repository.VerifyAsync(typed, CancellationToken.None))
+        if (await _access.VerifyAsync(typed, CancellationToken.None))
         {
             await UnlockAsync();
             return;
         }
 
         // A password cleared since the panel opened (Reset-Password.ps1) can't be given: ask for a new one instead.
-        if (!(await _repository.GetAsync(CancellationToken.None)).HasPassword)
+        if (!(await _access.GetAsync(CancellationToken.None)).HasPassword)
         {
             IsSettingUp = true;
             ErrorMessage = "There's no password any more: set a new one.";
@@ -126,20 +126,20 @@ public sealed class SignInState : ScreenState
         PasswordRules.EnsureValid(typed);
         PasswordRules.EnsureMatches(typed, again);
 
-        if ((await _repository.GetAsync(CancellationToken.None)).HasPassword)
+        if ((await _access.GetAsync(CancellationToken.None)).HasPassword)
         {
             IsSettingUp = false;
             ErrorMessage = "A password has been set already: sign in with it.";
             return;
         }
 
-        await _repository.CreatePasswordAsync(typed, CancellationToken.None);
+        await _access.CreatePasswordAsync(typed, CancellationToken.None);
         await UnlockAsync();
     }
 
     private async Task UnlockAsync()
     {
-        var settings = await _repository.GetAsync(CancellationToken.None);
+        var settings = await _access.GetAsync(CancellationToken.None);
         _appLock.SetAutoLockMinutes(settings.AutoLockMinutes);
         IsSettingUp = false;
         _appLock.Unlock();

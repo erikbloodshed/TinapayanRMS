@@ -17,6 +17,8 @@ using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.SubAssemblies;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
+using TinapayanRMS.UseCases.Access;
+using TinapayanRMS.UseCases.Database;
 using TinapayanRMS.UseCases.Products;
 using TinapayanRMS.UseCases.RawMaterials;
 using TinapayanRMS.UseCases.Settings;
@@ -115,7 +117,7 @@ public static class ServiceRegistration
         // and the last problems are kept in the view state.
         services.AddSingleton<AutomaticBackups>();
         services.AddScoped(provider => new DatabaseBackupsState(
-            provider.GetRequiredService<IDatabaseBackups>(),
+            provider.GetRequiredService<IBackupLibrary>(),
             message => provider.GetRequiredService<AppStatus>().AnnounceRestore(message),
             provider.GetRequiredService<Serilog.ILogger>(),
             provider.GetRequiredService<AutomaticBackups>()));
@@ -173,5 +175,8 @@ public static class ServiceRegistration
         services.AddSingleton<ILookupListEditor<UnitOfMeasure>, UnitOfMeasureEditor>();
         services.AddSingleton<ICostingDefaultsEditor, CostingDefaultsEditor>();
         services.AddSingleton<IPrintSettingsEditor, PrintSettingsEditor>();
+        services.AddSingleton<IAccessSettingsEditor, AccessSettingsEditor>();
+        services.AddSingleton<IBackupLibrary, BackupLibrary>();
+        services.AddSingleton<IDatabaseUpdates, DatabaseUpdates>();
     }
 }

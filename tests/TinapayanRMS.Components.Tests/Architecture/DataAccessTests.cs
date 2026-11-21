@@ -12,18 +12,13 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// </summary>
 public class DataAccessTests
 {
-    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3); 9 holding 24 once Settings' lists, Costing Defaults and Printing did (phase 4's first step).</summary>
+    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3); 9 holding 24 once Settings' lists, Costing Defaults and Printing did (phase 4's first step); 4 holding 19 once the password and the backups did (its second).</summary>
     private static readonly Dictionary<string, int> StillReaching = new(StringComparer.Ordinal)
     {
-        ["TinapayanRMS.Presentation.App.AutomaticBackups"] = 1,
-        ["TinapayanRMS.Presentation.App.DatabaseReadiness"] = 1,
         ["TinapayanRMS.Presentation.App.QuickFindState"] = 3,
-        ["TinapayanRMS.Presentation.App.SignInState"] = 1,
         ["TinapayanRMS.Presentation.PriceSimulator.PriceSimulatorState"] = 6,
         ["TinapayanRMS.Presentation.Printing.PrintDialogState"] = 4,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 6,
-        ["TinapayanRMS.Presentation.Settings.DatabaseBackupsState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.SecurityState"] = 1,
     };
 
     /// <summary>

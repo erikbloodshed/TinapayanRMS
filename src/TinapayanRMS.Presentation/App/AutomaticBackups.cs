@@ -1,6 +1,7 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.UseCases.Database;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.App;
@@ -14,7 +15,7 @@ namespace TinapayanRMS.Presentation.App;
 /// Database tab shows both problems, and an
 /// automatic backup failing with the newest one getting old also says so once a run (<see cref="OverdueWarningAsync"/>).
 /// </summary>
-public sealed class AutomaticBackups(IDatabaseBackups backups, IViewStateStore viewState, ILogger logger)
+public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore viewState, ILogger logger)
 {
     /// <summary>The view state key the second folder is kept under.</summary>
     public const string CopyFolderKey = "backup-copy-folder";

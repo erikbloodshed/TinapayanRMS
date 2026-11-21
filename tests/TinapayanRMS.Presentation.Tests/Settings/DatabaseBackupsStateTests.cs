@@ -10,6 +10,7 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.UseCases.Database;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -185,7 +186,7 @@ public sealed class DatabaseBackupsStateTests(DatabaseFixture fixture) : IAsyncD
 
     private DatabaseBackupsState CreateState()
     {
-        return new DatabaseBackupsState(_backups, _restarts.Add, new LoggerConfiguration().CreateLogger());
+        return new DatabaseBackupsState(new BackupLibrary(_backups), _restarts.Add, new LoggerConfiguration().CreateLogger());
     }
 
     private async Task AddCategoryAsync(string name)
