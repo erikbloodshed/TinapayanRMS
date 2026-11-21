@@ -1,7 +1,6 @@
 using System.Collections.Specialized;
 using System.Reactive.Linq;
 using AwesomeAssertions;
-using Serilog;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -37,11 +36,7 @@ public class ReportsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fi
         var factory = CreateDbContextFactory();
         var packagingLineRepository = new PackagingLineRepository(factory);
 
-        return new ReportsState(
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialRepository(factory),
-            new ProductRepository(factory),
-            new SavedProductReader(
+        return ReportsViews.Create(factory, new SavedProductReader(
                 new PackagingLinkRepository(factory),
                 new ProductSubAssemblyUsageRepository(factory),
                 packagingLineRepository,
@@ -49,8 +44,7 @@ public class ReportsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fi
                 new SubAssemblyLineRepository(factory),
                 new ProductRepository(factory),
                 new CostingDefaultsRepository(factory),
-                CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+                CreateUnitOfWork()));
     }
 
     [Test]

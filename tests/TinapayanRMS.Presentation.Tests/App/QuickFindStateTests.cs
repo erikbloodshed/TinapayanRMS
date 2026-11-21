@@ -5,6 +5,7 @@ using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.QuickFind;
 
 namespace TinapayanRMS.Presentation.Tests.App;
 
@@ -86,6 +87,7 @@ public class QuickFindStateTests(DatabaseFixture fixture) : PersistenceTestBase(
     {
         var factory = CreateDbContextFactory();
         return new QuickFindState(
-            new RawMaterialRepository(factory), new SubAssemblyRepository(factory), new ProductRepository(factory), new LoggerConfiguration().CreateLogger());
+            new QuickFindQueries(new RawMaterialRepository(factory), new SubAssemblyRepository(factory), new ProductRepository(factory)),
+            new LoggerConfiguration().CreateLogger());
     }
 }

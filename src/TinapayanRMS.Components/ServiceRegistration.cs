@@ -20,7 +20,9 @@ using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.UseCases.Access;
 using TinapayanRMS.UseCases.Database;
 using TinapayanRMS.UseCases.Products;
+using TinapayanRMS.UseCases.QuickFind;
 using TinapayanRMS.UseCases.RawMaterials;
+using TinapayanRMS.UseCases.Reports;
 using TinapayanRMS.UseCases.Settings;
 using TinapayanRMS.UseCases.SubAssemblies;
 using TinapayanRMS.Components.Printing;
@@ -178,5 +180,7 @@ public static class ServiceRegistration
         services.AddSingleton<IAccessSettingsEditor, AccessSettingsEditor>();
         services.AddSingleton<IBackupLibrary, BackupLibrary>();
         services.AddSingleton<IDatabaseUpdates, DatabaseUpdates>();
+        services.AddSingleton<IQuickFindQueries, QuickFindQueries>();
+        services.AddSingleton<IReportQueries, ReportQueries>();
     }
 }

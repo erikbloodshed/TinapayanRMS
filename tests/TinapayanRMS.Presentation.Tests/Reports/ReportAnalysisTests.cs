@@ -140,14 +140,7 @@ public class ReportAnalysisTests(DatabaseFixture fixture) : PersistenceTestBase(
     private ReportsState CreateReports()
     {
         var factory = CreateDbContextFactory();
-        return new ReportsState(
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialRepository(factory),
-            new ProductRepository(factory),
-            SavedProducts(),
-            new Serilog.LoggerConfiguration().CreateLogger(),
-            new ProductVersionRepository(factory),
-            new IngredientBomLineRepository(factory));
+        return ReportsViews.Create(factory, SavedProducts(), readsVersions: true);
     }
 
     private async Task<IReadOnlyList<CostDriverRow>> AnalyseCostDriversAsync()

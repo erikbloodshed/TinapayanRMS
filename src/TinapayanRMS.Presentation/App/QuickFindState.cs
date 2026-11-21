@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.QuickFind;
 
 namespace TinapayanRMS.Presentation.App;
 
@@ -26,17 +26,13 @@ public sealed class QuickFindState : ScreenState
 
     private const CompareOptions Loose = CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace;
 
-    private readonly IRawMaterialRepository _rawMaterials;
-    private readonly ISubAssemblyRepository _subAssemblies;
-    private readonly IProductRepository _products;
+    private readonly IQuickFindQueries _queries;
     private IReadOnlyList<QuickFindResult> _records = [];
 
-    public QuickFindState(IRawMaterialRepository rawMaterials, ISubAssemblyRepository subAssemblies, IProductRepository products, ILogger logger)
+    public QuickFindState(IQuickFindQueries queries, ILogger logger)
         : base(logger)
     {
-        _rawMaterials = rawMaterials;
-        _subAssemblies = subAssemblies;
-        _products = products;
+        _queries = queries;
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(LoadAsync));
     }
 
@@ -113,12 +109,7 @@ public sealed class QuickFindState : ScreenState
 
     private async Task LoadAsync()
     {
-        // Read together, off the UI thread, as the screens read their lists.
-        var rawMaterialsRead = Task.Run(() => _rawMaterials.GetAllAsync(CancellationToken.None));
-        var subAssembliesRead = Task.Run(() => _subAssemblies.GetStandaloneAsync(CancellationToken.None));
-        var productsRead = Task.Run(() => _products.GetAllAsync(CancellationToken.None));
-        await Task.WhenAll(rawMaterialsRead, subAssembliesRead, productsRead);
-        var (rawMaterials, subAssemblies, products) = (await rawMaterialsRead, await subAssembliesRead, await productsRead);
+        var (rawMaterials, subAssemblies, products) = await _queries.ReadAsync(CancellationToken.None);
         _records =
         [
             .. rawMaterials.Select(m => new QuickFindResult(

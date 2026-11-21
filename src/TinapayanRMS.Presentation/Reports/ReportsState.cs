@@ -2,13 +2,14 @@ using System.Collections.ObjectModel;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.RawMaterials;
+using TinapayanRMS.UseCases.Reports;
 
 namespace TinapayanRMS.Presentation.Reports;
 
@@ -237,9 +238,6 @@ public sealed class ReportsState : ScreenState, IDisposable
 
     public ScreenCommand ExportMarginErosionCommand { get; }
 
-    private readonly IProductVersionRepository? _versionRepository;
-    private readonly IIngredientBomLineRepository? _bomLineRepository;
-
     private IReadOnlyList<CostBufferRow> _allCostBuffers = [];
 
     /// <summary>Every purchased material with a price and a buffered cost, or only those whose buffer is below target.</summary>
@@ -262,17 +260,15 @@ public sealed class ReportsState : ScreenState, IDisposable
 
     /// <summary>
     /// Puts the target buffer back on top of the dearest brand for the materials picked, or for every one shown that's below
-    /// target, once it's confirmed (IRawMaterialRepository.ReapplyTargetBuffersAsync, with the cascade a Save runs).
+    /// target, once it's confirmed (IRawMaterialEditor.ReapplyTargetBuffersAsync, with the cascade a Save runs).
     /// </summary>
     public ScreenCommand ReapplyTargetBuffersCommand { get; }
 
     /// <summary>The Cost Buffers table to an Excel workbook, as its grid shows it.</summary>
     public ScreenCommand ExportCostBuffersCommand { get; }
 
-    private readonly IRawMaterialPriceHistoryRepository _priceHistoryRepository;
-    private readonly IRawMaterialRepository _rawMaterialRepository;
-    private readonly IProductRepository _productRepository;
-    private readonly SavedProductReader _savedProducts;
+    private readonly IReportQueries _queries;
+    private readonly IRawMaterialEditor _rawMaterials;
 
     public TableRows<ProductCostRow> ProductCosts { get; } = [];
 
@@ -306,27 +302,16 @@ public sealed class ReportsState : ScreenState, IDisposable
     /// <summary>The Raw Materials Price Summary to an Excel workbook, as its grid shows it.</summary>
     public ScreenCommand ExportRawMaterialPricesCommand { get; }
 
-    public ReportsState(
-        IRawMaterialPriceHistoryRepository priceHistoryRepository,
-        IRawMaterialRepository rawMaterialRepository,
-        IProductRepository productRepository,
-        SavedProductReader savedProducts,
-        ILogger logger,
-        IProductVersionRepository? versionRepository = null,
-        IIngredientBomLineRepository? bomLineRepository = null)
+    public ReportsState(IReportQueries queries, IRawMaterialEditor rawMaterials, ILogger logger)
         : base(logger)
     {
-        _versionRepository = versionRepository;
-        _bomLineRepository = bomLineRepository;
+        _queries = queries;
+        _rawMaterials = rawMaterials;
         ExportCostDriversCommand = new ScreenCommand(() => ExportToExcelAsync(CostDriversTitle));
         ExportMarginErosionCommand = new ScreenCommand(() => ExportToExcelAsync(MarginErosionTitle));
 
         // A new day to compare with reads the versions again; a newer one cancels a read still running.
         LoadLatest(_marginErosionWanted, (_, cancellationToken) => LoadMarginErosionAsync(cancellationToken));
-        _priceHistoryRepository = priceHistoryRepository;
-        _rawMaterialRepository = rawMaterialRepository;
-        _productRepository = productRepository;
-        _savedProducts = savedProducts;
         ExportCostBuffersCommand = new ScreenCommand(() => ExportToExcelAsync(CostBuffersTitle));
         ReapplyTargetBuffersCommand = new ScreenCommand(ReapplyTargetBuffersAsync);
 
@@ -337,8 +322,8 @@ public sealed class ReportsState : ScreenState, IDisposable
 
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            // Off the UI thread, as Products and Raw Materials read their details.
-            var read = await Task.Run(ReadAsync);
+            // Read, priced and worked into the tables off the UI thread, as Products and Raw Materials read their details.
+            var read = await Task.Run(async () => Tabulate(await _queries.ReadAsync(CancellationToken.None)));
 
             // Each table in one change (TableRows), so its grid draws it once.
             ProductCosts.ReplaceWith(read.ProductCosts);
@@ -352,23 +337,16 @@ public sealed class ReportsState : ScreenState, IDisposable
     }
 
     /// <summary>
-    /// Every product as it's saved, priced as the Products screen prices it once opened (SavedProductReader, which the screen
-    /// and Print read through too), and every material with its price history, all read side by side, then worked into
-    /// every table but Margin Erosion. The products are read once for the Product Cost Summary, Cost Drivers and Margin
-    /// Erosion together, in the same dozen or so queries however many there are: each read them for itself, three times a
-    /// visit, before 2026-11-13.
+    /// What a visit read (IReportQueries: every product as it's saved, and every material with its price history and the
+    /// BOM lines) worked into every table but Margin Erosion, each product priced as the Products screen prices it once
+    /// opened (SavedProductReader, which the screen and Print read through too). The products are read once for the Product
+    /// Cost Summary, Cost Drivers and Margin Erosion together: each read them for itself, three times a visit, before
+    /// 2026-11-13.
     /// </summary>
-    private async Task<Read> ReadAsync()
+    private static Read Tabulate(ReportsRead read)
     {
-        var productsRead = ReadProductsAsync();
-        var materialsRead = _rawMaterialRepository.GetAllAsync(CancellationToken.None);
-        var historyRead = _priceHistoryRepository.GetAllAsync(CancellationToken.None);
-        var bomLinesRead = _bomLineRepository?.GetAllAsync(CancellationToken.None);
-        await Task.WhenAll(productsRead, materialsRead, historyRead, bomLinesRead ?? Task.CompletedTask);
-
-        var (products, details) = await productsRead;
-        var materials = await materialsRead;
-        var history = (await historyRead).ToLookup(h => h.RawMaterialId);
+        var (products, details, materials) = (read.Products, read.Details, read.Materials);
+        var history = read.PriceHistory.ToLookup(h => h.RawMaterialId);
 
         // The products in the list's order, by name; the purchased materials, ingredients and packaging alike, by name: a
         // made or linked ingredient has no price history. Cost Buffers takes those with a price and a buffered cost.
@@ -379,13 +357,7 @@ public sealed class ReportsState : ScreenState, IDisposable
             [.. priced.Select(s => new ProductCostRow(s.Product, s.Costs, s.SectionsWithoutPieceSize))],
             [.. purchased.Select(m => new RawMaterialPriceSummaryRow(m, [.. history[m.Id]]))],
             [.. purchased.Where(m => RawMaterialRules.CurrentBufferPercentOf(m) is not null).Select(m => new CostBufferRow(m))],
-            bomLinesRead is null ? [] : CostDriverAnalysis.Analyse(products, details, materials.ToDictionary(m => m.Id), [.. await bomLinesRead]));
-
-        async Task<(IReadOnlyList<Product> Products, IReadOnlyDictionary<int, ProductDetail> Details)> ReadProductsAsync()
-        {
-            var products = await _productRepository.GetAllAsync(CancellationToken.None);
-            return (products, await _savedProducts.ReadDetailsAsync([.. products.Select(p => p.Id)], CancellationToken.None));
-        }
+            CostDriverAnalysis.Analyse(products, details, materials.ToDictionary(m => m.Id), [.. read.BomLines]));
     }
 
     /// <summary>What a visit reads, priced and worked into its tables.</summary>
@@ -405,17 +377,12 @@ public sealed class ReportsState : ScreenState, IDisposable
     /// </summary>
     private async Task LoadMarginErosionAsync(CancellationToken cancellationToken)
     {
-        if (_versionRepository is null)
-        {
-            return;
-        }
-
         var priced = _priced;
         var asOf = MarginErosionSince.AddDays(1).AddTicks(-1);
         var rows = await Task.Run(
             async () =>
             {
-                var versions = (await _versionRepository.GetLatestAsOfAsync(asOf, cancellationToken)).ToDictionary(v => v.ProductId);
+                var versions = (await _queries.ReadVersionsAsOfAsync(asOf, cancellationToken)).ToDictionary(v => v.ProductId);
                 return MarginErosionAnalysis.Analyse(priced, versions);
             },
             cancellationToken);
@@ -458,7 +425,7 @@ public sealed class ReportsState : ScreenState, IDisposable
 
         await RunSafelyAsync(async () =>
         {
-            var changed = await Task.Run(() => _rawMaterialRepository.ReapplyTargetBuffersAsync([.. rows.Select(r => r.RawMaterialId)], CancellationToken.None));
+            var changed = await Task.Run(() => _rawMaterials.ReapplyTargetBuffersAsync([.. rows.Select(r => r.RawMaterialId)], CancellationToken.None));
             await LoadCommand.ExecuteAsync();
             SuccessMessage = $"The target buffer is back on {(changed == 1 ? "1 material" : $"{changed} materials")}.";
         });

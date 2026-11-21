@@ -307,11 +307,7 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     private ReportsState CreateReportsState(FailingDbContextFactory factory)
     {
         var productRepository = new ProductRepository(factory);
-        return new ReportsState(
-            new RawMaterialPriceHistoryRepository(factory),
-            new RawMaterialRepository(factory),
-            productRepository,
-            new SavedProductReader(
+        return ReportsViews.Create(factory, new SavedProductReader(
                 new PackagingLinkRepository(factory),
                 new ProductSubAssemblyUsageRepository(factory),
                 new PackagingLineRepository(factory),
@@ -319,7 +315,6 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
                 new SubAssemblyLineRepository(factory),
                 productRepository,
                 new CostingDefaultsRepository(factory),
-                CreateUnitOfWork()),
-            new LoggerConfiguration().CreateLogger());
+                CreateUnitOfWork()));
     }
 }
