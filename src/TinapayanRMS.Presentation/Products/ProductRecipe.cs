@@ -1352,7 +1352,7 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     private void RestoreSections(IReadOnlyList<ProductUsageEdit> usages, bool hasAddSubAssemblyTab, RecipeTabChoice? tab)
     {
-        Draft.ReplaceUsageItems(usages);
+        Draft.Restore(usages);
 
         if (hasAddSubAssemblyTab)
         {

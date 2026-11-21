@@ -907,6 +907,50 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.UsageForm.FormLines.Select(l => l.Ingredient!.Name).Should().Equal("Flour", "Butter");
     });
 
+    // Something typed before a load that moved an ingredient's cost, undone after it, or redone: the product's own dough and
+    // the header show the cost the load brought, not the one the step was taken at.
+    [Test]
+    public Task Undoing_an_edit_from_before_a_load_shows_the_costs_the_load_brought() => UiThread.RunAsync(async () =>
+    {
+        await WithoutWastageAsync();
+        var roleId = await AddRoleAsync("Dough", isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (productId, _) = await AddProductWithSubAssemblyAsync("Cream Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        state.Pick(state.Products.Single(p => p.Id == productId));
+        await Settle.UntilAsync(
+            state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady && state.Recipe.UsageEdits.Count == 1, () => $"ready={state.AreDetailsReady}");
+        state.Recipe.UsageEdits.Single().IsOwned.Should().BeTrue();
+        state.Costing.Costs.Material.Should().Be(3m, "60 g of flour at 0.05");
+
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        state.EditingName = "Cream Loaf Large";
+        recorder.EndUndoStep();
+
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.RawMaterials.Where(m => m.Id == flourId).ExecuteUpdateAsync(
+                set => set.SetProperty(m => m.CostPerBaseUnit, 0.08m).SetProperty(m => m.BufferedCostPerBaseUnit, 0.08m), Cancellation);
+        }
+
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.Costing.Costs.Material == 4.8m, () => $"material={state.Costing.Costs.Material}");
+
+        state.TryUndo().Should().BeTrue();
+
+        state.EditingName.Should().Be("Cream Loaf");
+        state.Recipe.UsageEdits.Single().CostPerPieceAt(CostBasis.Buffered).Should().Be(4.8m, "the dough at the flour's cost now, 0.08, not 0.05 as when the step was taken");
+        state.Costing.Costs.Material.Should().Be(4.8m, "and the header with it");
+        state.SaveCommand.CanExecute().Should().BeFalse("nothing typed is left");
+
+        state.TryRedo().Should().BeTrue();
+
+        state.EditingName.Should().Be("Cream Loaf Large");
+        state.Costing.Costs.Material.Should().Be(4.8m);
+    });
+
     [Test]
     public Task A_linked_sections_lines_are_edited_in_the_product_and_Save_writes_them_to_the_sub_assembly_after_asking() => UiThread.RunAsync(async () =>
     {

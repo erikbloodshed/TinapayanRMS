@@ -312,6 +312,19 @@ public sealed class ProductRecipeDraft : ObservableState
         }
     }
 
+    /// <summary>
+    /// An undo step's sections put back (<see cref="ReplaceUsageItems"/>), each at the ingredients as the screen last loaded
+    /// them, by id, as a load points the sections at them (<see cref="Repriced"/>). A step keeps the copies it was taken
+    /// with, so without this a section put back after a load that moved its ingredients' costs would show the old costs,
+    /// the header's figures too, until the next load. A linked section a load found changed where it's kept is already as
+    /// kept in every step (ProductRecipe.WithLinkedAsSavedNow); its lines and add-ins are repriced here like any other's.
+    /// </summary>
+    internal void Restore(IReadOnlyList<ProductUsageEdit> sections)
+    {
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
+        ReplaceUsageItems([.. sections.Select(section => section.WithIngredients(lines => Repriced(lines, ingredientsById)))]);
+    }
+
     /// <summary>A saved usage as its section, with the screen's own copies of its role and ingredients (ProductUsageEdit.FromSaved).</summary>
     private ProductUsageEdit ToUsageEdit(
         ProductSubAssemblyUsage usage,

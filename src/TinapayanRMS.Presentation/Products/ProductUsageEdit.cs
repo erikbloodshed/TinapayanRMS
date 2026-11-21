@@ -271,6 +271,21 @@ public sealed class ProductUsageEdit : ObservableRow
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SectionLine> lines) =>
         new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner, toMadeIngredient: _toMadeIngredient);
 
+    /// <summary>
+    /// The same section with each ingredient of its lines, its add-ins and a linked one's lines as kept swapped for
+    /// <paramref name="reprice"/>'s copy, and nothing else: what Save writes, the piece size and the name stay. Itself when
+    /// every ingredient is the copy it holds already.
+    /// </summary>
+    public ProductUsageEdit WithIngredients(Func<IReadOnlyList<SectionLine>, IReadOnlyList<SectionLine>> reprice)
+    {
+        var lines = reprice(Lines);
+        var addIns = reprice(AddIns);
+        var savedLines = ReferenceEquals(_savedLines, Lines) ? lines : reprice(_savedLines);
+        return lines.SequenceEqual(Lines) && addIns.SequenceEqual(AddIns) && savedLines.SequenceEqual(_savedLines)
+            ? this
+            : new(SubAssemblyId, Role, lines, AuthoredField, AuthoredValue, LinkedName, addIns, Name, _isOwn, _isReleasing, savedLines, LinkedOwner, _toMadeIngredient);
+    }
+
     /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
     public ProductUsageEdit Released() =>
         new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true, linkedOwner: LinkedOwner);

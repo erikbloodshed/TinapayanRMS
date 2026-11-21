@@ -19,7 +19,7 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// costs moved or not. Whatever the sequence, the sections stay in recipe order and told apart, each knows whether others
 /// share its role, the dirty check says whether a Save would write the recipe differently from where it was loaded, a load
 /// changes nothing Save writes, a recipe that saves as loaded is as saved, and undoing every step gives back where it
-/// started, redoing them where it ended.
+/// started, redoing them where it ended, at the costs the last load brought.
 /// </summary>
 public class ProductRecipeDraftTests
 {
@@ -36,16 +36,15 @@ public class ProductRecipeDraftTests
                 world.History.IsDirty.Should().Be(!SavesSameAs(world.Start, world.Capture()), $"after {step}, the dirty check says whether Save would write it");
             }
 
-            // Exactly, with no load between the steps; with one, as Save would write it: a step keeps the ingredients it was
-            // taken with, so an undo across a load that moved their costs shows those costs until the next load (the build
-            // plan's open items).
-            Func<IReadOnlyList<ProductUsageEdit>, IReadOnlyList<ProductUsageEdit>, bool> same = steps.Any(s => s is Load or ChangedElsewhere) ? SavesSameAs : ShowsSameAs;
+            // As it started, at the costs the last load brought: a step keeps the ingredients it was taken with, and an undo
+            // puts its sections back at the ones the screen holds now (ProductRecipeDraft.Restore).
             var end = world.Capture();
             while (world.TryUndo())
             {
             }
 
-            same(world.Capture(), world.Start).Should().BeTrue("undoing every step gives back where it started");
+            SavesSameAs(world.Capture(), world.Start).Should().BeTrue("undoing every step gives back where it started");
+            world.ShouldShowTheLastLoadsCosts("undone");
             world.History.IsDirty.Should().BeFalse();
             if (!steps.Any(s => s is ChangedElsewhere(3)))
             {
@@ -59,7 +58,7 @@ public class ProductRecipeDraftTests
             {
             }
 
-            same(world.Capture(), end).Should().BeTrue("redoing every step gives back where it ended");
+            ShowsSameAs(world.Capture(), end).Should().BeTrue("redoing every step gives back where it ended, costs and all");
             world.ShouldHoldItsRules("redone");
         }, iter: 300);
 
@@ -95,6 +94,23 @@ public class ProductRecipeDraftTests
                 world.Draft.IsAsSaved(now).Should().Be(Describe(now) == loaded, $"after {step}");
             }
         }, iter: 300);
+
+    [Test]
+    public void An_undo_across_a_load_that_moved_the_costs_shows_the_costs_the_load_brought()
+    {
+        var world = new World();
+        var dough = world.Draft.UsageEdits.Single(u => !u.IsLinked);
+        var costBefore = dough.TotalCostAt(CostBasis.Buffered);
+        world.Apply(new EditLines(Row: world.Draft.UsageEdits.IndexOf(dough), Ingredient: 0, Grams: 500));
+        world.Apply(new Load(CostsChanged: true));
+
+        world.TryUndo().Should().BeTrue();
+
+        var undone = world.Draft.UsageEdits.Single(u => !u.IsLinked);
+        undone.Lines.Select(l => (l.Ingredient.Id, l.Grams)).Should().Equal(dough.Lines.Select(l => (l.Ingredient.Id, l.Grams)), "the edit is undone");
+        undone.TotalCostAt(CostBasis.Buffered).Should().BeGreaterThan(costBefore, "the load moved every cost up, and the undone dough shows it");
+        world.ShouldShowTheLastLoadsCosts("undone");
+    }
 
     [Test]
     public void A_linked_section_copied_becomes_a_new_one_of_its_lines_and_add_ins_at_its_piece_size()
@@ -226,6 +242,21 @@ public class ProductRecipeDraftTests
 
         public IReadOnlyList<ProductUsageEdit> Capture() => [.. Draft.UsageEdits];
 
+        /// <summary>Every section's lines and add-ins at the ingredients' costs as the last load brought them.</summary>
+        public void ShouldShowTheLastLoadsCosts(string when)
+        {
+            var now = Ingredients.ToDictionary(i => i.Id);
+            foreach (var section in Draft.UsageEdits)
+            {
+                foreach (var line in section.Lines.Concat(section.AddIns))
+                {
+                    (line.Ingredient.CostPerBaseUnit, line.Ingredient.BufferedCostPerBaseUnit)
+                        .Should().Be((now[line.Ingredient.Id].CostPerBaseUnit, now[line.Ingredient.Id].BufferedCostPerBaseUnit),
+                            $"{when}, {section.DisplayName}'s {line.Ingredient.Name} is at the last load's cost");
+                }
+            }
+        }
+
         /// <summary>What holds of the sections whatever was done to them.</summary>
         public void ShouldHoldItsRules(string when)
         {
@@ -284,8 +315,9 @@ public class ProductRecipeDraftTests
         {
             if (moved)
             {
+                // As the form's undo does (ProductRecipe.RestoreSections).
                 _restoring = true;
-                Draft.ReplaceUsageItems(snapshot.Usages);
+                Draft.Restore(snapshot.Usages);
                 _restoring = false;
             }
 
