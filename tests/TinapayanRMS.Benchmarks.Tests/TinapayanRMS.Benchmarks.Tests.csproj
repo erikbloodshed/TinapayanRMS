@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The benchmarks' scenarios held to what was approved (docs/adr/0008): the SQL commands each sends, and the memory it
+       allocates, on the golden master's copy of the shop's data. Counts, not times, so they hold in the suite whatever
+       else the PC is doing; scripts/Compare-Benchmarks.ps1 compares the times. -->
+  <PropertyGroup>
+    <!-- Every method compiled once, optimized: tiering's later recompiles can keep an object on the stack that the first
+         compile allocated, and would move what a scenario allocates by when they happen to come. -->
+    <TieredCompilation>false</TieredCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TinapayanRMS.Benchmarks\TinapayanRMS.Benchmarks.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Budgets\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

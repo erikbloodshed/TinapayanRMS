@@ -67,6 +67,9 @@
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
+    <!-- Times the warm operations of tests/TinapayanRMS.Benchmarks, in process, which scripts/Compare-Benchmarks.ps1 runs
+         for two commits side by side (docs/adr/0008). -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <!-- Renders the MAUI app's Blazor components in a test, without a web view (TinapayanRMS.Components.Tests). -->
     <PackageVersion Include="bunit" Version="2.15.2" />
     <!-- Property-based tests: random sequences of edits, loads and undos against a draft, shrunk to the shortest that fails
