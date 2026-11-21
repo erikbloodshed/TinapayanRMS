@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.UseCases.Database;
 
 namespace TinapayanRMS.Presentation.Tests.App;
 
@@ -65,10 +66,10 @@ public sealed class AutomaticBackupsTests : IDisposable
     public void The_second_folder_is_kept_for_the_user_and_cleared_with_nothing()
     {
         var viewState = new InMemoryViewStateStore();
-        var automatic = new AutomaticBackups(new FileBackups(_root), viewState, new LoggerConfiguration().CreateLogger());
+        var automatic = new AutomaticBackups(new BackupLibrary(new FileBackups(_root)), viewState, new LoggerConfiguration().CreateLogger());
 
         automatic.CopyFolder = @"E:\Backups";
-        new AutomaticBackups(new FileBackups(_root), viewState, new LoggerConfiguration().CreateLogger()).CopyFolder.Should().Be(@"E:\Backups");
+        new AutomaticBackups(new BackupLibrary(new FileBackups(_root)), viewState, new LoggerConfiguration().CreateLogger()).CopyFolder.Should().Be(@"E:\Backups");
         automatic.CopyFolder = null;
         automatic.CopyFolder.Should().BeNull();
     }
@@ -77,13 +78,13 @@ public sealed class AutomaticBackupsTests : IDisposable
     public Task A_copys_problem_is_still_said_after_a_restart_until_the_folder_changes() => UiThread.RunAsync(async () =>
     {
         var viewState = new InMemoryViewStateStore();
-        var automatic = new AutomaticBackups(new FileBackups(BackupsFolder()), viewState, new LoggerConfiguration().CreateLogger())
+        var automatic = new AutomaticBackups(new BackupLibrary(new FileBackups(BackupsFolder())), viewState, new LoggerConfiguration().CreateLogger())
         {
             CopyFolder = Path.Combine(_root, "unplugged"),
         };
         await automatic.RunAsync(Today, Cancellation);
 
-        var restarted = new AutomaticBackups(new FileBackups(BackupsFolder()), viewState, new LoggerConfiguration().CreateLogger());
+        var restarted = new AutomaticBackups(new BackupLibrary(new FileBackups(BackupsFolder())), viewState, new LoggerConfiguration().CreateLogger());
         restarted.LastCopyProblem.Should().Contain("wasn't there");
 
         restarted.CopyFolder = null;
@@ -95,13 +96,13 @@ public sealed class AutomaticBackupsTests : IDisposable
     {
         var viewState = new InMemoryViewStateStore();
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
-        var automatic = new AutomaticBackups(backups, viewState, new LoggerConfiguration().CreateLogger());
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), viewState, new LoggerConfiguration().CreateLogger());
 
         var taken = await automatic.RunAsync(Today, Cancellation);
 
         taken.Should().BeNull();
         automatic.LastBackupProblem.Should().Contain("wasn't taken").And.Contain("no password supplied");
-        new AutomaticBackups(backups, viewState, new LoggerConfiguration().CreateLogger()).LastBackupProblem
+        new AutomaticBackups(new BackupLibrary(backups), viewState, new LoggerConfiguration().CreateLogger()).LastBackupProblem
             .Should().Be(automatic.LastBackupProblem, "a restart mustn't make it look as if backups are fine");
     });
 
@@ -109,7 +110,7 @@ public sealed class AutomaticBackupsTests : IDisposable
     public Task The_next_backup_that_goes_through_clears_the_problem() => UiThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
-        var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
         await automatic.RunAsync(Today, Cancellation);
         automatic.LastBackupProblem.Should().NotBeNull();
 
@@ -166,7 +167,7 @@ public sealed class AutomaticBackupsTests : IDisposable
     public Task An_old_backup_is_no_reason_to_warn_when_todays_went_through() => UiThread.RunAsync(async () =>
     {
         var backups = new FileBackups(BackupsFolder()) { Newest = Backup(Today.AddDays(-30)) };
-        var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
         await automatic.RunAsync(Today, Cancellation);
 
         (await automatic.OverdueWarningAsync(Today, Cancellation)).Should().BeNull();
@@ -177,8 +178,8 @@ public sealed class AutomaticBackupsTests : IDisposable
     {
         var backups = new FileBackups(BackupsFolder()) { Refusal = new PostgresFailure("no password supplied") };
         var logger = new LoggerConfiguration().CreateLogger();
-        var automatic = new AutomaticBackups(backups, new InMemoryViewStateStore(), logger);
-        var state = new DatabaseBackupsState(backups, _ => { }, logger, automatic);
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), new InMemoryViewStateStore(), logger);
+        var state = new DatabaseBackupsState(new BackupLibrary(backups), _ => { }, logger, automatic);
         state.BackupProblemText.Should().BeNull();
 
         await automatic.RunAsync(Today, Cancellation);
@@ -189,18 +190,18 @@ public sealed class AutomaticBackupsTests : IDisposable
     private string BackupsFolder() => Directory.CreateDirectory(Path.Combine(_root, "backups")).FullName;
 
     private AutomaticBackups Create(string copyFolder) =>
-        new(new FileBackups(BackupsFolder()), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger())
+        new(new BackupLibrary(new FileBackups(BackupsFolder())), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger())
         {
             CopyFolder = copyFolder,
         };
 
     private AutomaticBackups CreateFailing(DateTime? newestTakenAt) =>
         new(
-            new FileBackups(BackupsFolder())
+            new BackupLibrary(new FileBackups(BackupsFolder())
             {
                 Refusal = new PostgresFailure("no password supplied"),
                 Newest = newestTakenAt is { } takenAt ? Backup(takenAt) : null,
-            },
+            }),
             new InMemoryViewStateStore(),
             new LoggerConfiguration().CreateLogger());
 

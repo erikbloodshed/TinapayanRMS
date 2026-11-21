@@ -5,6 +5,7 @@ using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Presentation.Settings;
 using TinapayanRMS.Tests.Common.Fixtures;
+using TinapayanRMS.UseCases.Access;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -17,7 +18,7 @@ public class SecurityStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
 
     private SecurityState CreateState()
     {
-        return new SecurityState(new AccessSettingsRepository(CreateDbContextFactory()), _appLock, new LoggerConfiguration().CreateLogger());
+        return new SecurityState(new AccessSettingsEditor(new AccessSettingsRepository(CreateDbContextFactory())), _appLock, new LoggerConfiguration().CreateLogger());
     }
 
     private AccessSettingsRepository Repository() => new(CreateDbContextFactory());

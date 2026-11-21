@@ -1,6 +1,6 @@
 # 0002. Layers, use cases and drafts
 
-**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies), 2 (Raw Materials) and 3 (Products) done, phase 3's done-when amended on 2026-11-21 (below); phase 4 under way (Settings' list tabs, Costing Defaults and Printing moved on 2026-11-21). What
+**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies), 2 (Raw Materials) and 3 (Products) done, phase 3's done-when amended on 2026-11-21 (below); phase 4 under way (Settings' list tabs, Costing Defaults and Printing, then the password and the backups, moved on 2026-11-21). What
 `Rebase` does is narrowed by [ADR 0007](0007-a-load-repoints-a-draft.md): it re-points a draft, and merges nothing.
 
 ## Context
