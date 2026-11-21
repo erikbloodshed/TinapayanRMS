@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Npgsql;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.Infrastructure.Services;

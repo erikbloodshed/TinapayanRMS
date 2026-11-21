@@ -1,5 +1,4 @@
 using System.Data.Common;
-using TinapayanRMS.ApplicationCore.Interfaces;
 
 namespace TinapayanRMS.ApplicationCore.Rules;
 

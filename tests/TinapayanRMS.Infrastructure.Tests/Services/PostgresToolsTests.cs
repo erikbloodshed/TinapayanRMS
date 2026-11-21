@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Npgsql;
 using TinapayanRMS.Infrastructure.Services;
-using TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.Infrastructure.Tests.Services;
 

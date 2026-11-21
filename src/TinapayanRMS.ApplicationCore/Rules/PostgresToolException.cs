@@ -1,8 +1,10 @@
-namespace TinapayanRMS.ApplicationCore.Interfaces;
+using TinapayanRMS.ApplicationCore.Interfaces;
+
+namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
 /// A PostgreSQL tool (pg_dump, pg_restore) that exited with an error, with what it wrote as its message: what
-/// <see cref="IDatabaseBackups"/> throws when one stops, which the screens put in its own words (Rules.Failure).
+/// <see cref="IDatabaseBackups"/> throws when one stops, which the screens put in its own words (<see cref="Failure"/>).
 /// </summary>
 public sealed class PostgresToolException(string tool, string error) : Exception($"{tool} failed: {error}")
 {
