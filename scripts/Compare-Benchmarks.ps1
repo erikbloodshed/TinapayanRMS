@@ -29,8 +29,9 @@
 
     The base is checked out in a git worktree at %TEMP%\trms-bench\base, kept between runs so its build stays incremental
     (-Clean removes it). Both sides build with -c Bench -p:Optimize=true into %TEMP%\trms-bench, which leaves your Debug
-    build and the MCP server's Release one alone; -Window also publishes each side's app there, as
-    Install-TinapayanRMS.ps1 publishes it. Each side measures on databases of its own, restored from the fixture by its
+    build and the MCP server's Release one alone. -Window also publishes each side's app there, as
+    Install-TinapayanRMS.ps1 publishes it, which builds Release in each tree, the working tree's bin and obj included, as
+    that script does: the MCP server's next start rebuilds what it changed. Each side measures on databases of its own, restored from the fixture by its
     own build (tinapayanrms_bench_*), vacuumed and analyzed before anything is timed, dropped again at the end, never the
     dev database. It refuses to start while a test project is running, and with -Window while any copy of the app is.
 
@@ -269,6 +270,12 @@ function Add-Count([string]$Part, [string]$Measure, [double[]]$BaseValues, [doub
 # Clean.
 
 if ($Clean) {
+    # A benchmark or budget run going on elsewhere has its databases open: they aren't leftovers.
+    $running = @(Get-Process TinapayanRMS.Benchmarks, TinapayanRMS.Benchmarks.Tests -ErrorAction SilentlyContinue)
+    if ($running) {
+        Write-Output "$($running[0].ProcessName) is running (process $($running[0].Id)): its databases aren't leftovers. Clean once it's done."
+        exit 1
+    }
     $exe = @('head', 'base') | ForEach-Object { Join-Path $work "bench-$_\TinapayanRMS.Benchmarks.exe" } | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($exe) {
         $dropped = Invoke-Tool $exe @('clean')
@@ -392,7 +399,10 @@ else {
                 Write-Output "Preparing the $key side's start database..."
                 $prepare = Invoke-Tool $exes[$key] @('startup', 'prepare', '--database', $databases[$key]) (Join-Path $results "prepare-$key.log")
                 if ($prepare.ExitCode -ne 0) { throw "The $key side couldn't prepare its database: see $results\prepare-$key.log." }
-                $prepared[$key] = $prepare.Output | Where-Object { $_ -like 'Host=*' } | Select-Object -Last 1
+                # Its connection string, by the database it names: a start on no connection string at all would open the
+                # app's own database, the developer's, from the appsettings.json built into it.
+                $prepared[$key] = $prepare.Output | Where-Object { $_ -match "(^|;)\s*Database=$($databases[$key])\s*(;|$)" } | Select-Object -Last 1
+                if (-not $prepared[$key]) { throw "The $key side's prepare named no $($databases[$key]): see $results\prepare-$key.log." }
             }
         }
 

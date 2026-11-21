@@ -1,5 +1,4 @@
 using Npgsql;
-using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 
@@ -22,8 +21,11 @@ public sealed class BenchDatabases : IAsyncDisposable
         _write = write;
     }
 
-    /// <summary>The restored copy, which the reads, the screens and the start run on, through a read-only connection.</summary>
-    public string Read => ReadOnlyConnection.Of(_read.ConnectionString);
+    /// <summary>
+    /// The restored copy, which the reads, the screens and the start run on, opened as the app opens its database: a
+    /// read-only session would refuse a write the app may make as a screen opens, and pools differently.
+    /// </summary>
+    public string Read => _read.ConnectionString;
 
     /// <summary>Its copy, which the cost cascade's saves write to.</summary>
     public string Write => _write.ConnectionString;
@@ -72,10 +74,25 @@ public sealed class BenchDatabases : IAsyncDisposable
         }
         finally
         {
+            DeleteFolder(folder);
+        }
+    }
+
+    /// <summary>The restore's own backup folder gone, if it can be: a file still held (a scanner's) mustn't fail a restore that worked.</summary>
+    private static void DeleteFolder(string folder)
+    {
+        try
+        {
             if (Directory.Exists(folder))
             {
                 Directory.Delete(folder, recursive: true);
             }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 
@@ -86,13 +103,18 @@ public sealed class BenchDatabases : IAsyncDisposable
         return ThrowawayDatabase.Of(BenchServer.Maintenance, name).DisposeAsync();
     }
 
-    /// <summary>The databases a run made that are still there: a run killed before it dropped them.</summary>
+    /// <summary>
+    /// The databases a run made that are still there and nobody is connected to: a run killed before it dropped them. One
+    /// with a connection open belongs to a run still going (a budget test run, a comparison in another terminal).
+    /// </summary>
     public static async Task<IReadOnlyList<string>> LeftoversAsync(CancellationToken cancellationToken)
     {
         await using var connection = new NpgsqlConnection(BenchServer.Maintenance);
         await connection.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
-            "SELECT datname FROM pg_database WHERE starts_with(datname, @prefix) ORDER BY datname", connection);
+            "SELECT d.datname FROM pg_database d WHERE starts_with(d.datname, @prefix) "
+            + "AND NOT EXISTS (SELECT 1 FROM pg_stat_activity a WHERE a.datname = d.datname) ORDER BY d.datname",
+            connection);
         command.Parameters.AddWithValue("prefix", BenchServer.Prefix);
         List<string> names = [];
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);

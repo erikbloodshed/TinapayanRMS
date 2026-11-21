@@ -45,6 +45,7 @@ public static class StartDatabase
         }
 
         NpgsqlConnection.ClearAllPools();
+        AppServices.DeleteRunFolder();
         await Console.Out.WriteLineAsync(restored.ConnectionString);
         return 0;
     }

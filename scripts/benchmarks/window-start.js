@@ -41,9 +41,10 @@ async function again(query) {
   }
 }
 
-// The page's own time when what `name` stands for first holds: at once if it holds already, else at the DOM change that
-// makes it, seen by a MutationObserver in the page (playwright-core 1.48's waitForFunction polls by time or by frame, and
-// a page off the screen may draw no frames).
+// The page's own time when what `name` stands for first holds, at the DOM change that makes it, seen by a
+// MutationObserver in the page (playwright-core 1.48's waitForFunction polls by time or by frame, and a page off the
+// screen may draw no frames): { at, late }. Late when it held already as the observer went in, so `at` is only when the
+// watcher looked, not when the app got there: such a mark is left out (null) rather than timed.
 function mark(page, name) {
   const marked = again(() => page.evaluate((what) => new Promise((resolve) => {
     const holds = {
@@ -52,22 +53,22 @@ function mark(page, name) {
     }[what];
     const now = () => performance.timeOrigin + performance.now();
     if (holds()) {
-      resolve(now());
+      resolve({ at: now(), late: true });
       return;
     }
     const observer = new MutationObserver(() => {
       if (holds()) {
         observer.disconnect();
-        resolve(now());
+        resolve({ at: now(), late: false });
       }
     });
     observer.observe(document, { childList: true, subtree: true, attributes: true });
   }), name));
-  const late = new Promise((_, reject) => setTimeout(async () => {
+  const overdue = new Promise((_, reject) => setTimeout(async () => {
     const seen = await describe(page);
     reject(new Error(`${name} wasn't seen within ${timeout} ms: ${seen}`));
   }, left()));
-  return Promise.race([marked, late]);
+  return Promise.race([marked, overdue]);
 }
 
 // What the page shows, for a mark that never came.
@@ -96,7 +97,13 @@ async function describe(page) {
   const cdp = await context.newCDPSession(page);
   await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
 
-  const signInReady = await mark(page, 'signIn');
+  const signIn = await mark(page, 'signIn');
+  const signInReady = signIn.late ? null : signIn.at;
+
+  // The list's mark goes in before any Enter, so it's when the list showed, not when the watcher next looked. It holds
+  // only once the sign-in panel has gone, so a refused try doesn't set it off.
+  const list = mark(page, 'list');
+  list.catch(() => {});
 
   // Typed once the panel has put the cursor in the box itself, as a person types: typing as soon as the box showed lost
   // keys to the panel's own focus landing partway (the box held only part of the password). At a person's pace, the whole
@@ -127,7 +134,7 @@ async function describe(page) {
       .waitForFunction(() => !document.querySelector('#sign-in-password'), null, { polling: 20, timeout: 8000 })
       .then(() => true, () => false);
     if (signedIn) {
-      listShown = await mark(page, 'list');
+      listShown = (await list).at;
       break;
     }
     if (attempt === 3) {

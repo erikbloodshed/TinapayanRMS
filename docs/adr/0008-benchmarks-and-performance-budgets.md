@@ -58,7 +58,10 @@ the developer's.
   a lot of allocation fails the suite before it's merged.
 - A change meant to move a budget is one approval and a diff to read, as the golden master's is.
 - The budgets measure the suite's own (Debug) build, alone in their process, with tiered compilation off so that
-  optimized recompiles don't move what an operation allocates by when they come. The timings measure `-c Bench`.
+  optimized recompiles don't move what an operation allocates by when they come. The timings measure `-c Bench`, which
+  leaves the trees' Debug and Release builds alone; `-Window` publishes Release, as the install script does.
+- The scenarios open their databases as the app does, not read-only: a refactor that has a screen write as it opens
+  is measured, not refused. Only the cascade writes, to a copy of its own.
 - A comparison takes about ten minutes (`-Quick` about three), longer with `-Window`, which also flashes a window on
   the screen at each start: it's run by hand before a merge that could move speed, not on every change.
 - `Test-Changed.ps1` runs the budgets on nearly every change, as Benchmarks.Tests references Components.

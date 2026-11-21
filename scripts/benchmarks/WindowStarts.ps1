@@ -68,6 +68,10 @@ function Stop-WindowMover($mover) {
     was given; and the page's JS heap. The window is closed again, and waited for, before the next start can be.
 #>
 function Measure-WindowStart([string]$Exe, [string]$ConnectionString, $Mover, [string]$Watcher, [string]$Log) {
+    # Only ever on a benchmark database: without one the app opens its own, the developer's (appsettings.json).
+    if ($ConnectionString -notmatch '(^|;)\s*Database=tinapayanrms_bench_\w+\s*(;|$)') {
+        throw "A start of the window needs a benchmark database's connection string, not '$ConnectionString'."
+    }
     $Mover.Shared.ShownAt = [long]0
     $env:ConnectionStrings__Default = $ConnectionString
     $process = Start-Process -FilePath $Exe -PassThru
@@ -98,7 +102,8 @@ function Measure-WindowStart([string]$Exe, [string]$ConnectionString, $Mover, [s
     [pscustomobject]@{
         windowMs          = if ($shownAt -gt 0) { [double]($shownAt - $startedAt) } else { [double]::NaN }
         pageMs            = [double]$marks.timeOrigin - $startedAt
-        signInReadyMs     = [double]$marks.signInReady - $startedAt
+        # Null when the panel was there already as the watcher attached: when it got there isn't known (window-start.js).
+        signInReadyMs     = if ($null -ne $marks.signInReady) { [double]$marks.signInReady - $startedAt } else { [double]::NaN }
         listAfterSignInMs = [double]$marks.listShown - [double]$marks.signingIn
         heapMB            = [math]::Round([double]$marks.heapBytes / 1MB, 2)
     }

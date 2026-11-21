@@ -80,6 +80,7 @@ public static class ColdStart
         {
             await start.DisposeAsync();
             await Log.CloseAndFlushAsync();
+            AppServices.DeleteRunFolder();
         }
     }
 
