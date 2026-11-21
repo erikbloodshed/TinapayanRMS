@@ -51,6 +51,25 @@ internal static class DataUpgrades
         }
     }
 
+    /// <summary>
+    /// The upgrades <paramref name="dbContext"/>'s database is due and hasn't had: their migration is applied, but they
+    /// aren't recorded. One added to the app after its migration ran on this database (tied to an earlier migration, as
+    /// "2026-11-09 innovation stage" is to InitialCreate) is one, and only a migrate makes it (<see cref="RunAsync"/>, EF
+    /// Core's seeding), so the updater counts it as an update even with no migration to apply (DatabaseUpdater, and a
+    /// restore's DatabaseBackups.BringUpToDateAsync). Those of a migration not applied yet come with it.
+    /// </summary>
+    public static async Task<IReadOnlyList<string>> OverdueAsync(
+        TinapayanRMSDbContext dbContext, IReadOnlyCollection<string> appliedMigrations, CancellationToken cancellationToken)
+    {
+        if (!appliedMigrations.Contains(TableMigration))
+        {
+            return [];
+        }
+
+        HashSet<string> made = [.. await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(cancellationToken)];
+        return [.. All.Where(u => appliedMigrations.Contains(u.Migration) && !made.Contains(u.Id)).Select(u => u.Id)];
+    }
+
     /// <summary>The same, for EF Core's synchronous Migrate, which `dotnet ef database update` runs, with no context to keep.</summary>
     public static void Run(DbContext context) => RunAsync(context, CancellationToken.None).GetAwaiter().GetResult();
 

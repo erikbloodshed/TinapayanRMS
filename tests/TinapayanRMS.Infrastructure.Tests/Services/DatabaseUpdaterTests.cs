@@ -100,6 +100,50 @@ public sealed class DatabaseUpdaterTests(DatabaseFixture fixture) : IAsyncDispos
         return await dbContext.RawMaterialCategories.OrderBy(c => c.Name).Select(c => c.Name).ToListAsync(Cancellation);
     }
 
+    /// <summary>
+    /// The database as a copy of the app before the "2026-11-09 innovation stage" upgrade left it, with a product still
+    /// stored in Innovation's former stage, and the upgrade not recorded: as if the app had just gained it, its migration
+    /// (InitialCreate) long applied.
+    /// </summary>
+    private async Task ForgetInnovationUpgradeAsync()
+    {
+        await using (var dbContext = _database.CreateDbContext())
+        {
+            dbContext.Products.Add(new Product { Name = "Ube Pandesal", Stage = ProductStage.Innovation });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await ExecuteAsync("UPDATE products SET stage = 'ResearchAndDevelopment'");
+        await ExecuteAsync("DELETE FROM data_upgrades WHERE id = '2026-11-09 innovation stage'");
+    }
+
+    /// <summary>The stages as stored, and whether the innovation upgrade is recorded.</summary>
+    private async Task<(List<string> Stages, bool Recorded)> InnovationUpgradeAsync()
+    {
+        await using var dbContext = _database.CreateDbContext();
+        var stages = await dbContext.Database.SqlQuery<string>($"SELECT stage AS \"Value\" FROM products").ToListAsync(Cancellation);
+        var recorded = await dbContext.DataUpgrades.AnyAsync(u => u.Id == "2026-11-09 innovation stage", Cancellation);
+        return (stages, recorded);
+    }
+
+    // An upgrade the app gained after its migration ran here: with no migration to apply, only a migrate makes it, so it
+    // counts as an update, a backup first (DataUpgrades.OverdueAsync).
+    [Test]
+    public async Task A_data_upgrade_added_after_its_migration_ran_is_made_after_a_backup()
+    {
+        await ForgetInnovationUpgradeAsync();
+        var told = 0;
+
+        var update = await CreateUpdater().UpdateAsync(count => told = count, Cancellation);
+
+        (update.Applied, update.Created).Should().Be((1, false));
+        told.Should().Be(1, "the panel says it's updating");
+        update.Backup.Should().NotBeNull().And.Match<DatabaseBackup>(b => b.Kind == BackupKind.BeforeUpdate);
+        (await InnovationUpgradeAsync()).Should().BeEquivalentTo((Stages: new List<string> { "Innovation" }, Recorded: true));
+
+        (await CreateUpdater().UpdateAsync(null, Cancellation)).Applied.Should().Be(0, "made once, it's recorded");
+    }
+
     [Test]
     public async Task A_database_already_up_to_date_is_left_alone_with_no_backup()
     {

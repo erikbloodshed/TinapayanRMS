@@ -11,4 +11,4 @@ Screens.OpenProduct | sql = 40 | allocated = 6063 KB
 Screens.PickProduct | sql = 13 | allocated = 1779 KB
 Screens.OpenRawMaterials | sql = 6 | allocated = 1215 KB
 Screens.OpenSubAssemblies | sql = 6 | allocated = 1076 KB
-Start.SignInAndFirstScreen | sql = 12 | allocated = 1771 KB
+Start.SignInAndFirstScreen | sql = 13 | allocated = 1771 KB

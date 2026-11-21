@@ -311,6 +311,45 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
         (await CategoryNamesAsync()).Should().Equal(["Breads"], "the first backup still holds what it was taken with");
     }
 
+    /// <summary>
+    /// The database as a copy of the app before the "2026-11-09 innovation stage" upgrade left it, with a product still
+    /// stored in Innovation's former stage, and the upgrade not recorded: as if the app had just gained it, its migration
+    /// (InitialCreate) long applied.
+    /// </summary>
+    private async Task ForgetInnovationUpgradeAsync()
+    {
+        await using (var dbContext = _database.CreateDbContext())
+        {
+            dbContext.Products.Add(new Product { Name = "Ube Pandesal", Stage = ProductStage.Innovation });
+            await dbContext.SaveChangesAsync(Cancellation);
+        }
+
+        await ExecuteAsync("UPDATE products SET stage = 'ResearchAndDevelopment'");
+        await ExecuteAsync("DELETE FROM data_upgrades WHERE id = '2026-11-09 innovation stage'");
+    }
+
+    /// <summary>The stages as stored, and whether the innovation upgrade is recorded.</summary>
+    private async Task<(List<string> Stages, bool Recorded)> InnovationUpgradeAsync()
+    {
+        await using var dbContext = _database.CreateDbContext();
+        var stages = await dbContext.Database.SqlQuery<string>($"SELECT stage AS \"Value\" FROM products").ToListAsync(Cancellation);
+        var recorded = await dbContext.DataUpgrades.AnyAsync(u => u.Id == "2026-11-09 innovation stage", Cancellation);
+        return (stages, recorded);
+    }
+
+    // A backup from before the app gained a data upgrade whose migration it already had: its restore makes it.
+    [Test]
+    public async Task A_backup_missing_a_data_upgrade_added_after_its_migration_gets_it_as_it_is_restored()
+    {
+        await ForgetInnovationUpgradeAsync();
+        var older = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+        var restored = await _backups.RestoreAsync(older, Cancellation);
+
+        restored.UpdatesApplied.Should().Be(1);
+        (await InnovationUpgradeAsync()).Should().BeEquivalentTo((Stages: new List<string> { "Innovation" }, Recorded: true));
+    }
+
     [Test]
     public async Task A_backup_from_an_earlier_version_is_brought_up_to_date()
     {

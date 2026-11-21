@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Infrastructure.Upgrades;
 
 namespace TinapayanRMS.Infrastructure.Services;
 
@@ -342,12 +343,15 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
         await using var dbContext = new TinapayanRMSDbContext(TinapayanRMSDbContext.CreateOptions(scratch.Connection.ConnectionString));
         var applied = (await dbContext.Database.GetAppliedMigrationsAsync(cancellationToken)).ToList();
         var needed = BackupRules.UpdatesNeeded(applied, [.. dbContext.Database.GetMigrations()]);
-        if (needed.Count > 0)
+
+        // A data upgrade added to the app after the backup's database had its migration: only a migrate makes it.
+        var updates = needed.Count + (await DataUpgrades.OverdueAsync(dbContext, applied, cancellationToken)).Count;
+        if (updates > 0)
         {
             await dbContext.Database.MigrateAsync(cancellationToken);
         }
 
-        return needed.Count;
+        return updates;
     }
 
     /// <summary>

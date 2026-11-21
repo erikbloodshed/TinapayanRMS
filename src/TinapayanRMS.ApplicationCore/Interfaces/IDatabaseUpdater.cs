@@ -14,8 +14,9 @@ public interface IDatabaseUpdater
 }
 
 /// <summary>
-/// What bringing the database up to date did: how many updates it applied, the backup taken first (none when nothing was
-/// applied or the database was new or empty), and whether the database had to be made.
+/// What bringing the database up to date did: how many updates it applied (migrations, and data upgrades the app gained
+/// after their migration ran), the backup taken first (none when nothing was applied or the database was new or empty),
+/// and whether the database had to be made.
 /// </summary>
 /// <param name="RecoveredRestore">Whether a restore cut short was put back first.</param>
 public sealed record DatabaseUpdate(int Applied, DatabaseBackup? Backup, bool Created, bool RecoveredRestore = false);
