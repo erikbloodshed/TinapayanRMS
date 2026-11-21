@@ -86,5 +86,5 @@ public class PrintDocumentPageTests
 
     private static ProductPrintout Printout() => new(
         "Pandesal", "Breads", "Production", "Per piece", "—", null, new DateTime(2026, 11, 9, 14, 0, 0), [], null,
-        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 100m)], MarginPercent = 30m, VatPercent = 12m }));
+        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 100m)], MarkupPercent = 30m, VatPercent = 12m }));
 }

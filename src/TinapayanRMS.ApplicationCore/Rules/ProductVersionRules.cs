@@ -300,7 +300,7 @@ public static class ProductVersionRules
         AddPercent(changes, "Labor %", was.LaborPercent, now.LaborPercent);
         AddPercent(changes, "Overhead %", was.OverheadPercent, now.OverheadPercent);
         AddPercent(changes, "Admin %", was.AdministrativePercent, now.AdministrativePercent);
-        AddPercent(changes, "Markup %", was.MarginPercent, now.MarginPercent);
+        AddPercent(changes, "Markup %", was.MarkupPercent, now.MarkupPercent);
     }
 
     /// <summary>

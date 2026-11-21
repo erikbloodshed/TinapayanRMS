@@ -8,6 +8,10 @@ public sealed class CostingParametersConfiguration : IEntityTypeConfiguration<Co
 {
     public void Configure(EntityTypeBuilder<CostingParameters> builder)
     {
+        // The markup on cost, stored as margin_percent, its name before 2026-11-22: the Recipe API, installed apart from the
+        // app, reads the column too, and would stop reading costs until reinstalled if the app renamed it.
+        builder.Property(c => c.MarkupPercent).HasColumnName("margin_percent");
+
         // Backstop for CostingRules.EnsureValidParameters.
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_CostingParameters_Percents",

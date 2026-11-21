@@ -40,7 +40,7 @@ public sealed class ProductCostSummary
         Labor = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.LaborPercent);
         Overhead = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.OverheadPercent);
         Administrative = CostingRules.CalculateCostFromSubAssemblyPercent(SubAssemblies, inputs.AdministrativePercent);
-        MarginPercent = inputs.MarginPercent;
+        MarkupPercent = inputs.MarkupPercent;
         VatPercent = inputs.VatPercent;
         (BaseCost, PreVatPrice, SellingPrice) = CostingRules.CalculateSellingPrice(
             SubAssemblies,
@@ -48,7 +48,7 @@ public sealed class ProductCostSummary
             inputs.LaborPercent,
             inputs.OverheadPercent,
             inputs.AdministrativePercent,
-            inputs.MarginPercent,
+            inputs.MarkupPercent,
             inputs.VatPercent,
             inputs.WastagePercent);
         CurrentPrice = inputs.CurrentPrice;
@@ -135,7 +135,7 @@ public sealed class ProductCostSummary
     /// <summary>The subtotal the markup goes on: materials, wastage, labor, overhead and administrative.</summary>
     public decimal BaseCost { get; }
 
-    public decimal MarginPercent { get; }
+    public decimal MarkupPercent { get; }
 
     public decimal PreVatPrice { get; }
 
@@ -152,7 +152,7 @@ public sealed class ProductCostSummary
     public decimal? CurrentPrice { get; }
 
     /// <summary>
-    /// The markup CurrentPrice actually earns on the base cost, VAT taken out (as MarginPercent is on
+    /// The markup CurrentPrice actually earns on the base cost, VAT taken out (as MarkupPercent is on
     /// SellingPrice); null when no current price is entered.
     /// </summary>
     public decimal? CurrentMarkupPercent { get; }
@@ -196,7 +196,7 @@ public sealed class ProductCostSummary
     /// </summary>
     public bool IsBelowTargetMarkup =>
         CurrentMarkupPercent is { } earned
-        && Math.Round(earned, 2, MidpointRounding.AwayFromZero) < Math.Round(MarginPercent, 2, MidpointRounding.AwayFromZero);
+        && Math.Round(earned, 2, MidpointRounding.AwayFromZero) < Math.Round(MarkupPercent, 2, MidpointRounding.AwayFromZero);
 
     public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
 

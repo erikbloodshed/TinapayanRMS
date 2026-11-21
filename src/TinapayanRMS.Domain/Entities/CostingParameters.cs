@@ -23,5 +23,5 @@ public sealed class CostingParameters
     public decimal AdministrativePercent { get; set; }
 
     /// <summary>Markup on cost (materials + labor + overhead + administrative), as a percentage.</summary>
-    public decimal MarginPercent { get; set; }
+    public decimal MarkupPercent { get; set; }
 }

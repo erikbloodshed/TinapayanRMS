@@ -24,7 +24,7 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
                 cancellationToken);
 
     public async Task SetAsync(
-        int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent, CancellationToken cancellationToken)
+        int productId, decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal markupPercent, CancellationToken cancellationToken)
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await SetAsync(
@@ -35,7 +35,7 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
                 LaborPercent = laborPercent,
                 OverheadPercent = overheadPercent,
                 AdministrativePercent = administrativePercent,
-                MarginPercent = marginPercent,
+                MarkupPercent = markupPercent,
             },
             cancellationToken);
     }
@@ -47,7 +47,7 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
     /// </summary>
     internal static async Task SetAsync(TinapayanRMSDbContext dbContext, int productId, CostingParameters costing, CancellationToken cancellationToken)
     {
-        CostingRules.EnsureValidParameters(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
+        CostingRules.EnsureValidParameters(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent);
 
         var existing = await dbContext.CostingParameters.FirstOrDefaultAsync(c => c.ProductId == productId, cancellationToken);
         CopyFields(costing, existing ?? dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId }).Entity);
@@ -59,10 +59,10 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
         decimal laborPercent,
         decimal overheadPercent,
         decimal administrativePercent,
-        decimal marginPercent,
+        decimal markupPercent,
         CancellationToken cancellationToken)
     {
-        CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, marginPercent);
+        CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, markupPercent);
         if (productIds.Count == 0)
         {
             return;
@@ -76,7 +76,7 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
             LaborPercent = laborPercent,
             OverheadPercent = overheadPercent,
             AdministrativePercent = administrativePercent,
-            MarginPercent = marginPercent,
+            MarkupPercent = markupPercent,
         };
         foreach (var productId in ids)
         {
@@ -92,6 +92,6 @@ public sealed class CostingParametersRepository(IDbContextFactory<TinapayanRMSDb
         row.LaborPercent = costing.LaborPercent;
         row.OverheadPercent = costing.OverheadPercent;
         row.AdministrativePercent = costing.AdministrativePercent;
-        row.MarginPercent = costing.MarginPercent;
+        row.MarkupPercent = costing.MarkupPercent;
     }
 }

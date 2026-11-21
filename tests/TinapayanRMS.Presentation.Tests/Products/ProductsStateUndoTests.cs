@@ -554,7 +554,7 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         // The screen's real opening order: the blank form is costed at nothing before the defaults exist, and the
         // load then puts them on it. That isn't the user's change, so it mustn't read as something to save.
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
-            new CostingDefaults { LaborPercent = 12m, OverheadPercent = 8m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m },
+            new CostingDefaults { LaborPercent = 12m, OverheadPercent = 8m, AdministrativePercent = 5m, MarkupPercent = 40m, VatPercent = 12m },
             Cancellation);
 
         var state = CreateState();

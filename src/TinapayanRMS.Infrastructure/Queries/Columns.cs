@@ -1,4 +1,4 @@
-﻿using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.Infrastructure.Queries;
 
@@ -52,6 +52,17 @@ internal static class Columns
         [typeof(Upgrades.DataUpgrade)] = ["id", "applied_at"],
     };
 
+    /// <summary>
+    /// The columns kept under a name their property no longer has, read as the property's (Dapper maps by name): the markup
+    /// on cost, stored as margin_percent, its name before 2026-11-22, which the Recipe API reads too
+    /// (CostingParametersConfiguration).
+    /// </summary>
+    private static readonly Dictionary<string, string> ReadAs = new()
+    {
+        ["margin_percent"] = "markup_percent",
+    };
+
     /// <summary><typeparamref name="T"/>'s columns qualified by <paramref name="alias"/>, for a SELECT list.</summary>
-    public static string Of<T>(string alias) => string.Join(", ", ByEntity[typeof(T)].Select(c => $"{alias}.{c}"));
+    public static string Of<T>(string alias) =>
+        string.Join(", ", ByEntity[typeof(T)].Select(c => ReadAs.TryGetValue(c, out var property) ? $"{alias}.{c} AS {property}" : $"{alias}.{c}"));
 }

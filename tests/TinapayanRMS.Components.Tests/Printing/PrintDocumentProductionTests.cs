@@ -62,5 +62,5 @@ public class PrintDocumentProductionTests
             [new PrintedLine("Flour", 1000m, 100m, 0.052m, 52m), new PrintedLine("Water", 600m, 60m, 0.001m, 0.6m)], [],
             1600m, 160m, 52.6m, 50m, 32m, 1.64m, true)],
         null,
-        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 1.64m)], MarginPercent = 30m, VatPercent = 12m }));
+        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 1.64m)], MarkupPercent = 30m, VatPercent = 12m }));
 }

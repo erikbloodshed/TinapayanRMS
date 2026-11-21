@@ -33,8 +33,8 @@ public sealed class CostingDefaults
 
     public decimal AdministrativePercent { get; set; }
 
-    /// <summary>Markup on cost, as CostingParameters.MarginPercent.</summary>
-    public decimal MarginPercent { get; set; }
+    /// <summary>Markup on cost, as CostingParameters.MarkupPercent.</summary>
+    public decimal MarkupPercent { get; set; }
 
     /// <summary>The shop's VAT, added on top of every product's marked-up price, as a percentage.</summary>
     public decimal VatPercent { get; set; }

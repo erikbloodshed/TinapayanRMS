@@ -232,7 +232,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         }
 
         var costingRepository = new CostingParametersRepository(CreateDbContextFactory());
-        await costingRepository.SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, Cancellation);
+        await costingRepository.SetAsync(sourceId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, markupPercent: 40m, Cancellation);
 
         var variantId = await CreateVariantAsync(sourceId, "Ensaymada Small");
 
@@ -248,7 +248,7 @@ public class ProductVariantPersistenceTests(DatabaseFixture fixture) : Persisten
         costing.Should().BeEquivalentTo(
             (await costingRepository.GetForProductAsync(sourceId, Cancellation))!,
             options => options.Excluding(c => c.Id).Excluding(c => c.ProductId).Excluding(c => c.Product));
-        costing.MarginPercent.Should().Be(40m);
+        costing.MarkupPercent.Should().Be(40m);
         costing.LaborPercent.Should().Be(5m);
     }
 

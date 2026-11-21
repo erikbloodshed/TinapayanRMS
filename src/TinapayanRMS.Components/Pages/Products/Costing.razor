@@ -32,7 +32,7 @@
             </div>
             <div class="cost-tile cost-markup">
                 <label class="form-label" for="cost-markup" title="On the base cost: materials, wastage, labor, overhead and administrative">Markup Metric</label>
-                <NumberField ID="cost-markup" TValue="decimal" @bind-Value="State.Costing.EditingMarginPercent" Format="N1" Min="0" Suffix="%" />
+                <NumberField ID="cost-markup" TValue="decimal" @bind-Value="State.Costing.EditingMarkupPercent" Format="N1" Min="0" Suffix="%" />
                 <NumberField TValue="decimal" @bind-Value="State.Costing.EditingMarkupAmount" Format="N2" Min="0" Tooltip="@($"The markup, {State.Costing.CostUnitCaption}, before VAT. Typing it sets the percentage.")" />
                 <span class="tile-caption">@State.Costing.Costs.MarkupShare.ToString("N1")% of the price</span>
             </div>
@@ -108,7 +108,7 @@
                     <tr>
                         <td>Markup</td>
                         <td class="number">@Costs.Markup.ToString("N2")</td>
-                        <td class="number percent">(@Costs.MarginPercent.ToString("N1")%)</td>
+                        <td class="number percent">(@Costs.MarkupPercent.ToString("N1")%)</td>
                         <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
                         <td class="number percent @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"({percent:N1}%)" : "")</td>
                     </tr>

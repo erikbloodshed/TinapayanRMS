@@ -77,7 +77,7 @@ public class PrintDocumentCostingTests
         new(new ProductCostInputs
         {
             Parts = [("Dough", 100m)],
-            MarginPercent = 30m,
+            MarkupPercent = 30m,
             VatPercent = 12m,
             CurrentPrice = currentPrice,
             PriceRoundingStep = 0.25m,

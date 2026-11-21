@@ -65,7 +65,7 @@ public class ProductSavePersistenceTests(DatabaseFixture fixture) : PersistenceT
                 [new LinkedUsageDraft(linkedFillingId, UsageAuthoredField.WeightPerPiece, 10m)]),
             null,
             [(boxId, null, PackagingLineAuthoredField.UnitsPerPackagingUnit, 6m)],
-            new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarginPercent = 30m },
+            new CostingParameters { LaborPercent = 6m, OverheadPercent = 5.5m, AdministrativePercent = 3.5m, MarkupPercent = 30m },
             Cancellation);
 
         product.Id.Should().Be(0, "the caller's entity is only read");

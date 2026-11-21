@@ -12,6 +12,10 @@ public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<Cost
         // A settings record, not a list: the one row always has Id 1, so it's never an identity.
         builder.Property(d => d.Id).ValueGeneratedNever();
 
+        // The markup on cost, stored as margin_percent, its name before 2026-11-22: the Recipe API, installed apart from the
+        // app, reads the column too, and would stop reading costs until reinstalled if the app renamed it.
+        builder.Property(d => d.MarkupPercent).HasColumnName("margin_percent");
+
         // The database default is only for the row saved before this was: the column is added to it as Production. As on
         // Products.Stage, HasSentinel moves the "leave it to the database" value off Innovation, the CLR
         // default, so EF always writes the stage picked. It's stored by name, reading Innovation's former name too

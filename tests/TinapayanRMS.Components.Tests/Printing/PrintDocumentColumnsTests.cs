@@ -117,7 +117,7 @@ public class PrintDocumentColumnsTests
         [new PrintedSection("Dough", null, "Baker's %", [new PrintedLine("Flour", 1000m, 100m, 0.052m, 52m)], [],
             1000m, 100m, 52m, 50m, 20m, 2.6m, true)],
         null,
-        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 2.6m)], MarginPercent = 30m, VatPercent = 12m })));
+        new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 2.6m)], MarkupPercent = 30m, VatPercent = 12m })));
 
     private static List<string> Headings<T>(IRenderedComponent<T> rendered, string table) where T : IComponent =>
         [.. rendered.Find(table).QuerySelectorAll("thead th").Select(cell => cell.TextContent.Trim())];

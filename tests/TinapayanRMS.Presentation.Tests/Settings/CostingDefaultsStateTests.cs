@@ -36,7 +36,7 @@ public class CostingDefaultsStateTests(DatabaseFixture fixture) : PersistenceTes
         state.EditingLaborPercent = 25m;
         state.EditingOverheadPercent = 10m;
         state.EditingAdministrativePercent = 5m;
-        state.EditingMarginPercent = 40m;
+        state.EditingMarkupPercent = 40m;
         state.EditingVatPercent = 12m;
         state.EditingWastagePercent = 4.5m;
         state.EditingNewProductStage = ProductStage.Innovation;
@@ -49,7 +49,7 @@ public class CostingDefaultsStateTests(DatabaseFixture fixture) : PersistenceTes
         state.SuccessMessage.Should().NotBeNull();
         var reloaded = CreateState();
         await reloaded.LoadCommand.ExecuteAsync();
-        (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarginPercent, reloaded.EditingVatPercent)
+        (reloaded.EditingLaborPercent, reloaded.EditingOverheadPercent, reloaded.EditingAdministrativePercent, reloaded.EditingMarkupPercent, reloaded.EditingVatPercent)
             .Should().Be((25m, 10m, 5m, 40m, 12m));
         reloaded.EditingWastagePercent.Should().Be(4.5m);
         reloaded.EditingNewProductStage.Should().Be(ProductStage.Innovation);

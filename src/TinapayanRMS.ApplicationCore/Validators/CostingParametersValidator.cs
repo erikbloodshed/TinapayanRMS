@@ -12,6 +12,6 @@ public sealed class CostingParametersValidator : AbstractValidator<CostingParame
 {
     public CostingParametersValidator()
     {
-        RuleFor(c => c).Satisfies(c => CostingRules.EnsureValidParameters(c.LaborPercent, c.OverheadPercent, c.AdministrativePercent, c.MarginPercent));
+        RuleFor(c => c).Satisfies(c => CostingRules.EnsureValidParameters(c.LaborPercent, c.OverheadPercent, c.AdministrativePercent, c.MarkupPercent));
     }
 }

@@ -71,13 +71,13 @@ public sealed class ProductCostRow(Product product, ProductCostSummary costs, IR
     public decimal? MarkupPercent => costs.CurrentMarkupPercent;
 
     /// <summary>The markup the costing aims for, the Costing tab's Markup Metric.</summary>
-    public decimal TargetMarkupPercent => costs.MarginPercent;
+    public decimal TargetMarkupPercent => costs.MarkupPercent;
 
     /// <summary>
     /// How many percentage points the current price's markup is short of <see cref="TargetMarkupPercent"/>; null
     /// when it isn't short, or there's no current price. Sorting by it puts the furthest short first.
     /// </summary>
-    public decimal? ShortOfTargetMarkup => costs.IsBelowTargetMarkup ? costs.MarginPercent - costs.CurrentMarkupPercent : null;
+    public decimal? ShortOfTargetMarkup => costs.IsBelowTargetMarkup ? costs.MarkupPercent - costs.CurrentMarkupPercent : null;
 
     /// <summary>
     /// The recipe sections with no weight per piece or yield, which cost it nothing per piece, by name ("Topping", or

@@ -24,10 +24,10 @@ public class ReportsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fi
     [Test]
     public void A_row_says_by_how_much_a_current_price_is_short_of_the_target_markup()
     {
-        var row = new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 20m)], MarginPercent = 30m, CurrentPrice = 25m }));
+        var row = new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 20m)], MarkupPercent = 30m, CurrentPrice = 25m }));
         row.TargetMarkupPercent.Should().Be(30m);
         row.ShortOfTargetMarkup.Should().Be(5m, "25.00 on 20.00 earns 25%");
-        new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 20m)], MarginPercent = 30m, CurrentPrice = 27m }))
+        new ProductCostRow(new Product { Name = "Pandesal" }, new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 20m)], MarkupPercent = 30m, CurrentPrice = 27m }))
             .ShortOfTargetMarkup.Should().BeNull();
     }
 
@@ -102,7 +102,7 @@ public class ReportsStateTests(DatabaseFixture fixture) : PersistenceTestBase(fi
             });
             dbContext.CostingParameters.Add(new CostingParameters
             {
-                ProductId = ensaymadaId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
+                ProductId = ensaymadaId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 30m,
             });
             await dbContext.SaveChangesAsync(Cancellation);
         }

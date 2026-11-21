@@ -523,7 +523,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         {
             var defaults = await Task.Run(() => _queries.ReadCostingDefaultsAsync(CancellationToken.None));
             var question = $"Set the costing of {ProductNames(products)} to the costing defaults: labor {defaults.LaborPercent:0.##}%, overhead "
-                + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarginPercent:0.##}%?"
+                + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarkupPercent:0.##}%?"
                 + "\n\nA version is recorded of each one this changes.";
             if (!await Runner.ConfirmDelete.Handle(question))
             {
@@ -535,7 +535,7 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
                 LaborPercent = defaults.LaborPercent,
                 OverheadPercent = defaults.OverheadPercent,
                 AdministrativePercent = defaults.AdministrativePercent,
-                MarginPercent = defaults.MarginPercent,
+                MarkupPercent = defaults.MarkupPercent,
             };
             var changed = await Task.Run(() => _editor.ApplyCostingAsync([.. ids], costing, DateTime.Now, CancellationToken.None));
 

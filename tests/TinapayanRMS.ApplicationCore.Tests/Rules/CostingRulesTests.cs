@@ -34,7 +34,7 @@ public class CostingRulesTests
     [Test]
     public void EnsureValidParameters_rejects_negative_labor_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: -1m, overheadPercent: 0m, administrativePercent: 0m, markupPercent: 0m);
 
         act.Should().Throw<BusinessRuleException>();
     }
@@ -42,7 +42,7 @@ public class CostingRulesTests
     [Test]
     public void EnsureValidParameters_rejects_negative_overhead_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: -1m, administrativePercent: 0m, marginPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: -1m, administrativePercent: 0m, markupPercent: 0m);
 
         act.Should().Throw<BusinessRuleException>();
     }
@@ -50,15 +50,15 @@ public class CostingRulesTests
     [Test]
     public void EnsureValidParameters_rejects_negative_administrative_cost()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, marginPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: -1m, markupPercent: 0m);
 
         act.Should().Throw<BusinessRuleException>();
     }
 
     [Test]
-    public void EnsureValidParameters_rejects_negative_margin_percent()
+    public void EnsureValidParameters_rejects_negative_markup_percent()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: -5m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, markupPercent: -5m);
 
         act.Should().Throw<BusinessRuleException>();
     }
@@ -76,7 +76,7 @@ public class CostingRulesTests
     [Test]
     public void EnsureValidParameters_accepts_zeroes()
     {
-        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, marginPercent: 0m);
+        var act = () => CostingRules.EnsureValidParameters(laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m, markupPercent: 0m);
 
         act.Should().NotThrow();
     }
@@ -100,7 +100,7 @@ public class CostingRulesTests
         // Margin 40% markup on cost -> ₱39.20 pre-VAT price.
         // VAT 12% added on top -> ₱43.904 final selling price.
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 0m, marginPercent: 40m, vatPercent: 12m);
+            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 0m, markupPercent: 40m, vatPercent: 12m);
 
         baseCost.Should().Be(28m);
         preVatPrice.Should().Be(39.2m);
@@ -113,7 +113,7 @@ public class CostingRulesTests
         // Sub-assemblies ₱20 + Labor 25% (₱5) + Overhead 15% (₱3) + Administrative 10% (₱2) = ₱30 base cost.
         // Margin 40% markup on cost -> ₱42 pre-VAT price; VAT 12% on top -> ₱47.04.
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, marginPercent: 40m, vatPercent: 12m);
+            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, markupPercent: 40m, vatPercent: 12m);
 
         baseCost.Should().Be(30m);
         preVatPrice.Should().Be(42m);
@@ -125,7 +125,7 @@ public class CostingRulesTests
     {
         // Sub-assemblies ₱10 + Labor 20% (₱2) + Overhead 10% (₱1) = ₱13.
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 10m, packagingCostPerPiece: 0m, laborPercent: 20m, overheadPercent: 10m, administrativePercent: 0m, marginPercent: 0m, vatPercent: 0m);
+            subAssemblyCostPerPiece: 10m, packagingCostPerPiece: 0m, laborPercent: 20m, overheadPercent: 10m, administrativePercent: 0m, markupPercent: 0m, vatPercent: 0m);
 
         baseCost.Should().Be(13m);
         preVatPrice.Should().Be(13m);
@@ -136,7 +136,7 @@ public class CostingRulesTests
     public void CalculateSellingPrice_with_no_material_cost_has_no_labor_overhead_or_administrative_cost()
     {
         var (baseCost, _, sellingPrice) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, marginPercent: 40m, vatPercent: 12m);
+            subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 0m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, markupPercent: 40m, vatPercent: 12m);
 
         baseCost.Should().Be(0m);
         sellingPrice.Should().Be(0m);
@@ -148,7 +148,7 @@ public class CostingRulesTests
         // The three percentages pay for making the recipe, so ₱4 of packaging adds ₱4 to the base cost and
         // nothing to labor, overhead or administrative: ₱20 + 25% (₱5) + 15% (₱3) + 10% (₱2) + ₱4 = ₱34.
         var (baseCost, _, _) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, marginPercent: 0m, vatPercent: 0m);
+            subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, markupPercent: 0m, vatPercent: 0m);
 
         baseCost.Should().Be(34m);
     }
@@ -160,7 +160,7 @@ public class CostingRulesTests
         // takes no wastage: ₱100 + ₱3 + ₱4 + ₱25 = ₱132. A 30% markup and 12% VAT go on that as before.
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
             subAssemblyCostPerPiece: 100m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 0m, administrativePercent: 0m,
-            marginPercent: 30m, vatPercent: 12m, wastagePercent: 3m);
+            markupPercent: 30m, vatPercent: 12m, wastagePercent: 3m);
 
         baseCost.Should().Be(132m);
         preVatPrice.Should().Be(171.6m);
@@ -172,7 +172,7 @@ public class CostingRulesTests
     {
         var (baseCost, _, _) = CostingRules.CalculateSellingPrice(
             subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 4m, laborPercent: 0m, overheadPercent: 0m, administrativePercent: 0m,
-            marginPercent: 0m, vatPercent: 0m, wastagePercent: 3m);
+            markupPercent: 0m, vatPercent: 0m, wastagePercent: 3m);
 
         baseCost.Should().Be(4m);
     }
@@ -203,7 +203,7 @@ public class CostingRulesTests
     public void CalculateSellingPrice_charges_nothing_for_labor_overhead_or_administrative_on_packaging_alone()
     {
         var (baseCost, _, _) = CostingRules.CalculateSellingPrice(
-            subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, marginPercent: 0m, vatPercent: 0m);
+            subAssemblyCostPerPiece: 0m, packagingCostPerPiece: 4m, laborPercent: 25m, overheadPercent: 15m, administrativePercent: 10m, markupPercent: 0m, vatPercent: 0m);
 
         baseCost.Should().Be(4m);
     }

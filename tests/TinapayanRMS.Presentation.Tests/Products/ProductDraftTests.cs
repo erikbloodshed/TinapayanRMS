@@ -183,7 +183,7 @@ public class ProductDraftTests
                 [Material71, Material(72, "Sticker Label", 0.4m)],
                 []));
             Draft.Costing.SetDefaults(new CostingDefaults { WastagePercent = 3m, VatPercent = 12m, PriceRoundingStep = 1m });
-            Draft.Costing.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m });
+            Draft.Costing.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m });
             Draft.EditingName = "Ube Loaf";
             Draft.EditingCategory = _categories[0];
             Draft.EditingCurrentPrice = 95m;

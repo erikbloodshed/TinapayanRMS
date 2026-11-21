@@ -2,14 +2,14 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class CostingRules
 {
-    public static void EnsureValidParameters(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent)
+    public static void EnsureValidParameters(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal markupPercent)
     {
         if (laborPercent < 0 || overheadPercent < 0 || administrativePercent < 0)
         {
             throw new BusinessRuleException("Labor, overhead and administrative percentages can't be negative.");
         }
 
-        if (marginPercent < 0)
+        if (markupPercent < 0)
         {
             throw new BusinessRuleException("The markup percentage can't be negative.");
         }
@@ -75,7 +75,7 @@ public static class CostingRules
         decimal laborPercent,
         decimal overheadPercent,
         decimal administrativePercent,
-        decimal marginPercent,
+        decimal markupPercent,
         decimal vatPercent,
         decimal wastagePercent = 0m)
     {
@@ -84,7 +84,7 @@ public static class CostingRules
         var overheadCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, overheadPercent);
         var administrativeCost = CalculateCostFromSubAssemblyPercent(subAssemblyCostPerPiece, administrativePercent);
         var baseCost = subAssemblyCostPerPiece + wastageCost + packagingCostPerPiece + laborCost + overheadCost + administrativeCost;
-        var preVatPrice = baseCost * (1 + marginPercent / 100m);
+        var preVatPrice = baseCost * (1 + markupPercent / 100m);
         var sellingPrice = preVatPrice * (1 + vatPercent / 100m);
         return (baseCost, preVatPrice, sellingPrice);
     }

@@ -279,7 +279,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
     public Task Apply_Costing_Defaults_sets_the_products_picked_to_them_once_confirmed_and_the_one_showing_follows() => UiThread.RunAsync(async () =>
     {
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
-            new CostingDefaults { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m }, Cancellation);
+            new CostingDefaults { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m }, Cancellation);
         var mamonId = await SaveProductAsync("Mamon", null);
         var pandesalId = await SaveProductAsync("Pandesal", null);
         var state = await OpenedStateAsync(mamonId);
@@ -297,12 +297,12 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         asked.Should().StartWith("Set the costing of Mamon and Pandesal to the costing defaults: labor 35%, overhead 25%, administrative 15% and markup 60%?");
         state.SuccessMessage.Should().Be("The costing defaults were applied to Mamon and Pandesal, with a version of each.");
         await Settle.UntilAsync(state,
-            () => state.AreDetailsReady && state.Costing.EditingMarginPercent == 60m,
-            () => $"ready={state.AreDetailsReady}, markup={state.Costing.EditingMarginPercent}");
+            () => state.AreDetailsReady && state.Costing.EditingMarkupPercent == 60m,
+            () => $"ready={state.AreDetailsReady}, markup={state.Costing.EditingMarkupPercent}");
         state.Costing.EditingLaborPercent.Should().Be(35m, "the product showing reads its new costing");
         state.HasUnsavedChanges.Should().BeFalse("its new costing is how it's saved");
         await using var dbContext = CreateDbContext();
-        (await dbContext.CostingParameters.Where(c => c.ProductId == pandesalId).Select(c => c.MarginPercent).SingleAsync(Cancellation)).Should().Be(60m);
+        (await dbContext.CostingParameters.Where(c => c.ProductId == pandesalId).Select(c => c.MarkupPercent).SingleAsync(Cancellation)).Should().Be(60m);
     });
 
     [Test]
@@ -1176,11 +1176,11 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         product.CurrentPrice = currentPrice;
         if (await dbContext.CostingParameters.SingleOrDefaultAsync(c => c.ProductId == productId, Cancellation) is { } costing)
         {
-            costing.MarginPercent = targetMarkupPercent;
+            costing.MarkupPercent = targetMarkupPercent;
         }
         else
         {
-            dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId, MarginPercent = targetMarkupPercent });
+            dbContext.CostingParameters.Add(new CostingParameters { ProductId = productId, MarkupPercent = targetMarkupPercent });
         }
 
         await dbContext.SaveChangesAsync(Cancellation);

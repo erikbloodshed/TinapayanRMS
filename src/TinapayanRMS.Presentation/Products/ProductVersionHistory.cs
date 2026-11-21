@@ -712,7 +712,7 @@ public sealed class ProductVersionHistory : ObservableState
             bulkLines,
             bulkLines.Count > 0 ? content.BulkPackagingQuantity : null,
             [.. content.Components.Select(c => new ComponentLineSnapshot(c.ProductId, c.Quantity))],
-            (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
+            (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent),
             content.QuantityRequired,
             content.CurrentPrice,
             content.IncludesComponentPackaging));

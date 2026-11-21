@@ -41,7 +41,7 @@ public sealed class CostingDefaultsEditor(
             LaborPercent = defaults.LaborPercent,
             OverheadPercent = defaults.OverheadPercent,
             AdministrativePercent = defaults.AdministrativePercent,
-            MarginPercent = defaults.MarginPercent,
+            MarkupPercent = defaults.MarkupPercent,
         });
         if (!validation.IsValid)
         {

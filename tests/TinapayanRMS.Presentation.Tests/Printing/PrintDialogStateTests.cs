@@ -472,7 +472,7 @@ public class PrintDialogStateTests(DatabaseFixture fixture) : PersistenceTestBas
         await using var dbContext = CreateDbContext();
         dbContext.CostingParameters.Add(new CostingParameters
         {
-            ProductId = productId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
+            ProductId = productId, LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 30m,
         });
         await dbContext.SaveChangesAsync(Cancellation);
     }

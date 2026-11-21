@@ -52,12 +52,12 @@ public sealed class CostingDefaultsState : ScreenState
         set => RaiseAndSetIfChanged(ref _editingAdministrativePercent, value);
     }
 
-    private decimal _editingMarginPercent;
-    /// <summary>The markup on cost, shown as Markup % (CostingParameters.MarginPercent).</summary>
-    public decimal EditingMarginPercent
+    private decimal _editingMarkupPercent;
+    /// <summary>The markup on cost, shown as Markup % (CostingParameters.MarkupPercent).</summary>
+    public decimal EditingMarkupPercent
     {
-        get => _editingMarginPercent;
-        set => RaiseAndSetIfChanged(ref _editingMarginPercent, value);
+        get => _editingMarkupPercent;
+        set => RaiseAndSetIfChanged(ref _editingMarkupPercent, value);
     }
 
     private decimal _editingVatPercent;
@@ -119,7 +119,7 @@ public sealed class CostingDefaultsState : ScreenState
             EditingLaborPercent = defaults.LaborPercent;
             EditingOverheadPercent = defaults.OverheadPercent;
             EditingAdministrativePercent = defaults.AdministrativePercent;
-            EditingMarginPercent = defaults.MarginPercent;
+            EditingMarkupPercent = defaults.MarkupPercent;
             EditingVatPercent = defaults.VatPercent;
             EditingWastagePercent = defaults.WastagePercent;
             EditingCostBufferPercent = defaults.CostBufferPercent;
@@ -136,7 +136,7 @@ public sealed class CostingDefaultsState : ScreenState
                     LaborPercent = EditingLaborPercent,
                     OverheadPercent = EditingOverheadPercent,
                     AdministrativePercent = EditingAdministrativePercent,
-                    MarginPercent = EditingMarginPercent,
+                    MarkupPercent = EditingMarkupPercent,
                     VatPercent = EditingVatPercent,
                     WastagePercent = EditingWastagePercent,
                     CostBufferPercent = EditingCostBufferPercent,

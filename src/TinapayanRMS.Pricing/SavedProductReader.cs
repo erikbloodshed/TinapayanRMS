@@ -406,7 +406,7 @@ public sealed class SavedProductReader(
             LaborPercent = costing?.LaborPercent ?? 0m,
             OverheadPercent = costing?.OverheadPercent ?? 0m,
             AdministrativePercent = costing?.AdministrativePercent ?? 0m,
-            MarginPercent = costing?.MarginPercent ?? 0m,
+            MarkupPercent = costing?.MarkupPercent ?? 0m,
             VatPercent = detail.VatPercent,
             WastagePercent = detail.WastagePercent,
             PriceRoundingStep = detail.PriceRoundingStep,

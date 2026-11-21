@@ -24,7 +24,7 @@ public class SavedProductPrintoutTests(DatabaseFixture fixture) : PersistenceTes
 
     private static CostingParameters Costing() => new()
     {
-        LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 30m,
+        LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 30m,
     };
 
     /// <summary>

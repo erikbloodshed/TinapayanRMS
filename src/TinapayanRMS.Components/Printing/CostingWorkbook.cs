@@ -73,7 +73,7 @@ public static class CostingWorkbook
         rows.Add(new($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare));
         rows.Add(new($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", costs.Administrative, costs.AdministrativeShare));
         rows.Add(new("Subtotal (base cost)", costs.BaseCost, costs.BaseCostShare));
-        rows.Add(new($"Markup ({costs.MarginPercent:0.##}%)", costs.Markup, costs.MarkupShare, costs.CurrentMarkup));
+        rows.Add(new($"Markup ({costs.MarkupPercent:0.##}%)", costs.Markup, costs.MarkupShare, costs.CurrentMarkup));
         rows.Add(new($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, costs.VatShare, costs.CurrentVat));
         rows.Add(new($"Selling price {unit.ToLowerInvariant()}", costs.SellingPrice, costs.SellingPriceShare, costs.CurrentPrice));
         if (costs.HasPriceRounding)

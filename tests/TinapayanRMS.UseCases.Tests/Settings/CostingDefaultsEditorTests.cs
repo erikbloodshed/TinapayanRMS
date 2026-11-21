@@ -40,7 +40,7 @@ public class CostingDefaultsEditorTests(DatabaseFixture fixture) : PersistenceTe
         var editor = CreateEditor();
         await editor.SaveAsync(Defaults(labor: 25m), Cancellation);
         var expected = new CostingParametersValidator()
-            .Validate(new CostingParameters { LaborPercent = -1m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m })
+            .Validate(new CostingParameters { LaborPercent = -1m, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 40m })
             .ToString(" ");
 
         await editor.Awaiting(e => e.SaveAsync(Defaults(labor: -1m), Cancellation))
@@ -57,7 +57,7 @@ public class CostingDefaultsEditorTests(DatabaseFixture fixture) : PersistenceTe
 
     private static CostingDefaults Defaults(decimal labor) => new()
     {
-        LaborPercent = labor, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m,
+        LaborPercent = labor, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 40m,
     };
 
     private CostingDefaultsEditor CreateEditor() => new(

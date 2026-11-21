@@ -28,7 +28,7 @@ public sealed record ProductCostInputs
     public decimal AdministrativePercent { get; init; }
 
     /// <summary>The markup on the base cost.</summary>
-    public decimal MarginPercent { get; init; }
+    public decimal MarkupPercent { get; init; }
 
     public decimal VatPercent { get; init; }
 

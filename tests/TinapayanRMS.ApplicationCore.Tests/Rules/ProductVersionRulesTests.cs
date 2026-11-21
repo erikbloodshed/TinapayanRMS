@@ -135,7 +135,7 @@ public class ProductVersionRulesTests
             CurrentPrice = 6m,
             QuantityRequired = 2,
             PackagingLines = [new VersionPackagingLine(Bag, 20, 0.02m)],
-            Costing = Base.Costing! with { MarginPercent = 35m },
+            Costing = Base.Costing! with { MarkupPercent = 35m },
         };
 
         ProductVersionRules.Changes(Base, later).Should().Equal(
@@ -231,6 +231,16 @@ public class ProductVersionRulesTests
         read.Materials.Should().HaveCount(Materials.Count);
         read.Materials.Single(m => m.Id == Bag).Units.Single().BaseUnitsPerUnit.Should().Be(100m);
         read.Sections.Single().AuthoredField.Should().Be(UsageAuthoredField.WeightPerPiece);
+    }
+
+    [Test]
+    public void A_snapshot_keeps_the_markup_under_the_name_every_stored_one_has()
+    {
+        // MarkupPercent was MarginPercent until 2026-11-22: every snapshot in the database holds it by that name.
+        var json = Base.ToJson();
+        json.Should().Contain("\"MarginPercent\":30").And.NotContain("MarkupPercent");
+
+        ProductVersionContent.FromJson(json).Costing!.MarkupPercent.Should().Be(30m);
     }
 
     [Test]

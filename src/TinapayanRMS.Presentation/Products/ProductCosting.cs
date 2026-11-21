@@ -68,11 +68,11 @@ public sealed class ProductCosting : ObservableState
         set => SetPercent(ref _editingAdministrativePercent, value);
     }
 
-    private decimal _editingMarginPercent;
-    public decimal EditingMarginPercent
+    private decimal _editingMarkupPercent;
+    public decimal EditingMarkupPercent
     {
-        get => _editingMarginPercent;
-        set => SetPercent(ref _editingMarginPercent, value);
+        get => _editingMarkupPercent;
+        set => SetPercent(ref _editingMarkupPercent, value);
     }
 
     /// <summary>A costing percentage set: the product is costed again as it's next read.</summary>
@@ -113,11 +113,11 @@ public sealed class ProductCosting : ObservableState
             ref _typedAdministrativeAmount, value, Costs.SubAssemblies, EditingAdministrativePercent);
     }
 
-    /// <summary>Markup Metric's value: EditingMarginPercent of the base cost.</summary>
+    /// <summary>Markup Metric's value: EditingMarkupPercent of the base cost.</summary>
     public decimal EditingMarkupAmount
     {
-        get => TypedAmount.Shown(_typedMarkupAmount, EditingMarginPercent, Costs.BaseCost, Costs.Markup);
-        set => EditingMarginPercent = TypedAmount.PercentFor(ref _typedMarkupAmount, value, Costs.BaseCost, EditingMarginPercent);
+        get => TypedAmount.Shown(_typedMarkupAmount, EditingMarkupPercent, Costs.BaseCost, Costs.Markup);
+        set => EditingMarkupPercent = TypedAmount.PercentFor(ref _typedMarkupAmount, value, Costs.BaseCost, EditingMarkupPercent);
     }
 
     /// <summary>The cost summary, worked out from the screen's recipe and fields and the percentages here as they stand.</summary>
@@ -220,8 +220,8 @@ public sealed class ProductCosting : ObservableState
     /// <summary>The four percentages as typed, for an undo step to keep and put back (ProductFormSnapshot.Costing).</summary>
     public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Percentages
     {
-        get => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent);
-        set => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarginPercent) = value;
+        get => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarkupPercent);
+        set => (EditingLaborPercent, EditingOverheadPercent, EditingAdministrativePercent, EditingMarkupPercent) = value;
     }
 
     /// <summary>Whether the percentages differ from the costing as loaded: what Save sends only then.</summary>
@@ -236,7 +236,7 @@ public sealed class ProductCosting : ObservableState
         LaborPercent = EditingLaborPercent,
         OverheadPercent = EditingOverheadPercent,
         AdministrativePercent = EditingAdministrativePercent,
-        MarginPercent = EditingMarginPercent,
+        MarkupPercent = EditingMarkupPercent,
     };
 
     /// <summary>Shows a product's costing as saved, none for all zero, and makes it what Save compares against.</summary>
@@ -246,7 +246,7 @@ public sealed class ProductCosting : ObservableState
             costing?.LaborPercent ?? 0m,
             costing?.OverheadPercent ?? 0m,
             costing?.AdministrativePercent ?? 0m,
-            costing?.MarginPercent ?? 0m);
+            costing?.MarkupPercent ?? 0m);
         _saved = Percentages;
     }
 
@@ -263,7 +263,7 @@ public sealed class ProductCosting : ObservableState
     /// </summary>
     public void SetDefaults(CostingDefaults defaults)
     {
-        _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent);
+        _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarkupPercent);
         if (_wastagePercent == defaults.WastagePercent && _vatPercent == defaults.VatPercent && _priceRoundingStep == defaults.PriceRoundingStep)
         {
             return;
@@ -310,7 +310,7 @@ public sealed class ProductCosting : ObservableState
             LaborPercent = EditingLaborPercent,
             OverheadPercent = EditingOverheadPercent,
             AdministrativePercent = EditingAdministrativePercent,
-            MarginPercent = EditingMarginPercent,
+            MarkupPercent = EditingMarkupPercent,
         });
 
         List<string> belowCost =

@@ -60,16 +60,16 @@ public partial class CostingParametersEntityType
         laborPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         laborPercent.AddAnnotation("Relational:ColumnName", "labor_percent");
 
-        var marginPercent = runtimeEntityType.AddProperty(
-            "MarginPercent",
+        var markupPercent = runtimeEntityType.AddProperty(
+            "MarkupPercent",
             typeof(decimal),
-            propertyInfo: typeof(CostingParameters).GetProperty("MarginPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(CostingParameters).GetField("<MarginPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            propertyInfo: typeof(CostingParameters).GetProperty("MarkupPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(CostingParameters).GetField("<MarkupPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
             precision: 18,
             scale: 4,
             sentinel: 0m);
-        marginPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        marginPercent.AddAnnotation("Relational:ColumnName", "margin_percent");
+        markupPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        markupPercent.AddAnnotation("Relational:ColumnName", "margin_percent");
 
         var overheadPercent = runtimeEntityType.AddProperty(
             "OverheadPercent",

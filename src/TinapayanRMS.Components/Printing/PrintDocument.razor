@@ -647,7 +647,7 @@
                 @CostRow("Subtotal (base cost)", now?.BaseCost, costs.BaseCost, costs.BaseCostShare, "print-band")
                 @if (now is not null)
                 {
-                    @CostRow($"Markup ({costs.MarginPercent:0.##}%)", now.Markup, costs.Markup, costs.MarkupShare)
+                    @CostRow($"Markup ({costs.MarkupPercent:0.##}%)", now.Markup, costs.Markup, costs.MarkupShare)
                     @CostRow($"VAT ({costs.VatPercent:0.##}%)", now.Vat, costs.Vat, costs.VatShare)
                     @CostRow(printout.SuggestedSellingPriceLabel, now.SellingPrice, costs.SellingPrice, costs.SellingPriceShare, "print-band print-total")
                 }
@@ -703,7 +703,7 @@
             <tr>
                 <td>Markup</td>
                 <td class="n">@Money(costs.Markup)</td>
-                <td class="n print-percent">@MarkupShare(costs.MarginPercent)</td>
+                <td class="n print-percent">@MarkupShare(costs.MarkupPercent)</td>
                 <td class="n @markupClass">@(costs.CurrentMarkup is { } markup ? Money(markup) : "—")</td>
                 <td class="n print-percent @markupClass">@MarkupShare(costs.CurrentMarkupPercent)</td>
             </tr>

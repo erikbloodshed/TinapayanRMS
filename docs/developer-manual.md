@@ -1390,7 +1390,7 @@ public class CostingRulesTests
     {
         var (baseCost, preVatPrice, sellingPrice) = CostingRules.CalculateSellingPrice(
             subAssemblyCostPerPiece: 20m, packagingCostPerPiece: 2m,
-            laborPercent: 25m, overheadPercent: 10m, administrativePercent: 5m, marginPercent: 30m, vatPercent: 12m);
+            laborPercent: 25m, overheadPercent: 10m, administrativePercent: 5m, markupPercent: 30m, vatPercent: 12m);
 
         baseCost.Should().Be(30m);
         preVatPrice.Should().Be(39m);

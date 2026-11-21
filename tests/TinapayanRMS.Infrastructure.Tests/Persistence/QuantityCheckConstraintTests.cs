@@ -120,7 +120,7 @@ public class QuantityCheckConstraintTests(DatabaseFixture fixture) : Persistence
     [Arguments(nameof(CostingParameters.LaborPercent))]
     [Arguments(nameof(CostingParameters.OverheadPercent))]
     [Arguments(nameof(CostingParameters.AdministrativePercent))]
-    [Arguments(nameof(CostingParameters.MarginPercent))]
+    [Arguments(nameof(CostingParameters.MarkupPercent))]
     public async Task A_costing_percent_cant_be_negative(string percent)
     {
         var productId = await AddProductAsync("Pandesal");

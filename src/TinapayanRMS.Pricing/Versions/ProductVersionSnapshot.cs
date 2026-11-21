@@ -74,7 +74,7 @@ public static class ProductVersionSnapshot
             BulkPackagingQuantity = detail.BulkLines.Count > 0 ? product.BulkPackagingQuantity : null,
             Costing = costing is null
                 ? null
-                : new VersionCosting(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent),
+                : new VersionCosting(costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent),
             WastagePercent = detail.WastagePercent,
             VatPercent = detail.VatPercent,
             Sections = sections,
@@ -204,7 +204,7 @@ public static class ProductVersionSnapshot
                 LaborPercent = c.LaborPercent,
                 OverheadPercent = c.OverheadPercent,
                 AdministrativePercent = c.AdministrativePercent,
-                MarginPercent = c.MarginPercent,
+                MarkupPercent = c.MarkupPercent,
             }
             : null;
 

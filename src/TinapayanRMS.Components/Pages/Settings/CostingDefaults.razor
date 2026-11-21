@@ -27,7 +27,7 @@
             <NumberField TValue="decimal" Format="N2" Min="0" ID="administrative-percent" @bind-Value="State!.EditingAdministrativePercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
         </FormRow>
         <FormRow Label="Markup %" For="markup-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarginPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarkupPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
         </FormRow>
         <FormRow Label="VAT %" For="vat-percent">
             <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="State!.EditingVatPercent" Tooltip="Every product's, not just new ones: the shop's VAT, on top of the marked-up price. Changing it reprices every product." />

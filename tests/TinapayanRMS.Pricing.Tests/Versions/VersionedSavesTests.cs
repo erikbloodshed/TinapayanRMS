@@ -49,13 +49,13 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [new RecipeLine(flourId, 400m)]);
         var costings = new CostingParametersRepository(CreateDbContextFactory());
         await costings.SetAsync(ensaymadaId, 35m, 25m, 15m, 60m, Cancellation);
-        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
 
         var changed = await CreateSaves().ApplyCostingAsync([pandesalId, ensaymadaId], defaults, DateTime.Now, Cancellation);
 
         changed.Should().Equal(["Pandesal"], "Ensaymada had the defaults already");
         var pandesal = (await costings.GetForProductAsync(pandesalId, Cancellation))!;
-        (pandesal.LaborPercent, pandesal.OverheadPercent, pandesal.AdministrativePercent, pandesal.MarginPercent).Should().Be((35m, 25m, 15m, 60m));
+        (pandesal.LaborPercent, pandesal.OverheadPercent, pandesal.AdministrativePercent, pandesal.MarkupPercent).Should().Be((35m, 25m, 15m, 60m));
         var versions = new ProductVersionRepository(CreateDbContextFactory());
         (await versions.GetForProductAsync(pandesalId, Cancellation)).Select(v => v.Note)
             .Should().Equal(VersionedSaves.CostingDefaultsNote, ProductVersionRules.BaselineNote);
@@ -80,7 +80,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         cheeseRoll.CurrentPrice = 9m;
         await CreateSaves().SaveProductAsync(cheeseRoll, null, null, null, null, null, false, DateTime.Now, Cancellation);
         var ensaymadaSavedAt = (await products.GetByIdAsync(ensaymadaId, Cancellation))!.UpdatedAt;
-        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
         var appliedAt = DateTime.Now;
 
         // Given out of the list's order, and Pandesal twice: the names come back in the order given, each once.
@@ -90,7 +90,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         foreach (var id in new[] { pandesalId, cheeseRollId, spanishBreadId })
         {
             var costing = (await costings.GetForProductAsync(id, Cancellation))!;
-            (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent).Should().Be((35m, 25m, 15m, 60m));
+            (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent).Should().Be((35m, 25m, 15m, 60m));
             (await products.GetByIdAsync(id, Cancellation))!.UpdatedAt.Should().BeOnOrAfter(appliedAt.AddSeconds(-1), "it's stamped as saved");
         }
 
@@ -115,7 +115,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
         var costings = new CostingParametersRepository(CreateDbContextFactory());
         await costings.SetAsync(pandesalId, 10m, 5m, 5m, 40m, Cancellation);
-        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m };
+        var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
 
         var apply = () => CreateSaves(refuseVersions: true).ApplyCostingAsync([pandesalId], defaults, DateTime.Now, Cancellation);
 

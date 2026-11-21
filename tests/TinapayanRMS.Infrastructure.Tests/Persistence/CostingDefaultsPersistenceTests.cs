@@ -21,14 +21,14 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     private CostingDefaultsRepository CreateRepository() => new(CreateDbContextFactory());
 
     private static CostingDefaults Defaults(decimal labor, decimal overhead, decimal administrative, decimal margin, decimal vat, decimal wastage = 3m) =>
-        new() { LaborPercent = labor, OverheadPercent = overhead, AdministrativePercent = administrative, MarginPercent = margin, VatPercent = vat, WastagePercent = wastage };
+        new() { LaborPercent = labor, OverheadPercent = overhead, AdministrativePercent = administrative, MarkupPercent = margin, VatPercent = vat, WastagePercent = wastage };
 
     [Test]
     public async Task GetAsync_reads_the_costing_at_zero_and_the_wastage_at_3_percent_before_anything_is_saved()
     {
         var defaults = await CreateRepository().GetAsync(Cancellation);
 
-        new[] { defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent }
+        new[] { defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarkupPercent, defaults.VatPercent }
             .Should().OnlyContain(p => p == 0m);
         defaults.WastagePercent.Should().Be(3m);
         defaults.NewProductStage.Should().Be(ProductStage.Production);
@@ -96,7 +96,7 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
         await CreateRepository().SetAsync(Defaults(30m, 10m, 5m, 45m, 12m), Cancellation);
 
         var defaults = await CreateRepository().GetAsync(Cancellation);
-        (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarginPercent, defaults.VatPercent)
+        (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarkupPercent, defaults.VatPercent)
             .Should().Be((30m, 10m, 5m, 45m, 12m));
         await using var dbContext = CreateDbContext();
         (await dbContext.CostingDefaults.CountAsync(Cancellation)).Should().Be(1);

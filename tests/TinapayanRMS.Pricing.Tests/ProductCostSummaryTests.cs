@@ -74,17 +74,17 @@ public class ProductCostSummaryTests
     {
         // 25.997 on a base cost of 20.00 earns exactly 29.985%, which shows as 29.99%: the target, rounded half away from
         // zero as the header shows it. Rounded half to even it would be 29.98%, and flagged.
-        Summary(20m, currentPrice: 25.997m, marginPercent: 29.99m).IsBelowTargetMarkup.Should().BeFalse();
-        Summary(20m, currentPrice: 25.996m, marginPercent: 29.99m).IsBelowTargetMarkup.Should().BeTrue();
+        Summary(20m, currentPrice: 25.997m, markupPercent: 29.99m).IsBelowTargetMarkup.Should().BeFalse();
+        Summary(20m, currentPrice: 25.996m, markupPercent: 29.99m).IsBelowTargetMarkup.Should().BeTrue();
     }
 
     /// <summary>One section at <paramref name="doughCost"/> a piece, at a 30% markup unless another is given, with no VAT unless one is given.</summary>
     private static ProductCostSummary Summary(
-        decimal doughCost, decimal? currentPrice = null, decimal priceRoundingStep = 0m, decimal vatPercent = 0m, decimal marginPercent = 30m) =>
+        decimal doughCost, decimal? currentPrice = null, decimal priceRoundingStep = 0m, decimal vatPercent = 0m, decimal markupPercent = 30m) =>
         new(new ProductCostInputs
         {
             Parts = [("Dough", doughCost)],
-            MarginPercent = marginPercent,
+            MarkupPercent = markupPercent,
             VatPercent = vatPercent,
             CurrentPrice = currentPrice,
             PriceRoundingStep = priceRoundingStep,

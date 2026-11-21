@@ -32,7 +32,7 @@ public class DeletedProductPersistenceTests(DatabaseFixture fixture) : Persisten
         var (productId, doughId) = await AddProductWithSubAssemblyAsync("Ensaymada", roleId, [(flourId, 1000m)]);
         await AddProductAsync("Pandesal");
         await new CostingParametersRepository(CreateDbContextFactory())
-            .SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, marginPercent: 40m, Cancellation);
+            .SetAsync(productId, laborPercent: 5m, overheadPercent: 3m, administrativePercent: 1m, markupPercent: 40m, Cancellation);
         var repository = CreateRepository();
         var updatedAt = (await repository.GetByIdAsync(productId, Cancellation))!.UpdatedAt;
 

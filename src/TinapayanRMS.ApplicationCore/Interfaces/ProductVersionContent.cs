@@ -99,9 +99,10 @@ public sealed record ProductVersionContent
 internal sealed partial class ProductVersionJsonContext : JsonSerializerContext;
 
 /// <summary>The costing percentages (CostingParameters).</summary>
+/// <param name="MarkupPercent">The markup on cost, stored by its name before 2026-11-22, "MarginPercent", as every snapshot written since the first was.</param>
 /// <param name="VatPercent">The product's own VAT, in a snapshot from before VAT was the shop's (ProductVersionContent.VatPercent); null since.</param>
 public sealed record VersionCosting(
-    decimal LaborPercent, decimal OverheadPercent, decimal AdministrativePercent, decimal MarginPercent, decimal? VatPercent = null);
+    decimal LaborPercent, decimal OverheadPercent, decimal AdministrativePercent, [property: JsonPropertyName("MarginPercent")] decimal MarkupPercent, decimal? VatPercent = null);
 
 /// <summary>
 /// One sub-assembly in the recipe, as the product used it: its own (<see cref="IsOwn"/>) or linked, at the product's piece

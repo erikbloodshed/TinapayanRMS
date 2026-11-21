@@ -2070,7 +2070,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.Costing.Costs.BaseCost.Should().Be(3m, "₱2 of sub-assemblies, then ₱0.50 + ₱0.30 + ₱0.20");
 
         state.Costing.EditingMarkupAmount = 0.75m;
-        state.Costing.EditingMarginPercent.Should().Be(25m, "the markup is a percentage of the ₱3 base cost");
+        state.Costing.EditingMarkupPercent.Should().Be(25m, "the markup is a percentage of the ₱3 base cost");
         state.Costing.Costs.Markup.Should().Be(0.75m);
         state.History.IsDirty.Should().BeTrue();
 
@@ -2079,7 +2079,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         var costing = await dbContext.CostingParameters.SingleAsync(Cancellation);
-        (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent)
+        (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent)
             .Should().Be((25m, 15m, 10m, 25m));
     });
 
@@ -2358,13 +2358,13 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
     public Task A_new_product_starts_with_the_costing_defaults_and_its_first_Save_keeps_them() => UiThread.RunAsync(async () =>
     {
         await new CostingDefaultsRepository(CreateDbContextFactory()).SetAsync(
-            new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarginPercent = 40m, VatPercent = 12m, PriceRoundingStep = 0.25m },
+            new CostingDefaults { LaborPercent = 25m, OverheadPercent = 10m, AdministrativePercent = 5m, MarkupPercent = 40m, VatPercent = 12m, PriceRoundingStep = 0.25m },
             Cancellation);
         var state = CreateState();
 
         await state.LoadCommand.ExecuteAsync();
 
-        (state.Costing.EditingLaborPercent, state.Costing.EditingOverheadPercent, state.Costing.EditingAdministrativePercent, state.Costing.EditingMarginPercent)
+        (state.Costing.EditingLaborPercent, state.Costing.EditingOverheadPercent, state.Costing.EditingAdministrativePercent, state.Costing.EditingMarkupPercent)
             .Should().Be((25m, 10m, 5m, 40m), "the screen opens on a new product");
         state.Costing.Costs.VatPercent.Should().Be(12m, "every product is priced with the shop's VAT");
         state.Costing.Costs.PriceRoundingStep.Should().Be(0.25m, "and its price rounded up as the shop rounds");
@@ -2375,7 +2375,7 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         state.ErrorMessage.Should().BeNull();
         await using var dbContext = CreateDbContext();
         var costing = await dbContext.CostingParameters.SingleAsync(c => c.Product!.Name == "Pandesal", Cancellation);
-        (costing.LaborPercent, costing.MarginPercent).Should().Be((25m, 40m));
+        (costing.LaborPercent, costing.MarkupPercent).Should().Be((25m, 40m));
     });
 
     [Test]

@@ -20,14 +20,14 @@ public class CostingParametersValidatorTests
     [Arguments(0, -1, 0, 0)]
     [Arguments(0, 0, -1, 0)]
     [Arguments(0, 0, 0, -1)]
-    public void Rejects_any_negative_field(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent)
+    public void Rejects_any_negative_field(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal markupPercent)
     {
         var result = _validator.Validate(new CostingParameters
         {
             LaborPercent = laborPercent,
             OverheadPercent = overheadPercent,
             AdministrativePercent = administrativePercent,
-            MarginPercent = marginPercent,
+            MarkupPercent = markupPercent,
         });
 
         result.IsValid.Should().BeFalse();
@@ -36,16 +36,16 @@ public class CostingParametersValidatorTests
     [Test]
     [Arguments(-1, 0, 0, 0)]
     [Arguments(0, 0, 0, -1)]
-    public void Says_what_saving_would(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal marginPercent)
+    public void Says_what_saving_would(decimal laborPercent, decimal overheadPercent, decimal administrativePercent, decimal markupPercent)
     {
-        var saving = () => CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, marginPercent);
+        var saving = () => CostingRules.EnsureValidParameters(laborPercent, overheadPercent, administrativePercent, markupPercent);
 
         var result = _validator.Validate(new CostingParameters
         {
             LaborPercent = laborPercent,
             OverheadPercent = overheadPercent,
             AdministrativePercent = administrativePercent,
-            MarginPercent = marginPercent,
+            MarkupPercent = markupPercent,
         });
 
         result.Errors.Should().ContainSingle().Which.ErrorMessage

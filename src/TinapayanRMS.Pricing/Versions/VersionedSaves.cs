@@ -43,12 +43,12 @@ public sealed class VersionedSaves(
         {
             // The products are read and written together, in the same few commands however many there are: one at a time,
             // it took some 30 a product, over 2,400 for the shop's 84, and 1.6 s (2026-11-13).
-            var wanted = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent);
+            var wanted = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent);
             List<int> given = [.. productIds.Distinct()];
             var costings = (await costingParametersRepository.GetForProductsAsync(given, cancellationToken)).ToDictionary(c => c.ProductId);
             bool TakesThemAlready(int productId) =>
                 costings.GetValueOrDefault(productId) is var current
-                && (current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarginPercent ?? 0m) == wanted;
+                && (current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarkupPercent ?? 0m) == wanted;
 
             var productsById = (await productRepository.GetByIdsAsync([.. given.Where(id => !TakesThemAlready(id))], cancellationToken)).ToDictionary(p => p.Id);
             List<Product> changing = [.. given.Where(productsById.ContainsKey).Select(id => productsById[id])];
@@ -60,7 +60,7 @@ public sealed class VersionedSaves(
             List<int> changingIds = [.. changing.Select(p => p.Id)];
             var before = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
             await costingParametersRepository.SetForProductsAsync(
-                changingIds, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarginPercent, cancellationToken);
+                changingIds, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent, cancellationToken);
             var after = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
 
             // One with no versions yet gets how it stood before first, dated when it was last saved, as a Save's would be

@@ -82,7 +82,7 @@ public class PrintPaneTests
             [new PrintedSection("Dough", null, "Baker's %", [new PrintedLine("Flour", 1000m, 100m, 0.052m, 52m)], [],
                 1000m, 100m, 52m, 50m, 20m, 2.6m, true)],
             null,
-            new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 2.6m)], MarginPercent = 30m, VatPercent = 12m }));
+            new ProductCostSummary(new ProductCostInputs { Parts = [("Dough", 2.6m)], MarkupPercent = 30m, VatPercent = 12m }));
         return new ProductPrintSet("Breads", [printout, printout with { ProductName = "Ensaymada" }], printout.PrintedAt);
     }
 }

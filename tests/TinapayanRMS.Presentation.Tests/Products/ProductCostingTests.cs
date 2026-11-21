@@ -132,7 +132,7 @@ public class ProductCostingTests
 
         var saved = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
         saved.SetDefaults(Defaults(labor: 35m));
-        saved.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 40m });
+        saved.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 40m });
 
         saved.TakeDefaults(Defaults(labor: 30m), isNewProduct: false).Should().BeFalse("a saved product's costing is its own");
         saved.EditingLaborPercent.Should().Be(35m);
@@ -144,7 +144,7 @@ public class ProductCostingTests
         LaborPercent = labor,
         OverheadPercent = 25m,
         AdministrativePercent = 15m,
-        MarginPercent = 40m,
+        MarkupPercent = 40m,
         WastagePercent = wastage,
         VatPercent = vat,
         PriceRoundingStep = rounding,
@@ -214,7 +214,7 @@ public class ProductCostingTests
             }
             else
             {
-                Costing.Load(new CostingParameters { LaborPercent = 25m, OverheadPercent = 20m, AdministrativePercent = 15m, MarginPercent = 60m });
+                Costing.Load(new CostingParameters { LaborPercent = 25m, OverheadPercent = 20m, AdministrativePercent = 15m, MarkupPercent = 60m });
             }
 
             History = new UndoHistory<Snapshot>(
@@ -232,14 +232,14 @@ public class ProductCostingTests
         public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Baseline { get; private set; }
 
         public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) DefaultsAsPercentages =>
-            (_defaults.LaborPercent, _defaults.OverheadPercent, _defaults.AdministrativePercent, _defaults.MarginPercent);
+            (_defaults.LaborPercent, _defaults.OverheadPercent, _defaults.AdministrativePercent, _defaults.MarkupPercent);
 
         public decimal Percent(int metric) => metric switch
         {
             0 => Costing.EditingLaborPercent,
             1 => Costing.EditingOverheadPercent,
             2 => Costing.EditingAdministrativePercent,
-            _ => Costing.EditingMarginPercent,
+            _ => Costing.EditingMarkupPercent,
         };
 
         public decimal Amount(int metric) => metric switch
@@ -261,7 +261,7 @@ public class ProductCostingTests
                 LaborPercent = Costing.EditingLaborPercent,
                 OverheadPercent = Costing.EditingOverheadPercent,
                 AdministrativePercent = Costing.EditingAdministrativePercent,
-                MarginPercent = Costing.EditingMarginPercent,
+                MarkupPercent = Costing.EditingMarkupPercent,
             });
             var shown = Costing.Costs;
             (shown.SubAssemblies, shown.Packaging, shown.Wastage, shown.Labor, shown.Overhead, shown.Administrative, shown.BaseCost, shown.SellingPrice, shown.RoundedSellingPrice)
@@ -346,7 +346,7 @@ public class ProductCostingTests
                 case 0: Costing.EditingLaborPercent = percent; break;
                 case 1: Costing.EditingOverheadPercent = percent; break;
                 case 2: Costing.EditingAdministrativePercent = percent; break;
-                default: Costing.EditingMarginPercent = percent; break;
+                default: Costing.EditingMarkupPercent = percent; break;
             }
         }
 
