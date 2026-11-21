@@ -426,27 +426,12 @@
     gap: 8px 12px;
 }
 
-/* The title keeps room for a name: at a width where the buttons would leave it less (the Products screen at the
-   window's opening 1400 wide), they go under it, still on the right; and where even that row is too narrow for them all,
-   the last ones wrap to a line of their own, rather than push the page wider than the window. */
-.header-title-row > :first-child {
-    flex: 1 1 0;
-    min-width: 200px;
-}
-
+/* No title (each record's tab shows its name): the buttons keep to the right, after Products' badges, and where the row
+   is too narrow for them all, the last ones wrap to a line of their own, rather than push the page wider than the window. */
 .header-title-row > .button-row {
     margin-left: auto;
     flex-wrap: wrap;
     justify-content: flex-end;
-}
-
-.header-title {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .section-divider {

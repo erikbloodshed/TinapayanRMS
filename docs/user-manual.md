@@ -190,7 +190,8 @@ The **Raw Materials**, **Sub-Assemblies** and **Products** lists are trees of fo
 - **Revert**, on the Products screen only, puts the whole product back as it was last saved.
 - **Pickers** (the boxes with a ˅ arrow, such as Category, Role or Existing Sub-Assembly) can be typed into. Typing narrows the list to the names that contain what you typed, closest first: the name itself, then names starting with it, then names with a word starting with it, then the rest, so "salt" lists Sea Salt before Unsalted Butter. The closest is highlighted in blue, with a bar down its left side, and the box keeps just what you typed. **Enter** or **Tab** picks the highlighted name, so "marg" and Enter picks Margarine, and so does clicking somewhere else. **Down** and **Up** move the highlight through the list: the first press puts the highlighted name in the box, and each one after moves to the next. Before you type, the highlight is on the name the picker holds, or on an empty picker the first name, which Enter picks but Tab doesn't. The name under the mouse is the same blue, without the bar. **Backspace** takes off a letter at a time, and you can empty the picker to see the whole list. If what you typed matches nothing, or you leave the picker empty where a name is needed (a recipe line's ingredient), it shows what it had again once you leave it. **Esc** closes the list, and the picker keeps what it had. Clicking or tabbing into a picker selects its text, so what you type replaces it.
 - **Number boxes take only numbers**, in the forms and in the tables alike: digits, commas between thousands, and one decimal point. A letter, a symbol or a second point doesn't appear when you press it. A box that holds a count, such as a quantity of pieces, takes no point either, and only a box whose figure can go below zero, such as the Price Simulator's **Change %**, takes a minus, at the start. Pasting or dropping a figure puts it in where the cursor is when it's one number, so `₱1,250.00` goes in as `1,250.00`; text with more than the number in it, such as `1/2` or `3 x 250 g`, and a figure the box can't take, such as `10-12` or a negative figure where none can go, is left out, and the box stays as it was.
-- **New** starts a blank record, in the preview tab. **Delete** asks before deleting anything, and closes the deleted record's tab.
+- **New** (the **+** under the list's search box) starts a blank record, in the preview tab. **Delete** asks before deleting anything, and closes the deleted record's tab.
+- **The buttons in a record's header show only their icons.** Point at one to see its name and what it does. The record's name is on its tab, not in the header.
 - **Each raw material, sub-assembly and product you open has a tab of its own** (see Raw Materials' [Tabs](#tabs), Sub-Assemblies' [Tabs](#tabs-1) and Products' [Tabs](#tabs-2)), which keeps what you've typed, and its **Undo**, until you save it or close the tab. So going somewhere else asks nothing: picking another item in the list, **New**, **Copy**, another screen (from the activity bar, Find, a **Dependents** tile or another link), **Back** or **Forward** leave the changes in their tab.
 - **Changes you haven't saved are never thrown away without asking.** A message asks **Save the changes to …?** when you close a tab that has them, and when you close the window, for each tab with changes, even one on another screen. **Clone**, **Create Variant** and **Apply Costing Defaults** ask too, before they work from a product with changes, since what they make or change is the product as saved. Reloading the page (**F5**) with changes not saved asks whether to leave instead.
   - **Yes** saves them, then goes on. If the save is refused, for example because a field is missing, you stay, and the red notice says why.
@@ -346,7 +347,7 @@ A role can't be deleted while any sub-assembly uses it.
 
 ### Costing Defaults
 
-**New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. Like **Type** on Material Categories, it's a picker you can type into to narrow its list, as on the screens. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
+**New Products In** is where **New Product** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. Like **Type** on Material Categories, it's a picker you can type into to narrow its list, as on the screens. **New Product Here** still files it in the folder you picked it on, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
 
 Under it are the four percentages a **new** product's costing starts with:
 
@@ -440,7 +441,7 @@ The Raw Materials screen has the list of materials on the left, and to its right
 
 - **A click on a material in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A material that's open already just shows its own tab.
 - **To keep a tab open**, double-click the material in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
-- **New** and **Copy** start the new material in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new material, in the preview tab, as it always has.
+- **New Raw Material** and **Copy** start the new material in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new material, in the preview tab, as it always has.
 - **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
 - **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
 - **Back** and **Forward** go through the tabs you've shown, like a web browser. Going back to a material whose tab you've closed opens it again, in the preview tab.
@@ -472,7 +473,7 @@ Dragging materials onto another category moves them straight away. A material ca
 
 ### The header
 
-At the top are the material's name and **New**, **Save**, **Undo**, **Redo** and **Delete**, then these figures:
+At the top are **Save**, **Undo**, **Redo** and **Delete**, as icons: point at one to see its name. The material's name is on its tab, and **New Raw Material** is under the list's search box. Below them are these figures:
 
 - **Base Unit**: *gram (g)* for an ingredient.
 - **Current Cost per …**: the true cost, as last saved. For a purchased material it's the price of the brand in **Basis** (the dearest brand unless you pick one), per the unit it's shown in.
@@ -602,7 +603,7 @@ The list is on the left. To its right, **each sub-assembly you open has a tab of
 
 - **A click on a sub-assembly in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A sub-assembly that's open already just shows its own tab.
 - **To keep a tab open**, double-click the sub-assembly in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
-- **New** starts a blank new sub-assembly in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new one, in the preview tab, as it always has.
+- **New Sub-Assembly** starts a blank new sub-assembly in the preview tab, so a tab with changes stays as it is. The screen opens on a blank new one, in the preview tab, as it always has.
 - **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
 - **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
 - **Back** and **Forward** go through the tabs you've shown, like a web browser. Going back to a sub-assembly whose tab you've closed opens it again, in the preview tab.
@@ -625,7 +626,7 @@ Dragging sub-assemblies onto another role's folder changes their role straight a
 
 **Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the sub-assembly you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in a tab, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
 
-**New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New**, **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New**, the first role's): type its name and press **Enter**. The name goes into the new sub-assembly's tab, but **it isn't saved yet**: add its lines and press **Save**. **Esc**, or clicking away before you've typed a name, adds nothing: the tab stays on the new sub-assembly.
+**New Folder** adds a *New folder* row after the roles: type the role's name and press **Enter** to add it. **New Sub-Assembly** and **New … Here** add a row for the new sub-assembly in its role's folder (from **New Sub-Assembly**, the first role's): type its name and press **Enter**. The name goes into the new sub-assembly's tab, but **it isn't saved yet**: add its lines and press **Save**. **Esc**, or clicking away before you've typed a name, adds nothing: the tab stays on the new sub-assembly.
 
 A new role from the list goes after the others and isn't product-owned. Change its place and **Product-owned** in Settings → Roles.
 
@@ -642,7 +643,7 @@ If the sub-assembly is open in a tab with changes you haven't saved, save or und
 
 ### The form
 
-Each tab holds the sub-assembly's form, which has two cards. The header at the top holds the name and **New**, **Copy**, **New Product**, **Save**, **Undo**, **Redo**, **Print** and **Delete**, then:
+Each tab holds the sub-assembly's form, which has two cards. The header at the top holds **Copy**, **New Product**, **Save**, **Undo**, **Redo**, **Print** and **Delete**, as icons: point at one to see its name. The sub-assembly's name is on its tab, and **New Sub-Assembly** is under the list's search box. Then:
 
 - **Batch Weight**, **Batch Cost** and **Cost per g**, worked out from the lines as you type.
 - **Name** and **Role**.
@@ -686,7 +687,7 @@ The Products screen has the product list on the left, and to its right a tab for
 
 - **A click on a product in the list** opens it in the **preview tab**, whose name is in *italics*. The next one you click takes the preview tab's place, so looking through the list doesn't fill the strip with tabs. A product that's open already just shows its own tab.
 - **To keep a tab open**, double-click the product in the list, or double-click its tab. A tab you type into is kept too: the next click in the list opens in a new preview tab beside it.
-- **New** and **New composite product** start the new product in the preview tab, so a tab with changes stays as it is. So does Sub-Assemblies' **New Product**. The screen opens on a blank new product, in the preview tab, as it always has.
+- **New Product** and **New Composite Product** start the new product in the preview tab, so a tab with changes stays as it is. So does Sub-Assemblies' **New Product**. The screen opens on a blank new product, in the preview tab, as it always has.
 - **Clone** and **Create Variant** open the new product in a tab of its own, beside the one it came from.
 - **A dot (●) on a tab** means it has changes you haven't saved. Its **✕** comes back when you point at it.
 - **The tab's ✕ closes it.** If it has changes you haven't saved, it shows and asks **Save the changes to …?**: **Yes** saves them and closes the tab, **No** throws them away and closes it, and **Cancel** keeps the tab open. Closing the tab showing shows the one before it.
@@ -732,7 +733,7 @@ Right-click menus:
 
 - **Rename** (or F2, or clicking the product you've already picked once more, slowly: a double-click doesn't rename) turns the product's name into a box with the name selected. Type the new name and press **Enter**, or click away, and it's saved straight away. **Esc** leaves the name as it was. **Rename** on a folder (or F2 with the folder picked) does the same for the folder.
 - **New Folder** adds a *New folder* row, its name selected, inside the folder or stage you right-clicked. From the button under the search box, it goes inside the folder you've picked, or the folder of the product you've picked, or at the top of Production. Type its name and press **Enter**: the folder is saved there and picked. **Esc**, an empty name, or clicking away before you've typed one, adds nothing. Two folders side by side can't have the same name, whatever the capitals; the same name in another folder is fine.
-- **New Product Here**, **New Composite Product Here** and **New** in the header add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc**, or clicking away before you've typed a name (on the form, or on another product), adds nothing, so no product called *New product* is saved by accident. Clicking the form leaves it on the new product, for you to fill in, name and **Save**. **New** from the header puts it in the stage set in Settings → Costing Defaults, Production unless you change it, at the top of the stage. Until the product is saved, a tag beside its name in the header says where it will go, such as **Goes in Production** or **Goes in Production › Rolls**. A product started from a folder has no category until you pick one on its form. New, New Folder and their "Here" forms clear the search and the category filter first, so the new row shows.
+- **New Product Here**, **New Composite Product Here**, and **New Product** and **New Composite Product** under the search box, add a *New product* row, its name selected, to the folder the product goes in. Type its name and press **Enter**: the product is saved there and then, with Settings' costing defaults, and opens on the right for you to fill in its recipe, packaging and price. **Esc**, or clicking away before you've typed a name (on the form, or on another product), adds nothing, so no product called *New product* is saved by accident. Clicking the form leaves it on the new product, for you to fill in, name and **Save**. **New Product** and **New Composite Product** under the search box (or in the empty space's menu) put it in the stage set in Settings → Costing Defaults, Production unless you change it, at the top of the stage. Until the product is saved, a tag in the header says where it will go, such as **Goes in Production** or **Goes in Production › Rolls**. A product started from a folder has no category until you pick one on its form. New, New Folder and their "Here" forms clear the search and the category filter first, so the new row shows.
 - **A composite product can't be saved until it holds two products**, so its name goes into the form instead. Its row keeps the name until you press **Save**.
 
 If the name is already taken, a message says so and the box stays open with what you typed, to change it.
@@ -743,7 +744,7 @@ A ⚠ after a product's name means its **Current Price** earns less than the **M
 
 ### The header
 
-The header has the product's name and **New**, **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Export to PDF**, **Unbuffered** and **Delete**. **New** starts a product. The arrow beside it also offers **New composite product**. Below them are these figures, all **per sellable unit**:
+The header has **Save**, **Undo**, **Redo**, **Revert**, **Print**, **Export to PDF**, **Unbuffered** and **Delete**, as icons: point at one to see its name. The product's name is on its tab, and **New Product** and **New Composite Product** are under the list's search box. Below them are these figures, all **per sellable unit**:
 
 - **Material Cost**: sub-assemblies plus packaging. For a composite product, its products' recipe cost and its own sub-assemblies, plus its own packaging, and its products' packaging too when it includes theirs.
 - **Base Cost**: materials plus wastage, labour, overhead and administrative.
@@ -758,7 +759,7 @@ Below the header are the fields you fill in:
 - **Quantity Required**: how many finished pieces make one sellable unit. A composite product doesn't have one.
 - **Current Price**: the price the shop charges now, per sellable unit, VAT included. It's for comparison only and doesn't change the computed selling price.
 
-**Unbuffered** switches every cost in the product's tab to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the packaging pickers. While it's on, the button reads **Buffered** and an **Unbuffered costs** badge shows beside the product's name. Press **Buffered** to go back to buffered costs.
+**Unbuffered** switches every cost in the product's tab to the materials' true costs, without their cost buffers. That covers the figures above, the Cost/g and cost columns, the batch cost and cost per piece, packaging, the Costing tab, the recipe cost of a composite product's products, and the cost column in the packaging pickers. While it's on, the button's name reads **Buffered** and an **Unbuffered costs** badge shows at the left of the header's buttons. Press **Buffered** to go back to buffered costs.
 
 - It only changes what you see. Nothing is saved, **Save** and **Undo** aren't affected, and **Reports** still use buffered costs.
 - It's the tab's own: it stays on when the tab shows another product, until you switch it off, close the window or reload the page. A new tab starts on buffered costs, and so does the app.
@@ -1402,7 +1403,7 @@ Right-click the folder in the Products list and choose **Print Folder**: it prin
 
 ### Make a composite product, such as a gift box of several products
 
-1. In the Products header, press the arrow beside **New** and choose **New composite product**. Or right-click a folder in the list and choose **New Composite Product Here**.
+1. Under the Products list's search box, press **New Composite Product**. Or right-click a folder in the list and choose **New Composite Product Here**.
 2. Type its name into the *New composite product* row the list shows, and press **Enter**. It's saved once you press **Save** in step 6.
 3. On the **Products** tab, add a line for each product: pick the product, then type how many go in under **Qty**.
 4. On the **Packaging** tab, type the box into **Packaging per Piece**, with anything wrapping the pieces inside it, or **Link** a packaging set that has them. The products' own packaging isn't included. If the pieces go in already in their own packaging, tick **Include each product's packaging** under the Products table instead of listing it again.

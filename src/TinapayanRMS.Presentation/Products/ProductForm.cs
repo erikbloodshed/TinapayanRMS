@@ -511,7 +511,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// <summary>The view's New: a new product, in the preview tab or a tab of its own (ProductsState.NewCommand).</summary>
     public ScreenCommand NewCommand => _view.NewCommand;
 
-    /// <summary>New's New composite product: a new product made of other products, with its own packaging and toppings or fillings.</summary>
+    /// <summary>The view's New composite product: a new product made of other products, with its own packaging and toppings or fillings (ProductsState.NewCompositeCommand).</summary>
     public ScreenCommand NewCompositeCommand => _view.NewCompositeCommand;
 
     public ScreenCommand SaveCommand { get; }

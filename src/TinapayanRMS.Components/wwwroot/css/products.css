@@ -1,8 +1,9 @@
-/* The Products screen's own pieces: the header's tags and New split button, the Recipe Structure's section tabs and
+/* The Products screen's own pieces: the header's tags, the Recipe Structure's section tabs and
    form, and the Costing tab. */
 
 .header-title-group {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     min-width: 0;
@@ -42,23 +43,6 @@
 
 .figure-error {
     color: #bd0e33;                /* Latte Red, deep */
-}
-
-.split-button {
-    display: inline-flex;
-}
-
-.split-button > .e-btn:first-child {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-
-.split-button .split-arrow.e-btn {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    margin-left: -1px;
-    padding: 0 6px;
-    min-width: 0;
 }
 
 .header-fields > .field-medium {

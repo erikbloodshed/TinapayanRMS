@@ -3,26 +3,24 @@
 
 <UndoKeys Screen="State!" Redraw="RedrawNowAsync" />
 
-@* One tab of the Sub-Assemblies view: a sub-assembly's header, with its batch figures, and its Recipe and Dependents
-   tabs. One in the Packaging role is a packaging set: packaging materials per set instead of ingredients in grams, and
+@* One tab of the Sub-Assemblies view: a sub-assembly's header, its buttons icons named by their tooltips (no name: its
+   tab shows it; no New: the list's toolbar has it), with its batch figures, and its Recipe and Dependents tabs. One in the Packaging role is a packaging set: packaging materials per set instead of ingredients in grams, and
    one figure, Set Cost. Drawn afresh each time its tab shows (keyed by its form), which keeps everything typed. *@
 <CascadingValue Value="(IUndoRecorder)State!" IsFixed="true">
     <section class="card header-card">
         <div class="header-title-row">
-            <h1 class="header-title">@State!.HeaderTitle</h1>
             <div class="button-row">
-                <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New"
-                               Tooltip="Starts a new sub-assembly in the preview tab. This one stays open in its tab, with whatever is typed." />
-                <CommandButton Command="State!.CopyCommand" Icon="AppIcon.Copy" Label="Copy"
-                               Tooltip="Starts a new sub-assembly with this one's role and lines, named '… Copy'. Rename it if you like, then Save; this one stays as it was saved." />
-                <CommandButton Command="State!.NewProductCommand" Icon="AppIcon.Link" Label="New Product"
-                               Tooltip="Starts a new product on the Products screen that links this sub-assembly, named after it. Type its piece size, then Save there. Not for a packaging set." />
-                <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the name, role and lines together." />
-                <CommandButton Command="State!.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a quantity typed, a line added or removed. Ctrl+Z." />
-                <CommandButton Command="State!.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
-                <CommandButton Command="State!.PrintCommand" Icon="AppIcon.Print" Label="Print"
-                               Tooltip="Shows this sub-assembly on its own in the Print window, as the form shows it: print it there or save it as a PDF. Unsaved changes print marked as a draft." />
-                <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+                <CommandButton Command="State!.CopyCommand" Icon="AppIcon.Copy"
+                               Tooltip="Copy: starts a new sub-assembly with this one's role and lines, named '… Copy'. Rename it if you like, then Save; this one stays as it was saved." />
+                <CommandButton Command="State!.NewProductCommand" Icon="AppIcon.Link"
+                               Tooltip="New Product: starts a new product on the Products screen that links this sub-assembly, named after it. Type its piece size, then Save there. Not for a packaging set." />
+                <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Primary="true" Tooltip="Save: saves the name, role and lines together." />
+                <CommandButton Command="State!.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change: a quantity typed, a line added or removed. Ctrl+Z." />
+                <CommandButton Command="State!.RedoCommand" Icon="AppIcon.Redo" Tooltip="Redo: puts back the change the last Undo took. Ctrl+Y." />
+                <CommandButton Command="State!.PrintCommand" Icon="AppIcon.Print"
+                               Tooltip="Print: shows this sub-assembly on its own in the Print window, as the form shows it: print it there or save it as a PDF. Unsaved changes print marked as a draft." />
+                <CommandButton Command="State!.DeleteCommand" Icon="AppIcon.Delete"
+                               Tooltip="Delete: deletes this sub-assembly, after asking, and closes its tab." />
             </div>
         </div>
 

@@ -43,7 +43,7 @@ Part of [PLAN.md](../../PLAN.md), the project guide: the Raw Materials screen as
 
 ## The header
 
-- **The title row**: the material's name (`HeaderTitle`), then New, Save, Undo, Redo and Delete; a divider under it.
+- **The button row**: Save, Undo, Redo and Delete on the right, as icons, each tooltip starting with the button's name; a divider under it. No title, as the material's tab shows its name (`TabTitle`, from `HeaderTitle`), and no New, as the list's toolbar has New Raw Material (the user's, 2026-11-22).
 - **The figure tiles**, each in its kind of figure's colour (`.figure-tile` and a `tile-…` colour), a plain row as compact as the Products header's:
   - **Base Unit**: the saved one, "gram (g)" for an ingredient (`SavedBaseUnitText`).
   - **Current Cost per** and **Buffered Cost per** the Per unit picked on Purchase Cost Setup (`HeaderCostUnitText`): the saved costs times that unit's multiplier, to 4 decimals on the base unit, whose costs are fractions of a centavo, and to the centavo on any other (plain getters, worked out as they're drawn). A made or linked ingredient has no Per unit, so its header is per gram. A cost is shown as the bare value everywhere on the screen, never "₱0.0372 / g": the labels already say what it's per.

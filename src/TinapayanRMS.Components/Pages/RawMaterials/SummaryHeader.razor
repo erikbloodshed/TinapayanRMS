@@ -1,18 +1,18 @@
 @using TinapayanRMS.Domain.Enums
 
-@* The picked material's header: its name with New, Save, Undo, Redo and Delete; its figures
+@* The picked material's header: Save, Undo, Redo and Delete, as icons, each named by its tooltip (no name: its tab shows
+   it; no New: the list's toolbar has it); its figures
    in coloured tiles (Base Unit, Current and Buffered Cost per its purchase unit, a made ingredient's Total Weight and
    Total Cost as its BOM stands, and Last Updated); then its fields on one row, Name first. Packaging is always
    purchased, so it has no Source and picks its Base Unit there instead; only a made ingredient has Weight Loss %. *@
 <section class="card header-card">
     <div class="header-title-row">
-        <h1 class="header-title">@State.HeaderTitle</h1>
         <div class="button-row">
-            <CommandButton Command="State.NewCommand" Icon="AppIcon.Add" Label="New" />
-            <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" Tooltip="Saves the details, alternative units, price and bill of materials together." />
-            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Label="Undo" Tooltip="Takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
-            <CommandButton Command="State.RedoCommand" Icon="AppIcon.Redo" Label="Redo" Tooltip="Puts back the change the last Undo took. Ctrl+Y." />
-            <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete" Label="Delete" />
+            <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Primary="true" Tooltip="Save: saves the details, alternative units, price and bill of materials together." />
+            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
+            <CommandButton Command="State.RedoCommand" Icon="AppIcon.Redo" Tooltip="Redo: puts back the change the last Undo took. Ctrl+Y." />
+            <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete"
+                           Tooltip="Delete: deletes this material with its prices and alternative units, after asking, and closes its tab. While anything uses it, it stays." />
         </div>
     </div>
 
