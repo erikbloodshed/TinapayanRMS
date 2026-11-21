@@ -9,6 +9,7 @@ using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -20,9 +21,10 @@ public class CostingDefaultsStateTests(DatabaseFixture fixture) : PersistenceTes
     private CostingDefaultsState CreateState()
     {
         return new CostingDefaultsState(
-            new CostingDefaultsRepository(CreateDbContextFactory()),
-            new CostingParametersValidator(),
-            new CostRecalculator(CreateDbContextFactory()),
+            new CostingDefaultsEditor(
+                new CostingDefaultsRepository(CreateDbContextFactory()),
+                new CostingParametersValidator(),
+                new CostRecalculator(CreateDbContextFactory())),
             new LoggerConfiguration().CreateLogger());
     }
 

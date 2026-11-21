@@ -41,6 +41,26 @@ public class SubAssemblyRoleEditorTests(DatabaseFixture fixture) : PersistenceTe
         (renamed.Name, renamed.SortOrder, renamed.IsProductOwned).Should().Be(("Bread Dough", 3, true));
     }
 
+    [Test]
+    public async Task A_move_swaps_the_role_with_the_one_above_it()
+    {
+        var doughId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 2);
+        var editor = CreateEditor();
+
+        await editor.MoveAsync(fillingId, up: true, Cancellation);
+
+        (await editor.GetAllAsync(Cancellation)).Where(r => r.Id == doughId || r.Id == fillingId).Select(r => r.Name)
+            .Should().Equal("Filling", "Dough");
+    }
+
+    [Test]
+    public async Task A_role_the_list_cannot_take_is_refused_before_anything_is_asked()
+    {
+        CreateEditor().Invoking(e => e.EnsureValid(new Domain.Entities.SubAssemblyRole { Name = "" }))
+            .Should().Throw<BusinessRuleException>();
+    }
+
     private SubAssemblyRoleEditor CreateEditor() =>
         new(new SubAssemblyRoleRepository(CreateDbContextFactory()), new SubAssemblyRoleValidator());
 }

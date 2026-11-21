@@ -1,6 +1,6 @@
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Printing;
 
@@ -10,7 +10,7 @@ namespace TinapayanRMS.Presentation.Printing;
 /// screen's pages, Export to PDF, the Price Simulator's report), so a change saved on another computer is used too, and
 /// set at once by Settings' own Save. A4, portrait, normal margins and everything printed until read.
 /// </summary>
-public sealed class PrintPage(IPrintSettingsRepository repository)
+public sealed class PrintPage(IPrintSettingsEditor settings)
 {
     private PrintSettings _settings = new();
 
@@ -42,7 +42,7 @@ public sealed class PrintPage(IPrintSettingsRepository repository)
     public bool HasHeading => Settings.ShopName is not null || Settings.ShopAddress is not null || Settings.Logo is not null;
 
     public async Task RefreshAsync(CancellationToken cancellationToken) =>
-        Settings = await repository.GetAsync(cancellationToken);
+        Settings = await settings.GetAsync(cancellationToken);
 
     /// <summary>What Settings has just saved.</summary>
     public void Use(PrintSettings settings) => Settings = settings;

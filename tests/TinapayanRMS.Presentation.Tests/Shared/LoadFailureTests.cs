@@ -14,6 +14,7 @@ using TinapayanRMS.Presentation.Reports;
 using TinapayanRMS.Presentation.Settings;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.SubAssemblies;
+using TinapayanRMS.UseCases.RawMaterials;
 
 namespace TinapayanRMS.Presentation.Tests.Shared;
 
@@ -171,7 +172,8 @@ public class LoadFailureTests(DatabaseFixture fixture) : PersistenceTestBase(fix
     public Task A_save_that_fails_says_why_and_doesnt_throw() => UiThread.RunAsync(async () =>
     {
         var factory = new FailingDbContextFactory(CreateDbContextFactory());
-        var state = new RawMaterialCategoriesState(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator(), new LoggerConfiguration().CreateLogger());
+        var state = new RawMaterialCategoriesState(
+            new RawMaterialCategoryEditor(new RawMaterialCategoryRepository(factory), new RawMaterialCategoryValidator()), new LoggerConfiguration().CreateLogger());
         await state.LoadCommand.ExecuteAsync();
         state.EditingName = "Breads";
 

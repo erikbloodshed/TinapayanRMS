@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
 using DynamicData;
-using FluentValidation;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Settings;
 
@@ -10,14 +10,13 @@ namespace TinapayanRMS.Presentation.Settings;
 /// A Settings tab that keeps one of the app's short lists (units of measure, raw material and product categories, roles):
 /// the list, and a form beside it. Picking an item loads it for editing; New, or finishing a Save or Delete, clears the
 /// form, so the next Save always adds one rather than changing the last one touched. Each tab says what its form holds
-/// beyond the name (<see cref="LoadIntoForm"/>, <see cref="FormItem"/>, <see cref="ClearFields"/>), how its list is read
-/// and written, and what Delete asks.
+/// beyond the name (<see cref="LoadIntoForm"/>, <see cref="FormItem"/>, <see cref="ClearFields"/>) and what Delete asks;
+/// its list is read, checked and written through its editor (<see cref="ILookupListEditor{TItem}"/>).
 /// </summary>
 /// <typeparam name="TItem">The kind of item the list holds.</typeparam>
 public abstract class LookupListState<TItem> : ScreenState, IDisposable
     where TItem : class
 {
-    private readonly IValidator<TItem> _validator;
     private readonly Func<TItem, int> _idOf;
     private readonly string _noun;
     private readonly SourceCache<TItem, int> _cache;
@@ -26,14 +25,14 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
     /// <param name="noun">What an item is called in the form's title: "Unit", "Category", "Role".</param>
     /// <param name="idOf">An item's id.</param>
     /// <param name="order">The order the list shows its items in.</param>
-    /// <param name="validator">What Save checks the form's item against.</param>
+    /// <param name="editor">What reads the list, checks the form's item and writes it.</param>
     /// <param name="logger">Where a failure is logged.</param>
-    protected LookupListState(string noun, Func<TItem, int> idOf, IComparer<TItem> order, IValidator<TItem> validator, ILogger logger)
+    protected LookupListState(string noun, Func<TItem, int> idOf, IComparer<TItem> order, ILookupListEditor<TItem> editor, ILogger logger)
         : base(logger)
     {
         _noun = noun;
         _idOf = idOf;
-        _validator = validator;
+        Editor = editor;
         _cache = new SourceCache<TItem, int>(idOf);
 
         _cache.Connect()
@@ -44,7 +43,7 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
         // replaces, so the selection and any unsaved edits survive.
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            var items = await ReadAllAsync();
+            var items = await Editor.GetAllAsync(CancellationToken.None);
             var selectedId = SelectedItem is { } selected ? _idOf(selected) : (int?)null;
 
             // The selection is pointed at its refreshed copy, which leaves the form and its unsaved edits as they are.
@@ -56,22 +55,16 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
+            // Checked before anything is asked (a tab's SaveAsync may ask first), and refused with why.
             var item = FormItem();
-
-            var validation = _validator.Validate(item);
-            if (!validation.IsValid)
-            {
-                ErrorMessage = validation.ToString(" ");
-                return;
-            }
-
+            Editor.EnsureValid(item);
             await SaveAsync(item);
         }));
 
         DeleteCommand = new ScreenCommand(
             () => RunWithConfirmationAsync(DeleteQuestion(SelectedItem!), async () =>
             {
-                await DeleteAsync(_idOf(SelectedItem!));
+                await Editor.DeleteAsync(_idOf(SelectedItem!), CancellationToken.None);
                 await FinishSaveAsync();
             }),
             () => SelectedItem is not null);
@@ -129,14 +122,8 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
     public ScreenCommand SaveCommand { get; }
     public ScreenCommand DeleteCommand { get; }
 
-    /// <summary>Every item, as stored.</summary>
-    protected abstract Task<IReadOnlyList<TItem>> ReadAllAsync();
-
-    protected abstract Task AddAsync(TItem item);
-
-    protected abstract Task UpdateAsync(TItem item);
-
-    protected abstract Task DeleteAsync(int id);
+    /// <summary>What reads the list, checks an item and writes it.</summary>
+    protected ILookupListEditor<TItem> Editor { get; }
 
     /// <summary>What Delete asks before deleting <paramref name="item"/>.</summary>
     protected abstract string DeleteQuestion(TItem item);
@@ -158,11 +145,11 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
     {
         if (EditingId == 0)
         {
-            await AddAsync(item);
+            await Editor.AddAsync(item, CancellationToken.None);
         }
         else
         {
-            await UpdateAsync(item);
+            await Editor.UpdateAsync(item, CancellationToken.None);
         }
 
         await FinishSaveAsync();

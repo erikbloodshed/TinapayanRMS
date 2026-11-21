@@ -1,9 +1,8 @@
 using DynamicData.Binding;
-using FluentValidation;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.Settings;
 
@@ -14,7 +13,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// </summary>
 public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
 {
-    private readonly ISubAssemblyRoleRepository _roleRepository;
+    private readonly ISubAssemblyRoleEditor _roleEditor;
 
     private bool _editingIsProductOwned;
     /// <summary>
@@ -41,10 +40,10 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
     /// <summary>Swaps the picked role with the one below it; off for the last.</summary>
     public ScreenCommand MoveDownCommand { get; }
 
-    public SubAssemblyRolesState(ISubAssemblyRoleRepository roleRepository, IValidator<SubAssemblyRole> roleValidator, ILogger logger)
-        : base("Role", r => r.Id, SortExpressionComparer<SubAssemblyRole>.Ascending(r => r.SortOrder).ThenByAscending(r => r.Name), roleValidator, logger)
+    public SubAssemblyRolesState(ISubAssemblyRoleEditor roleEditor, ILogger logger)
+        : base("Role", r => r.Id, SortExpressionComparer<SubAssemblyRole>.Ascending(r => r.SortOrder).ThenByAscending(r => r.Name), roleEditor, logger)
     {
-        _roleRepository = roleRepository;
+        _roleEditor = roleEditor;
 
         // Asked of the pick's place in the list as it is, since a move or a new role changes what's first and last.
         MoveUpCommand = new ScreenCommand(
@@ -54,14 +53,6 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
             () => MoveAsync(up: false),
             () => SelectedItem is { } role && Items.IndexOf(role) is var index && index >= 0 && index < Items.Count - 1);
     }
-
-    protected override Task<IReadOnlyList<SubAssemblyRole>> ReadAllAsync() => _roleRepository.GetAllAsync(CancellationToken.None);
-
-    protected override Task AddAsync(SubAssemblyRole item) => _roleRepository.AddAsync(item, CancellationToken.None);
-
-    protected override Task UpdateAsync(SubAssemblyRole item) => _roleRepository.UpdateAsync(item, CancellationToken.None);
-
-    protected override Task DeleteAsync(int id) => _roleRepository.DeleteAsync(id, CancellationToken.None);
 
     protected override string DeleteQuestion(SubAssemblyRole item) => $"Delete the '{item.Name}' role? This can't be undone.";
 
@@ -101,10 +92,10 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
     {
         if (Items.FirstOrDefault(r => r.Id == item.Id) is { } stored && stored.IsProductOwned != item.IsProductOwned)
         {
-            var count = await _roleRepository.CountOwnershipChangesAsync(item.Id, item.IsProductOwned, CancellationToken.None);
+            var count = await _roleEditor.CountOwnershipChangesAsync(item.Id, item.IsProductOwned, CancellationToken.None);
             await RunWithConfirmationAsync(OwnershipChangeMessage(item, count), async () =>
             {
-                await _roleRepository.UpdateAsync(item, CancellationToken.None);
+                await _roleEditor.UpdateAsync(item, CancellationToken.None);
                 await FinishSaveAsync();
             });
             return;
@@ -119,7 +110,7 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
     /// </summary>
     private Task MoveAsync(bool up) => RunSafelyAsync(async () =>
     {
-        await _roleRepository.MoveAsync(SelectedItem!.Id, up, CancellationToken.None);
+        await _roleEditor.MoveAsync(SelectedItem!.Id, up, CancellationToken.None);
         await LoadCommand.ExecuteAsync();
     });
 

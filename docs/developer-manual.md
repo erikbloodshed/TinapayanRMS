@@ -253,7 +253,7 @@ A change is done when:
 | `src/TinapayanRMS.ApplicationCore` | `net11.0` | Domain; FluentValidation | `Interfaces/`, `Rules/`, `Validators/` |
 | `src/TinapayanRMS.Infrastructure` | `net11.0` | Domain, ApplicationCore; EF Core (Npgsql, with EFCore.NamingConventions), Dapper, the Generic Host | `TinapayanRMSDbContext` and its design-time factory, `DatabaseHost` and `ReadOnlyConnection` at the root; `Configurations/`, `Migrations/`, `CompiledModels/`, `Queries/`, `Repositories/`, `Services/` |
 | `src/TinapayanRMS.Pricing` | `net11.0` | ApplicationCore | What a saved product costs, the one way the screens and both servers work it out: `SavedProductReader` and what it builds, at its root. `Versions/` holds the product versions' snapshot and the saves that record them (`VersionedSaves`, `ProductVersionRecorder`) |
-| `src/TinapayanRMS.UseCases` | `net11.0` | ApplicationCore, Pricing | What the screens do with the records ([ADR 0002](adr/0002-layers-use-cases-and-drafts.md)), a folder per screen moved to it: `SubAssemblies/` holds `ISubAssemblyQueries` (what the screen reads), `ISubAssemblyEditor` (Save with its checks and versions, Delete, Rename, Move, Make In-House Ingredient), `ISubAssemblyRoleEditor` and `SharedRecipeImpact`, each with its class; `RawMaterials/` holds `IRawMaterialQueries` (with `MaterialCostShares`), `IRawMaterialEditor` (Save, with the material's, a unit's and a brand price's checks; Delete, Rename, Move, a price history entry's Delete) and `IRawMaterialCategoryEditor` |
+| `src/TinapayanRMS.UseCases` | `net11.0` | ApplicationCore, Pricing | What the screens do with the records ([ADR 0002](adr/0002-layers-use-cases-and-drafts.md)), a folder per screen moved to it: `SubAssemblies/` holds `ISubAssemblyQueries` (what the screen reads), `ISubAssemblyEditor` (Save with its checks and versions, Delete, Rename, Move, Make In-House Ingredient), `ISubAssemblyRoleEditor` and `SharedRecipeImpact`, each with its class; `RawMaterials/` holds `IRawMaterialQueries` (with `MaterialCostShares`), `IRawMaterialEditor` (Save, with the material's, a unit's and a brand price's checks; Delete, Rename, Move, a price history entry's Delete) and `IRawMaterialCategoryEditor`; `Products/` holds `IProductQueries`, `IProductEditor`, `IProductListEditor` and `IProductCategoryEditor`; `Settings/` holds `ILookupListEditor` (what Settings' list tabs do to their lists, which the category and role editors take on too), `UnitOfMeasureEditor`, `ICostingDefaultsEditor` and `IPrintSettingsEditor` |
 | `src/TinapayanRMS.Presentation` | `net11.0` | All four and UseCases; DynamicData, System.Reactive, Serilog | The screens' states, with no UI framework in them: a folder per screen (`RawMaterials/`, `SubAssemblies/`, `Products/`, `Settings/`, `Reports/`, `PriceSimulator/`, `Printing/`), `App/` for what's around the screens, and `Shared/` and `Trees/` for what they share |
 | `src/TinapayanRMS.Components` | `net11.0` (Razor) | Infrastructure, Presentation; Blazor, Syncfusion Blazor, XlsIO | The screens: `ServiceRegistration`, `StartupTasks`, `UnhandledFailures` and `OneCopyPerPc` at the root; `Pages/`, `Layout/`, `Shared/`, `Printing/`, `Vim/`; `wwwroot/` (their styles and scripts) |
 | `src/TinapayanRMS.Maui` | `net11.0-windows10.0.19041.0` (MAUI) | Components; MAUI, BlazorWebView, Serilog | The app: `MauiProgram`, `App`, `MainPage` and `appsettings.json` at the root; `Platforms/Windows/` (the window), `Services/`, `Resources/AppIcon/`, `wwwroot/index.html` (the host page) |
@@ -382,7 +382,7 @@ The layering is fixed:
 - **ApplicationCore** holds the rules, the repository contracts and the validators. It knows nothing of EF Core, SQL or the UI, so everything in it can be unit tested without a database.
 - **Infrastructure** does all the I/O: EF Core for writes, the schema and migrations; Dapper for reads; and the services that work across entities.
 - **Pricing** is what a saved product costs, read and worked out one way: `SavedProductReader`, the immutable `SavedProduct` it builds (its `PricedSection`s and `PricedPackagingLine`s), and `ProductCostSummary`, which is worked out from a `ProductCostInputs` record: the screen fills one from the form and the reader from what's saved. A section's batch and piece figures come from `SectionFigures.Of` and a packaging line's cost from `PricedPackagingLine.Price`, for the screens' editable rows and saved products alike, and a row gives its immutable form with `ToPriced()`, which printouts read. A price tried on the Price Simulator is worked out and checked by `TriedPriceChange.Of`, for its Price Changes table and the MCP server's `simulate_price_changes`. A saved product's sections are named as the screen names them, two in one role apart by their labels ("Dough" beside "Dough: Paste"). It knows ApplicationCore's interfaces and rules, and nothing of EF Core, Blazor, MAUI, Syncfusion or the screens' states, so the Recipe API and the MCP server price exactly as the screens do with no UI in them. Everything in it is immutable: the editable rows the screens type into (`ProductUsageEdit`, `PackagingLineRow`, `SimulatedPriceChange`, on `ObservableRow`) are Presentation's, so the servers can't reach them.
-- **UseCases** is what the screens do with the records ([ADR 0002](adr/0002-layers-use-cases-and-drafts.md)): each aggregate's editor (its Save with the checks, the transaction and the product versions; Delete, Rename, Move) and the queries its screen reads, over ApplicationCore's interfaces and Pricing. It never references Infrastructure: the composition root (`ServiceRegistration`) hands it the repositories. Sub-Assemblies is the first screen moved to it (`UseCases/SubAssemblies/`), Raw Materials the second (`UseCases/RawMaterials/`), and Products reads and writes through it too (`UseCases/Products/`: its queries, its editor, the list's editor and the Category picker's), its drafts still to come; the others follow, a screen at a time, and until then reach their repositories themselves.
+- **UseCases** is what the screens do with the records ([ADR 0002](adr/0002-layers-use-cases-and-drafts.md)): each aggregate's editor (its Save with the checks, the transaction and the product versions; Delete, Rename, Move) and the queries its screen reads, over ApplicationCore's interfaces and Pricing. It never references Infrastructure: the composition root (`ServiceRegistration`) hands it the repositories. Sub-Assemblies is the first screen moved to it (`UseCases/SubAssemblies/`), Raw Materials the second (`UseCases/RawMaterials/`), Products the third (`UseCases/Products/`: its queries, its editor, the list's editor and the Category picker's), and Settings' list tabs, Costing Defaults and Printing the first of phase 4 (`UseCases/Settings/`: `ILookupListEditor`, which the category and role editors take on too, `UnitOfMeasureEditor`, `ICostingDefaultsEditor` and `IPrintSettingsEditor`, which `PrintPage` reads); the others follow, a few screens at a time, and until then reach their repositories themselves.
 - **Presentation** holds the screen states. A screen moved to UseCases depends on its interfaces alone for what it reads and writes; the others still depend on ApplicationCore's interfaces and on Pricing, and knows nothing of Blazor, MAUI, HTML or Syncfusion, so a screen state is tested by driving its commands. The screens say what failed in `Failure`'s words.
 - **Components** renders the screen states: the pages, the shared components, the title bar, the printouts and the Vim keys, with their styles and scripts (`wwwroot`, served at `_content/TinapayanRMS.Components/`) and the JS initializer that loads Syncfusion's scripts before Blazor starts. It's the whole UI, the shared Razor class library a host draws: a host gives it a page that links its styles and scripts, and implements what only a window can do, an interface here (`IAppWindow`, `IFileDialogs`, `IPagePrinter`), which the Maui project implements and the tests fake. `ServiceRegistration` is the only code that names an Infrastructure type, to register it.
 - **Maui** is the app, the screens' host: the window, the web view that draws them, the host page they're drawn in (`wwwroot/index.html`), and the Windows code under `Platforms/Windows/` (`StartupMessage`, Windows' message box for a start that failed or was refused; the chromeless frame, the file dialogs, asking before the window closes, one copy at a time).
@@ -972,7 +972,7 @@ A large screen is split into components in a folder named after it (`Pages/RawMa
 
 A command that deletes, or does anything else that can't be undone, goes through `RunWithConfirmationAsync`. A command that saves runs inside `RunSafelyAsync`, and runs its validator first. A command that only changes the form in memory isn't wrapped.
 
-The smallest complete screens are Settings' list tabs (Units of Measure, Material Categories, Product Categories, Roles): a list, and a form beside it. They share [LookupListState](../src/TinapayanRMS.Presentation/Settings/LookupListState.cs), which holds the list, the pick, the name and the commands; each tab adds what its form holds beyond the name, how its list is read and written, and what Delete asks. Abridged:
+The smallest complete screens are Settings' list tabs (Units of Measure, Material Categories, Product Categories, Roles): a list, and a form beside it. They share [LookupListState](../src/TinapayanRMS.Presentation/Settings/LookupListState.cs), which holds the list, the pick, the name and the commands, and reads, checks and writes the list through its editor, an [ILookupListEditor](../src/TinapayanRMS.UseCases/Settings/ILookupListEditor.cs) (the tab's use case: `UnitOfMeasureEditor`, or the category's or role's own editor, which the other screens use too); each tab adds what its form holds beyond the name and what Delete asks. Abridged:
 
 ```csharp
 public abstract class LookupListState<TItem> : ScreenState, IDisposable
@@ -981,9 +981,10 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
     private readonly SourceCache<TItem, int> _cache;
     private readonly ReadOnlyObservableCollection<TItem> _items;
 
-    protected LookupListState(string noun, Func<TItem, int> idOf, IComparer<TItem> order, IValidator<TItem> validator, ILogger logger)
+    protected LookupListState(string noun, Func<TItem, int> idOf, IComparer<TItem> order, ILookupListEditor<TItem> editor, ILogger logger)
         : base(logger)
     {
+        Editor = editor;
         _cache = new SourceCache<TItem, int>(idOf);
         _cache.Connect()
             .SortAndBind(out _items, order)
@@ -991,7 +992,7 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
 
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            var items = await ReadAllAsync();                                          // 1. fetch
+            var items = await Editor.GetAllAsync(CancellationToken.None);              // 1. fetch
             var selectedId = SelectedItem is { } selected ? idOf(selected) : (int?)null; // 2. remember picks by id
             _cache.MergeFrom(items);                                                   // 3. merge, and point the
             SelectedItem = Items.FirstOrDefault(i => idOf(i) == selectedId);           //    selection at its fresh copy
@@ -1000,20 +1001,14 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
             var item = FormItem();
-            var validation = validator.Validate(item);
-            if (!validation.IsValid)
-            {
-                ErrorMessage = validation.ToString(" ");
-                return;
-            }
-
-            await SaveAsync(item);   // AddAsync or UpdateAsync, then the form cleared and the list loaded again
+            Editor.EnsureValid(item);   // a refusal (BusinessRuleException) shows as ErrorMessage, with why
+            await SaveAsync(item);      // the editor's AddAsync or UpdateAsync, then the form cleared and the list loaded again
         }));
 
         DeleteCommand = new ScreenCommand(
             () => RunWithConfirmationAsync(DeleteQuestion(SelectedItem!), async () =>
             {
-                await DeleteAsync(idOf(SelectedItem!));
+                await Editor.DeleteAsync(idOf(SelectedItem!), CancellationToken.None);
                 await FinishSaveAsync();
             }),
             () => SelectedItem is not null);
@@ -1042,11 +1037,11 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
     // Worked out as it's read: the screen reads it again each time it's drawn.
     public string FormTitle => SelectedItem is null ? $"New {noun}" : $"Edit {noun}";
 
-    protected abstract Task<IReadOnlyList<TItem>> ReadAllAsync();
+    protected ILookupListEditor<TItem> Editor { get; }
     protected abstract string DeleteQuestion(TItem item);
     protected abstract void LoadIntoForm(TItem item);
     protected abstract TItem FormItem();
-    /* … AddAsync, UpdateAsync, DeleteAsync, ClearFields … */
+    /* … ClearFields … */
 
     public void Dispose() => _cache.Dispose();
 }
@@ -1055,12 +1050,10 @@ public abstract class LookupListState<TItem> : ScreenState, IDisposable
 A tab is then its own fields and those few answers ([RawMaterialCategoriesState](../src/TinapayanRMS.Presentation/Settings/RawMaterialCategoriesState.cs), abridged); Roles overrides `SaveAsync` too, to ask before a role's product-owned box changes what it moves:
 
 ```csharp
-public sealed class RawMaterialCategoriesState(IRawMaterialCategoryRepository repository, IValidator<RawMaterialCategory> validator, ILogger logger)
-    : LookupListState<RawMaterialCategory>("Category", c => c.Id, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name), validator, logger)
+public sealed class RawMaterialCategoriesState(IRawMaterialCategoryEditor editor, ILogger logger)
+    : LookupListState<RawMaterialCategory>("Category", c => c.Id, SortExpressionComparer<RawMaterialCategory>.Ascending(c => c.Name), editor, logger)
 {
     public RawMaterialCategoryType EditingType { get; set; }   // RaiseAndSetIfChanged, as every stored property
-
-    protected override Task<IReadOnlyList<RawMaterialCategory>> ReadAllAsync() => repository.GetAllAsync(CancellationToken.None);
 
     protected override string DeleteQuestion(RawMaterialCategory item) => $"Delete the '{item.Name}' category? This can't be undone.";
 
@@ -1072,7 +1065,7 @@ public sealed class RawMaterialCategoriesState(IRawMaterialCategoryRepository re
 
     protected override RawMaterialCategory FormItem() => new() { Id = EditingId, Name = EditingName.Trim(), Type = EditingType };
 
-    /* … AddAsync, UpdateAsync and DeleteAsync, each the repository's; ClearFields … */
+    /* … ClearFields … */
 }
 ```
 

@@ -19,6 +19,7 @@ using TinapayanRMS.Pricing;
 using TinapayanRMS.Pricing.Versions;
 using TinapayanRMS.UseCases.Products;
 using TinapayanRMS.UseCases.RawMaterials;
+using TinapayanRMS.UseCases.Settings;
 using TinapayanRMS.UseCases.SubAssemblies;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Shared;
@@ -169,5 +170,8 @@ public static class ServiceRegistration
         services.AddSingleton<IProductEditor, ProductEditor>();
         services.AddSingleton<IProductListEditor, ProductListEditor>();
         services.AddSingleton<IProductCategoryEditor, ProductCategoryEditor>();
+        services.AddSingleton<ILookupListEditor<UnitOfMeasure>, UnitOfMeasureEditor>();
+        services.AddSingleton<ICostingDefaultsEditor, CostingDefaultsEditor>();
+        services.AddSingleton<IPrintSettingsEditor, PrintSettingsEditor>();
     }
 }

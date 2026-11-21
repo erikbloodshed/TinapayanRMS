@@ -6,6 +6,7 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.UseCases.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -20,7 +21,8 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
     private SubAssemblyRolesState CreateState(bool confirm, List<string>? asked = null)
     {
         var state = new SubAssemblyRolesState(
-            new SubAssemblyRoleRepository(CreateDbContextFactory()), new SubAssemblyRoleValidator(), new LoggerConfiguration().CreateLogger());
+            new SubAssemblyRoleEditor(new SubAssemblyRoleRepository(CreateDbContextFactory()), new SubAssemblyRoleValidator()),
+            new LoggerConfiguration().CreateLogger());
         state.ConfirmDelete.RegisterHandler(context =>
         {
             asked?.Add(context.Input);

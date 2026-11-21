@@ -1,7 +1,6 @@
 using DynamicData.Binding;
-using FluentValidation;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.UseCases.Products;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.Settings;
@@ -11,8 +10,8 @@ namespace TinapayanRMS.Presentation.Settings;
 /// apart from raw material categories (RawMaterialCategoriesState).
 /// A category can set the Wastage % its products are priced with in place of the shop-wide one.
 /// </summary>
-public sealed class ProductCategoriesState(IProductCategoryRepository repository, IValidator<ProductCategory> validator, ILogger logger)
-    : LookupListState<ProductCategory>("Category", c => c.Id, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name), validator, logger)
+public sealed class ProductCategoriesState(IProductCategoryEditor editor, ILogger logger)
+    : LookupListState<ProductCategory>("Category", c => c.Id, SortExpressionComparer<ProductCategory>.Ascending(c => c.Name), editor, logger)
 {
     private decimal? _editingWastagePercent;
 
@@ -22,14 +21,6 @@ public sealed class ProductCategoriesState(IProductCategoryRepository repository
         get => _editingWastagePercent;
         set => RaiseAndSetIfChanged(ref _editingWastagePercent, value);
     }
-
-    protected override Task<IReadOnlyList<ProductCategory>> ReadAllAsync() => repository.GetAllAsync(CancellationToken.None);
-
-    protected override Task AddAsync(ProductCategory item) => repository.AddAsync(item, CancellationToken.None);
-
-    protected override Task UpdateAsync(ProductCategory item) => repository.UpdateAsync(item, CancellationToken.None);
-
-    protected override Task DeleteAsync(int id) => repository.DeleteAsync(id, CancellationToken.None);
 
     protected override string DeleteQuestion(ProductCategory item) =>
         $"Delete the '{item.Name}' category? Its products are left uncategorized. This can't be undone.";

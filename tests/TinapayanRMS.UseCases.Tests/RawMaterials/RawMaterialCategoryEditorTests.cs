@@ -45,6 +45,18 @@ public class RawMaterialCategoryEditorTests(DatabaseFixture fixture) : Persisten
             .Should().Match<Domain.Entities.RawMaterialCategory>(c => c.Name == "Cake Boxes" && c.Type == RawMaterialCategoryType.Packaging);
     }
 
+    [Test]
+    public async Task Settings_update_writes_the_name_and_kind_over_the_stored_category()
+    {
+        var editor = CreateEditor();
+        var added = await editor.AddAsync("Boxes", RawMaterialCategoryType.Ingredient, Cancellation);
+
+        await editor.UpdateAsync(new Domain.Entities.RawMaterialCategory { Id = added.Id, Name = "Cake Boxes", Type = RawMaterialCategoryType.Packaging }, Cancellation);
+
+        (await editor.GetAllAsync(Cancellation)).Should().ContainSingle()
+            .Which.Should().Match<Domain.Entities.RawMaterialCategory>(c => c.Name == "Cake Boxes" && c.Type == RawMaterialCategoryType.Packaging);
+    }
+
     private RawMaterialCategoryRepository Repository() => new(CreateDbContextFactory());
 
     private RawMaterialCategoryEditor CreateEditor() => new(Repository(), new RawMaterialCategoryValidator());

@@ -1,10 +1,10 @@
 using System.Reactive;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Settings;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.Settings;
@@ -16,7 +16,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// </summary>
 public sealed class PrintingState : ScreenState
 {
-    private readonly IPrintSettingsRepository _repository;
+    private readonly IPrintSettingsEditor _editor;
     private readonly PrintPage _page;
 
     /// <summary>What the Paper picker offers, each with its size.</summary>
@@ -187,16 +187,16 @@ public sealed class PrintingState : ScreenState
     /// <summary>Answered with the picture file chosen, or null when cancelled.</summary>
     public Interaction<Unit, string?> ChooseLogoFile { get; } = new();
 
-    public PrintingState(IPrintSettingsRepository repository, PrintPage page, ILogger logger)
+    public PrintingState(IPrintSettingsEditor editor, PrintPage page, ILogger logger)
         : base(logger)
     {
-        _repository = repository;
+        _editor = editor;
         _page = page;
 
         // What's saved replaces the fields: a choice left unsaved doesn't outlive the visit.
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            var settings = await _repository.GetAsync(CancellationToken.None);
+            var settings = await _editor.GetAsync(CancellationToken.None);
             EditingPaperSize = settings.PaperSize;
             EditingOrientation = settings.Orientation;
             EditingMargins = settings.Margins;
@@ -213,10 +213,8 @@ public sealed class PrintingState : ScreenState
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
-            var settings = Editing;
-            await _repository.SetAsync(settings, CancellationToken.None);
             // As it's kept, names tidied: what the printouts use, and what the fields show.
-            settings = await _repository.GetAsync(CancellationToken.None);
+            var settings = await _editor.SaveAsync(Editing, CancellationToken.None);
             EditingShopName = settings.ShopName;
             EditingShopAddress = settings.ShopAddress;
             EditingFooterNote = settings.FooterNote;
