@@ -101,19 +101,62 @@ public sealed class SharedTransactionDbContextFactory(string connectionString, T
 
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
-        if (readOnly)
+
+        // A run that writes takes its turn (Transactions.WritesLockKey) before its transaction begins, not with its first
+        // write: PostgreSQL takes a Serializable transaction's snapshot at its first statement, which the run's reads come
+        // before, and from a snapshot taken before another writer committed the run would work a made ingredient's cost out
+        // from that writer's inputs as they were, writing rows the other didn't, so nothing would refuse it
+        // (CostCascadeConcurrencyPersistenceTests). Held by the session, so the repositories' own take of it is granted at
+        // once, and let go once the transaction has ended.
+        if (!readOnly)
         {
-            await using var command = new NpgsqlCommand("SET TRANSACTION READ ONLY", connection, transaction);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            await ExecuteAsync(connection, null, $"SELECT pg_advisory_lock({Transactions.WritesLockKey})", cancellationToken);
         }
 
-        // Set here, so it reaches the work, and gone again when this returns: an AsyncLocal set in an async method never
-        // flows back out to its caller.
-        Current.Value = new SharedTransaction(connectionString, transaction, TinapayanRMSDbContext.CreateOptions(connection));
-        var result = await work();
-        await transaction.CommitAsync(cancellationToken);
-        return result;
+        try
+        {
+            await using var transaction = await connection.BeginTransactionAsync(isolationLevel, cancellationToken);
+            if (readOnly)
+            {
+                await ExecuteAsync(connection, transaction, "SET TRANSACTION READ ONLY", cancellationToken);
+            }
+
+            // Set here, so it reaches the work, and gone again when this returns: an AsyncLocal set in an async method never
+            // flows back out to its caller.
+            Current.Value = new SharedTransaction(connectionString, transaction, TinapayanRMSDbContext.CreateOptions(connection));
+            var result = await work();
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        finally
+        {
+            if (!readOnly)
+            {
+                await LetGoOfWritesAsync(connection);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The writes' lock let go, the transaction over. A pooled connection that can't let go of it (broken, say) is closed
+    /// rather than handed to the next run with the lock still held: the lock goes with the session.
+    /// </summary>
+    private static async Task LetGoOfWritesAsync(NpgsqlConnection connection)
+    {
+        try
+        {
+            await ExecuteAsync(connection, null, $"SELECT pg_advisory_unlock({Transactions.WritesLockKey})", CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            NpgsqlConnection.ClearPool(connection);
+        }
+    }
+
+    private static async Task ExecuteAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, string sql, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private SharedTransaction? Shared() => Current.Value is { } shared && shared.ConnectionString == connectionString ? shared : null;

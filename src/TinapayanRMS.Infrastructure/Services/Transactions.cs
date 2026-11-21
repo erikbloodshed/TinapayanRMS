@@ -15,8 +15,8 @@ namespace TinapayanRMS.Infrastructure.Services;
 /// made or linked ingredient out from the other's costs as they were before it committed, the one committing last storing
 /// a cost from stale inputs that nothing would flag. Taken behind the first, the second reads what the first committed.
 /// Every writer takes the one lock before it writes anything, so two can't each hold what the other waits for. A unit of
-/// work takes it with its first write, not as it begins, so a run that only reads holds up nobody; one that read before
-/// another committed fails to serialize instead, and is run again (SharedTransactionDbContextFactory.RunAsync).
+/// work that writes takes it before its transaction begins (SharedTransactionDbContextFactory.RunAsync), so its snapshot
+/// sees what the writer ahead of it committed; a read-only run (ReadSnapshotAsync) takes none and holds up nobody.
 /// </para>
 /// </summary>
 public static class Transactions

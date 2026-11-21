@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Enums;
@@ -143,47 +144,75 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
         (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal");
     }
 
+    // A run that writes takes its turn as it begins, so a save that changes costs, made beside it, waits for it to commit and
+    // writes after it: it can't commit between the run's reads and its writes (CostCascadeConcurrencyPersistenceTests).
     [Test]
-    public async Task A_run_cancelled_for_a_save_beside_it_is_run_again_and_sees_what_that_save_committed()
+    public async Task A_save_beside_a_run_that_writes_waits_until_the_run_has_committed()
     {
         var productId = await AddProductAsync("Pandesal");
         var products = new ProductRepository(CreateDbContextFactory());
+        var cancellation = Cancellation;
+        Task? beside = null;
+
+        var readFirst = await CreateUnitOfWork().RunAsync(async () =>
+        {
+            var name = (await products.GetByIdAsync(productId, cancellation))!.Name;
+            beside = OutsideAsync(() => products.RenameAsync(productId, "Pandesal Classic", cancellation));
+            await UntilAConnectionWaitsOnALockAsync();
+            await products.RenameAsync(productId, name + " Special", cancellation);
+            return name;
+        }, Cancellation);
+        await beside!;
+
+        readFirst.Should().Be("Pandesal", "nothing committed between the run's read and its write");
+        (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal Classic", "the save beside it wrote after the run");
+    }
+
+    // A write that changes no cost takes no turn (a category's), so it can still commit between a run's read and its write,
+    // and PostgreSQL cancels the run's: it's run again, and sees what the other committed.
+    [Test]
+    public async Task A_run_cancelled_for_a_save_beside_it_is_run_again_and_sees_what_that_save_committed()
+    {
+        var categories = new ProductCategoryRepository(CreateDbContextFactory());
+        await categories.AddAsync(new Domain.Entities.ProductCategory { Name = "Breads" }, Cancellation);
+        var categoryId = (await categories.GetAllAsync(Cancellation)).Single().Id;
         var cancellation = Cancellation;
         var attempts = 0;
 
         var readFirst = await CreateUnitOfWork().RunAsync(async () =>
         {
             attempts++;
-            var name = (await products.GetByIdAsync(productId, cancellation))!.Name;
+            var name = (await categories.GetAllAsync(cancellation)).Single().Name;
             if (attempts == 1)
             {
-                // Committed after the run read the product: its own write to the product can't be serialized after it.
-                await OutsideAsync(() => products.RenameAsync(productId, "Pandesal Classic", cancellation));
+                // Committed after the run read the category: its own write to it can't be serialized after it.
+                await OutsideAsync(() => categories.UpdateAsync(new Domain.Entities.ProductCategory { Id = categoryId, Name = "Loaves" }, cancellation));
             }
 
-            await products.RenameAsync(productId, name + " Special", cancellation);
+            await categories.UpdateAsync(new Domain.Entities.ProductCategory { Id = categoryId, Name = name + " and Rolls" }, cancellation);
             return name;
         }, Cancellation);
 
         attempts.Should().Be(2);
-        readFirst.Should().Be("Pandesal Classic", "the second try read what the other save committed");
-        (await products.GetByIdAsync(productId, Cancellation))!.Name.Should().Be("Pandesal Classic Special");
+        readFirst.Should().Be("Loaves", "the second try read what the other save committed");
+        (await categories.GetAllAsync(Cancellation)).Single().Name.Should().Be("Loaves and Rolls");
     }
 
     [Test]
     public async Task A_run_cancelled_every_time_gives_up_after_its_attempts_with_what_postgresql_said()
     {
-        var productId = await AddProductAsync("Pandesal");
-        var products = new ProductRepository(CreateDbContextFactory());
+        var categories = new ProductCategoryRepository(CreateDbContextFactory());
+        await categories.AddAsync(new Domain.Entities.ProductCategory { Name = "Breads" }, Cancellation);
+        var categoryId = (await categories.GetAllAsync(Cancellation)).Single().Id;
         var cancellation = Cancellation;
         var attempts = 0;
 
         var run = () => CreateUnitOfWork().RunAsync(async () =>
         {
             attempts++;
-            var name = (await products.GetByIdAsync(productId, cancellation))!.Name;
-            await OutsideAsync(() => products.RenameAsync(productId, $"Pandesal {attempts}", cancellation));
-            await products.RenameAsync(productId, name + " Special", cancellation);
+            var name = (await categories.GetAllAsync(cancellation)).Single().Name;
+            await OutsideAsync(() => categories.UpdateAsync(new Domain.Entities.ProductCategory { Id = categoryId, Name = $"Breads {attempts}" }, cancellation));
+            await categories.UpdateAsync(new Domain.Entities.ProductCategory { Id = categoryId, Name = name + " and Rolls" }, cancellation);
             return 0;
         }, Cancellation);
 
@@ -206,6 +235,32 @@ public class SharedTransactionDbContextFactoryTests(DatabaseFixture fixture) : P
 
         await run.Should().ThrowAsync<BusinessRuleException>();
         attempts.Should().Be(1);
+    }
+
+    /// <summary>Until a connection to the test database waits on a lock another holds: the save beside the run, behind it.</summary>
+    private async Task UntilAConnectionWaitsOnALockAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            await using (var dbContext = CreateDbContext())
+            {
+                var waiting = await dbContext.Database
+                    .SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
+                    .SingleAsync(Cancellation);
+                if (waiting > 0)
+                {
+                    return;
+                }
+            }
+
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("The save beside the run never waited on it.");
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(20), Cancellation);
+        }
     }
 
     /// <summary>

@@ -46,6 +46,43 @@ public class CostCascadeConcurrencyPersistenceTests(DatabaseFixture fixture) : P
             .Should().Be(0, "no stored cost was worked out from stale inputs");
     }
 
+    // A unit of work (a Save that records a version) behind a price change it doesn't write over: it adds flour to Syrup's
+    // recipe while flour's new price waits to commit. What it works Syrup out from has to be the price committed ahead of it.
+    [Test]
+    public async Task A_unit_of_work_behind_a_price_change_works_its_made_ingredient_out_from_the_new_price()
+    {
+        // Syrup is made from 1 kg of sugar at 0.05 a gram; flour, at 0.05, isn't in it yet.
+        var flourId = await AddIngredientAsync("Flour");
+        await SetPriceAsync(flourId, unitId: null, price: 0.05m);
+        var sugarId = await AddIngredientAsync("Sugar");
+        await SetPriceAsync(sugarId, unitId: null, price: 0.05m);
+        var syrupId = await AddMadeIngredientAsync("Syrup", [(sugarId, 1000m)]);
+        var recipeId = await RecipeIdOfAsync(syrupId);
+        SubAssembly recipe;
+        await using (var dbContext = CreateDbContext())
+        {
+            recipe = await dbContext.SubAssemblies.AsNoTracking().SingleAsync(s => s.Id == recipeId, Cancellation);
+        }
+
+        // Flour's new price is held as it's about to commit; 1 kg of flour goes into Syrup's recipe in a unit of work meanwhile.
+        var flourHeld = new HeldCommit();
+        var flourSave = new RawMaterialBrandPriceRepository(FactoryWith(flourHeld))
+            .SetAsync(flourId, [new RawMaterialBrandPrice { Price = 0.07m }], Cancellation);
+        await flourHeld.Reached.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        var recipeSave = CreateUnitOfWork().RunAsync(
+            () => new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(recipe, [(sugarId, 1000m), (flourId, 1000m)], Cancellation),
+            Cancellation);
+        await UntilASaveWaitsOnAnotherAsync();
+        flourHeld.Release();
+        await Task.WhenAll(flourSave, recipeSave);
+
+        // Syrup at flour's new price: (0.07 + 0.05) / 2 a gram, as Recalculate Costs works it out.
+        await using var check = CreateDbContext();
+        (await check.RawMaterials.SingleAsync(m => m.Id == syrupId, Cancellation)).CostPerBaseUnit.Should().Be(0.06m);
+        (await new CostRecalculator(CreateDbContextFactory()).RecalculateAllAsync(Cancellation)).IngredientsCorrected
+            .Should().Be(0, "no stored cost was worked out from stale inputs");
+    }
+
     /// <summary>Until a connection to the test database waits on a lock another holds: the second save, behind the first.</summary>
     private async Task UntilASaveWaitsOnAnotherAsync()
     {
