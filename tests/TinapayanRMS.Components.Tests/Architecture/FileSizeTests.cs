@@ -32,7 +32,7 @@ public class FileSizeTests
     [Test]
     public void A_screen_state_file_is_at_most_seven_hundred_lines()
     {
-        var presentation = Path.Combine(RepositoryRoot(), "src", "TinapayanRMS.Presentation");
+        var presentation = Path.Combine(Codebase.RepositoryRoot(), "src", "TinapayanRMS.Presentation");
         var lengths = Directory.EnumerateFiles(presentation, "*.cs", SearchOption.AllDirectories)
             .Where(file => !IsBuildOutput(Path.GetRelativePath(presentation, file)))
             .Select(file => (Path: Path.GetRelativePath(presentation, file).Replace('\\', '/'), Lines: File.ReadAllLines(file).Length))
@@ -60,18 +60,7 @@ public class FileSizeTests
         string.Join(Environment.NewLine, problems).Should().BeEmpty();
     }
 
+    /// <summary>A file under the project's bin or obj folder, by its first folder alone: a source folder named "objects" is measured.</summary>
     private static bool IsBuildOutput(string relativePath) =>
-        relativePath.StartsWith("bin", StringComparison.Ordinal) || relativePath.StartsWith("obj", StringComparison.Ordinal);
-
-    /// <summary>The folder holding the solution, above where the tests run from.</summary>
-    private static string RepositoryRoot()
-    {
-        var folder = new DirectoryInfo(AppContext.BaseDirectory);
-        while (folder is not null && !File.Exists(Path.Combine(folder.FullName, "TinapayanRMS.slnx")))
-        {
-            folder = folder.Parent;
-        }
-
-        return folder?.FullName ?? throw new InvalidOperationException("The tests aren't running under the repository's folder.");
-    }
+        relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)[0] is "bin" or "obj";
 }

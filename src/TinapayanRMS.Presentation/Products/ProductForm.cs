@@ -868,9 +868,9 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
         // What's linked as it's kept now (ProductDraft.RebaseLinked): the linked packaging, read again for this product only
         // while it showed the link as saved, and the recipe's sections.
-        var sameProduct = load.DetailProductId == _detailProductId;
         var (linkedSectionsChanged, linkedPackagingNow) = Draft.RebaseLinked(
-            sameProduct ? load.SavedLink : null, sameProduct ? load.LinkedPackagingLines : null, read.LinkedSubAssemblies, read.LinkedLines);
+            load.DetailProductId == _detailProductId && load is { SavedLink: { } savedLink, LinkedPackagingLines: { } lines } ? (savedLink, lines) : null,
+            read.LinkedSubAssemblies, read.LinkedLines);
 
         // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
         // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked

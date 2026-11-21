@@ -143,7 +143,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     /// A saved product's own fields, as <paramref name="product"/> holds them, its category <paramref name="categories"/>'
     /// own copy; the Create Variant name starts as the product's own, with " Copy".
     /// </summary>
-    public void ShowFields(Product product, IReadOnlyList<ProductCategory> categories)
+    internal void ShowFields(Product product, IReadOnlyList<ProductCategory> categories)
     {
         EditingName = product.Name;
         EditingDescription = product.Description ?? string.Empty;
@@ -155,7 +155,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     }
 
     /// <summary>A new product's own fields: no name, description or category, one piece to a unit, no price.</summary>
-    public void ClearFields()
+    internal void ClearFields()
     {
         EditingName = string.Empty;
         EditingDescription = string.Empty;
@@ -172,7 +172,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     /// its lines and its bulk packaging for <paramref name="bulkPackagingQuantity"/> products. The recipe's sections and the
     /// costing are the form's to show after, in that order (the recipe part's ShowSaved reselects its tabs).
     /// </summary>
-    public void ShowParts(ProductDetail detail, int? bulkPackagingQuantity)
+    internal void ShowParts(ProductDetail detail, int? bulkPackagingQuantity)
     {
         Components.Load(detail.Components);
         Packaging.LoadLink(detail.PackagingLink);
@@ -185,27 +185,27 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     /// fresh copy among <paramref name="categories"/>, and a composite's lines pointed at the fresh products at their fresh
     /// costs, with every composite's lines as saved for the product cell's choices.
     /// </summary>
-    public void Rebase(int? categoryId, IReadOnlyList<ProductCategory> categories, IReadOnlyDictionary<int, ComponentCosts> componentCosts, IReadOnlyList<ProductComponent> componentLinks)
+    internal void Rebase(int? categoryId, IReadOnlyList<ProductCategory> categories, IReadOnlyDictionary<int, ComponentCosts> componentCosts, IReadOnlyList<ProductComponent> componentLinks)
     {
         EditingCategory = categories.FirstOrDefault(c => c.Id == categoryId);
         Components.TakeFresh(componentCosts, componentLinks);
     }
 
     /// <summary>
-    /// What a load brought from where it's kept, nothing typed changed (ADR 0007): the linked packaging's link and lines as
-    /// saved now (<paramref name="savedLink"/>, <paramref name="linkedPackagingLines"/>, read again while the form still shows
-    /// the link as saved), the recipe's sections at the fresh ingredients, roles and linked sub-assemblies, and the packaging's
-    /// rows at their materials' refreshed costs and units. What changed of what's linked, for the form's undo history to take
-    /// in too: whether a linked section did, and the packaging as it shows now when its linked lines or name did.
+    /// What a load brought from where it's kept, nothing typed changed (ADR 0007): the linked packaging as saved now
+    /// (<paramref name="linkedPackaging"/>, its link and its lines, read again while the form still shows the link as saved;
+    /// null when they weren't), and the recipe's sections at the fresh ingredients, roles and linked sub-assemblies. What
+    /// changed of what's linked, for the form's undo history to take in too: whether a linked section did, and the packaging
+    /// as it shows now when its linked lines or name did. The packaging's rows at their materials' refreshed costs are the
+    /// form's to re-point after its history is rewritten (ProductPackagingDraft.ResolveRows).
     /// </summary>
-    public (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
-        PackagingLinkTarget? savedLink,
-        IReadOnlyList<PackagingLine>? linkedPackagingLines,
+    internal (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
+        (PackagingLinkTarget Link, IReadOnlyList<PackagingLine> Lines)? linkedPackaging,
         IReadOnlyList<SubAssembly> linkedSubAssemblies,
         IReadOnlyList<SubAssemblyLine> linkedLines)
     {
         PackagingSnapshot? linkedPackagingNow = null;
-        if (linkedPackagingLines is not null)
+        if (linkedPackaging is var (savedLink, linkedPackagingLines))
         {
             // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
             var renamed = !Equals(Packaging.LinkTarget, savedLink);
@@ -295,7 +295,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     /// recipe part's Restore). The category goes back by id, as the reloaded <paramref name="categories"/>' own copy; the
     /// packaging's link as saved is left alone, as it's what Save compares against.
     /// </summary>
-    public void Restore(ProductFormSnapshot snapshot, IReadOnlyList<ProductCategory> categories)
+    internal void Restore(ProductFormSnapshot snapshot, IReadOnlyList<ProductCategory> categories)
     {
         // The product's own fields.
         EditingName = snapshot.Name;

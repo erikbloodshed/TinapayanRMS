@@ -82,12 +82,36 @@ public class ProductDraftTests
         world.Draft.EditingCategory.Should().BeSameAs(freshLoaves, "a load re-points the category at its fresh copy, by id");
         world.Draft.Costing.Costs.WastagePercent.Should().Be(4m);
 
+        world.Draft.EditingDescription = "Soft";
+        world.Draft.Components.IncludesPackaging = true;
         world.Draft.ClearFields();
+        world.Draft.EditingDescription.Should().BeEmpty();
+        world.Draft.Components.IncludesPackaging.Should().BeFalse();
         world.Draft.EditingName.Should().BeEmpty();
         world.Draft.EditingCategory.Should().BeNull();
         world.Draft.EditingQuantityRequired.Should().Be(1);
         world.Draft.EditingCurrentPrice.Should().BeNull();
         world.Draft.EditingCloneName.Should().BeEmpty();
+    }
+
+    [Test]
+    public void A_load_says_what_it_changed_of_the_linked_packaging()
+    {
+        var world = new World();
+        var set = new PackagingLinkTarget.Set(81, "Standard Wrap");
+        PackagingLine Line(decimal qty) => new() { PackagingMaterialId = 71, PackagingMaterial = world.Material71, QtyPerUnit = qty, AuthoredField = PackagingLineAuthoredField.QtyPerUnit };
+        world.Draft.Packaging.LoadLink(new PackagingLink { LinkedSubAssemblyId = 81, LinkedSubAssembly = new SubAssembly { Id = 81, Name = "Standard Wrap" } });
+        world.Draft.Packaging.LoadLines([Line(1m)]);
+
+        world.Draft.RebaseLinked(null, [], []).LinkedPackagingNow.Should().BeNull("the linked packaging wasn't read again");
+        world.Draft.RebaseLinked((set, [Line(1m)]), [], []).LinkedPackagingNow.Should().BeNull("it's as it was");
+
+        var renamed = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, [Line(1m)]), [], []).LinkedPackagingNow;
+        renamed.Should().NotBeNull("the set was renamed where it's kept");
+        world.Draft.Packaging.PackagingLinkedToText.Should().Contain("Standard Wrap 10 x 14");
+
+        var moreLines = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, [Line(2m)]), [], []).LinkedPackagingNow;
+        moreLines!.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "the set's lines changed where it's kept");
     }
 
     /// <summary>One thing a user does to the product, as one undo step.</summary>
@@ -152,10 +176,11 @@ public class ProductDraftTests
             _categories.Add(new ProductCategory { Id = 62, Name = "Loaves", WastagePercent = 5m });
             _categories.Add(new ProductCategory { Id = 63, Name = "Cakes" });
 
+            Material71 = Material(71, "Cello Wrapper", 0.7m);
             Draft = new ProductDraft(this, new ProductLists(
                 [],
                 [],
-                [Material(71, "Cello Wrapper", 0.7m), Material(72, "Sticker Label", 0.4m)],
+                [Material71, Material(72, "Sticker Label", 0.4m)],
                 []));
             Draft.Costing.SetDefaults(new CostingDefaults { WastagePercent = 3m, VatPercent = 12m, PriceRoundingStep = 1m });
             Draft.Costing.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarginPercent = 60m });
@@ -168,6 +193,9 @@ public class ProductDraftTests
         }
 
         public ProductDraft Draft { get; }
+
+        /// <summary>The cello wrapper, as the screen holds it.</summary>
+        public RawMaterial Material71 { get; }
 
         public UndoHistory<ProductFormSnapshot> History { get; }
 
