@@ -7,7 +7,8 @@
 @* A printout's preview: what to include, and Print and Export to PDF, over the document on sheets of paper, one for each
    part that starts a page. Print opens the computer's print dialog over the window's page, and Export to PDF writes the
    same pages to a file, each printing the document alone (print.css hides the rest), on pages app.js breaks and the web
-   view numbers. Production copy prints the recipe alone for the production floor, in large type with a box to tick
+   view numbers. Sub-assembly total prints the recipe with its costs and the total sub-assembly cost, in place of the costing.
+   Production copy prints the recipe alone for the production floor, in large type with a box to tick
    beside each line. *@
 <div class="print-pane">
     <div class="print-bar no-print">
@@ -19,6 +20,8 @@
                         title="Each sub-assembly's ingredients and piece size, then the packaging." />
             <SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe || Includes.ProductionCopy"
                         title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
+            <SfCheckBox Label="Sub-assembly total" @bind-Checked="Includes.SubAssemblyTotal" Disabled="Includes.ProductionCopy"
+                        title="In place of the costing: the recipe with each line's unit price and cost, each table's total, and the total sub-assembly cost (the raw materials) at the end, without the costing's breakdown." />
             <SfCheckBox Label="Production copy" @bind-Checked="Includes.ProductionCopy"
                         title="The recipe alone, with no costs, for the production floor: large type, a box to tick beside each line as it's weighed, and a line to sign." />
         }
@@ -39,7 +42,8 @@
         else if (Set is not null)
         {
             <PrintDocument Set="Set" IncludeRecipe="Includes.ProductionCopy || Includes.Recipe"
-                           IncludeCosting="!Includes.ProductionCopy && Includes.Costing" ProductionCopy="Includes.ProductionCopy" />
+                           IncludeCosting="!Includes.ProductionCopy && Includes.Costing"
+                           IncludeSubAssemblyTotal="!Includes.ProductionCopy && Includes.SubAssemblyTotal" ProductionCopy="Includes.ProductionCopy" />
         }
         else if (Empty is not null)
         {

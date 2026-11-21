@@ -4,7 +4,10 @@ using TinapayanRMS.Presentation.Tests.Fixtures;
 
 namespace TinapayanRMS.Presentation.Tests.Printing;
 
-/// <summary>The print preview's Include ticks, kept for the Windows user: both to start with, and never neither.</summary>
+/// <summary>
+/// The print preview's Include ticks, kept for the Windows user: both parts to start with, and never neither; the
+/// sub-assembly total in place of the costing.
+/// </summary>
 public class PrintIncludesTests
 {
     [Test]
@@ -50,6 +53,33 @@ public class PrintIncludesTests
         var next = new PrintIncludes(viewState);
         (next.Recipe, next.Costing, next.ProductionCopy).Should().Be((true, false, true));
         viewState.ReadList(PrintIncludes.Key).Should().Equal("recipe", "production");
+    }
+
+    [Test]
+    public void Sub_assembly_total_takes_the_costings_place_and_is_kept()
+    {
+        var viewState = new InMemoryViewStateStore();
+        var includes = new PrintIncludes(viewState) { Recipe = false };
+        includes.SubAssemblyTotal.Should().BeFalse();
+
+        includes.SubAssemblyTotal = true;
+
+        var next = new PrintIncludes(viewState);
+        (next.Recipe, next.Costing, next.SubAssemblyTotal).Should().Be((true, false, true), "it's the recipe's, in place of the costing");
+        viewState.ReadList(PrintIncludes.Key).Should().Equal("recipe", "sub-assembly-total");
+    }
+
+    [Test]
+    public void Ticking_costing_clears_the_sub_assembly_total_and_clearing_it_leaves_the_recipe()
+    {
+        var includes = new PrintIncludes(new InMemoryViewStateStore()) { SubAssemblyTotal = true };
+
+        includes.Costing = true;
+        (includes.Recipe, includes.Costing, includes.SubAssemblyTotal).Should().Be((true, true, false));
+
+        includes.SubAssemblyTotal = true;
+        includes.SubAssemblyTotal = false;
+        (includes.Recipe, includes.Costing, includes.SubAssemblyTotal).Should().Be((true, false, false));
     }
 
     [Test]

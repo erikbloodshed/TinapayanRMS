@@ -12,7 +12,8 @@ namespace TinapayanRMS.Components.Tests.Printing;
 
 /// <summary>
 /// What Settings → Printing leaves out of a printout: the recipe's unit costs and percentages, column and cell alike, the
-/// figure tiles and the price comparison; and the print preview's Include ticks, as the Windows user last left them.
+/// figure tiles and the price comparison; the print preview's Include ticks, as the Windows user last left them; and
+/// Include's sub-assembly total, in place of the costing.
 /// </summary>
 public class PrintDocumentColumnsTests
 {
@@ -59,6 +60,53 @@ public class PrintDocumentColumnsTests
 
         pane.FindAll(".print-costing").Should().BeEmpty("the costing was cleared last time");
         Headings(pane, ".print-block table").Should().Equal("Ingredient", "Grams", "Baker's %");
+    }
+
+    [Test]
+    public async Task The_sub_assembly_total_prints_the_recipes_costs_with_unit_prices_and_the_total_at_the_end()
+    {
+        await using var context = AppServices.NewContext();
+        context.Services.GetRequiredService<PrintPage>().Use(new PrintSettings { OmitUnitCosts = true });
+        var packaging = new PrintedPackaging(null, [new PrintedPackagingLine("Paper Bag", 1m, "pc", 0.75m, 0.75m)], 0.75m);
+
+        var document = context.Render<PrintDocument>(parameters => parameters
+            .Add(d => d.Set, ProductPrintSet.Of(Set().Products[0] with { Packaging = packaging }))
+            .Add(d => d.IncludeCosting, false)
+            .Add(d => d.IncludeSubAssemblyTotal, true));
+
+        Headings(document, ".print-block table").Should().Equal(["Ingredient", "Grams", "Baker's %", "Cost/g", "Cost"], "it has the unit prices whatever Settings leaves out");
+        Row(document, ".print-block tbody tr").Should().Equal("Flour", "1,000.0", "100.0", "0.0520", "52.00");
+        Row(document, ".print-block tfoot tr").Should().Equal("Total", "1,000.0", "100.0", "", "52.00");
+        document.Find(".print-block .print-small").TextContent.Should().EndWith("Cost per piece 2.60");
+        var packagingTable = document.FindAll(".print-block table")[1];
+        packagingTable.QuerySelectorAll("thead th").Select(cell => cell.TextContent.Trim()).Should().Equal("Material", "Qty", "Unit", "Unit Cost", "Cost");
+        packagingTable.QuerySelector("tbody tr")!.Children.Select(cell => cell.TextContent.Trim()).Should().Equal("Paper Bag", "1", "pc", "0.7500", "0.75");
+        packagingTable.QuerySelector("tfoot tr")!.Children.Select(cell => cell.TextContent.Trim()).Should().Equal("Total", "", "", "", "0.75");
+        Row(document, ".print-sub-assembly-total tr").Should().Equal("Total sub-assembly cost (Per piece)", "2.60");
+        document.FindAll(".print-figures, .print-price-comparison, .print-part-row").Should().BeEmpty("none of the costing's breakdown prints");
+        document.FindAll(".print-costing").Should().ContainSingle("the total alone, not the breakdown");
+    }
+    [Test]
+    public async Task The_costing_wins_over_the_sub_assembly_total_and_a_production_copy_has_neither()
+    {
+        await using var context = AppServices.NewContext();
+        context.Services.AddSingleton<Components.Shared.IFileDialogs>(new FakeFileDialogs());
+        var includes = context.Services.GetRequiredService<PrintIncludes>();
+        includes.SubAssemblyTotal = true;
+
+        var pane = context.Render<PrintPane>(parameters => parameters.Add(p => p.Set, Set()));
+        pane.FindAll(".print-sub-assembly-total").Should().ContainSingle();
+
+        includes.ProductionCopy = true;
+        pane.Render();
+        pane.FindAll(".print-sub-assembly-total, .print-costing").Should().BeEmpty();
+        Headings(pane, ".print-block table").Should().NotContain("Cost");
+
+        includes.ProductionCopy = false;
+        includes.Costing = true;
+        pane.Render();
+        pane.FindAll(".print-sub-assembly-total").Should().BeEmpty();
+        pane.FindAll(".print-price-comparison").Should().ContainSingle("the whole costing prints");
     }
 
     private static IRenderedComponent<PrintDocument> Render(BunitContext context) =>

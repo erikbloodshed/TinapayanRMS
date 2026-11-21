@@ -170,6 +170,18 @@
     [Parameter] public bool IncludeCosting { get; set; } = true;
 
     /// <summary>
+    /// In place of the costing: the recipe's costs as the costing prints them, each line's with its unit cost (Cost/g, Unit
+    /// Cost) whatever Settings → Printing leaves out, each table's total and each section's cost per piece, then the total
+    /// sub-assembly cost (the raw materials) at the end, and none of the breakdown. The costing wins when both are set.
+    /// </summary>
+    [Parameter] public bool IncludeSubAssemblyTotal { get; set; }
+
+    private bool SubAssemblyTotalOnly => IncludeSubAssemblyTotal && !IncludeCosting;
+
+    // The recipe's own costs, each line's and each table's: with the costing, or the sub-assembly total in its place.
+    private bool ShowsRecipeCosts => IncludeCosting || SubAssemblyTotalOnly;
+
+    /// <summary>
     /// For the production floor: the recipe alone (the preview passes no costing with it), in large type, with a box to
     /// tick beside each ingredient and packaging line as it's weighed, and a line to sign at the end.
     /// </summary>
@@ -226,8 +238,9 @@
         "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\A ") + "\"";
 
     // What's left out (Settings → Printing): the recipe's unit costs (Cost/g, packaging's Unit Cost) go with the costing
-    // too, and the figure tiles and price comparison are only ever the costing's.
-    private bool ShowsUnitCosts => IncludeCosting && !PageSetup.Settings.OmitUnitCosts;
+    // too, and the figure tiles and price comparison are only ever the costing's. The sub-assembly total always has the
+    // unit costs: its lines' costs are what it's printed for (the user, 2026-11-21).
+    private bool ShowsUnitCosts => SubAssemblyTotalOnly || (IncludeCosting && !PageSetup.Settings.OmitUnitCosts);
     private bool ShowsPercentages => !PageSetup.Settings.OmitPercentages;
     private bool ShowsFigures => IncludeCosting && !PageSetup.Settings.OmitFigures;
     private bool ShowsPriceComparison => !PageSetup.Settings.OmitPriceComparison;
@@ -262,6 +275,7 @@
     {
         _ when ProductionCopy => "Production Copy",
         (true, true) => "Recipe and Costing",
+        (true, false) when SubAssemblyTotalOnly => "Recipe and Sub-Assembly Total",
         (true, false) => "Recipe",
         _ => "Costing",
     };
@@ -362,6 +376,10 @@
         {
             @CostingPart(printout)
         }
+        else if (IncludeRecipe && SubAssemblyTotalOnly)
+        {
+            @SubAssemblyTotalPart(printout)
+        }
         @if (ProductionCopy)
         {
             <p class="print-signoff">Weighed by <span></span> Checked by <span></span> Date <span></span></p>
@@ -433,7 +451,7 @@
                 <thead>
                     <tr>
                         <th>Product</th><th class="n">Qty</th>
-                        @if (IncludeCosting)
+                        @if (ShowsRecipeCosts)
                         {
                             <th class="n">Recipe Cost</th>
                             @if (withPackaging) { <th class="n">Packaging Cost</th> }
@@ -447,7 +465,7 @@
                     {
                         <tr>
                             <td>@component.Product</td><td class="n">@component.Quantity?.ToString("N0")</td>
-                            @if (IncludeCosting)
+                            @if (ShowsRecipeCosts)
                             {
                                 <td class="n">@Money(component.RecipeCost)</td>
                                 @if (withPackaging) { <td class="n">@(component.PackagingCost is { } p ? Money(p) : "")</td> }
@@ -457,7 +475,7 @@
                         </tr>
                     }
                 </tbody>
-                @if (IncludeCosting)
+                @if (ShowsRecipeCosts)
                 {
                     <tfoot>
                         <tr>
@@ -473,7 +491,7 @@
     </text>;
 
     private RenderFragment SectionPart(ProductPrintout printout, PrintedSection section) => @<section class="print-block">
-        @{ var withNow = printout.Simulation is not null && IncludeCosting; }
+        @{ var withNow = printout.Simulation is not null && ShowsRecipeCosts; }
         <h3 class="print-section">@section.Name @if (section.Source is { } source) { <span class="print-source">@source</span> }</h3>
         <table class="print-table">
             <thead>
@@ -481,7 +499,7 @@
                     <th>Ingredient</th><th class="n">Grams</th>
                     @if (ShowsPercentages) { <th class="n">@section.PercentHeader</th> }
                     @if (ShowsUnitCosts) { <th class="n">Cost/g</th> }
-                    @if (IncludeCosting) { <th class="n">Cost</th> }
+                    @if (ShowsRecipeCosts) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
                     @if (ProductionCopy) { <th class="print-tick">Done</th> }
                 </tr>
@@ -493,7 +511,7 @@
                 }
                 @if (section.AddIns.Count > 0)
                 {
-                    <tr class="print-subheading"><td colspan="@(2 + (ShowsPercentages ? 1 : 0) + (ShowsUnitCosts ? 1 : 0) + (IncludeCosting ? 1 : 0) + (withNow ? 1 : 0) + (ProductionCopy ? 1 : 0))">Add-ins</td></tr>
+                    <tr class="print-subheading"><td colspan="@(2 + (ShowsPercentages ? 1 : 0) + (ShowsUnitCosts ? 1 : 0) + (ShowsRecipeCosts ? 1 : 0) + (withNow ? 1 : 0) + (ProductionCopy ? 1 : 0))">Add-ins</td></tr>
                     @foreach (var line in section.AddIns)
                     {
                         @LineRow(line, withNow)
@@ -505,33 +523,34 @@
                     <td>Total</td><td class="n">@Grams(section.TotalWeight)</td>
                     @if (ShowsPercentages) { <td class="n">@Percent(section.TotalPercent)</td> }
                     @if (ShowsUnitCosts) { <td></td> }
-                    @if (IncludeCosting) { <td class="n">@Money(section.BatchCost)</td> }
+                    @if (ShowsRecipeCosts) { <td class="n">@Money(section.BatchCost)</td> }
                     @if (withNow) { <td class="n">@(section.NowBatchCost is { } now ? Money(now) : "")</td> }
                     @if (ProductionCopy) { <td></td> }
                 </tr>
             </tfoot>
         </table>
-        <p class="print-small">@PieceSizeText(section, IncludeCosting)</p>
+        <p class="print-small">@PieceSizeText(section, ShowsRecipeCosts)</p>
     </section>;
 
+    // A line's costs, with the costing or the sub-assembly total.
     private RenderFragment LineRow(PrintedLine line, bool withNow) => @<tr>
         <td>@line.Ingredient</td><td class="n">@Grams(line.Grams)</td>
         @if (ShowsPercentages) { <td class="n">@Percent(line.Percent)</td> }
         @if (ShowsUnitCosts) { <td class="n">@line.CostPerGram.ToString("N4")</td> }
-        @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
+        @if (ShowsRecipeCosts) { <td class="n">@Money(line.Cost)</td> }
         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
         @if (ProductionCopy) { @TickBox }
     </tr>;
 
     private RenderFragment PackagingPart(ProductPrintout printout, PrintedPackaging packaging) => @<section class="print-block">
-        @{ var withNow = printout.Simulation is not null && IncludeCosting; }
+        @{ var withNow = printout.Simulation is not null && ShowsRecipeCosts; }
         <h3 class="print-section">Packaging @if (packaging.LinkedTo is { } linkedTo) { <span class="print-source">@linkedTo</span> }</h3>
         <table class="print-table">
             <thead>
                 <tr>
                     <th>Material</th><th class="n">Qty</th><th>Unit</th>
                     @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
-                    @if (IncludeCosting) { <th class="n">Cost</th> }
+                    @if (ShowsRecipeCosts) { <th class="n">Cost</th> }
                     @if (withNow) { <th class="n">Cost Now</th> }
                     @if (ProductionCopy) { <th class="print-tick">Done</th> }
                 </tr>
@@ -542,13 +561,13 @@
                     <tr>
                         <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
                         @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
-                        @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
+                        @if (ShowsRecipeCosts) { <td class="n">@Money(line.Cost)</td> }
                         @if (withNow) { <td class="n">@(line.NowCost is { } now ? Money(now) : "")</td> }
                         @if (ProductionCopy) { @TickBox }
                     </tr>
                 }
             </tbody>
-            @if (IncludeCosting)
+            @if (ShowsRecipeCosts)
             {
                 <tfoot>
                     <tr>
@@ -568,7 +587,7 @@
                     <tr>
                         <th>Material</th><th class="n">Qty per Pack</th><th>Unit</th>
                         @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
-                        @if (IncludeCosting) { <th class="n">Cost per Pack</th> }
+                        @if (ShowsRecipeCosts) { <th class="n">Cost per Pack</th> }
                         @if (ProductionCopy) { <th class="print-tick">Done</th> }
                     </tr>
                 </thead>
@@ -578,12 +597,12 @@
                         <tr>
                             <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
                             @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
-                            @if (IncludeCosting) { <td class="n">@Money(line.Cost)</td> }
+                            @if (ShowsRecipeCosts) { <td class="n">@Money(line.Cost)</td> }
                             @if (ProductionCopy) { @TickBox }
                         </tr>
                     }
                 </tbody>
-                @if (IncludeCosting)
+                @if (ShowsRecipeCosts)
                 {
                     <tfoot>
                         <tr><td>Pack cost</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.PackCost)</td></tr>
@@ -639,6 +658,31 @@
             @PriceComparison(costs)
         }
     </section>;
+
+    // The sub-assembly total in place of the costing: the costing's first figure alone, for one sellable unit, under the
+    // recipe; a simulation's with today's beside it.
+    private RenderFragment SubAssemblyTotalPart(ProductPrintout printout) => @<section class="print-block print-keep">
+        @{
+            var costs = printout.Costs;
+            var now = printout.Simulation?.Now;
+        }
+        <table class="print-table print-costing print-sub-assembly-total">
+            @if (now is not null)
+            {
+                <thead><tr><th></th><th class="n">Now</th><th class="n">Simulated</th><th class="n">Change</th></tr></thead>
+            }
+            <tbody>
+                <tr class="print-band print-total">
+                    <td>@SubAssemblyTotalLabel(printout)</td>
+                    @if (now is not null) { <td class="n">@Money(now.SubAssemblies)</td><td class="n">@Money(costs.SubAssemblies)</td><td class="n">@Change(now.SubAssemblies, costs.SubAssemblies)</td> } else { <td class="n">@Money(costs.SubAssemblies)</td> }
+                </tr>
+            </tbody>
+        </table>
+    </section>;
+
+    /// <summary>"Total sub-assembly cost (Per piece)"; a composite's names what it holds, "Total products cost (Per pack)".</summary>
+    private static string SubAssemblyTotalLabel(ProductPrintout printout) =>
+        $"Total {(printout.Costs.IsComposite ? printout.Costs.PartsBase : "sub-assembly")} cost ({printout.CostUnitCaption}{BasisSuffix(printout)})";
 
     // The suggested price beside the current one, as the Costing tab shows them under the base cost. A simulation's
     // costing keeps its markup, VAT and price rows in the breakdown instead, now beside simulated.

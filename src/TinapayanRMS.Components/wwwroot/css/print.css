@@ -393,6 +393,11 @@
     padding: 6px;
 }
 
+/* Include's Sub-assembly total, in place of the costing: one line under the recipe. */
+.print-sub-assembly-total {
+    margin-top: 14px;
+}
+
 /* A product's suggested price beside its current one, under the costing's base cost. */
 .print-price-comparison {
     margin-top: 10px;
