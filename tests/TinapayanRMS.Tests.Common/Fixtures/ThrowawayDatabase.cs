@@ -23,18 +23,30 @@ public sealed class ThrowawayDatabase : IAsyncDisposable
 
     public string Name => new NpgsqlConnectionStringBuilder(ConnectionString).Database!;
 
-    /// <summary>A new, migrated database named tinapayanrms_test_backup_ and eight characters of a GUID.</summary>
+    /// <summary>A new, migrated database named tinapayanrms_test_backup_ and eight characters of a GUID, or <paramref name="name"/>.</summary>
     /// <param name="like">A connection string to the server to make it on, such as the fixture's.</param>
-    public static async Task<ThrowawayDatabase> CreateAsync(string like, CancellationToken cancellationToken)
+    /// <param name="name">
+    /// Its name, for a database whose name says whose it is (the benchmarks' tinapayanrms_bench_ copies, which their
+    /// script drops by name when a run was killed); it mustn't be there already.
+    /// </param>
+    public static async Task<ThrowawayDatabase> CreateAsync(string like, CancellationToken cancellationToken, string? name = null)
     {
-        var builder = new NpgsqlConnectionStringBuilder(like) { Database = $"tinapayanrms_test_backup_{Guid.NewGuid():N}"[..33] };
-        // Dropping a database checkpoints first on Windows, which after a busy test run can outlast the default 30 seconds.
-        var maintenance = new NpgsqlConnectionStringBuilder(like) { Database = "postgres", Pooling = false, CommandTimeout = 600 };
-        var database = new ThrowawayDatabase(builder.ConnectionString, maintenance.ConnectionString);
-
+        var database = Of(like, name ?? $"tinapayanrms_test_backup_{Guid.NewGuid():N}"[..33]);
         await using var dbContext = database.CreateDbContext();
         await dbContext.Database.MigrateAsync(cancellationToken);
         return database;
+    }
+
+    /// <summary>
+    /// The database <paramref name="name"/> on <paramref name="like"/>'s server, made or not: to reach one a run made before,
+    /// and to drop it (<see cref="DisposeAsync"/>).
+    /// </summary>
+    public static ThrowawayDatabase Of(string like, string name)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(like) { Database = name };
+        // Dropping a database checkpoints first on Windows, which after a busy test run can outlast the default 30 seconds.
+        var maintenance = new NpgsqlConnectionStringBuilder(like) { Database = "postgres", Pooling = false, CommandTimeout = 600 };
+        return new ThrowawayDatabase(builder.ConnectionString, maintenance.ConnectionString);
     }
 
     public TinapayanRMSDbContext CreateDbContext() => new(TinapayanRMSDbContext.CreateOptions(ConnectionString));

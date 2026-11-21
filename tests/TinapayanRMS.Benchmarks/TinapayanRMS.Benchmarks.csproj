@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- What a refactor could make slower, timed (docs/adr/0008): the screens' reads, the costing, the cost cascade and the
+       screen states' loads, warm, by BenchmarkDotNet in process; and the app's start, cold, one sample a process (the
+       startup commands). On an anonymized copy of the shop's data, the golden master's, restored into databases of its
+       own. Not a test project (its name doesn't end in .Tests): Benchmarks.Tests counts the same scenarios' queries and
+       allocations in the suite. scripts/Compare-Benchmarks.ps1 runs two commits' builds of it side by side. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <!-- The cold start logs to a file as the app does (MauiProgram), into the run's own folder. -->
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The app's own registrations (ServiceRegistration.AddTinapayanRMS), which reach every layer below the window. -->
+    <ProjectReference Include="..\..\src\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
+    <ProjectReference Include="..\TinapayanRMS.Tests.Common\TinapayanRMS.Tests.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The golden master's copy of the shop's data, restored as each run starts. -->
+    <Content Include="..\TinapayanRMS.Mcp.Tests\Golden\costing-fixture.backup" Link="Golden\costing-fixture.backup">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -20,7 +20,7 @@ updates:
       dotnet-runtime:
         patterns: ["Microsoft.Extensions.*", "Microsoft.AspNetCore.*"]
       testing:
-        patterns: ["TUnit*", "Microsoft.Testing.*", "AwesomeAssertions", "bunit", "Respawn"]
+        patterns: ["TUnit*", "Microsoft.Testing.*", "AwesomeAssertions", "bunit", "Respawn", "BenchmarkDotNet*"]
     ignore:
       # Held at 5.0.2, the last WiX under the plain MS-RL licence (Directory.Packages.props, the user's choice, 2026-11-15).
       - dependency-name: "WixToolset.*"

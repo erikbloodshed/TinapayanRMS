@@ -1,0 +1,14 @@
+Pricing.ReadAll | sql = 16 | allocated = 2886 KB
+Products.ReadLoad | sql = 11 | allocated = 884 KB
+Products.ReadDetail | sql = 13 | allocated = 538 KB
+RawMaterials.ReadCatalog | sql = 6 | allocated = 519 KB
+SubAssemblies.ReadCatalog | sql = 6 | allocated = 726 KB
+Reports.Read | sql = 21 | allocated = 2507 KB
+PriceSimulator.Read | sql = 23 | allocated = 2520 KB
+PriceSimulator.Simulate | sql = 0 | allocated = 1331 KB
+Cascade.SaveFlourPrice | sql = 26 | allocated = 710 KB
+Screens.OpenProduct | sql = 40 | allocated = 6063 KB
+Screens.PickProduct | sql = 13 | allocated = 1779 KB
+Screens.OpenRawMaterials | sql = 6 | allocated = 1215 KB
+Screens.OpenSubAssemblies | sql = 6 | allocated = 1076 KB
+Start.SignInAndFirstScreen | sql = 12 | allocated = 1771 KB
