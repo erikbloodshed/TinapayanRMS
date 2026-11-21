@@ -63,7 +63,7 @@ public abstract class DatabaseFixtureBase : IAsyncInitializer, IAsyncDisposable
             // with the rest (the upgrade tests need it empty), so migrating makes every data upgrade again, and on the rows
             // the last run's last test left one can fail: a folder already named as one ProductFoldersUpgrade files a
             // category's products in breaks its unique index, and every test of the collection with it (2026-11-18). On empty
-            // tables they make nothing, as on CI's new databases.
+            // tables they make nothing, as on a new PC's databases.
             if (await dbContext.Database.CanConnectAsync() && (await dbContext.Database.GetAppliedMigrationsAsync()).Any())
             {
                 await using var leftover = new NpgsqlConnection(ConnectionString);

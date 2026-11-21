@@ -10,7 +10,7 @@
     <!-- The SDK's built-in .NET analyzers at their Recommended rule set, tracking the SDK's latest
          rules. Per-folder exceptions live in .editorconfig. -->
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <!-- A using nothing needs (IDE0005, a warning in .editorconfig) is reported by every build, so CI's, which takes any
+    <!-- A using nothing needs (IDE0005, a warning in .editorconfig) is reported by every build, so local CI's (scripts/Invoke-LocalCI.ps1), which takes any
          warning as an error, refuses it. The build runs the code-style rules for it, and the compiler reads the doc
          comments, without which it can't tell whether a using is there for one (a <see cref>): a doc comment it can't
          read, or that names what isn't there, is a warning too. No documentation is wanted from it, so a public member
