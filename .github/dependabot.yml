@@ -25,11 +25,6 @@ updates:
       # Held at 5.0.2, the last WiX under the plain MS-RL licence (Directory.Packages.props, the user's choice, 2026-11-15).
       - dependency-name: "WixToolset.*"
         versions: [">= 6.0.0"]
-      # Held at 11.0.0-rc.3 while Npgsql's provider asks for exactly that (EFCoreVersion in Directory.Packages.props): a
-      # move on its own fails the restore. Npgsql's own 11.0.0 still comes as a pull request, which is the signal to take
-      # this rule out and move both together (the build plan's open item).
-      - dependency-name: "Microsoft.EntityFrameworkCore*"
-        versions: [">= 11.0.0"]
 
   - package-ecosystem: dotnet-sdk
     directory: /
