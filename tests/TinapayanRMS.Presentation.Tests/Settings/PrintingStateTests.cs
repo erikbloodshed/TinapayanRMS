@@ -6,6 +6,7 @@ using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Settings;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -19,9 +20,9 @@ public class PrintingStateTests(DatabaseFixture fixture) : PersistenceTestBase(f
 {
     private (PrintingState State, PrintPage Page) CreateState()
     {
-        var repository = new PrintSettingsRepository(CreateDbContextFactory());
-        var page = new PrintPage(repository);
-        return (new PrintingState(repository, page, new LoggerConfiguration().CreateLogger()), page);
+        var editor = new PrintSettingsEditor(new PrintSettingsRepository(CreateDbContextFactory()));
+        var page = new PrintPage(editor);
+        return (new PrintingState(editor, page, new LoggerConfiguration().CreateLogger()), page);
     }
 
     [Test]

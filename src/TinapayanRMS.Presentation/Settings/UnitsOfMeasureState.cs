@@ -1,14 +1,13 @@
 using DynamicData.Binding;
-using FluentValidation;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.UseCases.Settings;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.Settings;
 
 /// <summary>Settings' Units of Measure tab: each unit's name and abbreviation.</summary>
-public sealed class UnitsOfMeasureState(IUnitOfMeasureRepository repository, IValidator<UnitOfMeasure> validator, ILogger logger)
-    : LookupListState<UnitOfMeasure>("Unit", u => u.Id, SortExpressionComparer<UnitOfMeasure>.Ascending(u => u.Name), validator, logger)
+public sealed class UnitsOfMeasureState(ILookupListEditor<UnitOfMeasure> editor, ILogger logger)
+    : LookupListState<UnitOfMeasure>("Unit", u => u.Id, SortExpressionComparer<UnitOfMeasure>.Ascending(u => u.Name), editor, logger)
 {
     private string _editingAbbreviation = string.Empty;
     public string EditingAbbreviation
@@ -16,14 +15,6 @@ public sealed class UnitsOfMeasureState(IUnitOfMeasureRepository repository, IVa
         get => _editingAbbreviation;
         set => RaiseAndSetIfChanged(ref _editingAbbreviation, value);
     }
-
-    protected override Task<IReadOnlyList<UnitOfMeasure>> ReadAllAsync() => repository.GetAllAsync(CancellationToken.None);
-
-    protected override Task AddAsync(UnitOfMeasure item) => repository.AddAsync(item, CancellationToken.None);
-
-    protected override Task UpdateAsync(UnitOfMeasure item) => repository.UpdateAsync(item, CancellationToken.None);
-
-    protected override Task DeleteAsync(int id) => repository.DeleteAsync(id, CancellationToken.None);
 
     protected override string DeleteQuestion(UnitOfMeasure item) => $"Delete '{item.Name}'? This can't be undone.";
 

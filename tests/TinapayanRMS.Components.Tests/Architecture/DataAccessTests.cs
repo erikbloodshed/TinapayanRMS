@@ -12,7 +12,7 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// </summary>
 public class DataAccessTests
 {
-    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3).</summary>
+    /// <summary>34 types holding 121 between them on 2026-11-20; 30 holding 106 once Sub-Assemblies moved (phase 1); 24 holding 83 once Raw Materials did (phase 2); 16 holding 32 once Products read and wrote through its use cases (phase 3); 9 holding 24 once Settings' lists, Costing Defaults and Printing did (phase 4's first step).</summary>
     private static readonly Dictionary<string, int> StillReaching = new(StringComparer.Ordinal)
     {
         ["TinapayanRMS.Presentation.App.AutomaticBackups"] = 1,
@@ -21,16 +21,9 @@ public class DataAccessTests
         ["TinapayanRMS.Presentation.App.SignInState"] = 1,
         ["TinapayanRMS.Presentation.PriceSimulator.PriceSimulatorState"] = 6,
         ["TinapayanRMS.Presentation.Printing.PrintDialogState"] = 4,
-        ["TinapayanRMS.Presentation.Printing.PrintPage"] = 1,
         ["TinapayanRMS.Presentation.Reports.ReportsState"] = 6,
-        ["TinapayanRMS.Presentation.Settings.CostingDefaultsState"] = 2,
         ["TinapayanRMS.Presentation.Settings.DatabaseBackupsState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.PrintingState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.ProductCategoriesState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.RawMaterialCategoriesState"] = 1,
         ["TinapayanRMS.Presentation.Settings.SecurityState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.SubAssemblyRolesState"] = 1,
-        ["TinapayanRMS.Presentation.Settings.UnitsOfMeasureState"] = 1,
     };
 
     /// <summary>

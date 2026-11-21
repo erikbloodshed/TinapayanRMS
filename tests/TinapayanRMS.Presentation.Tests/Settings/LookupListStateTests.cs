@@ -5,6 +5,7 @@ using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Settings;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Tests.Settings;
 
@@ -19,7 +20,8 @@ public class LookupListStateTests(DatabaseFixture fixture) : PersistenceTestBase
     private UnitsOfMeasureState CreateState(bool confirm = true, List<string>? asked = null)
     {
         var state = new UnitsOfMeasureState(
-            new UnitOfMeasureRepository(CreateDbContextFactory()), new UnitOfMeasureValidator(), new LoggerConfiguration().CreateLogger());
+            new UnitOfMeasureEditor(new UnitOfMeasureRepository(CreateDbContextFactory()), new UnitOfMeasureValidator()),
+            new LoggerConfiguration().CreateLogger());
         state.ConfirmDelete.RegisterHandler(context =>
         {
             asked?.Add(context.Input);

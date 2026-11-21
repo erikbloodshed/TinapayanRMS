@@ -1,10 +1,10 @@
-using FluentValidation;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.Presentation.Settings;
 
@@ -17,9 +17,7 @@ namespace TinapayanRMS.Presentation.Settings;
 /// </summary>
 public sealed class CostingDefaultsState : ScreenState
 {
-    private readonly ICostingDefaultsRepository _repository;
-    private readonly IValidator<CostingParameters> _validator;
-    private readonly ICostRecalculator _costRecalculator;
+    private readonly ICostingDefaultsEditor _editor;
 
     /// <summary>What the New Products In picker offers, Production first, each with its folder's title.</summary>
     public IReadOnlyList<KeyValuePair<ProductStage, string>> Stages { get; } =
@@ -102,23 +100,21 @@ public sealed class CostingDefaultsState : ScreenState
 
     /// <summary>
     /// Recalculate Costs: every made and linked ingredient's costs worked out again from what they're made of
-    /// (ICostRecalculator), for after the database was changed outside the app. Says how many were out of date.
+    /// (ICostingDefaultsEditor.RecalculateCostsAsync), for after the database was changed outside the app. Says how many
+    /// were out of date.
     /// </summary>
     public ScreenCommand RecalculateCostsCommand { get; }
 
-    public CostingDefaultsState(
-        ICostingDefaultsRepository repository, IValidator<CostingParameters> validator, ICostRecalculator costRecalculator, ILogger logger)
+    public CostingDefaultsState(ICostingDefaultsEditor editor, ILogger logger)
         : base(logger)
     {
-        _repository = repository;
-        _validator = validator;
-        _costRecalculator = costRecalculator;
+        _editor = editor;
         EditingPriceRounding = PriceRoundingOptions[0];
 
         // What's saved replaces the fields: an unsaved edit doesn't outlive the dialog it was typed in.
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(async () =>
         {
-            var defaults = await _repository.GetAsync(CancellationToken.None);
+            var defaults = await _editor.GetAsync(CancellationToken.None);
             EditingNewProductStage = defaults.NewProductStage;
             EditingLaborPercent = defaults.LaborPercent;
             EditingOverheadPercent = defaults.OverheadPercent;
@@ -132,21 +128,8 @@ public sealed class CostingDefaultsState : ScreenState
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
-            // The same checks, and messages, as a product's own costing; the VAT and the rest are the repository's to check.
-            var validation = _validator.Validate(new CostingParameters
-            {
-                LaborPercent = EditingLaborPercent,
-                OverheadPercent = EditingOverheadPercent,
-                AdministrativePercent = EditingAdministrativePercent,
-                MarginPercent = EditingMarginPercent,
-            });
-            if (!validation.IsValid)
-            {
-                ErrorMessage = validation.ToString(" ");
-                return;
-            }
-
-            await _repository.SetAsync(
+            // Checked as a product's own costing is, with the same messages: a refusal is shown with why.
+            await _editor.SaveAsync(
                 new CostingDefaults
                 {
                     NewProductStage = EditingNewProductStage,
@@ -165,7 +148,7 @@ public sealed class CostingDefaultsState : ScreenState
 
         RecalculateCostsCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
         {
-            var result = await _costRecalculator.RecalculateAllAsync(CancellationToken.None);
+            var result = await _editor.RecalculateCostsAsync(CancellationToken.None);
             SuccessMessage = RecalculatedText(result);
         }));
     }

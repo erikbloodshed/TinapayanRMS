@@ -3,14 +3,16 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
+using TinapayanRMS.UseCases.Settings;
 
 namespace TinapayanRMS.UseCases.RawMaterials;
 
 /// <summary>
 /// What the Raw Materials screen does to a category, its list's folders and its forms' Category picker: adds one of a kind,
-/// renames one, deletes one. A refusal is a <see cref="BusinessRuleException"/>, in words for the shop's staff.
+/// renames one, deletes one; and Settings' Material Categories tab (<see cref="ILookupListEditor{TItem}"/>). A refusal is
+/// a <see cref="BusinessRuleException"/>, in words for the shop's staff.
 /// </summary>
-public interface IRawMaterialCategoryEditor
+public interface IRawMaterialCategoryEditor : ILookupListEditor<RawMaterialCategory>
 {
     /// <summary>Refuses a name a category of <paramref name="type"/> can't take, before anything is asked or written.</summary>
     void EnsureValid(string name, RawMaterialCategoryType type);
@@ -21,8 +23,6 @@ public interface IRawMaterialCategoryEditor
     /// <summary>Renames <paramref name="category"/>, keeping its type.</summary>
     Task RenameAsync(RawMaterialCategory category, string name, CancellationToken cancellationToken);
 
-    /// <summary>Deletes a category; the database refuses one any material is in.</summary>
-    Task DeleteAsync(int categoryId, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc cref="IRawMaterialCategoryEditor"/>
@@ -30,6 +30,10 @@ public sealed class RawMaterialCategoryEditor(IRawMaterialCategoryRepository cat
     : IRawMaterialCategoryEditor
 {
     public void EnsureValid(string name, RawMaterialCategoryType type) => Ensure(new RawMaterialCategory { Name = name, Type = type });
+
+    public void EnsureValid(RawMaterialCategory item) => Ensure(item);
+
+    public Task<IReadOnlyList<RawMaterialCategory>> GetAllAsync(CancellationToken cancellationToken) => categoryRepository.GetAllAsync(cancellationToken);
 
     public async Task<RawMaterialCategory> AddAsync(string name, RawMaterialCategoryType type, CancellationToken cancellationToken)
     {
@@ -48,7 +52,20 @@ public sealed class RawMaterialCategoryEditor(IRawMaterialCategoryRepository cat
         await categoryRepository.UpdateAsync(renamed, cancellationToken);
     }
 
-    public Task DeleteAsync(int categoryId, CancellationToken cancellationToken) => categoryRepository.DeleteAsync(categoryId, cancellationToken);
+    public async Task AddAsync(RawMaterialCategory item, CancellationToken cancellationToken)
+    {
+        // Async, so a refusal fails the task rather than throwing as it's called.
+        Ensure(item);
+        await categoryRepository.AddAsync(item, cancellationToken);
+    }
+
+    public async Task UpdateAsync(RawMaterialCategory item, CancellationToken cancellationToken)
+    {
+        Ensure(item);
+        await categoryRepository.UpdateAsync(item, cancellationToken);
+    }
+
+    public Task DeleteAsync(int id, CancellationToken cancellationToken) => categoryRepository.DeleteAsync(id, cancellationToken);
 
     private void Ensure(RawMaterialCategory category)
     {
