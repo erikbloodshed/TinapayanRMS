@@ -13,6 +13,7 @@ written. A decision that changes gets a new record that supersedes the old one, 
 | [0005](0005-change-control-and-dependencies.md) | Change control and dependencies | Accepted |
 | [0006](0006-testing-strategy.md) | Testing strategy | Accepted |
 | [0007](0007-a-load-repoints-a-draft.md) | A load re-points a draft; it doesn't merge saves made elsewhere | Accepted |
+| [0008](0008-benchmarks-and-performance-budgets.md) | Benchmarks, startup timing and performance budgets | Accepted |
 
 ## Writing one
 
