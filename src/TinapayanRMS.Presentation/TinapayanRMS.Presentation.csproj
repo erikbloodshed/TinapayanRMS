@@ -13,7 +13,6 @@
     <ProjectReference Include="..\TinapayanRMS.Domain\TinapayanRMS.Domain.csproj" />
     <ProjectReference Include="..\TinapayanRMS.ApplicationCore\TinapayanRMS.ApplicationCore.csproj" />
     <!-- Failure, which puts what the database refused into words, and the backups' services. -->
-    <ProjectReference Include="..\TinapayanRMS.Infrastructure\TinapayanRMS.Infrastructure.csproj" />
     <!-- What a saved product costs, read the one way the screens and the two servers read it. -->
     <ProjectReference Include="..\TinapayanRMS.Pricing\TinapayanRMS.Pricing.csproj" />
     <!-- What the screens can do with the records, a screen at a time (docs/adr/0002): Sub-Assemblies', Raw Materials'

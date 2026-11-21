@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.RecipeApi.Contracts;
 using TinapayanRMS.RecipeApi.Endpoints;

@@ -13,7 +13,6 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
 using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.RecipeApi.Contracts;
 using TinapayanRMS.RecipeApi.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;

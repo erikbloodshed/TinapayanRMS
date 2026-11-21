@@ -4,7 +4,7 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;

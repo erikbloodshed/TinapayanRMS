@@ -1,6 +1,5 @@
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.UseCases.Database;
 using ILogger = Serilog.ILogger;
 

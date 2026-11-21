@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Infrastructure.Repositories;
-using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.Products;

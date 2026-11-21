@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Npgsql;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.Infrastructure.Services;
@@ -183,12 +184,4 @@ internal sealed class PostgresTools(string? configuredFolder, TimeSpan? timeout 
         // "18" isn't a Version on its own; "18.0" is.
         static string VersionText(string name) => name.Contains('.', StringComparison.Ordinal) ? name : name + ".0";
     }
-}
-
-/// <summary>A PostgreSQL tool that exited with an error, with what it wrote as its message.</summary>
-public sealed class PostgresToolException(string tool, string error) : Exception($"{tool} failed: {error}")
-{
-    public string Tool { get; } = tool;
-
-    public string Error { get; } = error;
 }

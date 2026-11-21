@@ -10,8 +10,8 @@ using Serilog;
 using Syncfusion.Blazor;
 using Syncfusion.Licensing;
 using TinapayanRMS.Components;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Components.Shared;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Maui.Services;
 using TinapayanRMS.Maui.WinUI;
 

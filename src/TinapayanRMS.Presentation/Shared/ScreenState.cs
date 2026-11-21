@@ -1,5 +1,5 @@
 using System.Reactive.Linq;
-using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.ApplicationCore.Rules;
 using ILogger = Serilog.ILogger;
 
 namespace TinapayanRMS.Presentation.Shared;
