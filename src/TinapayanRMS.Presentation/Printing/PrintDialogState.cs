@@ -1,12 +1,10 @@
-using Npgsql;
-using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Pricing;
 using ILogger = Serilog.ILogger;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Printing;
 
 namespace TinapayanRMS.Presentation.Printing;
 
@@ -103,10 +101,7 @@ public sealed record PrintableCategory(int Id, string Name)
 public sealed class PrintDialogState : ScreenState
 {
     private readonly ProductsState _products;
-    private readonly IProductRepository _productRepository;
-    private readonly IProductFolderRepository _folderRepository;
-    private readonly IProductCategoryRepository _categoryRepository;
-    private readonly SavedProductReader _savedProducts;
+    private readonly IPrintQueries _queries;
     private readonly PrintPage _page;
 
     // The preparation running; a newer one cancels it.
@@ -123,22 +118,12 @@ public sealed class PrintDialogState : ScreenState
     // Every product in use, in the Products list's order, before the categories ticked narrow it.
     private IReadOnlyList<PrintableProduct> _everyProduct = [];
 
-    public PrintDialogState(
-        ProductsState products,
-        IProductRepository productRepository,
-        IProductFolderRepository folderRepository,
-        IProductCategoryRepository categoryRepository,
-        SavedProductReader savedProducts,
-        PrintPage page,
-        ILogger logger)
+    public PrintDialogState(ProductsState products, IPrintQueries queries, PrintPage page, ILogger logger)
         : base(logger)
     {
         _page = page;
         _products = products;
-        _productRepository = productRepository;
-        _folderRepository = folderRepository;
-        _categoryRepository = categoryRepository;
-        _savedProducts = savedProducts;
+        _queries = queries;
 
         LoadCommand = new ScreenCommand(() => LoadSafelyAsync(PrepareAsync));
     }
@@ -322,11 +307,7 @@ public sealed class PrintDialogState : ScreenState
             // The products, their folders and categories as they're saved now, read together, for the lists and a set alike,
             // not the folders as the Products screen last read them: products another computer filed in a folder it made in
             // the one picked are in the set, in their place.
-            var productsRead = _productRepository.GetAllAsync(preparing.Token);
-            var foldersRead = _folderRepository.GetAllAsync(preparing.Token);
-            var categoriesRead = _categoryRepository.GetAllAsync(preparing.Token);
-            await Task.WhenAll(productsRead, foldersRead, categoriesRead);
-            var (products, folders, categories) = (await productsRead, await foldersRead, await categoriesRead);
+            var (products, folders, categories) = await _queries.ReadListsAsync(preparing.Token);
             ShowChoices(products, folders, categories);
 
             // A Print on Products ticks its products now, as they're saved.
@@ -352,11 +333,8 @@ public sealed class PrintDialogState : ScreenState
         }
         catch (OperationCanceledException) when (preparing.IsCancellationRequested)
         {
-            // A newer choice, or the dialog opened again, is preparing its own.
-        }
-        catch (NpgsqlException) when (preparing.IsCancellationRequested)
-        {
-            // The same, cancelled in the middle of a read, should Npgsql report it as its own exception rather than a cancellation.
+            // A newer choice, or the dialog opened again, is preparing its own: a read cut short says so as a cancellation
+            // (IPrintQueries), whatever the database's driver reported.
         }
         finally
         {
@@ -431,7 +409,7 @@ public sealed class PrintDialogState : ScreenState
         // At the costs the Products screen shows: buffered, unless it's been switched to unbuffered. Read together, in the
         // same dozen or so queries however many products the set holds.
         Progress = products.Count == 1 ? "Preparing 1 product…" : $"Preparing {products.Count} products…";
-        var saved = await _savedProducts.ReadAllAsync(products, _products.Form?.Costing.CostBasis ?? CostBasis.Buffered, cancellationToken);
+        var saved = await _queries.PriceAsSavedAsync(products, _products.Form?.Costing.CostBasis ?? CostBasis.Buffered, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         List<ProductPrintout> printouts = [.. saved.Select(s => s.ToPrintout(printedAt))];
 

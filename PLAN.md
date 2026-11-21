@@ -92,6 +92,7 @@ TinapayanRMS.slnx
 │   │   ├── QuickFind/                — what Find reads: IQuickFindQueries
 │   │   ├── Reports/                  — what Reports reads: IReportQueries (its Re-apply Target Buffer is IRawMaterialEditor's)
 │   │   ├── PriceSimulator/           — IPriceSimulatorQueries (what its figures are worked out from) and IPriceScenarioEditor
+│   │   ├── Printing/                 — what the Print dialog reads: IPrintQueries (its lists, and a set priced as saved)
 │   │   └── Database/                 — IBackupLibrary (the Database tab, AutomaticBackups) and IDatabaseUpdates (DatabaseReadiness)
 │   ├── TinapayanRMS.Presentation     — the screens' state classes, net11.0, with no UI framework, in a folder per screen
 │   │   ├── RawMaterials/             — the Raw Materials screen: its state, list, parts, rows, tree and form snapshot
