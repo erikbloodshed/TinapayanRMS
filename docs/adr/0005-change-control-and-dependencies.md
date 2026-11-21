@@ -1,6 +1,6 @@
 # 0005. Change control and dependencies
 
-**Status:** Accepted, 2026-11-20.
+**Status:** Accepted, 2026-11-20. Amended 2026-11-21: CI runs on the developer's PC, not on GitHub (below).
 
 ## Context
 
@@ -31,11 +31,31 @@ Npgsql's provider has an 11.0.0 release.
   Maui project imports the Satori GC experiment's SDK (`PublishWithSatoriGC`, `11.0.1-satori.…`) in every build, off
   unless asked for, which is to be named so or taken out (the build plan's open items).
 
+### Amendment, 2026-11-21: CI on the developer's PC
+
+GitHub refused to start the build workflow's runs on PR #21: the account has no paid plan, and the private repository's
+Windows minutes (counted double) had run out. Even when they ran, every merge waited on a run of its own, on top of the same
+checks already run on the PC. The owner's call: "Remove the Github CI workflow, I don't have a paid account on github, we
+could locally CI the codebase."
+
+- **`.github/workflows/build.yml` is gone, and `scripts/Invoke-LocalCI.ps1` runs what it ran**, in the same order: the
+  whole solution built from scratch with warnings as errors, `dotnet ef migrations has-pending-model-changes`, and the
+  whole suite, on the developer's PC and its PostgreSQL 18.
+- **A pull request's check is local CI passing on its branch**, with `/code-review`, before it's merged; an everyday
+  change runs it before it's pushed. Nothing on GitHub checks a push any more.
+- **Protecting `main` is dropped**: a ruleset requiring a check needs the check to run on GitHub.
+- **Dependabot stays** (it costs nothing): its pull requests are checked by local CI like any other, and it no longer
+  watches the workflow's actions, since there are none.
+
+The trade: a clean checkout of the commit is no longer what's checked, the working tree is, so a file left out of a
+commit can pass locally; the script says how many files aren't committed, and passes for the commit only once they are.
+
 ## Consequences
 
 - A failure in a structural change is found on its branch, not on `main`.
 - A week's dependency updates arrive as a few checked pull requests rather than as hand edits between other work.
 - Pull requests and their runs cost Actions minutes, Windows' counting double: weekly grouping keeps that to a handful.
+  Since 2026-11-21 they cost nothing, as no CI runs on GitHub (the amendment).
 
 ## Rejected
 

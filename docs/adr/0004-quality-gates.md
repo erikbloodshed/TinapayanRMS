@@ -5,7 +5,7 @@
 ## Context
 
 The codebase's rules were written down (CLAUDE.md, PLAN.md, the developer manual) and kept by review. Some were already
-checked (`DecimalNumbersTests`, `RoundingModeTests`, CI failing on any warning); the layers, how the screens reach the
+checked (`DecimalNumbersTests`, `RoundingModeTests`, CI failing on any warning, local CI since 2026-11-21); the layers, how the screens reach the
 database and how big a state class may grow were not. ADR 0002 moves the screens to a new shape over four phases, and
 nothing would stop new code being written the old way meanwhile.
 
@@ -29,7 +29,7 @@ that goes down must be lowered where it's listed, so it can't creep back up.
 - **File size** (`FileSizeTests`, from 2026-11-21, ADR 0002's amendment): a file of the screens' states (Presentation) is
   at most 700 lines, except the nine listed with their lengths, each lowered once it's 25 lines shorter.
 - **Code metrics** (.editorconfig): a method's cyclomatic complexity over 25 (CA1502), a type coupled to over 95 types or
-  a member to over 40 (CA1506), the analyzers' own thresholds, as warnings, which CI's build refuses. The 22 places over
+  a member to over 40 (CA1506), the analyzers' own thresholds, as warnings, which CI's build refuses (local CI's since 2026-11-21, ADR 0005). The 22 places over
   them on 2026-11-20 carry a `SuppressMessage` saying why: a screen's state until its phase moves it, a composition root
   by design, the rest until they next change. Tests are left out: a test class reaches into whatever its scenarios need.
 - **Banned APIs** (`BannedSymbols.txt`, Microsoft.CodeAnalysis.BannedApiAnalyzers, RS0030): `Convert.ToDecimal` and
