@@ -402,6 +402,79 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
         state.SelectedDetailsTab.Should().Be(0, "a hidden tab can't stay the one showing");
     });
 
+    // The view's load reads the products using each tab's material as it sets out. A tab that reads its own since (another
+    // material picked and this one again) keeps its own, newer than the load's.
+    [Test]
+    public Task A_load_leaves_alone_the_Dependents_a_tab_read_while_it_was_on_its_way() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour");
+        var sugarId = await AddIngredientAsync("Sugar");
+        await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [(sugarId, 100m)]);
+        HeldCatalog held = null!;
+        var form = RawMaterialsViews.Create(CreateDbContextFactory(), queries: real => held = new HeldCatalog(real)).Form!;
+        await form.LoadCommand.ExecuteAsync();
+        await SelectAsync(form, form.RawMaterials.Single(m => m.Id == sugarId));
+        form.Dependents.Products.Select(p => p.Name).Should().Equal("Pandesal");
+
+        // The load reads, Sugar used by Pandesal alone, and is held on its way back.
+        held.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loading = form.LoadCommand.ExecuteAsync();
+        await held.HasRead.Task.WaitAsync(TimeSpan.FromSeconds(15));
+
+        // Meanwhile Ensaymada starts using Sugar, and the tab goes to Flour and back, reading Sugar's Dependents afresh. The
+        // screen isn't idle while the load is held, so each pick is waited for by its details.
+        await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [(sugarId, 50m)]);
+        foreach (var id in new[] { flourId, sugarId })
+        {
+            form.Pick(form.RawMaterials.Single(m => m.Id == id));
+            await Settle.EventuallyAsync(() => form.AreDetailsReady && form.DetailMaterialId == id, () => $"material {id}'s details never arrived");
+        }
+
+        form.Dependents.Products.Select(p => p.Name).Should().Equal("Ensaymada", "Pandesal");
+
+        held.Hold.SetResult();
+        await loading;
+        await Settle.UntilAsync(form, () => true);
+
+        form.Dependents.Products.Select(p => p.Name).Should().Equal(["Ensaymada", "Pandesal"], "the tab's own read is newer than the load's");
+    });
+
+    /// <summary>The real queries, the catalog's read held, once it has read, until <see cref="Hold"/> is let go.</summary>
+    private sealed class HeldCatalog(UseCases.RawMaterials.IRawMaterialQueries real) : UseCases.RawMaterials.IRawMaterialQueries
+    {
+        public TaskCompletionSource? Hold { get; set; }
+
+        /// <summary>Set once a held read has read.</summary>
+        public TaskCompletionSource HasRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<UseCases.RawMaterials.RawMaterialsCatalog> ReadCatalogAsync(IReadOnlyCollection<int> dependentsFor, CancellationToken cancellationToken)
+        {
+            var read = await real.ReadCatalogAsync(dependentsFor, cancellationToken);
+            if (Hold is { } hold)
+            {
+                HasRead.TrySetResult();
+                await hold.Task.WaitAsync(cancellationToken);
+            }
+
+            return read;
+        }
+
+        public Task<UseCases.RawMaterials.RawMaterialDetail> ReadDetailAsync(RawMaterial material, CancellationToken cancellationToken) =>
+            real.ReadDetailAsync(material, cancellationToken);
+
+        public Task<RawMaterial?> ReadAsync(int rawMaterialId, CancellationToken cancellationToken) => real.ReadAsync(rawMaterialId, cancellationToken);
+
+        public Task<IReadOnlyList<RawMaterialPriceHistory>> ReadPriceHistoryAsync(int rawMaterialId, CancellationToken cancellationToken) =>
+            real.ReadPriceHistoryAsync(rawMaterialId, cancellationToken);
+
+        public Task<IReadOnlyList<SubAssemblyLine>> ReadSubAssemblyLinesAsync(int subAssemblyId, CancellationToken cancellationToken) =>
+            real.ReadSubAssemblyLinesAsync(subAssemblyId, cancellationToken);
+
+        public Task<IReadOnlyDictionary<int, decimal>?> ReadCostSharesAsync(int rawMaterialId, IReadOnlyList<int> productIds, CancellationToken cancellationToken) =>
+            real.ReadCostSharesAsync(rawMaterialId, productIds, cancellationToken);
+    }
+
     [Test]
     public Task Used_By_lists_the_picked_materials_products_follows_other_tabs_and_opens_one_on_a_tile() => UiThread.RunAsync(async () =>
     {

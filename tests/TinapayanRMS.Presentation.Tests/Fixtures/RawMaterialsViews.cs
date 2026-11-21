@@ -13,12 +13,14 @@ namespace TinapayanRMS.Presentation.Tests.Fixtures;
 internal static class RawMaterialsViews
 {
     /// <param name="costShares">What the Dependents tiles' shares are worked out by; none, and they aren't.</param>
+    /// <param name="queries">What the view reads through, around the real queries: a test's stand-in that holds a read.</param>
     public static RawMaterialsState Create(
         IDbContextFactory<TinapayanRMSDbContext> factory,
         IViewStateStore? viewStateStore = null,
-        MaterialCostShares? costShares = null) =>
+        MaterialCostShares? costShares = null,
+        Func<IRawMaterialQueries, IRawMaterialQueries>? queries = null) =>
         new(
-            new RawMaterialQueries(
+            (queries ?? (real => real))(new RawMaterialQueries(
                 new RawMaterialRepository(factory),
                 new RawMaterialPriceHistoryRepository(factory),
                 new RawMaterialBrandPriceRepository(factory),
@@ -28,7 +30,7 @@ internal static class RawMaterialsViews
                 new RawMaterialCategoryRepository(factory),
                 new UnitOfMeasureRepository(factory),
                 new CostingDefaultsRepository(factory),
-                costShares),
+                costShares)),
             new RawMaterialEditor(
                 new RawMaterialRepository(factory),
                 new RawMaterialPriceHistoryRepository(factory),

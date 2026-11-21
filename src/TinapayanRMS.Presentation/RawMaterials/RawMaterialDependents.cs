@@ -62,9 +62,16 @@ public sealed class RawMaterialDependents : ObservableState, IDisposable
     /// <summary>The tiles changed, so their shares are wanted again, once the tab shows.</summary>
     public IObservable<Unit> SharesWanted => _sharesWanted;
 
+    /// <summary>
+    /// How many times tiles have been shown: a load gives its read only to a form whose tiles haven't changed since it set
+    /// out (RawMaterialsState.LoadAsync), as a form that read its own since has a newer one.
+    /// </summary>
+    internal int Shown { get; private set; }
+
     /// <summary>What uses the material showing: <paramref name="products"/>, by name, their shares still to be worked out.</summary>
     public void Show(IReadOnlyList<LinkingProduct> products)
     {
+        Shown++;
         Products = products;
         Text = products.Count == 0 ? NotUsedText : UsedText;
         _sharesWanted.OnNext(Unit.Default);

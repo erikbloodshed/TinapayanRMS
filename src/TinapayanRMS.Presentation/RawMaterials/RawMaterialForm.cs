@@ -669,10 +669,10 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     }
 
     /// <summary>
-    /// The view's load is merged: what follows it on the form. <paramref name="dependentsRead"/> holds the products using
-    /// each material whose details showed as the load set out, read with the lists.
+    /// The view's load is merged: what follows it on the form. <paramref name="dependentsRead"/> gives the products using a
+    /// material as read with the lists, or none while the tiles aren't the ones the load set out with (RawMaterialsState).
     /// </summary>
-    internal async Task EndLoadAsync(Load load, IReadOnlyDictionary<int, IReadOnlyList<LinkingProduct>> dependentsRead)
+    internal async Task EndLoadAsync(Load load, Func<int, IReadOnlyList<LinkingProduct>?> dependentsRead)
     {
         // The Sub-Assemblies screen may have changed the recipe's lines. Pointing the recipe at its fresh copy reads them only
         // when the sub-assembly's own row changed, so they're read here every time.
@@ -681,8 +681,8 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
             await LoadRecipeLinesAsync(recipe, CancellationToken.None);
         }
 
-        // The products using the material, read with the lists: kept only if the details showing are still that material's.
-        if (_detailMaterialId is { } readFor && dependentsRead.TryGetValue(readFor, out var dependents))
+        // The products using the material, read with the lists: shown only over the tiles the load set out with, not newer.
+        if (_detailMaterialId is { } readFor && dependentsRead(readFor) is { } dependents)
         {
             Dependents.Show(dependents);
         }

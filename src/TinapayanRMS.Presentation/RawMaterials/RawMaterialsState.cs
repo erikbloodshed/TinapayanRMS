@@ -136,6 +136,10 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
         // drawing. The products using each form's material are read with them, since Products may have started or stopped
         // using one meanwhile.
         int[] dependentsFor = [.. Tabs.All.Select(tab => tab.Form.DetailMaterialId).OfType<int>()];
+
+        // What each form's Dependents tiles were as the load set out: a form showing others by the time the load reaches it
+        // (another material picked, or this one read again) keeps its own, newer than the load's read.
+        var tilesAtStart = Tabs.All.ToDictionary(tab => tab.Form, tab => tab.Form.Dependents.Shown);
         var (categories, units, rawMaterials, costingDefaults, subAssemblies, dependentsRead) =
             await Task.Run(() => _queries.ReadCatalogAsync(dependentsFor, CancellationToken.None));
 
@@ -162,7 +166,8 @@ public sealed class RawMaterialsState : RecordViewState<RawMaterialForm>, IRawMa
 
         foreach (var (form, load) in loads)
         {
-            await form.EndLoadAsync(load, dependentsRead);
+            await form.EndLoadAsync(load, materialId =>
+                tilesAtStart.TryGetValue(form, out var shown) && shown == form.Dependents.Shown ? dependentsRead.GetValueOrDefault(materialId) : null);
         }
 
         OpenRecordWaiting();
