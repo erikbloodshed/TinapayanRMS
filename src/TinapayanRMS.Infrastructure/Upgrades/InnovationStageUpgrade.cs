@@ -1,6 +1,6 @@
+using TinapayanRMS.ApplicationCore.Rules;
 using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure.Configurations;
 
 namespace TinapayanRMS.Infrastructure.Upgrades;
 
@@ -13,7 +13,7 @@ internal static class InnovationStageUpgrade
 {
     public static async Task RunAsync(TinapayanRMSDbContext dbContext, CancellationToken cancellationToken)
     {
-        const string former = ProductStageConverter.FormerInnovationName;
+        const string former = ProductRules.FormerInnovationName;
         var innovation = nameof(ProductStage.Innovation);
         await dbContext.Database.ExecuteSqlAsync(
             $"UPDATE products SET stage = {innovation} WHERE stage = {former}", cancellationToken);

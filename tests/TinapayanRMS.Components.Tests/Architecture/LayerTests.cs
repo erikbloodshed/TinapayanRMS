@@ -33,7 +33,6 @@ public class LayerTests
     /// <summary>References the layers don't allow that are still there, each with what takes it away.</summary>
     private static readonly Dictionary<string, string> StillThere = new()
     {
-        ["Presentation -> Infrastructure"] = "Failure's words and ProductStageConverter, which move behind use cases (ADR 0002, phase 4)",
     };
 
     [Test]

@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 
@@ -19,6 +18,31 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class FailureTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
+    [Test]
+    public void An_error_it_has_no_words_for_is_shown_in_the_servers_own_without_its_code()
+    {
+        // XX000, an internal error: Npgsql puts the code before the message, and copies the server's own text into Data.
+        Failure.Of(new PostgresException("boom", "ERROR", "ERROR", "XX000"))
+            .Should().Be(new Failure("The database reported a problem: boom", IsRejection: false));
+    }
+
+    [Test]
+    public void Another_drivers_error_with_no_fields_is_read_by_its_code_alone()
+    {
+        Failure.Of(new OtherDriverException("23505", "duplicate key"))
+            .Should().Be(new Failure("That's already there, and it can only be there once.", IsRejection: true), "no index name to say which");
+        Failure.Of(new OtherDriverException("XX000", "XX000: boom"))
+            .Should().Be(new Failure("The database reported a problem: XX000: boom", IsRejection: false), "no server text, so its message as it is");
+        Failure.Of(new OtherDriverException(sqlState: null, "connection lost"))
+            .Should().Be(new Failure(Failure.UnreachableText, IsRejection: false));
+    }
+
+    /// <summary>A driver's exception other than Npgsql's: a SQLSTATE, and nothing in Data.</summary>
+    private sealed class OtherDriverException(string? sqlState, string message) : System.Data.Common.DbException(message)
+    {
+        public override string? SqlState => sqlState;
+    }
+
     [Test]
     public void A_rule_is_shown_in_its_own_words()
     {

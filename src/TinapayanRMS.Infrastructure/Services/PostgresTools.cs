@@ -184,11 +184,3 @@ internal sealed class PostgresTools(string? configuredFolder, TimeSpan? timeout 
         static string VersionText(string name) => name.Contains('.', StringComparison.Ordinal) ? name : name + ".0";
     }
 }
-
-/// <summary>A PostgreSQL tool that exited with an error, with what it wrote as its message.</summary>
-public sealed class PostgresToolException(string tool, string error) : Exception($"{tool} failed: {error}")
-{
-    public string Tool { get; } = tool;
-
-    public string Error { get; } = error;
-}

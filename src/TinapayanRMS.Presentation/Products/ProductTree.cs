@@ -5,7 +5,6 @@ using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
-using TinapayanRMS.Infrastructure.Configurations;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Trees;
 
@@ -134,7 +133,7 @@ public sealed class ProductFolderNode : ProductTreeNode, ITreeFolder<ProductTree
     /// </summary>
     public static string CurrentFolderKey(string key)
     {
-        const string former = ProductStageConverter.FormerInnovationName;
+        const string former = ProductRules.FormerInnovationName;
         return key == former ? nameof(ProductStage.Innovation)
             : key.StartsWith(former + "/", StringComparison.Ordinal) ? nameof(ProductStage.Innovation) + key[former.Length..]
             : key;

@@ -4,6 +4,12 @@ namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class ProductRules
 {
+    /// <summary>
+    /// What Innovation was called, and stored as, before 2026-11-09: a product's stage as an older copy of the app writes it
+    /// (ProductStageConverter reads it as Innovation), and a folder key the view state kept then (ProductTree.CurrentFolderKey).
+    /// </summary>
+    public const string FormerInnovationName = "ResearchAndDevelopment";
+
     /// <summary>What a product with no category is filed under: its folder in the list, and its category on a report or a printout.</summary>
     public const string UncategorizedTitle = "Uncategorized";
 

@@ -1,4 +1,4 @@
-using TinapayanRMS.Infrastructure.Services;
+using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Presentation.App;
 using TinapayanRMS.Components.Shared;
 
