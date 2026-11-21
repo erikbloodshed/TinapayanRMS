@@ -22,7 +22,6 @@ public interface IRawMaterialCategoryEditor : ILookupListEditor<RawMaterialCateg
 
     /// <summary>Renames <paramref name="category"/>, keeping its type.</summary>
     Task RenameAsync(RawMaterialCategory category, string name, CancellationToken cancellationToken);
-
 }
 
 /// <inheritdoc cref="IRawMaterialCategoryEditor"/>
