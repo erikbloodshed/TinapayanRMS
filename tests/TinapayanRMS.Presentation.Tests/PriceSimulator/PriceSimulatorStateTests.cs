@@ -13,6 +13,7 @@ using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Presentation.PriceSimulator;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Reports;
+using TinapayanRMS.UseCases.PriceSimulator;
 
 namespace TinapayanRMS.Presentation.Tests.PriceSimulator;
 
@@ -517,12 +518,14 @@ public class PriceSimulatorStateTests(DatabaseFixture fixture) : PersistenceTest
     {
         var factory = CreateDbContextFactory();
         return new PriceSimulatorState(
-            new ProductRepository(factory),
-            new RawMaterialRepository(factory),
-            new IngredientBomLineRepository(factory),
-            new RawMaterialBrandPriceRepository(factory),
-            new PriceScenarioRepository(factory),
-            SavedProducts(factory),
+            new PriceSimulatorQueries(
+                new ProductRepository(factory),
+                SavedProducts(factory),
+                new RawMaterialRepository(factory),
+                new IngredientBomLineRepository(factory),
+                new RawMaterialBrandPriceRepository(factory),
+                new PriceScenarioRepository(factory)),
+            new PriceScenarioEditor(new PriceScenarioRepository(factory)),
             new LoggerConfiguration().CreateLogger());
     }
 
