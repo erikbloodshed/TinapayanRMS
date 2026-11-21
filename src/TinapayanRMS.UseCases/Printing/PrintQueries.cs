@@ -5,7 +5,11 @@ using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.UseCases.Printing;
 
-/// <summary>What the Print dialog reads: its lists, as saved now, and the products of a set, priced as saved.</summary>
+/// <summary>
+/// What the Print dialog reads: its lists, as saved now, and the products of a set, priced as saved. A read its token cut
+/// short ends in an <see cref="OperationCanceledException"/>, whatever the database's driver reported, so a preparation a
+/// newer one replaced isn't taken for a failure.
+/// </summary>
 public interface IPrintQueries
 {
     /// <summary>
@@ -31,15 +35,33 @@ public sealed class PrintQueries(
     IProductCategoryRepository categoryRepository,
     SavedProductReader savedProducts) : IPrintQueries
 {
-    public async Task<PrintLists> ReadListsAsync(CancellationToken cancellationToken)
-    {
-        var productsRead = productRepository.GetAllAsync(cancellationToken);
-        var foldersRead = folderRepository.GetAllAsync(cancellationToken);
-        var categoriesRead = categoryRepository.GetAllAsync(cancellationToken);
-        await Task.WhenAll(productsRead, foldersRead, categoriesRead);
-        return new PrintLists(await productsRead, await foldersRead, await categoriesRead);
-    }
+    public Task<PrintLists> ReadListsAsync(CancellationToken cancellationToken) => CancelledAsCancellation(
+        async () =>
+        {
+            var productsRead = productRepository.GetAllAsync(cancellationToken);
+            var foldersRead = folderRepository.GetAllAsync(cancellationToken);
+            var categoriesRead = categoryRepository.GetAllAsync(cancellationToken);
+            await Task.WhenAll(productsRead, foldersRead, categoriesRead);
+            return new PrintLists(await productsRead, await foldersRead, await categoriesRead);
+        },
+        cancellationToken);
 
     public Task<IReadOnlyList<SavedProduct>> PriceAsSavedAsync(IReadOnlyList<Product> products, CostBasis basis, CancellationToken cancellationToken) =>
-        savedProducts.ReadAllAsync(products, basis, cancellationToken);
+        CancelledAsCancellation(() => savedProducts.ReadAllAsync(products, basis, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="read"/>, a failure once <paramref name="cancellationToken"/> is cancelled reported as the
+    /// cancellation it is: a driver can report a command cancelled mid-read as its own exception (Npgsql's).
+    /// </summary>
+    private static async Task<T> CancelledAsCancellation<T>(Func<Task<T>> read, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await read();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("The read was cancelled.", ex, cancellationToken);
+        }
+    }
 }

@@ -15,16 +15,30 @@ namespace TinapayanRMS.UseCases.Tests.Printing;
 public class PrintQueriesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Test]
-    public async Task The_lists_hold_every_product_and_category_as_saved()
+    public async Task The_lists_hold_every_product_in_use_folder_and_category_as_saved()
     {
         var pandesalId = await AddProductAsync("Pandesal");
         var ensaymadaId = await AddProductAsync("Ensaymada");
+        var deletedId = await AddProductAsync("Old Monay");
+        await new ProductRepository(CreateDbContextFactory()).DeleteAsync(deletedId, Cancellation);
         await new ProductCategoryRepository(CreateDbContextFactory()).AddAsync(new ProductCategory { Name = "Breads" }, Cancellation);
+        await new ProductFolderRepository(CreateDbContextFactory()).AddAsync(new ProductFolder { Name = "Christmas", Stage = ProductStage.Production }, Cancellation);
 
         var lists = await CreateQueries().ReadListsAsync(Cancellation);
 
-        lists.Products.Select(p => p.Id).Should().BeEquivalentTo([pandesalId, ensaymadaId]);
+        lists.Products.Select(p => p.Id).Should().BeEquivalentTo([pandesalId, ensaymadaId], "a deleted product isn't printed");
         lists.Categories.Select(c => c.Name).Should().Contain("Breads");
+        lists.Folders.Should().ContainSingle(f => f.Name == "Christmas" && f.Stage == ProductStage.Production);
+    }
+
+    [Test]
+    public async Task A_read_its_token_cut_short_ends_as_a_cancellation()
+    {
+        await AddProductAsync("Pandesal");
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await CreateQueries().Awaiting(q => q.ReadListsAsync(cancelled.Token)).Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Test]

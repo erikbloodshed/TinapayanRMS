@@ -1,4 +1,3 @@
-using Npgsql;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
@@ -334,11 +333,8 @@ public sealed class PrintDialogState : ScreenState
         }
         catch (OperationCanceledException) when (preparing.IsCancellationRequested)
         {
-            // A newer choice, or the dialog opened again, is preparing its own.
-        }
-        catch (NpgsqlException) when (preparing.IsCancellationRequested)
-        {
-            // The same, cancelled in the middle of a read, should Npgsql report it as its own exception rather than a cancellation.
+            // A newer choice, or the dialog opened again, is preparing its own: a read cut short says so as a cancellation
+            // (IPrintQueries), whatever the database's driver reported.
         }
         finally
         {
