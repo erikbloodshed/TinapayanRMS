@@ -7,7 +7,7 @@ written. A decision that changes gets a new record that supersedes the old one, 
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
-| [0002](0002-layers-use-cases-and-drafts.md) | Layers, use cases and drafts | Accepted; migration in progress (phases 0 to 2 done, 3 begun); `Rebase` narrowed by 0007 |
+| [0002](0002-layers-use-cases-and-drafts.md) | Layers, use cases and drafts | Accepted; migration in progress (phases 0 to 3 done, phase 3's done-when amended 2026-11-21); `Rebase` narrowed by 0007 |
 | [0003](0003-mutable-observable-screen-state.md) | Mutable, observable screen state | Accepted |
 | [0004](0004-quality-gates.md) | Quality gates the build enforces | Accepted |
 | [0005](0005-change-control-and-dependencies.md) | Change control and dependencies | Accepted |

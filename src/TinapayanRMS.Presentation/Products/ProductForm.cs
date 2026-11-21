@@ -844,13 +844,13 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     internal void TakeLoad(Load load, ProductsLoad read)
     {
-        EditingCategory = Categories.FirstOrDefault(c => c.Id == load.CategoryId);
         Packaging.TakePackagingSets(read.PackagingSets);
         RefreshCostingDefaults(read.CostingDefaults);
 
-        // A composite's lines point at the fresh products (a rename shows) at their fresh recipe costs. Only a composite's
-        // Products table offers products: any other's are built if it becomes one (StartNew, a pick).
-        ComponentsTable.Draft.TakeFresh(read.ComponentCosts, read.ComponentLinks);
+        // The category back on its fresh copy, and a composite's lines at the fresh products (a rename shows) at their fresh
+        // recipe costs (ProductDraft.Rebase). Only a composite's Products table offers products: any other's are built if it
+        // becomes one (StartNew, a pick).
+        Draft.Rebase(load.CategoryId, Categories, read.ComponentCosts, read.ComponentLinks);
         if (IsEditingComposite)
         {
             RefreshComponentOptions();
@@ -866,19 +866,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         load.SavedSince = FollowSavedVersion(
             SelectedProduct is { } showing && showing.Id == EditingId && EditingId == load.DetailProductId ? showing.UpdatedAt : SavedVersion);
 
-        PackagingSnapshot? linkedPackagingNow = null;
-        if (load.DetailProductId == _detailProductId && load.LinkedPackagingLines is { } linkedPackagingLines)
-        {
-            // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
-            var renamed = !Equals(Packaging.Draft.LinkTarget, load.SavedLink);
-            Packaging.Draft.ShowLink(load.SavedLink);
-            if (Packaging.Draft.RefreshLinkedLines(linkedPackagingLines) || renamed)
-            {
-                linkedPackagingNow = Packaging.Draft.Capture();
-            }
-        }
-
-        var linkedSectionsChanged = Recipe.Draft.RefreshRows(read.LinkedSubAssemblies, read.LinkedLines);
+        // What's linked as it's kept now (ProductDraft.RebaseLinked): the linked packaging, read again for this product only
+        // while it showed the link as saved, and the recipe's sections.
+        var (linkedSectionsChanged, linkedPackagingNow) = Draft.RebaseLinked(
+            load.DetailProductId == _detailProductId && load is { SavedLink: { } savedLink, LinkedPackagingLines: { } lines } ? (savedLink, lines) : null,
+            read.LinkedSubAssemblies, read.LinkedLines);
 
         // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
         // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked
@@ -967,14 +959,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
         EditingId = product.Id;
         SavedVersion = product.UpdatedAt;
-        EditingName = product.Name;
-        EditingDescription = product.Description ?? string.Empty;
-        EditingCategory = Categories.FirstOrDefault(c => c.Id == product.CategoryId);
-        EditingQuantityRequired = product.QuantityRequired;
-        ComponentsTable.Draft.IncludesPackaging = product.IncludesComponentPackaging;
-        EditingCurrentPrice = product.CurrentPrice;
+        Draft.ShowFields(product, Categories);
         ShowUpdatedAt(product.UpdatedAt);
-        EditingCloneName = $"{product.Name} Copy";
     }
 
     /// <summary>
@@ -1087,14 +1073,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         FormVersion++;
         EditingId = 0;
         SavedVersion = null;
-        EditingName = string.Empty;
-        EditingDescription = string.Empty;
-        EditingCategory = null;
-        EditingQuantityRequired = 1;
-        ComponentsTable.Draft.IncludesPackaging = false;
-        EditingCurrentPrice = null;
+        Draft.ClearFields();
         ShowUpdatedAt(null);
-        EditingCloneName = string.Empty;
 
         // After an unsaved new product nothing was selected, so the selection subscriptions don't run. The kind goes
         // first, so the tab ClearDetails picks is the new kind's.
@@ -1193,14 +1173,10 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         AreDetailsReady = true;
 
         // A composite's Products tab (or none) goes in before the tabs are rebuilt, and its lines before the recipe
-        // settles what Save compares it against, which they're part of.
+        // settles what Save compares it against, which they're part of; the packaging before the recipe's tabs, rebuilt
+        // next, so they can reselect the Packaging tab if it showed (ProductDraft.ShowParts).
         SetComposite(product.IsComposite);
-        ComponentsTable.Draft.Load(detail.Components);
-
-        // The packaging first, so the recipe's tabs, rebuilt next, can reselect the Packaging tab if it showed.
-        Packaging.Draft.LoadLink(detail.PackagingLink);
-        Packaging.Draft.LoadLines(detail.Lines);
-        Packaging.Draft.LoadBulk(detail.BulkLines, product.BulkPackagingQuantity);
+        Draft.ShowParts(detail, product.BulkPackagingQuantity);
         Recipe.ShowSaved(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
         Costing.Load(detail.Costing);
         Recipe.RefreshLinkableOptions();

@@ -1,6 +1,6 @@
 # 0002. Layers, use cases and drafts
 
-**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies) and 2 (Raw Materials) done; phase 3 (Products) begun, its use cases in place and its Packaging, Components, Costing and Recipe drafts, and the product's own draft over them; `ProductForm` still over 700 lines. What
+**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies), 2 (Raw Materials) and 3 (Products) done, phase 3's done-when amended on 2026-11-21 (below); phase 4 to come. What
 `Rebase` does is narrowed by [ADR 0007](0007-a-load-repoints-a-draft.md): it re-points a draft, and merges nothing.
 
 ## Context
@@ -56,11 +56,29 @@ Components, the composition root, is the one place above Infrastructure that see
 | 0 | The guardrails of ADR 0004: the layers, data access and constructor sizes held where they are | Done 2026-11-20 |
 | 1 | The UseCases project, `SubAssemblyEditor`, `SubAssemblyDraft` with `Rebase`, model-based tests of it (ADR 0006) | Its form and view hold no data-access type and take at most six things; the costing golden master unchanged; checked in the window |
 | 2 | Raw Materials the same way; the cost cascade stays in `IngredientCostPropagator`, called by its editor | The same |
-| 3 | Products, a part at a time: Packaging, Components, Costing, then the Recipe | `ProductForm` under 700 lines; Presentation no longer uses `Infrastructure.Services` |
+| 3 | Products, a part at a time: Packaging, Components, Costing, then the Recipe | Amended 2026-11-21 (below): its record's state and rules are drafts', with property tests; no Products form, view or part holds a data-access type; no screen-state file grows past where it is (`FileSizeTests`); the golden master unchanged; checked in the window |
 | 4 | Settings, Reports, the Price Simulator and Printing onto query services; Presentation's reference to Infrastructure removed | `DataAccessTests.StillReaching` and `LayerTests.StillThere` empty |
 
 No feature work on a screen while it's being moved, and each phase passes the whole suite, the golden master and a
 check in the window before it's merged.
+
+### Amendment, 2026-11-21: phase 3's done-when
+
+Phase 3 was to be done with `ProductForm` under 700 lines and Presentation no longer using `Infrastructure.Services`.
+Moving Products showed the first measured the wrong thing. By the sixth step every piece of the record's state and its
+rules had left the form for drafts with property tests (`ProductPackagingDraft`, `ProductComponentsDraft`,
+`ProductCosting`, `ProductRecipeDraft`, and `ProductDraft` over them, with `Show`, `Clear` and `Rebase`), and the form
+was still about 1,800 lines: what's left is the screen's own coordination (the view's load merged into the form, a pick's
+details, the wiring between the parts, the commands), each an ordered sequence across the drafts, the tabs, the section
+form and the undo history. Splitting it across classes to reach a line count would have moved that coupling behind large
+host interfaces, not removed it, and risked reordering steps the screen's tests only partly pin down. The second
+criterion isn't Products' at all: what uses `Infrastructure.Services` is `ScreenState`'s failure wording and
+`AutomaticBackups`, which phase 4 takes with Presentation's reference to Infrastructure (`LayerTests.StillThere`).
+
+So phase 3 is done when its record's state and rules are drafts' with property tests and no Products form, view or part
+holds a data-access type, and a ratchet, `FileSizeTests` (ADR 0004), keeps every screen-state file over 700 lines from
+growing: what was longer is listed with its length, which may only go down. A screen's coordination that grows is the
+signal to split it, by the job it does, when that job is clear.
 
 ## Consequences
 
