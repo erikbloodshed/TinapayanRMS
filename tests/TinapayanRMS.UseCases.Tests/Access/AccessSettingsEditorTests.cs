@@ -45,11 +45,12 @@ public class AccessSettingsEditorTests(DatabaseFixture fixture) : PersistenceTes
     [Test]
     public async Task The_auto_lock_minutes_are_kept()
     {
-        var editor = CreateEditor();
+        // Not the default, 15, which an empty database reads as already.
+        (await CreateEditor().GetAsync(Cancellation)).AutoLockMinutes.Should().Be(Domain.Entities.AccessSettings.DefaultAutoLockMinutes);
 
-        await editor.SetAutoLockMinutesAsync(15, Cancellation);
+        await CreateEditor().SetAutoLockMinutesAsync(30, Cancellation);
 
-        (await editor.GetAsync(Cancellation)).AutoLockMinutes.Should().Be(15);
+        (await CreateEditor().GetAsync(Cancellation)).AutoLockMinutes.Should().Be(30);
     }
 
     private AccessSettingsEditor CreateEditor() => new(new AccessSettingsRepository(CreateDbContextFactory()));
