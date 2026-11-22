@@ -362,6 +362,10 @@ public sealed class ProductRecipe : ObservableState
         HashSet<int> previousIds = [.. UsageEdits.Select(u => u.SubAssemblyId)];
         _isRecipeClearedForAnother = false;
 
+        // The section form holds what was saved before. Closed, its tab opens it again on what's saved now: left open over a
+        // clean form's reload (RecordScreenState.FollowSavedVersion), the next Save, or a change of tab, applied its old rows
+        // over the save the reload had just shown.
+        CloseUsageForm();
         Draft.Show(usages, subAssemblyLines, addIns);
         ReselectRecipeTab(previousTab, previousUsage, previousIds);
     }
@@ -688,7 +692,7 @@ public sealed class ProductRecipe : ObservableState
 
             usages[i] = fresh;
             changed = true;
-            if (form is { IsAdding: false, EditingUsageIndex: { } at } && at == i && !edit.AreLinkedLinesEdited && ShowsLines(form.Lines, edit.Lines))
+            if (form is { IsAdding: false, EditingUsageIndex: { } at } && at == i && !edit.AreLinkedLinesEdited && form.ShowsLines(edit.Lines))
             {
                 IReadOnlyList<IngredientLineSnapshot> lines =
                     [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
@@ -709,15 +713,6 @@ public sealed class ProductRecipe : ObservableState
 
         return changed ? snapshot with { Usages = usages, Form = form } : snapshot;
     }
-
-    /// <summary>Whether the form's lines, as a step kept them, are <paramref name="lines"/>: nothing typed over them there.</summary>
-    private static bool ShowsLines(IReadOnlyList<IngredientLineSnapshot> form, IReadOnlyList<SectionLine> lines) =>
-        form.Count == lines.Count
-        && form.Zip(lines).All(pair =>
-            pair.First.IngredientId == pair.Second.Ingredient.Id
-            && pair.First.Grams == pair.Second.Grams
-            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
-            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
 
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     internal void StartUsageFormMode()

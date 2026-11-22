@@ -135,6 +135,104 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     });
 
     [Test]
+    public Task A_form_with_nothing_typed_shows_its_open_section_as_saved_since_and_a_Save_keeps_it() => UiThread.RunAsync(async () =>
+    {
+        var toppingId = await AddRoleAsync("Topping", isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (id, sectionId) = await AddProductWithSubAssemblyAsync("Loaf", toppingId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var state = await OpenedStateAsync(id);
+        state.UsageForm.IsUsageFormOpen.Should().BeTrue("a product opens on its first section");
+
+        await AnotherPcSavesRecipeAsync(id, new RecipeDraft(
+            [new NewSubAssemblyDraft(toppingId, [(flourId, 1000m), (butterId, 250m)], UsageAuthoredField.WeightPerPiece, 60m) { Id = sectionId }],
+            []));
+        await state.LoadCommand.ExecuteAsync();
+
+        state.UsageForm.FormLines.Select(l => (l.IngredientId, l.Grams)).Should().Equal((flourId, 1000m), (butterId, 250m));
+        state.History.IsDirty.Should().BeFalse("nothing was typed");
+
+        // Save applies the section form left open, whatever on the product was changed.
+        TypeDescription(state, "Toasted");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m), (butterId, 250m));
+    });
+
+    [Test]
+    public Task Leaving_a_section_taken_up_as_saved_since_changes_nothing() => UiThread.RunAsync(async () =>
+    {
+        var toppingId = await AddRoleAsync("Topping", isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var (id, sectionId) = await AddProductWithSubAssemblyAsync("Loaf", toppingId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var state = await OpenedStateAsync(id);
+
+        await AnotherPcSavesRecipeAsync(id, new RecipeDraft(
+            [new NewSubAssemblyDraft(toppingId, [(flourId, 800m)], UsageAuthoredField.WeightPerPiece, 60m) { Id = sectionId }],
+            []));
+        await state.LoadCommand.ExecuteAsync();
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+
+        state.Recipe.UsageEdits.Single().Lines.Select(l => l.Grams).Should().Equal(800m);
+        state.History.IsDirty.Should().BeFalse("looking at another tab is no edit");
+        state.History.CanUndo.Should().BeFalse();
+    });
+
+    [Test]
+    public Task A_form_with_nothing_typed_shows_a_linked_sections_piece_size_and_add_ins_as_saved_since() => UiThread.RunAsync(async () =>
+    {
+        var doughId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var ubeId = await AddIngredientAsync("Ube", costPerGram: 0.2m);
+        var (id, linkedId) = await AddProductWithSubAssemblyAsync("Loaf", doughId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var state = await OpenedStateAsync(id);
+
+        await AnotherPcSavesRecipeAsync(id, new RecipeDraft(
+            [], [new LinkedUsageDraft(linkedId, UsageAuthoredField.WeightPerPiece, 75m) { AddIns = [(ubeId, 50m)] }]));
+        await state.LoadCommand.ExecuteAsync();
+
+        state.UsageForm.EditingUsageWeightPerPiece.Should().Be(75m);
+        state.UsageForm.FormAddIns.Select(l => (l.IngredientId, l.Grams)).Should().Equal((ubeId, 50m));
+
+        TypeDescription(state, "Toasted");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == id, Cancellation);
+        usage.AuthoredValue.Should().Be(75m);
+        (await dbContext.UsageAddInLines.Where(l => l.UsageId == usage.Id).Select(l => l.Grams).ToListAsync(Cancellation)).Should().Equal(50m);
+    });
+
+    [Test]
+    public Task A_section_taken_out_since_stays_out_of_a_form_with_nothing_typed() => UiThread.RunAsync(async () =>
+    {
+        var toppingId = await AddRoleAsync("Topping", sortOrder: 1, isProductOwned: true);
+        var fillingId = await AddRoleAsync("Filling", sortOrder: 2, isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var id = await AddProductAsync("Loaf");
+        await SaveRecipeAsync(id, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(toppingId, [(flourId, 100m)], UsageAuthoredField.Yield, 1m),
+                new NewSubAssemblyDraft(fillingId, [(flourId, 200m)], UsageAuthoredField.Yield, 1m),
+            ],
+            []));
+        var keptId = await SubAssemblyIdAsync(id, fillingId);
+        var state = await OpenedStateAsync(id);
+        state.UsageForm.EditingUsage!.RoleId.Should().Be(toppingId, "the topping's tab shows");
+
+        await AnotherPcSavesRecipeAsync(id, new RecipeDraft(
+            [new NewSubAssemblyDraft(fillingId, [(flourId, 200m)], UsageAuthoredField.Yield, 1m) { Id = keptId }],
+            []));
+        await state.LoadCommand.ExecuteAsync();
+
+        state.Recipe.UsageEdits.Select(u => u.RoleId).Should().Equal(fillingId);
+        state.UsageForm.FormLines.Select(l => l.Grams).Should().Equal(200m);
+        state.History.IsDirty.Should().BeFalse();
+    });
+
+    [Test]
     public Task A_rename_from_the_screens_own_list_doesnt_refuse_what_is_typed() => UiThread.RunAsync(async () =>
     {
         var id = await SaveProductAsync("Mamon");
@@ -358,6 +456,21 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         var theirs = (await products.GetByIdAsync(id, Cancellation))!;
         theirs.Description = description;
         await products.SaveAsync(theirs, recipe: null, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+    }
+
+    /// <summary>The product's recipe saved from another PC on this database, over the product as saved now.</summary>
+    private async Task AnotherPcSavesRecipeAsync(int id, RecipeDraft recipe)
+    {
+        var products = new ProductRepository(CreateDbContextFactory());
+        var theirs = (await products.GetByIdAsync(id, Cancellation))!;
+        await products.SaveAsync(theirs, recipe, packagingLink: null, packagingLines: null, costing: null, Cancellation);
+    }
+
+    private async Task<IReadOnlyList<(int? IngredientId, decimal? Grams)>> StoredLinesAsync(int subAssemblyId)
+    {
+        await using var dbContext = CreateDbContext();
+        var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == subAssemblyId).OrderBy(l => l.SortOrder).ToListAsync(Cancellation);
+        return [.. lines.Select(l => ((int?)l.IngredientId, (decimal?)l.Grams))];
     }
 
     private async Task<(string Name, string? Description)> StoredAsync(int id)

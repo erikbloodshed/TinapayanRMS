@@ -213,6 +213,15 @@ public sealed record SectionFormSnapshot
     public required decimal WeightPerPiece { get; init; }
     public required decimal Yield { get; init; }
 
+    /// <summary>Whether the form's lines, as kept, are <paramref name="lines"/>: nothing typed over them there.</summary>
+    public bool ShowsLines(IReadOnlyList<SectionLine> lines) =>
+        Lines.Count == lines.Count
+        && Lines.Zip(lines).All(pair =>
+            pair.First.IngredientId == pair.Second.Ingredient.Id
+            && pair.First.Grams == pair.Second.Grams
+            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
+            && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
+
     /// <summary>The form looks the same: every field, its lines and add-ins line by line.</summary>
     public bool ShowsSameAs(SectionFormSnapshot other) =>
         IsOpen == other.IsOpen
