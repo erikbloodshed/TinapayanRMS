@@ -89,6 +89,13 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     /// itself, on the Sub-Assemblies screen, so every product linking it follows. Null leaves its lines as they are.
     /// </summary>
     public IReadOnlyList<RecipeLine>? Lines { get; init; }
+
+    /// <summary>
+    /// The lines <see cref="Lines"/> were changed from, as the form took them: Save is refused when the sub-assembly's have
+    /// been saved as others since (SavedVersionRules.EnsureLinesNotSavedSince). Null, from a caller that isn't a form, isn't
+    /// checked.
+    /// </summary>
+    public IReadOnlyList<RecipeLine>? LinesTaken { get; init; }
 }
 
 /// <summary>

@@ -77,8 +77,42 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
     /// </summary>
     internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {
+        await EnsureLinkedLinesNotSavedSinceAsync(dbContext, recipe, cancellationToken);
         await SetRecipeAsync(dbContext, productId, recipe, linksOthersOwn: false, cancellationToken);
         await StampOwnersOfRelinedAsync(dbContext, productId, recipe, cancellationToken);
+    }
+
+    /// <summary>
+    /// Before anything of the recipe is written, and after the writes' lock: each linked one the form changed the lines of
+    /// still has the lines it changed (SavedVersionRules.EnsureLinesNotSavedSince).
+    /// </summary>
+    private static async Task EnsureLinkedLinesNotSavedSinceAsync(
+        TinapayanRMSDbContext dbContext, RecipeDraft recipe, CancellationToken cancellationToken)
+    {
+        List<LinkedUsageDraft> changed = [.. recipe.Linked.Where(l => l is { Lines: not null, LinesTaken: not null })];
+        if (changed.Count == 0)
+        {
+            return;
+        }
+
+        List<int> ids = [.. changed.Select(l => l.SubAssemblyId)];
+        var names = await dbContext.SubAssemblies.Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, cancellationToken);
+        var stored = (await dbContext.SubAssemblyLines
+                .AsNoTracking()
+                .Where(l => ids.Contains(l.SubAssemblyId))
+                .OrderBy(l => l.SortOrder)
+                .ThenBy(l => l.Id)
+                .ToListAsync(cancellationToken))
+            .ToLookup(l => l.SubAssemblyId, l => new RecipeLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent));
+
+        // One deleted since is SetRecipeAsync's to refuse.
+        foreach (var link in changed)
+        {
+            if (names.TryGetValue(link.SubAssemblyId, out var name))
+            {
+                SavedVersionRules.EnsureLinesNotSavedSince(name, [.. stored[link.SubAssemblyId]], link.LinesTaken);
+            }
+        }
     }
 
     /// <summary>

@@ -82,6 +82,29 @@ public class ProductRecipeDraftTests
         }, iter: 300);
 
     [Test]
+    public void A_change_saved_elsewhere_never_moves_what_lines_changed_here_were_changed_from() =>
+        Gen.Select(Steps.Array[0, 30], Gen.Int[0, 3]).Sample((steps, kind) =>
+        {
+            var world = new World();
+            foreach (var step in steps)
+            {
+                world.Apply(step);
+            }
+
+            var before = world.Draft.CurrentDraft().Linked.Where(l => l.Lines is not null).ToDictionary(l => l.SubAssemblyId);
+            world.Apply(new ChangedElsewhere(kind));
+
+            // One whose lines are now what's kept there has nothing left to write, so nothing to check.
+            foreach (var now in world.Draft.CurrentDraft().Linked.Where(l => l.Lines is not null))
+            {
+                if (before.TryGetValue(now.SubAssemblyId, out var was))
+                {
+                    now.LinesTaken.Should().Equal(was.LinesTaken!, "the Save that writes them is refused over what was saved since");
+                }
+            }
+        }, iter: 300);
+
+    [Test]
     public void A_recipe_that_saves_as_loaded_is_as_saved() =>
         Steps.Array[0, 40].Sample(steps =>
         {
@@ -365,7 +388,7 @@ public class ProductRecipeDraftTests
             }
         }
 
-        /// <summary>An undo step's linked sections as the sub-assemblies are kept now (ProductRecipe.WithLinkedAsSavedNow's sections).</summary>
+        /// <summary>An undo step's linked sections as the sub-assemblies are kept now (ProductRecipeDraft.StepAsSavedNow's sections).</summary>
         private IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages)
         {
             var ingredientsById = Ingredients.ToDictionary(i => i.Id);

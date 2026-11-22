@@ -202,7 +202,8 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     internal (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
         (PackagingLinkTarget Link, IReadOnlyList<PackagingLine> Lines)? linkedPackaging,
         IReadOnlyList<SubAssembly> linkedSubAssemblies,
-        IReadOnlyList<SubAssemblyLine> linkedLines)
+        IReadOnlyList<SubAssemblyLine> linkedLines,
+        SectionFormSnapshot? form = null)
     {
         PackagingSnapshot? linkedPackagingNow = null;
         if (linkedPackaging is var (savedLink, linkedPackagingLines))
@@ -216,7 +217,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             }
         }
 
-        var linkedSectionsChanged = Recipe.RefreshRows(linkedSubAssemblies, linkedLines);
+        var linkedSectionsChanged = Recipe.RefreshRows(linkedSubAssemblies, linkedLines, form);
         return (linkedSectionsChanged, linkedPackagingNow);
     }
 

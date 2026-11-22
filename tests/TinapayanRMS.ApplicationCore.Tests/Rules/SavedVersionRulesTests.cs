@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 
 namespace TinapayanRMS.ApplicationCore.Tests.Rules;
@@ -6,6 +7,38 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 public class SavedVersionRulesTests
 {
     private static readonly DateTime Opened = new(2026, 11, 18, 8, 0, 0);
+
+    [Test]
+    public void A_linked_ones_lines_stored_as_they_were_taken_save()
+    {
+        IReadOnlyList<RecipeLine> taken = [new(1, 1000m, IsFormulaBase: true), new(2, 650m)];
+
+        var act = () => SavedVersionRules.EnsureLinesNotSavedSince("House Dough", storedLines: [new(1, 1000m, IsFormulaBase: true), new(2, 650m)], taken);
+
+        act.Should().NotThrow();
+    }
+
+    [Test]
+    public void A_linked_ones_lines_saved_since_they_were_taken_are_refused_by_name()
+    {
+        IReadOnlyList<RecipeLine> taken = [new(1, 1000m, IsFormulaBase: true), new(2, 650m)];
+
+        var regrammed = () => SavedVersionRules.EnsureLinesNotSavedSince("House Dough", storedLines: [new(1, 1000m, IsFormulaBase: true), new(2, 600m)], taken);
+        var reticked = () => SavedVersionRules.EnsureLinesNotSavedSince("House Dough", storedLines: [new(1, 1000m), new(2, 650m)], taken);
+
+        regrammed.Should().Throw<SavedSinceException>().WithMessage(
+            "House Dough's lines were saved after you opened this product, so your changes weren't saved. They're still on the form: "
+            + "note them, press Revert to see what was saved, then make yours again.");
+        reticked.Should().Throw<SavedSinceException>();
+    }
+
+    [Test]
+    public void Lines_that_dont_say_what_they_were_taken_from_arent_checked()
+    {
+        var act = () => SavedVersionRules.EnsureLinesNotSavedSince("House Dough", storedLines: [new(1, 1000m)], linesTaken: null);
+
+        act.Should().NotThrow();
+    }
 
     [Test]
     public void A_record_saved_as_the_form_opened_it_saves()

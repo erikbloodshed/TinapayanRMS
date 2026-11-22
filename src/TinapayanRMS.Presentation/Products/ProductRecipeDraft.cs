@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
 
@@ -144,9 +145,10 @@ public sealed class ProductRecipeDraft : ObservableState
     /// section at its refreshed sub-assembly and lines, keeping each section's own piece size, so costs
     /// changed on other tabs reach the recipe and the cost summary. Only a section that shows something
     /// different is rebuilt. The screen points the packaging rows at their refreshed materials the same way after. True when
-    /// a linked section came in changed from where it's kept, which the undo history then follows (<see cref="ProductRecipe.WithLinkedAsSavedNow"/>).
+    /// a linked section came in changed from where it's kept, which the undo history then follows (<see cref="StepAsSavedNow"/>).
     /// </summary>
-    internal bool RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
+    /// <param name="form">The section form as it stands: lines typed into it keep the ones they were changed from.</param>
+    internal bool RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines, SectionFormSnapshot? form = null)
     {
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
@@ -183,7 +185,7 @@ public sealed class ProductRecipeDraft : ObservableState
                     continue;
                 }
 
-                fresh = AsSavedNow(edit, subAssembly, linkedLinesById, ingredientsById);
+                fresh = AsSavedNow(edit, subAssembly, linkedLinesById, ingredientsById, form?.HasLinesTypedInto(i, edit) == true);
             }
             else
             {
@@ -218,10 +220,12 @@ public sealed class ProductRecipeDraft : ObservableState
     /// <summary>
     /// A linked section as the sub-assembly where it's kept is saved now (<paramref name="subAssembly"/>): its lines, name
     /// and role come from there; its add-ins are this product's own, so they only need their ingredients' new costs; lines
-    /// changed here and not saved yet stay, repriced; its piece size stays the product's.
+    /// changed here and not saved yet stay, repriced, and with them, as with lines typed in its form
+    /// (<paramref name="areLinesTypedInto"/>), the lines they were changed from; its piece size stays the product's.
     /// </summary>
     internal ProductUsageEdit AsSavedNow(
-        ProductUsageEdit edit, SubAssembly subAssembly, ILookup<int, SubAssemblyLine> linkedLinesById, Dictionary<int, RawMaterial> ingredientsById)
+        ProductUsageEdit edit, SubAssembly subAssembly, ILookup<int, SubAssemblyLine> linkedLinesById, Dictionary<int, RawMaterial> ingredientsById,
+        bool areLinesTypedInto = false)
     {
         var role = _roles.FirstOrDefault(r => r.Id == subAssembly.RoleId) ?? subAssembly.Role;
         return edit.WithLinked(
@@ -231,7 +235,64 @@ public sealed class ProductRecipeDraft : ObservableState
             [.. linkedLinesById[subAssembly.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
             edit.AreLinkedLinesEdited ? Repriced(edit.Lines, ingredientsById) : null,
             Repriced(edit.AddIns, ingredientsById),
-            PricedSection.LinkedOwnerOf(subAssembly));
+            PricedSection.LinkedOwnerOf(subAssembly),
+            areLinesTypedInto);
+    }
+
+    /// <summary>
+    /// An undo step's recipe (<paramref name="step"/>) with its linked sections as a load just found them saved where
+    /// they're kept (as <see cref="RefreshRows"/> brought them into the form), and the section form open on one of them
+    /// showing its lines as saved now, unless they're typed into there. What the product holds of its own (a piece size,
+    /// add-ins, lines edited here and the ones they were changed from) stays as the step had it. An undo or a redo then
+    /// never puts back a sub-assembly's lines as they were before it was saved on the Sub-Assemblies screen.
+    /// </summary>
+    internal RecipeSnapshot StepAsSavedNow(RecipeSnapshot step, IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
+    {
+        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
+        var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
+        var linkedLinesById = linkedLines.ToLookup(l => l.SubAssemblyId);
+        var productId = _host.DetailProductId;
+        List<ProductUsageEdit> usages = [.. step.Usages];
+        var form = step.Form;
+        var changed = false;
+        for (var i = 0; i < usages.Count; i++)
+        {
+            var edit = usages[i];
+            if (!edit.IsLinked
+                || linkedById.GetValueOrDefault(edit.SubAssemblyId) is not { } saved
+                || (saved.OwnerProductId is { } ownerId && ownerId == productId))
+            {
+                continue;
+            }
+
+            var fresh = AsSavedNow(edit, saved, linkedLinesById, ingredientsById, step.Form.HasLinesTypedInto(i, edit));
+            if (fresh.ShowsSameAs(edit))
+            {
+                continue;
+            }
+
+            usages[i] = fresh;
+            changed = true;
+            if (form is { IsAdding: false, EditingUsageIndex: { } at } && at == i && !edit.AreLinkedLinesEdited && form.ShowsLines(edit.Lines))
+            {
+                IReadOnlyList<IngredientLineSnapshot> lines =
+                    [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+                // The figure typed stays and the other follows the new batch, as the form's own does (FollowPieceSize).
+                var batchWeight = lines.Sum(l => l.Grams ?? 0m) + form.AddIns.Sum(l => l.Grams ?? 0m);
+                var typed = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : form.Yield;
+                var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(form.AuthoredField, typed, batchWeight);
+                form = form with
+                {
+                    Title = fresh.EditTitle,
+                    Lines = lines,
+                    FormulaBase = SubAssemblyRules.FormulaBaseWeight([.. lines.Select(l => (l.Grams ?? 0m, l.IsFormulaBase))]),
+                    WeightPerPiece = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : Math.Round(weightPerPiece, 2, MidpointRounding.ToEven),
+                    Yield = form.AuthoredField == UsageAuthoredField.Yield ? form.Yield : Math.Round(yield, 2, MidpointRounding.ToEven),
+                };
+            }
+        }
+
+        return changed ? step with { Usages = usages, Form = form } : step;
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>
@@ -317,7 +378,7 @@ public sealed class ProductRecipeDraft : ObservableState
     /// them, by id, as a load points the sections at them (<see cref="Repriced"/>). A step keeps the copies it was taken
     /// with, so without this a section put back after a load that moved its ingredients' costs would show the old costs,
     /// the header's figures too, until the next load. A linked section a load found changed where it's kept is already as
-    /// kept in every step (ProductRecipe.WithLinkedAsSavedNow); its lines and add-ins are repriced here like any other's.
+    /// kept in every step (StepAsSavedNow); its lines and add-ins are repriced here like any other's.
     /// </summary>
     internal void Restore(IReadOnlyList<ProductUsageEdit> sections)
     {
@@ -365,9 +426,12 @@ public sealed class ProductRecipeDraft : ObservableState
                 AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
 
                 // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
-                // screen has changed since.
+                // screen has changed since; and with those, the lines they were changed from, so it's refused over others.
                 Lines = u.AreLinkedLinesEdited
                     ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
+                    : null,
+                LinesTaken = u.AreLinkedLinesEdited
+                    ? [.. u.LinesTaken.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
                     : null,
             })])
         {

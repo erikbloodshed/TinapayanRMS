@@ -222,6 +222,10 @@ public sealed record SectionFormSnapshot
             && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
             && pair.First.AuthoredBakersPercent == pair.Second.AuthoredBakersPercent);
 
+    /// <summary>Whether lines are typed into the form over <paramref name="section"/>, the <paramref name="index"/>th of the recipe's, and not applied.</summary>
+    public bool HasLinesTypedInto(int index, ProductUsageEdit section) =>
+        IsOpen && !IsAdding && EditingUsageIndex == index && !ShowsLines(section.Lines);
+
     /// <summary>The form looks the same: every field, its lines and add-ins line by line.</summary>
     public bool ShowsSameAs(SectionFormSnapshot other) =>
         IsOpen == other.IsOpen

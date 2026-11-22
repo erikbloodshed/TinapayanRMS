@@ -8,6 +8,13 @@ using TinapayanRMS.Presentation.Shared;
 namespace TinapayanRMS.Presentation.Products;
 
 /// <summary>
+/// A linked section's lines as they're kept where it's kept: <paramref name="Now"/>, as last read, and
+/// <paramref name="Taken"/>, the ones the lines changed here were changed from, which Save says
+/// (LinkedUsageDraft.LinesTaken). The same until lines are both changed here and saved there.
+/// </summary>
+public sealed record KeptLines(IReadOnlyList<SectionLine> Now, IReadOnlyList<SectionLine> Taken);
+
+/// <summary>
 /// One sub-assembly in the product's recipe, saved or not: a section of the Recipe Structure, called by its
 /// role, and by its name too when the recipe has more than one in that role (<see cref="SectionName"/>), with its
 /// ingredient lines, and a box in the Unit Conversion Overview (a batch in pieces). Either new (the form edits its
@@ -64,9 +71,9 @@ public sealed class ProductUsageEdit : ObservableRow
     /// </param>
     /// <param name="isReleasing">One of the product's own that Save moves to the Sub-Assemblies screen and links (Move to Sub-Assemblies).</param>
     /// <param name="toMadeIngredient">The made ingredient one of the product's own becomes on Save (Move to In-House); null for none.</param>
-    /// <param name="savedLines">
-    /// A linked one's lines as the Sub-Assemblies screen has them, when <paramref name="lines"/> were changed here since; null
-    /// when they're the same.
+    /// <param name="kept">
+    /// A linked one's lines as the Sub-Assemblies screen has them (<see cref="KeptLines"/>); null when they're
+    /// <paramref name="lines"/>, with nothing changed here.
     /// </param>
     /// <param name="linkedOwner">The product a linked one is kept in, its own, which only a variant links; null for one on the Sub-Assemblies screen.</param>
     public ProductUsageEdit(
@@ -80,14 +87,15 @@ public sealed class ProductUsageEdit : ObservableRow
         string? name = null,
         bool isOwn = false,
         bool isReleasing = false,
-        IReadOnlyList<SectionLine>? savedLines = null,
+        KeptLines? kept = null,
         (int Id, string Name)? linkedOwner = null,
         MadeIngredientDraft? toMadeIngredient = null)
     {
         _isOwn = isOwn;
         _isReleasing = isReleasing;
         _toMadeIngredient = toMadeIngredient;
-        _savedLines = savedLines ?? lines;
+        _savedLines = kept?.Now ?? lines;
+        LinesTaken = kept?.Taken ?? _savedLines;
         Name = SubAssemblyRules.NormalizeName(name);
         SubAssemblyId = subAssemblyId;
         Role = role;
@@ -236,6 +244,18 @@ public sealed class ProductUsageEdit : ObservableRow
     public bool AreLinkedLinesEdited => IsLinked && !HaveSameRecipe(Lines, _savedLines);
 
     /// <summary>
+    /// The lines a linked one's were changed from: what Save checks are still the ones kept there, so it never writes over
+    /// others saved since (SavedVersionRules.EnsureLinesNotSavedSince). A load moves it only while nothing's changed here.
+    /// </summary>
+    public IReadOnlyList<SectionLine> LinesTaken { get; }
+
+    /// <summary>Whether a linked one's lines are kept as <paramref name="other"/>'s are: a load that found others saved there makes them differ.</summary>
+    internal bool HasSameKeptLines(ProductUsageEdit other) => !IsLinked || HaveSameRecipe(_savedLines, other._savedLines);
+
+    /// <summary>The section form's title over it: "Edit Dough", a linked one with where it's kept.</summary>
+    internal string EditTitle => IsEditable ? $"Edit {SectionName}" : $"Edit {SectionName} ({LinkedFromText})";
+
+    /// <summary>
     /// The badge beside a linked section's heading, which opens where it's kept: "Cheese Roll Dough, from Sub-Assemblies",
     /// or a variant's "Ensaymada Filling, from Ensaymada", the product whose own it is.
     /// </summary>
@@ -283,7 +303,7 @@ public sealed class ProductUsageEdit : ObservableRow
         var savedLines = ReferenceEquals(_savedLines, Lines) ? lines : reprice(_savedLines);
         return lines.SequenceEqual(Lines) && addIns.SequenceEqual(AddIns) && savedLines.SequenceEqual(_savedLines)
             ? this
-            : new(SubAssemblyId, Role, lines, AuthoredField, AuthoredValue, LinkedName, addIns, Name, _isOwn, _isReleasing, savedLines, LinkedOwner, _toMadeIngredient);
+            : new(SubAssemblyId, Role, lines, AuthoredField, AuthoredValue, LinkedName, addIns, Name, _isOwn, _isReleasing, new KeptLines(savedLines, LinesTaken), LinkedOwner, _toMadeIngredient);
     }
 
     /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
@@ -297,8 +317,9 @@ public sealed class ProductUsageEdit : ObservableRow
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
     /// its role and <paramref name="savedLines"/> — with its add-ins repriced; its piece size stays the product's. Lines
-    /// changed here and not saved yet stay as they are, repriced (<paramref name="editedLines"/>), and Save writes them over
-    /// the ones kept there.
+    /// changed here and not saved yet stay as they are, repriced (<paramref name="editedLines"/>), and so do the lines they
+    /// were changed from (<see cref="LinesTaken"/>), as they do while some are typed in its form and not applied
+    /// (<paramref name="areLinesTypedInto"/>): Save refuses to write them over others saved there since.
     /// </summary>
     public ProductUsageEdit WithLinked(
         string linkedName,
@@ -307,8 +328,13 @@ public sealed class ProductUsageEdit : ObservableRow
         IReadOnlyList<SectionLine> savedLines,
         IReadOnlyList<SectionLine>? editedLines,
         IReadOnlyList<SectionLine> addIns,
-        (int Id, string Name)? linkedOwner) =>
-        new(SubAssemblyId, role, editedLines ?? savedLines, AuthoredField, AuthoredValue, linkedName, addIns, name, savedLines: savedLines, linkedOwner: linkedOwner);
+        (int Id, string Name)? linkedOwner,
+        bool areLinesTypedInto)
+    {
+        var lines = editedLines ?? savedLines;
+        var taken = areLinesTypedInto || !HaveSameRecipe(lines, savedLines) ? LinesTaken : savedLines;
+        return new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, linkedName, addIns, name, kept: new KeptLines(savedLines, taken), linkedOwner: linkedOwner);
+    }
 
     /// <summary>The same linked section with the lines, piece size and add-ins the form now holds.</summary>
     public ProductUsageEdit WithLinkedForm(
@@ -316,7 +342,7 @@ public sealed class ProductUsageEdit : ObservableRow
         UsageAuthoredField authoredField,
         decimal authoredValue,
         IReadOnlyList<SectionLine> addIns) =>
-        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, savedLines: _savedLines, linkedOwner: LinkedOwner);
+        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, kept: new KeptLines(_savedLines, LinesTaken), linkedOwner: LinkedOwner);
 
     /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
     private static bool HaveSameRecipe(IReadOnlyList<SectionLine> a, IReadOnlyList<SectionLine> b) =>

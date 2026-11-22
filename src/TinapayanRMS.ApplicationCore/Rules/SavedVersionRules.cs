@@ -1,3 +1,5 @@
+using TinapayanRMS.ApplicationCore.Interfaces;
+
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 /// <summary>
@@ -52,6 +54,25 @@ public static class SavedVersionRules
             }
         }
     }
+
+    /// <summary>
+    /// Refuses a product's Save that changes the lines of <paramref name="name"/>, a sub-assembly it links, when
+    /// <paramref name="storedLines"/> aren't the <paramref name="linesTaken"/> it changed. By the lines rather than the
+    /// sub-assembly's UpdatedAt, as they're all such a Save writes there: a rename since, or a save of the same lines, is
+    /// nothing to write over. A save that doesn't say what it took isn't checked.
+    /// </summary>
+    public static void EnsureLinesNotSavedSince(string name, IReadOnlyList<RecipeLine> storedLines, IReadOnlyList<RecipeLine>? linesTaken)
+    {
+        if (linesTaken is { } taken && !storedLines.SequenceEqual(taken))
+        {
+            throw new SavedSinceException(LinesSavedSinceText(name));
+        }
+    }
+
+    /// <summary>What a product's refused Save says of a linked sub-assembly's lines: they can be this window's own save, from another tab.</summary>
+    public static string LinesSavedSinceText(string name) =>
+        $"{name}'s lines were saved after you opened this product, so your changes weren't saved. They're still on the form: "
+        + "note them, press Revert to see what was saved, then make yours again.";
 
     /// <summary>"Someone else saved Pandesal after you opened it, …": what a refused save says, true of every screen's form.</summary>
     public static string SavedSinceText(string name) =>

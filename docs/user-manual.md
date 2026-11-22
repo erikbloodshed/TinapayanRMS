@@ -809,7 +809,7 @@ A section's changes go into the recipe when you leave its tab, or when you press
 
 A linked section has a badge saying where it's from. Click the badge to open the sub-assembly on its own screen. The pencil beside the badge lets you **link another sub-assembly in its place**, keeping this product's piece size and add-ins.
 
-- **Editing the lines** of a linked section changes the sub-assembly itself. Save asks first when other products also use it, because their recipes and costs change too.
+- **Editing the lines** of a linked section changes the sub-assembly itself. Save asks first when other products also use it, because their recipes and costs change too. If its lines have been saved from anywhere else since you opened the product (the Sub-Assemblies screen, another product's tab, another PC), Save is refused rather than write over them, and what you typed stays. A new name alone doesn't refuse it.
 - **The Add-Ins table** under the linked recipe's lines holds this product's own extras on top of the linked recipe, such as a colouring, a flavouring or an inclusion. Add-ins go into the batch but don't change the shared sub-assembly. An ingredient the linked recipe already has can't be added as an add-in.
 - **The add-ins badge**, over the top right corner of the linked recipe's lines, level with the badge saying where the section is from, tells you whether the product has add-ins: it reads **No add-ins**, or the count, such as **2 add-ins**. When there are some, click the badge (or Tab to it and press Enter) to jump down to the Add-Ins table. The **Go to top** badge over the Add-Ins table's top right corner takes you back up to the linked recipe's lines.
 - **Copy** makes a copy for this product alone, with the same lines, base ticks and typed percentages. Save keeps the copy named after this product and uses it instead. In a product-owned role the copy is the product's own. Otherwise it's saved on the Sub-Assemblies screen and linked.
@@ -1576,6 +1576,9 @@ Someone else signed in to Windows on this PC has TinapayanRMS open. Only one cop
 
 **"Someone else saved … after you opened it, so your changes weren't saved."**
 Another PC using the same database saved this product, raw material or sub-assembly while you had it open, and saving yours would have overwritten what they saved. What you typed is still on the form, and **Save** keeps refusing it. Note what you changed. Then go to another item in the list, or to another screen, and answer **No** when asked about saving your changes. Come back to the item: it now shows what they saved. On the Products screen, **Revert** does the same without leaving it. Make your changes again and press **Save**.
+
+**"…'s lines were saved after you opened this product, so your changes weren't saved."**
+You changed a linked sub-assembly's lines in a product's recipe, and that sub-assembly's lines were saved meanwhile: on the Sub-Assemblies screen, from another product's tab or on another PC. What you typed is still on the form. Note it, press **Revert** to see the lines saved, then make your changes again and press **Save**.
 
 **The password is forgotten.**
 Clear it, and the app asks for a new one. On the PC that holds the database, signed in to Windows as the app's user, open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Reset-Password.ps1`. It asks first; answer **y**. The next time the app opens, or its window is locked, it asks you to set a new password. Nothing else changes, the auto-lock's minutes included.

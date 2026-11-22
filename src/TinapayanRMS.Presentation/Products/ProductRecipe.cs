@@ -3,7 +3,6 @@ using System.Collections.Specialized;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
-using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.UseCases.Products;
@@ -658,62 +657,6 @@ public sealed class ProductRecipe : ObservableState
         _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == pickedRoleId);
     }
 
-    /// <summary>
-    /// <paramref name="snapshot"/>, an undo step's recipe, with its linked sections as a load just found them saved where
-    /// they're kept (as <see cref="ProductRecipeDraft.RefreshRows"/> brought them into the form), and the section form open on one of them
-    /// showing its lines as saved now, unless they're typed into there. What the product holds of its own (a piece size,
-    /// add-ins, lines edited here) stays as the step had it. An undo or a redo then never puts back a sub-assembly's lines as
-    /// they were before it was saved on the Sub-Assemblies screen.
-    /// </summary>
-    internal RecipeSnapshot WithLinkedAsSavedNow(RecipeSnapshot snapshot, IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
-    {
-        var ingredientsById = _ingredients.ToDictionary(m => m.Id);
-        var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
-        var linkedLinesById = linkedLines.ToLookup(l => l.SubAssemblyId);
-        var productId = _host.DetailProductId;
-        List<ProductUsageEdit> usages = [.. snapshot.Usages];
-        var form = snapshot.Form;
-        var changed = false;
-        for (var i = 0; i < usages.Count; i++)
-        {
-            var edit = usages[i];
-            if (!edit.IsLinked
-                || linkedById.GetValueOrDefault(edit.SubAssemblyId) is not { } saved
-                || (saved.OwnerProductId is { } ownerId && ownerId == productId))
-            {
-                continue;
-            }
-
-            var fresh = Draft.AsSavedNow(edit, saved, linkedLinesById, ingredientsById);
-            if (fresh.ShowsSameAs(edit))
-            {
-                continue;
-            }
-
-            usages[i] = fresh;
-            changed = true;
-            if (form is { IsAdding: false, EditingUsageIndex: { } at } && at == i && !edit.AreLinkedLinesEdited && form.ShowsLines(edit.Lines))
-            {
-                IReadOnlyList<IngredientLineSnapshot> lines =
-                    [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-                // The figure typed stays and the other follows the new batch, as the form's own does (FollowPieceSize).
-                var batchWeight = lines.Sum(l => l.Grams ?? 0m) + form.AddIns.Sum(l => l.Grams ?? 0m);
-                var typed = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : form.Yield;
-                var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(form.AuthoredField, typed, batchWeight);
-                form = form with
-                {
-                    Title = EditTitleOf(fresh),
-                    Lines = lines,
-                    FormulaBase = SubAssemblyRules.FormulaBaseWeight([.. lines.Select(l => (l.Grams ?? 0m, l.IsFormulaBase))]),
-                    WeightPerPiece = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : Math.Round(weightPerPiece, 2, MidpointRounding.ToEven),
-                    Yield = form.AuthoredField == UsageAuthoredField.Yield ? form.Yield : Math.Round(yield, 2, MidpointRounding.ToEven),
-                };
-            }
-        }
-
-        return changed ? snapshot with { Usages = usages, Form = form } : snapshot;
-    }
-
     /// <summary>The add form, fresh for its mode: a new sub-assembly's name, role and lines, or the pick of another product's.</summary>
     internal void StartUsageFormMode()
     {
@@ -1131,16 +1074,12 @@ public sealed class ProductRecipe : ObservableState
         }
     }
 
-    /// <summary>The section form's title over <paramref name="usage"/>: "Edit Dough", a linked one with where it's kept.</summary>
-    private static string EditTitleOf(ProductUsageEdit usage) =>
-        usage.IsEditable ? $"Edit {usage.SectionName}" : $"Edit {usage.SectionName} ({usage.LinkedFromText})";
-
     /// <summary>The form on <paramref name="usage"/>, as it was last applied: the whole of its tab.</summary>
     internal void OpenUsageForm(ProductUsageEdit usage)
     {
         _usageForm.EditingUsage = usage;
         _usageForm.IsAddingUsage = false;
-        _usageForm.UsageFormTitle = EditTitleOf(usage);
+        _usageForm.UsageFormTitle = usage.EditTitle;
         _usageForm.IsFormEditingLines = usage.IsEditable;
         _usageForm.IsFormPickingSource = false;
 
@@ -1243,25 +1182,28 @@ public sealed class ProductRecipe : ObservableState
         Usages = [.. UsageEdits],
         SelectedTab = CaptureTabChoice(),
         HasAddSubAssemblyTab = RecipeTabs.Contains(AddSubAssemblyTab),
-        Form = new SectionFormSnapshot
-        {
-            IsOpen = _usageForm.IsUsageFormOpen,
-            IsAdding = _usageForm.IsAddingUsage,
-            Title = _usageForm.UsageFormTitle,
-            Mode = _usageForm.EditingUsageMode,
-            IsEditingLines = _usageForm.IsFormEditingLines,
-            IsPickingSource = _usageForm.IsFormPickingSource,
-            EditingUsageIndex = _usageForm.EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
-            RoleId = _usageForm.EditingUsageRole?.Id,
-            Name = _usageForm.EditingUsageName,
-            SourceKey = _usageForm.EditingUsageSource?.Key,
-            Lines = [.. _usageForm.FormLines.Select(CaptureIngredientLine)],
-            AddIns = [.. _usageForm.FormAddIns.Select(CaptureIngredientLine)],
-            FormulaBase = _usageForm.FormFormulaBase,
-            AuthoredField = _usageForm.AuthoredField,
-            WeightPerPiece = _usageForm.EditingUsageWeightPerPiece,
-            Yield = _usageForm.EditingUsageYield,
-        },
+        Form = CaptureForm(),
+    };
+
+    /// <summary>The section form as it stands, for an undo step, and for a load to leave what's typed into it alone.</summary>
+    internal SectionFormSnapshot CaptureForm() => new()
+    {
+        IsOpen = _usageForm.IsUsageFormOpen,
+        IsAdding = _usageForm.IsAddingUsage,
+        Title = _usageForm.UsageFormTitle,
+        Mode = _usageForm.EditingUsageMode,
+        IsEditingLines = _usageForm.IsFormEditingLines,
+        IsPickingSource = _usageForm.IsFormPickingSource,
+        EditingUsageIndex = _usageForm.EditingUsage is { } editing && UsageEdits.IndexOf(editing) is var i and >= 0 ? i : null,
+        RoleId = _usageForm.EditingUsageRole?.Id,
+        Name = _usageForm.EditingUsageName,
+        SourceKey = _usageForm.EditingUsageSource?.Key,
+        Lines = [.. _usageForm.FormLines.Select(CaptureIngredientLine)],
+        AddIns = [.. _usageForm.FormAddIns.Select(CaptureIngredientLine)],
+        FormulaBase = _usageForm.FormFormulaBase,
+        AuthoredField = _usageForm.AuthoredField,
+        WeightPerPiece = _usageForm.EditingUsageWeightPerPiece,
+        Yield = _usageForm.EditingUsageYield,
     };
 
     private static IngredientLineSnapshot CaptureIngredientLine(IngredientLineRow row) =>

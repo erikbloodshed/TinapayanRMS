@@ -870,7 +870,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // while it showed the link as saved, and the recipe's sections.
         var (linkedSectionsChanged, linkedPackagingNow) = Draft.RebaseLinked(
             load.DetailProductId == _detailProductId && load is { SavedLink: { } savedLink, LinkedPackagingLines: { } lines } ? (savedLink, lines) : null,
-            read.LinkedSubAssemblies, read.LinkedLines);
+            read.LinkedSubAssemblies, read.LinkedLines, Recipe.CaptureForm());
 
         // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
         // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked
@@ -880,7 +880,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
             History.RewriteAll(snapshot => snapshot with
             {
                 Recipe = linkedSectionsChanged
-                    ? Recipe.WithLinkedAsSavedNow(snapshot.Recipe, read.LinkedSubAssemblies, read.LinkedLines)
+                    ? Recipe.Draft.StepAsSavedNow(snapshot.Recipe, read.LinkedSubAssemblies, read.LinkedLines)
                     : snapshot.Recipe,
                 Packaging = linkedPackagingNow is { } now && snapshot.Packaging.Link?.Key == now.Link?.Key && !snapshot.Packaging.IsMoving
                     ? snapshot.Packaging with { Link = now.Link, Lines = now.Lines }

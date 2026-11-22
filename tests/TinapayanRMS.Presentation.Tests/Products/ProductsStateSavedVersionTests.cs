@@ -266,6 +266,86 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     });
 
     [Test]
+    [Arguments(false, false)]
+    [Arguments(false, true)]
+    [Arguments(true, false)]
+    [Arguments(true, true)]
+    public Task A_linked_ones_lines_saved_since_refuse_the_Save_that_changed_them_here(bool isApplied, bool loads) => UiThread.RunAsync(async () =>
+    {
+        var (state, linkedId, roleId, flourId, butterId, sugarId) = await EditingALinkedOnesLinesAsync();
+        if (isApplied)
+        {
+            state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+        }
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Id = linkedId, Name = "House Dough", RoleId = roleId }, [(flourId, 1000m), (sugarId, 100m)], Cancellation);
+        if (loads)
+        {
+            await state.LoadCommand.ExecuteAsync();
+        }
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.LinesSavedSinceText("House Dough"));
+        (await StoredLinesAsync(linkedId)).Should().Equal((flourId, 1000m), (sugarId, 100m));
+        state.Recipe.UsageEdits.Single().Lines.Select(l => l.Ingredient.Id).Should().Equal([flourId, butterId], "what's typed stays");
+
+        // As often as it's pressed, the refusal's own load included.
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.LinesSavedSinceText("House Dough"));
+        (await StoredLinesAsync(linkedId)).Should().Equal((flourId, 1000m), (sugarId, 100m));
+
+        // Revert shows what was saved, and an edit made from that saves.
+        await state.RevertCommand.ExecuteAsync();
+        await ShowingAsync(state, state.SelectedProduct!.Id);
+        await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
+        state.UsageForm.FormLines.Select(l => (l.IngredientId, l.Grams)).Should().Equal((flourId, 1000m), (sugarId, 100m));
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(linkedId)).Should().Equal((flourId, 1000m), (sugarId, 100m), (butterId, 250m));
+    });
+
+    [Test]
+    public Task A_linked_one_renamed_since_doesnt_refuse_its_lines_changed_here() => UiThread.RunAsync(async () =>
+    {
+        var (state, linkedId, _, flourId, butterId, _) = await EditingALinkedOnesLinesAsync();
+
+        await new SubAssemblyRepository(CreateDbContextFactory()).RenameAsync(linkedId, "Soft Dough", [], Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull("only the lines are written there, and nobody else saved those");
+        (await StoredLinesAsync(linkedId)).Should().Equal((flourId, 1000m), (butterId, 250m));
+    });
+
+    [Test]
+    public Task An_undo_of_lines_changed_here_shows_them_as_saved_since_and_an_edit_from_there_saves() => UiThread.RunAsync(async () =>
+    {
+        var (state, linkedId, roleId, flourId, butterId, sugarId) = await EditingALinkedOnesLinesAsync();
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+        await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Id = linkedId, Name = "House Dough", RoleId = roleId }, [(flourId, 1000m), (sugarId, 100m)], Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+
+        while (state.TryUndo())
+        {
+        }
+
+        state.UsageForm.FormLines.Select(l => (l.IngredientId, l.Grams)).Should().Equal((flourId, 1000m), (sugarId, 100m));
+        state.History.IsDirty.Should().BeFalse("all that was typed is undone");
+
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull("it was made from the lines as saved now");
+        (await StoredLinesAsync(linkedId)).Should().Equal((flourId, 1000m), (sugarId, 100m), (butterId, 250m));
+    });
+
+    [Test]
     public Task A_rename_from_the_screens_own_list_doesnt_refuse_what_is_typed() => UiThread.RunAsync(async () =>
     {
         var id = await SaveProductAsync("Mamon");
@@ -531,6 +611,28 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         variant.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
         await variant.SaveCommand.ExecuteAsync();
         variant.ErrorMessage.Should().BeNull();
+    }
+
+    /// <summary>A product linking House Dough, with butter typed into that section's form as the form brackets it.</summary>
+    private async Task<(ProductForm State, int LinkedId, int RoleId, int FlourId, int ButterId, int SugarId)> EditingALinkedOnesLinesAsync()
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.06m);
+        var linkedId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = roleId }, [(flourId, 1000m)], Cancellation);
+        var id = await AddProductAsync("Loaf");
+        await SaveRecipeAsync(id, new RecipeDraft([], [new LinkedUsageDraft(linkedId, UsageAuthoredField.WeightPerPiece, 60m)]));
+
+        var state = await OpenedStateAsync(id);
+        state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        state.UsageForm.IsEditingLinkedUsage.Should().BeTrue("a product opens on its first section");
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
+        recorder.EndUndoStep();
+        return (state, linkedId, roleId, flourId, butterId, sugarId);
     }
 
     private async Task<(string Name, string? Description)> StoredAsync(int id)
