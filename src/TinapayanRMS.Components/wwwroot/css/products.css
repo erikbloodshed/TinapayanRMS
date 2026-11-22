@@ -518,6 +518,11 @@
     overflow: auto;
 }
 
+/* The chart's own height (History.razor): its element is 100% of this box, which keeps it off the buttons below. */
+.history-trend-chart {
+    height: 240px;
+}
+
 .history-actions {
     justify-content: flex-end;
 }

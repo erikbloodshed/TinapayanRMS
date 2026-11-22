@@ -75,26 +75,30 @@
 
         <div class="history-trend">
             <h2 class="section-header">Cost Over Time</h2>
+            @* The chart in a box of its own height: Syncfusion sizes the chart's element to 100% of its parent, and here, under
+               the heading, it hung past the box over Print Version and Restore, and took their clicks. *@
             @if (Versions.IsTrendShown)
             {
-                <SfChart Height="240px" Width="100%">
-                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
-                    <ChartPrimaryYAxis LabelFormat="N2" />
-                    <ChartTooltipSettings Enable="true" Format="${series.name} ${point.x}: ${point.y}" />
-                    <ChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
-                    <ChartSeriesCollection>
-                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.BaseCost)" Name="Base Cost" Type="ChartSeriesType.Line" Fill="#fe640b">
-                            <ChartMarker Visible="true" />
-                        </ChartSeries>
-                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.SuggestedPrice)" Name="Suggested Price" Type="ChartSeriesType.Line" Fill="#179299">
-                            <ChartMarker Visible="true" />
-                        </ChartSeries>
-                        <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.CurrentPrice)" Name="Current Price" Type="ChartSeriesType.Line" Fill="#8839ef">
-                            <ChartMarker Visible="true" />
-                            <ChartEmptyPointSettings Mode="EmptyPointMode.Gap" />
-                        </ChartSeries>
-                    </ChartSeriesCollection>
-                </SfChart>
+                <div class="history-trend-chart">
+                    <SfChart Height="240px" Width="100%">
+                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category" />
+                        <ChartPrimaryYAxis LabelFormat="N2" />
+                        <ChartTooltipSettings Enable="true" Format="${series.name} ${point.x}: ${point.y}" />
+                        <ChartLegendSettings Visible="true" Position="LegendPosition.Bottom" />
+                        <ChartSeriesCollection>
+                            <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.BaseCost)" Name="Base Cost" Type="ChartSeriesType.Line" Fill="#fe640b">
+                                <ChartMarker Visible="true" />
+                            </ChartSeries>
+                            <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.SuggestedPrice)" Name="Suggested Price" Type="ChartSeriesType.Line" Fill="#179299">
+                                <ChartMarker Visible="true" />
+                            </ChartSeries>
+                            <ChartSeries DataSource="Versions.Trend" XName="@nameof(VersionTrendPoint.Label)" YName="@nameof(VersionTrendPoint.CurrentPrice)" Name="Current Price" Type="ChartSeriesType.Line" Fill="#8839ef">
+                                <ChartMarker Visible="true" />
+                                <ChartEmptyPointSettings Mode="EmptyPointMode.Gap" />
+                            </ChartSeries>
+                        </ChartSeriesCollection>
+                    </SfChart>
+                </div>
             }
             @if (Versions.IsTrendHintShown)
             {
