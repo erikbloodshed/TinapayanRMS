@@ -337,7 +337,7 @@ Each role has:
 
 - **Name**: what the section is called in a recipe, such as Dough or Filling.
 - **Order**: where the role's sections go in a recipe. Lower numbers come first. A new role goes last. To change a role's place, pick it in the list and press **Move Up** or **Move Down** above the list. The roles are numbered 1, 2, 3… again after a move or a delete, so there are no gaps.
-- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it, except its variants. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move.
+- **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it, except its variants. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move. A section of one that you were changing in a product keeps what you typed, and that product's **Save** is refused until you press **Revert** and make the change again.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
   - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
@@ -1579,6 +1579,9 @@ Another PC using the same database saved this product, raw material or sub-assem
 
 **"…'s lines were saved after you opened this product, so your changes weren't saved."**
 You changed a linked sub-assembly's lines in a product's recipe, and that sub-assembly's lines were saved meanwhile: on the Sub-Assemblies screen, from another product's tab or on another PC. What you typed is still on the form. Note it, press **Revert** to see the lines saved, then make your changes again and press **Save**.
+
+**"… became this product's own after you opened this product, …"** or **"… moved to the Sub-Assemblies screen after you opened this product, …"**
+**Product-owned** was turned on or off in Settings ▸ Roles for the role of a section you were changing or had taken out. Nothing was saved, and what you typed is still on the form. Note it, press **Revert** to see the section as it is now, then make your changes again and press **Save**.
 
 **The password is forgotten.**
 Clear it, and the app asks for a new one. On the PC that holds the database, signed in to Windows as the app's user, open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Reset-Password.ps1`. It asks first; answer **y**. The next time the app opens, or its window is locked, it asks you to set a new password. Nothing else changes, the auto-lock's minutes included.

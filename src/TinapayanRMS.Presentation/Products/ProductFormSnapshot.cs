@@ -226,6 +226,22 @@ public sealed record SectionFormSnapshot
     public bool HasLinesTypedInto(int index, ProductUsageEdit section) =>
         IsOpen && !IsAdding && EditingUsageIndex == index && !ShowsLines(section.Lines);
 
+    /// <summary>
+    /// Whether anything is typed into the form over <paramref name="section"/>, the <paramref name="index"/>th of the
+    /// recipe's, and not applied: lines, add-ins, the piece size, and, for one that's not linked, its role and name.
+    /// </summary>
+    public bool IsTypedInto(int index, ProductUsageEdit section) =>
+        HasLinesTypedInto(index, section)
+        || (IsOpen && !IsAdding && EditingUsageIndex == index
+            && (!ShowsAddIns(section.AddIns)
+                || AuthoredField != section.AuthoredField
+                || (AuthoredField == UsageAuthoredField.WeightPerPiece ? WeightPerPiece : Yield) != section.AuthoredValue
+                || (!section.IsLinked && (RoleId != section.Role?.Id || Name != section.Name))));
+
+    private bool ShowsAddIns(IReadOnlyList<SectionLine> addIns) =>
+        AddIns.Count == addIns.Count
+        && AddIns.Zip(addIns).All(pair => pair.First.IngredientId == pair.Second.Ingredient.Id && pair.First.Grams == pair.Second.Grams);
+
     /// <summary>The form looks the same: every field, its lines and add-ins line by line.</summary>
     public bool ShowsSameAs(SectionFormSnapshot other) =>
         IsOpen == other.IsOpen

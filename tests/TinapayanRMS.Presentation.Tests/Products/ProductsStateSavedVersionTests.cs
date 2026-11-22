@@ -346,6 +346,159 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
     });
 
     [Test]
+    [Arguments(true, false, true)]
+    [Arguments(true, false, false)]
+    [Arguments(true, true, true)]
+    [Arguments(true, true, false)]
+    [Arguments(false, false, true)]
+    [Arguments(false, false, false)]
+    [Arguments(false, true, true)]
+    [Arguments(false, true, false)]
+    public Task A_roles_Product_owned_changed_since_keeps_lines_changed_here_and_refuses_the_Save(bool startsOwned, bool isApplied, bool loads) => UiThread.RunAsync(async () =>
+    {
+        var (state, sectionId, roleId, flourId, butterId) = await OpenedOnASectionAsync(startsOwned);
+        Edit(state, () => state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+        if (isApplied)
+        {
+            state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+        }
+
+        await SetProductOwnedAsync(roleId, !startsOwned);
+        if (loads)
+        {
+            await state.LoadCommand.ExecuteAsync();
+            var lines = isApplied
+                ? state.Recipe.UsageEdits.Single().Lines.Select(l => (int?)l.Ingredient.Id)
+                : state.UsageForm.FormLines.Select(l => l.IngredientId);
+            lines.Should().Equal([flourId, butterId], "a load changes nothing typed");
+        }
+
+        await state.SaveCommand.ExecuteAsync();
+
+        var refusal = SavedVersionRules.OwnershipChangedText("Loaf Topping", isOwnNow: !startsOwned);
+        state.ErrorMessage.Should().Be(refusal);
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m));
+        state.Recipe.UsageEdits.Single().Lines.Select(l => l.Ingredient.Id).Should().Equal([flourId, butterId], "what's typed stays");
+
+        // As often as it's pressed, the refusal's own load included.
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(refusal);
+
+        // Revert shows it as whose it is now, and the same edit made again saves.
+        await state.RevertCommand.ExecuteAsync();
+        await ShowingAsync(state, state.SelectedProduct!.Id);
+        state.Recipe.UsageEdits.Single().IsOwned.Should().Be(!startsOwned);
+        await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
+        Edit(state, () => state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m), (butterId, 250m));
+    });
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task A_roles_Product_owned_changed_since_keeps_a_piece_size_still_in_the_sections_form(bool startsOwned) => UiThread.RunAsync(async () =>
+    {
+        var (state, _, roleId, _, _) = await OpenedOnASectionAsync(startsOwned);
+        Edit(state, () => state.UsageForm.TypeWeightPerPiece(75m));
+
+        await SetProductOwnedAsync(roleId, !startsOwned);
+        await state.LoadCommand.ExecuteAsync();
+
+        state.UsageForm.EditingUsageWeightPerPiece.Should().Be(75m);
+        state.History.IsDirty.Should().BeTrue();
+    });
+
+    [Test]
+    public Task A_roles_Product_owned_unticked_since_keeps_a_name_typed_for_the_section() => UiThread.RunAsync(async () =>
+    {
+        var (state, _, roleId, _, _) = await OpenedOnASectionAsync(startsOwned: true);
+        Edit(state, () => state.UsageForm.EditingUsageName = "Crumb");
+
+        await SetProductOwnedAsync(roleId, false);
+        await state.LoadCommand.ExecuteAsync();
+
+        state.UsageForm.EditingUsageName.Should().Be("Crumb");
+        state.UsageForm.IsFormEditingLines.Should().BeTrue("it stays as it's being edited until it's reverted");
+    });
+
+    [Test]
+    public Task A_roles_Product_owned_ticked_since_keeps_add_ins_typed_for_the_linked_section() => UiThread.RunAsync(async () =>
+    {
+        var (state, _, roleId, _, butterId) = await OpenedOnASectionAsync(startsOwned: false);
+        Edit(state, () => state.UsageForm.FormAddIns.Add(new IngredientLineRow { IngredientId = butterId, Grams = 40m }));
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+
+        await SetProductOwnedAsync(roleId, true);
+        await state.LoadCommand.ExecuteAsync();
+
+        state.Recipe.UsageEdits.Single().AddIns.Select(l => l.Ingredient.Id).Should().Equal(butterId);
+    });
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task A_linked_section_taken_out_and_made_the_products_own_since_isnt_deleted_by_the_Save(bool loads) => UiThread.RunAsync(async () =>
+    {
+        var (state, sectionId, roleId, flourId, _) = await OpenedOnASectionAsync(startsOwned: false);
+        await state.Recipe.RemoveUsageCommand.ExecuteAsync();
+
+        await SetProductOwnedAsync(roleId, true);
+        if (loads)
+        {
+            await state.LoadCommand.ExecuteAsync();
+        }
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.OwnershipChangedText("Loaf Topping", isOwnNow: true));
+        (await StoredLinesAsync(sectionId)).Should().Equal([(flourId, 1000m)], "taking a linked one out never deletes it");
+    });
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task A_roles_Product_owned_changed_since_turns_a_section_nothing_is_typed_into(bool startsOwned) => UiThread.RunAsync(async () =>
+    {
+        var (state, sectionId, roleId, flourId, _) = await OpenedOnASectionAsync(startsOwned);
+        TypeDescription(state, "Toasted");
+
+        await SetProductOwnedAsync(roleId, !startsOwned);
+        await state.LoadCommand.ExecuteAsync();
+
+        state.Recipe.UsageEdits.Single().IsOwned.Should().Be(!startsOwned);
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m));
+        state.Recipe.UsageEdits.Single().IsOwned.Should().Be(!startsOwned);
+    });
+
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task An_undo_of_what_was_changed_in_the_section_lets_the_next_load_show_whose_it_is_now(bool startsOwned) => UiThread.RunAsync(async () =>
+    {
+        var (state, _, roleId, flourId, butterId) = await OpenedOnASectionAsync(startsOwned);
+        Edit(state, () => state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+        await SetProductOwnedAsync(roleId, !startsOwned);
+        await state.LoadCommand.ExecuteAsync();
+
+        while (state.TryUndo())
+        {
+        }
+
+        state.History.IsDirty.Should().BeFalse("all that was typed is undone");
+        await state.LoadCommand.ExecuteAsync();
+
+        state.Recipe.UsageEdits.Single().IsOwned.Should().Be(!startsOwned);
+        state.UsageForm.FormLines.Select(l => l.IngredientId).Should().Equal(flourId);
+    });
+
+    [Test]
     public Task A_rename_from_the_screens_own_list_doesnt_refuse_what_is_typed() => UiThread.RunAsync(async () =>
     {
         var id = await SaveProductAsync("Mamon");
@@ -634,6 +787,34 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         recorder.EndUndoStep();
         return (state, linkedId, roleId, flourId, butterId, sugarId);
     }
+
+    /// <summary>Loaf open on its topping's section: its own, or linked from the Sub-Assemblies screen, as the role has it.</summary>
+    private async Task<(ProductForm State, int SectionId, int RoleId, int FlourId, int ButterId)> OpenedOnASectionAsync(bool startsOwned)
+    {
+        var roleId = await AddRoleAsync("Topping", isProductOwned: startsOwned);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (id, sectionId) = await AddProductWithSubAssemblyAsync("Loaf", roleId, [(flourId, 1000m)], weightPerPiece: 60m);
+
+        var state = await OpenedStateAsync(id);
+        state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        state.UsageForm.IsUsageFormOpen.Should().BeTrue("a product opens on its first section");
+        return (state, sectionId, roleId, flourId, butterId);
+    }
+
+    /// <summary>One edit in the form, as a field or a cell brackets it in the app.</summary>
+    private static void Edit(ProductForm state, Action edit)
+    {
+        var recorder = (IUndoRecorder)state;
+        recorder.BeginUndoStep();
+        edit();
+        recorder.EndUndoStep();
+    }
+
+    /// <summary>Product-owned ticked or unticked for the role in Settings.</summary>
+    private Task SetProductOwnedAsync(int roleId, bool isProductOwned) =>
+        new SubAssemblyRoleRepository(CreateDbContextFactory()).UpdateAsync(
+            new SubAssemblyRole { Id = roleId, Name = "Topping", IsProductOwned = isProductOwned }, Cancellation);
 
     private async Task<(string Name, string? Description)> StoredAsync(int id)
     {

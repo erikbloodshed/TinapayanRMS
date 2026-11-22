@@ -105,6 +105,28 @@ public class ProductRecipeDraftTests
         }, iter: 300);
 
     [Test]
+    public void A_section_changed_here_stays_as_changed_when_its_ownership_changes_elsewhere() =>
+        Gen.Select(Steps.Array[0, 30], Gen.Int[4, 5]).Sample((steps, kind) =>
+        {
+            var world = new World();
+            foreach (var step in steps)
+            {
+                world.Apply(step);
+            }
+
+            // The dough of its own released (4), or the icing it links made its own (5).
+            var id = kind == 4 ? 51 : 41;
+            var before = world.Capture().FirstOrDefault(u => u.SubAssemblyId == id);
+            var start = world.Start.FirstOrDefault(u => u.SubAssemblyId == id);
+            world.Apply(new ChangedElsewhere(kind));
+
+            if (before is not null && start is not null && Saved(before) != Saved(start))
+            {
+                Saved(world.Capture().Single(u => u.SubAssemblyId == id)).Should().Be(Saved(before), "a load changes nothing typed (ADR 0007)");
+            }
+        }, iter: 300);
+
+    [Test]
     public void A_recipe_that_saves_as_loaded_is_as_saved() =>
         Steps.Array[0, 40].Sample(steps =>
         {
@@ -191,7 +213,8 @@ public class ProductRecipeDraftTests
 
     /// <summary>
     /// A load bringing what was saved elsewhere since: the butter icing's lines changed (0), the ube filling renamed (1) or put
-    /// in the Topping role (2), or the cheese filling's role made product-owned, so this product owns it (3).
+    /// in the Topping role (2), or the cheese filling's role made product-owned, so this product owns it (3). Only where
+    /// a test says: the dough's role no longer product-owned (4), or the butter icing's made so (5).
     /// </summary>
     private sealed record ChangedElsewhere(int Kind) : Step;
 
@@ -437,8 +460,10 @@ public class ProductRecipeDraftTests
             // What was saved elsewhere since stays saved: each later load reads it too.
             var ubeMoved = _changedElsewhere.Contains(2);
             _kept.Clear();
-            _kept.Add(new SubAssembly { Id = 51, Name = "Ube Loaf Dough", RoleId = 31, Role = Roles[0], OwnerProductId = ProductId });
-            _kept.Add(new SubAssembly { Id = 41, Name = "Butter Icing", RoleId = 33, Role = Roles[2] });
+            int? doughOwner = _changedElsewhere.Contains(4) ? null : ProductId;
+            int? icingOwner = _changedElsewhere.Contains(5) ? ProductId : null;
+            _kept.Add(new SubAssembly { Id = 51, Name = "Ube Loaf Dough", RoleId = 31, Role = Roles[0], OwnerProductId = doughOwner });
+            _kept.Add(new SubAssembly { Id = 41, Name = "Butter Icing", RoleId = 33, Role = Roles[2], OwnerProductId = icingOwner });
             _kept.Add(new SubAssembly
             {
                 Id = 42, Name = _changedElsewhere.Contains(1) ? "Ube Halaya Filling" : "Ube Filling", RoleId = ubeMoved ? 33 : 32, Role = Roles[ubeMoved ? 2 : 1],

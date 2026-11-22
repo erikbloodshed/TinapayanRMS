@@ -77,9 +77,42 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
     /// </summary>
     internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
     {
+        await EnsureOwnershipNotChangedSinceAsync(dbContext, productId, recipe, cancellationToken);
         await EnsureLinkedLinesNotSavedSinceAsync(dbContext, recipe, cancellationToken);
         await SetRecipeAsync(dbContext, productId, recipe, linksOthersOwn: false, cancellationToken);
         await StampOwnersOfRelinedAsync(dbContext, productId, recipe, cancellationToken);
+    }
+
+    /// <summary>
+    /// Before anything of the recipe is written: whose each sub-assembly is, is as the recipe has it. A role's
+    /// Product-owned changed in Settings moves them without a save of the product, so its saved time can't say. One the
+    /// recipe keeps as the product's own can have gone to the Sub-Assemblies screen; one it links, or linked and took out
+    /// (RecipeDraft.OwnTaken), can have become the product's own, which SetRecipeAsync would delete as one taken out.
+    /// </summary>
+    private static async Task EnsureOwnershipNotChangedSinceAsync(
+        TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
+    {
+        List<int> keptOwnIds = [.. recipe.New.Where(n => n.Id > 0).Select(n => n.Id)];
+        var stored = await dbContext.SubAssemblies
+            .Where(s => keptOwnIds.Contains(s.Id)
+                || (s.OwnerProductId == productId
+                    && dbContext.ProductSubAssemblyUsages.Any(u => u.ProductId == productId && u.SubAssemblyId == s.Id)))
+            .Select(s => new { s.Id, s.Name, s.OwnerProductId })
+            .ToListAsync(cancellationToken);
+        foreach (var subAssembly in stored)
+        {
+            if (subAssembly.OwnerProductId is null)
+            {
+                throw new SavedSinceException(SavedVersionRules.OwnershipChangedText(subAssembly.Name, isOwnNow: false));
+            }
+
+            if (subAssembly.OwnerProductId == productId
+                && !keptOwnIds.Contains(subAssembly.Id)
+                && (recipe.Linked.Any(l => l.SubAssemblyId == subAssembly.Id) || recipe.OwnTaken?.Contains(subAssembly.Id) == false))
+            {
+                throw new SavedSinceException(SavedVersionRules.OwnershipChangedText(subAssembly.Name, isOwnNow: true));
+            }
+        }
     }
 
     /// <summary>

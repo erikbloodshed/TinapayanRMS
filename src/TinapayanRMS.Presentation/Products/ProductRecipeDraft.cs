@@ -144,10 +144,12 @@ public sealed class ProductRecipeDraft : ObservableState
     /// Points the recipe's sections, saved or not, at the refreshed ingredients and roles, and a linked
     /// section at its refreshed sub-assembly and lines, keeping each section's own piece size, so costs
     /// changed on other tabs reach the recipe and the cost summary. Only a section that shows something
-    /// different is rebuilt. The screen points the packaging rows at their refreshed materials the same way after. True when
+    /// different is rebuilt. One whose role was made product-owned, or no longer, is the product's own now, or linked, but
+    /// not while it's changed here (<see cref="IsChangedHere"/>): it stays as it's being edited, and Save is refused (ADR
+    /// 0007). The screen points the packaging rows at their refreshed materials the same way after. True when
     /// a linked section came in changed from where it's kept, which the undo history then follows (<see cref="StepAsSavedNow"/>).
     /// </summary>
-    /// <param name="form">The section form as it stands: lines typed into it keep the ones they were changed from.</param>
+    /// <param name="form">The section form as it stands: what's typed into it is changed here too, applied or not.</param>
     internal bool RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines, SectionFormSnapshot? form = null)
     {
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
@@ -164,7 +166,11 @@ public sealed class ProductRecipeDraft : ObservableState
             ProductUsageEdit fresh;
             var saved = edit.SubAssemblyId > 0 ? linkedById.GetValueOrDefault(edit.SubAssemblyId) : null;
             var isOwnNow = saved is not null && saved.OwnerProductId is { } ownerId && ownerId == productId;
-            if (saved is not null && edit.IsLinked && isOwnNow)
+            if (saved is not null && edit.IsOwned != isOwnNow && IsChangedHere(edit, i, form))
+            {
+                fresh = edit.WithIngredients(lines => Repriced(lines, ingredientsById));
+            }
+            else if (saved is not null && edit.IsLinked && isOwnNow)
             {
                 // Its role was made product-owned: the product owns it now, with any add-ins it had merged into its lines.
                 var role = roles.FirstOrDefault(r => r.Id == saved.RoleId) ?? saved.Role;
@@ -215,6 +221,23 @@ public sealed class ProductRecipeDraft : ObservableState
         }
 
         return linkedChanged;
+    }
+
+    /// <summary>
+    /// Whether a saved section holds a change of the user's: something Save would write of it that isn't as the recipe was
+    /// saved, or something typed into its form and not applied yet. A linked one the saved recipe doesn't link (a version
+    /// put back links it) holds one only once its lines are changed here.
+    /// </summary>
+    private bool IsChangedHere(ProductUsageEdit edit, int index, SectionFormSnapshot? form)
+    {
+        if (form?.IsTypedInto(index, edit) == true)
+        {
+            return true;
+        }
+
+        return edit.IsLinked
+            ? (_savedRecipe.Linked.FirstOrDefault(l => l.SubAssemblyId == edit.SubAssemblyId) is { } linked ? !SavesSame(LinkedDraftOf(edit), linked) : edit.AreLinkedLinesEdited)
+            : _savedRecipe.New.FirstOrDefault(n => n.Id == edit.SubAssemblyId) is not { } own || !SavesSame(OwnDraftOf(edit), own);
     }
 
     /// <summary>
@@ -410,32 +433,38 @@ public sealed class ProductRecipeDraft : ObservableState
     /// products, each with how many go in (a line half filled in is refused: ProductComponentRow.CompleteLines).
     /// </summary>
     internal RecipeDraft CurrentDraft() =>
-        new(
-            [.. UsageEdits.Where(u => u.IsEditable).Select(u => new NewSubAssemblyDraft(
-                u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
-            {
-                // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
-                Id = u.SubAssemblyId,
-                Placement = u.ToMadeIngredient is { } made ? new SectionPlacement.MoveToInHouse(made)
-                    : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
-                    : u.IsOwned ? new SectionPlacement.ProductsOwn()
-                    : new SectionPlacement.ByRole(),
-            })],
-            [.. UsageEdits.Where(u => u.IsLinked).Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
-            {
-                AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
-
-                // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
-                // screen has changed since; and with those, the lines they were changed from, so it's refused over others.
-                Lines = u.AreLinkedLinesEdited
-                    ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
-                    : null,
-                LinesTaken = u.AreLinkedLinesEdited
-                    ? [.. u.LinesTaken.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
-                    : null,
-            })])
+        new([.. UsageEdits.Where(u => u.IsEditable).Select(OwnDraftOf)], [.. UsageEdits.Where(u => u.IsLinked).Select(LinkedDraftOf)])
         {
             Components = _host.IsEditingComposite ? [.. ProductComponentRow.CompleteLines(_components.ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
+            OwnTaken = SavedOwnSectionIds,
+        };
+
+    /// <summary>A section whose lines the form edits, the product's own or a new one, as Save writes it.</summary>
+    private static NewSubAssemblyDraft OwnDraftOf(ProductUsageEdit u) =>
+        new(u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
+        {
+            // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
+            Id = u.SubAssemblyId,
+            Placement = u.ToMadeIngredient is { } made ? new SectionPlacement.MoveToInHouse(made)
+                : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
+                : u.IsOwned ? new SectionPlacement.ProductsOwn()
+                : new SectionPlacement.ByRole(),
+        };
+
+    /// <summary>A linked section as Save writes it.</summary>
+    private static LinkedUsageDraft LinkedDraftOf(ProductUsageEdit u) =>
+        new(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
+        {
+            AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
+
+            // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
+            // screen has changed since; and with those, the lines they were changed from, so it's refused over others.
+            Lines = u.AreLinkedLinesEdited
+                ? [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
+                : null,
+            LinesTaken = u.AreLinkedLinesEdited
+                ? [.. u.LinesTaken.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))]
+                : null,
         };
 
     /// <summary>Whether <paramref name="draft"/> would save the recipe as it was loaded (IsSameRecipe), so Save needn't write it.</summary>
@@ -450,21 +479,24 @@ public sealed class ProductRecipeDraft : ObservableState
     private static bool IsSameRecipe(RecipeDraft a, RecipeDraft b) =>
         a.Components.SequenceEqual(b.Components)
         && a.Linked.Count == b.Linked.Count
-        && a.Linked.Zip(b.Linked).All(pair =>
-            pair.First.SubAssemblyId == pair.Second.SubAssemblyId
-            && pair.First.AuthoredField == pair.Second.AuthoredField
-            && pair.First.AuthoredValue == pair.Second.AuthoredValue
-            && pair.First.AddIns.SequenceEqual(pair.Second.AddIns)
-            && (pair.First.Lines is null) == (pair.Second.Lines is null)
-            && (pair.First.Lines ?? []).SequenceEqual(pair.Second.Lines ?? []))
+        && a.Linked.Zip(b.Linked).All(pair => SavesSame(pair.First, pair.Second))
         && a.New.Count == b.New.Count
-        && a.New.Zip(b.New).All(pair =>
-            pair.First.Id == pair.Second.Id
-            && pair.First.Placement == pair.Second.Placement
+        && a.New.Zip(b.New).All(pair => SavesSame(pair.First, pair.Second));
 
-            && pair.First.RoleId == pair.Second.RoleId
-            && pair.First.SectionName == pair.Second.SectionName
-            && pair.First.AuthoredField == pair.Second.AuthoredField
-            && pair.First.AuthoredValue == pair.Second.AuthoredValue
-            && pair.First.Lines.SequenceEqual(pair.Second.Lines));
+    private static bool SavesSame(LinkedUsageDraft a, LinkedUsageDraft b) =>
+        a.SubAssemblyId == b.SubAssemblyId
+        && a.AuthoredField == b.AuthoredField
+        && a.AuthoredValue == b.AuthoredValue
+        && a.AddIns.SequenceEqual(b.AddIns)
+        && (a.Lines is null) == (b.Lines is null)
+        && (a.Lines ?? []).SequenceEqual(b.Lines ?? []);
+
+    private static bool SavesSame(NewSubAssemblyDraft a, NewSubAssemblyDraft b) =>
+        a.Id == b.Id
+        && a.Placement == b.Placement
+        && a.RoleId == b.RoleId
+        && a.SectionName == b.SectionName
+        && a.AuthoredField == b.AuthoredField
+        && a.AuthoredValue == b.AuthoredValue
+        && a.Lines.SequenceEqual(b.Lines);
 }

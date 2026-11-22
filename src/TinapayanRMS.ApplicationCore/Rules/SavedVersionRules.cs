@@ -70,8 +70,17 @@ public static class SavedVersionRules
     }
 
     /// <summary>What a product's refused Save says of a linked sub-assembly's lines: they can be this window's own save, from another tab.</summary>
-    public static string LinesSavedSinceText(string name) =>
-        $"{name}'s lines were saved after you opened this product, so your changes weren't saved. They're still on the form: "
+    public static string LinesSavedSinceText(string name) => RecipeSavedSinceText($"{name}'s lines were saved");
+
+    /// <summary>
+    /// What a product's refused Save says of <paramref name="name"/>, made the product's own since the form took it
+    /// (<paramref name="isOwnNow"/>), or no longer its own: its role's Product-owned was changed in Settings.
+    /// </summary>
+    public static string OwnershipChangedText(string name, bool isOwnNow) =>
+        RecipeSavedSinceText(isOwnNow ? $"{name} became this product's own" : $"{name} moved to the Sub-Assemblies screen");
+
+    private static string RecipeSavedSinceText(string happened) =>
+        $"{happened} after you opened this product, so your changes weren't saved. They're still on the form: "
         + "note them, press Revert to see what was saved, then make yours again.";
 
     /// <summary>"Someone else saved Pandesal after you opened it, …": what a refused save says, true of every screen's form.</summary>

@@ -823,8 +823,8 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     {
         // A role made product-owned in Settings, or no longer, since the product was loaded: a section it linked is its own
         // now, or one of its own is linked now. With nothing typed into the form, the product is read again, so what Save
-        // compares against is how it's saved now; with something typed, RefreshRows turns the section round in place, and
-        // the next Save writes it as it shows.
+        // compares against is how it's saved now; with something typed, RefreshRows turns round in place a section with none
+        // of it, which the next Save writes as it shows, and leaves one changed here as it is, which Save refuses (ADR 0007).
         var detailProductId = load.DetailProductId;
         var ownershipChanged = Recipe.UsageEdits.Any(u => read.LinkedSubAssemblies.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved
             && (saved.OwnerProductId is not null && saved.OwnerProductId == detailProductId) != u.IsOwned);
