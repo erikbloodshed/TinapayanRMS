@@ -15,7 +15,7 @@
     <SyncfusionVersion>35.2.12</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
-    <PackageVersion Include="Dapper" Version="2.1.89" />
+    <PackageVersion Include="Dapper" Version="2.1.100" />
     <PackageVersion Include="DynamicData" Version="9.5.0" />
     <!-- The snake_case table and column names (UseSnakeCaseNamingConvention): on EF Core's major release, as EFCoreVersion says. -->
     <PackageVersion Include="EFCore.NamingConventions" Version="11.0.0" />
