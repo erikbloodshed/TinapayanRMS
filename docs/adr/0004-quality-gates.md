@@ -1,6 +1,9 @@
 # 0004. Quality gates the build enforces
 
-**Status:** Accepted, 2026-11-20.
+**Status:** Accepted, 2026-11-20. Its text was edited after (the file-size gate, local CI), as
+[ADR 0009](0009-close-the-migration.md) records. Partly superseded by [ADR 0010](0010-the-gates-read-method-bodies.md):
+what the gates check (the banned APIs, the doubles, data access, the code metrics' reach) and the rejection of
+ArchUnitNET and NetArchTest. The ratchet stands.
 
 ## Context
 

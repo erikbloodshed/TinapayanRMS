@@ -2,6 +2,7 @@
 
 **Status:** Accepted, 2026-11-20. Records the state model the app has used since ReactiveUI went (2026-11-16). Narrowed
 by [ADR 0009](0009-close-the-migration.md): no version on a draft for its figures to be cached on.
+[ADR 0012](0012-figures-hear-of-a-change-from-whoever-made-it.md) restates why signals stay turned down without it.
 
 ## Context
 

@@ -1,7 +1,9 @@
 # 0006. Testing strategy
 
 **Status:** Accepted, 2026-11-20. Narrowed by [ADR 0009](0009-close-the-migration.md): the screens' tests may use the database. The
-random sequences stand, and aren't all built yet.
+random sequences stand, and aren't all built yet. Narrowed by [ADR 0011](0011-change-control-on-the-developers-pc.md)
+too: local CI is to run the window's smoke run, once it's built, where 0006 kept the window out of CI. Extended by
+[ADR 0012](0012-figures-hear-of-a-change-from-whoever-made-it.md): the sequences check each figure after every step.
 
 ## Context
 

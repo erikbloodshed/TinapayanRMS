@@ -25,7 +25,7 @@
   </PropertyGroup>
 
   <!-- APIs the codebase's rules forbid, listed in BannedSymbols.txt, are refused by the build (RS0030) rather than left
-       to review (docs/adr/0004-quality-gates.md). -->
+       to review (docs/adr/0004-quality-gates.md; what's listed, docs/adr/0010-the-gates-read-method-bodies.md). -->
   <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />

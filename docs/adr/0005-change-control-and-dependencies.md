@@ -1,6 +1,7 @@
 # 0005. Change control and dependencies
 
-**Status:** Accepted, 2026-11-20. Amended 2026-11-21: CI runs on the developer's PC, not on GitHub (below).
+**Status:** Accepted, 2026-11-20. Amended 2026-11-21: CI runs on the developer's PC, not on GitHub (below). Superseded
+by [ADR 0011](0011-change-control-on-the-developers-pc.md), which restates what stands.
 
 ## Context
 

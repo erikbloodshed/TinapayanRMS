@@ -1,5 +1,5 @@
 # Dependency updates as pull requests, each checked by local CI (scripts/Invoke-LocalCI.ps1) before it's merged: GitHub
-# runs no CI since 2026-11-21 (docs/adr/0005, its amendment). Weekly and grouped, so a week's updates are a few pull
+# runs no CI since 2026-11-21 (docs/adr/0011). Weekly and grouped, so a week's updates are a few pull
 # requests to check rather than one per package. Packages that must move together are grouped together, as
 # Directory.Packages.props says they must.
 version: 2

@@ -35,7 +35,7 @@ public static class BackgroundWork
         {
             // Off the UI thread, which the services never need, so the wait can't hold up what they're waiting for. It
             // can't be awaited: the window closing and Windows ending the session both need the app ended as they return.
-#pragma warning disable RS0030 // The one blocking wait allowed, at most StopWaitsFor (approved 2026-11-22, ADR 0004).
+#pragma warning disable RS0030 // The one blocking wait allowed, at most StopWaitsFor (approved 2026-11-22, ADR 0010).
             Task.Run(() => Task.WhenAll(stopping)).Wait(StopWaitsFor);
 #pragma warning restore RS0030
         }

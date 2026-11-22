@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
     The checks that say work is done (CLAUDE.md), run on this PC: the solution builds with no warnings, the model has no
-    change a migration is missing, and every test passes. Run it before a merge to main.
+    change a migration is missing, and every test passes. Run it before a push to main.
 
 .DESCRIPTION
-    What GitHub's build workflow ran until 2026-11-21 (docs/adr/0005-change-control-and-dependencies.md, its amendment),
-    in the same order, each stopping the run when it fails:
+    What GitHub's build workflow ran until 2026-11-21 (docs/adr/0011-change-control-on-the-developers-pc.md), in the
+    same order, each stopping the run when it fails:
 
       1. Build: the whole solution from scratch (--no-incremental, so every project's warnings are reported, not only
          those of the projects that changed), warnings as errors, NuGet's vulnerability audit only reported.

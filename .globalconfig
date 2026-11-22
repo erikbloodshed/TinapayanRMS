@@ -2,7 +2,7 @@ is_global = true
 
 # The severities a file Razor generates from a .razor file is analyzed at. A generated file takes no severity from
 # .editorconfig's sections, only from global configs like this one, though it does take .editorconfig's
-# generated_code = false, which has the analyzers read a .razor file's code as the developer's (docs/adr/0004).
+# generated_code = false, which has the analyzers read a .razor file's code as the developer's (docs/adr/0010).
 # .editorconfig's [*.cs] sets the same rules again for the files on disk, where it wins over this file.
 
 # The code metrics, as for the rest of the app's code.
