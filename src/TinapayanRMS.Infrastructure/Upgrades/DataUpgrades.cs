@@ -71,7 +71,11 @@ internal static class DataUpgrades
     }
 
     /// <summary>The same, for EF Core's synchronous Migrate, which `dotnet ef database update` runs, with no context to keep.</summary>
+    // EF Core's seeding hook for Migrate is synchronous, and only dotnet-ef's own process, with no UI thread, calls it: the
+    // app migrates with MigrateAsync, which seeds by RunAsync.
+#pragma warning disable RS0030 // The one wait on async work allowed in Infrastructure (approved 2026-11-22, ADR 0004).
     public static void Run(DbContext context) => RunAsync(context, CancellationToken.None).GetAwaiter().GetResult();
+#pragma warning restore RS0030
 
     private static string MigrationId<TMigration>()
         where TMigration : Migration =>

@@ -18,3 +18,12 @@ M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.TimeSpan);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Runtime.CompilerServices.TaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ConfiguredTaskAwaitable.ConfiguredTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ConfiguredTaskAwaitable`1.ConfiguredTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ValueTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ValueTaskAwaiter`1.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable.ConfiguredValueTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable`1.ConfiguredValueTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
+P:System.Threading.Tasks.ValueTask`1.Result;Blocks the thread on async work, which deadlocks on the UI thread: await it
