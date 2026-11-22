@@ -816,7 +816,7 @@ public sealed class ProductRecipe : ObservableState
         {
             var saved = await _queries.ReadSubAssemblyLinesAsync(subAssembly.Id, cancellationToken);
             var ingredientsById = _ingredients.ToDictionary(m => m.Id);
-            lines = [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams))];
+            lines = [.. saved.Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
         }
 
         cancellationToken.ThrowIfCancellationRequested();

@@ -2503,6 +2503,33 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         return boxId;
     }
 
+    /// <summary>
+    /// House Dough on the Sub-Assemblies screen, flour its base and water typed as 65% of it, picked in a new product's
+    /// section form to link or copy (<paramref name="mode"/>), its piece size typed.
+    /// </summary>
+    private async Task<(ProductForm State, int DoughId, int FlourId, int WaterId, int SaltId)> PickedToTakeInAsync(UsageFormMode mode)
+    {
+        var roleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var waterId = await AddIngredientAsync("Water", costPerGram: 0m);
+        var saltId = await AddIngredientAsync("Salt", costPerGram: 0.02m);
+        var doughId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Dough", RoleId = roleId },
+            [new RecipeLine(flourId, 1000m, IsFormulaBase: true), new RecipeLine(waterId, 650m, IsFormulaBase: false, AuthoredBakersPercent: 65m)],
+            Cancellation);
+        await AddProductAsync("Cream Loaf");
+
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        state.Pick(state.Products.Single());
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.SelectedProduct is not null);
+        await state.Recipe.AddUsageCommand.ExecuteAsync(mode);
+        state.UsageForm.PickSource(state.UsageForm.LinkableSubAssemblies.Single());
+        await Settle.UntilAsync(state, () => state.UsageForm.FormLines.Count == 2, () => $"lines={state.UsageForm.FormLines.Count}");
+        state.UsageForm.TypeWeightPerPiece(30m);
+        return (state, doughId, flourId, waterId, saltId);
+    }
+
     private ProductForm CreateState(IViewStateStore? viewStateStore = null)
     {
         var factory = CreateDbContextFactory();
@@ -2948,6 +2975,33 @@ public class ProductsStateRefreshTests(DatabaseFixture fixture) : PersistenceTes
         copy.IsNew.Should().BeTrue();
         copy.Lines.Single(l => l.Ingredient.Id == flourId).IsFormulaBase.Should().BeTrue("the copy is the same formula");
         copy.Lines.Single(l => l.Ingredient.Id == waterId).IsFormulaBase.Should().BeFalse();
+    });
+
+    [Test]
+    public Task Linking_one_then_changing_its_lines_keeps_its_base_and_typed_percentages() => UiThread.RunAsync(async () =>
+    {
+        var (state, doughId, flourId, waterId, saltId) = await PickedToTakeInAsync(UsageFormMode.Link);
+        state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        state.Recipe.PickRecipeTab(state.Recipe.PackagingTab);
+
+        await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single());
+        state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = saltId, Grams = 20m });
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        await using var dbContext = CreateDbContext();
+        var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == doughId).OrderBy(l => l.SortOrder).ToListAsync(Cancellation);
+        lines.Select(l => (l.IngredientId, l.IsFormulaBase, l.AuthoredBakersPercent))
+            .Should().Equal((flourId, true, (decimal?)null), (waterId, false, 65m), (saltId, false, (decimal?)null));
+    });
+
+    [Test]
+    public Task Copying_an_existing_one_keeps_its_base_and_typed_percentages() => UiThread.RunAsync(async () =>
+    {
+        var (state, _, flourId, waterId, _) = await PickedToTakeInAsync(UsageFormMode.Copy);
+
+        state.UsageForm.FormLines.Select(l => (l.IngredientId, l.IsFormulaBase, l.AuthoredBakersPercent))
+            .Should().Equal(((int?)flourId, true, (decimal?)null), ((int?)waterId, false, 65m));
     });
 
     [Test]
