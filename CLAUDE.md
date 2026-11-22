@@ -21,10 +21,10 @@ dotnet run --project src/TinapayanRMS.Maui                                      
 dotnet run --project src/TinapayanRMS.RecipeApi                                   # the Recipe API, http://localhost:5290/api/v1
 powershell -ExecutionPolicy Bypass -File scripts/Install-TinapayanRMS.ps1         # install or update the app for this Windows user
 
-dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure
-dotnet ef database update --project src/TinapayanRMS.Infrastructure
-dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure
-dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels
+dotnet ef migrations add <Name>                                                   # from any folder: .config/dotnet-ef.json names Infrastructure
+dotnet ef database update
+dotnet ef migrations has-pending-model-changes
+dotnet ef dbcontext optimize --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels
 powershell -ExecutionPolicy Bypass -File scripts/Invoke-LocalCI.ps1                # local CI: the build (warnings as errors), the migration check, the whole suite
 dotnet run -c Release --project tests/TinapayanRMS.Benchmarks -- --quick                 # time the benchmarks' scenarios once (--scenario "Screens.*")
 powershell -ExecutionPolicy Bypass -File scripts/Compare-Benchmarks.ps1 -Base main      # how fast a refactor left it: base vs working tree, the start included (-Window: the window's own start)

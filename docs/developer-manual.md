@@ -157,11 +157,11 @@ Run every command from the repository root.
    [Environment]::SetEnvironmentVariable("SYNCFUSION_LICENSE_KEY", "<your key>", "User")
    ```
    If you use an AI assistant, also set `SYNCFUSION_API_KEY` the same way, to the API key from your syncfusion.com account. Syncfusion's documentation MCP server needs it (see [Working with Syncfusion](#working-with-syncfusion)). The build doesn't.
-4. **Install the EF Core tools** at the `EFCoreVersion` in `Directory.Packages.props`: `dotnet tool update --global dotnet-ef --version 11.0.0`.
+4. **Install the EF Core tools** at the `EFCoreVersion` in `Directory.Packages.props`: `dotnet tool update --global dotnet-ef --version 11.0.0`. The repo's [.config/dotnet-ef.json](../.config/dotnet-ef.json) names `src/TinapayanRMS.Infrastructure` as the project and the startup project, so a `dotnet ef` command needs no `--project`, from any folder in the repo (an explicit `--project` still wins).
 5. **Build:** `dotnet build TinapayanRMS.slnx`.
 6. **Create the database.** This creates `tinapayanrms` and applies every migration, including the rows the migrations seed, such as the starting sub-assembly roles:
    ```powershell
-   dotnet ef database update --project src/TinapayanRMS.Infrastructure
+   dotnet ef database update
    ```
 7. **Run the app:** `dotnet run --project src/TinapayanRMS.Maui`. With an empty database, follow the user manual's [First-time setup](user-manual.md#3-first-time-setup).
 8. **Run the tests:** `dotnet test --solution TinapayanRMS.slnx`. The first run creates the test databases `tinapayanrms_test_infrastructure`, `tinapayanrms_test_presentation`, `tinapayanrms_test_pricing`, `tinapayanrms_test_mcp`, `tinapayanrms_test_recipeapi` and `tinapayanrms_test_usecases`. The tests never touch `tinapayanrms`.
@@ -204,10 +204,10 @@ The backups look for `pg_dump` and `pg_restore` in `C:\Program Files\PostgreSQL\
 | Time the benchmarks' scenarios once, warm (see [Benchmarks and performance budgets](#benchmarks-and-performance-budgets)); `--scenario "Screens.*"` for some | `dotnet run -c Release --project tests/TinapayanRMS.Benchmarks -- --quick` |
 | Compare how fast a refactor left the app: a base commit against the working tree, the start included (`-Window` for the window's own start) | `powershell -ExecutionPolicy Bypass -File scripts/Compare-Benchmarks.ps1 -Base main` |
 | Approve new budgets, after a change meant to move one | `$env:TINAPAYANRMS_APPROVE_BUDGETS = '1'; dotnet test --project tests/TinapayanRMS.Benchmarks.Tests; Remove-Item Env:TINAPAYANRMS_APPROVE_BUDGETS` |
-| Add a migration | `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure` |
-| Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` |
-| Apply migrations | `dotnet ef database update --project src/TinapayanRMS.Infrastructure` |
-| Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
+| Add a migration | `dotnet ef migrations add <Name>` |
+| Check the model matches the migrations | `dotnet ef migrations has-pending-model-changes` |
+| Apply migrations | `dotnet ef database update` |
+| Regenerate the compiled model, after any model change | `dotnet ef dbcontext optimize --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels` |
 | Query the database | `& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U tinapayanrms -d tinapayanrms -c "SELECT name, cost_per_base_unit FROM raw_materials"` |
 | Run the MCP server by hand, as an AI assistant does from `.mcp.json` (see [Checking costs from an AI assistant](#checking-costs-from-an-ai-assistant)) | `powershell -ExecutionPolicy Bypass -File scripts/Start-McpServer.ps1` |
 | Run the Recipe API (see [The Recipe API](#the-recipe-api)), then try it | `dotnet run --project src/TinapayanRMS.RecipeApi`, then `curl http://localhost:5290/api/v1/mixes` |
@@ -834,11 +834,11 @@ Migrations come only from `dotnet ef migrations add`. Never write or edit one by
 **Data a schema change needs goes in a data upgrade, not the migration**, and so does data an older one left to be filled in later (the target buffers, 2026-11-05). [DataUpgrades](../src/TinapayanRMS.Infrastructure/Upgrades/DataUpgrades.cs) lists one-time changes to the data, oldest first, each a name and a method on the DbContext. EF Core's seeding hook (`UseSeeding` and `UseAsyncSeeding`, set in `TinapayanRMSDbContext.Configure`) runs the ones a database hasn't had after the migrations and inside their transaction, whenever a database is migrated: by `dotnet ef database update`, by a restored backup being brought up to date, and by the test fixtures. Each is recorded in `data_upgrades` and never made again. One added after its migration ran on a database (tied to an earlier migration) counts as an update there on its own (`DataUpgrades.OverdueAsync`), so the app's update and a restore migrate for it even with no migration to apply, a backup first: until 2026-11-22 they skipped `MigrateAsync` then, and it never ran. Each names the migration whose schema it needs, and waits until that's applied, so a database migrated back to an earlier migration skips it; it runs against the schema the migrations leave, so it can't read a column a later migration drops. Add one to the end of the list, never change one that has run, and test it in `DataUpgradesTests`.
 
 1. Change the entity, its configuration, and its `Columns` list.
-2. `dotnet ef migrations add <Name> --project src/TinapayanRMS.Infrastructure`.
+2. `dotnet ef migrations add <Name>`.
 3. Read the generated `Up` and `Down` before you accept them.
-4. `dotnet ef migrations has-pending-model-changes --project src/TinapayanRMS.Infrastructure` should report no changes.
+4. `dotnet ef migrations has-pending-model-changes` should report no changes.
 5. Regenerate the compiled model (see [The compiled model](#the-compiled-model)).
-6. `dotnet ef database update --project src/TinapayanRMS.Infrastructure`. (Running the app would apply it too, after a backup: see below.)
+6. `dotnet ef database update`. (Running the app would apply it too, after a backup: see below.)
 7. Run the tests. The fixtures migrate the test databases themselves.
 
 ### The app updates its own database
@@ -852,7 +852,7 @@ Updating the app is all an update takes, on this PC or another: the MSI or the i
 
 While migrations are being applied, `DatabaseReadiness.IsUpdating` makes the panel say so. It's registered in `ServiceRegistration`, not `DatabaseHost`: the Recipe API and the MCP server never change the database. A Debug build started signed in (`TINAPAYANRMS_SIGNED_IN`) draws the screens without waiting for it; a failure then shows in the banner. Tests: `DatabaseUpdaterTests` (throwaway databases), `DatabaseReadinessTests`, `SignInStateTests`, `SignInTests`.
 
-To discard a migration you've generated but haven't applied anywhere, run `dotnet ef migrations remove --project src/TinapayanRMS.Infrastructure`.
+To discard a migration you've generated but haven't applied anywhere, run `dotnet ef migrations remove`.
 
 **Renaming a column without losing data.** EF Core pairs renamed columns by guesswork. If you rename two columns of the same type on one table in one step, it can pair them crosswise and swap their data, or drop and re-add them. Use two migrations instead:
 
@@ -863,7 +863,7 @@ To discard a migration you've generated but haven't applied anywhere, run `dotne
 
 The app runs on a compiled EF Core model, the generated code in `Infrastructure/CompiledModels/`, so the first query doesn't spend time building the model from the configurations. EF Core finds it by itself, through the `[assembly: DbContextModel]` attribute in `TinapayanRMSDbContextAssemblyAttributes.cs`, so `TinapayanRMSDbContext.Configure` doesn't call `UseModel`. The app, the tests and the repositories all use it. The `dotnet ef` commands don't: `migrations add`, `has-pending-model-changes` and `dbcontext optimize` itself build the design-time model from `OnModelCreating`.
 
-- **Regenerate it after every model change**: an entity, a configuration, `ConfigureConventions` or `OnModelCreating`. Run `dotnet ef dbcontext optimize --project src/TinapayanRMS.Infrastructure --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels`. It overwrites the folder, and the result is committed with the change. Never edit the generated files by hand.
+- **Regenerate it after every model change**: an entity, a configuration, `ConfigureConventions` or `OnModelCreating`. Run `dotnet ef dbcontext optimize --output-dir CompiledModels --namespace TinapayanRMS.Infrastructure.CompiledModels`. It overwrites the folder, and the result is committed with the change. Never edit the generated files by hand.
 - **A stale one still builds and runs.** It finds properties by name, so it keeps mapping the model as it was. [CompiledModelTests](../tests/TinapayanRMS.Infrastructure.Tests/CompiledModels/CompiledModelTests.cs) fail until it's regenerated. They compare it with the model built from the configurations: the entities, properties, keys, relationships and indexes, and the tables, columns, types and constraints they map to.
 - **If the regeneration won't build**, for example because an entity class it names was deleted, delete `CompiledModels/` and run the command again.
 - A compiled model leaves out what only migrations use, such as column collations and seed data. Those come from the design-time model, so they don't need to match.
@@ -1753,7 +1753,7 @@ Respawn picks up the new table by itself.
 | A screen shows "This screen ran into a problem it didn't expect" | An exception escaped the screen (`ScreenErrorBoundary`) | Read the log for its stack ("A screen failed"); Open It Again shows the screen as it was |
 | Every screen says the database doesn't exist after a restore was cut short | The app ended between the restore's two renames | Start the app again: `StartupTasks` renames `<database>_replaced` back (`RecoverInterruptedRestoreAsync`), and logs that it did |
 | A screen says "Couldn't reach the database.", and the log has "Failed to connect" or "password authentication failed" | PostgreSQL isn't running, or the password file has no line for the server and role | Start the `postgresql-x64-18` service, and check `appsettings.json` and `%APPDATA%\postgresql\pgpass.conf` |
-| A banner under the title bar says the database is out of date | A migration hasn't been applied to it | Stop the app, run `dotnet ef database update --project src/TinapayanRMS.Infrastructure`, start it again |
+| A banner under the title bar says the database is out of date | A migration hasn't been applied to it | Stop the app, run `dotnet ef database update`, start it again |
 | A bar at the bottom of the window says something went wrong and the page needs reloading | An exception escaped a component outside the screens (the title bar, the layout) and broke the page | Read the log for its stack; in a Debug build the developer tools' console (F12) has it too |
 | "More than one sibling of element 'tr' has the same key value" in the log | One object drawn as two rows in a keyed loop | See [Typing: three rules](#typing-three-rules) |
 | Characters go missing when typing quickly | Something wrote into the box while it had the cursor | Use `TextField`, `NumberField` or `PickField`; see the three rules |
