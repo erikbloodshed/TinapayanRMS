@@ -1,18 +1,27 @@
+@using Microsoft.AspNetCore.Components.Sections
 @implements IDisposable
 @inject IFileDialogs Dialogs
 @inject IAppWindow Window
 @inject PrintPage PageSetup
+@inject IJSRuntime JS
 
 @* Export to PDF: asks where to save the pages, then draws them out of sight for as long as the window takes to write the
-   file. While they're here print.css prints them in place of the screen around them. *@
+   file. They're drawn in the layout's outlet (OutletName), outside the window's shell as the Print dialog's document is,
+   so on paper print.css puts the shell away and prints them alone, at the paper's width: drawn in the product's tab,
+   the list beside it printed too, and squeezed the pages off the paper's edge. *@
 @if (_set is not null)
 {
-    <div class="pdf-export" aria-hidden="true">
-        <PrintDocument Set="_set" IncludeRecipe="true" IncludeCosting="true" />
-    </div>
+    <SectionContent SectionName="@OutletName">
+        <div class="pdf-export" aria-hidden="true">
+            <PrintDocument Set="_set" IncludeRecipe="true" IncludeCosting="true" />
+        </div>
+    </SectionContent>
 }
 
 @code {
+    /// <summary>The layout's outlet the pages are drawn in, outside the window's shell (MainLayout).</summary>
+    public const string OutletName = "pdf-export";
+
     private const string Kind = "PDF document";
 
     private IDisposable? _handler;
@@ -48,6 +57,9 @@
             _set = interaction.Input;
             await InvokeAsync(StateHasChanged);
             await _drawn.Task;
+            // The pages broken as the print preview breaks them, before the window writes them: the web view's PDF fires no
+            // beforeprint, and PrintDocument's own call isn't awaited.
+            await JS.InvokeVoidAsync("tinapayan.layOutPrintoutPages");
             await Window.SavePageAsPdfAsync(path);
         }
         finally

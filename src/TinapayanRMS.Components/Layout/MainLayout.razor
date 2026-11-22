@@ -67,6 +67,9 @@
     <PrintDialog />
 }
 
+@* Export to PDF's pages (PdfExport), out here for the same reason: on paper they print alone, at the paper's width. *@
+<Microsoft.AspNetCore.Components.Sections.SectionOutlet SectionName="@PdfExport.OutletName" />
+
 <NoticeHost />
 <ConfirmationHost />
 <PromptHost />

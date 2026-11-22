@@ -1,4 +1,7 @@
 using AwesomeAssertions;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Sections;
 using Microsoft.Extensions.DependencyInjection;
 using TinapayanRMS.Components.Printing;
 using TinapayanRMS.Components.Shared;
@@ -23,7 +26,7 @@ public class PdfExportTests
         await using var _ = context;
         dialogs.SaveAnswer = Chosen;
         var export = new Interaction<ProductPrintSet, string?>();
-        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        var page = RenderWithOutlet(context, export);
         string? drawnAsSaved = null;
         window.OnSavePdf = _ =>
         {
@@ -51,7 +54,7 @@ public class PdfExportTests
             PaperSize = PaperSize.Letter, Orientation = PaperOrientation.Landscape, Margins = PageMargins.Narrow,
         };
         var export = new Interaction<ProductPrintSet, string?>();
-        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        var page = RenderWithOutlet(context, export);
         (string Rule, string? Height)? drawn = null;
         window.OnSavePdf = _ =>
         {
@@ -73,7 +76,7 @@ public class PdfExportTests
         await using var _ = context;
         dialogs.SaveAnswer = null;
         var export = new Interaction<ProductPrintSet, string?>();
-        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        var page = RenderWithOutlet(context, export);
 
         var saved = await page.InvokeAsync(() => export.Handle(Set("Pandesal")));
 
@@ -88,7 +91,7 @@ public class PdfExportTests
         var (context, dialogs, _) = NewContext();
         await using var _1 = context;
         var export = new Interaction<ProductPrintSet, string?>();
-        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        var page = RenderWithOutlet(context, export);
 
         await page.InvokeAsync(() => export.Handle(Set("Ube/Cheese: Roll?")));
 
@@ -103,12 +106,57 @@ public class PdfExportTests
         dialogs.SaveAnswer = Chosen;
         window.OnSavePdf = _ => throw new IOException("The file is open in another program.");
         var export = new Interaction<ProductPrintSet, string?>();
-        var page = context.Render<PdfExport>(parameters => parameters.Add(p => p.Export, export));
+        var page = RenderWithOutlet(context, export);
 
         var saving = () => page.InvokeAsync(() => export.Handle(Set("Pandesal")));
 
         await saving.Should().ThrowAsync<IOException>();
         await page.WaitForAssertionAsync(() => page.FindAll(".pdf-export").Should().BeEmpty());
+    }
+
+    [Test]
+    public async Task The_pages_are_drawn_in_the_layouts_outlet_outside_the_screen()
+    {
+        var (context, dialogs, window) = NewContext();
+        await using var _ = context;
+        dialogs.SaveAnswer = Chosen;
+        var export = new Interaction<ProductPrintSet, string?>();
+        var page = RenderWithOutlet(context, export);
+        bool? inOutlet = null;
+        window.OnSavePdf = _ =>
+        {
+            inOutlet = page.Find(".pdf-export").ParentElement?.ClassName == "outlet";
+            return Task.CompletedTask;
+        };
+
+        await page.InvokeAsync(() => export.Handle(Set("Pandesal")));
+
+        inOutlet.Should().BeTrue("print.css prints the pages alone only outside the window's shell, where MainLayout's outlet is");
+    }
+
+    // PdfExport in a screen, with MainLayout's outlet its pages are drawn in, apart from it.
+    private static IRenderedComponent<ExportHost> RenderWithOutlet(BunitContext context, Interaction<ProductPrintSet, string?> export) =>
+        context.Render<ExportHost>(parameters => parameters.Add(p => p.Export, export));
+
+    private sealed class ExportHost : ComponentBase
+    {
+        [Parameter] public Interaction<ProductPrintSet, string?> Export { get; set; } = null!;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "outlet");
+            builder.OpenComponent<SectionOutlet>(2);
+            builder.AddComponentParameter(3, nameof(SectionOutlet.SectionName), PdfExport.OutletName);
+            builder.CloseComponent();
+            builder.CloseElement();
+            builder.OpenElement(4, "div");
+            builder.AddAttribute(5, "class", "screen");
+            builder.OpenComponent<PdfExport>(6);
+            builder.AddComponentParameter(7, nameof(PdfExport.Export), Export);
+            builder.CloseComponent();
+            builder.CloseElement();
+        }
     }
 
     private static (BunitContext Context, FakeFileDialogs Dialogs, FakeAppWindow Window) NewContext()

@@ -50,9 +50,12 @@
 
 /* ---- The document. ---- */
 
+/* Its line height is the Print dialog's (Syncfusion's .e-dlg-content), which it was laid out under, so Export to PDF's
+   pages (PdfExport), drawn outside the dialog, have the same rows and break where Print's do. */
 .print-document {
     font-family: "Segoe UI", system-ui, sans-serif;
     font-size: calc(10.5pt * var(--type-scale, 1));
+    line-height: 21px;
     color: #1f2233;
 }
 
@@ -544,8 +547,8 @@
         background: #fff !important;
     }
 
-    /* Export to PDF's pages take the place of the screen they're drawn on. */
-    :has(> .pdf-export) > :not(.pdf-export) {
+    /* Export to PDF's pages (PdfExport, drawn outside the shell, MainLayout) print alone, as the Print dialog's do. */
+    body:has(.pdf-export) .app-shell {
         display: none !important;
     }
 
