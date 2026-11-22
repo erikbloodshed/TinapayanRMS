@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
@@ -14,7 +15,7 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// And none of it, the screens included, turns one into a decimal: a cast is a built-in conversion BannedSymbols.txt
 /// can't name, so it's read from each method's IL.
 /// </summary>
-public class DecimalNumbersTests
+public partial class DecimalNumbersTests
 {
     /// <summary>
     /// The places a double is meant: each named with why, and nothing else. The History tab's chart plots doubles and
@@ -58,12 +59,44 @@ public class DecimalNumbersTests
             .SelectMany(IlReader.Bodies)
             .Where(TurnsBinaryIntoDecimal)
             .Select(method => $"{method.DeclaringType!.FullName}.{method.Name}")
+            .Concat(UnreferencedAssemblies.Files.Values.SelectMany(ConvertingIn))
             .Distinct()
             .Order(StringComparer.Ordinal)
             .ToList();
 
         string.Join(Environment.NewLine, converting).Should().BeEmpty("since .NET 11 the decimal keeps the double's binary noise: take it from text or a literal");
     }
+
+    [Test]
+    public void The_app_and_the_two_servers_are_read_from_their_builds()
+    {
+        UnreferencedAssemblies.Files.Keys.Should().BeEquivalentTo("TinapayanRMS.Maui", "TinapayanRMS.RecipeApi", "TinapayanRMS.Mcp");
+        UnreferencedAssemblies.Files.Values.Should().OnlyContain(file => File.Exists(file));
+    }
+
+    [Test]
+    public void A_double_or_float_turned_into_a_decimal_is_found_in_an_assembly_read_from_its_file()
+    {
+        var converting = ConvertingIn(typeof(DecimalNumbersTests).Assembly.Location)
+            .Where(method => method.StartsWith(typeof(DecimalNumbersTests).FullName + ".", StringComparison.Ordinal))
+            .Select(method => method[(typeof(DecimalNumbersTests).FullName!.Length + 1)..]);
+
+        converting.Should().BeEquivalentTo(
+            nameof(CastFromADouble), nameof(CastFromANullableDouble), nameof(CastFromAFloat), nameof(CastFromAHalf), nameof(CreatedFromADouble));
+    }
+
+    /// <summary>The methods of the assembly in <paramref name="assemblyFile"/> that turn a double, a float or a Half into a decimal.</summary>
+    private static IEnumerable<string> ConvertingIn(string assemblyFile) =>
+        UnreferencedAssemblies.CallsIn(assemblyFile)
+            .Where(call => call.Called.ReturnType == "System.Decimal"
+                && (call.Called.Name is "op_Explicit" or "op_Implicit" || call.Called.Name.StartsWith("Create", StringComparison.Ordinal))
+                && call.Called.ParameterTypes.Any(parameter => BinaryName().IsMatch(parameter)))
+            .Select(call => call.Caller)
+            .Distinct();
+
+    /// <summary>A double, a float or a Half, alone or inside a type it's built from (System.Nullable`1&lt;System.Double&gt;).</summary>
+    [GeneratedRegex(@"\bSystem\.(Double|Single|Half)\b")]
+    private static partial Regex BinaryName();
 
     [Test]
     [Arguments(nameof(CastFromADouble))]

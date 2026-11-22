@@ -38,6 +38,11 @@ generated_code = false
 [src/TinapayanRMS.Infrastructure/Migrations/**.cs]
 generated_code = true
 
+# WinUI's XAML compiler writes this file into the app's build, with a Convert.ChangeType BannedSymbols.txt refuses
+# elsewhere: nothing in it can be changed (approved 2026-11-22, ADR 0004).
+[src/TinapayanRMS.Maui/obj/**/XamlTypeInfo.g.cs]
+dotnet_diagnostic.RS0030.severity = none
+
 [tests/**.cs]
 # Test methods are named Method_Scenario_Result.
 dotnet_diagnostic.CA1707.severity = none

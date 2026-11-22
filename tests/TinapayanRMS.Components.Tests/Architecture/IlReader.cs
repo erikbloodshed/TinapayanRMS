@@ -12,7 +12,8 @@ internal static class IlReader
     private const BindingFlags Declared =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
-    private static readonly Dictionary<short, OpCode> OpCodesByValue =
+    /// <summary>Every IL opcode by its value, which an opcode's one or two bytes (0xFE first) make.</summary>
+    internal static readonly Dictionary<short, OpCode> OpCodesByValue =
         typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
             .Select(field => (OpCode)field.GetValue(null)!)
             .ToDictionary(opCode => opCode.Value);

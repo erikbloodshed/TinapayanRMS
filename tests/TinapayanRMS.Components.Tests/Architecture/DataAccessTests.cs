@@ -77,6 +77,8 @@ public class DataAccessTests
     [Arguments(nameof(Planted.ResolvedByType))]
     [Arguments(nameof(Planted.ResolvedAfterAnAwait))]
     [Arguments(nameof(Planted.ContextMade))]
+    [Arguments(nameof(Planted.ResolvedByATypeInAVariable))]
+    [Arguments(nameof(Planted.MadeByATypeInAVariable))]
     public void Data_access_reached_without_being_held_is_found(string method) =>
         DataAccessUsedBy(typeof(Planted).GetMethod(method)!).Should().NotBeEmpty();
 
@@ -106,6 +108,12 @@ public class DataAccessTests
 
         public static DbContext ContextMade(DbContextOptions options) => new(options);
 
+        // What a Type in a variable names can't be read: a screen asks by a type argument, which can.
+        public static object? ResolvedByATypeInAVariable(IServiceProvider services, Type type) => services.GetService(type);
+
+        public static object MadeByATypeInAVariable(IServiceProvider services, Type type) =>
+            ActivatorUtilities.CreateInstance(services, type);
+
         public static object UseCaseResolved(IServiceProvider services) =>
             services.GetRequiredService<UseCases.SubAssemblies.ISubAssemblyEditor>();
 
@@ -121,8 +129,28 @@ public class DataAccessTests
     /// The data-access types <paramref name="method"/>'s IL names. A service's static method is a calculation unless it's
     /// Infrastructure's or EF Core's own (SavedProductReader.Build prices what was already read, with no query).
     /// </summary>
-    private static IEnumerable<string> DataAccessUsedBy(MethodBase method) =>
-        IlReader.UsedBy(method).SelectMany(TypesNamedBy).Where(IsDataAccess).Select(found => found.Name).Distinct();
+    private static IEnumerable<string> DataAccessUsedBy(MethodBase method)
+    {
+        var used = IlReader.UsedBy(method).ToList();
+        return used.SelectMany(TypesNamedBy).Where(IsDataAccess).Select(found => found.Name)
+            .Concat(used.OfType<MethodBase>().Where(ResolvesByAType).Select(called => $"{called.Name} with a Type, which could be anything"))
+            .Distinct();
+    }
+
+    /// <summary>
+    /// A call that asks the services for one, or makes one with them, by a <see cref="Type"/>: whatever it names, the IL
+    /// shows only a variable. Asked for by a type argument (GetRequiredService&lt;T&gt;) or an [Inject] property, it's read.
+    /// </summary>
+    private static bool ResolvesByAType(MethodBase called) =>
+        called.DeclaringType is { } declaring
+        && ServiceResolution.Contains(declaring)
+        && called.GetParameters().Any(parameter => parameter.ParameterType == typeof(Type));
+
+    private static readonly HashSet<Type> ServiceResolution =
+    [
+        typeof(IServiceProvider), typeof(IKeyedServiceProvider), typeof(ISupportRequiredService),
+        typeof(ServiceProviderServiceExtensions), typeof(ServiceProviderKeyedServiceExtensions), typeof(ActivatorUtilities),
+    ];
 
     private static IEnumerable<Type> TypesNamedBy(MemberInfo member)
     {

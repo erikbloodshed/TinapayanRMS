@@ -11,6 +11,24 @@
     <ProjectReference Include="..\..\src\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
   </ItemGroup>
 
+  <!-- The architecture tests that read IL (DecimalNumbersTests) read the app and the two servers too, from the assemblies
+       their builds make, without loading them (ExternalAssemblies): built first, but not referenced. The app's is Windows
+       only, which this project's net11.0 can't reference, so its framework isn't negotiated. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TinapayanRMS.Maui\TinapayanRMS.Maui.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="ReadAssembly" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.RecipeApi\TinapayanRMS.RecipeApi.csproj" ReferenceOutputAssembly="false" OutputItemType="ReadAssembly" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.Mcp\TinapayanRMS.Mcp.csproj" ReferenceOutputAssembly="false" OutputItemType="ReadAssembly" />
+  </ItemGroup>
+
+  <Target Name="NameReadAssemblies" AfterTargets="ResolveProjectReferences" BeforeTargets="GetAssemblyAttributes">
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>ReadAssembly:%(ReadAssembly.Filename)</_Parameter1>
+        <_Parameter2>%(ReadAssembly.FullPath)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <!-- SyncfusionScriptsTests: the page's list of the Syncfusion components whose scripts it loads, and Syncfusion's
          loader, from the package at SyncfusionVersion, that it's checked against. -->
