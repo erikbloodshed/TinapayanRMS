@@ -1,0 +1,19 @@
+is_global = true
+
+# The severities a file Razor generates from a .razor file is analyzed at. A generated file takes no severity from
+# .editorconfig's sections, only from global configs like this one, though it does take .editorconfig's
+# generated_code = false, which has the analyzers read a .razor file's code as the developer's (docs/adr/0004).
+# .editorconfig's [*.cs] sets the same rules again for the files on disk, where it wins over this file.
+
+# The code metrics, as for the rest of the app's code.
+dotnet_diagnostic.CA1502.severity = warning
+dotnet_diagnostic.CA1506.severity = warning
+
+# What else reading the generated code as the developer's would wake flags what Razor writes, or what a component's
+# shape asks for (a Dispose with no finalizer to suppress, the markup's ToString calls), so it stays off there.
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1816.severity = none
+dotnet_diagnostic.CA1822.severity = none
+dotnet_diagnostic.CA1826.severity = none
+dotnet_diagnostic.CA1861.severity = none

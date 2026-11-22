@@ -18,6 +18,21 @@ dotnet_diagnostic.IDE0005.severity = warning
 dotnet_diagnostic.CA1502.severity = warning
 dotnet_diagnostic.CA1506.severity = warning
 
+# Back at the Recommended level's severity for the files on disk: .globalconfig takes them off for the code Razor
+# generates from a .razor file, which takes its severities from there alone.
+dotnet_diagnostic.CA1000.severity = warning
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1816.severity = warning
+dotnet_diagnostic.CA1822.severity = warning
+dotnet_diagnostic.CA1826.severity = warning
+dotnet_diagnostic.CA1861.severity = warning
+
+# A .razor file's code is the developer's, though the compiler sees it in the files Razor generates from it (the markup in
+# *_razor.g.cs, the @code members in *_razor.decl.g.cs), which analyzers skip as generated. Marked as not, the code
+# metrics see it too, at the severity .globalconfig gives them.
+[**_razor.{g,decl.g}.cs]
+generated_code = false
+
 # Migrations are scaffolded by `dotnet ef migrations add` and never edited by hand,
 # so analyzer warnings in them can't be acted on.
 [src/TinapayanRMS.Infrastructure/Migrations/**.cs]

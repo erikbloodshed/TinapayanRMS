@@ -86,6 +86,30 @@ public class PrintDocumentColumnsTests
         document.FindAll(".print-figures, .print-price-comparison, .print-part-row").Should().BeEmpty("none of the costing's breakdown prints");
         document.FindAll(".print-costing").Should().ContainSingle("the total alone, not the breakdown");
     }
+
+    [Test]
+    public async Task The_bulk_packaging_prints_under_the_packaging_with_the_packs_cost_and_each_products_share()
+    {
+        await using var context = AppServices.NewContext();
+        var bulk = new PrintedBulkPackaging([new PrintedPackagingLine("Box of 6", 1m, "pc", 6m, 6m)], 6, 6m, 1m);
+        var packaging = new PrintedPackaging(null, [new PrintedPackagingLine("Paper Bag", 1m, "pc", 0.75m, 0.75m)], 0.75m) { Bulk = bulk };
+
+        var document = context.Render<PrintDocument>(parameters => parameters
+            .Add(d => d.Set, ProductPrintSet.Of(Set().Products[0] with { Packaging = packaging })));
+
+        var packagingBlock = document.FindAll(".print-block")[1];
+        packagingBlock.QuerySelectorAll("h3").Select(heading => heading.TextContent.Trim())
+            .Should().Equal("Packaging", "Bulk Packaging one pack holds 6 products");
+        var bulkTable = packagingBlock.QuerySelectorAll("table")[1];
+        bulkTable.QuerySelectorAll("thead th").Select(cell => cell.TextContent.Trim())
+            .Should().Equal("Material", "Qty per Pack", "Unit", "Unit Cost", "Cost per Pack");
+        bulkTable.QuerySelector("tbody tr")!.Children.Select(cell => cell.TextContent.Trim())
+            .Should().Equal("Box of 6", "1", "pc", "6.0000", "6.00");
+        var totals = bulkTable.QuerySelectorAll("tfoot tr");
+        totals.Should().HaveCount(2);
+        totals[0].Children.Select(cell => cell.TextContent.Trim()).Should().Equal("Pack cost", "", "", "", "6.00");
+        totals[1].Children.Select(cell => cell.TextContent.Trim()).Should().Equal("Per unit", "", "", "", "1.00");
+    }
     [Test]
     public async Task The_costing_wins_over_the_sub_assembly_total_and_a_production_copy_has_neither()
     {

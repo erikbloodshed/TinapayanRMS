@@ -581,37 +581,42 @@
         </table>
         @if (packaging.Bulk is { } bulk)
         {
-            <h3 class="print-section">Bulk Packaging <span class="print-source">@(bulk.Quantity is { } held ? $"one pack holds {held} {(held == 1 ? "product" : "products")}" : "")</span></h3>
-            <table class="print-table">
-                <thead>
-                    <tr>
-                        <th>Material</th><th class="n">Qty per Pack</th><th>Unit</th>
-                        @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
-                        @if (ShowsRecipeCosts) { <th class="n">Cost per Pack</th> }
-                        @if (ProductionCopy) { <th class="print-tick">Done</th> }
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var line in bulk.Lines)
-                    {
-                        <tr>
-                            <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
-                            @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
-                            @if (ShowsRecipeCosts) { <td class="n">@Money(line.Cost)</td> }
-                            @if (ProductionCopy) { @TickBox }
-                        </tr>
-                    }
-                </tbody>
-                @if (ShowsRecipeCosts)
-                {
-                    <tfoot>
-                        <tr><td>Pack cost</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.PackCost)</td></tr>
-                        <tr><td>Per unit</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.CostPerUnit)</td></tr>
-                    </tfoot>
-                }
-            </table>
+            @BulkPackagingPart(bulk)
         }
     </section>;
+
+    // The bulk pack's lines, under the packaging's.
+    private RenderFragment BulkPackagingPart(PrintedBulkPackaging bulk) => @<text>
+        <h3 class="print-section">Bulk Packaging <span class="print-source">@(bulk.Quantity is { } held ? $"one pack holds {held} {(held == 1 ? "product" : "products")}" : "")</span></h3>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>Material</th><th class="n">Qty per Pack</th><th>Unit</th>
+                    @if (ShowsUnitCosts) { <th class="n">Unit Cost</th> }
+                    @if (ShowsRecipeCosts) { <th class="n">Cost per Pack</th> }
+                    @if (ProductionCopy) { <th class="print-tick">Done</th> }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var line in bulk.Lines)
+                {
+                    <tr>
+                        <td>@line.Material</td><td class="n">@line.Qty?.ToString("#,0.####")</td><td>@line.Unit</td>
+                        @if (ShowsUnitCosts) { <td class="n">@line.UnitCost.ToString("N4")</td> }
+                        @if (ShowsRecipeCosts) { <td class="n">@Money(line.Cost)</td> }
+                        @if (ProductionCopy) { @TickBox }
+                    </tr>
+                }
+            </tbody>
+            @if (ShowsRecipeCosts)
+            {
+                <tfoot>
+                    <tr><td>Pack cost</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.PackCost)</td></tr>
+                    <tr><td>Per unit</td><td></td><td></td>@if (ShowsUnitCosts) { <td></td> }<td class="n">@Money(bulk.CostPerUnit)</td></tr>
+                </tfoot>
+            }
+        </table>
+    </text>;
 
     private RenderFragment CostingPart(ProductPrintout printout) => @<section class="print-block print-keep">
         @{

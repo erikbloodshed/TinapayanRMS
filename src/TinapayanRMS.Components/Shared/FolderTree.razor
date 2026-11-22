@@ -451,36 +451,10 @@
         switch (e.Key)
         {
             case "ArrowDown" or "ArrowUp" or "Home" or "End":
-                if (_visible.Count == 0)
-                {
-                    return;
-                }
-
-                var index = current is null ? -1 : _visible.IndexOf(current);
-                index = e.Key switch
-                {
-                    "ArrowDown" => Math.Min(index + 1, _visible.Count - 1),
-                    "ArrowUp" => Math.Max(index - 1, 0),
-                    "Home" => 0,
-                    _ => _visible.Count - 1,
-                };
-                _pickedHere = true;
-                PickAlone(_visible[index]);
-                _shownSelection = null;
+                StepTo(e.Key, current);
                 break;
-            case "ArrowRight" when current is not null && ChildrenOf(current) is not null && !IsExpanded(current):
-                SetExpanded(current, true);
-                break;
-            case "ArrowLeft" when current is not null && ChildrenOf(current) is not null && IsExpanded(current):
-                SetExpanded(current, false);
-                break;
-            case "ArrowLeft" when current is not null && PathTo(current) is { Count: > 1 } path:
-                _pickedHere = true;
-                PickAlone(path[^2]);
-                _shownSelection = null;
-                break;
-            case "Enter" or " " when current is not null && ChildrenOf(current) is not null:
-                SetExpanded(current, !IsExpanded(current));
+            case "ArrowRight" or "ArrowLeft" or "Enter" or " " when current is not null:
+                OpenOrClose(e.Key, current);
                 break;
             case "F2" or "Delete" when !isEditing:
                 RunShortcut(e.Key == "F2" ? "F2" : "Del");
@@ -492,6 +466,56 @@
                 await _menu.OpenAsync(MenuFor(current), 200, 200);
                 break;
         }
+    }
+
+    /// <summary>Down, Up, Home or End: picks the row below the one picked, above it, the first or the last.</summary>
+    private void StepTo(string key, TNode? current)
+    {
+        if (_visible.Count == 0)
+        {
+            return;
+        }
+
+        var index = current is null ? -1 : _visible.IndexOf(current);
+        index = key switch
+        {
+            "ArrowDown" => Math.Min(index + 1, _visible.Count - 1),
+            "ArrowUp" => Math.Max(index - 1, 0),
+            "Home" => 0,
+            _ => _visible.Count - 1,
+        };
+        PickByKey(_visible[index]);
+    }
+
+    /// <summary>
+    /// Right opens the folder picked, Left closes it or, on a row whose folder is open, picks that folder, and Enter or
+    /// Space opens or closes it.
+    /// </summary>
+    private void OpenOrClose(string key, TNode current)
+    {
+        var isFolder = ChildrenOf(current) is not null;
+        switch (key)
+        {
+            case "ArrowRight" when isFolder && !IsExpanded(current):
+                SetExpanded(current, true);
+                break;
+            case "ArrowLeft" when isFolder && IsExpanded(current):
+                SetExpanded(current, false);
+                break;
+            case "ArrowLeft" when PathTo(current) is { Count: > 1 } path:
+                PickByKey(path[^2]);
+                break;
+            case "Enter" or " " when isFolder:
+                SetExpanded(current, !IsExpanded(current));
+                break;
+        }
+    }
+
+    private void PickByKey(TNode node)
+    {
+        _pickedHere = true;
+        PickAlone(node);
+        _shownSelection = null;
     }
 
     /// <summary>Runs what the row picked's menu shows beside <paramref name="gesture"/> (TreeShortcut), if it can run.</summary>
