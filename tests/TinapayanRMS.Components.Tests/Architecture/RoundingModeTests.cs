@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Reflection.Emit;
 using AwesomeAssertions;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Infrastructure;
@@ -22,16 +21,12 @@ public class RoundingModeTests
         typeof(ApplicationCore.Rules.CostingRules).Assembly,       // ApplicationCore
         typeof(TinapayanRMSDbContext).Assembly,                    // Infrastructure
         typeof(Pricing.SavedProductReader).Assembly,               // Pricing
+        Codebase.UseCases,                                         // UseCases
         typeof(VersionTrendPoint).Assembly,                        // Presentation
     ];
 
     private const BindingFlags Declared =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
-
-    private static readonly Dictionary<short, OpCode> OpCodesByValue =
-        typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static)
-            .Select(field => (OpCode)field.GetValue(null)!)
-            .ToDictionary(opCode => opCode.Value);
 
     [Test]
     public void Every_rounding_below_the_screens_names_its_midpoint_mode()
@@ -60,56 +55,8 @@ public class RoundingModeTests
     private static decimal RoundedAwayFromZero(decimal amount) => Math.Round(amount, 2, MidpointRounding.AwayFromZero);
 
     private static bool RoundsWithoutAMode(MethodBase method) =>
-        CalledBy(method).Any(called =>
+        IlReader.UsedBy(method).OfType<MethodBase>().Any(called =>
             (called.DeclaringType == typeof(Math) || called.DeclaringType == typeof(decimal))
             && called.Name == nameof(Math.Round)
             && called.GetParameters().All(parameter => parameter.ParameterType != typeof(MidpointRounding)));
-
-    /// <summary>Every method <paramref name="method"/>'s IL calls (call, callvirt, newobj, ldftn), each operand read by its opcode.</summary>
-    private static IEnumerable<MethodBase> CalledBy(MethodBase method)
-    {
-        if (method.GetMethodBody()?.GetILAsByteArray() is not { } il)
-        {
-            yield break;
-        }
-
-        var typeArguments = method.DeclaringType is { IsGenericType: true } type ? type.GetGenericArguments() : null;
-        var methodArguments = method is MethodInfo { IsGenericMethod: true } ? method.GetGenericArguments() : null;
-        for (var at = 0; at < il.Length;)
-        {
-            short value = il[at++];
-            if (value == 0xFE)
-            {
-                value = unchecked((short)(0xFE00 | il[at++]));
-            }
-
-            var opCode = OpCodesByValue[value];
-            if (opCode.OperandType == OperandType.InlineMethod && Resolve(method.Module, BitConverter.ToInt32(il, at), typeArguments, methodArguments) is { } called)
-            {
-                yield return called;
-            }
-
-            at += opCode.OperandType switch
-            {
-                OperandType.InlineNone => 0,
-                OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
-                OperandType.InlineVar => 2,
-                OperandType.InlineI8 or OperandType.InlineR => 8,
-                OperandType.InlineSwitch => 4 + (4 * BitConverter.ToInt32(il, at)),
-                _ => 4,
-            };
-        }
-    }
-
-    private static MethodBase? Resolve(Module module, int token, Type[]? typeArguments, Type[]? methodArguments)
-    {
-        try
-        {
-            return module.ResolveMethod(token, typeArguments, methodArguments);
-        }
-        catch (Exception ex) when (ex is ArgumentException or BadImageFormatException)
-        {
-            return null;
-        }
-    }
 }

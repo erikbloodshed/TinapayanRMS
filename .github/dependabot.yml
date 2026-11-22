@@ -13,14 +13,16 @@ updates:
     groups:
       syncfusion:
         patterns: ["Syncfusion.*"]
+      # The first group a package matches takes it. The WebView pin without .Maui is the runtime's
+      # (Directory.Packages.props), so it's left for dotnet-runtime below.
       maui:
-        patterns: ["Microsoft.Maui.*", "Microsoft.AspNetCore.Components.WebView*"]
+        patterns: ["Microsoft.Maui.*", "Microsoft.AspNetCore.Components.WebView.Maui"]
       ef-core-and-npgsql:
         patterns: ["Microsoft.EntityFrameworkCore*", "Npgsql*", "EFCore.*"]
       dotnet-runtime:
         patterns: ["Microsoft.Extensions.*", "Microsoft.AspNetCore.*"]
       testing:
-        patterns: ["TUnit*", "Microsoft.Testing.*", "AwesomeAssertions", "bunit", "Respawn", "BenchmarkDotNet*"]
+        patterns: ["TUnit*", "Microsoft.Testing.*", "AwesomeAssertions", "bunit", "CsCheck", "Respawn", "BenchmarkDotNet*"]
     ignore:
       # Held at 5.0.2, the last WiX under the plain MS-RL licence (Directory.Packages.props, the user's choice, 2026-11-15).
       - dependency-name: "WixToolset.*"

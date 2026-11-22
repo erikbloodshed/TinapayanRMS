@@ -6,4 +6,15 @@ M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.IObservabl
 M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.Threading.Tasks.Task{``0}});A failure that reaches Switch ends the subscription for good: load through ScreenState.LoadLatest
 P:System.Threading.Tasks.Task`1.Result;Blocks the thread on async work, which deadlocks on the UI thread: await it
 M:System.Threading.Tasks.Task.Wait;Blocks the thread on async work, which deadlocks on the UI thread: await it
-M:System.Threading.Tasks.Task.WaitAll;Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.Wait(System.Int32);Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.Wait(System.Int32,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.Wait(System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan);Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.Wait(System.TimeSpan,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await it
+M:System.Threading.Tasks.Task.WaitAll(System.Collections.Generic.IEnumerable{System.Threading.Tasks.Task},System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.ReadOnlySpan{System.Threading.Tasks.Task});Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[]);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.TimeSpan);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll

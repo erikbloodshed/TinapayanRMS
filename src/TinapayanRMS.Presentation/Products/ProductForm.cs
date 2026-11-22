@@ -29,8 +29,9 @@ namespace TinapayanRMS.Presentation.Products;
 /// The form keeps its own fields, which product it shows, Save, the costs, and the undo history over them all; the view keeps
 /// the list, the products, categories, roles and materials its pickers offer, and the load that brings them (<see cref="View"/>).
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+#pragma warning disable CA1506 // The type's own coupling alone, baseline of 2026-11-20 (ADR 0004): the screen's coordination (ADR 0002's amendment). Each member is still checked.
 public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDisposable, IRecordScreen, IRevertScreen, ITabForm,
+#pragma warning restore CA1506
     IProductDraftHost, IProductRecipeHost, IProductPackagingHost, IProductVersionHistoryHost, IProductUsageFormHost, IProductComponentsHost
 {
     /// <summary>The details tabs along the bottom: Recipe, Costing, Clone, then History.</summary>
@@ -62,7 +63,6 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     private readonly CategoryPicker<ProductCategory> _categoryPicker;
 
     private readonly Subject<PrintScope> _printRequests = new();
-
     private readonly Subject<int> _subAssemblyOpenRequests = new();
 
     /// <summary>A product whose versions the History tab should read: pushed as the tab shows, and after a Save.</summary>

@@ -11,6 +11,8 @@ namespace TinapayanRMS.Components.Tests.Architecture;
 /// double turned into a decimal keeps its binary noise (28.35 becomes 28.3499…). So no field, property, parameter,
 /// return value or local variable of the app's own code below the screens is a double or a float, however it's wrapped
 /// (double?, double[], IReadOnlyList&lt;double&gt;), except where a number leaves for something that only takes doubles.
+/// And none of it, the screens included, turns one into a decimal: a cast is a built-in conversion BannedSymbols.txt
+/// can't name, so it's read from each method's IL.
 /// </summary>
 public class DecimalNumbersTests
 {
@@ -26,6 +28,7 @@ public class DecimalNumbersTests
         typeof(ApplicationCore.Rules.CostingRules).Assembly,       // ApplicationCore
         typeof(TinapayanRMSDbContext).Assembly,                    // Infrastructure
         typeof(Pricing.SavedProductReader).Assembly,               // Pricing
+        Codebase.UseCases,                                         // UseCases
         typeof(VersionTrendPoint).Assembly,                        // Presentation
     ];
 
@@ -46,6 +49,54 @@ public class DecimalNumbersTests
         // Joined, so a failure lists every one, not only the first.
         string.Join(Environment.NewLine, doubles).Should().BeEmpty("amounts, quantities and percentages are decimals; a double is only for something that takes nothing else, named in MeantForDoubles");
     }
+
+    [Test]
+    public void No_double_or_float_is_turned_into_a_decimal()
+    {
+        var converting = Checked.Append(Codebase.Components)
+            .SelectMany(assembly => assembly.GetTypes())
+            .SelectMany(IlReader.Bodies)
+            .Where(TurnsBinaryIntoDecimal)
+            .Select(method => $"{method.DeclaringType!.FullName}.{method.Name}")
+            .Distinct()
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        string.Join(Environment.NewLine, converting).Should().BeEmpty("since .NET 11 the decimal keeps the double's binary noise: take it from text or a literal");
+    }
+
+    [Test]
+    [Arguments(nameof(CastFromADouble))]
+    [Arguments(nameof(CastFromANullableDouble))]
+    [Arguments(nameof(CastFromAFloat))]
+    [Arguments(nameof(CastFromAHalf))]
+    [Arguments(nameof(CreatedFromADouble))]
+    public void A_double_or_float_turned_into_a_decimal_is_found(string method) =>
+        TurnsBinaryIntoDecimal(typeof(DecimalNumbersTests).GetMethod(method, Declared)!).Should().BeTrue();
+
+    [Test]
+    public void A_decimal_from_text_or_a_whole_number_is_let_through() =>
+        TurnsBinaryIntoDecimal(typeof(DecimalNumbersTests).GetMethod(nameof(FromTextAndAWholeNumber), Declared)!).Should().BeFalse();
+
+    private static decimal CastFromADouble(double number) => (decimal)number;
+
+    private static decimal? CastFromANullableDouble(double? number) => (decimal?)number;
+
+    private static decimal CastFromAFloat(float number) => (decimal)number;
+
+    private static decimal CastFromAHalf(Half number) => (decimal)number;
+
+    private static decimal CreatedFromADouble(double number) => decimal.CreateChecked(number);
+
+    private static decimal FromTextAndAWholeNumber(string text, int whole) =>
+        decimal.Parse(text, System.Globalization.CultureInfo.InvariantCulture) + whole;
+
+    /// <summary>A conversion to decimal from a double, a float or a Half: a cast's operator, or decimal.CreateChecked and its kin.</summary>
+    private static bool TurnsBinaryIntoDecimal(MethodBase method) =>
+        IlReader.UsedBy(method).OfType<MethodInfo>().Any(called =>
+            called.ReturnType == typeof(decimal)
+            && (called.Name is "op_Explicit" or "op_Implicit" || called.Name.StartsWith("Create", StringComparison.Ordinal))
+            && called.GetParameters().Any(parameter => IsBinary(parameter.ParameterType)));
 
     /// <summary>Where <paramref name="type"/> holds, takes or gives a double or a float: "Type.Member (what)".</summary>
     private static IEnumerable<string> Uses(Type type)
