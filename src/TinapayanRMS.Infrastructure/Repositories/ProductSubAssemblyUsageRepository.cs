@@ -71,9 +71,36 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 splitOn: "Id")).AsList(),
             cancellationToken);
 
-    /// <summary>A product's recipe as its own screen saves it, linking nothing that's another product's own but what it already links.</summary>
-    internal static Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken) =>
-        SetRecipeAsync(dbContext, productId, recipe, linksOthersOwn: false, cancellationToken);
+    /// <summary>
+    /// A product's recipe as its own screen saves it, linking nothing that's another product's own but what it already links;
+    /// the product whose own section it relined is saved by it too (<see cref="StampOwnersOfRelinedAsync"/>).
+    /// </summary>
+    internal static async Task SetRecipeAsync(TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
+    {
+        await SetRecipeAsync(dbContext, productId, recipe, linksOthersOwn: false, cancellationToken);
+        await StampOwnersOfRelinedAsync(dbContext, productId, recipe, cancellationToken);
+    }
+
+    /// <summary>
+    /// A variant's Save that changes the lines of a section that's its source's own has saved the source's recipe, so it
+    /// stamps the source as saved (Product.UpdatedAt), as relining stamps the sub-assembly: the source's form reads itself
+    /// again with nothing typed, and with something typed its Save is refused (SavedVersionRules), since it writes every
+    /// section of its own as the form holds it.
+    /// </summary>
+    private static async Task StampOwnersOfRelinedAsync(
+        TinapayanRMSDbContext dbContext, int productId, RecipeDraft recipe, CancellationToken cancellationToken)
+    {
+        List<int> relinedIds = [.. recipe.Linked.Where(l => l.Lines is not null).Select(l => l.SubAssemblyId)];
+        if (relinedIds.Count == 0)
+        {
+            return;
+        }
+
+        var now = dbContext.LocalNow();
+        await dbContext.Products
+            .Where(p => p.Id != productId && dbContext.SubAssemblies.Any(s => s.OwnerProductId == p.Id && relinedIds.Contains(s.Id)))
+            .ExecuteUpdateAsync(set => set.SetProperty(p => p.UpdatedAt, now), cancellationToken);
+    }
 
     /// <summary>
     /// Replaces the product's recipe on the caller's context, which should hold a transaction: its usages, one for each

@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Infrastructure.Tests.Fixtures;
 using TinapayanRMS.Tests.Common.Fixtures;
 
@@ -181,6 +182,41 @@ public class SavedVersionPersistenceTests(DatabaseFixture fixture) : Persistence
 
         var act = () => SubAssemblies.SaveStandaloneAsync(opened, [new RecipeLine(flourId, 300m)], Cancellation);
         await act.Should().ThrowAsync<BusinessRuleException>().WithMessage(SavedVersionRules.SavedSinceText("Dough"));
+    }
+
+    [Test]
+    public async Task A_variants_save_relining_its_sources_own_section_is_a_save_of_the_source()
+    {
+        var flourId = await AddIngredientAsync("Flour", 0.05m);
+        var roleId = await AddRoleAsync("Topping", isProductOwned: true);
+        var (sourceId, sectionId) = await AddProductWithSubAssemblyAsync("Loaf", roleId, [(flourId, 100m)]);
+        var variantId = await new ProductCloner(CreateDbContextFactory(_clock)).CreateVariantAsync(sourceId, "Loaf Mini", Cancellation);
+
+        // Its own piece size of the section leaves the source's recipe as it was.
+        AMinuteLater();
+        var before = (await ProductAsync(sourceId)).UpdatedAt;
+        await Products.SaveAsync(
+            await ProductAsync(variantId),
+            new RecipeDraft([], [new LinkedUsageDraft(sectionId, UsageAuthoredField.WeightPerPiece, 20m)]),
+            packagingLink: null,
+            packagingLines: null,
+            costing: null,
+            Cancellation);
+        (await ProductAsync(sourceId)).UpdatedAt.Should().Be(before);
+
+        var opened = await ProductAsync(sourceId);
+        opened.UpdatedAt = SavedVersionRules.OpenedAs(opened.UpdatedAt);
+        AMinuteLater();
+        await Products.SaveAsync(
+            await ProductAsync(variantId),
+            new RecipeDraft([], [new LinkedUsageDraft(sectionId, UsageAuthoredField.WeightPerPiece, 20m) { Lines = [new RecipeLine(flourId, 250m)] }]),
+            packagingLink: null,
+            packagingLines: null,
+            costing: null,
+            Cancellation);
+
+        var act = () => SaveAsync(opened);
+        await act.Should().ThrowAsync<SavedSinceException>().WithMessage(SavedVersionRules.SavedSinceText("Loaf"));
     }
 
     [Test]

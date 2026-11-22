@@ -68,8 +68,9 @@ public sealed class Product
     public decimal? CurrentPrice { get; set; }
 
     /// <summary>
-    /// When the product was last saved, in local time: set each time it's added or updated, and for a
-    /// clone when it's made. Null for a product not saved since this was added.
+    /// When the product was last saved, in local time: set each time it's added or updated, for a clone when it's
+    /// made, and when a variant's Save changes the lines of a section of this product's own. Null for a product not saved
+    /// since this was added.
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
 

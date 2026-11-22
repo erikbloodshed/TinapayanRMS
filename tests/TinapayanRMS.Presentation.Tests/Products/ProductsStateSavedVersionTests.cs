@@ -5,6 +5,7 @@ using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
+using TinapayanRMS.Infrastructure.Services;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Presentation.Tests.Fixtures;
@@ -230,6 +231,38 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         state.Recipe.UsageEdits.Select(u => u.RoleId).Should().Equal(fillingId);
         state.UsageForm.FormLines.Select(l => l.Grams).Should().Equal(200m);
         state.History.IsDirty.Should().BeFalse();
+    });
+
+    [Test]
+    public Task The_sources_tab_takes_up_what_its_variant_saved_into_its_own_section_and_a_Save_keeps_it() => UiThread.RunAsync(async () =>
+    {
+        var (source, variant, sectionId, flourId, butterId) = await SourceAndVariantTabsAsync();
+
+        await SaveButterIntoTheSectionAsync(variant, butterId);
+
+        source.View.Show(source.View.Tabs.Holding(source.SelectedProduct!.Id)!);
+        source.UsageForm.FormLines.Select(l => (l.IngredientId, l.Grams)).Should().Equal((flourId, 1000m), (butterId, 250m));
+        source.History.IsDirty.Should().BeFalse("nothing was typed");
+
+        source.UsageForm.TypeWeightPerPiece(70m);
+        await source.SaveCommand.ExecuteAsync();
+
+        source.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m), (butterId, 250m));
+    });
+
+    [Test]
+    public Task The_sources_tab_with_changes_is_refused_over_what_its_variant_saved_into_its_own_section() => UiThread.RunAsync(async () =>
+    {
+        var (source, variant, sectionId, flourId, butterId) = await SourceAndVariantTabsAsync();
+        TypeDescription(source, "Toasted");
+
+        await SaveButterIntoTheSectionAsync(variant, butterId);
+        await source.SaveCommand.ExecuteAsync();
+
+        source.ErrorMessage.Should().Be(SavedVersionRules.SavedSinceText("Loaf"));
+        source.EditingDescription.Should().Be("Toasted", "what's typed stays");
+        (await StoredLinesAsync(sectionId)).Should().Equal((flourId, 1000m), (butterId, 250m));
     });
 
     [Test]
@@ -471,6 +504,33 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         await using var dbContext = CreateDbContext();
         var lines = await dbContext.SubAssemblyLines.Where(l => l.SubAssemblyId == subAssemblyId).OrderBy(l => l.SortOrder).ToListAsync(Cancellation);
         return [.. lines.Select(l => ((int?)l.IngredientId, (decimal?)l.Grams))];
+    }
+
+    /// <summary>A product with a section of its own, and its variant, each in a tab of the one window.</summary>
+    private async Task<(ProductForm Source, ProductForm Variant, int SectionId, int FlourId, int ButterId)> SourceAndVariantTabsAsync()
+    {
+        var toppingId = await AddRoleAsync("Topping", isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var (sourceId, sectionId) = await AddProductWithSubAssemblyAsync("Loaf", toppingId, [(flourId, 1000m)], weightPerPiece: 60m);
+        var variantId = await new ProductCloner(CreateDbContextFactory()).CreateVariantAsync(sourceId, "Loaf Mini", Cancellation);
+
+        var source = await OpenedStateAsync(sourceId);
+        var view = source.View;
+        view.Keep(view.Tabs.Active!);
+        view.OpenRecord(variantId);
+        var variant = view.Form!;
+        await ShowingAsync(variant, variantId);
+        return (source, variant, sectionId, flourId, butterId);
+    }
+
+    private static async Task SaveButterIntoTheSectionAsync(ProductForm variant, int butterId)
+    {
+        variant.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        variant.UsageForm.IsEditingLinkedUsage.Should().BeTrue("the variant links its source's section");
+        variant.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m });
+        await variant.SaveCommand.ExecuteAsync();
+        variant.ErrorMessage.Should().BeNull();
     }
 
     private async Task<(string Name, string? Description)> StoredAsync(int id)
