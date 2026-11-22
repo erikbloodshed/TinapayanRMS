@@ -554,8 +554,8 @@ public sealed class ProductVersionHistory : ObservableState
     /// add-ins among them). Packaging links what it linked while that's still there, else takes the lines it showed as the
     /// product's own. Refused, with nothing changed, while a material, role or product it needs is gone.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     private async Task RestoreAsync(ProductVersionRow row)
     {
         if (_host.ProductShowing is not { } product || ProductId != product.Id)

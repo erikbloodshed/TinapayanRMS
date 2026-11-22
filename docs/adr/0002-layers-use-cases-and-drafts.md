@@ -1,7 +1,8 @@
 # 0002. Layers, use cases and drafts
 
-**Status:** Accepted, 2026-11-20. Migration in progress: phases 0 (guardrails), 1 (Sub-Assemblies), 2 (Raw Materials) and 3 (Products) done, phase 3's done-when amended on 2026-11-21 (below); phase 4 done on 2026-11-21 (Settings' list tabs, Costing Defaults and Printing, the password and the backups, Quick Find and Reports, the Price Simulator and the Print dialog moved, emptying `DataAccessTests.StillReaching`; then Presentation's reference to Infrastructure went, `Failure` moving to ApplicationCore, emptying `LayerTests.StillThere`). The migration is complete. What
-`Rebase` does is narrowed by [ADR 0007](0007-a-load-repoints-a-draft.md): it re-points a draft, and merges nothing.
+**Status:** Accepted, 2026-11-20. Migration complete, 2026-11-21 (phases 0 to 4, phase 3's done-when amended below), and closed by [ADR 0009](0009-close-the-migration.md). Narrowed by
+[ADR 0007](0007-a-load-repoints-a-draft.md) (`Rebase` re-points a draft, and merges nothing) and by ADR 0009 (no draft `Version` to cache on, and
+the screens' tests may use the database).
 
 ## Context
 

@@ -1,6 +1,7 @@
 # 0003. Mutable, observable screen state
 
-**Status:** Accepted, 2026-11-20. Records the state model the app has used since ReactiveUI went (2026-11-16).
+**Status:** Accepted, 2026-11-20. Records the state model the app has used since ReactiveUI went (2026-11-16). Narrowed
+by [ADR 0009](0009-close-the-migration.md): no version on a draft for its figures to be cached on.
 
 ## Context
 

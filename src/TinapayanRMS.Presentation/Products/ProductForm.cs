@@ -77,7 +77,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     private (int ProductId, ProductDetail Detail)? _preloadedDetail;
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     internal ProductForm(
         ProductsState view,
         IProductQueries queries,

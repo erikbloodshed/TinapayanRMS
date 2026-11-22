@@ -133,7 +133,7 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// <param name="categories">Every category, by name, as the view binds them: the category filter's choices.</param>
     /// <param name="queries">What the list reads again after a move: the folders, and the products moved.</param>
     /// <param name="editor">What the list's moves, renames and folders write.</param>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): moves to a use case and a draft as its screen is migrated (ADR 0002).")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     public ProductsList(
         IProductsListHost host,
         SourceCache<Product, int> productCache,

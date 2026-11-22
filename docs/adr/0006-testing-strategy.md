@@ -1,6 +1,7 @@
 # 0006. Testing strategy
 
-**Status:** Accepted, 2026-11-20.
+**Status:** Accepted, 2026-11-20. Narrowed by [ADR 0009](0009-close-the-migration.md): the screens' tests may use the database. The
+random sequences stand, and aren't all built yet.
 
 ## Context
 
