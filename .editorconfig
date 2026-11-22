@@ -1,5 +1,9 @@
 root = true
 
+# Every file is written with LF, as Git stores and checks them out (.gitattributes).
+[*]
+end_of_line = lf
+
 [*.cs]
 # CA1716 flags member names that are keywords in other .NET languages, such as `Date` in Visual Basic.
 # This app is C# only, and IPriceHistoryEntry.Date maps to a database column.
