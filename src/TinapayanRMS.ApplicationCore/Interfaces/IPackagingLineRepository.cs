@@ -10,8 +10,8 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 public sealed record EffectivePackaging(IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>> Lines, IReadOnlySet<int> LinkedRoundInALoop)
 {
     /// <summary>
-    /// Each product's bulk packaging (PackagingLine.IsBulk), by product id: its own lines for one bulk pack, never read
-    /// through a link; empty for one with none.
+    /// Each product's bulk packaging (PackagingLine.IsBulk), by product id, its lines for one bulk pack: those of the
+    /// packaging set it links (PackagingLink.IsBulk), or its own; empty for one with none.
     /// </summary>
     public IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>> Bulk { get; init; } = new Dictionary<int, IReadOnlyList<PackagingLine>>();
 }

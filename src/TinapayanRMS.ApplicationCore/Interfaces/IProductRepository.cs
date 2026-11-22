@@ -148,12 +148,21 @@ public closed record PackagingLinkDraft
 
 /// <summary>
 /// A product's bulk packaging as Save writes it: the packaging one bulk pack takes (a box several units share, its tape),
-/// each line's quantity per pack, and how many sellable units one pack holds (Product.BulkPackagingQuantity), which its
-/// cost is shared out among. No lines is no bulk packaging, and the quantity is then stored as null.
+/// each line's quantity per pack, or the packaging set on the Sub-Assemblies screen it links instead (<paramref name="SetId"/>,
+/// whose lines are the pack's), and how many sellable units one pack holds (Product.BulkPackagingQuantity), which its cost
+/// is shared out among, the product's own either way. No lines and no set is no bulk packaging, and the quantity is then
+/// stored as null.
 /// </summary>
+/// <param name="Lines">The product's own lines for one pack: none while it links a set.</param>
+/// <param name="SetId">The packaging set its bulk packaging links (PackagingLink.IsBulk), or null for its own lines.</param>
 public sealed record BulkPackagingDraft(
     IReadOnlyList<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> Lines,
-    int? Quantity);
+    int? Quantity,
+    int? SetId = null)
+{
+    /// <summary>It's some bulk packaging, its own lines or a set's: what needs how many products a pack holds.</summary>
+    public bool HasPackaging => Lines.Count > 0 || SetId is not null;
+}
 
 /// <summary>
 /// A product filed under another folder of the Products list: the stage and the folder (ProductFolder) it goes in from now

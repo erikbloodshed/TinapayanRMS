@@ -16,14 +16,14 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261119114520_PrintoutLook";
+    public override string LastMigrationId => "20261122130916_BulkPackagingLinks";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
 #pragma warning disable 612, 618
         modelBuilder
             .HasAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False")
-            .HasAnnotation("ProductVersion", "11.0.0-rc.3.26522.148")
+            .HasAnnotation("ProductVersion", "11.0.0")
             .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -92,7 +92,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("labor_percent");
 
-                b.Property<decimal>("MarginPercent")
+                b.Property<decimal>("MarkupPercent")
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("margin_percent");
@@ -163,7 +163,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("labor_percent");
 
-                b.Property<decimal>("MarginPercent")
+                b.Property<decimal>("MarkupPercent")
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("margin_percent");
@@ -303,6 +303,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<bool>("IsBulk")
+                    .HasColumnType("boolean")
+                    .HasColumnName("is_bulk");
+
                 b.Property<int?>("LinkedProductId")
                     .HasColumnType("integer")
                     .HasColumnName("linked_product_id");
@@ -324,12 +328,14 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.HasIndex("LinkedSubAssemblyId")
                     .HasDatabaseName("ix_packaging_links_linked_sub_assembly_id");
 
-                b.HasIndex("ProductId")
+                b.HasIndex("ProductId", "IsBulk")
                     .IsUnique()
-                    .HasDatabaseName("ix_packaging_links_product_id");
+                    .HasDatabaseName("ix_packaging_links_product_id_is_bulk");
 
                 b.ToTable("packaging_links", t =>
                     {
+                        t.HasCheckConstraint("CK_PackagingLinks_BulkLinksASet", "NOT is_bulk OR linked_sub_assembly_id IS NOT NULL");
+
                         t.HasCheckConstraint("CK_PackagingLinks_OneTarget", "(linked_product_id IS NOT NULL AND linked_sub_assembly_id IS NULL) OR (linked_product_id IS NULL AND linked_sub_assembly_id IS NOT NULL)");
                     });
             });

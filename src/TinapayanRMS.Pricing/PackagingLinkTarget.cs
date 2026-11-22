@@ -5,7 +5,8 @@ namespace TinapayanRMS.Pricing;
 
 /// <summary>
 /// What a product's per-piece packaging links: a standalone packaging set from the Sub-Assemblies screen
-/// (<see cref="Set"/>, one set per sellable unit), or another product's packaging (<see cref="OtherProduct"/>).
+/// (<see cref="Set"/>, one set per sellable unit), or another product's packaging (<see cref="OtherProduct"/>). Its bulk
+/// packaging links only a set (one set per bulk pack).
 /// </summary>
 /// <param name="Name">The set's or the product's name, as it was read.</param>
 public closed record PackagingLinkTarget(string Name)

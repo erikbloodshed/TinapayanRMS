@@ -853,7 +853,10 @@ To use packaging that already exists, use the buttons at the top right of the ta
 - **Insert Line** puts a blank line in above the selected one, and **Remove Line** takes the selected one out.
 - Save refuses bulk lines with no **Products per pack**. Take every line out to have no bulk packaging.
 - A material can be both one of the packaging lines and one of the bulk lines, such as tape on each product's bag and on the box.
-- Bulk packaging is this product's own. **Link**, **Copy**, **Make a Copy**, **Remove Link** and **Move to Sub-Assemblies** leave it as it is, and the packaging set never has it. **Clone** copies it; **Create Variant** doesn't, since a variant starts with no packaging.
+- **Link**, beside **Products per pack**, uses a packaging set from the Sub-Assemblies screen as what one bulk pack takes. It opens a picker of the packaging sets in its place, as the packaging per piece's Link does. Pick one, and its lines show in the Bulk Packaging table, read-only, and follow every change made to the set. Each of the set's quantities is for one whole pack. **Products per pack** stays this product's own, so one box set can hold 6 of one product and 4 of a bigger one. The badge beside the heading names the set; click it to open the set on the Sub-Assemblies screen.
+- Under linked bulk lines, **Make a Copy** turns them into this product's own lines so you can change them, and **Remove Link** takes the link and its lines out, leaving no bulk packaging. **Undo** puts back what the table held before a Link, a Make a Copy or a Remove Link.
+- The packaging per piece's **Link**, **Copy**, **Make a Copy**, **Remove Link** and **Move to Sub-Assemblies** leave the bulk packaging as it is. **Clone** copies it, or links the same packaging set; **Create Variant** doesn't, since a variant starts with no packaging. Restoring a version from the History tab brings back the bulk lines it showed as this product's own.
+- A packaging set that a product's bulk packaging links can't be deleted from the Sub-Assemblies screen until that product stops linking it.
 
 **Move to Sub-Assemblies**, at the top right of the Packaging tab while the packaging per piece is this product's own lines, works as it does for the product's own sections. Save puts the lines on the Sub-Assemblies screen as a packaging set named after the product, such as *Ensaymada Packaging*, and this product links it there. The cost doesn't change. Until you save, a **Moves to Sub-Assemblies on Save** badge shows and you can still change the lines; Undo or Revert keeps them the product's own. Afterwards other products can link the set too, its lines are changed on the Sub-Assemblies screen, and **Make a Copy** makes them this product's own again.
 
@@ -1424,7 +1427,7 @@ For products packed several to a box, whether or not each is in its own wrapper 
 
 1. Open the product on its **Packaging** tab, which every product has. Under **Packaging per Piece** is **Bulk Packaging**.
 2. In **Products per pack**, type how many products one box holds, such as 6.
-3. In the Bulk Packaging table, add what one box takes: the box itself (Qty 1), and anything else for the whole box, such as its tape.
+3. In the Bulk Packaging table, add what one box takes: the box itself (Qty 1), and anything else for the whole box, such as its tape. Or, if the box is kept as a packaging set on the Sub-Assemblies screen, press **Link** beside Products per pack and pick the set.
 4. Check the caption under the table, then Save. Each product now carries a sixth of the box's cost, on top of any packaging of its own.
 
 ### Install or update TinapayanRMS

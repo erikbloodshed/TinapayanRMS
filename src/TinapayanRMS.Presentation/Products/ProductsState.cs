@@ -244,9 +244,9 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         var linkedPackaging = await Task.Run(() => _queries.ReadLinkedPackagingAsync([.. packagingToRead.Select(r => r.ProductId).Distinct()], CancellationToken.None));
         foreach (var (load, productId) in packagingToRead)
         {
-            if (linkedPackaging.TryGetValue(productId, out var lines))
+            if (linkedPackaging.TryGetValue(productId, out var now))
             {
-                load.LinkedPackagingLines = lines;
+                load.LinkedPackaging = now;
             }
         }
 

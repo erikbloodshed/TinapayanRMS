@@ -4,6 +4,7 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -177,7 +178,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
         Components.Load(detail.Components);
         Packaging.LoadLink(detail.PackagingLink);
         Packaging.LoadLines(detail.Lines);
-        Packaging.LoadBulk(detail.BulkLines, bulkPackagingQuantity);
+        Packaging.LoadBulk(detail.BulkLines, bulkPackagingQuantity, detail.BulkPackagingLink);
     }
 
     /// <summary>
@@ -193,28 +194,24 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
 
     /// <summary>
     /// What a load brought from where it's kept, nothing typed changed (ADR 0007): the linked packaging as saved now
-    /// (<paramref name="linkedPackaging"/>, its link and its lines, read again while the form still shows the link as saved;
-    /// null when they weren't), and the recipe's sections at the fresh ingredients, roles and linked sub-assemblies. What
-    /// changed of what's linked, for the form's undo history to take in too: whether a linked section did, and the packaging
-    /// as it shows now when its linked lines or name did. The packaging's rows at their materials' refreshed costs are the
-    /// form's to re-point after its history is rewritten (ProductPackagingDraft.ResolveRows).
+    /// (<paramref name="linkedPackaging"/>, the links the form still showed as saved, the packaging per piece's and the bulk
+    /// packaging's, and what the product's packaging shows now; null when nothing was read again), and the recipe's sections
+    /// at the fresh ingredients, roles and linked sub-assemblies. What changed of what's linked, for the form's undo history
+    /// to take in too: whether a linked section did, and the packaging as it shows now when its linked lines or a name did.
+    /// The packaging's rows at their materials' refreshed costs are the form's to re-point after its history is rewritten
+    /// (ProductPackagingDraft.ResolveRows).
     /// </summary>
     internal (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
-        (PackagingLinkTarget Link, IReadOnlyList<PackagingLine> Lines)? linkedPackaging,
+        (PackagingLinkTarget? Link, PackagingLinkTarget? BulkLink, PackagingNow Now)? linkedPackaging,
         IReadOnlyList<SubAssembly> linkedSubAssemblies,
         IReadOnlyList<SubAssemblyLine> linkedLines,
         SectionFormSnapshot? form = null)
     {
         PackagingSnapshot? linkedPackagingNow = null;
-        if (linkedPackaging is var (savedLink, linkedPackagingLines))
+        if (linkedPackaging is var (savedLink, savedBulkLink, now)
+            && Packaging.RefreshLinked(savedLink, now.Lines, savedBulkLink, now.BulkLines))
         {
-            // A renamed product or set reads right in the banner too. The lines are shown again only when they changed.
-            var renamed = !Equals(Packaging.LinkTarget, savedLink);
-            Packaging.ShowLink(savedLink);
-            if (Packaging.RefreshLinkedLines(linkedPackagingLines) || renamed)
-            {
-                linkedPackagingNow = Packaging.Capture();
-            }
+            linkedPackagingNow = Packaging.Capture();
         }
 
         var linkedSectionsChanged = Recipe.RefreshRows(linkedSubAssemblies, linkedLines, form);
@@ -261,7 +258,8 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             ? PrintedPackaging.From(
                 Packaging.LineEdits.Select(l => l.ToPriced()),
                 Packaging.IsPackagingLinked ? Packaging.PackagingLinkedToText : null,
-                Packaging.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.BulkEdits.Select(l => l.ToPriced())], Packaging.BulkQuantity))
+                Packaging.BulkEdits.Count == 0 ? null : new PricedBulkPackaging([.. Packaging.BulkEdits.Select(l => l.ToPriced())], Packaging.BulkQuantity),
+                Packaging.IsBulkLinked ? Packaging.BulkLinkedToText : null)
             : null,
         Costing.Costs,
         IsEditingComposite ? PrintedComponent.From(Components.ComponentEdits) : null)

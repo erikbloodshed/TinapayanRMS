@@ -264,7 +264,7 @@ public sealed record SectionFormSnapshot
 
 /// <summary>
 /// The Packaging tab's share of an undo step (ProductPackagingDraft.Capture): what its packaging links, whether Move to
-/// Sub-Assemblies was pressed, its lines for each piece and its bulk packaging.
+/// Sub-Assemblies was pressed, its lines for each piece and its bulk packaging, with the set that links.
 /// </summary>
 public sealed record PackagingSnapshot
 {
@@ -274,17 +274,21 @@ public sealed record PackagingSnapshot
     public required bool IsMoving { get; init; }
     public required IReadOnlyList<PackagingLineSnapshot> Lines { get; init; }
 
+    /// <summary>The packaging set the bulk packaging links, or null while its lines are the product's own (a restored version's are).</summary>
+    public PackagingLinkTarget? BulkLink { get; init; }
+
     /// <summary>The bulk packaging's lines, each for one bulk pack.</summary>
     public required IReadOnlyList<PackagingLineSnapshot> BulkLines { get; init; }
 
     /// <summary>How many products one bulk pack holds, as typed; null while nothing is.</summary>
     public required int? BulkQuantity { get; init; }
 
-    /// <summary>The packaging looks the same: its link and move, its lines and bulk lines line by line, and the quantity.</summary>
+    /// <summary>The packaging looks the same: its links and move, its lines and bulk lines line by line, and the quantity.</summary>
     public bool ShowsSameAs(PackagingSnapshot other) =>
         Equals(Link, other.Link)
         && IsMoving == other.IsMoving
         && Lines.SequenceEqual(other.Lines)
+        && Equals(BulkLink, other.BulkLink)
         && BulkLines.SequenceEqual(other.BulkLines)
         && BulkQuantity == other.BulkQuantity;
 }

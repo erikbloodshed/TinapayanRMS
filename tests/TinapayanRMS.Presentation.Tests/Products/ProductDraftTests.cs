@@ -6,6 +6,7 @@ using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
 using TinapayanRMS.Pricing;
+using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
 
@@ -104,13 +105,13 @@ public class ProductDraftTests
         world.Draft.Packaging.LoadLines([Line(1m)]);
 
         world.Draft.RebaseLinked(null, [], []).LinkedPackagingNow.Should().BeNull("the linked packaging wasn't read again");
-        world.Draft.RebaseLinked((set, [Line(1m)]), [], []).LinkedPackagingNow.Should().BeNull("it's as it was");
+        world.Draft.RebaseLinked((set, null, new PackagingNow([Line(1m)], [])), [], []).LinkedPackagingNow.Should().BeNull("it's as it was");
 
-        var renamed = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, [Line(1m)]), [], []).LinkedPackagingNow;
+        var renamed = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(1m)], [])), [], []).LinkedPackagingNow;
         renamed.Should().NotBeNull("the set was renamed where it's kept");
         world.Draft.Packaging.PackagingLinkedToText.Should().Contain("Standard Wrap 10 x 14");
 
-        var moreLines = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, [Line(2m)]), [], []).LinkedPackagingNow;
+        var moreLines = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(2m)], [])), [], []).LinkedPackagingNow;
         moreLines!.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "the set's lines changed where it's kept");
     }
 

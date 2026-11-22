@@ -21,7 +21,7 @@ public partial class PackagingLinkEntityType
             "TinapayanRMS.Domain.Entities.PackagingLink",
             typeof(PackagingLink),
             baseEntityType,
-            propertyCount: 4,
+            propertyCount: 5,
             navigationCount: 3,
             foreignKeyCount: 3,
             unnamedIndexCount: 3,
@@ -37,6 +37,15 @@ public partial class PackagingLinkEntityType
             sentinel: 0);
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         id.AddAnnotation("Relational:ColumnName", "id");
+
+        var isBulk = runtimeEntityType.AddProperty(
+            "IsBulk",
+            typeof(bool),
+            propertyInfo: typeof(PackagingLink).GetProperty("IsBulk", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(PackagingLink).GetField("<IsBulk>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        isBulk.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        isBulk.AddAnnotation("Relational:ColumnName", "is_bulk");
 
         var linkedProductId = runtimeEntityType.AddProperty(
             "LinkedProductId",
@@ -79,9 +88,9 @@ public partial class PackagingLinkEntityType
         index0.AddAnnotation("Relational:Name", "ix_packaging_links_linked_sub_assembly_id");
 
         var index1 = runtimeEntityType.AddIndex(
-            new[] { productId },
+            new[] { productId, isBulk },
             unique: true);
-        index1.AddAnnotation("Relational:Name", "ix_packaging_links_product_id");
+        index1.AddAnnotation("Relational:Name", "ix_packaging_links_product_id_is_bulk");
 
         return runtimeEntityType;
     }

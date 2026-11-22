@@ -88,6 +88,30 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
     }
 
     [Test]
+    public async Task Bulk_packaging_linking_a_set_is_priced_from_the_sets_lines_shared_out_among_the_products_a_pack_holds()
+    {
+        var setup = await SetUpAsync();
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var setId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Box of 4", RoleId = packagingRoleId }, [(setup.BoxId, null, 2m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Id = productId, Name = "Ensaymada" }, null, null, null, new BulkPackagingDraft([], 4, setId), null, Cancellation);
+        var product = (await new ProductRepository(CreateDbContextFactory()).GetByIdAsync(productId, Cancellation))!;
+
+        var detail = await CreateReader().ReadDetailAsync(productId, Cancellation);
+        var saved = SavedProductReader.Build(product, detail);
+
+        detail.PackagingLink.Should().BeNull("its packaging per piece links nothing");
+        detail.BulkPackagingLink!.LinkedSubAssemblyId.Should().Be(setId);
+        detail.BulkLines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m);
+        saved.BulkPackaging!.PackCost.Should().Be(10m, "two ₱5 boxes a pack");
+        saved.Costs.Packaging.Should().Be(2.5m, "the pack shared out among the 4 it holds");
+        saved.BulkPackagingLinkedTo.Should().Be("Linked to Box of 4 (Sub-Assemblies)");
+        saved.PackagingLinkedTo.Should().BeNull();
+    }
+
+    [Test]
     public async Task A_composite_read_with_others_brings_the_products_it_holds_in_with_it()
     {
         var setup = await SetUpAsync();

@@ -11,9 +11,9 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 
 public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbContext> dbContextFactory) : IPackagingLinkRepository
 {
-    // ProductId is unique, so there's at most one link.
+    // One link a product for its packaging per piece at most ({ProductId, IsBulk} is unique).
     public async Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken) =>
-        (await GetLinksAsync("l.product_id = @productId", new { productId }, cancellationToken)).SingleOrDefault();
+        (await GetLinksAsync("l.product_id = @productId AND NOT l.is_bulk", new { productId }, cancellationToken)).SingleOrDefault();
 
     public async Task<IReadOnlyList<PackagingLink>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
@@ -48,7 +48,7 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
     {
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         await EnsureProductExistsAsync(dbContext, productId, cancellationToken);
-        await SetSetLinkAsync(dbContext, productId, subAssemblyId, cancellationToken);
+        await SetSetLinkAsync(dbContext, productId, subAssemblyId, isBulk: false, cancellationToken);
     }
 
     public async Task SetLinkAsync(int productId, int linkedProductId, CancellationToken cancellationToken)
@@ -65,7 +65,7 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
         // The link goes and the lines it showed take its place in one transaction, so lines refused after the link had gone
         // can't leave the product with no packaging at all.
         await using var transaction = await dbContext.Database.BeginOrJoinTransactionAsync(cancellationToken);
-        var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
+        var link = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId && !l.IsBulk, cancellationToken);
         if (link is null)
         {
             return;
@@ -98,7 +98,7 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
         switch (link)
         {
             case PackagingLinkDraft.Set(var setId):
-                await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
+                await SetSetLinkAsync(dbContext, productId, setId, isBulk: false, cancellationToken);
                 break;
 
             case PackagingLinkDraft.OtherProduct(var linkedProductId):
@@ -106,7 +106,7 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
                 break;
 
             case PackagingLinkDraft.None:
-                await dbContext.PackagingLinks.Where(l => l.ProductId == productId).ExecuteDeleteAsync(cancellationToken);
+                await dbContext.PackagingLinks.Where(l => l.ProductId == productId && !l.IsBulk).ExecuteDeleteAsync(cancellationToken);
                 break;
 
             case PackagingLinkDraft.NewSet:
@@ -148,7 +148,25 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
             cancellationToken);
 
         await dbContext.PackagingLines.Where(l => l.ProductId == productId && !l.IsBulk).ExecuteDeleteAsync(cancellationToken);
-        await SetSetLinkAsync(dbContext, productId, setId, cancellationToken);
+        await SetSetLinkAsync(dbContext, productId, setId, isBulk: false, cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes <paramref name="productId"/>'s bulk packaging link the packaging set <paramref name="setId"/>, or nothing when
+    /// it's null, on the caller's context and saved. Linked, the set's lines are what one bulk pack takes; the product's own
+    /// bulk lines are the caller's to write (none while it's linked: SetBulkLinesAsync refuses them), and how many products
+    /// a pack holds stays the product's.
+    /// </summary>
+    internal static async Task SetBulkLinkAsync(TinapayanRMSDbContext dbContext, int productId, int? setId, CancellationToken cancellationToken)
+    {
+        if (setId is { } id)
+        {
+            await SetSetLinkAsync(dbContext, productId, id, isBulk: true, cancellationToken);
+        }
+        else
+        {
+            await dbContext.PackagingLinks.Where(l => l.ProductId == productId && l.IsBulk).ExecuteDeleteAsync(cancellationToken);
+        }
     }
 
     /// <summary>Links the product's packaging to another product's, after the self-link, existence and cycle checks.</summary>
@@ -166,10 +184,10 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
             throw new BusinessRuleException($"{linked.Name} is deleted. Restore it from the Deleted folder to link its packaging.");
         }
 
-        var links = await dbContext.PackagingLinks.ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);
+        var links = await dbContext.PackagingLinks.Where(l => !l.IsBulk).ToDictionaryAsync(l => l.ProductId, l => l.LinkedProductId, cancellationToken);
         PackagingLinkRules.EnsureNoCycle(productId, linkedProductId, id => links.TryGetValue(id, out var next) ? next : null);
 
-        var existing = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
+        var existing = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId && !l.IsBulk, cancellationToken);
         if (existing is null)
         {
             dbContext.PackagingLinks.Add(new PackagingLink { ProductId = productId, LinkedProductId = linkedProductId });
@@ -183,8 +201,11 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Links the product's packaging to a packaging set, which is all it can link among sub-assemblies.</summary>
-    private static async Task SetSetLinkAsync(TinapayanRMSDbContext dbContext, int productId, int subAssemblyId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Links the product's packaging per piece, or its bulk packaging (<paramref name="isBulk"/>), to a packaging set, which
+    /// is all either can link among sub-assemblies.
+    /// </summary>
+    private static async Task SetSetLinkAsync(TinapayanRMSDbContext dbContext, int productId, int subAssemblyId, bool isBulk, CancellationToken cancellationToken)
     {
         var set = await dbContext.SubAssemblies
             .Where(s => s.Id == subAssemblyId)
@@ -193,14 +214,16 @@ public sealed class PackagingLinkRepository(IDbContextFactory<TinapayanRMSDbCont
             ?? throw new BusinessRuleException($"Sub-assembly {subAssemblyId} does not exist.");
         if (!set.IsPackaging)
         {
-            throw new BusinessRuleException("A product's packaging can only link a packaging set from the Sub-Assemblies screen.");
+            throw new BusinessRuleException(isBulk
+                ? "A product's bulk packaging can only link a packaging set from the Sub-Assemblies screen."
+                : "A product's packaging can only link a packaging set from the Sub-Assemblies screen.");
         }
 
         // A set links nothing itself, so no chain runs through it and there's nothing to cycle.
-        var existing = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId, cancellationToken);
+        var existing = await dbContext.PackagingLinks.FirstOrDefaultAsync(l => l.ProductId == productId && l.IsBulk == isBulk, cancellationToken);
         if (existing is null)
         {
-            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = productId, LinkedSubAssemblyId = subAssemblyId });
+            dbContext.PackagingLinks.Add(new PackagingLink { ProductId = productId, LinkedSubAssemblyId = subAssemblyId, IsBulk = isBulk });
         }
         else
         {

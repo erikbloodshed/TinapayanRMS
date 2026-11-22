@@ -214,11 +214,16 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
     /// <summary>Its bulk packaging, under the lines; null for a product without.</summary>
     public PrintedBulkPackaging? Bulk { get; init; }
 
-    /// <summary>The Packaging tab's lines and its bulk packaging, leaving out any line without a material, which isn't a line yet.</summary>
-    public static PrintedPackaging From(IEnumerable<PricedPackagingLine> packagingLines, string? linkedTo, PricedBulkPackaging? bulk = null)
+    /// <summary>
+    /// The Packaging tab's lines and its bulk packaging, with what each links (<paramref name="linkedTo"/>,
+    /// <paramref name="bulkLinkedTo"/>), leaving out any line without a material, which isn't a line yet.
+    /// </summary>
+    public static PrintedPackaging From(IEnumerable<PricedPackagingLine> packagingLines, string? linkedTo, PricedBulkPackaging? bulk = null, string? bulkLinkedTo = null)
     {
         var lines = LinesOf(packagingLines);
-        var printedBulk = bulk is null ? null : new PrintedBulkPackaging(LinesOf(bulk.Lines), bulk.Quantity, bulk.PackCost, bulk.CostPerUnit);
+        var printedBulk = bulk is null
+            ? null
+            : new PrintedBulkPackaging(LinesOf(bulk.Lines), bulk.Quantity, bulk.PackCost, bulk.CostPerUnit) { LinkedTo = bulkLinkedTo };
         return new(linkedTo, lines, lines.Sum(l => l.Cost)) { Bulk = printedBulk };
     }
 
@@ -234,7 +239,11 @@ public sealed record PrintedPackaging(string? LinkedTo, IReadOnlyList<PrintedPac
 /// A product's bulk packaging on paper: what one bulk pack takes of each material (each line's quantity and cost for the
 /// pack), how many products the pack holds, and each one's share of its cost.
 /// </summary>
-public sealed record PrintedBulkPackaging(IReadOnlyList<PrintedPackagingLine> Lines, int? Quantity, decimal PackCost, decimal CostPerUnit);
+public sealed record PrintedBulkPackaging(IReadOnlyList<PrintedPackagingLine> Lines, int? Quantity, decimal PackCost, decimal CostPerUnit)
+{
+    /// <summary>"Linked to Box of 6 (Sub-Assemblies)" while it links a packaging set; null for the product's own lines.</summary>
+    public string? LinkedTo { get; init; }
+}
 
 /// <summary>One product in a composite, as its Products table shows it.</summary>
 /// <param name="Quantity">How many of the product's sellable units go in; null while nothing is typed for it.</param>
@@ -302,7 +311,7 @@ public static class SavedProductPrintout
         null,
         printedAt,
         [.. saved.Sections.Select(s => PrintedSection.From(s, saved.CostBasis))],
-        saved.HasPackaging ? PrintedPackaging.From(saved.PackagingLines, saved.PackagingLinkedTo, saved.BulkPackaging) : null,
+        saved.HasPackaging ? PrintedPackaging.From(saved.PackagingLines, saved.PackagingLinkedTo, saved.BulkPackaging, saved.BulkPackagingLinkedTo) : null,
         saved.Costs,
         saved.Product.IsComposite
             ? [.. saved.Components.Select(c => saved.Product.IncludesComponentPackaging

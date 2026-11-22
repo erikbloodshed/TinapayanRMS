@@ -4,10 +4,16 @@ namespace TinapayanRMS.ApplicationCore.Interfaces;
 
 public interface IPackagingLinkRepository
 {
-    /// <summary>The product's packaging link, with the product or packaging set it's linked to, or null when it owns its packaging.</summary>
+    /// <summary>
+    /// The product's packaging link for each piece, with the product or packaging set it's linked to, or null when it owns
+    /// its packaging. Never its bulk packaging's (PackagingLink.IsBulk).
+    /// </summary>
     Task<PackagingLink?> GetForProductAsync(int productId, CancellationToken cancellationToken);
 
-    /// <summary>GetForProductAsync for several products at once, in one query: the links there are, one at most for each.</summary>
+    /// <summary>
+    /// The links of several products at once, in one query: for each, one for its packaging per piece and one for its bulk
+    /// packaging (PackagingLink.IsBulk) at most.
+    /// </summary>
     Task<IReadOnlyList<PackagingLink>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
 
     /// <summary>

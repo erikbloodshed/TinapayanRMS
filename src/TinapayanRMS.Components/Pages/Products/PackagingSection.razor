@@ -4,8 +4,9 @@
    to copy, the other products) in their place, ready to type into; and Move to Sub-Assemblies for lines of its own. Its
    table is typed straight into unless it's linked, with Make a Copy and Remove Link under a linked one, and while it has
    no lines a caption says what to add (a table's own empty text shows only without an add row). Then its bulk packaging:
-   what one bulk pack takes (a box several units share, its tape), and in a box of its own how many products the pack
-   holds, which share out its cost. *@
+   what one bulk pack takes (a box several units share, its tape), typed in or a packaging set it links (Link opens a
+   picker of the sets in its place, and a linked one has Make a Copy and Remove Link under it), and in a box of its own
+   how many products the pack holds, which share out its cost. *@
 <div class="section-view">
     <div class="section-heading">
         <div class="usage-badges">
@@ -86,21 +87,54 @@
 
     <div class="add-ins bulk-packaging">
         <div class="add-ins-heading">
-            <span class="group-heading">Bulk Packaging</span>
-            <div class="bulk-quantity">
-                <label class="form-label" for="bulk-quantity">Products per pack</label>
-                <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="State.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
-                             Tooltip="How many products one bulk pack holds: the pack's cost is shared out among them." />
+            <div class="usage-badges">
+                <span class="group-heading">Bulk Packaging</span>
+                @if (State.Packaging.IsBulkLinked && State.Packaging.BulkLinkedSetId is { } bulkSetId)
+                {
+                    <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, bulkSetId)" title="Open the packaging set on the Sub-Assemblies screen">
+                        @State.Packaging.BulkLinkedToText
+                    </button>
+                }
+                @if (State.Packaging.IsPickingBulkSource)
+                {
+                    <PickField ID="bulk-packaging-source" TItem="LinkableSubAssemblyOption" Items="State.Packaging.SourceOptions" TextField="PackagingSourceName"
+                               Value="State.Packaging.PickedSource" ValueChanged="State.Packaging.PickSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
+                               OpenOnShow="true" PopupWidth="420px"
+                               Tooltip="Its lines show here, read-only, as what one bulk pack takes, in place of the ones here, and follow every change made to the set." />
+                    <CommandButton Command="State.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the bulk packaging as it is" />
+                }
+            </div>
+            <div class="lines-footer-right">
+                @if (!State.Packaging.IsPickingBulkSource)
+                {
+                    <CommandButton Command="State.Packaging.StartLinkingBulkCommand" Icon="AppIcon.Link" Label="Link"
+                                   Tooltip="Use a packaging set from the Sub-Assemblies screen as what one bulk pack takes, instead of the lines here. Its lines show read-only, and follow every change made to the set." />
+                }
+                <div class="bulk-quantity">
+                    <label class="form-label" for="bulk-quantity">Products per pack</label>
+                    <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="State.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
+                                 Tooltip="How many products one bulk pack holds: the pack's cost is shared out among them." />
+                </div>
             </div>
         </div>
-        <PackagingLinesGrid @ref="_bulk" Items="State.Packaging.BulkEdits" NewItem="State.Packaging.NewBulkEdit" Materials="State.PackagingMaterials"
-                            @bind-SelectedItem="State.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" Basis="State.Costing.CostBasis" />
+        <PackagingLinesGrid @ref="_bulk" Items="State.Packaging.BulkEdits" NewItem="@(State.Packaging.IsBulkEditable ? State.Packaging.NewBulkEdit : null)" Materials="State.PackagingMaterials"
+                            @bind-SelectedItem="State.Packaging.SelectedBulkEdit" CostHeader="Cost per Pack" ReadOnly="!State.Packaging.IsBulkEditable" Basis="State.Costing.CostBasis" />
         <div class="lines-footer">
             <p class="caption">@State.Packaging.BulkCostText</p>
             <div class="button-row">
-                <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
-                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
-                <CommandButton Command="State.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                @if (State.Packaging.IsBulkLinked)
+                {
+                    <CommandButton Command="State.Packaging.MakeBulkCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
+                                   Tooltip="Make these lines this product's own, to change them here. It stops following the packaging set." />
+                    <CommandButton Command="State.Packaging.RemoveBulkLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
+                                   Tooltip="Take the link out, and its lines with it, leaving no bulk packaging. The packaging set stays on the Sub-Assemblies screen." />
+                }
+                else
+                {
+                    <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
+                                  Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                    <CommandButton Command="State.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
+                }
             </div>
         </div>
     </div>

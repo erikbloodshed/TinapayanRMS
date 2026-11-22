@@ -288,8 +288,8 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
         SubAssemblyRules.EnsureNoMadeIngredientMadeFrom(
             name, await dbContext.RawMaterials.Where(m => m.SubAssemblyId == id).OrderBy(m => m.Name).Select(m => m.Name).ToListAsync(cancellationToken));
 
-        // Every product using a sub-assembly links it: a recipe through a usage, a set through its
-        // packaging link.
+        // Every product using a sub-assembly links it: a recipe through a usage, a set through a packaging link, its
+        // packaging per piece's or its bulk packaging's (once for a product linking it for both).
         await EnsureNoneLinkedElsewhereAsync(dbContext, u => u.SubAssemblyId == id, cancellationToken);
         var setLinkedBy = await dbContext.PackagingLinks
             .Where(l => l.LinkedSubAssemblyId == id)
@@ -297,7 +297,7 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
             .ToListAsync(cancellationToken);
         if (setLinkedBy.Count > 0)
         {
-            SubAssemblyRules.EnsureNotLinkedElsewhere(name, [.. setLinkedBy.Select(l => l.ListedName).Order(StringComparer.CurrentCultureIgnoreCase)]);
+            SubAssemblyRules.EnsureNotLinkedElsewhere(name, [.. setLinkedBy.Select(l => l.ListedName).Distinct().Order(StringComparer.CurrentCultureIgnoreCase)]);
         }
 
         // Its lines go with it (Cascade).

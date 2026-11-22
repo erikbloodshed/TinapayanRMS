@@ -18,11 +18,11 @@ public interface IProductQueries
 
     /// <summary>
     /// The packaging lines each of <paramref name="productIds"/> shows for one sellable unit as they're saved now, through
-    /// its link, the linked set's or product's, by product: for every open form at once, in a few queries however many
-    /// there are. A product whose links come round again, which only an edit outside the app can leave, isn't among them:
-    /// its form keeps the lines it shows.
+    /// its link, the linked set's or product's, and its bulk packaging's for one pack, through its link to a set, by
+    /// product: for every open form at once, in a few queries however many there are. A product whose links come round
+    /// again, which only an edit outside the app can leave, isn't among them: its form keeps the lines it shows.
     /// </summary>
-    Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ReadLinkedPackagingAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<int, PackagingNow>> ReadLinkedPackagingAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
 
     /// <summary>A product as saved, or null when it's gone.</summary>
     Task<Product?> ReadAsync(int productId, CancellationToken cancellationToken);
@@ -126,23 +126,26 @@ public sealed class ProductQueries(
             CostingDefaults: await costingDefaultsRead,
             LinkedSubAssemblies: await linkedSubAssembliesRead,
             LinkedLines: await linkedLinesRead,
-            PackagingLinks: (await packagingLinksRead).ToDictionary(link => link.ProductId),
+            PackagingLinks: (await packagingLinksRead).Where(link => !link.IsBulk).ToDictionary(link => link.ProductId),
             ComponentLinks: await componentLinksRead,
-            ComponentCosts: await componentCostsRead);
+            ComponentCosts: await componentCostsRead)
+        {
+            BulkPackagingLinks = (await packagingLinksRead).Where(link => link.IsBulk).ToDictionary(link => link.ProductId),
+        };
     }
 
-    public async Task<IReadOnlyDictionary<int, IReadOnlyList<PackagingLine>>> ReadLinkedPackagingAsync(
+    public async Task<IReadOnlyDictionary<int, PackagingNow>> ReadLinkedPackagingAsync(
         IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
     {
         if (productIds.Count == 0)
         {
-            return new Dictionary<int, IReadOnlyList<PackagingLine>>();
+            return new Dictionary<int, PackagingNow>();
         }
 
         var effective = await packagingLineRepository.GetEffectiveForProductsAsync(productIds, cancellationToken);
         return effective.Lines
             .Where(lines => !effective.LinkedRoundInALoop.Contains(lines.Key))
-            .ToDictionary(lines => lines.Key, lines => lines.Value);
+            .ToDictionary(lines => lines.Key, lines => new PackagingNow(lines.Value, effective.Bulk.GetValueOrDefault(lines.Key, [])));
     }
 
     public Task<Product?> ReadAsync(int productId, CancellationToken cancellationToken) => productRepository.GetByIdAsync(productId, cancellationToken);

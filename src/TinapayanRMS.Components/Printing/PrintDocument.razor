@@ -587,7 +587,7 @@
 
     // The bulk pack's lines, under the packaging's.
     private RenderFragment BulkPackagingPart(PrintedBulkPackaging bulk) => @<text>
-        <h3 class="print-section">Bulk Packaging <span class="print-source">@(bulk.Quantity is { } held ? $"one pack holds {held} {(held == 1 ? "product" : "products")}" : "")</span></h3>
+        <h3 class="print-section">Bulk Packaging <span class="print-source">@string.Join(" · ", new[] { bulk.LinkedTo, bulk.Quantity is { } held ? $"one pack holds {held} {(held == 1 ? "product" : "products")}" : null }.OfType<string>())</span></h3>
         <table class="print-table">
             <thead>
                 <tr>

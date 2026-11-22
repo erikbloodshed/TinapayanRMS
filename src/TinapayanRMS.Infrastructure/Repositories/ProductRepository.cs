@@ -348,13 +348,20 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
             }
         }
 
-        // The bulk packaging is the product's own whatever its packaging links, so it's written after the link, apart from
-        // the lines, with how many units a pack holds: none without lines.
+        // The bulk packaging stands apart from what the packaging per piece links, so it's written after it: its link (to a
+        // set, or none) before its lines, which a linked one has none of, then how many units a pack holds: none without
+        // lines or a set.
         if (bulkPackaging is not null)
         {
-            ProductRules.EnsureValidBulkPackaging(bulkPackaging.Lines.Count, bulkPackaging.Quantity);
+            if (bulkPackaging.SetId is not null && bulkPackaging.Lines.Count > 0)
+            {
+                throw new BusinessRuleException("Linked bulk packaging shows its packaging set's lines, and has none of its own.");
+            }
+
+            ProductRules.EnsureValidBulkPackaging(bulkPackaging.HasPackaging ? 1 : 0, bulkPackaging.Quantity);
+            await PackagingLinkRepository.SetBulkLinkAsync(dbContext, fields.Id, bulkPackaging.SetId, cancellationToken);
             await PackagingLineRepository.SetBulkLinesAsync(dbContext, fields.Id, bulkPackaging.Lines, cancellationToken);
-            stored.BulkPackagingQuantity = bulkPackaging.Lines.Count > 0 ? bulkPackaging.Quantity : null;
+            stored.BulkPackagingQuantity = bulkPackaging.HasPackaging ? bulkPackaging.Quantity : null;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -410,6 +417,7 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
     /// </summary>
     private static async Task EnsureNothingLeansOnAsync(TinapayanRMSDbContext dbContext, int id, CancellationToken cancellationToken)
     {
+        // Only packaging per piece links a product's (a bulk packaging's links a set).
         var packagingLinkedBy = await dbContext.PackagingLinks
             .Where(l => l.LinkedProductId == id)
             .Select(l => new { l.Product!.Name, l.Product.DeletedAt })

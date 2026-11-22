@@ -41,6 +41,8 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
     /// their packaging only when it includes theirs (products.includes_component_packaging), and then all of it, so
     /// packaging_costs climbs from every product whose packaging cost the material is in to each composite like that
     /// holding it, and on up. A packaging link takes only the lines, so packaging_users doesn't climb through composites.
+    /// A bulk packaging's lines, its own or a set's it links, are in its product's packaging cost too (bulk_users), but no
+    /// link reads them, so nothing climbs from them but through composites.
     /// feeds, recipe_users and packaging_costs each stop where a row comes round again (CYCLE): the app refuses a loop, but
     /// one left by an edit outside it would run until the command timed out after 30 seconds. A UNION would end it too, but PostgreSQL sizes a UNION's hash table from its row estimate, here thousands
     /// of times too high, and that made this read about 20 ms slower. packaging_users can't meet a loop: it climbs from
@@ -79,17 +81,29 @@ public sealed class RawMaterialRepository(IDbContextFactory<TinapayanRMSDbContex
         packaging_users AS (
             SELECT l.product_id
             FROM packaging_lines l
-            WHERE l.packaging_material_id = @id
-                AND NOT EXISTS (SELECT 1 FROM packaging_links k WHERE k.product_id = l.product_id)
+            WHERE l.packaging_material_id = @id AND NOT l.is_bulk
+                AND NOT EXISTS (SELECT 1 FROM packaging_links k WHERE k.product_id = l.product_id AND NOT k.is_bulk)
             UNION ALL
             SELECT k.product_id
             FROM packaging_links k
-            WHERE EXISTS (SELECT 1 FROM sub_assembly_packaging_lines s WHERE s.sub_assembly_id = k.linked_sub_assembly_id AND s.packaging_material_id = @id)
+            WHERE NOT k.is_bulk
+                AND EXISTS (SELECT 1 FROM sub_assembly_packaging_lines s WHERE s.sub_assembly_id = k.linked_sub_assembly_id AND s.packaging_material_id = @id)
             UNION ALL
             SELECT k.product_id FROM packaging_links k JOIN packaging_users p ON p.product_id = k.linked_product_id
         ),
+        bulk_users AS (
+            SELECT l.product_id
+            FROM packaging_lines l
+            WHERE l.packaging_material_id = @id AND l.is_bulk
+                AND NOT EXISTS (SELECT 1 FROM packaging_links k WHERE k.product_id = l.product_id AND k.is_bulk)
+            UNION ALL
+            SELECT k.product_id
+            FROM packaging_links k
+            WHERE k.is_bulk
+                AND EXISTS (SELECT 1 FROM sub_assembly_packaging_lines s WHERE s.sub_assembly_id = k.linked_sub_assembly_id AND s.packaging_material_id = @id)
+        ),
         packaging_costs AS (
-            SELECT product_id FROM packaging_users
+            SELECT product_id FROM (SELECT product_id FROM packaging_users UNION ALL SELECT product_id FROM bulk_users) u
             UNION ALL
             SELECT c.product_id
             FROM product_components c

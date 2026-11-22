@@ -28,12 +28,16 @@ public sealed class PackagingLinkConfiguration : IEntityTypeConfiguration<Packag
             .HasForeignKey(l => l.LinkedSubAssemblyId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // A link points at a product or at a set, never both or neither.
-        builder.ToTable(t => t.HasCheckConstraint(
-            "CK_PackagingLinks_OneTarget",
-            "(linked_product_id IS NOT NULL AND linked_sub_assembly_id IS NULL) OR (linked_product_id IS NULL AND linked_sub_assembly_id IS NOT NULL)"));
+        // A link points at a product or at a set, never both or neither; a bulk packaging's only at a set.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint(
+                "CK_PackagingLinks_OneTarget",
+                "(linked_product_id IS NOT NULL AND linked_sub_assembly_id IS NULL) OR (linked_product_id IS NULL AND linked_sub_assembly_id IS NOT NULL)");
+            t.HasCheckConstraint("CK_PackagingLinks_BulkLinksASet", "NOT is_bulk OR linked_sub_assembly_id IS NOT NULL");
+        });
 
-        // A product has one packaging, so at most one link.
-        builder.HasIndex(l => l.ProductId).IsUnique();
+        // A product has one packaging per piece and one bulk packaging, so at most one link for each.
+        builder.HasIndex(l => new { l.ProductId, l.IsBulk }).IsUnique();
     }
 }

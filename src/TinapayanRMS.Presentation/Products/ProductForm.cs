@@ -762,11 +762,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         /// </summary>
         public IReadOnlyList<int> ComponentIds { get; init; } = [];
 
-        /// <summary>The packaging link as saved, while the form still shows it as saved; null otherwise.</summary>
-        public PackagingLinkTarget? SavedLink { get; set; }
+        /// <summary>The packaging per piece's link and the bulk packaging's as saved, each while the form still shows it as saved.</summary>
+        public (PackagingLinkTarget? Link, PackagingLinkTarget? BulkLink) SavedLinks { get; set; }
 
-        /// <summary>The linked packaging's lines as they're saved now, read again while the form shows the link as saved.</summary>
-        public IReadOnlyList<PackagingLine>? LinkedPackagingLines { get; set; }
+        /// <summary>The product's packaging as it shows now, read again while the form shows a link as saved.</summary>
+        public PackagingNow? LinkedPackaging { get; set; }
 
         /// <summary>A role made product-owned, or no longer, since the product was loaded, with nothing typed: it's read again.</summary>
         public bool ReloadDetails { get; set; }
@@ -803,19 +803,13 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     /// </summary>
     internal int? LinkedPackagingToRead(Load load, ProductsLoad read)
     {
-        if (load.DetailProductId is not { } productId || !read.PackagingLinks.TryGetValue(productId, out var packagingLink))
+        if (load.DetailProductId is not { } productId)
         {
             return null;
         }
 
-        var savedLink = PackagingLinkTarget.From(packagingLink);
-        if (!Packaging.Draft.ShowsSavedLink(savedLink))
-        {
-            return null;
-        }
-
-        load.SavedLink = savedLink;
-        return packagingLink.ProductId;
+        load.SavedLinks = Packaging.Draft.SavedLinksShowing(read.PackagingLinks.GetValueOrDefault(productId), read.BulkPackagingLinks.GetValueOrDefault(productId));
+        return load.SavedLinks is (null, null) ? null : productId;
     }
 
     /// <summary>Just before the merge: what the form shows, by id, and whether its product is read again after.</summary>
@@ -869,7 +863,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // What's linked as it's kept now (ProductDraft.RebaseLinked): the linked packaging, read again for this product only
         // while it showed the link as saved, and the recipe's sections.
         var (linkedSectionsChanged, linkedPackagingNow) = Draft.RebaseLinked(
-            load.DetailProductId == _detailProductId && load is { SavedLink: { } savedLink, LinkedPackagingLines: { } lines } ? (savedLink, lines) : null,
+            load.DetailProductId == _detailProductId && load.LinkedPackaging is { } now ? (load.SavedLinks.Link, load.SavedLinks.BulkLink, now) : null,
             read.LinkedSubAssemblies, read.LinkedLines, Recipe.CaptureForm());
 
         // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
@@ -882,9 +876,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
                 Recipe = linkedSectionsChanged
                     ? Recipe.Draft.StepAsSavedNow(snapshot.Recipe, read.LinkedSubAssemblies, read.LinkedLines)
                     : snapshot.Recipe,
-                Packaging = linkedPackagingNow is { } now && snapshot.Packaging.Link?.Key == now.Link?.Key && !snapshot.Packaging.IsMoving
-                    ? snapshot.Packaging with { Link = now.Link, Lines = now.Lines }
-                    : snapshot.Packaging,
+                Packaging = linkedPackagingNow is { } now ? ProductPackagingDraft.AsLinkedNow(snapshot.Packaging, now) : snapshot.Packaging,
             });
         }
 

@@ -435,7 +435,7 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
         state.Recipe.RecipeTabs.Should().Equal(state.Recipe.PackagingTab);
         state.Recipe.SelectedRecipeTab.Should().BeSameAs(state.Recipe.PackagingTab);
         state.Recipe.HasRecipeSections.Should().BeFalse();
-        state.Packaging.BulkCostText.Should().Be("No bulk packaging. Add what one bulk pack takes, such as a box several products share.");
+        state.Packaging.BulkCostText.Should().Be("No bulk packaging. Add what one bulk pack takes, such as a box several products share, or Link a packaging set.");
 
         state.EditingName = "Pandesal";
         state.Packaging.BulkEdits.Add(new PackagingLineRow { PackagingMaterialId = cartonId, QtyPerUnit = 1m });
@@ -571,6 +571,159 @@ public class ProductsStatePackagingTests(DatabaseFixture fixture) : PersistenceT
     }
 
     private PackagingLinkRepository CreatePackagingLinkRepository() => new(CreateDbContextFactory());
+
+    // The bulk packaging's Link: a packaging set's lines become what one bulk pack takes, read-only, beside the packaging
+    // per piece, and how many products a pack holds stays typed here. Save writes the bulk link.
+    [Test]
+    public Task Link_on_the_Bulk_Packaging_shows_a_sets_lines_read_only_and_Save_writes_the_bulk_link() => UiThread.RunAsync(async () =>
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Box of 6", 12m);
+        var tapeId = await AddPackagingAsync("Tape", 0.15m, "cm");
+        var wrapperId = await AddPackagingAsync("Wrapper", 2m);
+        var sets = new SubAssemblyRepository(CreateDbContextFactory());
+        var boxSetId = await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Box of 6 Set", RoleId = packagingRoleId }, [(boxId, null, 1m), (tapeId, null, 20m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await new PackagingLineRepository(CreateDbContextFactory()).SetLinesAsync(productId, [(wrapperId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)], Cancellation);
+        var state = await CreateLoadedStateAsync();
+        state.Pick(state.Products.Single(p => p.Id == productId));
+        await Settle.UntilAsync(state, () => state.SelectedProduct?.Id == productId && state.AreDetailsReady, () => $"selected={state.SelectedProduct?.Id}, ready={state.AreDetailsReady}");
+
+        await state.Packaging.StartLinkingBulkCommand.ExecuteAsync();
+        state.Packaging.IsPickingBulkSource.Should().BeTrue();
+        state.Packaging.IsPickingSource.Should().BeFalse("the packaging per piece's picker is another");
+        state.Packaging.SourceOptions.Select(o => o.PackagingSourceName).Should().Equal("Box of 6 Set — packaging set");
+        await PickBulkAsync(state, "Box of 6 Set — packaging set");
+
+        state.ErrorMessage.Should().BeNull();
+        state.Packaging.IsBulkLinked.Should().BeTrue();
+        state.Packaging.IsBulkEditable.Should().BeFalse();
+        state.Packaging.RemoveBulkLineCommand.CanExecute().Should().BeFalse();
+        state.Packaging.BulkLinkedToText.Should().Be("Linked to Box of 6 Set (Sub-Assemblies)");
+        state.Packaging.BulkLinkedSetId.Should().Be(boxSetId);
+        state.Packaging.BulkEdits.Select(r => (r.PackagingMaterialId, r.QtyPerUnit)).Should().Equal([(boxId, 1m), (tapeId, 20m)]);
+        state.Packaging.IsPackagingLinked.Should().BeFalse("the packaging per piece stays the product's own");
+        state.Packaging.LineEdits.Should().ContainSingle();
+
+        state.Packaging.BulkQuantity = 6;
+        await Settle.UntilAsync(state, () => state.Costing.Costs.Packaging == 4.5m, () => $"packaging={state.Costing.Costs.Packaging}");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            var link = await dbContext.PackagingLinks.SingleAsync(Cancellation);
+            (link.ProductId, link.LinkedSubAssemblyId, link.IsBulk).Should().Be((productId, boxSetId, true));
+            (await dbContext.PackagingLines.Where(l => l.IsBulk).CountAsync(Cancellation)).Should().Be(0, "a linked bulk packaging has no lines of its own");
+            (await dbContext.Products.SingleAsync(p => p.Id == productId, Cancellation)).BulkPackagingQuantity.Should().Be(6);
+        }
+
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && !state.SaveCommand.CanExecute(), () => $"ready={state.AreDetailsReady}");
+        state.Packaging.IsBulkLinked.Should().BeTrue("the reload shows the saved link");
+        state.Packaging.BulkEdits.Should().HaveCount(2);
+
+        // The set linked now isn't offered again.
+        await state.Packaging.StartLinkingBulkCommand.ExecuteAsync();
+        state.Packaging.IsPickingBulkSource.Should().BeFalse();
+        state.ErrorMessage.Should().Be("This product's bulk packaging links the only packaging set there is.");
+    });
+
+    [Test]
+    public Task Make_a_Copy_and_Remove_Link_on_linked_bulk_packaging_save_its_lines_as_the_products_own_or_none() => UiThread.RunAsync(async () =>
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Box of 6", 12m);
+        var boxSetId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Box of 6 Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await LinkBulkAsync(productId, boxSetId, productsPerPack: 6);
+        var state = await CreateLoadedStateAsync();
+        state.Pick(state.Products.Single(p => p.Id == productId));
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Packaging.BulkEdits.Count == 1, () => $"bulk={state.Packaging.BulkEdits.Count}");
+        state.Packaging.IsBulkLinked.Should().BeTrue();
+        state.Costing.Costs.Packaging.Should().Be(2m, "a ₱12 box shared by 6");
+
+        await state.Packaging.MakeBulkCopyCommand.ExecuteAsync();
+        state.Packaging.IsBulkLinked.Should().BeFalse();
+        state.Packaging.IsBulkEditable.Should().BeTrue();
+        state.SaveCommand.CanExecute().Should().BeTrue("unlinking is an edit");
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.PackagingLinks.CountAsync(Cancellation)).Should().Be(0);
+            (await dbContext.PackagingLines.Select(l => new { l.PackagingMaterialId, l.IsBulk }).ToListAsync(Cancellation))
+                .Should().BeEquivalentTo([new { PackagingMaterialId = boxId, IsBulk = true }], "the set's lines are its own now");
+        }
+
+        // Linked again, then Remove Link: no bulk packaging, and undoing it puts the link back.
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && !state.SaveCommand.CanExecute(), () => $"ready={state.AreDetailsReady}");
+        await state.Packaging.StartLinkingBulkCommand.ExecuteAsync();
+        await PickBulkAsync(state, "Box of 6 Set — packaging set");
+        await state.SaveCommand.ExecuteAsync();
+        state.ErrorMessage.Should().BeNull();
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && !state.SaveCommand.CanExecute(), () => $"ready={state.AreDetailsReady}");
+        await state.Packaging.RemoveBulkLinkCommand.ExecuteAsync();
+        state.Packaging.BulkEdits.Should().BeEmpty();
+        state.Costing.Costs.Packaging.Should().Be(0m);
+        state.TryUndo().Should().BeTrue();
+        state.Packaging.IsBulkLinked.Should().BeTrue();
+        state.Packaging.BulkEdits.Should().ContainSingle();
+        state.SaveCommand.CanExecute().Should().BeFalse("it's as it was saved");
+    });
+
+    [Test]
+    public Task A_tab_linking_a_set_for_its_bulk_packaging_shows_the_sets_lines_as_saved_now_after_a_load() => UiThread.RunAsync(async () =>
+    {
+        var packagingRoleId = await AddRoleAsync("Packaging", isPackaging: true);
+        var boxId = await AddPackagingAsync("Box of 6", 12m);
+        var sets = new SubAssemblyRepository(CreateDbContextFactory());
+        var boxSetId = await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Name = "Box of 6 Set", RoleId = packagingRoleId }, [(boxId, null, 1m)], Cancellation);
+        var productId = await AddProductAsync("Ensaymada");
+        await LinkBulkAsync(productId, boxSetId, productsPerPack: 6);
+        var view = (await CreateLoadedStateAsync()).View;
+        view.OpenRecord(productId);
+        view.Keep(view.Tabs.Active!);
+        var form = view.Form!;
+        await Settle.UntilAsync(form, () => form.AreDetailsReady && form.Packaging.BulkEdits.Count == 1, () => $"bulk={form.Packaging.BulkEdits.Count}");
+        var recorder = (IUndoRecorder)form;
+        recorder.BeginUndoStep();
+        form.EditingName = "Ensaymada Special";
+        recorder.EndUndoStep();
+
+        await sets.SaveStandalonePackagingAsync(
+            new SubAssembly { Id = boxSetId, Name = "Box of 6 Deluxe", RoleId = packagingRoleId }, [(boxId, null, 2m)], Cancellation);
+        await view.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(form, () => form.Packaging.BulkEdits.Single().QtyPerUnit == 2m, () => $"qty={form.Packaging.BulkEdits.Single().QtyPerUnit}");
+
+        form.Packaging.BulkLinkedToText.Should().Be("Linked to Box of 6 Deluxe (Sub-Assemblies)");
+        form.TryUndo().Should().BeTrue();
+        form.Packaging.BulkEdits.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "the set as it's saved now, not as it was");
+        form.SaveCommand.CanExecute().Should().BeFalse("the set was saved on the Sub-Assemblies screen, not typed here");
+    });
+
+    /// <summary>Links the product's bulk packaging to <paramref name="setId"/>, a pack holding <paramref name="productsPerPack"/>.</summary>
+    private Task<int> LinkBulkAsync(int productId, int setId, int productsPerPack) =>
+        new ProductRepository(CreateDbContextFactory()).SaveAsync(
+            new Product { Id = productId, Name = "Ensaymada" },
+            recipe: null,
+            packagingLink: null,
+            packagingLines: null,
+            new ApplicationCore.Interfaces.BulkPackagingDraft([], productsPerPack, setId),
+            costing: null,
+            Cancellation);
+
+    /// <summary>Picks <paramref name="name"/> in the Bulk Packaging's open Link picker, and waits for its lines to go in.</summary>
+    private static async Task PickBulkAsync(ProductForm state, string name)
+    {
+        state.Packaging.PickSource(state.Packaging.SourceOptions.Single(o => o.PackagingSourceName == name));
+        await Settle.UntilAsync(state,
+            () => !state.Packaging.IsPickingBulkSource || state.ErrorMessage is not null,
+            () => $"picking={state.Packaging.IsPickingBulkSource}, error={state.ErrorMessage}");
+    }
 
     /// <summary>Picks <paramref name="name"/> in the Packaging tab's open Link or Copy picker, and waits for its lines to go in.</summary>
     private static async Task PickAsync(ProductForm state, string name)

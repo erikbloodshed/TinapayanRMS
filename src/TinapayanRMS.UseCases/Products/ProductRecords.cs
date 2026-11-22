@@ -12,7 +12,7 @@ namespace TinapayanRMS.UseCases.Products;
 /// <param name="PackagingSets">The packaging sets: the standalone sub-assemblies whose role is a packaging one.</param>
 /// <param name="LinkedSubAssemblies">The sub-assemblies the open forms' saved sections are, as they're saved now.</param>
 /// <param name="LinkedLines">Those sub-assemblies' lines.</param>
-/// <param name="PackagingLinks">The open products' packaging links as saved, by product; one with none isn't there.</param>
+/// <param name="PackagingLinks">The open products' packaging links for each piece as saved, by product; one with none isn't there.</param>
 /// <param name="ComponentLinks">Every composite's products, which the Products table's lines point at.</param>
 /// <param name="ComponentCosts">What each product the open composites hold brings, by id.</param>
 public sealed record ProductsLoad(
@@ -29,7 +29,17 @@ public sealed record ProductsLoad(
     IReadOnlyList<SubAssemblyLine> LinkedLines,
     IReadOnlyDictionary<int, PackagingLink> PackagingLinks,
     IReadOnlyList<ProductComponent> ComponentLinks,
-    IReadOnlyDictionary<int, ComponentCosts> ComponentCosts);
+    IReadOnlyDictionary<int, ComponentCosts> ComponentCosts)
+{
+    /// <summary>The open products' bulk packaging links as saved (PackagingLink.IsBulk), by product; one with none isn't there.</summary>
+    public IReadOnlyDictionary<int, PackagingLink> BulkPackagingLinks { get; init; } = new Dictionary<int, PackagingLink>();
+}
+
+/// <summary>
+/// A product's packaging as it shows now, read through its links: its lines for each piece, and its bulk packaging's for one
+/// pack. What the Products view reads again for a form showing linked packaging as saved (IProductQueries.ReadLinkedPackagingAsync).
+/// </summary>
+public sealed record PackagingNow(IReadOnlyList<PackagingLine> Lines, IReadOnlyList<PackagingLine> BulkLines);
 
 /// <summary>A product's versions for its History tab, with the product as it's saved now, which each is compared with.</summary>
 public sealed record ProductHistory(Product Product, ProductDetail Detail, IReadOnlyList<ProductVersion> Versions);

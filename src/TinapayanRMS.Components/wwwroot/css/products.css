@@ -237,9 +237,10 @@
     white-space: nowrap;
 }
 
-/* The Packaging tab's Link and Copy picker: up to wide enough for a set's or a product's name, narrower beside a link's
-   badge. A flex basis, since Syncfusion sets the picker's own width inline. */
-.section-heading .usage-badges {
+/* The Packaging tab's Link and Copy picker, and the bulk packaging's Link picker: up to wide enough for a set's or a
+   product's name, narrower beside a link's badge. A flex basis, since Syncfusion sets the picker's own width inline. */
+.section-heading .usage-badges,
+.bulk-packaging .add-ins-heading .usage-badges {
     flex: 1 1 auto;
     min-width: 0;
 }
@@ -251,6 +252,12 @@
 
 .bulk-packaging {
     margin-top: 14px;
+}
+
+/* Its heading holds the link's badge or picker, Link and Products per pack: the buttons' height, so it doesn't jump. */
+.bulk-packaging .add-ins-heading {
+    gap: 12px;
+    min-height: 34px;
 }
 
 .bulk-quantity {

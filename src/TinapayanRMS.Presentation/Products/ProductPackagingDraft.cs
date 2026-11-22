@@ -21,7 +21,8 @@ public interface IProductPackagingDraftHost
 /// <summary>
 /// A product's packaging as its form edits it (ADR 0002): the lines for each piece, typed in or what they link (a packaging
 /// set on the Sub-Assemblies screen, or another product's packaging), a Move to Sub-Assemblies waiting for Save, its bulk
-/// packaging (a box several units share, with how many it holds), and the packaging last loaded, which Save compares against.
+/// packaging (a box several units share, typed in or a packaging set it links, with how many it holds), and the packaging
+/// last loaded, which Save compares against.
 /// It holds the rules that follow an edit (what a link or a move does to the lines and to Save), its undo share
 /// (<see cref="Capture"/>, <see cref="Restore"/>), a load's re-pointing at fresh materials (<see cref="ResolveRows"/>, which
 /// changes nothing typed, ADR 0007), and what Save writes of it (<see cref="ChangedLink"/>, <see cref="ChangedLines"/>,
@@ -45,6 +46,9 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
 
     /// <summary>How many products a bulk pack held as last loaded.</summary>
     private int? _savedBulkQuantity;
+
+    /// <summary>The key of the packaging set the bulk packaging linked as last loaded, or null for none.</summary>
+    private int? _savedBulkLinkKey;
 
     /// <param name="host">The form: the cost basis the rows are priced at.</param>
     /// <param name="packagingMaterials">The packaging materials as the screen last loaded them, which a row prices itself from.</param>
@@ -79,8 +83,8 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
 
     /// <summary>
     /// The bulk packaging's lines, typed into the Packaging tab's Bulk Packaging table: what one bulk pack takes (a box
-    /// several units share, its tape), each quantity per pack (PackagingLine.IsBulk). The product's own, whatever its
-    /// packaging links.
+    /// several units share, its tape), each quantity per pack (PackagingLine.IsBulk), whatever the packaging per piece links;
+    /// read-only while the bulk packaging links a set (<see cref="BulkLinkTarget"/>), whose lines they are.
     /// </summary>
     public ObservableCollection<PackagingLineRow> BulkEdits { get; } = [];
 
@@ -129,7 +133,7 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
     /// to add (a quantity alone saves nothing).
     /// </summary>
     public string BulkCostText =>
-        BulkEdits.Count == 0 ? "No bulk packaging. Add what one bulk pack takes, such as a box several products share."
+        BulkEdits.Count == 0 ? "No bulk packaging. Add what one bulk pack takes, such as a box several products share, or Link a packaging set."
         : BulkQuantity is >= 1 ? $"Pack cost {BulkPackCost:N2} ÷ {BulkQuantity} {(BulkQuantity == 1 ? "product" : "products")} = {BulkCostPerUnit:N2} per unit"
         : $"Pack cost {BulkPackCost:N2}. Enter how many products one pack holds.";
 
@@ -222,6 +226,52 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
 
     public bool IsPackagingLinkedToProduct => IsPackagingLinked && !IsPackagingLinkedToSet;
 
+    /// <summary>
+    /// The packaging set the bulk packaging links as the form stands, saved or not (Link sets it, and Make a Copy and Remove
+    /// Link clear it), or null while its lines are the product's own. How many products a pack holds is the product's either way.
+    /// </summary>
+    public PackagingLinkTarget? BulkLinkTarget { get; private set; }
+
+    /// <summary>The bulk packaging links a packaging set, so its table shows the set's lines, read-only.</summary>
+    public bool IsBulkLinked => BulkLinkTarget is not null;
+
+    /// <summary>The bulk packaging's lines are the product's own, so its table can be typed into.</summary>
+    public bool IsBulkEditable => !IsBulkLinked;
+
+    /// <summary>"Linked to Box of 6 (Sub-Assemblies)", or empty while the bulk packaging is the product's own.</summary>
+    public string BulkLinkedToText => BulkLinkTarget?.LinkedToText ?? string.Empty;
+
+    /// <summary>The packaging set the bulk packaging links, whose badge opens it on Sub-Assemblies; null for none.</summary>
+    public int? BulkLinkedSetId => (BulkLinkTarget as PackagingLinkTarget.Set)?.SubAssemblyId;
+
+    /// <summary>What the bulk packaging links as the form stands, saved or not: a load, Link, Make a Copy and Remove Link come through here.</summary>
+    public void ShowBulkLink(PackagingLinkTarget? target)
+    {
+        BulkLinkTarget = target;
+        RaisePropertyChanged(nameof(BulkLinkTarget));
+        RaisePropertyChanged(nameof(IsBulkLinked));
+        RaisePropertyChanged(nameof(IsBulkEditable));
+        RaisePropertyChanged(nameof(BulkLinkedToText));
+        RaisePropertyChanged(nameof(BulkLinkedSetId));
+    }
+
+    /// <summary>Make a Copy on linked bulk packaging: the set's lines, as they show, become the product's own; the link goes with Save.</summary>
+    public void MakeBulkCopy() => ShowBulkLink(null);
+
+    /// <summary>Remove Link on linked bulk packaging: the link and the lines it shows go, leaving no bulk packaging.</summary>
+    public void RemoveBulkLink()
+    {
+        ShowBulkLines([]);
+        ShowBulkLink(null);
+    }
+
+    /// <summary>The packaging set picked on the bulk packaging's picker, its lines read: <paramref name="rows"/> in place of its lines, linked to <paramref name="link"/>.</summary>
+    public void TakeBulk(IEnumerable<PackagingLineRow> rows, PackagingLinkTarget link)
+    {
+        ShowBulkLines(rows);
+        ShowBulkLink(link);
+    }
+
     /// <summary>Make a Copy: the linked packaging's lines, as they show, become the product's own, and the link goes with Save.</summary>
     public void MakeCopy() => ShowLink(null);
 
@@ -283,8 +333,67 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
         ShowLink(target);
     }
 
-    /// <summary>Whether the form still shows <paramref name="savedLink"/>, the link as saved, so a refresh may read its lines again.</summary>
-    public bool ShowsSavedLink(PackagingLinkTarget savedLink) => savedLink.Key == _savedLinkKey && LinkTarget?.Key == savedLink.Key;
+    /// <summary>
+    /// Of the saved links, <paramref name="link"/> of the packaging per piece and <paramref name="bulkLink"/> of the bulk
+    /// packaging, those the form still shows as saved, so a refresh may read their lines again; null for each it doesn't.
+    /// </summary>
+    public (PackagingLinkTarget? Link, PackagingLinkTarget? BulkLink) SavedLinksShowing(PackagingLink? link, PackagingLink? bulkLink)
+    {
+        var savedLink = link is null ? null : PackagingLinkTarget.From(link);
+        var savedBulkLink = bulkLink is null ? null : PackagingLinkTarget.From(bulkLink);
+        return (
+            savedLink is not null && savedLink.Key == _savedLinkKey && LinkTarget?.Key == savedLink.Key ? savedLink : null,
+            savedBulkLink is not null && savedBulkLink.Key == _savedBulkLinkKey && BulkLinkTarget?.Key == savedBulkLink.Key ? savedBulkLink : null);
+    }
+
+    /// <summary>
+    /// What linked packaging shows as the view's load read it again, for each link the form showed as saved
+    /// (<see cref="SavedLinksShowing"/>): the link under its name now, and its lines in place of the rows when they differ
+    /// from those last loaded. True when anything showed differently, so the undo steps take it in too (<see cref="AsLinkedNow"/>).
+    /// </summary>
+    public bool RefreshLinked(PackagingLinkTarget? savedLink, IReadOnlyList<PackagingLine> lines, PackagingLinkTarget? savedBulkLink, IReadOnlyList<PackagingLine> bulkLines)
+    {
+        // A renamed product or set reads right in the banner too.
+        var changed = false;
+        if (savedLink is not null)
+        {
+            changed |= !Equals(LinkTarget, savedLink);
+            ShowLink(savedLink);
+            changed |= RefreshLinkedLines(lines);
+        }
+
+        if (savedBulkLink is not null)
+        {
+            changed |= !Equals(BulkLinkTarget, savedBulkLink);
+            ShowBulkLink(savedBulkLink);
+            if (!AsTyped(bulkLines).SequenceEqual(_savedBulkLines))
+            {
+                ShowBulkLines(bulkLines.Select(PackagingLineRow.FromSaved));
+                _savedBulkLines = CurrentBulkLines();
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// An undo step's packaging with what its links show now (<paramref name="now"/>, as <see cref="RefreshLinked"/> left the
+    /// draft): each part linking what the form links now takes the lines it shows now, so undoing something typed before a
+    /// set was saved on the Sub-Assemblies screen never puts back the set's lines as they were.
+    /// </summary>
+    public static PackagingSnapshot AsLinkedNow(PackagingSnapshot step, PackagingSnapshot now)
+    {
+        var piece = now.Link is { } link && step.Link?.Key == link.Key && !step.IsMoving;
+        var bulk = now.BulkLink is { } bulkLink && step.BulkLink?.Key == bulkLink.Key;
+        return step with
+        {
+            Link = piece ? now.Link : step.Link,
+            Lines = piece ? now.Lines : step.Lines,
+            BulkLink = bulk ? now.BulkLink : step.BulkLink,
+            BulkLines = bulk ? now.BulkLines : step.BulkLines,
+        };
+    }
 
     /// <summary>Puts <paramref name="rows"/> in the lines' table, in place of whatever it held.</summary>
     public void ShowLines(IEnumerable<PackagingLineRow> rows)
@@ -310,20 +419,14 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
 
     /// <summary>
     /// The linked packaging's lines as the view's load read them again, while the form shows the link as saved
-    /// (<see cref="ShowsSavedLink"/>): shown in place of the rows only when they differ from the lines last loaded. The view's
+    /// (<see cref="SavedLinksShowing"/>): shown in place of the rows only when they differ from the lines last loaded. The view's
     /// load merges into every open tab, and a table rebuilt row by row each time, its changes running through every
     /// subscription to it, was a fifth of each tab's merge; the rows are pointed at their refreshed materials either way
     /// (<see cref="ResolveRows"/>). True when they were shown again.
     /// </summary>
     public bool RefreshLinkedLines(IReadOnlyList<PackagingLine> lines)
     {
-        var fresh = lines.Select(line =>
-        {
-            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
-            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
-            return (line.PackagingMaterialId, line.UnitId, PackagingLineAuthoredField.QtyPerUnit, qtyPerUnit);
-        });
-        if (fresh.SequenceEqual(_savedLines))
+        if (AsTyped(lines).SequenceEqual(_savedLines))
         {
             return false;
         }
@@ -332,14 +435,26 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
         return true;
     }
 
+    /// <summary>Saved lines as the rows they show would be read back (<see cref="CurrentLines"/>): each quantity per unit, in its unit.</summary>
+    private static IEnumerable<(int PackagingMaterialId, int? UnitId, PackagingLineAuthoredField AuthoredField, decimal AuthoredValue)> AsTyped(IEnumerable<PackagingLine> lines) =>
+        lines.Select(line =>
+        {
+            var authoredValue = line.AuthoredField == PackagingLineAuthoredField.QtyPerUnit ? line.QtyPerUnit : line.UnitsPerPackagingUnit;
+            var qtyPerUnit = ProductRules.ReconcileReciprocal(line.AuthoredField, authoredValue).QtyPerUnit;
+            return (line.PackagingMaterialId, line.UnitId, PackagingLineAuthoredField.QtyPerUnit, qtyPerUnit);
+        });
+
     /// <summary>
-    /// Shows the bulk packaging as saved, its lines for one pack and how many products it holds, and makes it what Save
-    /// compares against.
+    /// Shows the bulk packaging as saved, its lines for one pack (the set's, when it links <paramref name="link"/>) and how
+    /// many products it holds, and makes it what Save compares against.
     /// </summary>
-    public void LoadBulk(IReadOnlyList<PackagingLine> lines, int? quantity)
+    public void LoadBulk(IReadOnlyList<PackagingLine> lines, int? quantity, PackagingLink? link = null)
     {
+        var target = link is null ? null : PackagingLinkTarget.From(link);
+        _savedBulkLinkKey = target?.Key;
+        ShowBulkLink(target);
         ShowBulkLines(lines.Select(PackagingLineRow.FromSaved));
-        BulkQuantity = lines.Count > 0 ? quantity : null;
+        BulkQuantity = lines.Count > 0 || target is not null ? quantity : null;
         _savedBulkLines = CurrentBulkLines();
         _savedBulkQuantity = BulkQuantity;
     }
@@ -359,6 +474,7 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
         Link = LinkTarget,
         IsMoving = IsPackagingMoving,
         Lines = [.. LineEdits.Select(PackagingLineSnapshot.Of)],
+        BulkLink = BulkLinkTarget,
         BulkLines = [.. BulkEdits.Select(PackagingLineSnapshot.Of)],
         BulkQuantity = BulkQuantity,
     };
@@ -378,6 +494,7 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
             LineEdits.Add(PackagingLineRow.Restore(line, FindMaterial));
         }
 
+        ShowBulkLink(snapshot.BulkLink);
         BulkEdits.Clear();
         foreach (var line in snapshot.BulkLines)
         {
@@ -396,14 +513,20 @@ public sealed class ProductPackagingDraft : ObservableState, IDisposable
         [.. PackagingLineRow.CompleteLines(BulkEdits, "pack").Select(l => (l.PackagingMaterial.Id, l.UnitId, PackagingLineAuthoredField.QtyPerUnit, l.QtyPerUnit))];
 
     /// <summary>
-    /// The bulk packaging, its lines and how many products a pack holds, when either differs from what was last loaded,
-    /// else null. Lines need the quantity (refused at Save, ProductRules.EnsureValidBulkPackaging); no lines saves none.
+    /// The bulk packaging, its lines or the set it links and how many products a pack holds, when any differs from what was
+    /// last loaded, else null. A linked one sends no lines, since they're the set's. Lines or a set need the quantity
+    /// (refused at Save, ProductRules.EnsureValidBulkPackaging); neither saves none. Bulk packaging that was linked when
+    /// loaded and is the product's own now (Make a Copy) is written even when its lines match what the link showed.
     /// </summary>
     public BulkPackagingDraft? ChangedBulk()
     {
-        var lines = CurrentBulkLines();
-        var quantity = lines.Count > 0 ? BulkQuantity : null;
-        return lines.SequenceEqual(_savedBulkLines) && quantity == _savedBulkQuantity ? null : new BulkPackagingDraft(lines, quantity);
+        var setId = BulkLinkedSetId;
+        var lines = setId is null ? CurrentBulkLines() : [];
+        var quantity = lines.Count > 0 || setId is not null ? BulkQuantity : null;
+        var unchanged = BulkLinkTarget?.Key == _savedBulkLinkKey
+            && (setId is not null || lines.SequenceEqual(_savedBulkLines))
+            && quantity == _savedBulkQuantity;
+        return unchanged ? null : new BulkPackagingDraft(lines, quantity, setId);
     }
 
     /// <summary>

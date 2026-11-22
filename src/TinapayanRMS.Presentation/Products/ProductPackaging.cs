@@ -11,11 +11,15 @@ using TinapayanRMS.UseCases.Products;
 
 namespace TinapayanRMS.Presentation.Products;
 
-/// <summary>How the Packaging tab's picker takes the packaging picked: as a link, or as a copy of its lines.</summary>
+/// <summary>
+/// How the Packaging tab's picker takes the packaging picked: as a link, or as a copy of its lines, for the packaging per
+/// piece; or as a link for the bulk packaging (<see cref="LinkBulk"/>), whose picker is drawn by its own table.
+/// </summary>
 public enum PackagingSourceMode
 {
     Link,
     Copy,
+    LinkBulk,
 }
 
 /// <summary>
@@ -84,7 +88,7 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         StartCopyingCommand = ScreenCommand.Of(StartCopying);
         CancelPickingCommand = ScreenCommand.Of(EndPickingSource);
         host.LoadLatest(
-            _pickedSources.Where(source => source is not null && IsPickingSource).Select(source => source!),
+            _pickedSources.Where(source => source is not null && SourceMode is not null).Select(source => source!),
             ApplySourceAsync);
 
         // The product's own packaging lines go to the Sub-Assemblies screen as a packaging set on Save, which it links. A
@@ -111,7 +115,18 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
         RemoveBulkLineCommand = ScreenCommand.Of(
             () => host.AsUndoStep(() => draft.BulkEdits.Remove(SelectedBulkEdit!)),
-            () => SelectedBulkEdit is not null);
+            () => SelectedBulkEdit is not null && !IsBulkLinked);
+
+        // The bulk packaging's own: Link opens the picker of the packaging sets; Make a Copy and Remove Link as above.
+        StartLinkingBulkCommand = ScreenCommand.Of(StartLinkingBulk);
+        MakeBulkCopyCommand = ScreenCommand.Of(() => host.AsUndoStep(draft.MakeBulkCopy), () => IsBulkLinked);
+        RemoveBulkLinkCommand = ScreenCommand.Of(
+            () => host.AsUndoStep(() =>
+            {
+                draft.RemoveBulkLink();
+                host.InvalidateCosts();
+            }),
+            () => IsBulkLinked);
     }
 
     /// <summary>The packaging the tab edits: what it links, its lines and bulk packaging, and what Save writes of them.</summary>
@@ -143,6 +158,15 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
     /// <summary>Removes the line picked in the Bulk Packaging table, as one undo step.</summary>
     public ScreenCommand RemoveBulkLineCommand { get; }
+
+    /// <summary>Link on the bulk packaging: a picker of the packaging sets, the one picked linked in place of its lines.</summary>
+    public ScreenCommand StartLinkingBulkCommand { get; }
+
+    /// <summary>Make a Copy on linked bulk packaging: the set's lines become the product's own, and the link goes with Save.</summary>
+    public ScreenCommand MakeBulkCopyCommand { get; }
+
+    /// <summary>Remove Link on linked bulk packaging: the link and the lines it shows go, leaving no bulk packaging.</summary>
+    public ScreenCommand RemoveBulkLinkCommand { get; }
 
     /// <summary>The packaging lines, typed straight into the tab's table (the draft's).</summary>
     public ObservableCollection<PackagingLineRow> LineEdits => Draft.LineEdits;
@@ -207,6 +231,18 @@ public sealed class ProductPackaging : ObservableState, IDisposable
 
     public bool IsPackagingLinkedToProduct => Draft.IsPackagingLinkedToProduct;
 
+    /// <summary>The bulk packaging links a packaging set, so its table shows the set's lines, read-only.</summary>
+    public bool IsBulkLinked => Draft.IsBulkLinked;
+
+    /// <summary>The bulk packaging's lines are the product's own, so its table can be typed into.</summary>
+    public bool IsBulkEditable => Draft.IsBulkEditable;
+
+    /// <summary>"Linked to Box of 6 (Sub-Assemblies)", or empty while the bulk packaging is the product's own.</summary>
+    public string BulkLinkedToText => Draft.BulkLinkedToText;
+
+    /// <summary>The packaging set the bulk packaging links, whose badge opens it on Sub-Assemblies; null for none.</summary>
+    public int? BulkLinkedSetId => Draft.BulkLinkedSetId;
+
     /// <summary>The packaging sets as LoadCommand read them: what Link offers, and Copy before the other products.</summary>
     public void TakePackagingSets(IReadOnlyList<SubAssembly> packagingSets) => _packagingSets = packagingSets;
 
@@ -222,11 +258,16 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         {
             RaiseAndSetIfChanged(ref _sourceMode, value);
             RaisePropertyChanged(nameof(IsPickingSource));
+            RaisePropertyChanged(nameof(IsPickingBulkSource));
             RaisePropertyChanged(nameof(SourcePlaceholder));
         }
     }
 
-    public bool IsPickingSource => SourceMode is not null;
+    /// <summary>The picker is open for the packaging per piece, in place of its Link and Copy.</summary>
+    public bool IsPickingSource => SourceMode is PackagingSourceMode.Link or PackagingSourceMode.Copy;
+
+    /// <summary>The picker is open for the bulk packaging, in place of its Link.</summary>
+    public bool IsPickingBulkSource => SourceMode == PackagingSourceMode.LinkBulk;
 
     /// <summary>The picker's prompt, by what it's for.</summary>
     public string SourcePlaceholder => SourceMode == PackagingSourceMode.Copy ? "Copy the packaging of…" : "Link a packaging set…";
@@ -299,6 +340,26 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         StartPickingSource(PackagingSourceMode.Link, options);
     }
 
+    /// <summary>
+    /// Link on the bulk packaging: the picker offers the Sub-Assemblies screen's packaging sets, less the one it links now,
+    /// each set's lines for one bulk pack. With none, it says how to make one.
+    /// </summary>
+    private void StartLinkingBulk()
+    {
+        var linkedKey = Draft.BulkLinkTarget?.Key;
+        List<LinkableSubAssemblyOption> options = [.. _packagingSets.Select(s => new LinkableSubAssemblyOption(s)).Where(o => o.Key != linkedKey)];
+        if (options.Count == 0)
+        {
+            _host.ShowError(_packagingSets.Count == 0
+                ? "There's no packaging set to link yet. Make one on the Sub-Assemblies screen, with what one bulk pack takes."
+                : "This product's bulk packaging links the only packaging set there is.");
+            return;
+        }
+
+        _host.ShowError(null);
+        StartPickingSource(PackagingSourceMode.LinkBulk, options);
+    }
+
     /// <summary>Copy: the picker offers the packaging sets, then every other product's packaging.</summary>
     private void StartCopying()
     {
@@ -315,7 +376,9 @@ public sealed class ProductPackaging : ObservableState, IDisposable
     /// The packaging picked, once its lines are in: a set's lines, or another product's packaging as it shows (through any
     /// link of its own). Linked, they show read-only and follow the set; copied, they're this product's own to type into.
     /// Either takes the place of the packaging per piece there was, as one undo step, and Save writes it; the bulk packaging
-    /// stays. Packaging with no lines is refused, and the picker stays open for another.
+    /// stays. For the bulk packaging (<see cref="PackagingSourceMode.LinkBulk"/>), the set's lines take the place of its
+    /// lines instead, linked, and the packaging per piece stays. Packaging with no lines is refused, and the picker stays
+    /// open for another.
     /// </summary>
     private async Task ApplySourceAsync(LinkableSubAssemblyOption source, CancellationToken cancellationToken)
     {
@@ -335,10 +398,15 @@ public sealed class ProductPackaging : ObservableState, IDisposable
             return;
         }
 
-        var linking = SourceMode == PackagingSourceMode.Link;
+        var mode = SourceMode;
         if (rows.Count == 0)
         {
-            _host.ShowError($"{target.Name} has no packaging for each piece to {(linking ? "link" : "copy")}. Pick another.");
+            _host.ShowError(mode switch
+            {
+                PackagingSourceMode.LinkBulk => $"{target.Name} has no packaging lines to link. Pick another.",
+                PackagingSourceMode.Link => $"{target.Name} has no packaging for each piece to link. Pick another.",
+                _ => $"{target.Name} has no packaging for each piece to copy. Pick another.",
+            });
             return;
         }
 
@@ -346,7 +414,15 @@ public sealed class ProductPackaging : ObservableState, IDisposable
         _host.AsUndoStep(() =>
         {
             EndPickingSource();
-            Draft.Take(rows, linking ? target : null);
+            if (mode == PackagingSourceMode.LinkBulk)
+            {
+                Draft.TakeBulk(rows, target);
+            }
+            else
+            {
+                Draft.Take(rows, mode == PackagingSourceMode.Link ? target : null);
+            }
+
             _host.InvalidateCosts();
         });
     }

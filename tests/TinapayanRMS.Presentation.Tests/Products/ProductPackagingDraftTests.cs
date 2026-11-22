@@ -14,7 +14,8 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// <summary>
 /// A product's packaging draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user
 /// does to a saved product's packaging (lines typed, picked, given a unit and taken out, a set linked or a product's
-/// packaging copied in, Make a Copy, Remove Link, Move to Sub-Assemblies, bulk lines and how many a pack holds), each an
+/// packaging copied in, Make a Copy, Remove Link, Move to Sub-Assemblies, bulk lines and how many a pack holds, a set linked
+/// for the bulk packaging, its Make a Copy and Remove Link), each an
 /// undo step, with loads that bring fresh copies of the materials between them, their costs moved or not. Whatever the
 /// sequence, the dirty check says whether the packaging shows differently from where it was loaded, packaging that shows
 /// as loaded saves nothing, a load changes nothing it shows or saves, and undoing every step gives back where it started,
@@ -156,7 +157,33 @@ public class ProductPackagingDraftTests
         bulk.Quantity.Should().Be(6);
     }
 
+    [Test]
+    public void Linked_bulk_packaging_saves_its_set_and_no_lines_and_Make_a_Copy_saves_the_lines_it_showed()
+    {
+        var linked = new World(linked: false);
+        linked.Apply(new LinkBulkSet(0));
+
+        linked.Draft.IsBulkLinked.Should().BeTrue();
+        linked.Draft.BulkEdits.Should().ContainSingle();
+        var bulk = linked.Draft.ChangedBulk()!;
+        (bulk.SetId, bulk.Lines.Count, bulk.Quantity).Should().Be((BulkSetId, 0, 6), "the set's lines are the set's, and how many a pack holds stays the product's");
+
+        linked.Apply(new MakeBulkCopy());
+        bulk = linked.Draft.ChangedBulk()!;
+        bulk.SetId.Should().BeNull();
+        bulk.Lines.Should().Equal((61, (int?)null, PackagingLineAuthoredField.QtyPerUnit, 1m));
+
+        var removed = new World(linked: false);
+        removed.Apply(new LinkBulkSet(0));
+        removed.Apply(new RemoveBulkLink());
+        removed.Draft.BulkEdits.Should().BeEmpty();
+        bulk = removed.Draft.ChangedBulk()!;
+        (bulk.SetId, bulk.Lines.Count, bulk.Quantity).Should().Be(((int?)null, 0, (int?)null), "no bulk packaging, and so no quantity");
+    }
+
     private const int SetId = 71;
+
+    private const int BulkSetId = 81;
 
     private const string Nothing = "nothing";
 
@@ -191,6 +218,12 @@ public class ProductPackagingDraftTests
 
     private sealed record MoveToSubAssemblies : Step;
 
+    private sealed record LinkBulkSet(int Index) : Step;
+
+    private sealed record MakeBulkCopy : Step;
+
+    private sealed record RemoveBulkLink : Step;
+
     /// <summary>The view's load: fresh copies of the packaging materials, the costs moved or not.</summary>
     private sealed record Load(bool CostsChanged) : Step;
 
@@ -209,6 +242,9 @@ public class ProductPackagingDraftTests
         Gen.Const<Step>(new MakeCopy()),
         Gen.Const<Step>(new RemoveLink()),
         Gen.Const<Step>(new MoveToSubAssemblies()),
+        Gen.Int[0, 1].Select(index => (Step)new LinkBulkSet(index)),
+        Gen.Const<Step>(new MakeBulkCopy()),
+        Gen.Const<Step>(new RemoveBulkLink()),
         Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)));
 
     /// <summary>
@@ -253,7 +289,7 @@ public class ProductPackagingDraftTests
                 var bulk = Draft.ChangedBulk();
                 return link is null && lines is null && bulk is null
                     ? Nothing
-                    : $"link {link}; lines {(lines is null ? "none" : string.Join(", ", lines))}; bulk {(bulk is null ? "none" : $"{string.Join(", ", bulk.Lines)} x {bulk.Quantity}")}";
+                    : $"link {link}; lines {(lines is null ? "none" : string.Join(", ", lines))}; bulk {(bulk is null ? "none" : $"{string.Join(", ", bulk.Lines)} set {bulk.SetId} x {bulk.Quantity}")}";
             }
             catch (BusinessRuleException refused)
             {
@@ -315,7 +351,7 @@ public class ProductPackagingDraftTests
             var bulk = draft.BulkEdits;
             switch (step)
             {
-                // As the tables let them be typed: the lines only while they're the product's own, the bulk lines always.
+                // As the tables let them be typed: each only while its lines are the product's own.
                 case AddLine(var material, var quarters) when draft.IsPackagingEditable:
                     AddRow(lines, material, quarters);
                     break;
@@ -336,13 +372,13 @@ public class ProductPackagingDraftTests
                 case RemoveLine(var at) when draft.IsPackagingEditable && lines.Count > 0:
                     lines.RemoveAt(at % lines.Count);
                     break;
-                case AddBulkLine(var material, var quarters):
+                case AddBulkLine(var material, var quarters) when draft.IsBulkEditable:
                     AddRow(bulk, material, quarters);
                     break;
-                case TypeBulkQuantityPerPack(var at, var quarters) when bulk.Count > 0:
+                case TypeBulkQuantityPerPack(var at, var quarters) when draft.IsBulkEditable && bulk.Count > 0:
                     bulk[at % bulk.Count].QtyPerUnit = quarters / 4m;
                     break;
-                case RemoveBulkLine(var at) when bulk.Count > 0:
+                case RemoveBulkLine(var at) when draft.IsBulkEditable && bulk.Count > 0:
                     bulk.RemoveAt(at % bulk.Count);
                     break;
                 case TypeBulkQuantity(var products):
@@ -363,6 +399,16 @@ public class ProductPackagingDraftTests
                     break;
                 case MoveToSubAssemblies when draft.CanMovePackaging:
                     draft.StartMoving();
+                    break;
+                case LinkBulkSet(var index):
+                    // As the bulk packaging's picker takes a set: its lines read, linked in place of the bulk lines.
+                    draft.TakeBulk([new PackagingLineRow(Materials[index], 1m + index)], new PackagingLinkTarget.Set(BulkSetId + index, $"Bulk Set {index}"));
+                    break;
+                case MakeBulkCopy when draft.IsBulkLinked:
+                    draft.MakeBulkCopy();
+                    break;
+                case RemoveBulkLink when draft.IsBulkLinked:
+                    draft.RemoveBulkLink();
                     break;
             }
         }

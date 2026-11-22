@@ -62,8 +62,11 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         var bulkLines = (await PackagingLineRepository.ReadBulkAsync(dbContext, [sourceProductId], cancellationToken))[sourceProductId];
 
         // A packaging set the source links directly stays linked, like its recipe's sub-assemblies: it's kept apart to
-        // be shared. Reached through another product's link, it's copied like the rest of that product's packaging.
-        var sourceLink = await dbContext.PackagingLinks.AsNoTracking().FirstOrDefaultAsync(l => l.ProductId == sourceProductId, cancellationToken);
+        // be shared. Reached through another product's link, it's copied like the rest of that product's packaging. Its
+        // bulk packaging's set, if it links one, stays linked the same way.
+        var sourceLinks = await dbContext.PackagingLinks.AsNoTracking().Where(l => l.ProductId == sourceProductId).ToListAsync(cancellationToken);
+        var sourceLink = sourceLinks.FirstOrDefault(l => !l.IsBulk);
+        var sourceBulkSetId = sourceLinks.FirstOrDefault(l => l.IsBulk)?.LinkedSubAssemblyId;
         var costing = await dbContext.CostingParameters.AsNoTracking().FirstOrDefaultAsync(c => c.ProductId == sourceProductId, cancellationToken);
 
         // Not the source's stage: a clone is a new product, so it starts in Innovation, in the folder at the source's
@@ -112,8 +115,15 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
             await PackagingLineRepository.SetLinesAsync(dbContext, newProduct.Id, AsTyped(packagingLines), cancellationToken);
         }
 
-        // Its bulk packaging is its own, however its packaging is had, so a clone copies it.
-        if (!asVariant && bulkLines.Count > 0)
+        // Its bulk packaging stands apart from how its packaging per piece is had, so a clone copies its lines, or links the
+        // set it links, with how many products a pack holds.
+        if (!asVariant && sourceBulkSetId is not null)
+        {
+            await PackagingLinkRepository.SetBulkLinkAsync(dbContext, newProduct.Id, sourceBulkSetId, cancellationToken);
+            newProduct.BulkPackagingQuantity = source.BulkPackagingQuantity;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (!asVariant && bulkLines.Count > 0)
         {
             await PackagingLineRepository.SetBulkLinesAsync(dbContext, newProduct.Id, AsTyped(bulkLines), cancellationToken);
             newProduct.BulkPackagingQuantity = source.BulkPackagingQuantity;

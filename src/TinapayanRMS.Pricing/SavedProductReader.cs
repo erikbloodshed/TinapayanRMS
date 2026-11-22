@@ -7,6 +7,7 @@ using TinapayanRMS.Domain.Enums;
 namespace TinapayanRMS.Pricing;
 
 /// <summary>Everything a product's detail shows, as it's saved: what <see cref="SavedProductReader.ReadDetailAsync"/> reads.</summary>
+/// <param name="PackagingLink">What its packaging per piece links, or null for its own lines.</param>
 public sealed record ProductDetail(
     PackagingLink? PackagingLink,
     IReadOnlyList<ProductSubAssemblyUsage> Usages,
@@ -18,8 +19,14 @@ public sealed record ProductDetail(
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
 
-    /// <summary>Its bulk packaging (PackagingLine.IsBulk): its own lines for one bulk pack, in order; none for a product without.</summary>
+    /// <summary>
+    /// Its bulk packaging (PackagingLine.IsBulk), its lines for one bulk pack in order: the packaging set's it links
+    /// (<see cref="BulkPackagingLink"/>), or its own; none for a product without.
+    /// </summary>
     public IReadOnlyList<PackagingLine> BulkLines { get; init; } = [];
+
+    /// <summary>The packaging set its bulk packaging links (PackagingLink.IsBulk), with the set; null for its own lines, or none.</summary>
+    public PackagingLink? BulkPackagingLink { get; init; }
 
     /// <summary>
     /// The Wastage % it's priced with: its category's when that sets one (ProductCategory.WastagePercent), else the shop-wide
@@ -99,6 +106,9 @@ public sealed record SavedProduct(
     /// <summary>Its bulk packaging, priced, whose share per unit is in its packaging cost; null for a product without.</summary>
     public PricedBulkPackaging? BulkPackaging { get; init; }
 
+    /// <summary>"Linked to Box of 6 (Sub-Assemblies)" while its bulk packaging links a packaging set; null for its own lines, or none.</summary>
+    public string? BulkPackagingLinkedTo { get; init; }
+
     /// <summary>
     /// Its sections with no weight per piece or yield (<see cref="PricedSection.HasPieceSize"/>), by name, in recipe order:
     /// each costs it nothing per piece, so its cost and price leave that section out until one is typed. The Products list
@@ -164,7 +174,9 @@ public sealed class SavedProductReader(
         // The rest one at a time, not side by side: they share the snapshot's connection, or a Save's inside its unit of work
         // (IUnitOfWork). It costs little: every product's detail, 68 of them, in 31 ms against 22 side by side.
         List<int> ids = [.. productIdsRead];
-        var linksByProduct = (await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(l => l.ProductId);
+        var links = await packagingLinkRepository.GetForProductsAsync(ids, cancellationToken);
+        var linksByProduct = links.Where(l => !l.IsBulk).ToDictionary(l => l.ProductId);
+        var bulkLinksByProduct = links.Where(l => l.IsBulk).ToDictionary(l => l.ProductId);
         var packaging = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
         var packagingByProduct = packaging.Lines;
         var costingsByProduct = (await costingParametersRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(c => c.ProductId);
@@ -221,6 +233,7 @@ public sealed class SavedProductReader(
                 HoldsItself = HoldsItself(productId),
                 PackagingLinkedRoundInALoop = packaging.LinkedRoundInALoop.Contains(productId),
                 BulkLines = packaging.Bulk.GetValueOrDefault(productId, []),
+                BulkPackagingLink = bulkLinksByProduct.GetValueOrDefault(productId),
             };
             details[productId] = detail;
             return detail;
@@ -426,6 +439,7 @@ public sealed class SavedProductReader(
         {
             Components = detail.Components,
             BulkPackaging = bulk,
+            BulkPackagingLinkedTo = detail.BulkPackagingLink is { } bulkLink ? PackagingLinkTarget.From(bulkLink).LinkedToText : null,
         };
     }
 }

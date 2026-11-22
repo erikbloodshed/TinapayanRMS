@@ -45,7 +45,7 @@ internal static class Columns
             "id", "paper_size", "orientation", "margins", "shop_name", "shop_address", "logo", "logo_content_type", "footer_note",
             "type_size", "omit_unit_costs", "omit_percentages", "omit_figures", "omit_price_comparison",
         ],
-        [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id"],
+        [typeof(PackagingLink)] = ["id", "product_id", "linked_product_id", "linked_sub_assembly_id", "is_bulk"],
         [typeof(ProductVersion)] = ["id", "product_id", "number", "saved_at", "note", "content"],
         [typeof(PriceScenario)] = ["id", "name", "saved_at"],
         [typeof(PriceScenarioLine)] = ["id", "price_scenario_id", "raw_material_id", "change_percent", "new_price", "sort_order"],

@@ -578,7 +578,7 @@ PER PRODUCT
 | `ProductSubAssemblyUsage` | A sub-assembly in a product's recipe | Stores only the typed piece-size figure (`AuthoredField`, `AuthoredValue`). |
 | `UsageAddInLine` | A product's extra ingredient on a linked usage | Never changes the sub-assembly that the usage links. |
 | `PackagingLine` | A packaging material per sellable unit | Stores both reciprocal quantities and which one was typed (`AuthoredField`). |
-| `PackagingLink` | A product's packaging, read from another product or from a set | Exactly one target, and no loops (`PackagingLinkRules`). |
+| `PackagingLink` | A product's packaging, read from another product or from a set; or (`IsBulk`) its bulk packaging, read from a set | Exactly one target, and no loops (`PackagingLinkRules`). One of each kind a product at most; a bulk one only to a set. |
 | `ProductComponent` | A product inside a composite | `Quantity` is at least 1, and a composite never contains itself (`CompositeProductRules.EnsureNoCycle`). |
 | `CostingParameters` | A product's five percentages | One per product. Never linked or shared. |
 | `ProductVersion` | One version in a product's history | `Number` is unique per product. `Content` is a self-contained JSON snapshot that points at nothing. Goes with the product only on a permanent delete. See [Product versions](#product-versions). |
