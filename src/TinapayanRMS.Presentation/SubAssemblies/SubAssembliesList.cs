@@ -141,7 +141,7 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
             moves => host.RunSafelyAsync(() => MoveSubAssembliesAsync(moves, isUndo: false)));
         UndoMoveCommand = new ScreenCommand(() => host.RunSafelyAsync(() => MoveSubAssembliesAsync(_moveUndo, isUndo: true)), () => MoveNotice is not null);
         NewSubAssemblyInCommand = new ScreenCommand<SubAssemblyFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
-            folder is null ? null : _roles.FirstOrDefault(r => r.Id == folder.RoleId))));
+            SubAssemblyTree.RoleIdOf(folder ?? SelectedTreeNode) is { } roleId ? _roles.FirstOrDefault(r => r.Id == roleId) : null)));
         RenameSubAssemblyCommand = ScreenCommand.Of<SubAssemblyLeafNode>(BeginRenameSubAssembly);
         DeleteSubAssemblyCommand = new ScreenCommand<SubAssemblyLeafNode>(leaf => host.DeleteAsync(leaf.Row));
         MakeInHouseIngredientCommand = new ScreenCommand<SubAssemblyLeafNode>(leaf => host.RunSafelyAsync(() => MakeInHouseIngredientAsync(leaf.Row)));
@@ -206,8 +206,8 @@ public sealed class SubAssembliesList : RecordList, IListTreeScreen, IDisposable
     public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
-    /// The list's New … Here: a new sub-assembly in the folder's role. With no folder (the list's empty space), as New
-    /// starts one. Like New, it adds the sub-assembly's row to the list for its name to be typed into (TreeNameEdit).
+    /// The list's New … Here: a new sub-assembly in the folder's role; with no folder (its toolbar or empty space), in the
+    /// picked row's (<see cref="SubAssemblyTree.RoleIdOf"/>). Like New, it adds its row for its name to be typed (TreeNameEdit).
     /// </summary>
     public ScreenCommand<SubAssemblyFolderNode?> NewSubAssemblyInCommand { get; }
 

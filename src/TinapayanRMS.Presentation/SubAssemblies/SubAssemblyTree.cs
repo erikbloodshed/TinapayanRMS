@@ -163,6 +163,18 @@ public sealed class SubAssemblyTree : IDisposable
     public SubAssemblyFolderNode? Folder(int roleId) => _folders.GetValueOrDefault(roleId);
 
     /// <summary>
+    /// The role a new sub-assembly started from a row of the list goes in (the list's New Sub-Assembly, from the row picked,
+    /// or New … Here, from its folder): a role's folder's, or a sub-assembly's; null for no row, or one still being named,
+    /// for New's own (the first role).
+    /// </summary>
+    public static int? RoleIdOf(object? row) => row switch
+    {
+        SubAssemblyFolderNode { IsNewFolder: false } folder => folder.RoleId,
+        SubAssemblyLeafNode { IsNew: false } leaf => leaf.SubAssembly.RoleId,
+        _ => null,
+    };
+
+    /// <summary>
     /// Every folder closed now, by <see cref="SubAssemblyFolderNode.Key"/>: what to start with next time. Before the first
     /// Refresh, which makes the folders, the ones it was given, so a screen never shown keeps them as they were.
     /// </summary>

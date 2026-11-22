@@ -323,7 +323,43 @@ public class SubAssembliesStateTreeTests(DatabaseFixture fixture) : PersistenceT
     });
 
     [Test]
-    public Task New_from_the_header_names_the_sub_assembly_in_the_first_role_and_Dont_Save_takes_the_row_away() => UiThread.RunAsync(async () =>
+    public Task The_toolbars_New_starts_a_sub_assembly_in_the_role_of_the_row_picked_in_the_list() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 2);
+        var packagingRoleId = await AddRoleAsync("Packaging", sortOrder: 3, isPackaging: true);
+        var halayaId = await AddRecipeAsync("Ube Halaya", fillingRoleId);
+        var boxSetId = await AddPackagingSetAsync("Box Set", packagingRoleId);
+        var state = await OpenedStateAsync(halayaId);
+        var list = state.View.List;
+
+        async Task<(int? RoleId, string? Name)> NewFromToolbarAsync()
+        {
+            await list.NewSubAssemblyInCommand.ExecuteAsync(null);
+            var name = list.TreeNameEdit?.InitialText;
+            list.CancelTreeName();
+            return (state.View.Form!.EditingRole?.Id, name);
+        }
+
+        // The sub-assembly showing is the row picked: the new one goes in its role.
+        list.SelectedTreeNode.Should().BeSameAs(list.SubAssemblyTree.Find(halayaId));
+        (await NewFromToolbarAsync()).Should().Be(((int?)fillingRoleId, "New sub-assembly"));
+
+        // A role's folder picked: that role. The Packaging role, or a packaging set, starts a packaging set.
+        list.SelectedTreeNode = list.SubAssemblyTree.Folder(doughRoleId);
+        (await NewFromToolbarAsync()).Should().Be(((int?)doughRoleId, "New sub-assembly"));
+        list.SelectedTreeNode = list.SubAssemblyTree.Find(boxSetId);
+        (await NewFromToolbarAsync()).Should().Be(((int?)packagingRoleId, "New packaging set"));
+        list.SelectedTreeNode = list.SubAssemblyTree.Folder(packagingRoleId);
+        (await NewFromToolbarAsync()).Should().Be(((int?)packagingRoleId, "New packaging set"));
+
+        // Nothing picked: the first role, as New starts one.
+        list.SelectedTreeNode = null;
+        (await NewFromToolbarAsync()).Should().Be(((int?)doughRoleId, "New sub-assembly"));
+    });
+
+    [Test]
+    public Task The_views_New_names_the_sub_assembly_in_the_first_role_and_Dont_Save_takes_the_row_away() => UiThread.RunAsync(async () =>
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1);
         await AddRoleAsync("Filling", sortOrder: 2);

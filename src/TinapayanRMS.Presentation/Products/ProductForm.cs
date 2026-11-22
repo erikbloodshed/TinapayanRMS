@@ -1051,7 +1051,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     bool IRecordScreen.OpenByName(string text) => _view.OpenByName(text);
 
     /// <summary>
-    /// New, from the header or the list, in this form. A product still waiting for the load to open it no longer is: it
+    /// New, from the list or the empty view, in this form. A product still waiting for the load to open it no longer is: it
     /// would load over the new form, and a name typed into it since would then be saved as that product's.
     /// </summary>
     internal void StartNew(ProductStage? stage = null, int? folderId = null, bool isComposite = false)

@@ -264,7 +264,7 @@ public class RawMaterialTreeTests
         RawMaterialTree.MoveTo(row, MaterialOf(2, "Cake Flour", Dairy)).Should().BeNull("nothing is dropped on it");
         RawMaterialTree.MoveTo(Folder(tree, RawMaterialType.Ingredient, "Dairy"), row.RawMaterial).Should().BeNull("and it isn't moved");
 
-        // With no category yet (New from the header), last in its type's folder, where a refresh keeps it too.
+        // With no category yet (the view's New), last in its type's folder, where a refresh keeps it too.
         tree.BeginNewMaterial(new RawMaterial { Name = "New ingredient", Type = RawMaterialType.Ingredient });
         TitlesIn(flour).Should().Equal(["Bread Flour"], "there's one at a time");
         TitlesIn(ingredients).Should().Equal("Dairy", "Flour", "New ingredient");

@@ -193,9 +193,9 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
 
         // A new product replaces the one showing, so its unsaved changes are asked about first.
         NewProductInCommand = new ScreenCommand<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
-            () => NewInList(folder?.Stage, folder?.FolderId)));
+            () => NewInPlace(folder, isComposite: false)));
         NewCompositeProductInCommand = new ScreenCommand<ProductFolderNode?>(folder => host.AfterUnsavedChangesAsync(
-            () => NewInList(folder?.Stage, folder?.FolderId, isComposite: true)));
+            () => NewInPlace(folder, isComposite: true)));
         RenameProductCommand = ScreenCommand.Of<ProductLeafNode>(BeginRenameProduct);
         CloneProductCommand = new ScreenCommand<ProductLeafNode>(leaf => MakeFromWithPromptAsync(
             leaf,
@@ -332,13 +332,13 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
-    /// New Product Here on a folder of the list: a new product, as New starts one, filed in that folder's stage and
-    /// category. Null, from the list's empty space, is New itself. Like New, it adds the product's row to the list for its
-    /// name to be typed into (TreeNameEdit), and the name typed saves it.
+    /// New Product Here on a folder of the list: a new product, as New starts one, filed in that folder. Null, from the
+    /// list's toolbar or empty space, files it where the row picked is (<see cref="NewProductPlace.Of"/>). Like New, it adds
+    /// the product's row to the list for its name to be typed into (TreeNameEdit), and the name typed saves it.
     /// </summary>
     public ScreenCommand<ProductFolderNode?> NewProductInCommand { get; }
 
-    /// <summary>New Composite Product Here on a folder of the list, as New Product Here; null, from the list's empty space, is New composite product itself.</summary>
+    /// <summary>New Composite Product Here on a folder of the list, and New Composite Product from its toolbar or empty space, placed as <see cref="NewProductInCommand"/> places a product.</summary>
     public ScreenCommand<ProductFolderNode?> NewCompositeProductInCommand { get; }
 
     /// <summary>
@@ -1012,15 +1012,15 @@ public sealed class ProductsList : RecordList, IListTreeScreen, IDisposable
     /// </summary>
     private void BeginNewFolder(ProductFolderNode? from)
     {
-        var (stage, parentId) = from is { IsDeletedFolder: false, IsNewFolder: false }
-            ? (from.Stage, from.FolderId)
-            : (SelectedTreeNode as ProductTreeNode) switch
-            {
-                ProductFolderNode { IsDeletedFolder: false, IsNewFolder: false } folder => (folder.Stage, folder.FolderId),
-                ProductLeafNode { IsDeleted: false, IsNew: false } leaf => (leaf.Product.Stage, leaf.Product.FolderId),
-                ProductFolderNode or ProductLeafNode or null => (ProductStage.Production, (int?)null),
-            };
+        var (stage, parentId) = NewProductPlace.Of(from) ?? NewProductPlace.Of(SelectedTreeNode) ?? (ProductStage.Production, null);
         BeginNewFolderIn(stage, parentId, ProductFolderNode.NewFolderTitle);
+    }
+
+    // New Product (Here) and New Composite Product (Here): in the folder, or with none, where the row picked is.
+    private void NewInPlace(ProductFolderNode? folder, bool isComposite)
+    {
+        var place = NewProductPlace.Of(folder ?? SelectedTreeNode);
+        NewInList(place?.Stage, place?.FolderId, isComposite);
     }
 
     private void BeginNewFolderIn(ProductStage stage, int? parentId, string text)

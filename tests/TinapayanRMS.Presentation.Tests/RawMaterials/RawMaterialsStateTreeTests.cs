@@ -521,6 +521,46 @@ public class RawMaterialsStateTreeTests(DatabaseFixture fixture) : PersistenceTe
     });
 
     [Test]
+    public Task The_toolbars_New_starts_a_material_where_the_row_picked_in_the_list_is() => UiThread.RunAsync(async () =>
+    {
+        var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);
+        var inHouseId = await AddCategoryAsync("In-House", RawMaterialCategoryType.Made);
+        var boxesId = await AddCategoryAsync("Boxes", RawMaterialCategoryType.Packaging);
+        var breadFlourId = await AddIngredientAsync("Bread Flour", flourId);
+        var syrupId = await AddIngredientAsync("Simple Syrup", inHouseId, RawMaterialSource.Made);
+        var state = await OpenedStateAsync(breadFlourId);
+        var list = state.View.List;
+
+        async Task<(RawMaterialType Type, RawMaterialSource Source, int? CategoryId)> NewFromToolbarAsync()
+        {
+            await list.NewMaterialInCommand.ExecuteAsync(null);
+            list.CancelTreeName();
+            var form = state.View.Form!;
+            return (form.EditingType, form.EditingSource, form.EditingCategory?.Id);
+        }
+
+        // The material showing is the row picked: the new one goes in its category.
+        list.SelectedTreeNode.Should().BeSameAs(list.RawMaterialTree.Find(breadFlourId));
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Purchased, (int?)flourId));
+
+        // A made ingredient picked, or its Made folder: a made one, in that category.
+        list.SelectedTreeNode = list.RawMaterialTree.Find(syrupId);
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made, (int?)inHouseId));
+        list.SelectedTreeNode = list.RawMaterialTree.CategoryFolder(inHouseId);
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Made, (int?)inHouseId));
+
+        // A category's folder picked: in it. A type's folder: that type, with no category yet.
+        list.SelectedTreeNode = list.RawMaterialTree.CategoryFolder(boxesId);
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Packaging, RawMaterialSource.Purchased, (int?)boxesId));
+        list.SelectedTreeNode = list.RawMaterialTree.TypeFolder(RawMaterialType.Packaging);
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Packaging, RawMaterialSource.Purchased, (int?)null));
+
+        // Nothing picked: a new ingredient, as New starts one.
+        list.SelectedTreeNode = null;
+        (await NewFromToolbarAsync()).Should().Be((RawMaterialType.Ingredient, RawMaterialSource.Purchased, (int?)null));
+    });
+
+    [Test]
     public Task Rename_Category_types_the_name_in_place_and_the_picker_follows() => UiThread.RunAsync(async () =>
     {
         var flourId = await AddCategoryAsync("Flour", RawMaterialCategoryType.Ingredient);

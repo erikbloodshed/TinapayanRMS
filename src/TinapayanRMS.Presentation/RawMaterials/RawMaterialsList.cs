@@ -145,10 +145,11 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
         MoveMaterialsCommand = new ScreenCommand<IReadOnlyList<RawMaterialMove>>(
             moves => host.RunSafelyAsync(() => MoveMaterialsAsync(moves, isUndo: false)));
         UndoMoveCommand = new ScreenCommand(() => host.RunSafelyAsync(() => MoveMaterialsAsync(_moveUndo, isUndo: true)), () => MoveNotice is not null);
-        NewMaterialInCommand = new ScreenCommand<RawMaterialFolderNode?>(folder => host.AfterUnsavedChangesAsync(() => NewInList(
-            folder?.Type ?? RawMaterialType.Ingredient,
-            folder?.CategoryId,
-            folder?.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased)));
+        NewMaterialInCommand = new ScreenCommand<RawMaterialFolderNode?>(folder => host.AfterUnsavedChangesAsync(() =>
+        {
+            var (type, categoryId, source) = RawMaterialTree.NewMaterialPlace(folder ?? SelectedTreeNode);
+            NewInList(type, categoryId, source);
+        }));
         RenameMaterialCommand = ScreenCommand.Of<RawMaterialLeafNode>(BeginRenameMaterial);
         CopyMaterialCommand = new ScreenCommand<RawMaterialLeafNode>(async leaf =>
         {
@@ -199,9 +200,8 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
     public ScreenCommand UndoMoveCommand { get; }
 
     /// <summary>
-    /// The list's New … Here: a new material of the folder's type, in its category when it's a category's folder. With no
-    /// folder (the list's empty space), a new ingredient, as New starts one. Like New, it adds the material's row to the list
-    /// for its name to be typed into (TreeNameEdit).
+    /// The list's New … Here, or with no folder (its toolbar or empty space) the row picked: a new material where
+    /// <see cref="RawMaterialTree.NewMaterialPlace"/> puts it, like New adding its row for its name to be typed (TreeNameEdit).
     /// </summary>
     public ScreenCommand<RawMaterialFolderNode?> NewMaterialInCommand { get; }
 
@@ -528,7 +528,7 @@ public sealed class RawMaterialsList : RecordList, IListTreeScreen, IDisposable
 
     /// <summary>
     /// New and New … Here: a fresh form for a new material (<see cref="IRawMaterialsListHost.StartNew"/>), and its row in the
-    /// list, in its category's folder (with none yet, from the header or the list's empty space, last in its type's folder),
+    /// list, in its category's folder (with none yet, from the view's New, or a type's folder, last in its type's folder),
     /// picked, with its name ready to be typed, as a new file in a file explorer. The name typed goes into the form
     /// (<see cref="RecordList.CommitTreeNameAsync"/>), and the row stays until Save files the material or the form leaves it.
     /// The search is cleared first, so the row shows.

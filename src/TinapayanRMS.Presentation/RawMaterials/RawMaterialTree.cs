@@ -202,6 +202,21 @@ public sealed class RawMaterialTree : IDisposable
     public RawMaterialFolderNode? CategoryFolder(int categoryId) => _categoryFolders.GetValueOrDefault(categoryId);
 
     /// <summary>
+    /// What a new material started from a row of the list is (the list's New Raw Material, from the row picked, or New …
+    /// Here, from its folder): a folder's type and category (a type's: none yet), made in a Made category; a material's type
+    /// and category, made when it's made (a linked one's neighbour starts purchased, as its folder's New Ingredient Here
+    /// does); and for no row, or one still being named, an ingredient with no category, as New starts one.
+    /// </summary>
+    public static (RawMaterialType Type, int? CategoryId, RawMaterialSource Source) NewMaterialPlace(object? row) => row switch
+    {
+        RawMaterialFolderNode { IsNewFolder: false } folder => (folder.Type, folder.CategoryId,
+            folder.CategoryType == RawMaterialCategoryType.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased),
+        RawMaterialLeafNode { IsNew: false, RawMaterial: var material } => (material.Type, material.CategoryId,
+            material.Source == RawMaterialSource.Made ? RawMaterialSource.Made : RawMaterialSource.Purchased),
+        _ => (RawMaterialType.Ingredient, null, RawMaterialSource.Purchased),
+    };
+
+    /// <summary>
     /// Every folder closed now, types included, by <see cref="RawMaterialFolderNode.Key"/>: what to start with next time.
     /// Before the first Refresh, which makes the category folders, the ones it was given.
     /// </summary>
@@ -273,7 +288,7 @@ public sealed class RawMaterialTree : IDisposable
 
     /// <summary>
     /// Adds a row for the new material the form starts, <paramref name="material"/> (no id yet), last in its category's
-    /// folder, or with no category yet (New from the header), last in its type's folder; its folders open to show it. A
+    /// folder, or with no category yet (the view's New, or a type's folder picked), last in its type's folder; its folders open to show it. A
     /// refresh keeps it there, uncounted, until <see cref="EndNewMaterial"/>. Any earlier one goes first.
     /// </summary>
     public RawMaterialLeafNode BeginNewMaterial(RawMaterial material)

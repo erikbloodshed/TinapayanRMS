@@ -93,4 +93,16 @@ public sealed class NewProductPlace : ObservableState
             FolderId = parentId;
         }
     }
+
+    /// <summary>
+    /// Where a row of the Products list puts something new started from it (the list's New Product, New Composite Product
+    /// and New Folder, from the row picked): in a folder (a stage's: at its top), or in a product's folder and stage; null
+    /// for the Deleted folder, a deleted product, a row still being named, or no row, for the caller's own default.
+    /// </summary>
+    public static (ProductStage Stage, int? FolderId)? Of(object? row) => row switch
+    {
+        ProductFolderNode { IsDeletedFolder: false, IsNewFolder: false } folder => (folder.Stage, folder.FolderId),
+        ProductLeafNode { IsDeleted: false, IsNew: false } leaf => (leaf.Product.Stage, leaf.Product.FolderId),
+        _ => null,
+    };
 }

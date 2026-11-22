@@ -450,7 +450,7 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         breads.Products.Select(l => l.Title).Should().Equal("Pan de Coco");
         state.NewProductTag.Should().BeNull("a saved product shows no tag");
 
-        // New, from the header, starts one in the stage Settings gives a new product: Production, to start with.
+        // The view's New (the empty view's, :new) starts one in the stage Settings gives a new product: Production, to start with.
         await state.NewCommand.ExecuteAsync();
         state.NewProductTag.Should().Be("Goes in Production");
         state.View.List.CancelTreeName();
@@ -490,6 +490,44 @@ public class ProductsStateTreeTests(DatabaseFixture fixture) : PersistenceTestBa
         await defaults.SetAsync(new CostingDefaults { NewProductStage = ProductStage.Production }, Cancellation);
         await state.LoadCommand.ExecuteAsync();
         state.NewProductTag.Should().Be("Goes in Innovation");
+    });
+
+    [Test]
+    public Task The_toolbars_New_files_a_product_where_the_row_picked_in_the_list_is() => UiThread.RunAsync(async () =>
+    {
+        var breadsId = await AddFolderAsync("Breads");
+        var cakesId = await AddFolderAsync("Cakes", ProductStage.Production);
+        var mamonId = await SaveProductAsync("Mamon", cakesId, ProductStage.Production);
+        var state = await OpenedStateAsync(mamonId);
+        var list = state.View.List;
+
+        async Task<string?> NewFromToolbarAsync(bool isComposite = false)
+        {
+            await (isComposite ? list.NewCompositeProductInCommand : list.NewProductInCommand).ExecuteAsync(null);
+            list.CancelTreeName();
+            return state.View.Form!.NewProductTag;
+        }
+
+        // The product showing is the row picked: the new one goes in its folder, in its stage.
+        list.SelectedTreeNode.Should().BeSameAs(list.ProductTree.Find(mamonId));
+        (await NewFromToolbarAsync()).Should().Be("Goes in Production › Cakes");
+
+        // A folder picked: inside it. A stage's folder: at its top.
+        list.SelectedTreeNode = list.ProductTree.Folder(breadsId);
+        (await NewFromToolbarAsync()).Should().Be("Goes in Innovation › Breads");
+        list.SelectedTreeNode = list.ProductTree.StageFolder(ProductStage.Innovation);
+        (await NewFromToolbarAsync()).Should().Be("Goes in Innovation");
+
+        // A composite product the same way.
+        list.SelectedTreeNode = list.ProductTree.Folder(breadsId);
+        (await NewFromToolbarAsync(isComposite: true)).Should().Be("Goes in Innovation › Breads");
+        state.View.Form!.IsEditingComposite.Should().BeTrue();
+
+        // The Deleted folder, or nothing, picked: where New puts it, Settings' stage (Production) at the top.
+        list.SelectedTreeNode = list.ProductTree.DeletedFolder;
+        (await NewFromToolbarAsync()).Should().Be("Goes in Production");
+        list.SelectedTreeNode = null;
+        (await NewFromToolbarAsync()).Should().Be("Goes in Production");
     });
 
     [Test]

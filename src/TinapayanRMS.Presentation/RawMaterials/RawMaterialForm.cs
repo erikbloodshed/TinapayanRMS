@@ -720,7 +720,7 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
     }
 
     /// <summary>
-    /// New, from the header or the list, in this form. A material still waiting for the load to open it is no longer opened:
+    /// New, from the list or the empty view, in this form. A material still waiting for the load to open it is no longer opened:
     /// it would load over the new form, and a name typed into it since would then be saved as that material's.
     /// </summary>
     internal void StartNew(
