@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Reflection;
-using System.Runtime;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -87,13 +86,6 @@ public static class MauiProgram
         }
 
         Log.Information("TinapayanRMS {Version} is starting", AppVersion.Current);
-
-        // Which garbage collector this copy runs on: Satori's in a build with -p:UseSatoriGC=true (the Maui project's
-        // experiment), which lists its settings under its own name, or .NET's own.
-        Log.Information(
-            "Garbage collector: {Collector}, latency mode {LatencyMode}",
-            GC.GetConfigurationVariables().ContainsKey("SatoriGC") ? "Satori" : ".NET's own",
-            GCSettings.LatencyMode);
 
         try
         {

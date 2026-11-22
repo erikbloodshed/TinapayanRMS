@@ -35,11 +35,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
-# TINAPAYANRMS_SATORI=1 drives the Satori GC build instead (dotnet build src/TinapayanRMS.Maui -p:UseSatoriGC=true).
-$bin = if ($env:TINAPAYANRMS_SATORI) { 'bin\Satori\Debug' } else { 'bin\Debug' }
 # TINAPAYANRMS_EXE drives another copy: one the install script put in a trial folder, say, as the shop will run it.
 $exe = if ($env:TINAPAYANRMS_EXE) { (Resolve-Path -LiteralPath $env:TINAPAYANRMS_EXE).Path }
-       else { Join-Path $repo "src\TinapayanRMS.Maui\$bin\net11.0-windows10.0.19041.0\win-x64\TinapayanRMS.Maui.exe" }
+       else { Join-Path $repo "src\TinapayanRMS.Maui\bin\Debug\net11.0-windows10.0.19041.0\win-x64\TinapayanRMS.Maui.exe" }
 $port = 9222
 $shots = Join-Path $env:TEMP 'tinapayanrms-shots'
 $tools = Join-Path $env:LOCALAPPDATA 'TinapayanRMS\dev\playwright'

@@ -64,13 +64,12 @@ if (git -C $repo status --porcelain) {
     Write-Warning 'The working tree has changes not committed: the MSI carries them, under the last commit''s version.'
 }
 
-# A fresh folder, so the MSI holds what this publish made and nothing an earlier one left. Satori GC stays off whatever
-# the shell says: an installed copy is the everyday build.
+# A fresh folder, so the MSI holds what this publish made and nothing an earlier one left.
 if (Test-Path -LiteralPath $published) {
     Remove-Item -LiteralPath $published -Recurse -Force
 }
 Write-Host "Publishing TinapayanRMS $Version (a few minutes)..."
-dotnet publish $project --configuration Release --output $published -p:UseSatoriGC=false --nologo
+dotnet publish $project --configuration Release --output $published --nologo
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
 }

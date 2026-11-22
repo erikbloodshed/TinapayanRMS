@@ -78,11 +78,10 @@ if (-not (Test-Path -LiteralPath $pgpass)) {
     Write-Warning "$pgpass is missing, so the app won't be able to sign in to PostgreSQL as this Windows user. See the developer manual's setup."
 }
 
-# Published to a folder of its own first, so a build that fails leaves the installed copy alone. Satori GC stays off
-# whatever the shell says: an installed copy is the everyday build.
+# Published to a folder of its own first, so a build that fails leaves the installed copy alone.
 $published = Join-Path ([IO.Path]::GetTempPath()) "TinapayanRMS.$([Guid]::NewGuid().ToString('N'))"
 Write-Host 'Publishing (a few minutes)...'
-dotnet publish $project --configuration Release --output $published -p:UseSatoriGC=false --nologo
+dotnet publish $project --configuration Release --output $published --nologo
 if ($LASTEXITCODE -ne 0) {
     $failedWith = $LASTEXITCODE
     Remove-Item -LiteralPath $published -Recurse -Force -ErrorAction SilentlyContinue

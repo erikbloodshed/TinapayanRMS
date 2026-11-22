@@ -436,7 +436,7 @@ else {
             foreach ($side in $sides.Values) {
                 Write-Output "Publishing the $($side.Key) side's app (a few minutes)..."
                 $out = Join-Path $work "app-$($side.Key)"
-                $publish = Invoke-Tool 'dotnet' @('publish', (Join-Path $side.Tree 'src\TinapayanRMS.Maui'), '--configuration', 'Release', '--output', $out, '-p:UseSatoriGC=false', '--nologo', '-v', 'q') (Join-Path $results "publish-$($side.Key).log")
+                $publish = Invoke-Tool 'dotnet' @('publish', (Join-Path $side.Tree 'src\TinapayanRMS.Maui'), '--configuration', 'Release', '--output', $out, '--nologo', '-v', 'q') (Join-Path $results "publish-$($side.Key).log")
                 if ($publish.ExitCode -ne 0) { throw "The $($side.Key) side's app didn't publish: see $results\publish-$($side.Key).log." }
                 $apps[$side.Key] = Join-Path $out 'TinapayanRMS.Maui.exe'
             }
