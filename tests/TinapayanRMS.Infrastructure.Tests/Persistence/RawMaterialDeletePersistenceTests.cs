@@ -15,8 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// uses it, naming each user, as deleting a product names what leans on it. Left to the foreign keys, the screen
 /// would say only "This item is currently in use elsewhere and can't be deleted."
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class RawMaterialDeletePersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private RawMaterialRepository CreateRepository() => new(CreateDbContextFactory());

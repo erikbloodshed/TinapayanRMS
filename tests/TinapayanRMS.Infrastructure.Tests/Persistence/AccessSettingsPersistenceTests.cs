@@ -12,8 +12,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// The app's one password and its auto-lock: no row reads as no password and a 15-minute auto-lock; the first password is
 /// set once, and changed only with the current one; only a salted hash is kept.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class AccessSettingsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private AccessSettingsRepository CreateRepository() => new(CreateDbContextFactory());

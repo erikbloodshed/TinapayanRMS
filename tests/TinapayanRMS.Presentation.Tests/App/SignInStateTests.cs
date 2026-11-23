@@ -18,8 +18,8 @@ namespace TinapayanRMS.Presentation.Tests.App;
 /// The sign-in panel: it asks for a new password while there's none, the password once there is, unlocks the window with
 /// the right one and the auto-lock's minutes, says so for a wrong one, and never lets a database it can't reach in.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class SignInStateTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private static readonly DateTime Start = new(2026, 11, 15, 8, 0, 0);

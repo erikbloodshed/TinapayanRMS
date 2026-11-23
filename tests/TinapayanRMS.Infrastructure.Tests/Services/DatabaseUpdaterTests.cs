@@ -19,8 +19,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Services;
 /// updates for one that's behind, a new one made, and one a newer copy updated, or someone else's, left alone. Each test
 /// has a database of its own (ThrowawayDatabase) and a backups folder of its own, as DatabaseBackupsTests have.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public sealed class DatabaseUpdaterTests(DatabaseFixture fixture) : IAsyncDisposable
 {
     private static CancellationToken Cancellation => TestContext.Current!.Execution.CancellationToken;

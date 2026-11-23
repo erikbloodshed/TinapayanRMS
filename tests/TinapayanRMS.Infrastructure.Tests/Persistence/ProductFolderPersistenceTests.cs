@@ -14,8 +14,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// The Products list's folders (ProductFolder): made, named, nested, moved and deleted as in a file explorer, each in one
 /// stage with everything in it, a name unique beside it, and never inside itself. Deleting one deletes no product.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductFolderPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductFolderRepository CreateRepository() => new(CreateDbContextFactory());

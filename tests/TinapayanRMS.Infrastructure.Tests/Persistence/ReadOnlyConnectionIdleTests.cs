@@ -9,8 +9,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// seconds (DatabaseBackups). A read-only connection left idle in its pool has to have closed by itself before then. In
 /// the collection of the tests that clear every pool, which would close it first.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ReadOnlyConnectionIdleTests(DatabaseFixture fixture)
 {
     private static readonly TimeSpan RestoreWait = TimeSpan.FromSeconds(25);

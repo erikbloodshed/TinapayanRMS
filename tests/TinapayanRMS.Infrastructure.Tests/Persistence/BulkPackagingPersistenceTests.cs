@@ -16,8 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// several products share and its tape, each quantity per pack, and how many products the pack holds. Its own whatever its
 /// packaging links, kept apart from the lines for each unit.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class BulkPackagingPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private PackagingLineRepository CreatePackagingLineRepository() => new(CreateDbContextFactory());

@@ -15,8 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Save writes it (SetRecipeAsync): named in the draft by a saved sub-assembly's id or a new section's stand-in, stored as the
 /// sub-assembly, checked before anything is written, and carried by Clone and Create Variant.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class ProductSectionFoldPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private ProductRepository CreateRepository() => new(CreateDbContextFactory());

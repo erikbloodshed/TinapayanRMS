@@ -13,8 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// Settings → Printing: no row reads as A4, portrait and normal margins; a save is read back, and saved again over the one
 /// row; a choice the lists don't offer is refused by the rules, and by the table.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class PrintSettingsPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private PrintSettingsRepository CreateRepository() => new(CreateDbContextFactory());

@@ -16,8 +16,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// on the same database makes one (SavedVersionRules). What moves that time is a save of the record itself, never a cost the
 /// cascade moves.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.C)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.C)]
 public class SavedVersionPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     private readonly TestClock _clock = new(new DateTime(2026, 11, 18, 8, 0, 0));

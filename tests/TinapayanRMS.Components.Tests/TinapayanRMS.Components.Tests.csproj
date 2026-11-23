@@ -14,8 +14,15 @@
   <!-- The architecture tests that read IL (DecimalNumbersTests) read the app and the two servers too, from the assemblies
        their builds make, without loading them (ExternalAssemblies): built first, but not referenced. The app's is Windows
        only, which this project's net11.0 can't reference, so its framework isn't negotiated. -->
+  <!-- With UseBuiltApp=true the app's assembly is read as its last build left it, and the app isn't built: its WinUI XAML
+       compiler runs on every build, changed or not, about 10 s of the 13 a build of this project took with nothing
+       changed (2026-11-23). scripts/Test-Changed.ps1 sets it only when that file is newer than every file of the app's
+       own; everything else (dotnet test, local CI) builds the app. -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\TinapayanRMS.Maui\TinapayanRMS.Maui.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="ReadAssembly" />
+    <ProjectReference Include="..\..\src\TinapayanRMS.Maui\TinapayanRMS.Maui.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="ReadAssembly"
+                      Condition="'$(UseBuiltApp)' != 'true'" />
+    <ReadAssembly Include="..\..\src\TinapayanRMS.Maui\bin\$(Configuration)\$(WindowsTargetFramework)\win-x64\TinapayanRMS.Maui.dll"
+                  Condition="'$(UseBuiltApp)' == 'true'" />
     <ProjectReference Include="..\..\src\TinapayanRMS.RecipeApi\TinapayanRMS.RecipeApi.csproj" ReferenceOutputAssembly="false" OutputItemType="ReadAssembly" />
     <ProjectReference Include="..\..\src\TinapayanRMS.Mcp\TinapayanRMS.Mcp.csproj" ReferenceOutputAssembly="false" OutputItemType="ReadAssembly" />
   </ItemGroup>

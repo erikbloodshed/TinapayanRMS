@@ -13,8 +13,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Upgrades;
 /// The one-time changes to the data a schema change needs (DataUpgrades): made once on a database as it's migrated, in
 /// order, and recorded so they're never made again.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.B)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.B)]
 public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Test]

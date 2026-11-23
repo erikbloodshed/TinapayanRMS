@@ -79,19 +79,25 @@ public abstract class DatabaseFixtureBase : IAsyncInitializer, IAsyncDisposable
         _respawner = await CreateRespawnerAsync(connection);
     }
 
-    /// <summary>What empties every table of the database as it now is, but the migrations' history.</summary>
+    /// <summary>
+    /// What empties every table of the database as it now is, but the migrations' history: a DELETE of each, in the order
+    /// their foreign keys allow, not Respawn's one TRUNCATE of them all. A test leaves a handful of rows, which a DELETE
+    /// clears in about a millisecond, where a TRUNCATE gives each of the 27 tables new files and took about 0.3 s a test,
+    /// three times the median test (2026-11-23: Presentation.Tests went from 211 s to 90 s, Infrastructure.Tests from
+    /// 217 s to about 120 s). Neither restarts the ids.
+    /// </summary>
     private static Task<Respawner> CreateRespawnerAsync(NpgsqlConnection connection) =>
         Respawner.CreateAsync(connection, new RespawnerOptions
         {
             DbAdapter = DbAdapter.Postgres,
             SchemasToInclude = ["public"],
             TablesToIgnore = [.. TablesExcludedFromReset.Select(t => new Respawn.Graph.Table(t))],
+            FormatDeleteStatement = table => $"DELETE FROM {table.GetFullName('"')};",
         });
 
     /// <summary>
-    /// Empties every table. Respawn truncates them, which waits for the locks any read still running holds, such as a
-    /// background load the last test left going; PostgreSQL ends one of the two as a deadlock when they cross, so it's
-    /// tried again.
+    /// Empties every table. The deletes wait for the locks any write still running holds, such as a background save the
+    /// last test left going; PostgreSQL ends one of the two as a deadlock when they cross, so it's tried again.
     /// </summary>
     public async Task ResetAsync()
     {

@@ -15,7 +15,7 @@ dotnet build TinapayanRMS.slnx
 dotnet test --solution TinapayanRMS.slnx                                          # all tests
 dotnet test --project tests/TinapayanRMS.ApplicationCore.Tests --treenode-filter "/*/*/UnitConversionRulesTests/*"   # /assembly/namespace/class/test
 dotnet test --project tests/TinapayanRMS.Presentation.Tests --treenode-filter "/*/*/*/*SomeTestName*"
-powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1               # only the test projects your changes reach (-List, -Class, -Since)
+powershell -ExecutionPolicy Bypass -File scripts/Test-Changed.ps1               # only the test projects your changes reach, skipping those that passed on them (-Near: classes named after the files; -List, -Class, -Since, -Rerun)
 powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -Class "*X*"   # rerun a class on each save, by hot reload
 dotnet run --project src/TinapayanRMS.Maui                                        # the app's window
 dotnet run --project src/TinapayanRMS.RecipeApi                                   # the Recipe API, http://localhost:5290/api/v1

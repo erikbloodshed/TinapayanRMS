@@ -15,8 +15,8 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 /// and the second takes its turn behind the first (Transactions.BeginOrJoinTransactionAsync's lock), so it works its made
 /// and linked ingredients out from what the first committed: neither leaves a stored cost worked out from stale inputs.
 /// </summary>
-[NotInParallel(DatabaseCollection.A)]
-[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.A)]
+[NotInParallel(DatabaseCollection.D)]
+[ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
 public class CostCascadeConcurrencyPersistenceTests(DatabaseFixture fixture) : PersistenceTestBase(fixture)
 {
     [Test]
