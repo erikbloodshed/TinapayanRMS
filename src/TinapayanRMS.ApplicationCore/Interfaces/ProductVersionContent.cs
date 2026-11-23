@@ -17,9 +17,10 @@ public sealed record ProductVersionContent
     /// <summary>
     /// The shape written today. A later change of shape bumps it, so an old snapshot can still be read. 2: each section
     /// keeps its label (VersionSection.Label), which 1 read from the sub-assembly's name. 3: the VAT is the shop's
-    /// (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing.
+    /// (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing. 4: a section can go whole into
+    /// another (VersionSection.GoesIntoSubAssemblyId), which before 4 none did, so an older one reads as none.
     /// </summary>
-    public const int CurrentSchema = 3;
+    public const int CurrentSchema = 4;
 
     public int Schema { get; init; } = CurrentSchema;
 
@@ -112,6 +113,10 @@ public sealed record VersionCosting(
 /// What it went by beside its role in the recipe, "Cheese"; null for one that went by its role alone, and in a snapshot
 /// from before schema 2, which read it from <paramref name="SubAssemblyName"/> instead (<see cref="LabelIn"/>).
 /// </param>
+/// <param name="GoesIntoSubAssemblyId">
+/// The sub-assembly of the recipe's other section it went into whole (ProductSubAssemblyUsage.GoesIntoSubAssemblyId), as
+/// that one's <see cref="SubAssemblyId"/> here; null for one cut into pieces itself, and in every snapshot before schema 4.
+/// </param>
 public sealed record VersionSection(
     int SubAssemblyId,
     string SubAssemblyName,
@@ -121,7 +126,8 @@ public sealed record VersionSection(
     decimal AuthoredValue,
     IReadOnlyList<VersionLine> Lines,
     IReadOnlyList<VersionAddIn> AddIns,
-    string? Label = null)
+    string? Label = null,
+    int? GoesIntoSubAssemblyId = null)
 {
     /// <summary>
     /// What it went by beside its role in <paramref name="productName"/>'s recipe: its <see cref="Label"/>, or in a

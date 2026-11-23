@@ -116,6 +116,11 @@ public sealed record ComponentInfo(int ProductId, int Quantity);
 /// <param name="SectionName">Its tab's name: its role, with its label when the role comes more than once ("Filling: Ube").</param>
 /// <param name="LinkedName">The linked sub-assembly's name; null for the product's own section.</param>
 /// <param name="AuthoredField">WeightPerPiece or Yield: which of the two <paramref name="AuthoredValue"/> is.</param>
+/// <param name="GoesIntoSubAssemblyId">
+/// The <paramref name="SubAssemblyId"/> of the product's other section this one goes into whole, as a sponge into the dough;
+/// null for one cut into pieces itself. Its whole batch is then in that one's, and it has no piece size of its own
+/// (<paramref name="AuthoredValue"/> 0): make one batch of it for each batch of that one.
+/// </param>
 public sealed record SectionInfo(
     int SubAssemblyId,
     string SectionName,
@@ -124,7 +129,8 @@ public sealed record SectionInfo(
     string AuthoredField,
     decimal AuthoredValue,
     IReadOnlyList<PlanLine> Lines,
-    IReadOnlyList<PlanLine> AddIns);
+    IReadOnlyList<PlanLine> AddIns,
+    int? GoesIntoSubAssemblyId = null);
 
 /// <summary>An ingredient and its grams: a line of a section of a product's recipe, or one of its add-ins.</summary>
 public sealed record PlanLine(int IngredientId, string Ingredient, decimal Grams);

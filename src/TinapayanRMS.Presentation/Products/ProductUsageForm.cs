@@ -9,7 +9,6 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.Presentation.Shared;
-using TinapayanRMS.Presentation.SubAssemblies;
 
 namespace TinapayanRMS.Presentation.Products;
 
@@ -44,7 +43,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     private readonly IReadOnlyList<RawMaterial> _ingredients;
 
     /// <summary>The form's batch weight, piece cost and captions, worked out when read (<see cref="Figures"/>).</summary>
-    private readonly Derived<FormFigures> _figures;
+    private readonly Derived<UsageFormFigures> _figures;
 
     /// <param name="host">The Products screen: its cost basis, what can be linked, its messages and its undo steps.</param>
     /// <param name="ingredients">The ingredients as the screen last loaded them, which a row prices itself from.</param>
@@ -54,9 +53,10 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         _ingredients = ingredients;
 
         // The form's figures follow any change to its tables, and to the form itself (OnPropertyChanged).
-        _figures = new Derived<FormFigures>(Figures, RaiseFiguresChanged);
+        _figures = new Derived<UsageFormFigures>(Figures, RaiseFiguresChanged);
         RowChanges.OnAnyChange(FormLines, _figures.Invalidate);
         RowChanges.OnAnyChange(FormAddIns, _figures.Invalidate);
+        Fold = new UsageFormFold(() => RaisePropertyChanged(nameof(Fold)));
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -83,6 +83,12 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
 
     /// <summary>Removes the line picked in the form's lines table, as one undo step.</summary>
     public ScreenCommand RemoveLineCommand { get; }
+
+    /// <summary>What the section goes into whole, and what goes into it (UsageFormFold).</summary>
+    public UsageFormFold Fold { get; }
+
+    /// <summary>What goes into the section whole, as rows under its lines (UsageFormFold.Rows).</summary>
+    public IReadOnlyList<FoldedRow> FormFoldedRows => Fold.Rows(FormFormulaBase, Batch().Sum(l => l.Grams), _host.CostBasis);
 
     /// <summary>Removes the add-in picked in the form's add-ins table, as one undo step.</summary>
     public ScreenCommand RemoveAddInCommand { get; }
@@ -461,7 +467,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// <summary>What the piece size is worked out from changed (a line, an add-in): the figure not typed follows, and the form's figures with it.</summary>
     internal void FollowPieceSize()
     {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Batch().Sum(l => l.Grams));
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Batch().Sum(l => l.Grams) + Fold.FoldedWeight);
 
         // Rounded to the 2 decimals the box shows, half to even as it always has been: the figure can be saved as typed.
         if (AuthoredField == UsageAuthoredField.WeightPerPiece)
@@ -539,63 +545,22 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// </summary>
     internal void Recompute()
     {
-        var (totalWeight, _) = SubAssemblyRules.CalculateTotals(Batch());
+        var totalWeight = SubAssemblyRules.CalculateTotals(Batch()).TotalWeight + Fold.FoldedWeight;
         var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
         FormFormulaBase = formulaBase;
         IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
     }
 
-    /// <summary>The form's figures, worked out together from the form as it stands.</summary>
-    private sealed record FormFigures(
-        string TotalWeightText, string PieceSizeCaption, string BaseCaption, string AddInsCaption, string CostPerPieceText, string BatchCostText);
-
     /// <summary>The form's batch weight, which figure stays put, what a piece costs, and the tables' captions.</summary>
-    private FormFigures Figures()
-    {
-        var batch = Batch();
-        var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
-        var authoredValue = AuthoredValue;
-        var (weightPerPiece, _) = ProductRules.ResolvePieceSize(AuthoredField, authoredValue, totalWeight);
-
-        // Neither figure is needed to put the section in (ProductRules.EnsureValidUsages), so with none typed the
-        // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
-        // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch.
-        var pieceSizeCaption = authoredValue <= 0
-            ? "Type the weight per piece or the yield; the other is worked out. Until then this section costs nothing per piece."
-            : AuthoredField == UsageAuthoredField.Yield && authoredValue == 1
-                ? "One piece takes the whole batch, and still does if the batch changes. For a batch that makes more, type the weight per piece or the yield."
-            : AuthoredField == UsageAuthoredField.WeightPerPiece
-                ? $"Weight per piece stays at {authoredValue:#,0.##} g if the batch changes."
-                : $"The yield stays at {authoredValue:#,0.##} pieces if the batch changes.";
-
-        // No pieces yet shows as a dash rather than 0.00, which would read as a section that costs nothing.
-        var costPerPiece = ProductRules.HasPieces(totalWeight, weightPerPiece)
-            ? ProductRules.CalculateUsageCostPerPiece(totalCost, weightPerPiece, totalWeight)
-            : (decimal?)null;
-
-        var formulaBase = FormFormulaBase;
-        var baseCaption = formulaBase > 0
-            ? $"Base {formulaBase:#,0.##} g · whole formula {totalWeight / formulaBase * 100m:#,0.#}%"
-            : SubAssemblyBatch.NoBaseCaption;
-
-        // The arithmetic of the two tables, in words: the recipe's grams, this product's on top, the batch.
-        var recipeName = EditingUsage?.DisplayName
-            ?? EditingUsageSource?.SubAssembly?.Name ?? "the recipe";
-        var addInWeight = FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams);
-        var baseWeight = totalWeight - addInWeight;
-        var addInsCaption = addInWeight > 0
-            ? $"{baseWeight:#,0.##} g from {recipeName} + {addInWeight:#,0.##} g of add-ins = a {totalWeight:#,0.##} g batch."
-            : $"Nothing extra yet — the batch is {recipeName}'s {baseWeight:#,0.##} g.";
-
-        return new FormFigures(
-            $"{totalWeight:#,0.##} g",
-            pieceSizeCaption,
-            baseCaption,
-            addInsCaption,
-            // Two decimals, as Batch cost beside it; packaging's, above, keeps four.
-            costPerPiece is { } figure ? $"{figure:N2}" : "—",
-            batch.Count > 0 ? $"{totalCost:N2}" : "—");
-    }
+    private UsageFormFigures Figures() =>
+        UsageFormFigures.Of(
+            Batch(),
+            FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams) ?? 0m,
+            (Fold.FoldedWeight, Fold.FoldedIn.Sum(f => f.Batch.CostAt(_host.CostBasis)), Fold.GoesWhole ? Fold.Target.Name : null),
+            AuthoredField,
+            AuthoredValue,
+            FormFormulaBase,
+            EditingUsage?.DisplayName ?? EditingUsageSource?.SubAssembly?.Name ?? "the recipe");
 
     private void RaiseFiguresChanged()
     {

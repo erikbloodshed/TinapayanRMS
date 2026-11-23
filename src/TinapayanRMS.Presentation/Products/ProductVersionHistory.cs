@@ -702,7 +702,7 @@ public sealed class ProductVersionHistory : ObservableState
                 isOwn: section.IsOwn && !keepsId));
         }
 
-        sections.Sort(ProductUsageEdit.RecipeOrder);
+        sections = ProductRecipeDraft.KeyedAsIn(sections, content.Sections);
         var costing = content.Costing ?? new VersionCosting(0m, 0m, 0m, 0m);
         _host.ApplyVersion(new RestoredVersion(
             product.IsComposite,

@@ -36,6 +36,21 @@ public sealed record PricedSection(
 
     public string RoleName => Role?.Name ?? string.Empty;
 
+    /// <summary>
+    /// The sub-assembly of the product's other section this one goes into whole (ProductSubAssemblyUsage.GoesIntoSubAssemblyId),
+    /// 0 for one not saved yet; null for a section cut into pieces itself. What <see cref="SectionFolds"/> folds it by.
+    /// </summary>
+    public int? GoesIntoSubAssemblyId { get; init; }
+
+    /// <summary>What the section it goes into whole is called, "Dough"; null for one cut into pieces itself. Set by <see cref="SectionFolds"/>.</summary>
+    public string? GoesIntoName { get; init; }
+
+    /// <summary>The sections that go into this one whole, each with its whole batch, in recipe order. Set by <see cref="SectionFolds"/>.</summary>
+    public IReadOnlyList<FoldedSection> FoldedIn { get; init; } = [];
+
+    /// <summary>It goes whole into another of the product's sections: it has no pieces of its own, and the product counts it through that one.</summary>
+    public bool GoesWhole => Figures.GoesWhole;
+
     public bool IsLinked => LinkedName is not null;
 
     /// <summary>Where a linked one is kept, "Cheese Roll Dough, from Sub-Assemblies"; null for the product's own or a new section.</summary>
@@ -84,7 +99,8 @@ public sealed record PricedSection(
 
     /// <summary>
     /// A saved usage of <paramref name="productName"/>'s as its section: the sub-assembly's lines, the product's add-ins and
-    /// the piece size, named after <paramref name="role"/>. <paramref name="ingredientsById"/>, when given, replaces the
+    /// the piece size, named after <paramref name="role"/>. Its figures are its own batch's, until <see cref="SectionFolds"/>
+    /// folds the product's sections into each other. <paramref name="ingredientsById"/>, when given, replaces the
     /// ingredients the lines were read with (the Price Simulator's materials at other costs, or a screen's own copies).
     /// </summary>
     public static PricedSection FromSaved(
@@ -116,7 +132,10 @@ public sealed record PricedSection(
             usage.AuthoredValue,
             sectionLines,
             sectionAddIns,
-            SectionFigures.Of(sectionLines, sectionAddIns, usage.AuthoredField, usage.AuthoredValue));
+            SectionFigures.Of(sectionLines, sectionAddIns, usage.AuthoredField, usage.AuthoredValue))
+        {
+            GoesIntoSubAssemblyId = usage.GoesIntoSubAssemblyId,
+        };
     }
 
     /// <summary>The product a linked sub-assembly is kept in, when it's that product's own (a variant's link); null for one on the Sub-Assemblies screen.</summary>
@@ -127,3 +146,6 @@ public sealed record PricedSection(
     public static IReadOnlySet<int> RepeatedRoles(IEnumerable<int> roleIds) =>
         roleIds.GroupBy(id => id).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
 }
+
+/// <summary>A section that goes whole into another, as that one shows it: what it's called, and its whole batch.</summary>
+public sealed record FoldedSection(string SectionName, FoldedBatch Batch);

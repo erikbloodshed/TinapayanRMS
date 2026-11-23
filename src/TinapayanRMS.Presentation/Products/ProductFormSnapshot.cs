@@ -167,6 +167,7 @@ public sealed record RecipeSnapshot
                 || a.LinkedName != b.LinkedName
                 || a.AuthoredField != b.AuthoredField
                 || a.AuthoredValue != b.AuthoredValue
+                || SectionFormSnapshot.IndexOfKey(left, a.GoesInto) != SectionFormSnapshot.IndexOfKey(right, b.GoesInto)
                 || !LinesShowSame(a.Lines, b.Lines)
                 || !LinesShowSame(a.AddIns, b.AddIns))
             {
@@ -213,6 +214,31 @@ public sealed record SectionFormSnapshot
     public required decimal WeightPerPiece { get; init; }
     public required decimal Yield { get; init; }
 
+    /// <summary>
+    /// The place among the recipe's sections of the one the form says this one goes into whole (UsageFormFold.TargetKey);
+    /// null for none. By place, as <see cref="EditingUsageIndex"/> is, since a Save reads a new section back under a new key.
+    /// </summary>
+    public int? GoesIntoIndex { get; init; }
+
+    /// <summary>The place among <paramref name="sections"/> of the one keyed <paramref name="key"/>; null for none, -1 for one not among them.</summary>
+    public static int? IndexOfKey(IReadOnlyList<ProductUsageEdit> sections, long? key)
+    {
+        if (key is not { } wanted)
+        {
+            return null;
+        }
+
+        for (var i = 0; i < sections.Count; i++)
+        {
+            if (sections[i].Key == wanted)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     /// <summary>Whether the form's lines, as kept, are <paramref name="lines"/>: nothing typed over them there.</summary>
     public bool ShowsLines(IReadOnlyList<SectionLine> lines) =>
         Lines.Count == lines.Count
@@ -228,14 +254,16 @@ public sealed record SectionFormSnapshot
 
     /// <summary>
     /// Whether anything is typed into the form over <paramref name="section"/>, the <paramref name="index"/>th of the
-    /// recipe's, and not applied: lines, add-ins, the piece size, and, for one that's not linked, its role and name.
+    /// recipe's <paramref name="sections"/>, and not applied: lines, add-ins, the piece size, what it goes into, and, for
+    /// one that's not linked, its role and name.
     /// </summary>
-    public bool IsTypedInto(int index, ProductUsageEdit section) =>
+    public bool IsTypedInto(int index, ProductUsageEdit section, IReadOnlyList<ProductUsageEdit> sections) =>
         HasLinesTypedInto(index, section)
         || (IsOpen && !IsAdding && EditingUsageIndex == index
             && (!ShowsAddIns(section.AddIns)
                 || AuthoredField != section.AuthoredField
                 || (AuthoredField == UsageAuthoredField.WeightPerPiece ? WeightPerPiece : Yield) != section.AuthoredValue
+                || GoesIntoIndex != IndexOfKey(sections, section.GoesInto)
                 || (!section.IsLinked && (RoleId != section.Role?.Id || Name != section.Name))));
 
     private bool ShowsAddIns(IReadOnlyList<SectionLine> addIns) =>
@@ -259,7 +287,8 @@ public sealed record SectionFormSnapshot
         && FormulaBase == other.FormulaBase
         && AuthoredField == other.AuthoredField
         && WeightPerPiece == other.WeightPerPiece
-        && Yield == other.Yield;
+        && Yield == other.Yield
+        && GoesIntoIndex == other.GoesIntoIndex;
 }
 
 /// <summary>

@@ -74,7 +74,9 @@ public sealed record ProductCostSheet(
 
 /// <summary>
 /// One section of a recipe (a sub-assembly it uses): its batch, how much of it a piece takes, and its lines. Line and
-/// batch costs are for the whole batch; CostPerPiece is what one piece takes of it, add-ins included.
+/// batch costs are for the whole batch; CostPerPiece is what one piece takes of it, add-ins included. A section that goes
+/// whole into another (GoesInto, that one's name) is in that one's batch, and costs nothing per piece itself; the batch of
+/// one that others go into includes theirs (FoldedInGrams; null when none do).
 /// </summary>
 public sealed record SectionCosting(
     string Name,
@@ -85,7 +87,9 @@ public sealed record SectionCosting(
     decimal Yield,
     decimal CostPerPiece,
     IReadOnlyList<LineCosting> Lines,
-    IReadOnlyList<LineCosting> AddIns)
+    IReadOnlyList<LineCosting> AddIns,
+    string? GoesInto = null,
+    decimal? FoldedInGrams = null)
 {
     public static SectionCosting From(PricedSection section, CostBasis basis) => new(
         section.SectionName,
@@ -96,7 +100,9 @@ public sealed record SectionCosting(
         section.Yield,
         section.CostPerPieceAt(basis),
         [.. section.Lines.Select(l => LineCosting.From(l, basis))],
-        [.. section.AddIns.Select(l => LineCosting.From(l, basis))]);
+        [.. section.AddIns.Select(l => LineCosting.From(l, basis))],
+        section.GoesIntoName,
+        section.FoldedIn.Count > 0 ? section.Figures.FoldedInWeight : null);
 }
 
 public sealed record LineCosting(string Ingredient, decimal Grams, decimal CostPerGram, decimal Cost)

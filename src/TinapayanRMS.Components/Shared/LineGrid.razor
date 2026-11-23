@@ -10,7 +10,8 @@
    matters, a line is dragged by its row header to its new place, as one undo step: with the pointer, by app.js's
    watchLineDrag, since the Windows web view never hands the page the browser's own drag and drop. Insert Line, or the
    Insert key while the table has the cursor, puts a blank line in above the one picked, or at the bottom with none,
-   and its first cell takes the cursor. *@
+   and its first cell takes the cursor. Under the add row, any rows the table only shows (Footer), which are no lines of its
+   own: what goes into a recipe section whole from another. *@
 <table @ref="_table" id="@_id" class="line-grid @(InsertKey ? "inserts-lines" : "")" @onkeydown="OnKeyDownAsync">
     <thead>
         <tr>
@@ -50,6 +51,10 @@
             <tr class="empty-row"><td colspan="99">@EmptyText</td></tr>
         }
     </tbody>
+    @if (Footer is not null)
+    {
+        <tfoot>@Footer</tfoot>
+    }
 </table>
 
 @code {
@@ -128,6 +133,9 @@
     [Parameter] public bool ReadOnly { get; set; }
 
     [Parameter] public string? EmptyText { get; set; }
+
+    /// <summary>Rows the table shows under its lines and add row, read-only, that are none of its lines: each a whole tr, row header cell included.</summary>
+    [Parameter] public RenderFragment? Footer { get; set; }
 
     /// <summary>
     /// Whether the Insert key puts a line in above the one picked, as the ingredient tables' Insert Line does. Insert Line

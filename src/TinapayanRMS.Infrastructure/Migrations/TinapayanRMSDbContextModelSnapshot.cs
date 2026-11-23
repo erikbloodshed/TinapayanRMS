@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261122130916_BulkPackagingLinks";
+    public override string LastMigrationId => "20261123080411_SectionGoesInto";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -751,6 +751,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("authored_value");
 
+                b.Property<int?>("GoesIntoSubAssemblyId")
+                    .HasColumnType("integer")
+                    .HasColumnName("goes_into_sub_assembly_id");
+
                 b.Property<int>("ProductId")
                     .HasColumnType("integer")
                     .HasColumnName("product_id");
@@ -762,6 +766,9 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id")
                     .HasName("pk_product_sub_assembly_usages");
 
+                b.HasIndex("GoesIntoSubAssemblyId")
+                    .HasDatabaseName("ix_product_sub_assembly_usages_goes_into_sub_assembly_id");
+
                 b.HasIndex("SubAssemblyId")
                     .HasDatabaseName("ix_product_sub_assembly_usages_sub_assembly_id");
 
@@ -772,6 +779,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("product_sub_assembly_usages", t =>
                     {
                         t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0");
+
+                        t.HasCheckConstraint("CK_ProductSubAssemblyUsages_GoesIntoAnother", "goes_into_sub_assembly_id IS NULL OR goes_into_sub_assembly_id <> sub_assembly_id");
                     });
             });
 
@@ -1611,6 +1620,12 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
             {
+                b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", null)
+                    .WithMany()
+                    .HasForeignKey("GoesIntoSubAssemblyId")
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("fk_product_sub_assembly_usages_sub_assemblies_goes_into_sub_as");
+
                 b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
                     .WithMany()
                     .HasForeignKey("ProductId")

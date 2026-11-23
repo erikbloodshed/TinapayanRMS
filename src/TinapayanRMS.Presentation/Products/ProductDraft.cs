@@ -1,4 +1,3 @@
-using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Pricing;
@@ -253,7 +252,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
         lastUpdatedText,
         note,
         DateTime.Now,
-        [.. Recipe.UsageEdits.Select(u => PrintedSection.From(u.ToPriced(), Costing.CostBasis))],
+        [.. Recipe.Priced().Select(s => PrintedSection.From(s, Costing.CostBasis))],
         Packaging.LineEdits.Count > 0 || Packaging.BulkEdits.Count > 0
             ? PrintedPackaging.From(
                 Packaging.LineEdits.Select(l => l.ToPriced()),
@@ -334,10 +333,13 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             ? lines.Sum(r => r.PackagingCostTotal)
             : null;
         var usages = Recipe.UsageEdits;
+
+        // A section that goes whole into another is counted in that one's batch, and has no pieces of its own.
+        var sections = Recipe.Priced().Where(s => !s.GoesWhole).ToList();
         return new ProductCostingInputs(
             new ProductCostInputs
             {
-                Parts = [.. components, .. usages.Select(u => (u.SectionName, u.CostPerPieceAt(Costing.CostBasis)))],
+                Parts = [.. components, .. sections.Select(s => (s.SectionName, s.CostPerPieceAt(Costing.CostBasis)))],
                 QuantityRequired = EditingQuantityRequired,
                 PackagingCosts = [.. Packaging.LineEdits.Select(l => l.CostPerUnit), .. Packaging.BulkEdits.Count > 0 ? [Packaging.BulkCostPerUnit] : Array.Empty<decimal>()],
                 ComponentPackaging = componentPackaging,
@@ -349,7 +351,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
                 .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
         {
-            SectionsWithoutPieceSize = [.. usages.Where(u => !ProductRules.HasPieceSize(u.AuthoredValue)).Select(u => u.SectionName)],
+            SectionsWithoutPieceSize = [.. sections.Where(s => !s.HasPieceSize).Select(s => s.SectionName)],
         };
     }
 

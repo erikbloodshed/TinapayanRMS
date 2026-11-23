@@ -164,6 +164,12 @@ public sealed record PrintedSection(
     /// <summary>On the Price Simulator report, the batch's cost at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowBatchCost { get; init; }
 
+    /// <summary>What the section goes into whole, "Dough"; null for one cut into pieces itself, which then has no piece size.</summary>
+    public string? GoesIntoName { get; init; }
+
+    /// <summary>The recipe's sections that go into this one whole, each as a line of its whole batch, after its lines.</summary>
+    public IReadOnlyList<PrintedLine> FoldedIn { get; init; } = [];
+
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
     public static PrintedSection From(PricedSection section, CostBasis basis)
     {
@@ -189,7 +195,19 @@ public sealed record PrintedSection(
             section.WeightPerPiece,
             section.Yield,
             section.CostPerPieceAt(basis),
-            section.HasPieceSize);
+            section.HasPieceSize)
+        {
+            GoesIntoName = section.GoesIntoName,
+            FoldedIn =
+            [
+                .. section.FoldedIn.Select(f => new PrintedLine(
+                    $"{f.SectionName} (whole batch)",
+                    f.Batch.Weight,
+                    PercentOf(f.Batch.Weight),
+                    f.Batch.Weight > 0 ? f.Batch.CostAt(basis) / f.Batch.Weight : 0m,
+                    f.Batch.CostAt(basis))),
+            ],
+        };
     }
 }
 

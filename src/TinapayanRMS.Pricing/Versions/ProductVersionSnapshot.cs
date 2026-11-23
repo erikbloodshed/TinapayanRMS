@@ -45,7 +45,8 @@ public static class ProductVersionSnapshot
                 usage.AuthoredValue,
                 [.. lines.Select(l => new VersionLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                 [.. addIns.Select(a => new VersionAddIn(a.IngredientId, a.Grams))],
-                SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name))));
+                SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name)),
+                usage.GoesIntoSubAssemblyId));
         }
 
         // As the Packaging tab shows them (PackagingLineRow.FromSaved): a line saved as pieces per unit is its quantity per
@@ -160,6 +161,7 @@ public static class ProductVersionSnapshot
                 },
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
+                GoesIntoSubAssemblyId = section.GoesIntoSubAssemblyId,
             });
             lines.AddRange(section.Lines.Select((l, sortOrder) => new SubAssemblyLine
             {

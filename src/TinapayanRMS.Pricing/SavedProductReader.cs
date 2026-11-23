@@ -112,9 +112,9 @@ public sealed record SavedProduct(
     /// <summary>
     /// Its sections with no weight per piece or yield (<see cref="PricedSection.HasPieceSize"/>), by name, in recipe order:
     /// each costs it nothing per piece, so its cost and price leave that section out until one is typed. The Products list
-    /// and Reports flag them.
+    /// and Reports flag them. Never one that goes whole into another, which that one's piece size shares out.
     /// </summary>
-    public IReadOnlyList<string> SectionsWithoutPieceSize => [.. Sections.Where(s => !s.HasPieceSize).Select(s => s.SectionName)];
+    public IReadOnlyList<string> SectionsWithoutPieceSize => [.. Sections.Where(s => !s.HasPieceSize && !s.GoesWhole).Select(s => s.SectionName)];
 }
 
 /// <summary>
@@ -391,7 +391,8 @@ public sealed class SavedProductReader(
 
         // Two sections in one role are told apart by their labels, "Dough" beside "Dough: Paste", as the screen tells them.
         var repeatedRoles = PricedSection.RepeatedRoles(detail.Usages.Select(u => u.SubAssembly!.Role?.Id ?? 0));
-        List<PricedSection> sections =
+        // A section that goes whole into another is in that one's batch, and counts for nothing per piece itself.
+        var sections = SectionFolds.Apply(
         [
             .. detail.Usages
                 .Select(u =>
@@ -401,7 +402,7 @@ public sealed class SavedProductReader(
                         u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], role, product.Name, repeatedRoles.Contains(role?.Id ?? 0), materialsById);
                 })
                 .Order(PricedSection.RecipeOrder),
-        ];
+        ]);
         List<PricedPackagingLine> packagingLines = [.. detail.Lines.Select(l => PricedPackagingLine.FromSaved(l, basis, materialsById))];
         var bulk = PricedBulkPackaging.FromSaved(detail.BulkLines, product.BulkPackagingQuantity, basis, materialsById);
 
@@ -411,7 +412,7 @@ public sealed class SavedProductReader(
             Parts =
             [
                 .. detail.Components.Select(c => (c.LineName, c.CostAt(basis))),
-                .. sections.Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
+                .. sections.Where(u => !u.GoesWhole).Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
             ],
             QuantityRequired = product.QuantityRequired,
             PackagingCosts = [.. packagingLines.Select(l => l.CostPerUnit), .. bulk is null ? [] : new[] { bulk.CostPerUnit }],

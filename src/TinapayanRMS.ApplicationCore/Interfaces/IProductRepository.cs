@@ -30,6 +30,12 @@ public sealed record NewSubAssemblyDraft(
     /// <summary>Where Save puts it: as its role says, unless the Products form asked for something else.</summary>
     public SectionPlacement Placement { get; init; } = new SectionPlacement.ByRole();
 
+    /// <summary>
+    /// The section of the recipe this one goes into whole (<see cref="RecipeDraft.SectionIdOf"/>): a saved sub-assembly's
+    /// id, or the stand-in of a new section. Null for one cut into pieces itself.
+    /// </summary>
+    public int? GoesInto { get; init; }
+
     /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there, or to In-House.</summary>
     public bool MovesToSubAssemblies => Placement is SectionPlacement.MoveToSubAssemblies or SectionPlacement.MoveToInHouse;
 }
@@ -96,6 +102,12 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     /// checked.
     /// </summary>
     public IReadOnlyList<RecipeLine>? LinesTaken { get; init; }
+
+    /// <summary>
+    /// The section of the recipe this one goes into whole (<see cref="RecipeDraft.SectionIdOf"/>); null for one cut into
+    /// pieces itself.
+    /// </summary>
+    public int? GoesInto { get; init; }
 }
 
 /// <summary>
@@ -120,6 +132,13 @@ public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOn
     /// taken out (SavedVersionRules.OwnershipChangedText). Null, from a caller that isn't a form, isn't checked.
     /// </summary>
     public IReadOnlyCollection<int>? OwnTaken { get; init; }
+
+    /// <summary>
+    /// How a section of this recipe is named where another goes into it (<see cref="NewSubAssemblyDraft.GoesInto"/>,
+    /// <see cref="LinkedUsageDraft.GoesInto"/>): its sub-assembly's id once it has one, or -(i + 1) for the i-th of
+    /// <see cref="New"/> while it's new (Id 0).
+    /// </summary>
+    public static int SectionIdOf(int subAssemblyId, int newIndex) => subAssemblyId > 0 ? subAssemblyId : -(newIndex + 1);
 }
 
 /// <summary>

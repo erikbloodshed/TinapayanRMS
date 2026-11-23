@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("b1306c76-7f58-4d93-8a1e-48991a99b318"), entityTypeCount: 27)
+        : base(skipDetectChanges: false, modelId: new Guid("9fcb13b9-924d-4f11-9441-501c9cdbc587"), entityTypeCount: 27)
     {
     }
 
@@ -62,8 +62,9 @@ public partial class TinapayanRMSDbContextModel
         ProductComponentEntityType.CreateForeignKey1(productComponent, product);
         ProductComponentEntityType.CreateForeignKey2(productComponent, product);
         ProductFolderEntityType.CreateForeignKey1(productFolder, productFolder);
-        ProductSubAssemblyUsageEntityType.CreateForeignKey1(productSubAssemblyUsage, product);
-        ProductSubAssemblyUsageEntityType.CreateForeignKey2(productSubAssemblyUsage, subAssembly);
+        ProductSubAssemblyUsageEntityType.CreateForeignKey1(productSubAssemblyUsage, subAssembly);
+        ProductSubAssemblyUsageEntityType.CreateForeignKey2(productSubAssemblyUsage, product);
+        ProductSubAssemblyUsageEntityType.CreateForeignKey3(productSubAssemblyUsage, subAssembly);
         ProductVersionEntityType.CreateForeignKey1(productVersion, product);
         RawMaterialEntityType.CreateForeignKey1(rawMaterial, unitOfMeasure);
         RawMaterialEntityType.CreateForeignKey2(rawMaterial, rawMaterialCategory);

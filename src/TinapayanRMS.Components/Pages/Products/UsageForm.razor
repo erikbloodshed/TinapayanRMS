@@ -6,7 +6,9 @@
    Copy for a linked one, or Move to Sub-Assemblies and Move to In-House for an own one. Then the batch's lines, with
    this product's add-ins to a linked recipe under them, beside
    the piece size: what a piece and the batch cost, the weight per piece and yield typed in, and the batch's weight they
-   share out. Insert Line and Insert Add-In put a blank line in above the one picked. *@
+   share out. Insert Line and Insert Add-In put a blank line in above the one picked. Under the lines, the whole batch of
+   each section of the recipe that goes into this one; and in the piece-size column, what this one goes into whole, which
+   takes the piece size's place. *@
 <div class="usage-form">
     @if (State.UsageForm.IsFormPickingSource)
     {
@@ -104,7 +106,7 @@
                 <div id="usage-lines">
                     <IngredientLinesGrid @ref="_lines" Items="State.UsageForm.FormLines" NewItem="@(State.UsageForm.IsFormLinesEditable ? State.UsageForm.NewFormLine : null)" Ingredients="State.Ingredients"
                                          @bind-SelectedItem="State.UsageForm.SelectedFormLine" PercentHeader="@State.UsageForm.UsageFormPercentHeader"
-                                         ReadOnly="!State.UsageForm.IsFormLinesEditable" />
+                                         ReadOnly="!State.UsageForm.IsFormLinesEditable" FoldedRows="State.UsageForm.FormFoldedRows" />
                 </div>
                 <div class="lines-footer">
                     <p class="caption">@State.UsageForm.UsageFormBaseCaption</p>
@@ -154,19 +156,32 @@
             </div>
 
             <div class="group-heading">Batch parameters</div>
-            <div class="param-row">
-                <label for="usage-weight">Weight/piece (g)</label>
-                <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
-                             Tooltip="Batch weight per piece. Typing it works out the yield." />
-            </div>
-            <div class="param-row">
-                <label for="usage-yield">Yield (pcs)</label>
-                <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
-                             Tooltip="Pieces per batch. Typing it works out the weight per piece." />
-            </div>
+            @if (State.UsageForm.Fold.Options.Count > 1 || State.UsageForm.Fold.GoesWhole)
+            {
+                <div class="param-row">
+                    <label for="usage-goes-into">Goes into</label>
+                    <div class="goes-into-field">
+                        <PickField ID="usage-goes-into" TItem="FoldTargetOption" Items="State.UsageForm.Fold.Options" TextField="Name" Value="State.UsageForm.Fold.Target" ValueChanged="State.UsageForm.Fold.Pick" PopupWidth="220px"
+                                   Tooltip="Another section of this recipe this one's whole batch goes into, as a sponge into the dough. That one's piece size shares it out." />
+                    </div>
+                </div>
+            }
+            @if (!State.UsageForm.Fold.GoesWhole)
+            {
+                <div class="param-row">
+                    <label for="usage-weight">Weight/piece (g)</label>
+                    <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
+                                 Tooltip="Batch weight per piece. Typing it works out the yield." />
+                </div>
+                <div class="param-row">
+                    <label for="usage-yield">Yield (pcs)</label>
+                    <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
+                                 Tooltip="Pieces per batch. Typing it works out the weight per piece." />
+                </div>
+            }
 
             <div class="group-heading">Computed</div>
-            <div class="param-row" data-title="Its lines plus this product's add-ins. Yield and weight per piece share it out.">
+            <div class="param-row" data-title="Its lines, this product's add-ins, and any section that goes into it whole. Yield and weight per piece share it out.">
                 <span>Total weight</span>
                 <span>@State.UsageForm.UsageFormTotalWeightText</span>
             </div>

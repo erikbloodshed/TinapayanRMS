@@ -41,6 +41,9 @@ public sealed class ProductRecipeDraft : ObservableState
     // What the product had when it was loaded, so Save only sends the parts that changed.
     private RecipeDraft _savedRecipe = new([], []);
 
+    /// <summary>The sections as the recipe prices them, the ones that go into another folded in (<see cref="Priced"/>).</summary>
+    private readonly Derived<IReadOnlyList<PricedSection>> _priced;
+
     /// <param name="host">The form: the product it's for, and its kind.</param>
     /// <param name="ingredients">Every ingredient, as the screen last loaded them: what a section's lines point at.</param>
     /// <param name="roles">Every sub-assembly role, as the screen last loaded them.</param>
@@ -52,13 +55,16 @@ public sealed class ProductRecipeDraft : ObservableState
         _ingredients = ingredients;
         _roles = roles;
         _components = components;
+        _priced = new Derived<IReadOnlyList<PricedSection>>(FoldSections, () => { });
 
         // As the sections change: the part's tabs mirror them first, then each section is marked when others share its role,
         // so it's called by its name too, then the tabs read their headers again, in the order they always went.
         UsageEdits.CollectionChanged += (_, e) =>
         {
+            _priced.Invalidate();
             SectionsChanged?.Invoke(e);
             MarkRepeatedRoles();
+            _priced.Invalidate();
             RepeatedRolesMarked?.Invoke();
         };
     }
@@ -137,8 +143,13 @@ public sealed class ProductRecipeDraft : ObservableState
         // Its add-ins become plain lines of the copy: the batch it was showing is the batch it keeps.
         // Never a duplicate ingredient, since an add-in can't be one the recipe already has.
         // In a role the recipe has more than one in, it keeps what it went by, so it's still told apart.
+        // It takes the linked one's place in the recipe, so what goes into it, and what it goes into, stay.
         new(0, usage.Role, [.. usage.Lines, .. usage.AddIns], usage.AuthoredField, usage.AuthoredValue,
-            linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn);
+            linkedName: null, name: usage.IsRoleRepeated ? usage.Label : null, isOwn: isOwn)
+        {
+            Key = usage.Key,
+            GoesInto = usage.GoesInto,
+        };
 
     /// <summary>
     /// Points the recipe's sections, saved or not, at the refreshed ingredients and roles, and a linked
@@ -181,7 +192,11 @@ public sealed class ProductRecipeDraft : ObservableState
                     edit.AuthoredField,
                     edit.AuthoredValue,
                     linkedName: null,
-                    name: saved.SectionName);
+                    name: saved.SectionName)
+                {
+                    Key = edit.Key,
+                    GoesInto = edit.GoesInto,
+                };
             }
             else if (edit.IsLinked || (edit.IsOwned && saved is not null && !isOwnNow))
             {
@@ -230,14 +245,14 @@ public sealed class ProductRecipeDraft : ObservableState
     /// </summary>
     private bool IsChangedHere(ProductUsageEdit edit, int index, SectionFormSnapshot? form)
     {
-        if (form?.IsTypedInto(index, edit) == true)
+        if (form?.IsTypedInto(index, edit, UsageEdits) == true)
         {
             return true;
         }
 
         return edit.IsLinked
-            ? (_savedRecipe.Linked.FirstOrDefault(l => l.SubAssemblyId == edit.SubAssemblyId) is { } linked ? !SavesSame(LinkedDraftOf(edit), linked) : edit.AreLinkedLinesEdited)
-            : _savedRecipe.New.FirstOrDefault(n => n.Id == edit.SubAssemblyId) is not { } own || !SavesSame(OwnDraftOf(edit), own);
+            ? (_savedRecipe.Linked.FirstOrDefault(l => l.SubAssemblyId == edit.SubAssemblyId) is { } linked ? !SavesSame(LinkedDraftOf(edit, SectionIdsByKey()), linked) : edit.AreLinkedLinesEdited)
+            : _savedRecipe.New.FirstOrDefault(n => n.Id == edit.SubAssemblyId) is not { } own || !SavesSame(OwnDraftOf(edit, SectionIdsByKey()), own);
     }
 
     /// <summary>
@@ -301,7 +316,7 @@ public sealed class ProductRecipeDraft : ObservableState
                 IReadOnlyList<IngredientLineSnapshot> lines =
                     [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
                 // The figure typed stays and the other follows the new batch, as the form's own does (FollowPieceSize).
-                var batchWeight = lines.Sum(l => l.Grams ?? 0m) + form.AddIns.Sum(l => l.Grams ?? 0m);
+                var batchWeight = lines.Sum(l => l.Grams ?? 0m) + form.AddIns.Sum(l => l.Grams ?? 0m) + Fold(usages)[i].Figures.FoldedInWeight;
                 var typed = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : form.Yield;
                 var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(form.AuthoredField, typed, batchWeight);
                 form = form with
@@ -409,6 +424,13 @@ public sealed class ProductRecipeDraft : ObservableState
         ReplaceUsageItems([.. sections.Select(section => section.WithIngredients(lines => Repriced(lines, ingredientsById)))]);
     }
 
+    /// <summary>
+    /// A version's sections put back, <paramref name="sections"/> built one for each of <paramref name="version"/>'s, in its
+    /// order: each known by the sub-assembly it had there, so one that went whole into another still does, in recipe order.
+    /// </summary>
+    internal static List<ProductUsageEdit> KeyedAsIn(IReadOnlyList<ProductUsageEdit> sections, IReadOnlyList<VersionSection> version) =>
+        [.. sections.Select((s, i) => s.Keyed(version[i].SubAssemblyId, version[i].GoesIntoSubAssemblyId)).Order(ProductUsageEdit.RecipeOrder)];
+
     /// <summary>A saved usage as its section, with the screen's own copies of its role and ingredients (ProductUsageEdit.FromSaved).</summary>
     private ProductUsageEdit ToUsageEdit(
         ProductSubAssemblyUsage usage,
@@ -432,15 +454,40 @@ public sealed class ProductRecipeDraft : ObservableState
     /// The recipe as Save writes it: the new sections with their lines, and the sub-assemblies it links; and a composite's
     /// products, each with how many go in (a line half filled in is refused: ProductComponentRow.CompleteLines).
     /// </summary>
-    internal RecipeDraft CurrentDraft() =>
-        new([.. UsageEdits.Where(u => u.IsEditable).Select(OwnDraftOf)], [.. UsageEdits.Where(u => u.IsLinked).Select(LinkedDraftOf)])
+    internal RecipeDraft CurrentDraft()
+    {
+        var sectionIdOf = SectionIdsByKey();
+        return new(
+            [.. UsageEdits.Where(u => u.IsEditable).Select(u => OwnDraftOf(u, sectionIdOf))],
+            [.. UsageEdits.Where(u => u.IsLinked).Select(u => LinkedDraftOf(u, sectionIdOf))])
         {
             Components = _host.IsEditingComposite ? [.. ProductComponentRow.CompleteLines(_components.ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
             OwnTaken = SavedOwnSectionIds,
         };
+    }
+
+    /// <summary>
+    /// How Save names each section where another goes into it (RecipeDraft.SectionIdOf), by its key: its sub-assembly's id,
+    /// or a new one's stand-in by its place among the sections whose lines the form edits, as <see cref="CurrentDraft"/>
+    /// lists them.
+    /// </summary>
+    private Dictionary<long, int> SectionIdsByKey()
+    {
+        Dictionary<long, int> ids = [];
+        var newIndex = 0;
+        foreach (var usage in UsageEdits)
+        {
+            ids[usage.Key] = usage.IsEditable ? RecipeDraft.SectionIdOf(usage.SubAssemblyId, newIndex++) : usage.SubAssemblyId;
+        }
+
+        return ids;
+    }
+
+    private static int? GoesIntoOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf) =>
+        u.GoesInto is { } key && sectionIdOf.TryGetValue(key, out var id) ? id : null;
 
     /// <summary>A section whose lines the form edits, the product's own or a new one, as Save writes it.</summary>
-    private static NewSubAssemblyDraft OwnDraftOf(ProductUsageEdit u) =>
+    private static NewSubAssemblyDraft OwnDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf) =>
         new(u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
         {
             // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
@@ -449,13 +496,15 @@ public sealed class ProductRecipeDraft : ObservableState
                 : u.IsReleasing ? new SectionPlacement.MoveToSubAssemblies()
                 : u.IsOwned ? new SectionPlacement.ProductsOwn()
                 : new SectionPlacement.ByRole(),
+            GoesInto = GoesIntoOf(u, sectionIdOf),
         };
 
     /// <summary>A linked section as Save writes it.</summary>
-    private static LinkedUsageDraft LinkedDraftOf(ProductUsageEdit u) =>
+    private static LinkedUsageDraft LinkedDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf) =>
         new(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
         {
             AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
+            GoesInto = GoesIntoOf(u, sectionIdOf),
 
             // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
             // screen has changed since; and with those, the lines they were changed from, so it's refused over others.
@@ -488,6 +537,7 @@ public sealed class ProductRecipeDraft : ObservableState
         && a.AuthoredField == b.AuthoredField
         && a.AuthoredValue == b.AuthoredValue
         && a.AddIns.SequenceEqual(b.AddIns)
+        && a.GoesInto == b.GoesInto
         && (a.Lines is null) == (b.Lines is null)
         && (a.Lines ?? []).SequenceEqual(b.Lines ?? []);
 
@@ -498,5 +548,80 @@ public sealed class ProductRecipeDraft : ObservableState
         && a.SectionName == b.SectionName
         && a.AuthoredField == b.AuthoredField
         && a.AuthoredValue == b.AuthoredValue
+        && a.GoesInto == b.GoesInto
         && a.Lines.SequenceEqual(b.Lines);
+
+    /// <summary>
+    /// The sections as the recipe prices them, in recipe order: each at its own figures, with the whole batches of the ones
+    /// that go into it in its batch, and one that goes into another with no pieces of its own (SectionFolds). What the
+    /// costing, the printouts and the section form read; worked out again when next read after any section changes.
+    /// </summary>
+    public IReadOnlyList<PricedSection> Priced() => _priced.Value;
+
+    /// <summary><paramref name="usage"/>'s figures in the recipe (<see cref="Priced"/>); its own, should it not be one of the recipe's sections.</summary>
+    public SectionFigures FiguresOf(ProductUsageEdit usage) =>
+        SectionFormSnapshot.IndexOfKey(UsageEdits, usage.Key) is { } i and >= 0 ? Priced()[i].Figures : usage.Figures;
+
+    /// <summary>The recipe's sections that go into <paramref name="usage"/> whole, each with its whole batch, in recipe order.</summary>
+    public IReadOnlyList<FoldedSection> FoldedInto(ProductUsageEdit usage) =>
+        SectionFormSnapshot.IndexOfKey(UsageEdits, usage.Key) is { } i and >= 0 ? Priced()[i].FoldedIn : [];
+
+    private IReadOnlyList<PricedSection> FoldSections() => Fold([.. UsageEdits]);
+
+    /// <summary><paramref name="sections"/> priced as a recipe, each going into the one its key names (SectionFolds).</summary>
+    private static IReadOnlyList<PricedSection> Fold(List<ProductUsageEdit> sections)
+    {
+        var indexOf = sections.Select((u, i) => (u.Key, i)).ToDictionary(p => p.Key, p => p.i);
+        int? IndexOf(long? key) => key is { } k && indexOf.TryGetValue(k, out var i) ? i : null;
+        var folded = SectionFolds.Apply([.. sections.Select(u => u.ToPriced())], [.. sections.Select(u => IndexOf(u.GoesInto))]);
+        return [.. folded.Select((section, i) => IndexOf(sections[i].GoesInto) is { } t ? section with { GoesIntoSubAssemblyId = sections[t].SubAssemblyId } : section)];
+    }
+
+    /// <summary>
+    /// The sections <paramref name="usage"/> could go into whole: the recipe's others, less any that goes into it already,
+    /// even through others, which would make a loop (ProductRules.EnsureValidFolds). In recipe order.
+    /// </summary>
+    public IReadOnlyList<ProductUsageEdit> FoldTargetsFor(ProductUsageEdit? usage)
+    {
+        var goesIntoOf = UsageEdits.ToDictionary(u => u.Key, u => u.GoesInto);
+        return
+        [
+            .. UsageEdits.Where(target => usage is null
+                || (target.Key != usage.Key && !LoopsBack(usage.Key, target.Key, goesIntoOf))),
+        ];
+    }
+
+    /// <summary>Whether going into <paramref name="targetKey"/> would bring <paramref name="key"/> back round to itself.</summary>
+    private static bool LoopsBack(long key, long targetKey, Dictionary<long, long?> goesIntoOf)
+    {
+        HashSet<long> seen = [];
+        for (long? next = targetKey; next is { } at && seen.Add(at); next = goesIntoOf.GetValueOrDefault(at))
+        {
+            if (at == key)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// <paramref name="removed"/> taken out of the recipe: each section that went into it whole is cut into pieces itself
+    /// again, with no piece size until one is typed. The names of the ones freed, for the message saying so.
+    /// </summary>
+    internal IReadOnlyList<string> FreeFoldsInto(ProductUsageEdit removed)
+    {
+        List<string> freed = [];
+        for (var i = 0; i < UsageEdits.Count; i++)
+        {
+            if (UsageEdits[i].GoesInto == removed.Key && !ReferenceEquals(UsageEdits[i], removed))
+            {
+                freed.Add(UsageEdits[i].SectionName);
+                UsageEdits[i] = UsageEdits[i].WithGoesInto(null);
+            }
+        }
+
+        return freed;
+    }
 }

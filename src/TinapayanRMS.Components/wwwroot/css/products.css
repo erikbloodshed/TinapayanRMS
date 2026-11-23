@@ -308,6 +308,18 @@
     flex: none;
 }
 
+/* Its label on one line, beside the boxes' labels. */
+.param-row > label {
+    white-space: nowrap;
+}
+
+/* The Goes into picker draws itself at its container's full width: the box keeps it near the number boxes' size, and
+   its list opens wider, so a long section name reads in full. */
+.param-row .goes-into-field {
+    width: 120px;
+    flex: none;
+}
+
 .piece-size-caption {
     margin-top: 8px;
 }

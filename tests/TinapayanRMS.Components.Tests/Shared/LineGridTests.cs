@@ -125,6 +125,27 @@ public class LineGridTests
     }
 
     [Test]
+    public async Task A_footer_draws_its_rows_under_the_add_row_none_of_them_a_line()
+    {
+        // What a recipe section's table shows of another section going into it whole.
+        await using var context = AppServices.NewContext();
+
+        var grid = Render(context, parameters => parameters.Add(g => g.Footer, "<tr class=\"folded-row\"><td></td><td class=\"name\">Sponge (whole batch)</td></tr>"));
+
+        grid.FindAll("tbody tr").Should().HaveCount(3, "the lines and the add row, as without a footer");
+        grid.Find("tfoot tr.folded-row td.name").TextContent.Should().Be("Sponge (whole batch)");
+        _lines.Should().HaveCount(2);
+    }
+
+    [Test]
+    public async Task Without_a_footer_there_is_no_tfoot()
+    {
+        await using var context = AppServices.NewContext();
+
+        Render(context).FindAll("tfoot").Should().BeEmpty();
+    }
+
+    [Test]
     public async Task Typing_in_the_add_row_makes_it_a_line_and_a_new_add_row_takes_its_place()
     {
         await using var context = AppServices.NewContext();

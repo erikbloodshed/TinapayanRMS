@@ -66,6 +66,68 @@ public static class ProductRules
     }
 
     /// <summary>
+    /// Which of a product's sections go whole into another (ProductSubAssemblyUsage.GoesIntoSubAssemblyId): a sponge into the
+    /// dough. Each section is named by <paramref name="sections"/>' SectionId, and goes into at most one other of them
+    /// (GoesIntoId). Its whole batch is part of that one's, so it has no piece size of its own, or the product would count it
+    /// twice; a chain (a sponge into a dough into a bigger dough) is fine, a loop is not, as no batch could weigh what it does.
+    /// </summary>
+    public static void EnsureValidFolds(IReadOnlyList<(int SectionId, int? GoesIntoId, decimal AuthoredValue, string Name)> sections)
+    {
+        var byId = sections.ToDictionary(s => s.SectionId);
+        foreach (var section in sections)
+        {
+            if (section.GoesIntoId is not { } targetId)
+            {
+                continue;
+            }
+
+            if (!byId.TryGetValue(targetId, out var target))
+            {
+                throw new BusinessRuleException($"{section.Name} goes into a section that isn't in this recipe any more. Pick another, or none.");
+            }
+
+            if (HasPieceSize(section.AuthoredValue))
+            {
+                throw new BusinessRuleException(
+                    $"{section.Name} goes whole into {target.Name}, so it can't have a weight per piece or yield of its own: {target.Name}'s shares it out.");
+            }
+
+            if (LoopsBack(section.SectionId, targetId, id => byId.TryGetValue(id, out var next) ? next.GoesIntoId : null))
+            {
+                throw new BusinessRuleException(
+                    targetId == section.SectionId
+                        ? $"{section.Name} can't go into itself."
+                        : $"{section.Name} goes into {target.Name}, which goes back into {section.Name}. A section can't go into itself, even through others.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the chain from <paramref name="sectionId"/>'s target, <paramref name="targetId"/>, each section going into
+    /// <paramref name="goesIntoOf"/>'s, comes back round to it. A chain that comes back round to another on the way is that
+    /// one's loop, refused when it comes to be checked. Public for the Products form's picker, which offers no target that
+    /// would make one.
+    /// </summary>
+    public static bool LoopsBack(int sectionId, int targetId, Func<int, int?> goesIntoOf)
+    {
+        HashSet<int> seen = [];
+        for (int? next = targetId; next is { } id; next = goesIntoOf(id))
+        {
+            if (id == sectionId)
+            {
+                return true;
+            }
+
+            if (!seen.Add(id))
+            {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// A usage's add-ins: this product's own extra ingredients on top of a recipe it links — a colouring,
     /// a flavouring, an inclusion. Unlike a sub-assembly's own lines, an empty set is valid: most linked
     /// usages take the recipe as it is. What isn't valid is an ingredient the recipe already has, since

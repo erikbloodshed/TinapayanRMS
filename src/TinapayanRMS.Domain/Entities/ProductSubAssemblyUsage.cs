@@ -27,4 +27,11 @@ public sealed class ProductSubAssemblyUsage
     /// typed one stays put when the batch changes.
     /// </summary>
     public decimal AuthoredValue { get; set; }
+
+    /// <summary>
+    /// The product's other section this one goes into whole, by its sub-assembly: a sponge mixed into the dough. Its whole
+    /// batch is then part of that one's, and it has no piece size of its own (ProductRules.EnsureValidFolds), so the product
+    /// counts it once. Null for a section cut into pieces itself.
+    /// </summary>
+    public int? GoesIntoSubAssemblyId { get; set; }
 }

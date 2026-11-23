@@ -151,8 +151,28 @@ public static class ProductVersionRules
             }
 
             AddPieceSizeChanges(changes, title, was, now);
+            AddFoldChange(changes, title, GoesIntoTitle(was, older), GoesIntoTitle(now, newer));
             AddLineChanges(changes, title, was.Lines, now.Lines, names);
             AddAddInChanges(changes, title, was.AddIns, now.AddIns, names);
+        }
+    }
+
+    /// <summary>
+    /// What the section of <paramref name="content"/>'s recipe that <paramref name="section"/> went into whole was called; null
+    /// for one cut into pieces itself. By title, not sub-assembly: a restored version's own section is saved as a new one.
+    /// </summary>
+    private static string? GoesIntoTitle(VersionSection section, ProductVersionContent content) =>
+        section.GoesIntoSubAssemblyId is { } id && content.Sections.FirstOrDefault(s => s.SubAssemblyId == id) is { } target
+            ? SectionTitle(target, content)
+            : null;
+
+    private static void AddFoldChange(List<string> changes, string title, string? was, string? now)
+    {
+        if (was != now)
+        {
+            changes.Add(now is null ? $"{title}: no longer goes into {was}"
+                : was is null ? $"{title}: now goes whole into {now}"
+                : $"{title}: now goes whole into {now} (was {was})");
         }
     }
 

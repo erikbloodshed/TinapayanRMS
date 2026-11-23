@@ -309,6 +309,11 @@
 
     private static string PieceSizeText(PrintedSection section, bool withCost)
     {
+        if (section.GoesIntoName is { } into)
+        {
+            return $"Goes whole into {into}, whose piece size shares it out.";
+        }
+
         if (!section.HasPieceSize)
         {
             return withCost ? "No weight per piece or yield yet, so this section costs nothing per piece." : "No weight per piece or yield yet.";
@@ -506,6 +511,10 @@
             </thead>
             <tbody>
                 @foreach (var line in section.Lines)
+                {
+                    @LineRow(line, withNow)
+                }
+                @foreach (var line in section.FoldedIn)
                 {
                     @LineRow(line, withNow)
                 }

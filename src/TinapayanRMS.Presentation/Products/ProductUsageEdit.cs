@@ -55,8 +55,50 @@ public sealed class ProductUsageEdit : ObservableRow
             saved.LinkedName,
             saved.AddIns,
             saved.Label,
-            linkedOwner: saved.LinkedOwner);
+            linkedOwner: saved.LinkedOwner)
+        {
+            // A saved section is known by its sub-assembly, so the one it goes into is too.
+            Key = saved.SubAssemblyId,
+            GoesInto = usage.GoesIntoSubAssemblyId,
+        };
     }
+
+    /// <summary>The last key given a section the form made (<see cref="Key"/>): counted down from 0, so never a saved one's id.</summary>
+    private static long s_lastNewKey;
+
+    /// <summary>
+    /// What tells the section apart from the recipe's others while the form holds it, kept through every change of it (an
+    /// Apply, Make a Copy, Unlink, a changed link, a move, a reprice): what another section that goes into it names
+    /// (<see cref="GoesInto"/>). A section read, or put back from a version, has its sub-assembly's id; one the form makes
+    /// gets a new one below 0.
+    /// </summary>
+    public long Key { get; init; } = NewKey();
+
+    /// <summary>A key no section has had: for one the form makes.</summary>
+    internal static long NewKey() => Interlocked.Decrement(ref s_lastNewKey);
+
+    /// <summary>
+    /// The <see cref="Key"/> of the recipe's other section this one goes into whole (a sponge into the dough), whose batch
+    /// it's part of; null for a section cut into pieces itself. It has no piece size then (ProductRules.EnsureValidFolds).
+    /// </summary>
+    public long? GoesInto { get; init; }
+
+    /// <summary>It goes whole into another of the recipe's sections, which counts it: it has no pieces of its own.</summary>
+    public bool GoesWhole => GoesInto is not null;
+
+    /// <summary>The same section going whole into the one keyed <paramref name="goesInto"/>, or, with null, cut into pieces itself.</summary>
+    public ProductUsageEdit WithGoesInto(long? goesInto) => goesInto == GoesInto ? this : Keyed(Key, goesInto);
+
+    /// <summary>
+    /// The same section known by <paramref name="key"/>, going whole into the one keyed <paramref name="goesInto"/>: a
+    /// version's section put back, known by the sub-assembly it had there, as what goes into it names it.
+    /// </summary>
+    public ProductUsageEdit Keyed(long key, long? goesInto) =>
+        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, new KeptLines(_savedLines, LinesTaken), LinkedOwner, _toMadeIngredient)
+        {
+            Key = key,
+            GoesInto = goesInto,
+        };
 
     /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
     /// <param name="linkedName">The linked sub-assembly's name, e.g. "Cheese Roll Filling: Ube"; null for the product's own or a new section.</param>
@@ -111,10 +153,17 @@ public sealed class ProductUsageEdit : ObservableRow
         Figures = SectionFigures.Of(lines, AddIns, authoredField, authoredValue);
     }
 
-    /// <summary>The section's batch and piece figures, at both costs.</summary>
+    /// <summary>
+    /// The section's own batch and piece figures, at both costs: its lines and add-ins alone. The recipe's figures
+    /// (ProductRecipeDraft.Priced) add the whole batches of any sections that go into it, and take the pieces away from one
+    /// that goes into another; nothing else differs.
+    /// </summary>
     public SectionFigures Figures { get; }
 
-    /// <summary>The section as it stands now, called what it's called now: what printouts read.</summary>
+    /// <summary>
+    /// The section as it stands now, called what it's called now, at its own figures: what ProductRecipeDraft.Priced folds
+    /// with the recipe's others for the costing and printouts.
+    /// </summary>
     public PricedSection ToPriced() =>
         new(SubAssemblyId, Role, Label, SectionName, LinkedName, LinkedOwner, AuthoredField, AuthoredValue, Lines, AddIns, Figures);
 
@@ -269,6 +318,8 @@ public sealed class ProductUsageEdit : ObservableRow
     /// <summary>What it's called where the recipe it's in isn't plain: a linked one by its name, a new one as its section is.</summary>
     public string DisplayName => LinkedName ?? SectionName;
 
+    // Its own figures, whatever goes into it or it goes into (Figures): the recipe's are ProductRecipeDraft.FiguresOf's.
+
     /// <summary>The sub-assembly's own batch, before this product's add-ins: what the form's caption compares against.</summary>
     public decimal BaseTotalWeight => Figures.BaseTotalWeight;
 
@@ -289,7 +340,11 @@ public sealed class ProductUsageEdit : ObservableRow
 
     /// <summary>A new section with its role refreshed (renamed in Settings) and its lines repriced with their ingredients.</summary>
     public ProductUsageEdit With(SubAssemblyRole? role, IReadOnlyList<SectionLine> lines) =>
-        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner, toMadeIngredient: _toMadeIngredient);
+        new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, linkedOwner: LinkedOwner, toMadeIngredient: _toMadeIngredient)
+        {
+            Key = Key,
+            GoesInto = GoesInto,
+        };
 
     /// <summary>
     /// The same section with each ingredient of its lines, its add-ins and a linked one's lines as kept swapped for
@@ -303,16 +358,28 @@ public sealed class ProductUsageEdit : ObservableRow
         var savedLines = ReferenceEquals(_savedLines, Lines) ? lines : reprice(_savedLines);
         return lines.SequenceEqual(Lines) && addIns.SequenceEqual(AddIns) && savedLines.SequenceEqual(_savedLines)
             ? this
-            : new(SubAssemblyId, Role, lines, AuthoredField, AuthoredValue, LinkedName, addIns, Name, _isOwn, _isReleasing, new KeptLines(savedLines, LinesTaken), LinkedOwner, _toMadeIngredient);
+            : new(SubAssemblyId, Role, lines, AuthoredField, AuthoredValue, LinkedName, addIns, Name, _isOwn, _isReleasing, new KeptLines(savedLines, LinesTaken), LinkedOwner, _toMadeIngredient)
+            {
+                Key = Key,
+                GoesInto = GoesInto,
+            };
     }
 
     /// <summary>The same section of the product's own, for Save to move to the Sub-Assemblies screen and link.</summary>
     public ProductUsageEdit Released() =>
-        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true, linkedOwner: LinkedOwner);
+        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, isReleasing: true, linkedOwner: LinkedOwner)
+        {
+            Key = Key,
+            GoesInto = GoesInto,
+        };
 
     /// <summary>The same section of the product's own, for Save to turn into <paramref name="made"/> (Move to In-House).</summary>
     public ProductUsageEdit MovedToInHouse(MadeIngredientDraft made) =>
-        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, linkedOwner: LinkedOwner, toMadeIngredient: made);
+        new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, linkedOwner: LinkedOwner, toMadeIngredient: made)
+        {
+            Key = Key,
+            GoesInto = GoesInto,
+        };
 
     /// <summary>
     /// A linked section as the Sub-Assemblies screen now has it — its name, the label it gives (<paramref name="name"/>),
@@ -333,16 +400,25 @@ public sealed class ProductUsageEdit : ObservableRow
     {
         var lines = editedLines ?? savedLines;
         var taken = areLinesTypedInto || !HaveSameRecipe(lines, savedLines) ? LinesTaken : savedLines;
-        return new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, linkedName, addIns, name, kept: new KeptLines(savedLines, taken), linkedOwner: linkedOwner);
+        return new(SubAssemblyId, role, lines, AuthoredField, AuthoredValue, linkedName, addIns, name, kept: new KeptLines(savedLines, taken), linkedOwner: linkedOwner)
+        {
+            Key = Key,
+            GoesInto = GoesInto,
+        };
     }
 
-    /// <summary>The same linked section with the lines, piece size and add-ins the form now holds.</summary>
+    /// <summary>The same linked section with the lines, piece size and add-ins the form now holds, and the section it goes into.</summary>
     public ProductUsageEdit WithLinkedForm(
         IReadOnlyList<SectionLine> lines,
         UsageAuthoredField authoredField,
         decimal authoredValue,
-        IReadOnlyList<SectionLine> addIns) =>
-        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, kept: new KeptLines(_savedLines, LinesTaken), linkedOwner: LinkedOwner);
+        IReadOnlyList<SectionLine> addIns,
+        long? goesInto) =>
+        new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, kept: new KeptLines(_savedLines, LinesTaken), linkedOwner: LinkedOwner)
+        {
+            Key = Key,
+            GoesInto = goesInto,
+        };
 
     /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>
     private static bool HaveSameRecipe(IReadOnlyList<SectionLine> a, IReadOnlyList<SectionLine> b) =>

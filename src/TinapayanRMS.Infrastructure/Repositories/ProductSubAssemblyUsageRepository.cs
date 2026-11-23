@@ -279,6 +279,18 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.LabelIn(s, productId, productName, s.Role.Name))),
         ]);
 
+        // A section that goes whole into another goes into one of this recipe's, without a piece size, and never round
+        // into itself; each is named by its id, or a new one's stand-in (RecipeDraft.SectionIdOf).
+        ProductRules.EnsureValidFolds(
+        [
+            .. recipe.New.Select((n, i) => (
+                RecipeDraft.SectionIdOf(n.Id, i),
+                n.GoesInto,
+                n.AuthoredValue,
+                SubAssemblyRules.NormalizeName(n.SectionName) is { } label ? $"{roles[n.RoleId].Name}: {label}" : roles[n.RoleId].Name)),
+            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.GoesInto, l.AuthoredValue, linkedSubAssemblies[l.SubAssemblyId].Name)),
+        ]);
+
         // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have: its lines as this save
         // leaves them, the new ones where they're changed here. Checked here, before anything is written; SetLinesAsync
         // checks them again as it writes them, after the new lines.
@@ -386,7 +398,9 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         // other, those saved just before it included. The ones kept are relined, and every one is used at the product's
         // piece size.
         List<string> takenNames = recipe.New.Any(n => n.Id == 0) ? await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken) : [];
-        foreach (var section in recipe.New)
+        Dictionary<int, int> subAssemblyIdOf = recipe.Linked.ToDictionary(l => l.SubAssemblyId, l => l.SubAssemblyId);
+        List<(int? GoesInto, ProductSubAssemblyUsage Usage)> usages = [];
+        foreach (var (section, index) in recipe.New.Select((n, i) => (n, i)))
         {
             SubAssembly subAssembly;
             if (section.Id > 0)
@@ -423,13 +437,16 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 await RawMaterialRepository.AddMadeAsync(dbContext, made, subAssembly.Id, cancellationToken);
             }
 
-            dbContext.ProductSubAssemblyUsages.Add(new ProductSubAssemblyUsage
+            var usage = new ProductSubAssemblyUsage
             {
                 ProductId = productId,
                 SubAssemblyId = subAssembly.Id,
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
-            });
+            };
+            dbContext.ProductSubAssemblyUsages.Add(usage);
+            subAssemblyIdOf[RecipeDraft.SectionIdOf(section.Id, index)] = subAssembly.Id;
+            usages.Add((section.GoesInto, usage));
         }
 
         // A linked one whose lines were changed in this recipe is relined where it's kept, before its add-ins are checked
@@ -457,6 +474,13 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
 
         dbContext.ProductSubAssemblyUsages.AddRange(linkedUsages.Select(p => p.Usage));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        // Every section has its sub-assembly now, so one going whole into another can say which (by its id, a new one's
+        // stand-in in the draft), written by the save below.
+        foreach (var (goesInto, usage) in usages.Concat(linkedUsages.Select(p => (p.Draft.GoesInto, p.Usage))))
+        {
+            usage.GoesIntoSubAssemblyId = goesInto is { } id ? subAssemblyIdOf[id] : null;
+        }
 
         // This product's own extra ingredients on top of a linked recipe. They belong to the usage, not to
         // the sub-assembly, so two products linking the same one each keep their own.

@@ -19,12 +19,11 @@ public class FileSizeTests
     private static readonly Dictionary<string, int> StillOver = new(StringComparer.Ordinal)
     {
         ["Products/ProductForm.cs"] = 1785,
-        ["Products/ProductRecipe.cs"] = 1317,
+        ["Products/ProductRecipe.cs"] = 1239,
         ["Products/ProductsList.cs"] = 1232,
         ["RawMaterials/RawMaterialForm.cs"] = 1150,
         ["Products/ProductVersionHistory.cs"] = 776,
         ["SubAssemblies/SubAssembliesList.cs"] = 745,
-        ["Products/ProductUsageForm.cs"] = 735,
         ["RawMaterials/RawMaterialsList.cs"] = 724,
         ["Products/ProductTree.cs"] = 721,
     };
