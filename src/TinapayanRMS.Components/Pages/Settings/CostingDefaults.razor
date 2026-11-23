@@ -15,7 +15,7 @@
         <FormRow Label="New Products In" For="new-products-in">
             <PickField ID="new-products-in" TItem="KeyValuePair<ProductStage, string>" Items="State!.Stages" TextOf="s => s.Value"
                        Value="State!.Stages.FirstOrDefault(s => s.Key == State!.EditingNewProductStage)" ValueChanged="s => State!.EditingNewProductStage = s.Key"
-                       Tooltip="The folder New on the Products screen files a product in. New Product Here keeps its folder's, and a clone or variant goes in Innovation." />
+                       Tooltip="Where New files a product. New Product Here uses its folder; clones and variants go in Innovation." />
         </FormRow>
         <FormRow Label="Labor %" For="labor-percent">
             <NumberField TValue="decimal" Format="N2" Min="0" ID="labor-percent" @bind-Value="State!.EditingLaborPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
@@ -30,10 +30,10 @@
             <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarkupPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
         </FormRow>
         <FormRow Label="VAT %" For="vat-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="State!.EditingVatPercent" Tooltip="Every product's, not just new ones: the shop's VAT, on top of the marked-up price. Changing it reprices every product." />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="State!.EditingVatPercent" Tooltip="VAT on top of the marked-up price. Changing it reprices every product." />
         </FormRow>
         <FormRow Label="Wastage %" For="wastage-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="wastage-percent" @bind-Value="State!.EditingWastagePercent" Max="100m" Tooltip="Every product's, not just new ones, unless its category sets its own (Product Categories): what's lost making a product, as a cost on top of its sub-assemblies (ingredients). 3% adds ₱3 to ₱100 of ingredients. Packaging isn't wasted, so it's left out." />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="wastage-percent" @bind-Value="State!.EditingWastagePercent" Max="100m" Tooltip="What's lost making a product, as a cost on its ingredients (not packaging), unless its category sets one. 3% adds ₱3 per ₱100." />
         </FormRow>
         <FormRow Label="Cost Buffer %" For="cost-buffer-percent">
             <NumberField TValue="decimal" Format="N2" Min="0" ID="cost-buffer-percent" @bind-Value="State!.EditingCostBufferPercent" Max="100m" Tooltip="What a new raw material's Cost Buffer % starts at: a cushion on top of its cost for price swings and waste" />
@@ -41,7 +41,7 @@
         <FormRow Label="Price Rounding" For="price-rounding">
             <PickField ID="price-rounding" TItem="PriceRoundingOption" Items="State!.PriceRoundingOptions" TextOf="o => o.Label"
                        Value="State!.EditingPriceRounding" ValueChanged="o => { if (o is not null) State!.EditingPriceRounding = o; }"
-                       Tooltip="A suggested price rounded up to a price you'd charge, shown beside the exact one on the Costing tab, in Reports and in the Price Simulator. The exact figures don't change." />
+                       Tooltip="Rounds suggested prices up to a price you'd charge, shown beside the exact one. Exact figures don't change." />
         </FormRow>
 
         <div class="button-row form-extra">

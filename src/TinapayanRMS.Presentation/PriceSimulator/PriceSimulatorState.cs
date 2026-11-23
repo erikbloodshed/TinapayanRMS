@@ -79,8 +79,8 @@ public sealed class PriceSimulatorState : ScreenState, IDisposable
 
     /// <summary>What the switch does from here.</summary>
     public string CostBasisButtonTooltip => IsUnbuffered
-        ? "Shows every product's figures, now and simulated, at the materials' buffered costs again, as Print Report and Export to Excel will. Nothing is saved."
-        : "Shows every product's figures, now and simulated, at the materials' true costs, without their cost buffers, as Print Report and Export to Excel will. Nothing is saved.";
+        ? "Shows all figures at buffered costs again, in print and Excel too. Nothing is saved."
+        : "Shows all figures at true costs, without cost buffers, in print and Excel too. Nothing is saved.";
 
     /// <summary>Unbuffered or Buffered, pressed: every product is priced again at the other of the materials' costs, from what's already read.</summary>
     public ScreenCommand ToggleCostBasisCommand { get; }

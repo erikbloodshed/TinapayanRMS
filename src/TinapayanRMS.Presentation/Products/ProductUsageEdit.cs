@@ -263,8 +263,8 @@ public sealed class ProductUsageEdit : ObservableRow
 
     /// <summary>The badge's tooltip: where it's kept, and that Save here writes changed lines there.</summary>
     public string LinkedFromToolTip => LinkedOwner is { } owner
-        ? $"It's {owner.Name}'s own, and this product links it as {owner.Name}'s variant, so both use its lines. Change them here or there: Save here writes them there. Click to open {owner.Name}."
-        : "It's kept on the Sub-Assemblies screen, and every product linking it uses its lines. Change them here or there: Save here writes them there. Click to open it there.";
+        ? $"{owner.Name}'s own, linked here as its variant. Save writes line changes there. Click to open {owner.Name}."
+        : "Kept on Sub-Assemblies and shared by every product linking it. Save writes line changes there. Click to open it.";
 
     /// <summary>What it's called where the recipe it's in isn't plain: a linked one by its name, a new one as its section is.</summary>
     public string DisplayName => LinkedName ?? SectionName;

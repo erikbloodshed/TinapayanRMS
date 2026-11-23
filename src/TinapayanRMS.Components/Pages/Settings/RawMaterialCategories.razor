@@ -25,7 +25,7 @@
         </FormRow>
         <FormRow Label="Type" For="category-type">
             <PickField ID="category-type" TItem="RawMaterialCategoryType" Items="State!.Types" @bind-Value="State!.EditingType"
-                       Tooltip="Ingredient: purchased and linked ingredients. Made: made ingredients, and only them. Packaging: packaging materials." />
+                       Tooltip="Ingredient: bought or linked. Made: made ingredients only. Packaging: packaging." />
         </FormRow>
         <p class="caption form-extra">Every material goes in a category of its own type: a made ingredient only in a Made one, and a Made one takes nothing else. A category's type can change only when everything in it fits the new one.</p>
         <div class="button-row">

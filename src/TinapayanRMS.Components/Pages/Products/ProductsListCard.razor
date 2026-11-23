@@ -61,7 +61,7 @@
     // The flags after a product's name: its current price earns less than its target markup, and a recipe section has no
     // weight per piece or yield, so it costs the product nothing. Made once, not for each row as it's drawn.
     private static readonly RenderFragment BelowTargetMarkup = @<span class="@AppIcons.CssOf(AppIcon.Warning) tree-flag" title="Its current price earns less than its target markup" aria-label="Short of its target markup"></span>;
-    private static readonly RenderFragment SectionWithoutPieceSize = @<span class="@AppIcons.CssOf(AppIcon.Section) tree-flag" title="A recipe section has no weight per piece or yield, so it adds nothing to this product's cost" aria-label="A section with no piece size"></span>;
+    private static readonly RenderFragment SectionWithoutPieceSize = @<span class="@AppIcons.CssOf(AppIcon.Section) tree-flag" title="A section has no weight per piece or yield, so it adds no cost" aria-label="A section with no piece size"></span>;
     private static readonly RenderFragment BothFlags = @<text>@BelowTargetMarkup@SectionWithoutPieceSize</text>;
 
     private static RenderFragment? FlagsOf(ProductTreeNode node) => (node.IsBelowTargetMarkup, node.HasSectionWithoutPieceSize) switch

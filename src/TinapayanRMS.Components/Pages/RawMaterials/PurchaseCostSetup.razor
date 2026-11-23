@@ -32,7 +32,7 @@
         <label class="form-label" for="rm-cost-from">Basis</label>
         <PickField ID="rm-cost-from" TItem="CostFromOption" Items="State.PurchaseCost.CostFromOptions" TextOf="o => o.Label"
                    Value="State.PurchaseCost.CostFrom" ValueChanged="o => State.PurchaseCost.CostFrom = o" CssClass="cost-from-picker" PopupWidth="340px"
-                   Tooltip="The brand the material is costed at. Dearest brand costs it at the most it's bought for; pick a brand to cost it at that brand's price (its dearest unit, if it's priced in more than one). Save keeps it." />
+                   Tooltip="The brand it's costed at: the dearest, or a picked brand's price (its dearest unit). Save keeps it." />
         <CommandButton Command="State.PurchaseCost.RemoveBrandPriceCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove" />
     </div>
 
@@ -40,17 +40,17 @@
         <div class="field-stack">
             <label class="field-label" for="rm-buffer-percent">Cost Buffer %</label>
             <NumberField ID="rm-buffer-percent" TValue="decimal?" @bind-Value="State.PurchaseCost.TypedCostBufferPercent" Min="0" Max="100"
-                         Tooltip="The cushion on top of the brand it's costed at (Basis), for price swings, waste and yield variation. Typing it works out the Buffered Cost; typing the Buffered Cost works it out." />
+                         Tooltip="A cushion over the Basis brand's cost for price swings and waste. Typing it sets the Buffered Cost, and vice versa." />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-buffered-cost">Buffered Cost</label>
             <NumberField ID="rm-buffered-cost" TValue="decimal?" @bind-Value="State.PurchaseCost.EditingBufferedCostInUnit" Min="0" LandsOnLeave="true"
-                         Tooltip="A fixed amount recipes and products are costed with. New brand prices don't move it; typing the Cost Buffer % again does." />
+                         Tooltip="The fixed cost recipes use. New prices don't move it; retyping the Cost Buffer % does." />
         </div>
         <div class="field-stack">
             <label class="field-label" for="rm-buffered-unit">Per</label>
             <PickField ID="rm-buffered-unit" TItem="PurchaseUnitChoice" Items="State.PurchaseCost.BufferedCostUnitOptions" TextField="Name" @bind-Value="State.PurchaseCost.BufferedCostUnit"
-                       Tooltip="The unit the buffered cost is shown and typed in. It's kept per base unit either way." />
+                       Tooltip="The unit the buffered cost is shown in. It's stored per base unit." />
         </div>
     </div>
     @if (State.PurchaseCost.IsBufferOffTarget)
@@ -58,7 +58,7 @@
         <div class="target-buffer-row">
             <span>@State.PurchaseCost.TargetBufferText</span>
             <CommandButton Command="State.PurchaseCost.ReapplyTargetBufferCommand" Icon="AppIcon.Apply" Label="Re-apply Target"
-                           Tooltip="Types the target buffer again: the Buffered Cost becomes the brand it's costed at (Basis) with it on top. Save keeps it." />
+                           Tooltip="Reapplies the target buffer over the Basis brand's cost. Save keeps it." />
         </div>
     }
     <p class="caption">@State.PurchaseCost.PurchaseBufferedCostText</p>

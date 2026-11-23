@@ -7,7 +7,7 @@
         <div class="header-title-group">
             @if (State.Costing.IsUnbuffered)
             {
-                <span class="badge badge-warning" title="Every cost on this screen is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
+                <span class="badge badge-warning" title="True costs, without cost buffers. Buffered switches back.">Unbuffered costs</span>
             }
             @if (State.Costing.BelowCostText is { } belowCost)
             {
@@ -19,22 +19,22 @@
             }
             @if (State.NewProductTag is { } tag)
             {
-                <span class="badge badge-warning" title="Where Save files this new product in the Products list: after New, the stage New Products In gives it (Settings → Costing Defaults); after New Product Here, the folder it was picked on.">@tag</span>
+                <span class="badge badge-warning" title="Where Save files this new product: the New Products In stage (Settings → Costing Defaults), or the folder New Product Here was used on.">@tag</span>
             }
         </div>
         <div class="button-row">
             <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Primary="true" Tooltip="Save: saves the details, recipe, packaging and costing together." />
-            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change: a quantity typed, a line added or removed, a sub-assembly put in. Ctrl+Z." />
+            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change. Ctrl+Z." />
             <CommandButton Command="State.RedoCommand" Icon="AppIcon.Redo" Tooltip="Redo: puts back the change the last Undo took. Ctrl+Y." />
             <CommandButton Command="State.RevertCommand" Icon="AppIcon.Cancel"
-                           Tooltip="Revert: puts the product back as it was last saved: the details, recipe, packaging and costing, and any sub-assembly being added or edited." />
+                           Tooltip="Revert: puts the whole product back as last saved." />
             <CommandButton Command="State.PrintCommand" Icon="AppIcon.Print"
-                           Tooltip="Print: opens the Print window, which previews and prints this product's recipe and costing as this screen shows them." />
+                           Tooltip="Print: previews and prints the recipe and costing as shown." />
             <CommandButton Command="State.ExportPdfCommand" Icon="AppIcon.ExportToPdf"
-                           Tooltip="Export to PDF: saves this product's recipe and costing as a PDF file, as this screen shows them, unsaved changes included. On the History tab, the version picked there." />
+                           Tooltip="Export to PDF: saves the recipe and costing as shown, unsaved changes included. On History, the picked version." />
             <CommandButton Command="State.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Tooltip="@($"{State.Costing.CostBasisButtonLabel}: {State.Costing.CostBasisButtonTooltip}")" />
             <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete"
-                           Tooltip="Delete: moves this product to the Deleted folder, after asking, and closes its tab." />
+                           Tooltip="Delete: moves it to the Deleted folder (asks first) and closes its tab." />
         </div>
     </div>
 
@@ -45,7 +45,7 @@
             <div class="figure-label">Material Cost</div>
             <div class="figure-value">@State.Costing.Costs.Material.ToString("N2")</div>
         </div>
-        <div class="figure-tile tile-pink" title="@($"{State.Costing.CostUnitCaption}: the material cost with labor, overhead and administrative on top, before markup and VAT")">
+        <div class="figure-tile tile-pink" title="@($"{State.Costing.CostUnitCaption}: material cost plus labor, overhead and admin, before markup and VAT")">
             <div class="figure-label">Base Cost</div>
             <div class="figure-value">@State.Costing.Costs.BaseCost.ToString("N2")</div>
         </div>
@@ -53,7 +53,7 @@
             <div class="figure-label">Current Price</div>
             <div class="figure-value">@(State.EditingCurrentPrice?.ToString("N2") ?? "—")</div>
         </div>
-        <div class="figure-tile tile-green" title="What the current price earns on the base cost, VAT taken out: the costing's Markup % at that price">
+        <div class="figure-tile tile-green" title="The markup the current price earns on the base cost, VAT excluded">
             <div class="figure-label">Markup %</div>
             <div class="figure-value @(State.Costing.Costs.IsCurrentPriceBelowCost ? "figure-error" : State.Costing.Costs.IsBelowTargetMarkup ? "figure-warning" : "")"
                  title="@(State.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : State.Costing.Costs.IsBelowTargetMarkup ? "Less than the Markup Metric on the Costing tab." : null)">@(State.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
@@ -72,13 +72,13 @@
         <PickField ID="product-category" TItem="ProductCategory" Items="State.Categories" TextField="Name"
                    Value="State.EditingCategory" ValueChanged="PickCategory" AllowEmpty="true"
                    OnArrive="ArriveAtCategory" OnTyped="t => State.CategorySearchText = t" OnLeave="State.CommitCategoryTextAsync"
-                   Tooltip="What the Products list groups it under. Pick a category, or type a new one's name to add it." />
+                   Tooltip="Groups it in the Products list. Pick one, or type a new name to add it." />
 
         @if (State.IsEditingSingle)
         {
-            <label class="form-label" for="product-quantity" title="How many finished pieces make one sellable unit. 1 for a product sold by the piece.">Quantity Required</label>
+            <label class="form-label" for="product-quantity" title="Pieces per sellable unit: 1 if sold by the piece.">Quantity Required</label>
             <NumberField ID="product-quantity" TValue="int" @bind-Value="State.EditingQuantityRequired" Format="N0" Min="1" CssClass="field-narrow"
-                         Tooltip="How many finished pieces make one sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The recipe stays per piece; the costing multiplies by this." />
+                         Tooltip="Pieces per sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The costing multiplies by it." />
         }
 
         <label class="form-label" for="product-price" title="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>

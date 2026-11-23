@@ -8,11 +8,11 @@
 <section class="card header-card">
     <div class="header-title-row">
         <div class="button-row">
-            <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Primary="true" Tooltip="Save: saves the details, alternative units, price and bill of materials together." />
-            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change: a price typed, a unit or a component added or removed. Ctrl+Z." />
+            <CommandButton Command="State.SaveCommand" Icon="AppIcon.Save" Primary="true" Tooltip="Save: saves the details, units, price and bill of materials." />
+            <CommandButton Command="State.UndoCommand" Icon="AppIcon.Undo" Tooltip="Undo: takes back the last change. Ctrl+Z." />
             <CommandButton Command="State.RedoCommand" Icon="AppIcon.Redo" Tooltip="Redo: puts back the change the last Undo took. Ctrl+Y." />
             <CommandButton Command="State.DeleteCommand" Icon="AppIcon.Delete"
-                           Tooltip="Delete: deletes this material with its prices and alternative units, after asking, and closes its tab. While anything uses it, it stays." />
+                           Tooltip="Delete: deletes it with its prices and units (asks first), unless something uses it." />
         </div>
     </div>
 
@@ -37,12 +37,12 @@
                 <div class="figure-label">Total Weight</div>
                 <div class="figure-value">@State.Recipe.BomTotalWeight.ToString("#,0.##") g</div>
             </div>
-            <div class="figure-tile tile-flamingo" title="What the BOM costs at its components' buffered costs, as it stands — the grid's Cost column. Over the Total Weight, it's the Buffered Cost per gram.">
+            <div class="figure-tile tile-flamingo" title="The BOM's cost at buffered costs (the grid's Cost column). Over Total Weight, it's the Buffered Cost per gram.">
                 <div class="figure-label">Total Cost</div>
                 <div class="figure-value">@State.Recipe.BomTotalCost.ToString("N2")</div>
             </div>
         }
-        <div class="figure-tile tile-mauve" title="When this material's cost last changed: a new price, a buffer edit, a recipe change, or the cascade reaching it from a component.">
+        <div class="figure-tile tile-mauve" title="When its cost last changed: a price, buffer or recipe edit, or a component's change.">
             <div class="figure-label">Last Updated</div>
             <div class="figure-value">@State.LastUpdatedText</div>
         </div>
@@ -54,7 +54,7 @@
 
         <label class="form-label" for="rm-type">Type</label>
         <PickField ID="rm-type" TItem="RawMaterialType" Items="State.Types" Value="State.EditingType" ValueChanged="State.ChangeType" Disabled="!State.CanChangeTypeAndSource"
-                   Tooltip="Ingredients go in recipes; packaging goes on a product's packaging lines. Fixed once saved." />
+                   Tooltip="Ingredients go in recipes, packaging on packaging lines. Fixed once saved." />
 
         <label class="form-label" for="rm-category">Category</label>
         <PickField ID="rm-category" TItem="RawMaterialCategory" Items="State.CategoryOptions" TextField="Name"
@@ -77,7 +77,7 @@
         {
             <label class="form-label" for="rm-weight-loss">Weight Loss %</label>
             <NumberField ID="rm-weight-loss" TValue="decimal?" @bind-Value="State.EditingWeightLossPercent" Min="0" Max="99.99m" CssClass="field-narrow"
-                         Tooltip="How much of the batch's weight is lost while making it: the cost is spread over what's left. A new made ingredient starts at 3%." />
+                         Tooltip="Weight lost in making; the cost spreads over what's left. New made ingredients start at 3%." />
         }
     </div>
 </section>

@@ -8,7 +8,7 @@
     <div class="costing-heading">
         <h2 class="panel-header">Costing Summary</h2>
         <CommandButton Command="State.ExportCostingCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
-                       Tooltip="Saves this product's costing and recipe to an Excel workbook, as the screen shows them: unsaved changes and Unbuffered too." />
+                       Tooltip="Saves the costing and recipe to Excel as shown, unsaved changes included." />
     </div>
     <div class="costing-columns">
         <div class="costing-metrics">
@@ -61,7 +61,7 @@
                             <td class="number">@line.Share.ToString("N1")%</td>
                         </tr>
                     }
-                    <tr title="What's lost making the product, as a cost: the Wastage % of its category, or the shop's in Settings → Costing Defaults when its category sets none.">
+                    <tr title="What's lost in making, as a cost: the category's Wastage %, or else the shop's (Settings → Costing Defaults).">
                         <td>Wastage (@State.Costing.Costs.WastagePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
                         <td class="number">@State.Costing.Costs.Wastage.ToString("N2")</td>
                         <td class="number share">@State.Costing.Costs.WastageShare.ToString("N1")%</td>
@@ -98,7 +98,7 @@
                 <thead>
                     <tr>
                         <th>Component</th>
-                        <th class="number" title="@($"{State.Costing.SuggestedSellingPriceLabel}: what the costing works out, the base cost with the Markup Metric on it, then VAT")">Suggested Price</th>
+                        <th class="number" title="@($"{State.Costing.SuggestedSellingPriceLabel}: the base cost plus the Markup Metric, then VAT")">Suggested Price</th>
                         <th class="percent"></th>
                         <th class="number" title="@CurrentPriceTooltip">Current Price</th>
                         <th class="percent"></th>

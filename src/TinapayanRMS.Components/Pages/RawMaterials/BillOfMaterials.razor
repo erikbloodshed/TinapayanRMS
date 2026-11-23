@@ -11,12 +11,12 @@
         {
             <PickField ID="made-from" TItem="SubAssembly" Items="State.Recipe.SubAssemblyOptions" TextField="Name" AllowEmpty="true"
                        Value="State.Recipe.SubAssembly" ValueChanged="State.Recipe.PickSubAssembly" Placeholder="Pick a sub-assembly…" CssClass="made-from-picker"
-                       Tooltip="The sub-assembly whose recipe it's made from, as it's kept on the Sub-Assemblies screen. Its add-ins and weight loss go on top." />
+                       Tooltip="The sub-assembly it's made from. Add-ins and weight loss go on top." />
         }
         @if (State.Recipe.IsShowingSubAssemblyBadge)
         {
             <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.Recipe.OpenSubAssemblyCommand)"
-                    title="Open it on the Sub-Assemblies screen, where its lines are changed. Every made ingredient and product using it follows.">
+                    title="Open it on Sub-Assemblies to change its lines; everything using it follows.">
                 @State.Recipe.SubAssemblyBadgeText
             </button>
             <CommandButton Command="State.Recipe.StartChangingSubAssemblyCommand" Icon="AppIcon.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />
@@ -64,7 +64,7 @@
     </LineGrid>
     <div class="button-row align-right form-extra">
         <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
-                      Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
+                      Tooltip="Adds a blank add-in above the selected one, or at the end. Insert." />
         <CommandButton Command="State.Recipe.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
     </div>
 </div>

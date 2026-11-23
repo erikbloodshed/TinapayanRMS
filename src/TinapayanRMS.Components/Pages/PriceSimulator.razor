@@ -22,7 +22,7 @@
                 <h2 class="section-header">Scenarios</h2>
                 <div class="button-row">
                     <CommandButton Command="State!.SaveScenarioCommand" Icon="AppIcon.Save" Label="Save Scenario"
-                                   Tooltip="Saves the price changes in the table under a name. Keep the open scenario's name to update it." />
+                                   Tooltip="Saves the price changes as a named scenario. Keep its name to update it." />
                     <CommandButton Command="State!.DeleteScenarioCommand" Icon="AppIcon.Delete" Label="Delete Scenario"
                                    Tooltip="Deletes the open scenario, after asking. Its changes stay in the table." />
                 </div>
@@ -55,7 +55,7 @@
                 <div class="button-row">
                     <CommandButton Command="State!.RemoveChangeCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                     <CommandButton Command="State!.ClearCommand" Icon="AppIcon.Cancel" Label="Clear All"
-                                   Tooltip="Takes every price change away, so the figures are today's again, and closes the open scenario." />
+                                   Tooltip="Clears every price change and closes the open scenario." />
                 </div>
             </div>
             <p class="caption">Pick a raw material and type how much its price changes, in percent, or its new price; the other is worked out. Prices are per the unit it's bought in, from the brand it's costed at. No real price changes here: the changes last until you close the tab, unless you save them as a scenario.</p>
@@ -91,16 +91,16 @@
                 Products
                 @if (State!.IsUnbuffered)
                 {
-                    <span class="badge badge-warning" title="Every figure is at the materials' true costs, without their cost buffers. Buffered switches back.">Unbuffered costs</span>
+                    <span class="badge badge-warning" title="True costs, without cost buffers. Buffered switches back.">Unbuffered costs</span>
                 }
             </h2>
             <div class="button-row">
                 <SfCheckBox Label="Only affected products" @bind-Checked="State!.OnlyAffected" />
                 <CommandButton Command="State!.ToggleCostBasisCommand" Icon="AppIcon.Calculate" Label="@State!.CostBasisButtonLabel" Tooltip="@State!.CostBasisButtonTooltip" />
                 <CommandButton Command="State!.PrintCommand" Icon="AppIcon.Print" Label="Print Report"
-                               Tooltip="Previews and prints each product's recipe and costing with the price changes, beside today's: the products picked in the table, or every product it shows." />
+                               Tooltip="Prints each product's costing with the changes beside today's: the picked products, or all shown." />
                 <CommandButton Command="State!.ExportCommand" Icon="AppIcon.ExportToExcel" Label="Export to Excel"
-                               Tooltip="Saves the products as shown, and the price changes, to an Excel workbook." />
+                               Tooltip="Saves the products as shown, and the price changes, to Excel." />
             </div>
         </div>
         <p class="caption">Every product for one sellable unit, now and with the price changes, at buffered costs; Unbuffered shows them at the materials' true costs instead, and Print Report and Export to Excel follow. A change reaches made and linked ingredients as a real one would, and moves a material's cost and buffered cost by the same amount. Markup % is what the product's current price earns; Price to Keep Markup is the price that earns today's markup with the changes. Double-click a product to open it.</p>

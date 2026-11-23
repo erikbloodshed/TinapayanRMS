@@ -10,15 +10,15 @@
                 <Face><Icon Of="AppIcon.Add" /> <span class="command-label">Add Sub-Assembly</span></Face>
                 <ChildContent>
                     <ActionButton Icon="AppIcon.Add" Label="New sub-assembly" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.New)"
-                                  Tooltip="Type its lines in here. In a product-owned role (Settings → Roles) Save keeps it as this product's own; in any other, on the Sub-Assemblies screen, named after this product and its role, and linked." />
+                                  Tooltip="Type its lines here. Save keeps it with this product in a product-owned role, otherwise on Sub-Assemblies, linked." />
                     <ActionButton Icon="AppIcon.Link" Label="Link an existing one" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.Link)"
-                                  Tooltip="One from the Sub-Assemblies screen. Its lines stay where they're kept, and it follows every change made to them. Another product's own can only be copied. Packaging is linked on the Packaging tab." />
+                                  Tooltip="Link one from Sub-Assemblies; it follows its changes. Another product's own can only be copied." />
                     <ActionButton Icon="AppIcon.Copy" Label="Copy an existing one" Flat="true" OnClick="() => Commands.Run(State.Recipe.AddUsageCommand, UsageFormMode.Copy)"
-                                  Tooltip="Starts from an existing one's lines and role, another product's own included. Save keeps it as a new one named after this product: its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
+                                  Tooltip="Start from an existing one's lines and role. Save keeps it as a new one, named after this product." />
                 </ChildContent>
             </MenuButton>
             <CommandButton Command="State.Recipe.RemoveUsageCommand" Icon="AppIcon.Delete" Label="Delete Sub-Assembly"
-                           Tooltip="Take the sub-assembly showing out of the recipe, with Save. One of this product's own is deleted; a linked one stays on the Sub-Assemblies screen." />
+                           Tooltip="Remove the sub-assembly showing, on Save. This product's own is deleted; a linked one stays on Sub-Assemblies." />
         </div>
     </div>
 

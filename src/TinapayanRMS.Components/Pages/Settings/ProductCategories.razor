@@ -24,7 +24,7 @@
         </FormRow>
         <FormRow Label="Wastage %" For="product-category-wastage">
             <NumberField ID="product-category-wastage" TValue="decimal?" @bind-Value="State!.EditingWastagePercent" Format="N2" Min="0" Max="100" Placeholder="Shop-wide"
-                         Tooltip="What's lost making this category's products, as a cost on top of their sub-assemblies, in place of the shop-wide Wastage % (Costing Defaults). Blank uses the shop-wide one." />
+                         Tooltip="Replaces the shop-wide Wastage % (Costing Defaults) for this category. Blank uses the shop-wide one." />
         </FormRow>
         <p class="caption form-extra">Blank uses the shop-wide Wastage % from Costing Defaults. A composite product uses its own category's, not its products'.</p>
         <div class="button-row">

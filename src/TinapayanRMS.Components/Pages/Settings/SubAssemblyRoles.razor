@@ -31,7 +31,7 @@
         </FormRow>
         <FormRow Label="">
             <SfCheckBox Label="Product-owned" @bind-Checked="State!.EditingIsProductOwned" Disabled="!State!.CanEditProductOwned"
-                        title="A section in this role made in a product stays that product's own: edited in its recipe, not on the Sub-Assemblies screen, and copied rather than linked by other products. Not for the Packaging role." />
+                        title="Sections in this role stay their product's own: edited in its recipe, copied not linked by others. Not for Packaging." />
         </FormRow>
         <div class="button-row">
             <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />

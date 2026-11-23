@@ -181,8 +181,8 @@ public sealed class ProductCosting : ObservableState
 
     /// <summary>What the header's switch does from here.</summary>
     public string CostBasisButtonTooltip => IsUnbuffered
-        ? "Shows every cost on this screen, and prints it, at the materials' buffered costs again. Nothing is saved."
-        : "Shows every cost on this screen, and prints it, at the materials' true costs, without their cost buffers. Nothing is saved.";
+        ? "Shows and prints every cost at buffered costs again. Nothing is saved."
+        : "Shows and prints every cost at true costs, without cost buffers. Nothing is saved.";
 
     /// <summary>
     /// The header's "Priced below cost" badge's tooltip, naming the purchased materials in the recipe and packaging that
@@ -207,15 +207,15 @@ public sealed class ProductCosting : ObservableState
 
     /// <summary>The header's Material Cost tooltip: what goes into it, which for a composite is what its products bring.</summary>
     public string MaterialCostTooltip => (_figures.Value.IsComposite
-        ? $"{CostUnitCaption}: the recipe cost of the products it holds and its own sub-assemblies, plus its own packaging"
+        ? $"{CostUnitCaption}: its products' recipe costs and its own sub-assemblies, plus its packaging"
             + (_figures.Value.IncludesComponentPackaging ? " and theirs" : string.Empty)
-        : $"{CostUnitCaption}: the share of every sub-assembly it holds, plus its packaging")
-        + (IsUnbuffered ? ", at the materials' true costs, without their cost buffers" : ", at the materials' buffered costs");
+        : $"{CostUnitCaption}: its sub-assemblies' share, plus its packaging")
+        + (IsUnbuffered ? ", at true costs" : ", at buffered costs");
 
     /// <summary>What the Costing tab's labor, overhead and admin metrics are a percentage of, for their tooltips.</summary>
     public string MetricBaseTooltip => _figures.Value.IsComposite
-        ? $"Of the recipe (ingredients) cost of the products it holds and its own sub-assemblies, packaging not included. {CostUnitCaption}."
-        : $"Of the sub-assemblies (ingredients) cost, packaging not included. {CostUnitCaption}.";
+        ? $"Of its products' and own sub-assemblies' ingredient cost, packaging excluded. {CostUnitCaption}."
+        : $"Of the ingredient (sub-assembly) cost, packaging excluded. {CostUnitCaption}.";
 
     /// <summary>The four percentages as typed, for an undo step to keep and put back (ProductFormSnapshot.Costing).</summary>
     public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Percentages

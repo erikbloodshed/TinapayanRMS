@@ -14,7 +14,7 @@
                        AllowFiltering="true" FilterType="FilterType.Contains" DebounceDelay="0" FilterBarPlaceholder="Search products"
                        EnableSelectionOrder="false" PopupHeight="420px" Width="320px"
                        Placeholder="This product" CssClass="print-products"
-                       title="Tick the products to print: they print as saved, after a contents page. With none ticked, it prints the product Products has open, unsaved edits included. Typing finds products by name.">
+                       title="Ticked products print as saved, after a contents page. None ticked prints the open product, unsaved edits included.">
             <MultiSelectFieldSettings Text="@nameof(PrintableProduct.Name)" Value="@nameof(PrintableProduct.Id)" />
         </SfMultiSelect>
         <label class="form-label" for="print-categories">Categories</label>
@@ -22,7 +22,7 @@
                        @bind-Value="State!.ChosenCategoryIds" Mode="VisualMode.CheckBox" ShowSelectAll="true" ShowDropDownIcon="true"
                        EnableSelectionOrder="false" PopupHeight="320px" Width="220px"
                        Placeholder="All categories" CssClass="print-categories"
-                       title="Tick categories to offer only their products under Print: a product ticked in another category is unticked.">
+                       title="Tick categories to offer only their products under Print.">
             <MultiSelectFieldSettings Text="@nameof(PrintableCategory.Name)" Value="@nameof(PrintableCategory.Id)" />
         </SfMultiSelect>
     </Options>

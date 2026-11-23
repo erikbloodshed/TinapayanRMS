@@ -23,9 +23,9 @@
         <p class="warning-text">@backupProblem The app tries again within the hour.</p>
     }
     <FormRow Label="Also Copy To">
-        <span class="read-only-text" title="Each automatic backup is copied here as well, and the newest 14 are kept here too. Nothing else in the folder is touched.">@State!.CopyFolderText</span>
+        <span class="read-only-text" title="Each automatic backup is also copied here; the newest 14 are kept. Nothing else is touched.">@State!.CopyFolderText</span>
         <CommandButton Command="State!.ChooseCopyFolderCommand" Icon="AppIcon.FolderOpen" Label="Choose…"
-                       Tooltip="A folder on this computer each automatic backup is copied to as well: a USB stick that stays plugged in, or a OneDrive folder. The newest automatic backup is copied there straight away." />
+                       Tooltip="A folder each automatic backup is also copied to, such as a USB stick or OneDrive. The newest is copied now." />
         <CommandButton Command="State!.ClearCopyFolderCommand" Icon="AppIcon.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
     </FormRow>
     @if (State!.CopyProblemText is { } copyProblem)

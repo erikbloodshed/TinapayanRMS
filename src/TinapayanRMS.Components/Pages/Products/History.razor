@@ -62,7 +62,7 @@
                 <label class="form-label" for="history-compare">Compare With</label>
                 <PickField ID="history-compare" TItem="VersionComparison" Items="Versions.CompareChoices" TextOf="c => c.Label"
                            Value="Versions.CompareWith" ValueChanged="c => Versions.CompareWith = c" CssClass="history-compare-picker"
-                           Tooltip="What the version picked is compared with: the version before it, the product as saved now, or any other version. The changes always read from the older one to the newer one." />
+                           Tooltip="Compare with the version before, the product as saved, or any other. Changes read older to newer." />
             </div>
             <p class="caption">@Versions.ChangesCaption</p>
             <ul class="history-change-list">
@@ -108,9 +108,9 @@
 
         <div class="button-row history-actions">
             <CommandButton Command="State.PrintCommand" Icon="AppIcon.Print" Label="Print Version"
-                           Tooltip="Shows this version's recipe, packaging and costing, at its costs then, in the Print window." />
+                           Tooltip="Opens this version, at its costs then, in the Print window." />
             <CommandButton Command="State.VersionHistory.RestoreCommand" Icon="AppIcon.Restore" Label="Restore"
-                           Tooltip="Puts this version's recipe, packaging, costing and price into the form. Save keeps it; Undo takes it back." />
+                           Tooltip="Loads this version into the form. Save keeps it; Undo takes it back." />
         </div>
     </div>
 </div>

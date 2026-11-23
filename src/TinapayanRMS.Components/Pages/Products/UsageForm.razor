@@ -14,7 +14,7 @@
     }
     @if (State.UsageForm.IsFormNewMovingToSubAssemblies)
     {
-        <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, named after this product and its role, and this product links it there. Pick a product-owned role to keep it this product's own.">Moves to Sub-Assemblies on Save</span>
+        <span class="badge badge-warning" title="Save puts it on Sub-Assemblies, named after this product and role, and links it. Pick a product-owned role to keep it here.">Moves to Sub-Assemblies on Save</span>
     }
 
     @if (State.UsageForm.IsFormPickingSource)
@@ -22,7 +22,7 @@
         <div class="usage-row">
             <label class="form-label" for="usage-source">Existing Sub-Assembly</label>
             <PickField ID="usage-source" TItem="LinkableSubAssemblyOption" Items="State.UsageForm.LinkableSubAssemblies" TextField="DisplayName" Value="State.UsageForm.EditingUsageSource" ValueChanged="State.UsageForm.PickSource"
-                       Tooltip="One from the Sub-Assemblies screen, or to copy, another product's own. A link follows every change made to it where it's kept; a copy is saved as a new one, named after this product. Packaging is linked or copied on the Packaging tab." />
+                       Tooltip="Link one from Sub-Assemblies, or copy another product's own as a new one named after this product." />
         </div>
     }
 
@@ -30,11 +30,11 @@
         <div class="usage-badges">
             @if (State.UsageForm.EditingUsage?.IsReleasing == true)
             {
-                <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, and this product links it there. Undo or Revert to keep it this product's own.">Moves to Sub-Assemblies on Save</span>
+                <span class="badge badge-warning" title="Save moves it to Sub-Assemblies with its name and lines, and links it. Undo or Revert to keep it here.">Moves to Sub-Assemblies on Save</span>
             }
             @if (State.UsageForm.EditingUsage is { IsMovingToInHouse: true } moving)
             {
-                <span class="badge badge-warning" title="Save puts it on the Sub-Assemblies screen, keeping its name and these lines, links this product to it there, and adds a made ingredient made from it, with no weight loss. Undo or Revert to keep it this product's own.">@moving.MovingToInHouseText</span>
+                <span class="badge badge-warning" title="Save moves it to Sub-Assemblies, links it, and adds a made ingredient from it. Undo or Revert to keep it here.">@moving.MovingToInHouseText</span>
             }
             @if (State.UsageForm.IsShowingLinkBadge && State.UsageForm.EditingUsage is { } linked)
             {
@@ -43,7 +43,7 @@
                     @linked.LinkedFromText
                 </button>
                 <CommandButton Command="State.UsageForm.StartChangingLinkCommand" Icon="AppIcon.Edit" Flat="true"
-                               Tooltip="Link another sub-assembly in its place, keeping this product's piece size and add-ins. The one linked now stays where it's kept." />
+                               Tooltip="Link another sub-assembly instead, keeping the piece size and add-ins." />
             }
             @if (State.UsageForm.IsChangingLink)
             {
@@ -61,37 +61,37 @@
                            Tooltip="What it's called in the recipe. Roles are added in Settings → Roles." />
                 <label class="form-label" for="usage-name">Name (optional)</label>
                 <TextField ID="usage-name" @bind-Value="State.UsageForm.EditingUsageName" Placeholder="e.g. Ube" CssClass="usage-name"
-                           Tooltip="Tells it apart from the recipe's other sub-assemblies in the same role: its tab reads Filling: Ube beside Filling: Cheese. One in a role can go without. Save keeps it on the Sub-Assemblies screen named after the product and role, with this after them: Cheese Roll Filling: Ube." />
+                           Tooltip="Tells apart sub-assemblies in the same role, e.g. Filling: Ube and Filling: Cheese. Optional for the only one." />
             </div>
         }
 
         <div class="usage-actions">
             @if (State.UsageForm.HasFormAddIns)
             {
-                <button type="button" class="badge badge-link" @onclick="GoToAddInsAsync" title="This product adds its own extras to the linked recipe. Click to scroll down to them.">@State.UsageForm.FormAddInsBadgeText</button>
+                <button type="button" class="badge badge-link" @onclick="GoToAddInsAsync" title="This product adds extras to the linked recipe. Click to see them.">@State.UsageForm.FormAddInsBadgeText</button>
             }
             @if (State.UsageForm.IsFormShowingNoAddIns)
             {
-                <span class="badge badge-muted" title="This product adds nothing to the linked recipe. Add a colouring, a flavouring or an inclusion in the Add-Ins table under its lines.">@State.UsageForm.FormAddInsBadgeText</span>
+                <span class="badge badge-muted" title="No extras on the linked recipe. Add colouring, flavouring or inclusions under its lines.">@State.UsageForm.FormAddInsBadgeText</span>
             }
             @if (!State.UsageForm.IsAddingUsage && State.UsageForm.EditingUsage is { } usage)
             {
                 @if (State.UsageForm.IsEditingLinkedUsage)
                 {
                     <ActionButton Icon="AppIcon.Unlink" Label="Unlink" OnClick="() => Commands.Run(State.Recipe.UnlinkCommand, usage)" Disabled="!State.Recipe.UnlinkCommand.CanExecute(usage)"
-                                  Tooltip="Make it this product's own copy, to change its lines for this product alone, whatever its role. The one on the Sub-Assemblies screen stays as it is. Save keeps the copy with this product, named after it: other products can copy it but not link it." />
+                                  Tooltip="Make a copy for this product alone, whatever its role. The original stays on Sub-Assemblies; others can copy it but not link it." />
                     <ActionButton Icon="AppIcon.Copy" Label="Copy" OnClick="() => Commands.Run(State.Recipe.MakeCopyCommand, usage)" Disabled="!State.Recipe.MakeCopyCommand.CanExecute(usage)"
-                                  Tooltip="Make a copy of it, to change its lines for this product alone. Save keeps the copy named after this product, and uses it instead: as its own in a product-owned role, otherwise on the Sub-Assemblies screen, linked." />
+                                  Tooltip="Copy it to change its lines for this product alone. Save keeps the copy, named after this product, in its place." />
                 }
                 @if (State.UsageForm.IsEditingOwnedUsage)
                 {
                     <ActionButton Icon="AppIcon.Link" Label="Move to Sub-Assemblies" OnClick="() => Commands.Run(State.Recipe.MoveToSubAssembliesCommand, usage)" Disabled="!State.Recipe.MoveToSubAssembliesCommand.CanExecute(usage)"
-                                  Tooltip="Save puts it on the Sub-Assemblies screen, keeping its name and lines, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
+                                  Tooltip="Save moves it to Sub-Assemblies, linked here, so other products can link it too." />
                 }
                 @if (State.UsageForm.CanMoveEditingUsageToInHouse)
                 {
                     <ActionButton Icon="AppIcon.InHouse" Label="Move to In-House" OnClick="() => Commands.Run(State.Recipe.MoveToInHouseCommand, usage)" Disabled="!State.Recipe.MoveToInHouseCommand.CanExecute(usage)"
-                                  Tooltip="Make a made ingredient from this section, on the Raw Materials screen in a Made category, so other recipes can use it as an ingredient. Save does it: the section moves to the Sub-Assemblies screen, where its lines are edited from then on, and this product links it there at the same piece size." />
+                                  Tooltip="Save makes it a made ingredient other recipes can use, and moves it to Sub-Assemblies, linked here." />
                 }
             }
         </div>
@@ -112,7 +112,7 @@
                     {
                         <div class="button-row">
                             <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
-                                          Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                                          Tooltip="Adds a blank line above the selected one, or at the end. Insert." />
                             <CommandButton Command="State.UsageForm.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                         </div>
                     }
@@ -133,7 +133,7 @@
                         <p class="caption">@State.UsageForm.UsageFormAddInsCaption</p>
                         <div class="button-row">
                             <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
-                                          Tooltip="Puts a blank add-in in above the selected one, or at the bottom with none selected. Insert." />
+                                          Tooltip="Adds a blank add-in above the selected one, or at the end. Insert." />
                             <CommandButton Command="State.UsageForm.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
                         </div>
                     </div>
@@ -143,7 +143,7 @@
 
         <div class="piece-size">
             <div class="stat-tiles">
-                <div class="stat-tile" title="What one piece of the product takes of this section: the batch's cost shared out by weight per piece.">
+                <div class="stat-tile" title="This section's cost per piece: the batch cost shared by weight per piece.">
                     <div class="caption">Cost/piece</div>
                     <div class="stat-value">@State.UsageForm.UsageFormCostPerPieceText</div>
                 </div>
@@ -157,16 +157,16 @@
             <div class="param-row">
                 <label for="usage-weight">Weight/piece (g)</label>
                 <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
-                             Tooltip="What one piece takes of the batch's total weight. Type it, and the yield is worked out." />
+                             Tooltip="Batch weight per piece. Typing it works out the yield." />
             </div>
             <div class="param-row">
                 <label for="usage-yield">Yield (pcs)</label>
                 <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
-                             Tooltip="Pieces one batch makes. Type it, and the weight per piece is worked out." />
+                             Tooltip="Pieces per batch. Typing it works out the weight per piece." />
             </div>
 
             <div class="group-heading">Computed</div>
-            <div class="param-row" title="The batch: the sum of its lines, and of this product's add-ins to them. The yield and the weight per piece share it out.">
+            <div class="param-row" title="Its lines plus this product's add-ins. Yield and weight per piece share it out.">
                 <span>Total weight</span>
                 <span>@State.UsageForm.UsageFormTotalWeightText</span>
             </div>

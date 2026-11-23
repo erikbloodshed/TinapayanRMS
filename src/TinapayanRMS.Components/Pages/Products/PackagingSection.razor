@@ -23,7 +23,7 @@
             }
             @if (State.Packaging.IsPackagingMoving)
             {
-                <span class="badge badge-warning" title="Save puts these lines on the Sub-Assemblies screen as a packaging set named after this product, and this product links it there. Undo or Revert to keep them this product's own.">Moves to Sub-Assemblies on Save</span>
+                <span class="badge badge-warning" title="Save makes these lines a packaging set on Sub-Assemblies, linked here. Undo or Revert to keep them here.">Moves to Sub-Assemblies on Save</span>
             }
             @if (State.Packaging.IsPickingSource)
             {
@@ -31,24 +31,24 @@
                            Value="State.Packaging.PickedSource" ValueChanged="State.Packaging.PickSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
                            OpenOnShow="true" PopupWidth="420px"
                            Tooltip="@(State.Packaging.SourceMode == PackagingSourceMode.Copy
-                               ? "Its lines become this product's own, in place of the ones here, to change as you like."
-                               : "Its lines show here, read-only, in place of the ones here, and follow every change made to the set.")" />
+                               ? "Its lines replace these, as this product's own to change."
+                               : "Its lines replace these, read-only, and follow the set.")" />
                 <CommandButton Command="State.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the packaging as it is" />
             }
         </div>
         <div class="lines-footer-right">
-            <span class="caption" title="What these lines cost one sellable unit. The bulk packaging's share is under its own table, and the Costing tab's Packaging holds both.">@State.Costing.CostUnitCaption · @State.Packaging.LinesCost.ToString("N2")</span>
+            <span class="caption" title="These lines' cost per sellable unit. Bulk packaging has its own table; the Costing tab's Packaging holds both.">@State.Costing.CostUnitCaption · @State.Packaging.LinesCost.ToString("N2")</span>
             @if (!State.Packaging.IsPickingSource)
             {
                 <CommandButton Command="State.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
-                               Tooltip="Use a packaging set from the Sub-Assemblies screen instead of the lines here. Its lines show read-only, and follow every change made to the set." />
+                               Tooltip="Link a packaging set from Sub-Assemblies in place of these lines. It shows read-only and follows the set." />
                 <CommandButton Command="State.Packaging.StartCopyingCommand" Icon="AppIcon.Copy" Label="Copy"
-                               Tooltip="Copy the lines of a packaging set, or of another product's packaging, in place of the ones here. They're this product's own, to change as you like." />
+                               Tooltip="Copy lines from a packaging set or another product, as this product's own to change." />
             }
             @if (State.Packaging.CanMovePackaging && State.Packaging.LineEdits.Count > 0)
             {
                 <CommandButton Command="State.Packaging.MoveToSubAssembliesCommand" Icon="AppIcon.Link" Label="Move to Sub-Assemblies"
-                               Tooltip="Save puts these lines on the Sub-Assemblies screen as a packaging set, named after this product, and this product links it there. Other products can then link it too, and its lines are edited on the Sub-Assemblies screen." />
+                               Tooltip="Save makes these lines a packaging set on Sub-Assemblies, linked here, so other products can link it too." />
             }
         </div>
     </div>
@@ -62,9 +62,9 @@
             <p class="caption">Its lines are kept where it's linked from, and follow every change there. Make a Copy to change them here.</p>
             <div class="button-row">
                 <CommandButton Command="State.Packaging.MakeCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
-                               Tooltip="Make these lines this product's own, to change them here. It stops following where it's from." />
+                               Tooltip="Make these lines this product's own to change here. They stop following their source." />
                 <CommandButton Command="State.Packaging.RemoveLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
-                               Tooltip="Take the link out, and its lines with it, leaving no packaging per piece. The packaging set stays on the Sub-Assemblies screen." />
+                               Tooltip="Remove the link and its lines. The packaging set stays on Sub-Assemblies." />
             </div>
         }
         else
@@ -79,7 +79,7 @@
             }
             <div class="button-row">
                 <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _lines?.InsertLineAsync() ?? Task.CompletedTask"
-                              Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                              Tooltip="Adds a blank line above the selected one, or at the end. Insert." />
                 <CommandButton Command="State.Packaging.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
             </div>
         }
@@ -100,7 +100,7 @@
                     <PickField ID="bulk-packaging-source" TItem="LinkableSubAssemblyOption" Items="State.Packaging.SourceOptions" TextField="PackagingSourceName"
                                Value="State.Packaging.PickedSource" ValueChanged="State.Packaging.PickSource" Placeholder="@State.Packaging.SourcePlaceholder" CssClass="packaging-source"
                                OpenOnShow="true" PopupWidth="420px"
-                               Tooltip="Its lines show here, read-only, as what one bulk pack takes, in place of the ones here, and follow every change made to the set." />
+                               Tooltip="Its lines replace these as one bulk pack's packaging, read-only, and follow the set." />
                     <CommandButton Command="State.Packaging.CancelPickingCommand" Icon="AppIcon.Cancel" Flat="true" Tooltip="Keep the bulk packaging as it is" />
                 }
             </div>
@@ -108,12 +108,12 @@
                 @if (!State.Packaging.IsPickingBulkSource)
                 {
                     <CommandButton Command="State.Packaging.StartLinkingBulkCommand" Icon="AppIcon.Link" Label="Link"
-                                   Tooltip="Use a packaging set from the Sub-Assemblies screen as what one bulk pack takes, instead of the lines here. Its lines show read-only, and follow every change made to the set." />
+                                   Tooltip="Link a packaging set from Sub-Assemblies as one bulk pack's packaging. It shows read-only and follows the set." />
                 }
                 <div class="bulk-quantity">
                     <label class="form-label" for="bulk-quantity">Products per pack</label>
                     <NumberField ID="bulk-quantity" TValue="int?" @bind-Value="State.Packaging.BulkQuantity" Format="N0" Min="1" CssClass="param-field"
-                                 Tooltip="How many products one bulk pack holds: the pack's cost is shared out among them." />
+                                 Tooltip="How many products one bulk pack holds; they share its cost." />
                 </div>
             </div>
         </div>
@@ -125,14 +125,14 @@
                 @if (State.Packaging.IsBulkLinked)
                 {
                     <CommandButton Command="State.Packaging.MakeBulkCopyCommand" Icon="AppIcon.Copy" Label="Make a Copy"
-                                   Tooltip="Make these lines this product's own, to change them here. It stops following the packaging set." />
+                                   Tooltip="Make these lines this product's own to change here. They stop following the set." />
                     <CommandButton Command="State.Packaging.RemoveBulkLinkCommand" Icon="AppIcon.Unlink" Label="Remove Link"
-                                   Tooltip="Take the link out, and its lines with it, leaving no bulk packaging. The packaging set stays on the Sub-Assemblies screen." />
+                                   Tooltip="Remove the link and its lines, leaving no bulk packaging. The set stays on Sub-Assemblies." />
                 }
                 else
                 {
                     <ActionButton Icon="AppIcon.Add" Label="Insert Line" OnClick="() => _bulk?.InsertLineAsync() ?? Task.CompletedTask"
-                                  Tooltip="Puts a blank line in above the selected one, or at the bottom with none selected. Insert." />
+                                  Tooltip="Adds a blank line above the selected one, or at the end. Insert." />
                     <CommandButton Command="State.Packaging.RemoveBulkLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
                 }
             </div>

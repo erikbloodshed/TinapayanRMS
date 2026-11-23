@@ -19,11 +19,11 @@
             <SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing || Includes.ProductionCopy"
                         title="Each sub-assembly's ingredients and piece size, then the packaging." />
             <SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe || Includes.ProductionCopy"
-                        title="The Costing tab's breakdown, from the materials up to the selling price, with the current price and its markup. Without it the recipe shows no costs." />
+                        title="The costing breakdown up to the selling price, with the current price and markup. Without it, no costs show." />
             <SfCheckBox Label="Sub-assembly total" @bind-Checked="Includes.SubAssemblyTotal" Disabled="Includes.ProductionCopy"
-                        title="In place of the costing: the recipe with each line's unit price and cost, each table's total, and the total sub-assembly cost (the raw materials) at the end, without the costing's breakdown." />
+                        title="Instead of the costing: each line's unit price and cost, table totals and the total material cost." />
             <SfCheckBox Label="Production copy" @bind-Checked="Includes.ProductionCopy"
-                        title="The recipe alone, with no costs, for the production floor: large type, a box to tick beside each line as it's weighed, and a line to sign." />
+                        title="The recipe only, for the production floor: large type, tick boxes and a sign-off line." />
         }
         <span class="print-bar-space"></span>
         @if (Status is not null)
