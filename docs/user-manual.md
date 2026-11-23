@@ -806,7 +806,7 @@ Each section's tab shows its form:
 
 You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
-A section's changes go into the recipe when you leave its tab, or when you press Save.
+A section's changes go into the recipe when you leave its tab, or when you press Save. **Undo** after leaving the tab takes the change back in one step and shows that section's tab again, as it was before you typed.
 
 #### A section that goes whole into another
 

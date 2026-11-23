@@ -158,16 +158,17 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
     });
 
     [Test]
-    public Task Undoing_a_section_applied_by_leaving_its_tab_does_not_apply_it_again() => UiThread.RunAsync(async () =>
+    public Task Undoing_an_edit_applied_by_leaving_its_tab_takes_it_all_back_on_its_tab() => UiThread.RunAsync(async () =>
     {
+        // Typed as a field types (one step), then applied by leaving the tab: the apply joins the typing's step, so one
+        // undo takes back both, and puts back the tab the edit was made on with its own form, not Filling's tab over
+        // Dough's form with Save still offered.
         var (state, _) = await OpenTwoSectionProductAsync();
         var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         state.Recipe.PickRecipeTab(dough);
-        state.UsageForm.TypeWeightPerPiece(75m);
-
-        // Leaving the tab applies the form, which is one step.
+        Edit(state, () => state.UsageForm.TypeWeightPerPiece(75m));
         state.Recipe.PickRecipeTab(filling);
         state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
 
@@ -175,7 +176,39 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
 
         state.ErrorMessage.Should().BeNull("restoring must not run the apply again");
         state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(50m);
-        state.Recipe.SelectedRecipeTab.Should().BeSameAs(filling, "the undo takes back the change, not where you navigated to");
+        state.Recipe.SelectedRecipeTab.Should().BeSameAs(dough, "the undo goes back to where the edit was made");
+        state.UsageForm.EditingUsage!.RoleName.Should().Be("Dough", "the form showing is the tab's own");
+        state.UsageForm.EditingUsageWeightPerPiece.Should().Be(50m);
+        CanSave(state).Should().BeFalse("the form shows what was saved again");
+        state.History.CanUndo.Should().BeFalse("the typing and its apply were one step");
+
+        state.TryRedo().Should().BeTrue();
+        state.Recipe.SelectedRecipeTab.Should().BeSameAs(filling);
+        state.UsageForm.EditingUsage!.RoleName.Should().Be("Filling");
+        state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(75m);
+        CanSave(state).Should().BeTrue();
+    });
+
+    [Test]
+    public Task An_apply_with_no_typing_step_to_join_is_undone_onto_the_tab_it_left() => UiThread.RunAsync(async () =>
+    {
+        // Typing no step holds, as an undo can put back: the apply on leaving is a step of its own, and its undo shows
+        // the form it applied, still typed, on that form's tab.
+        var (state, _) = await OpenTwoSectionProductAsync();
+        var dough = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Dough");
+        var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
+
+        state.Recipe.PickRecipeTab(dough);
+        state.UsageForm.TypeWeightPerPiece(75m);
+        state.Recipe.PickRecipeTab(filling);
+
+        state.TryUndo().Should().BeTrue();
+
+        state.Recipe.UsageEdits.Single(u => u.RoleName == "Dough").WeightPerPiece.Should().Be(50m);
+        state.Recipe.SelectedRecipeTab.Should().BeSameAs(dough, "the tab the form was applied from, never Filling over Dough's form");
+        state.UsageForm.EditingUsage!.RoleName.Should().Be("Dough");
+        state.UsageForm.EditingUsageWeightPerPiece.Should().Be(75m);
+        CanSave(state).Should().BeTrue("the 75 g typed into the form isn't in the recipe yet, and Save would write it");
     });
 
     [Test]
@@ -231,14 +264,14 @@ public class ProductsStateUndoTests(DatabaseFixture fixture) : PersistenceTestBa
         var filling = state.Recipe.RecipeTabs.OfType<SubAssemblyRecipeTab>().First(t => t.Header == "Filling");
 
         state.Recipe.PickRecipeTab(dough);
-        state.UsageForm.TypeWeightPerPiece(75m);
+        Edit(state, () => state.UsageForm.TypeWeightPerPiece(75m));
         state.Recipe.PickRecipeTab(filling);
         state.TryUndo().Should().BeTrue();
+        state.Recipe.SelectedRecipeTab.Should().BeSameAs(dough);
 
-        // Back to Dough's tab by hand, then type and leave: the apply must still happen, which it wouldn't if
-        // the restore had left behind a stale note of which tab's form was open.
-        state.Recipe.PickRecipeTab(dough);
-        state.UsageForm.TypeWeightPerPiece(80m);
+        // Type and leave again: the apply must still happen, which it wouldn't if the restore had left behind a stale
+        // note of which tab's form was open.
+        Edit(state, () => state.UsageForm.TypeWeightPerPiece(80m));
         state.Recipe.PickRecipeTab(filling);
 
         state.ErrorMessage.Should().BeNull();

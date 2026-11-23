@@ -480,11 +480,7 @@ public sealed class ProductRecipe : ObservableState
     /// The screen shows <paramref name="tab"/>, as part of whatever undo step it's taking, and does what showing it does
     /// even when it was already showing.
     /// </summary>
-    private void SelectRecipeTab(RecipeTab? tab)
-    {
-        SelectedRecipeTab = tab;
-        RecipeTabShown(tab);
-    }
+    private void SelectRecipeTab(RecipeTab? tab) => RecipeTabShown(tab);
 
     /// <summary>
     /// The user picks <paramref name="tab"/> in the strip; picking the one showing does nothing. The pick runs between
@@ -499,7 +495,6 @@ public sealed class ProductRecipe : ObservableState
             return;
         }
 
-        SelectedRecipeTab = tab;
         var history = _host.History;
         if (!history.IsStepOpen)
         {
@@ -524,6 +519,9 @@ public sealed class ProductRecipe : ObservableState
     /// opens its form, which is all it shows, and New Sub-Assembly opens a form to add one (a form already adding
     /// one is left as it is). So a form still open is always one Save should apply. New Sub-Assembly's tab only
     /// lasts while it shows: once another does, its add has been applied or had nothing in it, and it goes.
+    ///
+    /// The tab moves only once the form left is applied: an undo step taken by the apply keeps the tab the form was on,
+    /// so undoing it puts back a form and the tab it belongs to, never the tab gone to over the form left.
     /// </summary>
     private void RecipeTabShown(RecipeTab? tab)
     {
@@ -533,6 +531,7 @@ public sealed class ProductRecipe : ObservableState
             return;
         }
 
+        SelectedRecipeTab = tab;
         _shownRecipeTab = tab;
 
         switch (tab)
@@ -921,11 +920,12 @@ public sealed class ProductRecipe : ObservableState
             return true;
         }
 
-        // Applying a section is one undo step, wherever it's applied from: a tab left, or a Save. A refused one
-        // changes only the message and whether the add-ins table is open, neither of which counts as a change, so
-        // the step settles into nothing of its own accord. An apply closes the form, which isn't a change either:
-        // the step is measured by what it did to the recipe, as Save's is (WithFormOf), so a tab left with nothing
-        // typed into its form records nothing.
+        // Applying a section finishes the typing into its form, wherever it's applied from: a tab left, or a Save. So
+        // it joins the typing's undo step rather than being one of its own (EndJoiningLast), and one undo takes back
+        // both, to the form before it was typed into, on its tab. A refused one changes only the message and whether
+        // the add-ins table is open, neither of which counts as a change, so the step settles into nothing of its own
+        // accord. An apply closes the form, which isn't a change either: the step is measured by what it did to the
+        // recipe, as Save's is (WithFormOf), so a tab left with nothing typed into its form records nothing.
         var history = _host.History;
         history.Begin();
         try
@@ -941,13 +941,13 @@ public sealed class ProductRecipe : ObservableState
         }
         finally
         {
-            history.End((before, now) => before.WithFormOf(now));
+            history.EndJoiningLast((before, now) => before.WithFormOf(now));
         }
     }
 
     /// <summary>
     /// Applies a form left open, as Save does, so what's typed into it is in the recipe, and shows its section's tab with
-    /// the form open on it again. One undo step, measured as leaving its tab measures one: by what it did to the recipe.
+    /// the form open on it again. It joins the typing's undo step, measured as leaving its tab measures it: by what it did to the recipe.
     /// An add form nothing was entered in is left as it is. A rule refusing the form throws, and the form stays as typed.
     /// </summary>
     internal void ApplyOpenForm()
@@ -965,7 +965,7 @@ public sealed class ProductRecipe : ObservableState
         }
         finally
         {
-            history.End((before, now) => before.WithFormOf(now));
+            history.EndJoiningLast((before, now) => before.WithFormOf(now));
         }
     }
 

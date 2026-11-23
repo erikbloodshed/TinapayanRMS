@@ -204,7 +204,18 @@ public sealed class UndoHistory<TSnapshot>(
     /// <paramref name="rebase"/>, as <see cref="Rebase"/> moves the settled form: for a change that carries along
     /// a part that isn't the user's. What's kept is still where it began, so an undo puts all of it back.
     /// </summary>
-    public void End(Func<TSnapshot, TSnapshot, TSnapshot>? rebase)
+    public void End(Func<TSnapshot, TSnapshot, TSnapshot>? rebase) => Close(rebase, joinLast: false);
+
+    /// <summary>
+    /// Closes the open step as <see cref="End(Func{TSnapshot, TSnapshot, TSnapshot}?)"/> does, but a change it made joins
+    /// the last step kept instead of being one of its own: for a change that finishes the one before it, as applying a
+    /// section form finishes the typing into it, which was its own step. Undoing that step then takes both back at once,
+    /// to the form as it stood before the typing, its tab with it. With no step kept to join (typing an undo put back), it
+    /// is kept as one of its own.
+    /// </summary>
+    public void EndJoiningLast(Func<TSnapshot, TSnapshot, TSnapshot> rebase) => Close(rebase, joinLast: true);
+
+    private void Close(Func<TSnapshot, TSnapshot, TSnapshot>? rebase, bool joinLast)
     {
         if (_pending is not { } before)
         {
@@ -223,6 +234,19 @@ public sealed class UndoHistory<TSnapshot>(
         RefreshDirty();
         if (showsSame(rebase is null ? before : rebase(before, now), now))
         {
+            return;
+        }
+
+        if (joinLast && _undo.Count > 0)
+        {
+            // The last step's snapshot is from before both changes, so it already takes this one back too. A change made
+            // after an undo is still a new branch.
+            if (_redo.Count > 0)
+            {
+                _redo.Clear();
+                RaisePropertyChanged(nameof(CanRedo));
+            }
+
             return;
         }
 

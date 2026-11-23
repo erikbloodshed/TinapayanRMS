@@ -69,6 +69,58 @@ public class UndoHistoryTests
     }
 
     [Test]
+    public void A_change_that_joins_the_last_step_is_undone_with_it()
+    {
+        // As a section form applied on leaving its tab finishes the typing into it: one undo takes both back.
+        var form = new Form();
+        form.Change("typed");
+
+        form.History.Begin();
+        form.Value = "applied";
+        form.History.EndJoiningLast((before, _) => before);
+
+        form.Undo().Should().BeTrue();
+        form.Value.Should().Be(string.Empty, "the last step was taken before the typing, so it takes back the apply too");
+        form.History.CanUndo.Should().BeFalse("the apply was no step of its own");
+
+        form.Redo().Should().BeTrue();
+        form.Value.Should().Be("applied", "redo steps forward to the form as the undo found it");
+    }
+
+    [Test]
+    public void A_change_that_joins_with_no_step_kept_is_kept_as_its_own()
+    {
+        var form = new Form();
+        form.Value = "typed, no step";
+
+        form.History.Begin();
+        form.Value = "applied";
+        form.History.EndJoiningLast((before, _) => before);
+
+        form.History.CanUndo.Should().BeTrue();
+        form.Undo().Should().BeTrue();
+        form.Value.Should().Be("typed, no step");
+    }
+
+    [Test]
+    public void A_change_that_joins_after_an_undo_starts_a_new_branch()
+    {
+        var form = new Form();
+        form.Change("first");
+        form.Change("second");
+        form.Undo().Should().BeTrue();
+        form.History.CanRedo.Should().BeTrue();
+
+        form.History.Begin();
+        form.Value = "applied";
+        form.History.EndJoiningLast((before, _) => before);
+
+        form.History.CanRedo.Should().BeFalse("what the undo stepped off is gone, as after any change");
+        form.Undo().Should().BeTrue();
+        form.Value.Should().Be(string.Empty);
+    }
+
+    [Test]
     public void Each_step_hands_back_the_settled_form_as_it_stood_when_the_step_was_taken()
     {
         // As Products rebases its settled form when another section's form opens: the step moves it, and the undo
