@@ -7,19 +7,19 @@
         <div class="header-title-group">
             @if (State.Costing.IsUnbuffered)
             {
-                <span class="badge badge-warning" title="True costs, without cost buffers. Buffered switches back.">Unbuffered costs</span>
+                <span class="badge badge-warning" data-title="True costs, without cost buffers. Buffered switches back.">Unbuffered costs</span>
             }
             @if (State.Costing.BelowCostText is { } belowCost)
             {
-                <span class="badge badge-warning" title="@belowCost">Priced below cost</span>
+                <span class="badge badge-warning" data-title="@belowCost">Priced below cost</span>
             }
             @if (State.Costing.NoPieceSizeText is { } noPieceSize)
             {
-                <span class="badge badge-warning" title="@noPieceSize">No piece size</span>
+                <span class="badge badge-warning" data-title="@noPieceSize">No piece size</span>
             }
             @if (State.NewProductTag is { } tag)
             {
-                <span class="badge badge-warning" title="Where Save files this new product: the New Products In stage (Settings → Costing Defaults), or the folder New Product Here was used on.">@tag</span>
+                <span class="badge badge-warning" data-title="Where Save files this new product: the New Products In stage (Settings → Costing Defaults), or the folder New Product Here was used on.">@tag</span>
             }
         </div>
         <div class="button-row">
@@ -41,24 +41,24 @@
     <div class="section-divider"></div>
 
     <div class="figure-tiles">
-        <div class="figure-tile tile-peach" title="@State.Costing.MaterialCostTooltip">
+        <div class="figure-tile tile-peach" data-title="@State.Costing.MaterialCostTooltip">
             <div class="figure-label">Material Cost</div>
             <div class="figure-value">@State.Costing.Costs.Material.ToString("N2")</div>
         </div>
-        <div class="figure-tile tile-pink" title="@($"{State.Costing.CostUnitCaption}: material cost plus labor, overhead and admin, before markup and VAT")">
+        <div class="figure-tile tile-pink" data-title="@($"{State.Costing.CostUnitCaption}: material cost plus labor, overhead and admin, before markup and VAT")">
             <div class="figure-label">Base Cost</div>
             <div class="figure-value">@State.Costing.Costs.BaseCost.ToString("N2")</div>
         </div>
-        <div class="figure-tile tile-sky" title="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now")">
+        <div class="figure-tile tile-sky" data-title="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now")">
             <div class="figure-label">Current Price</div>
             <div class="figure-value">@(State.EditingCurrentPrice?.ToString("N2") ?? "—")</div>
         </div>
-        <div class="figure-tile tile-green" title="The markup the current price earns on the base cost, VAT excluded">
+        <div class="figure-tile tile-green" data-title="The markup the current price earns on the base cost, VAT excluded">
             <div class="figure-label">Markup %</div>
             <div class="figure-value @(State.Costing.Costs.IsCurrentPriceBelowCost ? "figure-error" : State.Costing.Costs.IsBelowTargetMarkup ? "figure-warning" : "")"
-                 title="@(State.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : State.Costing.Costs.IsBelowTargetMarkup ? "Less than the Markup Metric on the Costing tab." : null)">@(State.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
+                 data-title="@(State.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : State.Costing.Costs.IsBelowTargetMarkup ? "Less than the Markup Metric on the Costing tab." : null)">@(State.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
         </div>
-        <div class="figure-tile tile-mauve" title="@State.LastUpdatedText">
+        <div class="figure-tile tile-mauve" data-title="@State.LastUpdatedText">
             <div class="figure-label">Last Updated</div>
             <div class="figure-value">@State.LastUpdatedText</div>
         </div>
@@ -76,12 +76,12 @@
 
         @if (State.IsEditingSingle)
         {
-            <label class="form-label" for="product-quantity" title="Pieces per sellable unit: 1 if sold by the piece.">Quantity Required</label>
+            <label class="form-label" for="product-quantity" data-title="Pieces per sellable unit: 1 if sold by the piece.">Quantity Required</label>
             <NumberField ID="product-quantity" TValue="int" @bind-Value="State.EditingQuantityRequired" Format="N0" Min="1" CssClass="field-narrow"
                          Tooltip="Pieces per sellable unit: 1 by the piece, 8 for a &quot;Box of 8&quot;. The costing multiplies by it." />
         }
 
-        <label class="form-label" for="product-price" title="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>
+        <label class="form-label" for="product-price" data-title="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now")">Current Price</label>
         <NumberField ID="product-price" TValue="decimal?" @bind-Value="State.EditingCurrentPrice" Format="N2" Min="0" CssClass="field-medium"
                      Tooltip="@($"{State.Costing.CostUnitCaption}, with VAT: what the shop charges now. The Markup % in the header shows what it earns.")" />
     </div>

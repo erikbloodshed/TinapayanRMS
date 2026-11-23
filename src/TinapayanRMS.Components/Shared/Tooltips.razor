@@ -1,0 +1,11 @@
+@* The tooltips of what it holds, in the activity bar's look: one SfTooltip shows the data-title of whatever the pointer is
+   on (never a title attribute, which would bring up the browser's own tooltip as well). MainLayout holds the whole page
+   in one, and a dialog its content in another, as SfDialog moves itself out to the body. The activity bar keeps its own,
+   to the icons' right. Its element is display: contents (app.css), so the layout around it doesn't see it. *@
+<SfTooltip Target="[data-title]:not(.activity-item)" WindowCollision="true" OpenDelay="300" CssClass="app-tooltip" class="app-tooltip-host">
+    @ChildContent
+</SfTooltip>
+
+@code {
+    [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = null!;
+}

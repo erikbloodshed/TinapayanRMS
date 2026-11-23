@@ -28,7 +28,7 @@
             <tr @key="row" class="@(isDraft ? "add-row" : "") @(ReferenceEquals(row, SelectedItem) ? "selected" : "")"
                 @onfocusin="events.Select" @onclick="events.Select">
                 <td class="row-header" data-drag="@(Reorderable && !isDraft ? "true" : null)"
-                    title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
+                    data-title="@(isDraft ? "Type here to add a line" : Reorderable ? "Drag to move the line" : null)">
                     @if (isDraft)
                     {
                         <Icon Of="AppIcon.Add" />

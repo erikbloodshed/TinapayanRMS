@@ -14,6 +14,8 @@
     <DialogTemplates>
         <Header>@Heading</Header>
         <Content>
+            @* Its own tooltips: the dialog moves out to the body, away from the page's (Tooltips). *@
+            <Tooltips>
             @switch (Previews.Showing)
             {
                 case PrintPreviewKind.Products:
@@ -34,6 +36,7 @@
                     <PrintPane Tables="Previews.Tables" />
                     break;
             }
+            </Tooltips>
         </Content>
     </DialogTemplates>
 </SfDialog>

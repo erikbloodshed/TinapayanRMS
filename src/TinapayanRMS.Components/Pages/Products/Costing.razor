@@ -13,25 +13,25 @@
     <div class="costing-columns">
         <div class="costing-metrics">
             <div class="cost-tile cost-labor">
-                <label class="form-label" for="cost-labor" title="@State.Costing.MetricBaseTooltip">Labor Metric</label>
+                <label class="form-label" for="cost-labor" data-title="@State.Costing.MetricBaseTooltip">Labor Metric</label>
                 <NumberField ID="cost-labor" TValue="decimal" @bind-Value="State.Costing.EditingLaborPercent" Format="N1" Min="0" Suffix="%" />
                 <NumberField TValue="decimal" @bind-Value="State.Costing.EditingLaborAmount" Format="N2" Min="0" Tooltip="@($"The labor cost, {State.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@State.Costing.Costs.LaborShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-overhead">
-                <label class="form-label" for="cost-overhead" title="@State.Costing.MetricBaseTooltip">Overhead Metric</label>
+                <label class="form-label" for="cost-overhead" data-title="@State.Costing.MetricBaseTooltip">Overhead Metric</label>
                 <NumberField ID="cost-overhead" TValue="decimal" @bind-Value="State.Costing.EditingOverheadPercent" Format="N1" Min="0" Suffix="%" />
                 <NumberField TValue="decimal" @bind-Value="State.Costing.EditingOverheadAmount" Format="N2" Min="0" Tooltip="@($"The overhead cost, {State.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@State.Costing.Costs.OverheadShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-administrative">
-                <label class="form-label" for="cost-administrative" title="@($"Administrative: office, permits, bookkeeping. {State.Costing.MetricBaseTooltip}")">Admin Metric</label>
+                <label class="form-label" for="cost-administrative" data-title="@($"Administrative: office, permits, bookkeeping. {State.Costing.MetricBaseTooltip}")">Admin Metric</label>
                 <NumberField ID="cost-administrative" TValue="decimal" @bind-Value="State.Costing.EditingAdministrativePercent" Format="N1" Min="0" Suffix="%" />
                 <NumberField TValue="decimal" @bind-Value="State.Costing.EditingAdministrativeAmount" Format="N2" Min="0" Tooltip="@($"The administrative cost, {State.Costing.CostUnitCaption}. Typing it sets the percentage.")" />
                 <span class="tile-caption">@State.Costing.Costs.AdministrativeShare.ToString("N1")% of the price</span>
             </div>
             <div class="cost-tile cost-markup">
-                <label class="form-label" for="cost-markup" title="On the base cost: materials, wastage, labor, overhead and administrative">Markup Metric</label>
+                <label class="form-label" for="cost-markup" data-title="On the base cost: materials, wastage, labor, overhead and administrative">Markup Metric</label>
                 <NumberField ID="cost-markup" TValue="decimal" @bind-Value="State.Costing.EditingMarkupPercent" Format="N1" Min="0" Suffix="%" />
                 <NumberField TValue="decimal" @bind-Value="State.Costing.EditingMarkupAmount" Format="N2" Min="0" Tooltip="@($"The markup, {State.Costing.CostUnitCaption}, before VAT. Typing it sets the percentage.")" />
                 <span class="tile-caption">@State.Costing.Costs.MarkupShare.ToString("N1")% of the price</span>
@@ -61,7 +61,7 @@
                             <td class="number">@line.Share.ToString("N1")%</td>
                         </tr>
                     }
-                    <tr title="What's lost in making, as a cost: the category's Wastage %, or else the shop's (Settings → Costing Defaults).">
+                    <tr data-title="What's lost in making, as a cost: the category's Wastage %, or else the shop's (Settings → Costing Defaults).">
                         <td>Wastage (@State.Costing.Costs.WastagePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
                         <td class="number">@State.Costing.Costs.Wastage.ToString("N2")</td>
                         <td class="number share">@State.Costing.Costs.WastageShare.ToString("N1")%</td>
@@ -98,9 +98,9 @@
                 <thead>
                     <tr>
                         <th>Component</th>
-                        <th class="number" title="@($"{State.Costing.SuggestedSellingPriceLabel}: the base cost plus the Markup Metric, then VAT")">Suggested Price</th>
+                        <th class="number" data-title="@($"{State.Costing.SuggestedSellingPriceLabel}: the base cost plus the Markup Metric, then VAT")">Suggested Price</th>
                         <th class="percent"></th>
-                        <th class="number" title="@CurrentPriceTooltip">Current Price</th>
+                        <th class="number" data-title="@CurrentPriceTooltip">Current Price</th>
                         <th class="percent"></th>
                     </tr>
                 </thead>
@@ -109,8 +109,8 @@
                         <td>Markup</td>
                         <td class="number">@Costs.Markup.ToString("N2")</td>
                         <td class="number percent">(@Costs.MarkupPercent.ToString("N1")%)</td>
-                        <td class="number @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
-                        <td class="number percent @CurrentMarkupClass" title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"({percent:N1}%)" : "")</td>
+                        <td class="number @CurrentMarkupClass" data-title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
+                        <td class="number percent @CurrentMarkupClass" data-title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"({percent:N1}%)" : "")</td>
                     </tr>
                     <tr>
                         <td>VAT (@Costs.VatPercent.ToString("0.##")%)</td>

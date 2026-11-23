@@ -26,10 +26,10 @@
 
     @* The window's own buttons are drawn here, not taken from an icon font: Syncfusion's icons have none for them. *@
     <div class="caption-buttons">
-        <button type="button" class="titlebar-button caption-button" title="Minimize" aria-label="Minimize" @onclick="Window.Minimize">
+        <button type="button" class="titlebar-button caption-button" data-title="Minimize" aria-label="Minimize" @onclick="Window.Minimize">
             <svg class="caption-glyph" viewBox="0 0 10 10" aria-hidden="true"><path d="M0 5.5h10" /></svg>
         </button>
-        <button type="button" class="titlebar-button caption-button" title="@(_maximized ? "Restore Down" : "Maximize")"
+        <button type="button" class="titlebar-button caption-button" data-title="@(_maximized ? "Restore Down" : "Maximize")"
                 aria-label="@(_maximized ? "Restore Down" : "Maximize")" @onclick="Window.ToggleMaximize">
             @if (_maximized)
             {
@@ -40,7 +40,7 @@
                 <svg class="caption-glyph" viewBox="0 0 10 10" aria-hidden="true"><rect x=".5" y=".5" width="9" height="9" /></svg>
             }
         </button>
-        <button type="button" class="titlebar-button caption-button caption-close" title="Close" aria-label="Close" @onclick="Window.Close">
+        <button type="button" class="titlebar-button caption-button caption-close" data-title="Close" aria-label="Close" @onclick="Window.Close">
             <svg class="caption-glyph" viewBox="0 0 10 10" aria-hidden="true"><path d="M.5.5l9 9m0-9l-9 9" /></svg>
         </button>
     </div>
@@ -65,17 +65,17 @@
     {
         <VimKeys />
         <FindHost />
-        <button type="button" class="titlebar-button titlebar-small-glyph" title="Lock: cover the window until the password is entered"
+        <button type="button" class="titlebar-button titlebar-small-glyph" data-title="Lock: cover the window until the password is entered"
                 aria-label="Lock" @onclick="Lock.Lock">
             <Icon Of="AppIcon.Lock" />
         </button>
         @* Back and Forward between the screens' addresses (a record's included), as Alt+Left and Alt+Right, and the Vim keys'
            H and L, go. The screen being left asks about its unsaved changes first. *@
-        <button type="button" class="titlebar-button titlebar-small-glyph" title="Back (Alt+Left)" aria-label="Back"
+        <button type="button" class="titlebar-button titlebar-small-glyph" data-title="Back (Alt+Left)" aria-label="Back"
                 disabled="@(!_canGoBack)" @onclick="GoBackAsync">
             <Icon Of="AppIcon.Back" />
         </button>
-        <button type="button" class="titlebar-button titlebar-small-glyph" title="Forward (Alt+Right)" aria-label="Forward"
+        <button type="button" class="titlebar-button titlebar-small-glyph" data-title="Forward (Alt+Right)" aria-label="Forward"
                 disabled="@(!_canGoForward)" @onclick="GoForwardAsync">
             <Icon Of="AppIcon.Forward" />
         </button>

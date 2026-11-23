@@ -6,7 +6,7 @@
    undo, a load) shows once it's left. When another record takes the form's place under the cursor
    (IUndoRecorder.FormVersion), the box is given up: what's typed into it is no longer passed on, and a fresh box, without
    the cursor, is drawn in its place with the record's own text. *@
-<span class="e-input-group field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
+<span class="e-input-group field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" data-title="@Tooltip">
     <input @key="_box" id="@ID" class="e-input" type="@(Password ? "password" : "text")" value="@_text" placeholder="@Placeholder" readonly="@ReadOnly" autocomplete="off"
            @onfocus="OnFocus" @oninput="OnInput" @onchange="OnChange" @onblur="OnBlur" @onkeydown="OnKeyDown" />
 </span>

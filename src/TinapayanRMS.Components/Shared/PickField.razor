@@ -29,7 +29,7 @@
         }
         @if (!_live || _handingOver)
         {
-            <span class="e-ddl e-input-group e-control-container e-control-wrapper e-valid-input field @CssClass deferred-pick" style="width: 100%;" title="@Tooltip">
+            <span class="e-ddl e-input-group e-control-container e-control-wrapper e-valid-input field @CssClass deferred-pick" style="width: 100%;" data-title="@Tooltip">
                 <input class="e-input" type="text" value="@NameShown" data-text="@NameShown" placeholder="@Placeholder" disabled="@Disabled"
                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" role="combobox" aria-expanded="false" @onfocus="GoLive" />
                 <span class="e-input-group-icon e-ddl-icon e-icons" @onmousedown="GoLiveAndOpen" @onmousedown:preventDefault="true"></span>
@@ -46,7 +46,7 @@ else
     private RenderFragment ComboBox =>
         @<PickComboBox @ref="_box" TItem="TItem" ID="@ID" DataSource="_choices" Value="ShownIndex" ValueChanged="OnValueChanged" DebounceDelay="0"
                      AllowFiltering="true" FilterType="FilterType.Contains" AllowCustom="false" Autofill="false" Placeholder="@Placeholder"
-                     Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="false" title="@Tooltip" PopupWidth="@PopupWidth">
+                     Enabled="!Disabled" CssClass="@($"field {CssClass}")" ShowClearButton="false" data-title="@Tooltip" PopupWidth="@PopupWidth">
             <ComboBoxFieldSettings Text="Text" Value="Index" />
             <ComboBoxEvents TValue="int?" TItem="Choice" Created="OnCreated" Focus="OnFocus" Blur="OnBlur" Filtering="OnFiltering" OnValueSelect="OnSelect" />
             @if (ItemTemplate is not null)

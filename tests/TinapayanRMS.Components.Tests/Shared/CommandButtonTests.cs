@@ -75,4 +75,19 @@ public class CommandButtonTests
         button.Find("button .glyph").ClassList.Should().Contain(["e-icons", "e-plus"], "Syncfusion's icon draws it");
         button.FindAll(".command-label").Should().BeEmpty();
     }
+
+    [Test]
+    public async Task Its_tooltip_is_the_pages_own_and_names_an_icon_button()
+    {
+        await using var context = AppServices.NewContext();
+        var command = ScreenCommand.Of(() => { });
+
+        var iconOnly = context.Render<CommandButton>(parameters => parameters.Add(b => b.Command, command).Add(b => b.Icon, AppIcon.Add).Add(b => b.Tooltip, "Add a line"));
+        var labelled = context.Render<CommandButton>(parameters => parameters.Add(b => b.Command, command).Add(b => b.Label, "Save").Add(b => b.Tooltip, "Saves it"));
+
+        iconOnly.Find("button").GetAttribute("data-title").Should().Be("Add a line", "the page's one SfTooltip shows it (MainLayout)");
+        iconOnly.Find("button").HasAttribute("title").Should().BeFalse("a title would bring up the browser's own tooltip as well");
+        iconOnly.Find("button").GetAttribute("aria-label").Should().Be("Add a line", "with no label, its tooltip is its name");
+        labelled.Find("button").HasAttribute("aria-label").Should().BeFalse("its label names it");
+    }
 }

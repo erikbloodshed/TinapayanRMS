@@ -29,7 +29,7 @@ public class TreeNameBoxTests
         var box = Render(context);
 
         box.Find("input").GetAttribute("value").Should().Be("Mamon");
-        box.Find(".tree-name-box").GetAttribute("title").Should().Be("What it's called");
+        box.Find(".tree-name-box").GetAttribute("data-title").Should().Be("What it's called");
         context.JSInterop.VerifyInvoke("tinapayan.showNameBox");
     }
 

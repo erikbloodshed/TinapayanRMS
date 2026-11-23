@@ -16,14 +16,10 @@
         @if (Set is not null && Tables is null)
         {
             <span class="form-label">Include</span>
-            <SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing || Includes.ProductionCopy"
-                        title="Each sub-assembly's ingredients and piece size, then the packaging." />
-            <SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe || Includes.ProductionCopy"
-                        title="The costing breakdown up to the selling price, with the current price and markup. Without it, no costs show." />
-            <SfCheckBox Label="Sub-assembly total" @bind-Checked="Includes.SubAssemblyTotal" Disabled="Includes.ProductionCopy"
-                        title="Instead of the costing: each line's unit price and cost, table totals and the total material cost." />
-            <SfCheckBox Label="Production copy" @bind-Checked="Includes.ProductionCopy"
-                        title="The recipe only, for the production floor: large type, tick boxes and a sign-off line." />
+            <span class="tip-host" data-title="Each sub-assembly's ingredients and piece size, then the packaging."><SfCheckBox Label="Recipe" @bind-Checked="Includes.Recipe" Disabled="!Includes.Costing || Includes.ProductionCopy" /></span>
+            <span class="tip-host" data-title="The costing breakdown up to the selling price, with the current price and markup. Without it, no costs show."><SfCheckBox Label="Costing" @bind-Checked="Includes.Costing" Disabled="!Includes.Recipe || Includes.ProductionCopy" /></span>
+            <span class="tip-host" data-title="Instead of the costing: each line's unit price and cost, table totals and the total material cost."><SfCheckBox Label="Sub-assembly total" @bind-Checked="Includes.SubAssemblyTotal" Disabled="Includes.ProductionCopy" /></span>
+            <span class="tip-host" data-title="The recipe only, for the production floor: large type, tick boxes and a sign-off line."><SfCheckBox Label="Production copy" @bind-Checked="Includes.ProductionCopy" /></span>
         }
         <span class="print-bar-space"></span>
         @if (Status is not null)

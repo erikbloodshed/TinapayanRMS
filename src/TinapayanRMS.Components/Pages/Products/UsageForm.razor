@@ -14,7 +14,7 @@
     }
     @if (State.UsageForm.IsFormNewMovingToSubAssemblies)
     {
-        <span class="badge badge-warning" title="Save puts it on Sub-Assemblies, named after this product and role, and links it. Pick a product-owned role to keep it here.">Moves to Sub-Assemblies on Save</span>
+        <span class="badge badge-warning" data-title="Save puts it on Sub-Assemblies, named after this product and role, and links it. Pick a product-owned role to keep it here.">Moves to Sub-Assemblies on Save</span>
     }
 
     @if (State.UsageForm.IsFormPickingSource)
@@ -30,16 +30,16 @@
         <div class="usage-badges">
             @if (State.UsageForm.EditingUsage?.IsReleasing == true)
             {
-                <span class="badge badge-warning" title="Save moves it to Sub-Assemblies with its name and lines, and links it. Undo or Revert to keep it here.">Moves to Sub-Assemblies on Save</span>
+                <span class="badge badge-warning" data-title="Save moves it to Sub-Assemblies with its name and lines, and links it. Undo or Revert to keep it here.">Moves to Sub-Assemblies on Save</span>
             }
             @if (State.UsageForm.EditingUsage is { IsMovingToInHouse: true } moving)
             {
-                <span class="badge badge-warning" title="Save moves it to Sub-Assemblies, links it, and adds a made ingredient from it. Undo or Revert to keep it here.">@moving.MovingToInHouseText</span>
+                <span class="badge badge-warning" data-title="Save moves it to Sub-Assemblies, links it, and adds a made ingredient from it. Undo or Revert to keep it here.">@moving.MovingToInHouseText</span>
             }
             @if (State.UsageForm.IsShowingLinkBadge && State.UsageForm.EditingUsage is { } linked)
             {
                 <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.Recipe.OpenLinkedSourceCommand, linked)"
-                        title="@linked.LinkedFromToolTip">
+                        data-title="@linked.LinkedFromToolTip">
                     @linked.LinkedFromText
                 </button>
                 <CommandButton Command="State.UsageForm.StartChangingLinkCommand" Icon="AppIcon.Edit" Flat="true"
@@ -68,11 +68,11 @@
         <div class="usage-actions">
             @if (State.UsageForm.HasFormAddIns)
             {
-                <button type="button" class="badge badge-link" @onclick="GoToAddInsAsync" title="This product adds extras to the linked recipe. Click to see them.">@State.UsageForm.FormAddInsBadgeText</button>
+                <button type="button" class="badge badge-link" @onclick="GoToAddInsAsync" data-title="This product adds extras to the linked recipe. Click to see them.">@State.UsageForm.FormAddInsBadgeText</button>
             }
             @if (State.UsageForm.IsFormShowingNoAddIns)
             {
-                <span class="badge badge-muted" title="No extras on the linked recipe. Add colouring, flavouring or inclusions under its lines.">@State.UsageForm.FormAddInsBadgeText</span>
+                <span class="badge badge-muted" data-title="No extras on the linked recipe. Add colouring, flavouring or inclusions under its lines.">@State.UsageForm.FormAddInsBadgeText</span>
             }
             @if (!State.UsageForm.IsAddingUsage && State.UsageForm.EditingUsage is { } usage)
             {
@@ -124,7 +124,7 @@
                 <div id="usage-add-ins" class="add-ins">
                     <div class="add-ins-heading">
                         <span class="group-heading">Add-Ins</span>
-                        <button type="button" class="badge badge-link" @onclick="GoToTopAsync" title="Scroll back up to the linked recipe's lines.">Go to top</button>
+                        <button type="button" class="badge badge-link" @onclick="GoToTopAsync" data-title="Scroll back up to the linked recipe's lines.">Go to top</button>
                     </div>
                     <IngredientLinesGrid @ref="_addIns" Items="State.UsageForm.FormAddIns" NewItem="State.UsageForm.NewFormAddIn" Ingredients="State.Ingredients"
                                          @bind-SelectedItem="State.UsageForm.SelectedFormAddIn" PercentHeader="@State.UsageForm.UsageFormPercentHeader"
@@ -143,11 +143,11 @@
 
         <div class="piece-size">
             <div class="stat-tiles">
-                <div class="stat-tile" title="This section's cost per piece: the batch cost shared by weight per piece.">
+                <div class="stat-tile" data-title="This section's cost per piece: the batch cost shared by weight per piece.">
                     <div class="caption">Cost/piece</div>
                     <div class="stat-value">@State.UsageForm.UsageFormCostPerPieceText</div>
                 </div>
-                <div class="stat-tile" title="What the whole batch costs: its lines, and this product's add-ins to them.">
+                <div class="stat-tile" data-title="What the whole batch costs: its lines, and this product's add-ins to them.">
                     <div class="caption">Batch cost</div>
                     <div class="stat-value">@State.UsageForm.UsageFormBatchCostText</div>
                 </div>
@@ -166,7 +166,7 @@
             </div>
 
             <div class="group-heading">Computed</div>
-            <div class="param-row" title="Its lines plus this product's add-ins. Yield and weight per piece share it out.">
+            <div class="param-row" data-title="Its lines plus this product's add-ins. Yield and weight per piece share it out.">
                 <span>Total weight</span>
                 <span>@State.UsageForm.UsageFormTotalWeightText</span>
             </div>

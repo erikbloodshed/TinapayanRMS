@@ -1,5 +1,5 @@
 @* A button for something a CommandButton can't bind: a command with a parameter, or a screen's own action. *@
-<SfButton CssClass="@Css" Disabled="Disabled" @onclick="OnClick" title="@Tooltip" IsPrimary="Primary">
+<SfButton CssClass="@Css" Disabled="Disabled" @onclick="OnClick" data-title="@Tooltip" aria-label="@(Label is null ? Tooltip : null)" IsPrimary="Primary">
     @if (Icon is { } icon)
     {
         <Icon Of="icon" />

@@ -17,13 +17,13 @@
             }
             @if (State.Packaging.IsPackagingLinkedToSet && State.Packaging.PackagingLinkedSetId is { } setId)
             {
-                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, setId)" title="Open the packaging set on the Sub-Assemblies screen">
+                <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, setId)" data-title="Open the packaging set on the Sub-Assemblies screen">
                     @State.Packaging.PackagingLinkedToText
                 </button>
             }
             @if (State.Packaging.IsPackagingMoving)
             {
-                <span class="badge badge-warning" title="Save makes these lines a packaging set on Sub-Assemblies, linked here. Undo or Revert to keep them here.">Moves to Sub-Assemblies on Save</span>
+                <span class="badge badge-warning" data-title="Save makes these lines a packaging set on Sub-Assemblies, linked here. Undo or Revert to keep them here.">Moves to Sub-Assemblies on Save</span>
             }
             @if (State.Packaging.IsPickingSource)
             {
@@ -37,7 +37,7 @@
             }
         </div>
         <div class="lines-footer-right">
-            <span class="caption" title="These lines' cost per sellable unit. Bulk packaging has its own table; the Costing tab's Packaging holds both.">@State.Costing.CostUnitCaption · @State.Packaging.LinesCost.ToString("N2")</span>
+            <span class="caption" data-title="These lines' cost per sellable unit. Bulk packaging has its own table; the Costing tab's Packaging holds both.">@State.Costing.CostUnitCaption · @State.Packaging.LinesCost.ToString("N2")</span>
             @if (!State.Packaging.IsPickingSource)
             {
                 <CommandButton Command="State.Packaging.StartLinkingCommand" Icon="AppIcon.Link" Label="Link"
@@ -91,7 +91,7 @@
                 <span class="group-heading">Bulk Packaging</span>
                 @if (State.Packaging.IsBulkLinked && State.Packaging.BulkLinkedSetId is { } bulkSetId)
                 {
-                    <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, bulkSetId)" title="Open the packaging set on the Sub-Assemblies screen">
+                    <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.OpenSubAssemblyCommand, bulkSetId)" data-title="Open the packaging set on the Sub-Assemblies screen">
                         @State.Packaging.BulkLinkedToText
                     </button>
                 }

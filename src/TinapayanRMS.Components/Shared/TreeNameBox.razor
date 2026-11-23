@@ -6,7 +6,7 @@
    only the first of them counts. The keys and clicks
    in it stay in it, so the tree around it doesn't move, open a folder or pick a row as they're typed. After Enter or Esc
    the cursor goes back to the tree, so the arrows carry on from the row, as in a file explorer. *@
-<span @ref="_element" class="tree-name-box" title="@Hint"
+<span @ref="_element" class="tree-name-box" data-title="@Hint"
       @onkeydown:stopPropagation="true" @onclick:stopPropagation="true" @onmousedown="() => _used = true" @onmousedown:stopPropagation="true"
       @ondblclick:stopPropagation="true" @oncontextmenu:stopPropagation="true">
     @* Not one of the form's boxes: it has no undo step, and it keeps what's typed until it's given back. *@

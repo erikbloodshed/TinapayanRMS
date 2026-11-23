@@ -30,8 +30,7 @@
             <TextField ID="role-name" @bind-Value="State!.EditingName" />
         </FormRow>
         <FormRow Label="">
-            <SfCheckBox Label="Product-owned" @bind-Checked="State!.EditingIsProductOwned" Disabled="!State!.CanEditProductOwned"
-                        title="Sections in this role stay their product's own: edited in its recipe, copied not linked by others. Not for Packaging." />
+            <span class="tip-host" data-title="Sections in this role stay their product's own: edited in its recipe, copied not linked by others. Not for Packaging."><SfCheckBox Label="Product-owned" @bind-Checked="State!.EditingIsProductOwned" Disabled="!State!.CanEditProductOwned" /></span>
         </FormRow>
         <div class="button-row">
             <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />

@@ -166,6 +166,24 @@ html, body {
    left edge, each a 32×32 square with a 16px glyph, as the title bar's are, in the card colour, Settings at its foot. The screen showing is in the heading colour, marked by a line of
    the accent on its left edge; the rest are a lighter grey, and darken to the heading colour under the pointer. */
 
+/* The page's tooltips (Shared/Tooltips.razor), the activity bar's look for every data-title: its element wraps the whole
+   page but takes no part in its layout, nor in its type (the theme gives a tooltip's element 12px type, which everything
+   in it would inherit), and a long tooltip wraps rather than running across the window. */
+.app-tooltip-host {
+    all: inherit;
+    display: contents;
+}
+
+/* A tooltip for a component that puts its attributes where the pointer never is (SfCheckBox's hidden input): a span
+   around it carries the data-title. It needs a box of its own (not display: contents), as the tooltip is placed by it. */
+.tip-host {
+    display: inline-flex;
+}
+
+.e-tooltip-wrap.app-tooltip {
+    max-width: 320px;
+}
+
 /* The host and the SfTooltip's element between it and the bar pass the window's height down to the bar. */
 .activity-bar-host,
 .activity-bar-host > .e-tooltip {

@@ -10,7 +10,7 @@
    puts the cursor back where it was, and the form it put back read as unsaved. An empty box is null where the value can be, and 0 where it can't.
    A number beyond Largest is read as no number at all. Within an undo screen the edit is one undo step. As TextField,
    the box is given up when another record takes the form's place under the cursor. *@
-<span class="e-input-group field number-field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" title="@Tooltip">
+<span class="e-input-group field number-field @CssClass @(ReadOnly ? "e-disabled read-only-field" : "")" data-title="@Tooltip">
     @* data-whole and data-signed tell the page's script (app.js) what may be typed: no point in a count's box, a minus
        only where the number may go below zero. Anything else typed is refused before it shows. *@
     <input @key="_box" id="@ID" class="e-input" type="text" inputmode="decimal" value="@_text" placeholder="@Placeholder" readonly="@ReadOnly" autocomplete="off" data-decimals="@DecimalsOf(Format)"

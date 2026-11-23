@@ -41,7 +41,7 @@
                 @if (Items.Contains(row))
                 {
                     <input type="checkbox" checked="@row.IsFormulaBase" disabled="@ReadOnly" @onchange="e => SetBase(row, e.Value is true)"
-                           title="The line the others' Baker's % are of: the flour, usually." />
+                           data-title="The line the others' Baker's % are of: the flour, usually." />
                 }
             </td>
         }

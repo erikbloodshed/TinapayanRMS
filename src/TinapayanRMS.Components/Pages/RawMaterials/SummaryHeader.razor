@@ -33,16 +33,16 @@
         </div>
         @if (State.IsEditingMade)
         {
-            <div class="figure-tile tile-teal" title="What the batch yields as the BOM stands: its grams less the weight loss.">
+            <div class="figure-tile tile-teal" data-title="What the batch yields as the BOM stands: its grams less the weight loss.">
                 <div class="figure-label">Total Weight</div>
                 <div class="figure-value">@State.Recipe.BomTotalWeight.ToString("#,0.##") g</div>
             </div>
-            <div class="figure-tile tile-flamingo" title="The BOM's cost at buffered costs (the grid's Cost column). Over Total Weight, it's the Buffered Cost per gram.">
+            <div class="figure-tile tile-flamingo" data-title="The BOM's cost at buffered costs (the grid's Cost column). Over Total Weight, it's the Buffered Cost per gram.">
                 <div class="figure-label">Total Cost</div>
                 <div class="figure-value">@State.Recipe.BomTotalCost.ToString("N2")</div>
             </div>
         }
-        <div class="figure-tile tile-mauve" title="When its cost last changed: a price, buffer or recipe edit, or a component's change.">
+        <div class="figure-tile tile-mauve" data-title="When its cost last changed: a price, buffer or recipe edit, or a component's change.">
             <div class="figure-label">Last Updated</div>
             <div class="figure-value">@State.LastUpdatedText</div>
         </div>

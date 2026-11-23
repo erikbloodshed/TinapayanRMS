@@ -474,7 +474,8 @@
     .no-print,
     .e-toast-container,
     #blazor-error-ui,
-    #components-reconnect-modal {
+    #components-reconnect-modal,
+    .e-tooltip-wrap {
         display: none !important;
     }
 

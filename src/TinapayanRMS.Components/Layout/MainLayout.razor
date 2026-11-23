@@ -15,6 +15,8 @@
     // This drawing has everything asked for so far; what's asked for while it's drawn is drawn again (RedrawGate.Drawn).
     _redraws.Drawn();
 }
+@* The page's tooltips, each element's data-title, in the activity bar's look (a dialog has its own: Tooltips). *@
+<Tooltips>
 <div class="app-shell">
     @* The window's title bar, which the page draws: the window has none of Windows' own. Locked, it keeps only what moves,
        sizes and closes the window. *@
@@ -73,6 +75,7 @@
 <NoticeHost />
 <ConfirmationHost />
 <PromptHost />
+</Tooltips>
 
 @code {
     // How often the page tells AppLock of a key or click: often enough that a minute's auto-lock never comes early.

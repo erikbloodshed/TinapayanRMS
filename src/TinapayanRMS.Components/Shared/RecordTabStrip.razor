@@ -17,7 +17,7 @@
         var dirty = tab.Form.HasUnsavedChanges;
         var events = EventsOf(tab);
         <div @key="tab" class="record-tab @(showing ? "active" : null) @(tab.IsPreview && !dirty ? "preview" : null) @(dirty ? "dirty" : null)"
-             title="@TooltipOf(tab, dirty)" @ondblclick="events.Keep">
+             data-title="@TooltipOf(tab, dirty)" @ondblclick="events.Keep">
             <a class="record-tab-link" href="@AddressOf(tab)" aria-current="@(showing ? "page" : null)">@tab.Form.TabTitle</a>
             <button type="button" class="record-tab-close" aria-label="Close @tab.Form.TabTitle" @onclick="events.Close">
                 <span class="record-tab-dot" aria-hidden="true"></span>

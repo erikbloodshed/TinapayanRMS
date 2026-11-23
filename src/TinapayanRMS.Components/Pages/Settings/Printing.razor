@@ -71,10 +71,10 @@
         </FormRow>
         <FormRow Label="Print">
             <div class="print-parts">
-                <SfCheckBox Label="Cost/g and Unit Cost" @bind-Checked="State!.PrintsUnitCosts" title="Each line's cost per gram or unit cost, beside its cost." />
-                <SfCheckBox Label="Baker's % and Absolute %" @bind-Checked="State!.PrintsPercentages" title="Each recipe line's share of its formula." />
-                <SfCheckBox Label="Figure tiles" @bind-Checked="State!.PrintsFigures" title="Material Cost, Base Cost, Current Price and Markup under each product's title." />
-                <SfCheckBox Label="Suggested beside current price" @bind-Checked="State!.PrintsPriceComparison" title="The suggested price's markup, VAT and price beside the current price's, under the costing." />
+                <span class="tip-host" data-title="Each line's cost per gram or unit cost, beside its cost."><SfCheckBox Label="Cost/g and Unit Cost" @bind-Checked="State!.PrintsUnitCosts" /></span>
+                <span class="tip-host" data-title="Each recipe line's share of its formula."><SfCheckBox Label="Baker's % and Absolute %" @bind-Checked="State!.PrintsPercentages" /></span>
+                <span class="tip-host" data-title="Material Cost, Base Cost, Current Price and Markup under each product's title."><SfCheckBox Label="Figure tiles" @bind-Checked="State!.PrintsFigures" /></span>
+                <span class="tip-host" data-title="The suggested price's markup, VAT and price beside the current price's, under the costing."><SfCheckBox Label="Suggested beside current price" @bind-Checked="State!.PrintsPriceComparison" /></span>
             </div>
         </FormRow>
 

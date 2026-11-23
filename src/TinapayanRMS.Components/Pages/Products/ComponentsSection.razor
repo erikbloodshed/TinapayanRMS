@@ -35,8 +35,7 @@
     </LineGrid>
 
     <div class="lines-footer">
-        <SfCheckBox Label="Include each product's packaging" @bind-Checked="State.ComponentsTable.IsPackagingTicked"
-                    title="Each product's packaging, times its quantity, adds to Packaging on the Costing tab, with no labor, overhead or admin on it." />
+        <span class="tip-host" data-title="Each product's packaging, times its quantity, adds to Packaging on the Costing tab, with no labor, overhead or admin on it."><SfCheckBox Label="Include each product's packaging" @bind-Checked="State.ComponentsTable.IsPackagingTicked" /></span>
         <CommandButton Command="State.ComponentsTable.RemoveLineCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Line" />
     </div>
 </div>

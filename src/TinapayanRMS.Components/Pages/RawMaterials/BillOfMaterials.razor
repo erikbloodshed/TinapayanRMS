@@ -16,7 +16,7 @@
         @if (State.Recipe.IsShowingSubAssemblyBadge)
         {
             <button type="button" class="badge badge-link" @onclick="() => Commands.Run(State.Recipe.OpenSubAssemblyCommand)"
-                    title="Open it on Sub-Assemblies to change its lines; everything using it follows.">
+                    data-title="Open it on Sub-Assemblies to change its lines; everything using it follows.">
                 @State.Recipe.SubAssemblyBadgeText
             </button>
             <CommandButton Command="State.Recipe.StartChangingSubAssemblyCommand" Icon="AppIcon.Edit" Flat="true" Tooltip="Make it from another sub-assembly" />

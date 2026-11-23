@@ -7,17 +7,17 @@
 <div class="dependent-tiles">
     @foreach (var product in Products)
     {
-        <button type="button" class="dependent-tile" title="Open on the Products screen" @onclick="() => Open.InvokeAsync(product.Id)">
+        <button type="button" class="dependent-tile" data-title="Open on the Products screen" @onclick="() => Open.InvokeAsync(product.Id)">
             <span class="dependent-name">@product.Name</span>
             @if (product.CostShareText is { } share)
             {
-                <span class="dependent-share" title="Its share of this product's material cost, at buffered costs">@share</span>
+                <span class="dependent-share" data-title="Its share of this product's material cost, at buffered costs">@share</span>
             }
         </button>
     }
     @foreach (var ingredient in MadeIngredients)
     {
-        <button type="button" class="dependent-tile" title="A made ingredient made from it. Open on the Raw Materials screen" @onclick="() => OpenMadeIngredient.InvokeAsync(ingredient.Id)">
+        <button type="button" class="dependent-tile" data-title="A made ingredient made from it. Open on the Raw Materials screen" @onclick="() => OpenMadeIngredient.InvokeAsync(ingredient.Id)">
             <span class="dependent-name">@ingredient.Name</span>
         </button>
     }

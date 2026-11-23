@@ -1,6 +1,6 @@
 @* A button bound to a screen state's command: enabled while the command can run, and running it on a click. The screen
    redraws it when the command's CanExecute changes (ScreenBase). *@
-<SfButton CssClass="@Css" Disabled="@(!Command.CanExecute())" @onclick="RunAsync" title="@Tooltip" IsPrimary="Primary">
+<SfButton CssClass="@Css" Disabled="@(!Command.CanExecute())" @onclick="RunAsync" data-title="@Tooltip" aria-label="@(Label is null ? Tooltip : null)" IsPrimary="Primary">
     @if (Icon is { } icon)
     {
         <Icon Of="icon" />

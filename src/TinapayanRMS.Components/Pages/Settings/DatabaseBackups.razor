@@ -15,7 +15,7 @@
     <p class="caption">Copies of all of the app's data. One is taken automatically each day: as the app starts, and within the hour after midnight while it runs. The newest 14 of those are kept. Set Also Copy To, or copy one to a USB stick now and then, so a broken computer doesn't take every copy with it.</p>
 
     <FormRow Label="Folder">
-        <span class="read-only-text" title="@State!.Folder">@State!.Folder</span>
+        <span class="read-only-text" data-title="@State!.Folder">@State!.Folder</span>
         <CommandButton Command="State!.OpenFolderCommand" Icon="AppIcon.FolderOpen" Label="Open Folder" Tooltip="Shows the backups folder in File Explorer." />
     </FormRow>
     @if (State!.BackupProblemText is { } backupProblem)
@@ -23,7 +23,7 @@
         <p class="warning-text">@backupProblem The app tries again within the hour.</p>
     }
     <FormRow Label="Also Copy To">
-        <span class="read-only-text" title="Each automatic backup is also copied here; the newest 14 are kept. Nothing else is touched.">@State!.CopyFolderText</span>
+        <span class="read-only-text" data-title="Each automatic backup is also copied here; the newest 14 are kept. Nothing else is touched.">@State!.CopyFolderText</span>
         <CommandButton Command="State!.ChooseCopyFolderCommand" Icon="AppIcon.FolderOpen" Label="Choose…"
                        Tooltip="A folder each automatic backup is also copied to, such as a USB stick or OneDrive. The newest is copied now." />
         <CommandButton Command="State!.ClearCopyFolderCommand" Icon="AppIcon.Cancel" Label="Stop Copying" Tooltip="Stops copying automatic backups to the folder. What was copied stays." />
@@ -33,7 +33,7 @@
         <p class="warning-text">@copyProblem</p>
     }
     <FormRow Label="App Version">
-        <span id="app-version" class="read-only-text" title="Which build of TinapayanRMS this is. Give it when reporting a problem.">@AppVersion.Current</span>
+        <span id="app-version" class="read-only-text" data-title="Which build of TinapayanRMS this is. Give it when reporting a problem.">@AppVersion.Current</span>
     </FormRow>
 
     <div class="button-row form-extra">

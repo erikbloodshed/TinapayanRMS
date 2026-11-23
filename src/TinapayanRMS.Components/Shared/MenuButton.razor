@@ -1,6 +1,6 @@
 @* A button that drops a short list of commands (New's arrow, Add Sub-Assembly, New Category). The list closes once
    one of its commands is clicked. *@
-<SfDropDownButton @ref="_button" CssClass="@CssClass" title="@Tooltip">
+<SfDropDownButton @ref="_button" CssClass="@CssClass" data-title="@Tooltip">
     <ChildContent>@Face</ChildContent>
     <PopupContent>
         <div class="drop-down-items" @onclick="Close">@ChildContent</div>
