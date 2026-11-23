@@ -548,14 +548,11 @@ public sealed class ProductVersionHistory : ObservableState
     /// <summary>
     /// Puts <paramref name="row"/>'s version into the form as unsaved edits, in one undo step: its sections, packaging,
     /// products, costing percentages, quantity required, current price and whether a composite includes its products'
-    /// packaging. The name, description, category and stage stay. A section of the product's own keeps its sub-assembly
-    /// when the product still owns it; a linked one is linked again as it is now, since Save never writes a version's lines
-    /// into a sub-assembly others may share; one deleted since comes back as a new section with the version's lines (its
-    /// add-ins among them). Packaging links what it linked while that's still there, else takes the lines it showed as the
+    /// packaging. The name, description, category and stage stay. The sections are put back as the recipe stands now
+    /// (<see cref="VersionSections"/>): a linked one linked again as it is now, or the product's own if its role was made
+    /// product-owned since. Packaging links what it linked while that's still there, else takes the lines it showed as the
     /// product's own. Refused, with nothing changed, while a material, role or product it needs is gone.
     /// </summary>
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1502:Avoid excessive complexity", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Baseline of 2026-11-20 (ADR 0004): split it when it next changes for another reason.")]
     private async Task RestoreAsync(ProductVersionRow row)
     {
         if (_host.ProductShowing is not { } product || ProductId != product.Id)
@@ -577,78 +574,14 @@ public sealed class ProductVersionHistory : ObservableState
                 .Distinct(),
         ];
         var linkedNow = await _queries.ReadLinkedSectionsAsync(linkedIds, CancellationToken.None);
-        var subAssembliesNow = linkedNow.SubAssemblies.ToDictionary(s => s.Id);
-        var linesNow = linkedNow.Lines.ToLookup(l => l.SubAssemblyId);
-
-        PackagingLinkTarget? link = null;
-        if (content.PackagingLink is { } versionLink)
-        {
-            if (versionLink.SubAssemblyId is { } setId && subAssembliesNow.TryGetValue(setId, out var set))
-            {
-                link = new PackagingLinkTarget.Set(setId, set.Name);
-            }
-            else if (versionLink.ProductId is { } linkedProductId && _products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct)
-            {
-                link = new PackagingLinkTarget.OtherProduct(linkedProductId, linkedProduct.Name);
-            }
-        }
-
-        // Everything it needs that's gone, named, before anything changes.
-        var materialNames = content.Materials.ToDictionary(m => m.Id, m => m.Name);
-        string MaterialName(int id) => materialNames.GetValueOrDefault(id) ?? $"Material {id}";
+        var link = PackagingLinkStillThere(content, linkedNow);
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         var packagingById = _packagingMaterials.ToDictionary(m => m.Id);
-        bool IsRelinked(VersionSection section) => !section.IsOwn && subAssembliesNow.ContainsKey(section.SubAssemblyId);
-        List<string> missing = [];
-        foreach (var section in content.Sections)
-        {
-            var relinked = IsRelinked(section);
-            if (!relinked && _roles.All(r => r.Id != section.Role.Id))
-            {
-                missing.Add($"the {section.Role.Name} role");
-            }
+        EnsureAllThere(row, linkedNow, link, ingredientsById, packagingById);
 
-            missing.AddRange((relinked ? Enumerable.Empty<int>() : section.Lines.Select(l => l.IngredientId))
-                .Concat(section.AddIns.Select(a => a.IngredientId))
-                .Where(id => !ingredientsById.ContainsKey(id))
-                .Select(MaterialName));
-        }
-
-        // The lines it owned, unless a link that's still there shows them, and its bulk packaging, its own either way.
-        missing.AddRange(content.PackagingLines
-            .Where(l => (link is null || l.IsBulk) && !packagingById.ContainsKey(l.MaterialId))
-            .Select(l => MaterialName(l.MaterialId)));
-
-        missing.AddRange(content.Components.Where(c => _products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
-        if (missing.Distinct().ToList() is { Count: > 0 } gone)
-        {
-            throw new BusinessRuleException(
-                $"{row.Title} can't be restored: it needs {string.Join(", ", gone)}, which {(gone.Count == 1 ? "is" : "are")} no longer there.");
-        }
-
-        // The lines a link shows: those showing already when it's the link the form has, else as it has them now. The bulk
-        // packaging is the version's own, whatever it linked.
-        IReadOnlyList<PackagingLineSnapshot> packagingLines;
+        // The bulk packaging is the version's own, whatever it linked.
         IReadOnlyList<PackagingLineSnapshot> bulkLines = [.. content.PackagingLines.Where(l => l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
-        if (link is null)
-        {
-            packagingLines = [.. content.PackagingLines.Where(l => !l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
-        }
-        else if (link.Key == _host.Packaging.Draft.LinkTarget?.Key)
-        {
-            packagingLines = [.. _host.Packaging.Draft.LineEdits.Select(PackagingLineSnapshot.Of)];
-        }
-        else
-        {
-            packagingLines = link switch
-            {
-                PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _queries.ReadPackagingSetLinesAsync(setId, CancellationToken.None)))
-                    .Select(l => new PackagingLineSnapshot(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
-                PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _queries.ReadEffectivePackagingAsync(linkedProductId, CancellationToken.None)))
-                    .Select(l => PackagingLineRow.FromSaved(l))
-                    .Select(PackagingLineSnapshot.Of)],
-            };
-        }
+        var packagingLines = await PackagingLinesOfAsync(content, link, packagingById);
 
         // Another product picked while that was read: the version isn't this one's.
         if (_host.ProductShowing?.Id != product.Id)
@@ -656,57 +589,11 @@ public sealed class ProductVersionHistory : ObservableState
             return;
         }
 
-        var ownedNow = _host.OwnedSectionIds;
-        List<string> changedSinceLinks = [];
-        List<ProductUsageEdit> sections = [];
-        foreach (var section in content.Sections)
-        {
-            if (IsRelinked(section))
-            {
-                var linked = subAssembliesNow[section.SubAssemblyId];
-                var current = linesNow[linked.Id].ToList();
-                if (!HasSameLines(current, section.Lines))
-                {
-                    changedSinceLinks.Add(linked.Name);
-                }
-
-                var linkedRole = _roles.FirstOrDefault(r => r.Id == linked.RoleId) ?? linked.Role;
-                sections.Add(new ProductUsageEdit(
-                    linked.Id,
-                    linkedRole,
-                    [.. current.Select(l => new SectionLine(
-                        ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                    section.AuthoredField,
-                    section.AuthoredValue,
-                    linked.Name,
-                    [.. section.AddIns.Select(a => new SectionLine(ingredientsById[a.IngredientId], a.Grams))],
-                    _host.SectionLabelOf(linked.Name, linkedRole),
-                    linkedOwner: PricedSection.LinkedOwnerOf(linked)));
-                continue;
-            }
-
-            // The product's own, or a linked one deleted since: the version's lines, and a linked one's add-ins with them,
-            // since a section of its own has none.
-            var keepsId = section.IsOwn && ownedNow.Contains(section.SubAssemblyId);
-            sections.Add(new ProductUsageEdit(
-                keepsId ? section.SubAssemblyId : 0,
-                _roles.First(r => r.Id == section.Role.Id),
-                [
-                    .. section.Lines.Select(l => new SectionLine(ingredientsById[l.IngredientId], l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)),
-                    .. section.AddIns.Select(a => new SectionLine(ingredientsById[a.IngredientId], a.Grams)),
-                ],
-                section.AuthoredField,
-                section.AuthoredValue,
-                linkedName: null,
-                name: section.LabelIn(content.ProductName, content.Schema),
-                isOwn: section.IsOwn && !keepsId));
-        }
-
-        sections = ProductRecipeDraft.KeyedAsIn(sections, content.Sections);
+        var restored = VersionSections.Build(content, product.Id, linkedNow, ingredientsById, _roles, _host.OwnedSectionIds, _host.SectionLabelOf);
         var costing = content.Costing ?? new VersionCosting(0m, 0m, 0m, 0m);
         _host.ApplyVersion(new RestoredVersion(
             product.IsComposite,
-            sections,
+            restored.Sections,
             link,
             packagingLines,
             bulkLines,
@@ -718,9 +605,14 @@ public sealed class ProductVersionHistory : ObservableState
             content.IncludesComponentPackaging));
 
         List<string> notes = [$"{row.Title} is in the form. Save to keep it, or Undo to put the form back."];
-        if (changedSinceLinks.Count > 0)
+        if (restored.ChangedSinceLinks is { Count: > 0 } changedSinceLinks)
         {
             notes.Add($"{string.Join(", ", changedSinceLinks)} {(changedSinceLinks.Count == 1 ? "has" : "have")} changed on Sub-Assemblies since, and {(changedSinceLinks.Count == 1 ? "is" : "are")} linked as {(changedSinceLinks.Count == 1 ? "it is" : "they are")} now.");
+        }
+
+        if (restored.OwnNow is { Count: > 0 } ownNow)
+        {
+            notes.Add($"{string.Join(", ", ownNow)} {(ownNow.Count == 1 ? "is" : "are")} this product's own now, so {(ownNow.Count == 1 ? "it comes" : "they come")} back with {(ownNow.Count == 1 ? "its" : "their")} lines as they are now.");
         }
 
         if (content.PackagingLink is { } wasLinked && link is null)
@@ -729,6 +621,91 @@ public sealed class ProductVersionHistory : ObservableState
         }
 
         _host.ShowSuccess(string.Join(" ", notes));
+    }
+
+    /// <summary>The packaging set or product a version linked, while it's still there; null when it linked none, or it's gone.</summary>
+    private PackagingLinkTarget? PackagingLinkStillThere(ProductVersionContent content, LinkedSections linkedNow)
+    {
+        if (content.PackagingLink is not { } versionLink)
+        {
+            return null;
+        }
+
+        if (versionLink.SubAssemblyId is { } setId && linkedNow.SubAssemblies.FirstOrDefault(s => s.Id == setId) is { } set)
+        {
+            return new PackagingLinkTarget.Set(setId, set.Name);
+        }
+
+        return versionLink.ProductId is { } linkedProductId && _products.FirstOrDefault(p => p.Id == linkedProductId) is { } linkedProduct
+            ? new PackagingLinkTarget.OtherProduct(linkedProductId, linkedProduct.Name)
+            : null;
+    }
+
+    /// <summary>
+    /// Refuses <paramref name="row"/>'s version, naming everything it needs that's gone, before anything changes: a role or
+    /// an ingredient of a section put back with the version's lines (one linked again shows its lines as they are now), an
+    /// add-in, a packaging material of the lines it owned (unless a link still there shows them) or of its bulk packaging,
+    /// and a composite's product.
+    /// </summary>
+    private void EnsureAllThere(
+        ProductVersionRow row, LinkedSections linkedNow, PackagingLinkTarget? link,
+        Dictionary<int, RawMaterial> ingredientsById, Dictionary<int, RawMaterial> packagingById)
+    {
+        var content = row.Content;
+        var materialNames = content.Materials.ToDictionary(m => m.Id, m => m.Name);
+        string MaterialName(int id) => materialNames.GetValueOrDefault(id) ?? $"Material {id}";
+        List<string> missing = [];
+        foreach (var section in content.Sections)
+        {
+            var relinked = VersionSections.IsRelinked(section, linkedNow);
+            if (!relinked && _roles.All(r => r.Id != section.Role.Id))
+            {
+                missing.Add($"the {section.Role.Name} role");
+            }
+
+            missing.AddRange((relinked ? Enumerable.Empty<int>() : section.Lines.Select(l => l.IngredientId))
+                .Concat(section.AddIns.Select(a => a.IngredientId))
+                .Where(id => !ingredientsById.ContainsKey(id))
+                .Select(MaterialName));
+        }
+
+        missing.AddRange(content.PackagingLines
+            .Where(l => (link is null || l.IsBulk) && !packagingById.ContainsKey(l.MaterialId))
+            .Select(l => MaterialName(l.MaterialId)));
+
+        missing.AddRange(content.Components.Where(c => _products.All(p => p.Id != c.ProductId)).Select(c => c.ProductName));
+        if (missing.Distinct().ToList() is { Count: > 0 } gone)
+        {
+            throw new BusinessRuleException(
+                $"{row.Title} can't be restored: it needs {string.Join(", ", gone)}, which {(gone.Count == 1 ? "is" : "are")} no longer there.");
+        }
+    }
+
+    /// <summary>
+    /// The packaging per piece a version puts back: the lines it owned, or, with a link still there, the lines that link
+    /// shows: those showing already when it's the link the form has, else as it has them now.
+    /// </summary>
+    private async Task<IReadOnlyList<PackagingLineSnapshot>> PackagingLinesOfAsync(
+        ProductVersionContent content, PackagingLinkTarget? link, Dictionary<int, RawMaterial> packagingById)
+    {
+        if (link is null)
+        {
+            return [.. content.PackagingLines.Where(l => !l.IsBulk).Select(l => OwnPackagingLineOf(l, content, packagingById))];
+        }
+
+        if (link.Key == _host.Packaging.Draft.LinkTarget?.Key)
+        {
+            return [.. _host.Packaging.Draft.LineEdits.Select(PackagingLineSnapshot.Of)];
+        }
+
+        return link switch
+        {
+            PackagingLinkTarget.Set(var setId, _) => [.. (await Task.Run(() => _queries.ReadPackagingSetLinesAsync(setId, CancellationToken.None)))
+                .Select(l => new PackagingLineSnapshot(l.PackagingMaterialId, l.UnitId, l.QtyPerSet))],
+            PackagingLinkTarget.OtherProduct(var linkedProductId, _) => [.. (await Task.Run(() => _queries.ReadEffectivePackagingAsync(linkedProductId, CancellationToken.None)))
+                .Select(l => PackagingLineRow.FromSaved(l))
+                .Select(PackagingLineSnapshot.Of)],
+        };
     }
 
     /// <summary>
@@ -746,14 +723,6 @@ public sealed class ProductVersionHistory : ObservableState
 
         return new PackagingLineSnapshot(line.MaterialId, line.UnitId, line.QtyPerUnit);
     }
-
-    /// <summary>Whether a sub-assembly's lines now are the ones a version saw: the same ingredients, grams and base ticks, in order.</summary>
-    private static bool HasSameLines(List<SubAssemblyLine> now, IReadOnlyList<VersionLine> then) =>
-        now.Count == then.Count
-        && now.Zip(then).All(pair =>
-            pair.First.IngredientId == pair.Second.IngredientId
-            && pair.First.Grams == pair.Second.Grams
-            && pair.First.IsFormulaBase == pair.Second.IsFormulaBase);
 
     /// <summary>
     /// <paramref name="row"/>'s version on paper, for Print on the History tab: its sections, packaging and costing as that

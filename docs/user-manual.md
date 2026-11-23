@@ -995,6 +995,7 @@ The figures follow the screen's buffered or unbuffered costs, as the Costing tab
 
 - A section that was the product's own comes back with its old lines.
 - A section that links a sub-assembly links it again **as it is now**. Restore never changes a sub-assembly that other products may share. If its lines have changed since, the green notice says so.
+- If that sub-assembly has become this product's own since (its role was made **Product-owned** in Settings), it comes back as the product's own section, with its lines as they are now, and the green notice says so.
 - A linked sub-assembly that has been deleted since comes back as a new section with the old lines.
 - Packaging links what it linked, if that still exists. Otherwise the lines it showed come back as the product's own.
 - If a material, role or product the version needs has been deleted, Restore refuses and names it, and nothing in the form changes.

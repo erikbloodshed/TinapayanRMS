@@ -22,7 +22,7 @@ public class FileSizeTests
         ["Products/ProductRecipe.cs"] = 1239,
         ["Products/ProductsList.cs"] = 1232,
         ["RawMaterials/RawMaterialForm.cs"] = 1150,
-        ["Products/ProductVersionHistory.cs"] = 776,
+        ["Products/ProductVersionHistory.cs"] = 745,
         ["SubAssemblies/SubAssembliesList.cs"] = 745,
         ["RawMaterials/RawMaterialsList.cs"] = 724,
         ["Products/ProductTree.cs"] = 721,

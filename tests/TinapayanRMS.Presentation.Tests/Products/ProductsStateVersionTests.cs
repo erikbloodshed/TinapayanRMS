@@ -398,6 +398,51 @@ public class ProductsStateVersionTests(DatabaseFixture fixture) : PersistenceTes
     });
 
     [Test]
+    public Task Restoring_a_version_that_linked_a_section_the_product_owns_now_puts_it_back_as_its_own() => UiThread.RunAsync(async () =>
+    {
+        // Version 1 linked House Topping from Sub-Assemblies; its role was made product-owned since, so the product owns
+        // it now. Restore linked it again, and the first Save was refused as one the product took after it was opened.
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 1);
+        var sugarId = await AddIngredientAsync("Sugar", costPerGram: 0.1m);
+        var toppingId = await new SubAssemblyRepository(CreateDbContextFactory()).SaveStandaloneAsync(
+            new SubAssembly { Name = "House Topping", RoleId = toppingRoleId }, [(sugarId, 100m)], Cancellation);
+        var productId = await AddProductAsync("Ube Roll");
+        await SaveRecipeAsync(productId, new RecipeDraft([], [new LinkedUsageDraft(toppingId, UsageAuthoredField.Yield, 1m)]));
+        var state = await OpenAsync(productId, vm => vm.Recipe.UsageEdits.Count == 1);
+        Edit(state, () => state.EditingCurrentPrice = 25m);
+        await state.SaveCommand.ExecuteAsync();
+        state.ErrorMessage.Should().BeNull();
+
+        await new SubAssemblyRoleRepository(CreateDbContextFactory()).UpdateAsync(
+            new SubAssemblyRole { Id = toppingRoleId, Name = "Topping", SortOrder = 1, IsProductOwned = true }, Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(state,
+            () => state.Recipe.UsageEdits.Single().IsOwned,
+            () => $"owned={state.Recipe.UsageEdits.Single().IsOwned}, error={state.ErrorMessage}");
+        await OpenHistoryAsync(state, rows: 2);
+
+        state.VersionHistory.SelectedRow = state.VersionHistory.Rows[1];
+        await state.VersionHistory.RestoreCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        var section = state.Recipe.UsageEdits.Single();
+        section.IsOwned.Should().BeTrue("the product owns it now, as a load turns it round");
+        section.IsLinked.Should().BeFalse();
+        section.SubAssemblyId.Should().Be(toppingId);
+        section.Lines.Should().ContainSingle().Which.Grams.Should().Be(100m);
+        state.SuccessMessage.Should().Contain("House Topping is this product's own now");
+        state.EditingCurrentPrice.Should().NotBe(25m, "the version's price is back");
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull("the first Save goes through");
+        await using var dbContext = CreateDbContext();
+        var usage = await dbContext.ProductSubAssemblyUsages.SingleAsync(u => u.ProductId == productId, Cancellation);
+        usage.SubAssemblyId.Should().Be(toppingId);
+        (await dbContext.SubAssemblies.SingleAsync(s => s.Id == toppingId, Cancellation)).OwnerProductId.Should().Be(productId);
+    });
+
+    [Test]
     public Task Restore_is_refused_while_an_ingredient_it_needs_is_gone() => UiThread.RunAsync(async () =>
     {
         var (state, seeded) = await OpenToppedProductAsync();
