@@ -12,7 +12,7 @@ namespace TinapayanRMS.Infrastructure.CompiledModels;
 public partial class TinapayanRMSDbContextModel
 {
     private TinapayanRMSDbContextModel()
-        : base(skipDetectChanges: false, modelId: new Guid("9fcb13b9-924d-4f11-9441-501c9cdbc587"), entityTypeCount: 27)
+        : base(skipDetectChanges: false, modelId: new Guid("34d95e11-6d21-41d6-99c3-ba1bbf8db6a5"), entityTypeCount: 28)
     {
     }
 
@@ -44,6 +44,7 @@ public partial class TinapayanRMSDbContextModel
         var subAssemblyRole = SubAssemblyRoleEntityType.Create(this);
         var unitOfMeasure = UnitOfMeasureEntityType.Create(this);
         var usageAddInLine = UsageAddInLineEntityType.Create(this);
+        var usageSectionLine = UsageSectionLineEntityType.Create(this);
         var dataUpgrade = DataUpgradeEntityType.Create(this);
 
         CostingParametersEntityType.CreateForeignKey1(costingParameters, product);
@@ -62,9 +63,8 @@ public partial class TinapayanRMSDbContextModel
         ProductComponentEntityType.CreateForeignKey1(productComponent, product);
         ProductComponentEntityType.CreateForeignKey2(productComponent, product);
         ProductFolderEntityType.CreateForeignKey1(productFolder, productFolder);
-        ProductSubAssemblyUsageEntityType.CreateForeignKey1(productSubAssemblyUsage, subAssembly);
-        ProductSubAssemblyUsageEntityType.CreateForeignKey2(productSubAssemblyUsage, product);
-        ProductSubAssemblyUsageEntityType.CreateForeignKey3(productSubAssemblyUsage, subAssembly);
+        ProductSubAssemblyUsageEntityType.CreateForeignKey1(productSubAssemblyUsage, product);
+        ProductSubAssemblyUsageEntityType.CreateForeignKey2(productSubAssemblyUsage, subAssembly);
         ProductVersionEntityType.CreateForeignKey1(productVersion, product);
         RawMaterialEntityType.CreateForeignKey1(rawMaterial, unitOfMeasure);
         RawMaterialEntityType.CreateForeignKey2(rawMaterial, rawMaterialCategory);
@@ -85,6 +85,8 @@ public partial class TinapayanRMSDbContextModel
         SubAssemblyPackagingLineEntityType.CreateForeignKey3(subAssemblyPackagingLine, rawMaterialUnit);
         UsageAddInLineEntityType.CreateForeignKey1(usageAddInLine, rawMaterial);
         UsageAddInLineEntityType.CreateForeignKey2(usageAddInLine, productSubAssemblyUsage);
+        UsageSectionLineEntityType.CreateForeignKey1(usageSectionLine, subAssembly);
+        UsageSectionLineEntityType.CreateForeignKey2(usageSectionLine, productSubAssemblyUsage);
 
         AccessSettingsEntityType.CreateAnnotations(accessSettings);
         CostingDefaultsEntityType.CreateAnnotations(costingDefaults);
@@ -112,6 +114,7 @@ public partial class TinapayanRMSDbContextModel
         SubAssemblyRoleEntityType.CreateAnnotations(subAssemblyRole);
         UnitOfMeasureEntityType.CreateAnnotations(unitOfMeasure);
         UsageAddInLineEntityType.CreateAnnotations(usageAddInLine);
+        UsageSectionLineEntityType.CreateAnnotations(usageSectionLine);
         DataUpgradeEntityType.CreateAnnotations(dataUpgrade);
 
         AddAnnotation("Npgsql:CollationDefinition:case_insensitive", "und-u-ks-level2,und-u-ks-level2,icu,False");

@@ -151,29 +151,41 @@ public static class ProductVersionRules
             }
 
             AddPieceSizeChanges(changes, title, was, now);
-            AddFoldChange(changes, title, GoesIntoTitle(was, older), GoesIntoTitle(now, newer));
             AddLineChanges(changes, title, was.Lines, now.Lines, names);
             AddAddInChanges(changes, title, was.AddIns, now.AddIns, names);
+            AddSectionLineChanges(changes, title, SectionLinesOf(was, older), SectionLinesOf(now, newer));
         }
     }
 
     /// <summary>
-    /// What the section of <paramref name="content"/>'s recipe that <paramref name="section"/> went into whole was called; null
-    /// for one cut into pieces itself. By title, not sub-assembly: a restored version's own section is saved as a new one.
+    /// <paramref name="section"/>'s lines that are others of <paramref name="content"/>'s sections, each by the title of the
+    /// one it uses, not its sub-assembly: a restored version's own section is saved as a new one. A line whose section isn't
+    /// there (which no save leaves) is left out.
     /// </summary>
-    private static string? GoesIntoTitle(VersionSection section, ProductVersionContent content) =>
-        section.GoesIntoSubAssemblyId is { } id && content.Sections.FirstOrDefault(s => s.SubAssemblyId == id) is { } target
-            ? SectionTitle(target, content)
-            : null;
+    private static List<(string Title, decimal Grams)> SectionLinesOf(VersionSection section, ProductVersionContent content) =>
+    [
+        .. (section.SectionLines ?? [])
+            .Select(l => (Line: l, Used: content.Sections.FirstOrDefault(s => s.SubAssemblyId == l.SubAssemblyId)))
+            .Where(p => p.Used is not null)
+            .Select(p => (SectionTitle(p.Used!, content), p.Line.Grams)),
+    ];
 
-    private static void AddFoldChange(List<string> changes, string title, string? was, string? now)
+    private static void AddSectionLineChanges(List<string> changes, string title, List<(string Title, decimal Grams)> was, List<(string Title, decimal Grams)> now)
     {
-        if (was != now)
+        var wasByTitle = was.ToDictionary(l => l.Title, l => l.Grams);
+        foreach (var (used, grams) in now)
         {
-            changes.Add(now is null ? $"{title}: no longer goes into {was}"
-                : was is null ? $"{title}: now goes whole into {now}"
-                : $"{title}: now goes whole into {now} (was {was})");
+            if (!wasByTitle.Remove(used, out var old))
+            {
+                changes.Add($"{title}: {used} added, {Amount(grams)} g");
+            }
+            else if (old != grams)
+            {
+                changes.Add($"{title}: {used} {Amount(old)} g → {Amount(grams)} g");
+            }
         }
+
+        changes.AddRange(wasByTitle.Keys.Select(used => $"{title}: {used} removed"));
     }
 
     private static void AddPieceSizeChanges(List<string> changes, string title, VersionSection was, VersionSection now)

@@ -8,7 +8,9 @@ namespace TinapayanRMS.Presentation.Shared;
 /// One row of an ingredient lines table that is typed into directly: the sub-assembly form's lines and a
 /// made ingredient's Bill of Materials. The grid's ingredient cell sets <see cref="IngredientId"/>; the
 /// screen points <see cref="Ingredient"/> at that ingredient (<see cref="Resolve"/>), which prices the row.
-/// A row can be half filled in: <see cref="CompleteLines"/> checks them all before they're used.
+/// On a product's section, a row can be another of the recipe's sections instead (<see cref="Section"/>, picked with
+/// <see cref="Pick"/>), priced at that section's cost per gram (<see cref="ResolveSections"/>).
+/// A row can be half filled in: <see cref="CompleteLines"/> and <see cref="CompleteSectionLines"/> check them all before they're used.
 /// </summary>
 public sealed class IngredientLineRow : ObservableRow
 {
@@ -41,6 +43,14 @@ public sealed class IngredientLineRow : ObservableRow
         _authoredBakersPercent = isFormulaBase ? null : authoredBakersPercent;
     }
 
+    /// <summary>A line that is another of the recipe's sections, <paramref name="section"/>, at its grams or its typed percentage.</summary>
+    public IngredientLineRow(LineSection section, decimal grams, decimal? authoredBakersPercent = null)
+    {
+        _section = section;
+        _grams = grams;
+        _authoredBakersPercent = authoredBakersPercent;
+    }
+
     /// <summary>
     /// A row put back exactly as it stood, which is what an undo needs (ProductsState's history). The
     /// public setters can't do it: typing grams or ticking the base lets a typed percentage go, and
@@ -56,11 +66,13 @@ public sealed class IngredientLineRow : ObservableRow
         int? ingredientId,
         decimal? grams,
         bool isFormulaBase,
-        decimal? authoredBakersPercent)
+        decimal? authoredBakersPercent,
+        LineSection? section = null)
     {
         var row = new IngredientLineRow(findIngredient, baseWeight);
-        row._ingredientId = ingredientId;
-        row._ingredient = ingredientId is { } id ? findIngredient(id) : null;
+        row._section = section;
+        row._ingredientId = section is null ? ingredientId : null;
+        row._ingredient = row._ingredientId is { } id ? findIngredient(id) : null;
         row._grams = grams;
         row._isFormulaBase = isFormulaBase;
         row._authoredBakersPercent = authoredBakersPercent;
@@ -112,8 +124,55 @@ public sealed class IngredientLineRow : ObservableRow
         }
     }
 
-    /// <summary>What a gram of this line's ingredient costs at <see cref="CostBasis"/>, buffered unless switched; 0 until one is picked.</summary>
-    public decimal CostPerGram => Ingredient is { } ingredient ? RawMaterialRules.CostPerBaseUnitAt(ingredient, CostBasis) : 0m;
+    private LineSection? _section;
+    /// <summary>
+    /// The recipe's other section this line is, in an ingredient's place (a sponge on the dough's lines), as the recipe
+    /// prices it; null for an ingredient's line. Never part of the formula's base.
+    /// </summary>
+    public LineSection? Section
+    {
+        get => _section;
+        private set
+        {
+            RaiseAndSetIfChanged(ref _section, value);
+            RaisePropertyChanged(nameof(IsSection));
+            RaisePropertyChanged(nameof(CostPerGram));
+            RaisePropertyChanged(nameof(Cost));
+        }
+    }
+
+    /// <summary>The line is another of the recipe's sections, not an ingredient.</summary>
+    public bool IsSection => Section is not null;
+
+    /// <summary>The key of the section the line is (ProductUsageEdit.Key); null for an ingredient's.</summary>
+    public long? SectionKey => Section?.Key;
+
+    /// <summary>What the line's picker shows picked: its section or its ingredient; null until one is.</summary>
+    public LinePick? Picked => Section is { } section ? LinePick.Of(section) : Ingredient is { } ingredient ? LinePick.Of(ingredient) : null;
+
+    /// <summary>
+    /// The user picks what the line is: an ingredient, or another of the recipe's sections, which is never part of the base.
+    /// </summary>
+    public void Pick(LinePick? pick)
+    {
+        if (pick?.Section is { } section)
+        {
+            IngredientId = null;
+            Ingredient = null;
+            IsFormulaBase = false;
+            Section = section;
+            return;
+        }
+
+        Section = null;
+        IngredientId = pick?.Ingredient?.Id;
+    }
+
+    /// <summary>What a gram of this line's ingredient, or section, costs at <see cref="CostBasis"/>, buffered unless switched; 0 until one is picked.</summary>
+    public decimal CostPerGram =>
+        Section is { } section ? section.CostPerGramAt(CostBasis)
+        : Ingredient is { } ingredient ? RawMaterialRules.CostPerBaseUnitAt(ingredient, CostBasis)
+        : 0m;
 
     private decimal? _grams;
     /// <summary>
@@ -266,7 +325,7 @@ public sealed class IngredientLineRow : ObservableRow
     public decimal Cost => (Grams ?? 0m) * CostPerGram;
 
     /// <summary>Nothing typed into it: the grid's add row left as it was, which isn't a line at all.</summary>
-    private bool IsBlank => IngredientId is null && Grams is null or 0m;
+    private bool IsBlank => IngredientId is null && Section is null && Grams is null or 0m;
 
     /// <summary>
     /// Points each row at its ingredient in <paramref name="ingredientsById"/> (the screen's current copies,
@@ -282,6 +341,21 @@ public sealed class IngredientLineRow : ObservableRow
             if (!ReferenceEquals(resolved, row.Ingredient))
             {
                 row.Ingredient = resolved;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Points each row that is a section at it as <paramref name="find"/> has it now: its name and cost per gram follow the
+    /// recipe. A row whose section <paramref name="find"/> doesn't know keeps the one it has.
+    /// </summary>
+    public static void ResolveSections(IEnumerable<IngredientLineRow> rows, Func<long, LineSection?> find)
+    {
+        foreach (var row in rows)
+        {
+            if (row.Section is { } section && find(section.Key) is { } fresh && fresh != section)
+            {
+                row.Section = fresh;
             }
         }
     }
@@ -324,22 +398,23 @@ public sealed class IngredientLineRow : ObservableRow
         }
     }
 
-    /// <summary>The batch the rows make: the grams of every row with its ingredient picked, as the screens' batch weight counts them.</summary>
+    /// <summary>The batch the rows make: the grams of every row with its ingredient or section picked, as the screens' batch weight counts them.</summary>
     public static decimal BatchWeightOf(IEnumerable<IngredientLineRow> rows) =>
-        rows.Where(r => r.Ingredient is not null).Sum(r => r.Grams ?? 0m);
+        rows.Where(r => r.Ingredient is not null || r.IsSection).Sum(r => r.Grams ?? 0m);
 
     /// <summary>The percentage column's header: "Baker's %" while there's a base, "Absolute %" while nothing is ticked.</summary>
     public static string PercentHeader(decimal baseWeight) => baseWeight > 0 ? "Baker's %" : "Absolute %";
 
     /// <summary>
-    /// The rows as lines, leaving out blank ones. A row with only an ingredient or only grams is refused, and so
-    /// is an ingredient on two rows, each with a message naming it and <paramref name="madeInto"/>.
+    /// The rows as lines, leaving out blank ones and those that are sections (<see cref="CompleteSectionLines"/>). A row with
+    /// only an ingredient or only grams is refused, and so is an ingredient on two rows, each with a message naming it and
+    /// <paramref name="madeInto"/>.
     /// </summary>
     public static IReadOnlyList<(RawMaterial Ingredient, decimal Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent)> CompleteLines(
         IEnumerable<IngredientLineRow> rows, string madeInto)
     {
         List<(RawMaterial Ingredient, decimal Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent)> lines = [];
-        foreach (var row in rows.Where(r => !r.IsBlank))
+        foreach (var row in rows.Where(r => !r.IsBlank && !r.IsSection))
         {
             if (row.Ingredient is not { } ingredient)
             {
@@ -361,11 +436,61 @@ public sealed class IngredientLineRow : ObservableRow
 
         return lines;
     }
+
+    /// <summary>
+    /// The rows that are sections, each with its place among the rows that aren't blank (<see cref="CompleteLines"/>' lines
+    /// are the rest, in their order). One with no grams is refused, and so is a section on two rows, each with a message
+    /// naming it and <paramref name="madeInto"/>.
+    /// </summary>
+    public static IReadOnlyList<(LineSection Section, decimal Grams, decimal? AuthoredBakersPercent, int Position)> CompleteSectionLines(
+        IEnumerable<IngredientLineRow> rows, string madeInto)
+    {
+        List<(LineSection Section, decimal Grams, decimal? AuthoredBakersPercent, int Position)> lines = [];
+        var position = 0;
+        foreach (var row in rows.Where(r => !r.IsBlank))
+        {
+            if (row.Section is { } section)
+            {
+                if (row.Grams is not > 0m)
+                {
+                    throw new BusinessRuleException($"Enter how many grams of {section.Name} go into {madeInto}, or delete its line.");
+                }
+
+                if (lines.Any(l => l.Section.Key == section.Key))
+                {
+                    throw new BusinessRuleException($"{section.Name} is on two lines of {madeInto}. Put its total on one line and delete the other.");
+                }
+
+                lines.Add((section, row.Grams.Value, row.AuthoredBakersPercent, position));
+            }
+
+            position++;
+        }
+
+        return lines;
+    }
+
+    /// <summary>
+    /// <paramref name="lines"/> with <paramref name="sectionLines"/> put back among them, each at its place: the rows of a
+    /// table that holds both, in its order.
+    /// </summary>
+    public static List<T> Merged<T>(IEnumerable<T> lines, IEnumerable<(int Position, T Row)> sectionLines)
+    {
+        List<T> rows = [.. lines];
+        foreach (var (position, row) in sectionLines.OrderBy(l => l.Position))
+        {
+            rows.Insert(Math.Clamp(position, 0, rows.Count), row);
+        }
+
+        return rows;
+    }
 }
 
 /// <summary>
 /// One ingredient line as <see cref="IngredientLineRow.Restore"/> can put it back. Its ingredient travels as
 /// an id rather than the object: a LoadCommand landing mid-gesture swaps in freshly priced RawMaterials, and
-/// comparing those by reference would read as an edit the user never made.
+/// comparing those by reference would read as an edit the user never made. A line that is another of a product's
+/// sections travels as that section's place among the recipe's (<paramref name="SectionIndex"/>), which a Save's reload
+/// keeps where it gives a new section another key.
 /// </summary>
-public readonly record struct IngredientLineSnapshot(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent);
+public readonly record struct IngredientLineSnapshot(int? IngredientId, decimal? Grams, bool IsFormulaBase, decimal? AuthoredBakersPercent, int? SectionIndex = null);

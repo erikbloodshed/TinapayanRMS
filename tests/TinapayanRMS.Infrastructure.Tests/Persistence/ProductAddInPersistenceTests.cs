@@ -24,8 +24,8 @@ public class ProductAddInPersistenceTests(DatabaseFixture fixture) : Persistence
     private static LinkedUsageDraft Linked(int subAssemblyId, decimal weightPerPiece, params (int IngredientId, decimal Grams)[] addIns) =>
         new(subAssemblyId, UsageAuthoredField.WeightPerPiece, weightPerPiece) { AddIns = addIns };
 
-    private Task<IReadOnlyList<UsageAddInLine>> AddInsAsync(int productId) =>
-        CreateUsageRepository().GetAddInsForProductAsync(productId, Cancellation);
+    private async Task<IReadOnlyList<UsageAddInLine>> AddInsAsync(int productId) =>
+        (await CreateUsageRepository().GetLinesForProductAsync(productId, Cancellation)).AddIns;
 
     /// <summary>Cream Loaf owns Sweet Dough; Cream Loaf Mini links it. Returns both products and the dough.</summary>
     private async Task<(int OwnerId, int LinkerId, int DoughId, int FlourId)> SeedLinkedDoughAsync()

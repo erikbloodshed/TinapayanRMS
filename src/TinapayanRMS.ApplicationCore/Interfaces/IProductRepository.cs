@@ -31,10 +31,10 @@ public sealed record NewSubAssemblyDraft(
     public SectionPlacement Placement { get; init; } = new SectionPlacement.ByRole();
 
     /// <summary>
-    /// The section of the recipe this one goes into whole (<see cref="RecipeDraft.SectionIdOf"/>): a saved sub-assembly's
-    /// id, or the stand-in of a new section. Null for one cut into pieces itself.
+    /// The recipe's other sections on its lines, each with its grams and its place among them (UsageSectionLine). Empty
+    /// for a section of ingredients alone.
     /// </summary>
-    public int? GoesInto { get; init; }
+    public IReadOnlyList<SectionLineDraft> SectionLines { get; init; } = [];
 
     /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there, or to In-House.</summary>
     public bool MovesToSubAssemblies => Placement is SectionPlacement.MoveToSubAssemblies or SectionPlacement.MoveToInHouse;
@@ -104,11 +104,20 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     public IReadOnlyList<RecipeLine>? LinesTaken { get; init; }
 
     /// <summary>
-    /// The section of the recipe this one goes into whole (<see cref="RecipeDraft.SectionIdOf"/>); null for one cut into
-    /// pieces itself.
+    /// The recipe's other sections among its add-ins, each with its grams and its place among them (UsageSectionLine):
+    /// this product's, as its add-ins are. Empty for none.
     /// </summary>
-    public int? GoesInto { get; init; }
+    public IReadOnlyList<SectionLineDraft> SectionLines { get; init; } = [];
 }
+
+/// <summary>
+/// A line of a recipe section that is another of the recipe's sections, as Save writes it (UsageSectionLine): a sponge on
+/// the dough's lines.
+/// </summary>
+/// <param name="SectionId">The section it uses (<see cref="RecipeDraft.SectionIdOf"/>): a saved sub-assembly's id, or a new section's stand-in.</param>
+/// <param name="AuthoredBakersPercent">The percentage typed for it, or null when its grams were.</param>
+/// <param name="Position">Its place in its section's table, among the ingredient lines (or a linked one's add-ins).</param>
+public sealed record SectionLineDraft(int SectionId, decimal Grams, decimal? AuthoredBakersPercent, int Position);
 
 /// <summary>
 /// A product's whole recipe of sub-assemblies: the sections whose lines it edits (its own, and new ones), and the ones
@@ -134,8 +143,8 @@ public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOn
     public IReadOnlyCollection<int>? OwnTaken { get; init; }
 
     /// <summary>
-    /// How a section of this recipe is named where another goes into it (<see cref="NewSubAssemblyDraft.GoesInto"/>,
-    /// <see cref="LinkedUsageDraft.GoesInto"/>): its sub-assembly's id once it has one, or -(i + 1) for the i-th of
+    /// How a section of this recipe is named where it's on another's lines (<see cref="SectionLineDraft.SectionId"/>): its
+    /// sub-assembly's id once it has one, or -(i + 1) for the i-th of
     /// <see cref="New"/> while it's new (Id 0).
     /// </summary>
     public static int SectionIdOf(int subAssemblyId, int newIndex) => subAssemblyId > 0 ? subAssemblyId : -(newIndex + 1);

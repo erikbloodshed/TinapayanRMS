@@ -22,10 +22,10 @@ public partial class ProductSubAssemblyUsageEntityType
             "TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage",
             typeof(ProductSubAssemblyUsage),
             baseEntityType,
-            propertyCount: 6,
+            propertyCount: 5,
             navigationCount: 2,
-            foreignKeyCount: 3,
-            unnamedIndexCount: 3,
+            foreignKeyCount: 2,
+            unnamedIndexCount: 2,
             keyCount: 1);
 
         var id = runtimeEntityType.AddProperty(
@@ -59,15 +59,6 @@ public partial class ProductSubAssemblyUsageEntityType
         authoredValue.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         authoredValue.AddAnnotation("Relational:ColumnName", "authored_value");
 
-        var goesIntoSubAssemblyId = runtimeEntityType.AddProperty(
-            "GoesIntoSubAssemblyId",
-            typeof(int?),
-            propertyInfo: typeof(ProductSubAssemblyUsage).GetProperty("GoesIntoSubAssemblyId", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            fieldInfo: typeof(ProductSubAssemblyUsage).GetField("<GoesIntoSubAssemblyId>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
-            nullable: true);
-        goesIntoSubAssemblyId.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
-        goesIntoSubAssemblyId.AddAnnotation("Relational:ColumnName", "goes_into_sub_assembly_id");
-
         var productId = runtimeEntityType.AddProperty(
             "ProductId",
             typeof(int),
@@ -92,33 +83,18 @@ public partial class ProductSubAssemblyUsageEntityType
         key.AddAnnotation("Relational:Name", "pk_product_sub_assembly_usages");
 
         var index = runtimeEntityType.AddIndex(
-            new[] { goesIntoSubAssemblyId });
-        index.AddAnnotation("Relational:Name", "ix_product_sub_assembly_usages_goes_into_sub_assembly_id");
+            new[] { subAssemblyId });
+        index.AddAnnotation("Relational:Name", "ix_product_sub_assembly_usages_sub_assembly_id");
 
         var index0 = runtimeEntityType.AddIndex(
-            new[] { subAssemblyId });
-        index0.AddAnnotation("Relational:Name", "ix_product_sub_assembly_usages_sub_assembly_id");
-
-        var index1 = runtimeEntityType.AddIndex(
             new[] { productId, subAssemblyId },
             unique: true);
-        index1.AddAnnotation("Relational:Name", "ix_product_sub_assembly_usages_product_id_sub_assembly_id");
+        index0.AddAnnotation("Relational:Name", "ix_product_sub_assembly_usages_product_id_sub_assembly_id");
 
         return runtimeEntityType;
     }
 
     public static RuntimeForeignKey CreateForeignKey1(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
-    {
-        var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("GoesIntoSubAssemblyId") },
-            principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),
-            principalEntityType,
-            deleteBehavior: DeleteBehavior.Restrict);
-
-        runtimeForeignKey.AddAnnotation("Relational:Name", "fk_product_sub_assembly_usages_sub_assemblies_goes_into_sub_as");
-        return runtimeForeignKey;
-    }
-
-    public static RuntimeForeignKey CreateForeignKey2(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
     {
         var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("ProductId") },
             principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),
@@ -137,7 +113,7 @@ public partial class ProductSubAssemblyUsageEntityType
         return runtimeForeignKey;
     }
 
-    public static RuntimeForeignKey CreateForeignKey3(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
+    public static RuntimeForeignKey CreateForeignKey2(RuntimeEntityType declaringEntityType, RuntimeEntityType principalEntityType)
     {
         var runtimeForeignKey = declaringEntityType.AddForeignKey(new[] { declaringEntityType.FindProperty("SubAssemblyId") },
             principalEntityType.FindKey(new[] { principalEntityType.FindProperty("Id") }),

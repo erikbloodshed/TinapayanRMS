@@ -5,8 +5,8 @@
    to draw and to read, and the line shows the cost once picked), its grams, its percentage (Baker's % while a line is
    ticked as the base, typed where it can be; Absolute % while none is), its cost per gram and cost, and the Base tick.
    The lines are dragged into order, and the add row has no tick until it's a line. Insert Line (InsertLineAsync) puts a
-   blank line in above the one picked, as one undo step. Under them, read-only, the whole batch of each section of the
-   product's recipe that goes into this one (FoldedRows). *@
+   blank line in above the one picked, as one undo step. On a product's section, the picker lists the recipe's other
+   sections too (Picks), and a line can be one, "Sponge (section)", in grams at its cost per gram, with no Base tick. *@
 <LineGrid @ref="_grid" TRow="IngredientLineRow" Items="Items" NewItem="NewItem" SelectedItem="SelectedItem" SelectedItemChanged="SelectedItemChanged"
           Reorderable="!ReadOnly" ReadOnly="ReadOnly" InsertKey="true">
     <Header>
@@ -24,7 +24,12 @@
         <td>
             @if (ReadOnly)
             {
-                <span class="cell-text">@row.Ingredient?.Name</span>
+                <span class="cell-text">@(row.Picked?.Name)</span>
+            }
+            else if (Picks is not null)
+            {
+                <PickField TItem="LinePick" Items="Picks" TextField="Name" CssClass="cell-field" Deferred="true" PopupWidth="320px"
+                           Value="row.Picked" ValueChanged="row.Pick" />
             }
             else
             {
@@ -39,7 +44,7 @@
         @if (ShowBase)
         {
             <td class="cell-check">
-                @if (Items.Contains(row))
+                @if (Items.Contains(row) && !row.IsSection)
                 {
                     <input type="checkbox" checked="@row.IsFormulaBase" disabled="@ReadOnly" @onchange="e => SetBase(row, e.Value is true)"
                            data-title="The line the others' Baker's % are of: the flour, usually." />
@@ -47,23 +52,6 @@
             </td>
         }
     </Row>
-    <Footer>
-        @foreach (var folded in FoldedRows)
-        {
-            <tr @key="folded.Name" class="folded-row" data-title="@($"{folded.Name}'s whole batch goes into this one. Change it on its own tab.")">
-                <td class="row-header"><Icon Of="AppIcon.Section" /></td>
-                <td><span class="cell-text">@folded.Name (whole batch)</span></td>
-                <td class="cell-number">@folded.Grams.ToString("#,0.0###")</td>
-                <td class="cell-number">@(folded.Percent?.ToString("N1"))</td>
-                <td class="cell-number">@folded.CostPerGram.ToString("N4")</td>
-                <td class="cell-number">@folded.Cost.ToString("N2")</td>
-                @if (ShowBase)
-                {
-                    <td class="cell-check"></td>
-                }
-            </tr>
-        }
-    </Footer>
 </LineGrid>
 
 @code {
@@ -73,6 +61,12 @@
 
     [Parameter, EditorRequired] public IEnumerable<RawMaterial> Ingredients { get; set; } = [];
 
+    /// <summary>
+    /// What a line can be on a product's section: the recipe's other sections, then the ingredients
+    /// (ProductUsageForm.Sections.Picks), in <see cref="Ingredients"/>' place; null for ingredients alone.
+    /// </summary>
+    [Parameter] public IReadOnlyList<LinePick>? Picks { get; set; }
+
     [Parameter] public IngredientLineRow? SelectedItem { get; set; }
 
     [Parameter] public EventCallback<IngredientLineRow?> SelectedItemChanged { get; set; }
@@ -80,9 +74,6 @@
     [Parameter] public string PercentHeader { get; set; } = "Baker's %";
 
     [Parameter] public bool ReadOnly { get; set; }
-
-    /// <summary>The whole batches that go into the recipe section from the product's others, shown under its lines.</summary>
-    [Parameter] public IReadOnlyList<FoldedRow> FoldedRows { get; set; } = [];
 
     /// <summary>Whether the lines have a Base tick; a linked recipe's add-ins don't.</summary>
     [Parameter] public bool ShowBase { get; set; } = true;

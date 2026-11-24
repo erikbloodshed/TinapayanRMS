@@ -334,8 +334,8 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             : null;
         var usages = Recipe.UsageEdits;
 
-        // A section that goes whole into another is counted in that one's batch, and has no pieces of its own.
-        var sections = Recipe.Priced().Where(s => !s.GoesWhole).ToList();
+        // Each priced as the recipe prices it, a section on another's lines in that one's batch at its cost per gram.
+        var sections = Recipe.Priced();
         return new ProductCostingInputs(
             new ProductCostInputs
             {
@@ -351,7 +351,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             [.. usages.SelectMany(u => u.Lines.Concat(u.AddIns)).Select(l => l.Ingredient)
                 .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
         {
-            SectionsWithoutPieceSize = [.. sections.Where(s => !s.HasPieceSize).Select(s => s.SectionName)],
+            SectionsWithoutPieceSize = [.. sections.Where(s => s.LacksPieceSize).Select(s => s.SectionName)],
         };
     }
 

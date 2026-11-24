@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261123080411_SectionGoesInto";
+    public override string LastMigrationId => "20261124054152_SectionLines";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -751,10 +751,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("authored_value");
 
-                b.Property<int?>("GoesIntoSubAssemblyId")
-                    .HasColumnType("integer")
-                    .HasColumnName("goes_into_sub_assembly_id");
-
                 b.Property<int>("ProductId")
                     .HasColumnType("integer")
                     .HasColumnName("product_id");
@@ -766,9 +762,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.HasKey("Id")
                     .HasName("pk_product_sub_assembly_usages");
 
-                b.HasIndex("GoesIntoSubAssemblyId")
-                    .HasDatabaseName("ix_product_sub_assembly_usages_goes_into_sub_assembly_id");
-
                 b.HasIndex("SubAssemblyId")
                     .HasDatabaseName("ix_product_sub_assembly_usages_sub_assembly_id");
 
@@ -779,8 +772,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("product_sub_assembly_usages", t =>
                     {
                         t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0");
-
-                        t.HasCheckConstraint("CK_ProductSubAssemblyUsages_GoesIntoAnother", "goes_into_sub_assembly_id IS NULL OR goes_into_sub_assembly_id <> sub_assembly_id");
                     });
             });
 
@@ -1442,6 +1433,53 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     });
             });
 
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageSectionLine", b =>
+            {
+                var id = b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("integer")
+                    .HasColumnName("id");
+
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
+
+                b.Property<decimal?>("AuthoredBakersPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("authored_bakers_percent");
+
+                b.Property<decimal>("Grams")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("grams");
+
+                b.Property<int>("Position")
+                    .HasColumnType("integer")
+                    .HasColumnName("position");
+
+                b.Property<int>("SectionSubAssemblyId")
+                    .HasColumnType("integer")
+                    .HasColumnName("section_sub_assembly_id");
+
+                b.Property<int>("UsageId")
+                    .HasColumnType("integer")
+                    .HasColumnName("usage_id");
+
+                b.HasKey("Id")
+                    .HasName("pk_usage_section_lines");
+
+                b.HasIndex("SectionSubAssemblyId")
+                    .HasDatabaseName("ix_usage_section_lines_section_sub_assembly_id");
+
+                b.HasIndex("UsageId", "SectionSubAssemblyId")
+                    .IsUnique()
+                    .HasDatabaseName("ix_usage_section_lines_usage_id_section_sub_assembly_id");
+
+                b.ToTable("usage_section_lines", t =>
+                    {
+                        t.HasCheckConstraint("CK_UsageSectionLines_Grams", "grams > 0");
+                    });
+            });
+
         modelBuilder.Entity("TinapayanRMS.Infrastructure.Upgrades.DataUpgrade", b =>
             {
                 b.Property<string>("Id")
@@ -1620,12 +1658,6 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", b =>
             {
-                b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", null)
-                    .WithMany()
-                    .HasForeignKey("GoesIntoSubAssemblyId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .HasConstraintName("fk_product_sub_assembly_usages_sub_assemblies_goes_into_sub_as");
-
                 b.HasOne("TinapayanRMS.Domain.Entities.Product", "Product")
                     .WithMany()
                     .HasForeignKey("ProductId")
@@ -1841,6 +1873,25 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasConstraintName("fk_usage_add_in_lines_product_sub_assembly_usages_usage_id");
 
                 b.Navigation("Ingredient");
+
+                b.Navigation("Usage");
+            });
+
+        modelBuilder.Entity("TinapayanRMS.Domain.Entities.UsageSectionLine", b =>
+            {
+                b.HasOne("TinapayanRMS.Domain.Entities.SubAssembly", null)
+                    .WithMany()
+                    .HasForeignKey("SectionSubAssemblyId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired()
+                    .HasConstraintName("fk_usage_section_lines_sub_assemblies_section_sub_assembly_id");
+
+                b.HasOne("TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage", "Usage")
+                    .WithMany()
+                    .HasForeignKey("UsageId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired()
+                    .HasConstraintName("fk_usage_section_lines_product_sub_assembly_usages_usage_id");
 
                 b.Navigation("Usage");
             });

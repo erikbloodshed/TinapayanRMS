@@ -58,6 +58,13 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                 .ThenBy(l => l.Id)
                 .ToListAsync(cancellationToken))
             .ToLookup(l => l.UsageId);
+        var sectionLinesByUsage = (await dbContext.UsageSectionLines
+                .AsNoTracking()
+                .Where(l => usageIds.Contains(l.UsageId))
+                .OrderBy(l => l.Position)
+                .ThenBy(l => l.Id)
+                .ToListAsync(cancellationToken))
+            .ToLookup(l => l.UsageId);
         var packagingLines = await PackagingLineRepository.ResolveEffectiveAsync(dbContext, sourceProductId, cancellationToken);
         var bulkLines = (await PackagingLineRepository.ReadBulkAsync(dbContext, [sourceProductId], cancellationToken))[sourceProductId];
 
@@ -100,7 +107,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         await ProductSubAssemblyUsageRepository.SetRecipeAsync(
             dbContext,
             newProduct.Id,
-            asVariant ? VariantRecipe(usages, addInsByUsage) : DerivedRecipe(usages, ownLines, addInsByUsage),
+            asVariant ? VariantRecipe(usages, addInsByUsage, sectionLinesByUsage) : DerivedRecipe(usages, ownLines, addInsByUsage, sectionLinesByUsage),
             linksOthersOwn: asVariant,
             cancellationToken);
 
@@ -148,13 +155,14 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
     /// <summary>
     /// The new product's recipe, at the source's piece sizes: its own copy of each of the source's own
     /// sub-assemblies (lines, role, and its section name there, named after the new product by SetRecipeAsync), and a
-    /// link to every one the source links, with the source's add-ins on it as the new product's own. A section that goes
-    /// whole into another still does, into the copy where the source's own was copied.
+    /// link to every one the source links, with the source's add-ins on it as the new product's own. A section on another's
+    /// lines still is, the copy's where the source's own was copied.
     /// </summary>
     private static RecipeDraft DerivedRecipe(
         List<ProductSubAssemblyUsage> usages,
         ILookup<int, SubAssemblyLine> ownLines,
-        ILookup<int, UsageAddInLine> addInsByUsage)
+        ILookup<int, UsageAddInLine> addInsByUsage,
+        ILookup<int, UsageSectionLine> sectionLinesByUsage)
     {
         List<NewSubAssemblyDraft> own = [];
         List<LinkedUsageDraft> linked = [];
@@ -190,20 +198,28 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
             sectionIdOf[usage.SubAssemblyId] = usage.SubAssemblyId;
         }
 
-        int? GoesInto(ProductSubAssemblyUsage usage) => usage.GoesIntoSubAssemblyId is { } id && sectionIdOf.TryGetValue(id, out var to) ? to : null;
+        // Its lines that are its other sections use the copy's sections; one using a section the copy doesn't have, which no
+        // save leaves, is dropped.
+        IReadOnlyList<SectionLineDraft> SectionLinesOf(ProductSubAssemblyUsage usage) =>
+        [
+            .. sectionLinesByUsage[usage.Id]
+                .Where(l => sectionIdOf.ContainsKey(l.SectionSubAssemblyId))
+                .Select(l => new SectionLineDraft(sectionIdOf[l.SectionSubAssemblyId], l.Grams, l.AuthoredBakersPercent, l.Position)),
+        ];
         var ownUsages = usages.Where(u => u.SubAssembly!.OwnerProductId == u.ProductId).ToList();
         var linkedUsages = usages.Where(u => u.SubAssembly!.OwnerProductId != u.ProductId).ToList();
         return new RecipeDraft(
-            [.. own.Select((draft, i) => draft with { GoesInto = GoesInto(ownUsages[i]) })],
-            [.. linked.Select((draft, i) => draft with { GoesInto = GoesInto(linkedUsages[i]) })]);
+            [.. own.Select((draft, i) => draft with { SectionLines = SectionLinesOf(ownUsages[i]) })],
+            [.. linked.Select((draft, i) => draft with { SectionLines = SectionLinesOf(linkedUsages[i]) })]);
     }
 
     /// <summary>
     /// A variant's recipe, at the source's piece sizes: a link to every sub-assembly the source uses, its own ones and
-    /// the ones it links from the Sub-Assemblies screen alike, with the source's add-ins on each as the variant's own, and
-    /// each going whole into what it went into there.
+    /// the ones it links from the Sub-Assemblies screen alike, with the source's add-ins and its lines that are sections on
+    /// each as the variant's own, among its add-ins.
     /// </summary>
-    private static RecipeDraft VariantRecipe(List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage) =>
+    private static RecipeDraft VariantRecipe(
+        List<ProductSubAssemblyUsage> usages, ILookup<int, UsageAddInLine> addInsByUsage, ILookup<int, UsageSectionLine> sectionLinesByUsage) =>
         new(
             [],
             [
@@ -211,7 +227,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                     .Select(u => new LinkedUsageDraft(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
                     {
                         AddIns = [.. addInsByUsage[u.Id].Select(l => (l.IngredientId, l.Grams))],
-                        GoesInto = u.GoesIntoSubAssemblyId,
+                        SectionLines = [.. sectionLinesByUsage[u.Id].Select(l => new SectionLineDraft(l.SectionSubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))],
                     }),
             ]);
 }

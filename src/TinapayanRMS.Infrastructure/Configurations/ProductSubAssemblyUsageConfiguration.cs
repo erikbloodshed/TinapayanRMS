@@ -22,21 +22,8 @@ public sealed class ProductSubAssemblyUsageConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(u => new { u.ProductId, u.SubAssemblyId }).IsUnique();
 
-        // The section it goes into whole is another of the same product's (ProductRules.EnsureValidFolds, in SetRecipeAsync),
-        // which uses that sub-assembly too, so it can't be deleted from under it either.
-        builder.HasOne<SubAssembly>()
-            .WithMany()
-            .HasForeignKey(u => u.GoesIntoSubAssemblyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // 0 means "not sized yet": a section goes into the recipe before how much of it a piece takes is
         // known (ProductRules.EnsureValidUsages). Only a negative piece size is refused.
-        builder.ToTable(t =>
-        {
-            t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0");
-            t.HasCheckConstraint(
-                "CK_ProductSubAssemblyUsages_GoesIntoAnother",
-                "goes_into_sub_assembly_id IS NULL OR goes_into_sub_assembly_id <> sub_assembly_id");
-        });
+        builder.ToTable(t => t.HasCheckConstraint("CK_ProductSubAssemblyUsages_AuthoredValue", "authored_value >= 0"));
     }
 }

@@ -56,7 +56,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         _figures = new Derived<UsageFormFigures>(Figures, RaiseFiguresChanged);
         RowChanges.OnAnyChange(FormLines, _figures.Invalidate);
         RowChanges.OnAnyChange(FormAddIns, _figures.Invalidate);
-        Fold = new UsageFormFold(() => RaisePropertyChanged(nameof(Fold)));
+        Sections = new UsageFormSections(ingredients, () => RaisePropertyChanged(nameof(Sections)));
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -84,11 +84,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// <summary>Removes the line picked in the form's lines table, as one undo step.</summary>
     public ScreenCommand RemoveLineCommand { get; }
 
-    /// <summary>What the section goes into whole, and what goes into it (UsageFormFold).</summary>
-    public UsageFormFold Fold { get; }
-
-    /// <summary>What goes into the section whole, as rows under its lines (UsageFormFold.Rows).</summary>
-    public IReadOnlyList<FoldedRow> FormFoldedRows => Fold.Rows(FormFormulaBase, Batch().Sum(l => l.Grams), _host.CostBasis);
+    /// <summary>What a line of the section can be, the recipe's other sections among them, and what they use of it (UsageFormSections).</summary>
+    public UsageFormSections Sections { get; }
 
     /// <summary>Removes the add-in picked in the form's add-ins table, as one undo step.</summary>
     public ScreenCommand RemoveAddInCommand { get; }
@@ -467,7 +464,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// <summary>What the piece size is worked out from changed (a line, an add-in): the figure not typed follows, and the form's figures with it.</summary>
     internal void FollowPieceSize()
     {
-        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Batch().Sum(l => l.Grams) + Fold.FoldedWeight);
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(AuthoredField, AuthoredValue, Math.Max(Batch().Sum(l => l.Grams) - Sections.UsedElsewhere, 0m));
 
         // Rounded to the 2 decimals the box shows, half to even as it always has been: the figure can be saved as typed.
         if (AuthoredField == UsageAuthoredField.WeightPerPiece)
@@ -504,11 +501,11 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
 
     /// <summary>
     /// The form's batch, as each line's grams and cost per gram (buffered, unless the screen isn't): both its tables, the
-    /// recipe and this product's add-ins on top of it, leaving out any row with no ingredient picked yet. Everything the form
-    /// works out from the batch reads it here, so add-ins reach all of it at once.
+    /// recipe and this product's add-ins on top of it, lines that are other sections included, leaving out any row with
+    /// nothing picked yet. Everything the form works out from the batch reads it here, so add-ins reach all of it at once.
     /// </summary>
     internal IReadOnlyList<(decimal Grams, decimal CostPerGram)> Batch() =>
-        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
+        [.. FormLines.Concat(FormAddIns).Where(l => l.Ingredient is not null || l.IsSection).Select(l => (l.Grams ?? 0m, l.CostPerGram))];
 
     /// <summary>The batch that goes in, e.g. "1,700 g".</summary>
     public string UsageFormTotalWeightText => _figures.Value.TotalWeightText;
@@ -545,7 +542,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// </summary>
     internal void Recompute()
     {
-        var totalWeight = SubAssemblyRules.CalculateTotals(Batch()).TotalWeight + Fold.FoldedWeight;
+        var totalWeight = SubAssemblyRules.CalculateTotals(Batch()).TotalWeight;
         var formulaBase = IngredientLineRow.ApplyFormulaBase([.. FormLines], totalWeight);
         FormFormulaBase = formulaBase;
         IngredientLineRow.ApplyFormulaBase(FormAddIns, formulaBase, totalWeight);
@@ -555,8 +552,8 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     private UsageFormFigures Figures() =>
         UsageFormFigures.Of(
             Batch(),
-            FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams) ?? 0m,
-            (Fold.FoldedWeight, Fold.FoldedIn.Sum(f => f.Batch.CostAt(_host.CostBasis)), Fold.GoesWhole ? Fold.Target.Name : null),
+            FormAddIns.Where(l => l.Ingredient is not null || l.IsSection).Sum(l => l.Grams) ?? 0m,
+            (Sections.UsedElsewhere, Sections.Users),
             AuthoredField,
             AuthoredValue,
             FormFormulaBase,
@@ -647,18 +644,18 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         return AuthoredValue == value && (value == 0 || AuthoredField == field);
     }
 
-    /// <summary>Puts <paramref name="lines"/> in the form's lines table, in place of whatever it held.</summary>
-    internal void ShowLines(IEnumerable<SectionLine> lines)
+    /// <summary>Puts <paramref name="lines"/> in the form's lines table, in place of whatever it held, and <paramref name="sectionRows"/> at their places.</summary>
+    internal void ShowLines(IEnumerable<SectionLine> lines, IEnumerable<(int Position, IngredientLineRow Row)>? sectionRows = null)
     {
         FormLines.Clear();
-        FormLines.AddRange(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)));
+        FormLines.AddRange(IngredientLineRow.Merged(lines.Select(l => new IngredientLineRow(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent)), sectionRows ?? []));
     }
 
     /// <summary>The same for the add-ins table under it.</summary>
-    internal void ShowAddIns(IEnumerable<SectionLine> addIns)
+    internal void ShowAddIns(IEnumerable<SectionLine> addIns, IEnumerable<(int Position, IngredientLineRow Row)>? sectionRows = null)
     {
         FormAddIns.Clear();
-        FormAddIns.AddRange(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)));
+        FormAddIns.AddRange(IngredientLineRow.Merged(addIns.Select(a => new IngredientLineRow(a.Ingredient, a.Grams)), sectionRows ?? []));
     }
 
     /// <summary>Whether the lines table still shows <paramref name="lines"/>, with nothing typed into it since.</summary>
@@ -679,6 +676,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         IngredientLineRow.Resolve(FormLines, ingredientsById);
         IngredientLineRow.Resolve(FormAddIns, ingredientsById);
+        Sections.RefreshPicks();
     }
 
     /// <summary>Every row priced at the screen's cost basis again: Unbuffered or Buffered was pressed.</summary>

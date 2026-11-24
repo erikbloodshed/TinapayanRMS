@@ -309,9 +309,9 @@
 
     private static string PieceSizeText(PrintedSection section, bool withCost)
     {
-        if (section.GoesIntoName is { } into)
+        if (section.IsUsedElsewhere)
         {
-            return $"Goes whole into {into}, whose piece size shares it out.";
+            return "No pieces of its own: the recipe's other sections use it on their lines.";
         }
 
         if (!section.HasPieceSize)
@@ -511,10 +511,6 @@
             </thead>
             <tbody>
                 @foreach (var line in section.Lines)
-                {
-                    @LineRow(line, withNow)
-                }
-                @foreach (var line in section.FoldedIn)
                 {
                     @LineRow(line, withNow)
                 }

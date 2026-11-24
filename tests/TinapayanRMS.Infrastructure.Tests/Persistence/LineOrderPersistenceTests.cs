@@ -160,7 +160,7 @@ public class LineOrderPersistenceTests(DatabaseFixture fixture) : PersistenceTes
         await SaveRecipeAsync(productId, new RecipeDraft([], [Linked((ubeId, 20m), (cheeseId, 50m), (pandanId, 5m))]));
         await SaveRecipeAsync(productId, new RecipeDraft([], [Linked((pandanId, 5m), (ubeId, 20m), (cheeseId, 50m))]));
 
-        var addIns = await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetAddInsForProductAsync(productId, Cancellation);
+        var addIns = (await new ProductSubAssemblyUsageRepository(CreateDbContextFactory()).GetLinesForProductAsync(productId, Cancellation)).AddIns;
         addIns.Select(l => l.IngredientId).Should().Equal(pandanId, ubeId, cheeseId);
         addIns.Select(l => l.SortOrder).Should().Equal(0, 1, 2);
     }

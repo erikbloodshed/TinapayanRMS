@@ -27,6 +27,7 @@ public static class ProductVersionSnapshot
 
         var linesBySubAssembly = detail.SubAssemblyLines.ToLookup(l => l.SubAssemblyId);
         var addInsByUsage = detail.AddIns.ToLookup(a => a.UsageId);
+        var sectionUsesByUsage = detail.SectionUses.ToLookup(l => l.UsageId);
         List<VersionSection> sections = [];
         foreach (var usage in detail.Usages)
         {
@@ -46,7 +47,9 @@ public static class ProductVersionSnapshot
                 [.. lines.Select(l => new VersionLine(l.IngredientId, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
                 [.. addIns.Select(a => new VersionAddIn(a.IngredientId, a.Grams))],
                 SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name)),
-                usage.GoesIntoSubAssemblyId));
+                SectionLines: sectionUsesByUsage[usage.Id] is var uses && uses.Any()
+                    ? [.. uses.Select(l => new VersionSectionLine(l.SectionSubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))]
+                    : null));
         }
 
         // As the Packaging tab shows them (PackagingLineRow.FromSaved): a line saved as pieces per unit is its quantity per
@@ -131,11 +134,12 @@ public static class ProductVersionSnapshot
         List<ProductSubAssemblyUsage> usages = [];
         List<SubAssemblyLine> lines = [];
         List<UsageAddInLine> addIns = [];
+        List<UsageSectionLine> sectionUses = [];
         for (var i = 0; i < content.Sections.Count; i++)
         {
             var section = content.Sections[i];
 
-            // A usage id of its own, which only its add-ins need to find it by.
+            // A usage id of its own, which only its add-ins and lines that are sections need to find it by.
             var usageId = i + 1;
             var role = new SubAssemblyRole
             {
@@ -161,7 +165,6 @@ public static class ProductVersionSnapshot
                 },
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
-                GoesIntoSubAssemblyId = section.GoesIntoSubAssemblyId,
             });
             lines.AddRange(section.Lines.Select((l, sortOrder) => new SubAssemblyLine
             {
@@ -180,6 +183,14 @@ public static class ProductVersionSnapshot
                 Ingredient = MaterialOf(a.IngredientId),
                 Grams = a.Grams,
                 SortOrder = sortOrder,
+            }));
+            sectionUses.AddRange((section.SectionLines ?? []).Select(l => new UsageSectionLine
+            {
+                UsageId = usageId,
+                SectionSubAssemblyId = l.SubAssemblyId,
+                Grams = l.Grams,
+                AuthoredBakersPercent = l.AuthoredBakersPercent,
+                Position = l.Position,
             }));
         }
 
@@ -223,6 +234,7 @@ public static class ProductVersionSnapshot
 
         var detail = new ProductDetail(link, usages, packaging, costing, lines, addIns)
         {
+            SectionUses = sectionUses,
             BulkLines = PackagingOf(isBulk: true),
             WastagePercent = wastagePercentNow ?? content.WastagePercent ?? 0m,
             VatPercent = vatPercentNow ?? content.VatThen,

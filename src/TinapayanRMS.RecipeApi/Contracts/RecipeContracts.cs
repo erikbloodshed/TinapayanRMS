@@ -111,15 +111,19 @@ public sealed record ComponentInfo(int ProductId, int Quantity);
 
 /// <summary>
 /// One section of a product's recipe: the sub-assembly it's made from, how big a piece is, its lines and the product's own
-/// add-ins on top, in grams per batch.
+/// add-ins on top, in grams per batch, and its lines that are the product's other sections.
 /// </summary>
 /// <param name="SectionName">Its tab's name: its role, with its label when the role comes more than once ("Filling: Ube").</param>
 /// <param name="LinkedName">The linked sub-assembly's name; null for the product's own section.</param>
 /// <param name="AuthoredField">WeightPerPiece or Yield: which of the two <paramref name="AuthoredValue"/> is.</param>
 /// <param name="GoesIntoSubAssemblyId">
-/// The <paramref name="SubAssemblyId"/> of the product's other section this one goes into whole, as a sponge into the dough;
-/// null for one cut into pieces itself. Its whole batch is then in that one's, and it has no piece size of its own
-/// (<paramref name="AuthoredValue"/> 0): make one batch of it for each batch of that one.
+/// No longer set, always null: from 2026-11-23 to 11-24 a section could go whole into another, which
+/// <paramref name="SectionLines"/> replaced. Kept, as a field once served is never taken away.
+/// </param>
+/// <param name="SectionLines">
+/// Its lines that are the product's other sections, as a sponge on the dough's lines, in grams per batch of this one; empty
+/// for most. Make that much of each for each batch of this one: the rest of its batch is its own pieces, if it has a piece
+/// size, which share out only what's left.
 /// </param>
 public sealed record SectionInfo(
     int SubAssemblyId,
@@ -130,7 +134,11 @@ public sealed record SectionInfo(
     decimal AuthoredValue,
     IReadOnlyList<PlanLine> Lines,
     IReadOnlyList<PlanLine> AddIns,
-    int? GoesIntoSubAssemblyId = null);
+    int? GoesIntoSubAssemblyId = null,
+    IReadOnlyList<SectionLineInfo>? SectionLines = null);
+
+/// <summary>A line of a section that is another of the product's sections, by its <see cref="SectionInfo.SubAssemblyId"/>, and its grams.</summary>
+public sealed record SectionLineInfo(int SubAssemblyId, string SectionName, decimal Grams);
 
 /// <summary>An ingredient and its grams: a line of a section of a product's recipe, or one of its add-ins.</summary>
 public sealed record PlanLine(int IngredientId, string Ingredient, decimal Grams);

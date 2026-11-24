@@ -167,7 +167,7 @@ public sealed record RecipeSnapshot
                 || a.LinkedName != b.LinkedName
                 || a.AuthoredField != b.AuthoredField
                 || a.AuthoredValue != b.AuthoredValue
-                || SectionFormSnapshot.IndexOfKey(left, a.GoesInto) != SectionFormSnapshot.IndexOfKey(right, b.GoesInto)
+                || !SectionFormSnapshot.PlacedSectionLines(a.SectionLines, left).SequenceEqual(SectionFormSnapshot.PlacedSectionLines(b.SectionLines, right))
                 || !LinesShowSame(a.Lines, b.Lines)
                 || !LinesShowSame(a.AddIns, b.AddIns))
             {
@@ -214,12 +214,6 @@ public sealed record SectionFormSnapshot
     public required decimal WeightPerPiece { get; init; }
     public required decimal Yield { get; init; }
 
-    /// <summary>
-    /// The place among the recipe's sections of the one the form says this one goes into whole (UsageFormFold.TargetKey);
-    /// null for none. By place, as <see cref="EditingUsageIndex"/> is, since a Save reads a new section back under a new key.
-    /// </summary>
-    public int? GoesIntoIndex { get; init; }
-
     /// <summary>The place among <paramref name="sections"/> of the one keyed <paramref name="key"/>; null for none, -1 for one not among them.</summary>
     public static int? IndexOfKey(IReadOnlyList<ProductUsageEdit> sections, long? key)
     {
@@ -239,10 +233,18 @@ public sealed record SectionFormSnapshot
         return -1;
     }
 
-    /// <summary>Whether the form's lines, as kept, are <paramref name="lines"/>: nothing typed over them there.</summary>
+    /// <summary>
+    /// <paramref name="sectionLines"/>, lines that are sections, each by the place among <paramref name="sections"/> of the
+    /// section it is (by place, as <see cref="EditingUsageIndex"/> is, since a Save reads a new section back under a new key).
+    /// </summary>
+    public static IEnumerable<(int? Index, decimal Grams, decimal? AuthoredBakersPercent, int Position)> PlacedSectionLines(
+        IReadOnlyList<UsedSectionEdit> sectionLines, IReadOnlyList<ProductUsageEdit> sections) =>
+        sectionLines.Select(l => (IndexOfKey(sections, l.Key), l.Grams, l.AuthoredBakersPercent, l.Position));
+
+    /// <summary>Whether the form's ingredient lines, as kept, are <paramref name="lines"/>: nothing typed over them there.</summary>
     public bool ShowsLines(IReadOnlyList<SectionLine> lines) =>
-        Lines.Count == lines.Count
-        && Lines.Zip(lines).All(pair =>
+        IngredientRows(Lines).Count == lines.Count
+        && IngredientRows(Lines).Zip(lines).All(pair =>
             pair.First.IngredientId == pair.Second.Ingredient.Id
             && pair.First.Grams == pair.Second.Grams
             && pair.First.IsFormulaBase == pair.Second.IsFormulaBase
@@ -254,8 +256,8 @@ public sealed record SectionFormSnapshot
 
     /// <summary>
     /// Whether anything is typed into the form over <paramref name="section"/>, the <paramref name="index"/>th of the
-    /// recipe's <paramref name="sections"/>, and not applied: lines, add-ins, the piece size, what it goes into, and, for
-    /// one that's not linked, its role and name.
+    /// recipe's <paramref name="sections"/>, and not applied: lines, add-ins, lines that are sections, the piece size, and,
+    /// for one that's not linked, its role and name.
     /// </summary>
     public bool IsTypedInto(int index, ProductUsageEdit section, IReadOnlyList<ProductUsageEdit> sections) =>
         HasLinesTypedInto(index, section)
@@ -263,12 +265,25 @@ public sealed record SectionFormSnapshot
             && (!ShowsAddIns(section.AddIns)
                 || AuthoredField != section.AuthoredField
                 || (AuthoredField == UsageAuthoredField.WeightPerPiece ? WeightPerPiece : Yield) != section.AuthoredValue
-                || GoesIntoIndex != IndexOfKey(sections, section.GoesInto)
+                || !SectionRows(section.IsLinked ? AddIns : Lines).SequenceEqual(PlacedSectionLines(section.SectionLines, sections))
                 || (!section.IsLinked && (RoleId != section.Role?.Id || Name != section.Name))));
 
     private bool ShowsAddIns(IReadOnlyList<SectionLine> addIns) =>
-        AddIns.Count == addIns.Count
-        && AddIns.Zip(addIns).All(pair => pair.First.IngredientId == pair.Second.Ingredient.Id && pair.First.Grams == pair.Second.Grams);
+        IngredientRows(AddIns).Count == addIns.Count
+        && IngredientRows(AddIns).Zip(addIns).All(pair => pair.First.IngredientId == pair.Second.Ingredient.Id && pair.First.Grams == pair.Second.Grams);
+
+    /// <summary>A table's rows that aren't sections: its ingredients', as kept.</summary>
+    private static List<IngredientLineSnapshot> IngredientRows(IReadOnlyList<IngredientLineSnapshot> rows) => [.. rows.Where(r => r.SectionIndex is null)];
+
+    /// <summary>
+    /// A table's rows that are sections, each with its place among the rows that aren't blank: what Apply makes of them
+    /// (IngredientLineRow.CompleteSectionLines).
+    /// </summary>
+    private static IEnumerable<(int? Index, decimal Grams, decimal? AuthoredBakersPercent, int Position)> SectionRows(IReadOnlyList<IngredientLineSnapshot> rows) =>
+        rows.Where(r => r.IngredientId is not null || r.SectionIndex is not null || r.Grams is not (null or 0m))
+            .Select((r, position) => (r, position))
+            .Where(p => p.r.SectionIndex is not null)
+            .Select(p => (p.r.SectionIndex, p.r.Grams ?? 0m, p.r.AuthoredBakersPercent, p.position));
 
     /// <summary>The form looks the same: every field, its lines and add-ins line by line.</summary>
     public bool ShowsSameAs(SectionFormSnapshot other) =>
@@ -287,8 +302,7 @@ public sealed record SectionFormSnapshot
         && FormulaBase == other.FormulaBase
         && AuthoredField == other.AuthoredField
         && WeightPerPiece == other.WeightPerPiece
-        && Yield == other.Yield
-        && GoesIntoIndex == other.GoesIntoIndex;
+        && Yield == other.Yield;
 }
 
 /// <summary>

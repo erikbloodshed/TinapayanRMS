@@ -135,11 +135,10 @@ public class ProductsStateSequenceTests(DatabaseFixture fixture) : PersistenceTe
             return;
         }
 
-        var fold = form.Fold;
         var expected = UsageFormFigures.Of(
             form.Batch(),
-            form.FormAddIns.Where(l => l.Ingredient is not null).Sum(l => l.Grams) ?? 0m,
-            (fold.FoldedWeight, fold.FoldedIn.Sum(f => f.Batch.CostAt(state.Costing.CostBasis)), fold.GoesWhole ? fold.Target.Name : null),
+            form.FormAddIns.Where(l => l.Ingredient is not null || l.IsSection).Sum(l => l.Grams) ?? 0m,
+            (form.Sections.UsedElsewhere, form.Sections.Users),
             form.AuthoredField,
             form.AuthoredValue,
             form.FormFormulaBase,

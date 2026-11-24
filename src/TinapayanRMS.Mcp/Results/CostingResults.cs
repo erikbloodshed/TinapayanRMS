@@ -74,9 +74,9 @@ public sealed record ProductCostSheet(
 
 /// <summary>
 /// One section of a recipe (a sub-assembly it uses): its batch, how much of it a piece takes, and its lines. Line and
-/// batch costs are for the whole batch; CostPerPiece is what one piece takes of it, add-ins included. A section that goes
-/// whole into another (GoesInto, that one's name) is in that one's batch, and costs nothing per piece itself; the batch of
-/// one that others go into includes theirs (FoldedInGrams; null when none do).
+/// batch costs are for the whole batch; CostPerPiece is what one piece takes of it, add-ins included. Its lines that are the
+/// recipe's other sections (SectionLines, each named by the section and costed at its cost per gram; null when none) are in
+/// its batch; what the others use of it (UsedElsewhereGrams; null when nothing) leaves the rest for its own pieces.
 /// </summary>
 public sealed record SectionCosting(
     string Name,
@@ -88,8 +88,8 @@ public sealed record SectionCosting(
     decimal CostPerPiece,
     IReadOnlyList<LineCosting> Lines,
     IReadOnlyList<LineCosting> AddIns,
-    string? GoesInto = null,
-    decimal? FoldedInGrams = null)
+    IReadOnlyList<LineCosting>? SectionLines = null,
+    decimal? UsedElsewhereGrams = null)
 {
     public static SectionCosting From(PricedSection section, CostBasis basis) => new(
         section.SectionName,
@@ -101,8 +101,10 @@ public sealed record SectionCosting(
         section.CostPerPieceAt(basis),
         [.. section.Lines.Select(l => LineCosting.From(l, basis))],
         [.. section.AddIns.Select(l => LineCosting.From(l, basis))],
-        section.GoesIntoName,
-        section.FoldedIn.Count > 0 ? section.Figures.FoldedInWeight : null);
+        section.SectionLines.Count > 0
+            ? [.. section.SectionLines.Select(l => new LineCosting(l.SectionName, l.Grams, l.CostPerGramAt(basis), l.CostAt(basis)))]
+            : null,
+        section.IsUsedElsewhere ? section.Figures.UsedElsewhereWeight : null);
 }
 
 public sealed record LineCosting(string Ingredient, decimal Grams, decimal CostPerGram, decimal Cost)

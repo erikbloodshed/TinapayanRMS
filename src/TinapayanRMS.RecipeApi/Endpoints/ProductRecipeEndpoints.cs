@@ -58,7 +58,7 @@ public static class ProductRecipeEndpoints
                 s.AuthoredValue,
                 [.. s.Lines.Select(l => new PlanLine(l.Ingredient.Id, l.Ingredient.Name, l.Grams))],
                 [.. s.AddIns.Select(a => new PlanLine(a.Ingredient.Id, a.Ingredient.Name, a.Grams))],
-                s.GoesIntoSubAssemblyId)),
+                SectionLines: [.. s.SectionLines.Select(l => new SectionLineInfo(l.SubAssemblyId, l.SectionName, l.Grams))])),
         ],
         saved.Costs.WastagePercent,
         PackagingPerUnit(saved),

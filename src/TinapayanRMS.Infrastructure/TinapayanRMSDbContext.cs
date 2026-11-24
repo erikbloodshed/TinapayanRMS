@@ -98,6 +98,8 @@ public sealed class TinapayanRMSDbContext : DbContext
 
     public DbSet<UsageAddInLine> UsageAddInLines => Set<UsageAddInLine>();
 
+    public DbSet<UsageSectionLine> UsageSectionLines => Set<UsageSectionLine>();
+
     public DbSet<PackagingLine> PackagingLines => Set<PackagingLine>();
 
     public DbSet<CostingParameters> CostingParameters => Set<CostingParameters>();

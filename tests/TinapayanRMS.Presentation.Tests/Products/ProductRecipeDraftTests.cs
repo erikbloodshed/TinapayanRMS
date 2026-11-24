@@ -273,7 +273,7 @@ public class ProductRecipeDraftTests
             Draft.Show(
                 [Usage(81, 51, UsageAuthoredField.WeightPerPiece, 280m), Usage(82, 41, UsageAuthoredField.WeightPerPiece, 15m)],
                 [.. _keptLines.Where(l => l.SubAssemblyId is 51 or 41)],
-                [new UsageAddInLine { UsageId = 82, IngredientId = 24, Ingredient = Ingredients.First(i => i.Id == 24), Grams = 5m }]);
+                new UsageLines([new UsageAddInLine { UsageId = 82, IngredientId = 24, Ingredient = Ingredients.First(i => i.Id == 24), Grams = 5m }], []));
             History.MarkClean();
             Start = Capture();
             _model = new UndoModel<Snapshot>(
@@ -342,8 +342,9 @@ public class ProductRecipeDraftTests
             ShouldHoldItsRules(when);
 
             List<ProductUsageEdit> sections = [.. Draft.UsageEdits];
-            int? IndexOf(long? key) => key is { } k && sections.FindIndex(u => u.Key == k) is var i and >= 0 ? i : null;
-            var fresh = SectionFolds.Apply([.. sections.Select(u => u.ToPriced())], [.. sections.Select(u => IndexOf(u.GoesInto))]);
+            var fresh = SectionUses.Apply(
+                [.. sections.Select(u => u.ToPriced())],
+                [.. sections.Select(u => (IReadOnlyList<int>)[.. u.SectionLines.Select(l => sections.FindIndex(s => s.Key == l.Key))])]);
             Draft.Priced().Select(p => p.Figures).Should().Equal(fresh.Select(p => p.Figures), $"{when}, the recipe's figures follow its sections");
         }
 
@@ -449,10 +450,10 @@ public class ProductRecipeDraftTests
                     break;
                 case EditLines(var row, var ingredient, var grams) when At(row) is { } usage:
                     IReadOnlyList<SectionLine> lines = [.. usage.Lines.Where(l => l.Ingredient.Id != Ingredients[ingredient].Id), new SectionLine(Ingredients[ingredient], grams)];
-                    Draft.ReplaceInRecipeOrder(usage, usage.IsLinked ? usage.WithLinkedForm(lines, usage.AuthoredField, usage.AuthoredValue, usage.AddIns, usage.GoesInto) : usage.With(usage.Role, lines));
+                    Draft.ReplaceInRecipeOrder(usage, usage.IsLinked ? usage.WithLinkedForm(lines, usage.AuthoredField, usage.AuthoredValue, usage.AddIns, usage.SectionLines) : usage.With(usage.Role, lines));
                     break;
                 case PieceSize(var row, var yield, var value) when At(row) is { IsLinked: true } usage:
-                    Draft.ReplaceInRecipeOrder(usage, usage.WithLinkedForm(usage.Lines, yield ? UsageAuthoredField.Yield : UsageAuthoredField.WeightPerPiece, value, usage.AddIns, usage.GoesInto));
+                    Draft.ReplaceInRecipeOrder(usage, usage.WithLinkedForm(usage.Lines, yield ? UsageAuthoredField.Yield : UsageAuthoredField.WeightPerPiece, value, usage.AddIns, usage.SectionLines));
                     break;
                 case Remove(var row) when At(row) is { } usage:
                     sections.Remove(usage);

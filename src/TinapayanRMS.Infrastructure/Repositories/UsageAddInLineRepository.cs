@@ -7,7 +7,7 @@ namespace TinapayanRMS.Infrastructure.Repositories;
 
 /// <summary>
 /// Writes a linked usage's add-ins. There's no read side here: they're loaded with the product's usages
-/// (<see cref="ProductSubAssemblyUsageRepository.GetAddInsForProductAsync"/>), as a usage's own detail.
+/// (<see cref="ProductSubAssemblyUsageRepository.GetLinesForProductAsync"/>), as a usage's own detail.
 /// </summary>
 public static class UsageAddInLineRepository
 {

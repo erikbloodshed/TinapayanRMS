@@ -54,7 +54,8 @@ public class RecipeApiContractTests(DatabaseFixture fixture) : PersistenceTestBa
             "[].sections[].role", "[].sections[].authoredField", "[].sections[].authoredValue", "[].sections[].lines",
             "[].sections[].lines[].ingredientId", "[].sections[].lines[].ingredient", "[].sections[].lines[].grams",
             "[].sections[].addIns", "[].sections[].addIns[].ingredientId", "[].sections[].addIns[].ingredient",
-            "[].sections[].addIns[].grams", "[].sections[].goesIntoSubAssemblyId", "[].wastagePercent", "[].packagingPerUnit", "[].packagingPerUnit[].materialId",
+            "[].sections[].addIns[].grams", "[].sections[].goesIntoSubAssemblyId", "[].sections[].sectionLines",
+            "[].sections[].sectionLines[].subAssemblyId", "[].sections[].sectionLines[].sectionName", "[].sections[].sectionLines[].grams", "[].wastagePercent", "[].packagingPerUnit", "[].packagingPerUnit[].materialId",
             "[].packagingPerUnit[].baseQuantity", "[].includesComponentPackaging", "[].costing", "[].costing.currentPrice",
             "[].costing.sellingPrice", "[].costing.vatPercent", "[].costing.baseCost",
         ]),
@@ -90,8 +91,8 @@ public class RecipeApiContractTests(DatabaseFixture fixture) : PersistenceTestBa
     }
 
     /// <summary>
-    /// One of each thing the JSON can hold, so no list comes back empty: a made ingredient, a linked recipe with an add-in,
-    /// packaging, and a composite. Returns the linked recipe's id, a mix.
+    /// One of each thing the JSON can hold, so no list comes back empty: a made ingredient, a linked recipe with an add-in
+    /// and a line that is the product's other section, packaging, and a composite. Returns the linked recipe's id, a mix.
     /// </summary>
     private async Task<int> AddBakeryAsync()
     {
@@ -100,12 +101,22 @@ public class RecipeApiContractTests(DatabaseFixture fixture) : PersistenceTestBa
         var ubeId = await AddIngredientAsync("Ube");
         await AddMadeIngredientAsync("Syrup", [(waterId, 100m), (flourId, 10m)]);
         var doughId = await AddRecipeAsync("Sweet Dough", [(flourId, 1000m), (waterId, 500m)]);
+        var spongeId = await AddRecipeAsync("Ube Sponge", [(flourId, 200m), (waterId, 200m)]);
 
         var boxId = await AddPackagingAsync("Box");
         var products = new ProductRepository(CreateDbContextFactory());
         var ubeBunId = await products.SaveAsync(
             new Product { Name = "Ube Bun" },
-            new RecipeDraft([], [new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m) { AddIns = [(ubeId, 20m)] }]),
+            new RecipeDraft(
+                [],
+                [
+                    new LinkedUsageDraft(doughId, UsageAuthoredField.WeightPerPiece, 50m)
+                    {
+                        AddIns = [(ubeId, 20m)],
+                        SectionLines = [new SectionLineDraft(spongeId, 100m, null, 1)],
+                    },
+                    new LinkedUsageDraft(spongeId, UsageAuthoredField.WeightPerPiece, 0m),
+                ]),
             packagingLink: null,
             [(boxId, null, PackagingLineAuthoredField.QtyPerUnit, 1m)],
             costing: null,

@@ -32,8 +32,9 @@ internal static class Columns
         [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at", "bulk_packaging_quantity", "folder_id"],
         [typeof(ProductFolder)] = ["id", "name", "stage", "parent_id"],
         [typeof(ProductComponent)] = ["id", "product_id", "component_product_id", "quantity", "sort_order"],
-        [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value", "goes_into_sub_assembly_id"],
+        [typeof(ProductSubAssemblyUsage)] = ["id", "product_id", "sub_assembly_id", "authored_field", "authored_value"],
         [typeof(UsageAddInLine)] = ["id", "usage_id", "ingredient_id", "grams", "sort_order"],
+        [typeof(UsageSectionLine)] = ["id", "usage_id", "section_sub_assembly_id", "grams", "authored_bakers_percent", "position"],
         [typeof(PackagingLine)] =
             ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order", "is_bulk"],
         [typeof(CostingParameters)] =

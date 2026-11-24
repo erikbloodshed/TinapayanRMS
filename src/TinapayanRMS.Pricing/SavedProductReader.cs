@@ -16,6 +16,9 @@ public sealed record ProductDetail(
     IReadOnlyList<SubAssemblyLine> SubAssemblyLines,
     IReadOnlyList<UsageAddInLine> AddIns)
 {
+    /// <summary>Its lines that are others of its sections (UsageSectionLine), each in its section's order; none for most.</summary>
+    public IReadOnlyList<UsageSectionLine> SectionUses { get; init; } = [];
+
     /// <summary>A composite's products, in its Products table's order, each with its recipe and packaging costs as saved; none for a product made of sub-assemblies.</summary>
     public IReadOnlyList<SavedComponent> Components { get; init; } = [];
 
@@ -110,11 +113,11 @@ public sealed record SavedProduct(
     public string? BulkPackagingLinkedTo { get; init; }
 
     /// <summary>
-    /// Its sections with no weight per piece or yield (<see cref="PricedSection.HasPieceSize"/>), by name, in recipe order:
-    /// each costs it nothing per piece, so its cost and price leave that section out until one is typed. The Products list
-    /// and Reports flag them. Never one that goes whole into another, which that one's piece size shares out.
+    /// Its sections with no weight per piece or yield to cost it by (<see cref="PricedSection.LacksPieceSize"/>), by name, in
+    /// recipe order: each costs it nothing per piece, so its cost and price leave that section out until one is typed. The
+    /// Products list and Reports flag them. Never one with none that another section uses, which costs through that one.
     /// </summary>
-    public IReadOnlyList<string> SectionsWithoutPieceSize => [.. Sections.Where(s => !s.HasPieceSize && !s.GoesWhole).Select(s => s.SectionName)];
+    public IReadOnlyList<string> SectionsWithoutPieceSize => [.. Sections.Where(s => s.LacksPieceSize).Select(s => s.SectionName)];
 }
 
 /// <summary>
@@ -180,7 +183,7 @@ public sealed class SavedProductReader(
         var packaging = await packagingLineRepository.GetEffectiveForProductsAsync(ids, cancellationToken);
         var packagingByProduct = packaging.Lines;
         var costingsByProduct = (await costingParametersRepository.GetForProductsAsync(ids, cancellationToken)).ToDictionary(c => c.ProductId);
-        var addIns = await usageRepository.GetAddInsForProductsAsync(ids, cancellationToken);
+        var usageLines = await usageRepository.GetLinesForProductsAsync(ids, cancellationToken);
         var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLines = await subAssemblyLineRepository.GetForSubAssembliesAsync([.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
         var costingDefaults = await costingDefaultsRepository.GetAsync(cancellationToken);
@@ -188,7 +191,8 @@ public sealed class SavedProductReader(
 
         var usagesByProduct = usages.ToLookup(u => u.ProductId);
         var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
-        var addInsByProduct = addIns.ToLookup(a => productIdByUsage[a.UsageId]);
+        var addInsByProduct = usageLines.AddIns.ToLookup(a => productIdByUsage[a.UsageId]);
+        var sectionUsesByProduct = usageLines.SectionLines.ToLookup(l => productIdByUsage[l.UsageId]);
         var sectionLinesBySubAssembly = sectionLines.ToLookup(l => l.SubAssemblyId);
 
         // Each product put together from what was read, a composite's products before it: what one brings is its own
@@ -219,6 +223,8 @@ public sealed class SavedProductReader(
                 [.. productUsages.Select(u => u.SubAssemblyId).Distinct().SelectMany(id => sectionLinesBySubAssembly[id])],
                 [.. addInsByProduct[productId]])
             {
+                SectionUses = [.. sectionUsesByProduct[productId]],
+
                 // Its category's, when that sets one; a composite's own, never its products'.
                 WastagePercent = categoryWastage.TryGetValue(productId, out var wastage) ? wastage : costingDefaults.WastagePercent,
                 VatPercent = costingDefaults.VatPercent,
@@ -388,18 +394,19 @@ public sealed class SavedProductReader(
     {
         var linesBySubAssembly = detail.SubAssemblyLines.ToLookup(l => l.SubAssemblyId);
         var addInsByUsage = detail.AddIns.ToLookup(a => a.UsageId);
+        var sectionUsesByUsage = detail.SectionUses.ToLookup(l => l.UsageId);
 
         // Two sections in one role are told apart by their labels, "Dough" beside "Dough: Paste", as the screen tells them.
         var repeatedRoles = PricedSection.RepeatedRoles(detail.Usages.Select(u => u.SubAssembly!.Role?.Id ?? 0));
-        // A section that goes whole into another is in that one's batch, and counts for nothing per piece itself.
-        var sections = SectionFolds.Apply(
+        // A section on another's lines costs that one its grams, and its own pieces come of what's left of it.
+        var sections = SectionUses.Apply(
         [
             .. detail.Usages
                 .Select(u =>
                 {
                     var role = u.SubAssembly!.Role;
                     return PricedSection.FromSaved(
-                        u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], role, product.Name, repeatedRoles.Contains(role?.Id ?? 0), materialsById);
+                        u, linesBySubAssembly[u.SubAssemblyId], addInsByUsage[u.Id], sectionUsesByUsage[u.Id], role, product.Name, repeatedRoles.Contains(role?.Id ?? 0), materialsById);
                 })
                 .Order(PricedSection.RecipeOrder),
         ]);
@@ -412,7 +419,7 @@ public sealed class SavedProductReader(
             Parts =
             [
                 .. detail.Components.Select(c => (c.LineName, c.CostAt(basis))),
-                .. sections.Where(u => !u.GoesWhole).Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
+                .. sections.Select(u => (u.SectionName, u.CostPerPieceAt(basis))),
             ],
             QuantityRequired = product.QuantityRequired,
             PackagingCosts = [.. packagingLines.Select(l => l.CostPerUnit), .. bulk is null ? [] : new[] { bulk.CostPerUnit }],

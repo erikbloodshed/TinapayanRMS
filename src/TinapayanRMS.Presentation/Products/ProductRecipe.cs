@@ -165,19 +165,17 @@ public sealed class ProductRecipe : ObservableState
         MoveToSubAssembliesCommand = ScreenCommand.Of<ProductUsageEdit>(usage => host.AsUndoStep(() =>
         {
             var wasEditing = ReferenceEquals(usage, usageForm.EditingUsage);
-            var applied = usage;
-            if (wasEditing)
+            ProductUsageEdit applied;
+            try
             {
-                try
-                {
-                    host.ShowError(null);
-                    applied = ApplyUsageForm();
-                }
-                catch (BusinessRuleException ex)
-                {
-                    host.ShowError(ex.Message);
-                    return;
-                }
+                host.ShowError(null);
+                applied = wasEditing ? ApplyUsageForm() : usage;
+                applied.EnsureNoSectionLines();
+            }
+            catch (BusinessRuleException ex)
+            {
+                host.ShowError(ex.Message);
+                return;
             }
 
             var moving = applied.Released();
@@ -198,6 +196,7 @@ public sealed class ProductRecipe : ObservableState
             () => host.RunSafelyAsync(() =>
             {
                 var usage = ((SubAssemblyRecipeTab)SelectedRecipeTab!).Usage;
+                RecipeSectionLines.EnsureNotUsedElsewhere(Draft, usage);
                 host.AsUndoStep(() =>
                 {
                     // Whatever was typed into its form goes with it, rather than being applied on the way out.
@@ -205,9 +204,6 @@ public sealed class ProductRecipe : ObservableState
                     {
                         CloseUsageForm();
                     }
-
-                    // What went into it is freed first, so the neighbour's form opens on the section as it now is.
-                    var freed = Draft.FreeFoldsInto(usage);
 
                     // Its neighbour's tab shows instead: the next sub-assembly's, else the one before, else a composite's
                     // Products, else Packaging.
@@ -218,10 +214,6 @@ public sealed class ProductRecipe : ObservableState
                     UsageEdits.Remove(usage);
                     RefreshLinkableOptions();
                     host.InvalidateCosts();
-                    if (freed.Count > 0)
-                    {
-                        host.ShowSuccess($"{string.Join(", ", freed)} went into {usage.SectionName}. Give {(freed.Count == 1 ? "it" : "them")} a weight per piece or yield.");
-                    }
                 });
                 return Task.CompletedTask;
             }),
@@ -361,7 +353,7 @@ public sealed class ProductRecipe : ObservableState
 
     /// <summary>The saved usages as sections, in recipe order; they're also what Save compares the recipe against.</summary>
     internal void ShowSaved(
-        IReadOnlyList<ProductSubAssemblyUsage> usages, IReadOnlyList<SubAssemblyLine> subAssemblyLines, IReadOnlyList<UsageAddInLine> addIns)
+        IReadOnlyList<ProductSubAssemblyUsage> usages, IReadOnlyList<SubAssemblyLine> subAssemblyLines, UsageLines usageLines)
     {
         // Another product's recipe opens on its first tab; the same product's, reloaded, keeps the tab it showed. Its
         // section is read now, before the tabs take on the new sections.
@@ -374,7 +366,7 @@ public sealed class ProductRecipe : ObservableState
         // clean form's reload (RecordScreenState.FollowSavedVersion), the next Save, or a change of tab, applied its old rows
         // over the save the reload had just shown.
         CloseUsageForm();
-        Draft.Show(usages, subAssemblyLines, addIns);
+        Draft.Show(usages, subAssemblyLines, usageLines);
         ReselectRecipeTab(previousTab, previousUsage, previousIds);
     }
 
@@ -632,7 +624,7 @@ public sealed class ProductRecipe : ObservableState
         _usageForm.PickRole(_usageForm.FormRoleOptions.FirstOrDefault(r => !takenRoleIds.Contains(r.Id)) ?? _usageForm.FormRoleOptions.FirstOrDefault());
         _usageForm.EditingUsageName = null;
         _usageForm.PickSource(null);
-        _usageForm.Fold.Show(Draft.FoldTargetsFor(null), null, []);
+        SectionFormCapture.ShowSections(_usageForm, null, Draft);
         _usageForm.StartPieceSize();
     }
 
@@ -678,13 +670,13 @@ public sealed class ProductRecipe : ObservableState
                 role,
                 lines,
                 _usageForm.AuthoredField,
-                _usageForm.Fold.GoesWhole ? 0m : _usageForm.AuthoredValue,
+                _usageForm.AuthoredValue,
                 subAssembly.Name,
                 [.. addIns.Where(a => !lineIngredientIds.Contains(a.Ingredient.Id)).Select(a => new SectionLine(a.Ingredient, a.Grams))],
                 Draft.SectionLabelOf(subAssembly.Name, role))
             {
                 Key = linked.Key,
-                GoesInto = _usageForm.Fold.TargetKey,
+                SectionLines = SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, subAssembly.Name),
             };
             Draft.EnsureSectionsDistinct(replacement, linked);
 
@@ -775,18 +767,16 @@ public sealed class ProductRecipe : ObservableState
         var made = new MadeIngredientDraft(name, categories[answer.Choice].Id);
         _host.AsUndoStep(() =>
         {
-            var applied = usage;
-            if (wasEditing)
+            ProductUsageEdit applied;
+            try
             {
-                try
-                {
-                    applied = ApplyUsageForm();
-                }
-                catch (BusinessRuleException ex)
-                {
-                    _host.ShowError(ex.Message);
-                    return;
-                }
+                applied = wasEditing ? ApplyUsageForm() : usage;
+                applied.EnsureNoSectionLines();
+            }
+            catch (BusinessRuleException ex)
+            {
+                _host.ShowError(ex.Message);
+                return;
             }
 
             var moving = applied.MovedToInHouse(made);
@@ -806,7 +796,7 @@ public sealed class ProductRecipe : ObservableState
     /// </summary>
     private ProductUsageEdit ApplyUsageForm()
     {
-        var authoredValue = _usageForm.Fold.GoesWhole ? 0m : _usageForm.AuthoredValue;
+        var authoredValue = _usageForm.AuthoredValue;
         ProductUsageEdit usage;
 
         if (_usageForm.EditingUsage is { IsLinked: true } linked)
@@ -820,7 +810,7 @@ public sealed class ProductRecipe : ObservableState
 
             IReadOnlyList<SectionLine> lineEdits = [.. lines.Select(l => new SectionLine(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
             usage = linked.WithLinkedForm(
-                lineEdits, _usageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits), _usageForm.Fold.TargetKey);
+                lineEdits, _usageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits), SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, linked.DisplayName));
         }
         else if (_usageForm.IsFormEditingLines)
         {
@@ -839,7 +829,7 @@ public sealed class ProductRecipe : ObservableState
                 _usageForm.EditingUsage is { IsOwned: true } own ? own.SubAssemblyId : 0, role, [.. lines.Select(l => new SectionLine(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], _usageForm.AuthoredField, authoredValue, linkedName: null, name: _usageForm.EditingUsageName, isOwn: _usageForm.EditingUsage?.IsOwned == true, isReleasing: _usageForm.EditingUsage?.IsReleasing == true, toMadeIngredient: _usageForm.EditingUsage?.ToMadeIngredient)
             {
                 Key = _usageForm.EditingUsage?.Key ?? ProductUsageEdit.NewKey(),
-                GoesInto = _usageForm.Fold.TargetKey,
+                SectionLines = SectionFormCapture.SectionLinesOf(_usageForm.FormLines, role.Name),
             };
         }
         else
@@ -869,7 +859,7 @@ public sealed class ProductRecipe : ObservableState
                 CompleteAddIns(sourceName, sourceLines),
                 Draft.SectionLabelOf(source.Name, role))
             {
-                GoesInto = _usageForm.Fold.TargetKey,
+                SectionLines = SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, sourceName),
             };
         }
 
@@ -1008,7 +998,7 @@ public sealed class ProductRecipe : ObservableState
         {
             tab.RefreshHeader();
         }
-        SectionFormCapture.FollowFoldedIn(_usageForm, Draft);
+        SectionFormCapture.FollowSections(_usageForm, Draft);
     }
 
     /// <summary>Closes the section form, as a restore, another product or a section taken out closes it.</summary>
@@ -1049,12 +1039,13 @@ public sealed class ProductRecipe : ObservableState
         _choices.RefreshRoles();
         _usageForm.EditingUsageRole = _usageForm.FormRoleOptions.FirstOrDefault(r => r.Id == usage.RoleId) ?? usage.Role;
         _usageForm.EditingUsageName = usage.Name;
-        _usageForm.Fold.Show(Draft.FoldTargetsFor(usage), usage.GoesInto, Draft.FoldedInto(usage));
+        SectionFormCapture.ShowSections(_usageForm, usage, Draft);
 
         // A linked one's lines show too, read-only: they're the Sub-Assemblies screen's. What is this product's is its piece
-        // size and its add-ins, which go in the table under them, open if there are any.
-        _usageForm.ShowLines(usage.Lines);
-        _usageForm.ShowAddIns(usage.AddIns);
+        // size and its add-ins, which go in the table under them, open if there are any, with its lines that are sections.
+        var sectionRows = SectionFormCapture.SectionRows(usage, Draft);
+        _usageForm.ShowLines(usage.Lines, usage.IsEditable ? sectionRows : null);
+        _usageForm.ShowAddIns(usage.AddIns, usage.IsEditable ? null : sectionRows);
         _usageForm.SelectedFormLine = null;
         _usageForm.SelectedFormAddIn = null;
         _usageForm.ShowPieceSize(usage.AuthoredField, usage.AuthoredValue);

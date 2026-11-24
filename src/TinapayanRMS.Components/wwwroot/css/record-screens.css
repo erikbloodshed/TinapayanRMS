@@ -739,13 +739,6 @@
     background: #fafbfc;
 }
 
-/* A section's whole batch going into this one (IngredientLinesGrid's FoldedRows): shown, never typed into. */
-.line-grid tr.folded-row td {
-    background: var(--accent-soft);
-    color: var(--muted-foreground);
-    font-style: italic;
-}
-
 .line-grid .cell-number,
 .line-grid .cell-text {
     padding: 0 8px;

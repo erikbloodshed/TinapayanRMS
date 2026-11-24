@@ -40,35 +40,53 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 splitOn: "Id,Id,Id")).AsList(),
             cancellationToken);
 
-    // The Ingredient comes with it: every add-in is priced from its BufferedCostPerBaseUnit on read.
-    public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
-        GetAddInsAsync("u.product_id = @productId", new { productId }, cancellationToken);
+    public Task<UsageLines> GetLinesForProductAsync(int productId, CancellationToken cancellationToken) =>
+        GetLinesAsync("u.product_id = @productId", new { productId }, cancellationToken);
 
-    public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
+    public async Task<UsageLines> GetLinesForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
-            ? []
-            : await GetAddInsAsync($"u.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
+            ? UsageLines.None
+            : await GetLinesAsync($"u.product_id IN ({DapperReads.IdsTable})", new { ids = DapperReads.IdList(productIds) }, cancellationToken);
 
-    private Task<IReadOnlyList<UsageAddInLine>> GetAddInsAsync(string filter, object parameters, CancellationToken cancellationToken) =>
-        dbContextFactory.ReadAsync<IReadOnlyList<UsageAddInLine>>(
-            async dbContext => (await dbContext.Connection().QueryAsync<UsageAddInLine, RawMaterial, UsageAddInLine>(
-                dbContext.Command(
-                    $"""
-                    SELECT {Columns.Of<UsageAddInLine>("l")}, {Columns.Of<RawMaterial>("i")}
-                    FROM usage_add_in_lines l
-                    JOIN product_sub_assembly_usages u ON u.id = l.usage_id
-                    JOIN raw_materials i ON i.id = l.ingredient_id
-                    WHERE {filter}
-                    ORDER BY u.product_id, l.sort_order, l.id
-                    """,
-                    parameters,
-                    cancellationToken),
-                (line, ingredient) =>
+    // One command of three reads: the add-ins, the ingredients they use (every add-in is priced from its
+    // BufferedCostPerBaseUnit on read), and the lines that are sections, so a product's read sends no more commands for them.
+    private Task<UsageLines> GetLinesAsync(string filter, object parameters, CancellationToken cancellationToken) =>
+        dbContextFactory.ReadAsync(
+            async dbContext =>
+            {
+                await using var reads = await dbContext.Connection().QueryMultipleAsync(
+                    dbContext.Command(
+                        $"""
+                        SELECT {Columns.Of<UsageAddInLine>("l")}
+                        FROM usage_add_in_lines l
+                        JOIN product_sub_assembly_usages u ON u.id = l.usage_id
+                        WHERE {filter}
+                        ORDER BY u.product_id, l.sort_order, l.id;
+                        SELECT {Columns.Of<RawMaterial>("i")}
+                        FROM raw_materials i
+                        WHERE i.id IN (
+                            SELECT l.ingredient_id
+                            FROM usage_add_in_lines l
+                            JOIN product_sub_assembly_usages u ON u.id = l.usage_id
+                            WHERE {filter});
+                        SELECT {Columns.Of<UsageSectionLine>("l")}
+                        FROM usage_section_lines l
+                        JOIN product_sub_assembly_usages u ON u.id = l.usage_id
+                        WHERE {filter}
+                        ORDER BY u.product_id, l.position, l.id
+                        """,
+                        parameters,
+                        cancellationToken));
+                var addIns = (await reads.ReadAsync<UsageAddInLine>()).AsList();
+                var ingredients = (await reads.ReadAsync<RawMaterial>()).ToDictionary(i => i.Id);
+                var sectionLines = (await reads.ReadAsync<UsageSectionLine>()).AsList();
+                foreach (var addIn in addIns)
                 {
-                    line.Ingredient = ingredient;
-                    return line;
-                },
-                splitOn: "Id")).AsList(),
+                    addIn.Ingredient = ingredients[addIn.IngredientId];
+                }
+
+                return new UsageLines(addIns, sectionLines);
+            },
             cancellationToken);
 
     /// <summary>
@@ -279,16 +297,18 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.LabelIn(s, productId, productName, s.Role.Name))),
         ]);
 
-        // A section that goes whole into another goes into one of this recipe's, without a piece size, and never round
-        // into itself; each is named by its id, or a new one's stand-in (RecipeDraft.SectionIdOf).
-        ProductRules.EnsureValidFolds(
+        // A section on another's lines is one of this recipe's, once there, with grams, and never round on its own; each is
+        // named by its id, or a new one's stand-in (RecipeDraft.SectionIdOf).
+        ProductRules.EnsureValidSectionLines(
         [
             .. recipe.New.Select((n, i) => (
                 RecipeDraft.SectionIdOf(n.Id, i),
-                n.GoesInto,
-                n.AuthoredValue,
-                SubAssemblyRules.NormalizeName(n.SectionName) is { } label ? $"{roles[n.RoleId].Name}: {label}" : roles[n.RoleId].Name)),
-            .. recipe.Linked.Select(l => (l.SubAssemblyId, l.GoesInto, l.AuthoredValue, linkedSubAssemblies[l.SubAssemblyId].Name)),
+                SubAssemblyRules.NormalizeName(n.SectionName) is { } label ? $"{roles[n.RoleId].Name}: {label}" : roles[n.RoleId].Name,
+                (IReadOnlyList<(int, decimal)>)[.. n.SectionLines.Select(l => (l.SectionId, l.Grams))])),
+            .. recipe.Linked.Select(l => (
+                l.SubAssemblyId,
+                linkedSubAssemblies[l.SubAssemblyId].Name,
+                (IReadOnlyList<(int, decimal)>)[.. l.SectionLines.Select(line => (line.SectionId, line.Grams))])),
         ]);
 
         // Add-ins go on top of a linked recipe, so they're only for what it doesn't already have: its lines as this save
@@ -399,7 +419,7 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         // piece size.
         List<string> takenNames = recipe.New.Any(n => n.Id == 0) ? await dbContext.SubAssemblies.Select(s => s.Name).ToListAsync(cancellationToken) : [];
         Dictionary<int, int> subAssemblyIdOf = recipe.Linked.ToDictionary(l => l.SubAssemblyId, l => l.SubAssemblyId);
-        List<(int? GoesInto, ProductSubAssemblyUsage Usage)> usages = [];
+        List<(IReadOnlyList<SectionLineDraft> SectionLines, ProductSubAssemblyUsage Usage)> usages = [];
         foreach (var (section, index) in recipe.New.Select((n, i) => (n, i)))
         {
             SubAssembly subAssembly;
@@ -446,7 +466,7 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
             };
             dbContext.ProductSubAssemblyUsages.Add(usage);
             subAssemblyIdOf[RecipeDraft.SectionIdOf(section.Id, index)] = subAssembly.Id;
-            usages.Add((section.GoesInto, usage));
+            usages.Add((section.SectionLines, usage));
         }
 
         // A linked one whose lines were changed in this recipe is relined where it's kept, before its add-ins are checked
@@ -475,12 +495,18 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         dbContext.ProductSubAssemblyUsages.AddRange(linkedUsages.Select(p => p.Usage));
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Every section has its sub-assembly now, so one going whole into another can say which (by its id, a new one's
-        // stand-in in the draft), written by the save below.
-        foreach (var (goesInto, usage) in usages.Concat(linkedUsages.Select(p => (p.Draft.GoesInto, p.Usage))))
-        {
-            usage.GoesIntoSubAssemblyId = goesInto is { } id ? subAssemblyIdOf[id] : null;
-        }
+        // Every section has its sub-assembly and its usage its id now, so a line that's another section can say which (by its
+        // id, a new one's stand-in in the draft), written by the save below.
+        dbContext.UsageSectionLines.AddRange(
+            usages.Concat(linkedUsages.Select(p => (p.Draft.SectionLines, p.Usage)))
+                .SelectMany(p => p.SectionLines.Select(l => new UsageSectionLine
+                {
+                    UsageId = p.Usage.Id,
+                    SectionSubAssemblyId = subAssemblyIdOf[l.SectionId],
+                    Grams = l.Grams,
+                    AuthoredBakersPercent = l.AuthoredBakersPercent,
+                    Position = l.Position,
+                })));
 
         // This product's own extra ingredients on top of a linked recipe. They belong to the usage, not to
         // the sub-assembly, so two products linking the same one each keep their own.

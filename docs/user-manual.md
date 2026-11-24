@@ -135,7 +135,7 @@ The figure you typed stays put. If the batch changes, the other figure is worked
 
 A new section in a **product-owned** role, such as a Topping or a Filling, starts at a **Yield of 1**: one piece takes the whole batch. Its Weight/piece is then the total of the Grams column, and it follows the lines as you type them and whenever you change them later. Type a weight per piece or a yield instead if the batch makes more than one piece. A section in any other role, and any section you link, starts with no piece size.
 
-A section that [goes whole into another](#a-section-that-goes-whole-into-another) has no piece size of its own: the one it goes into shares it out.
+A section that's [on another's lines](#a-section-on-another-sections-lines) makes its pieces of what that one leaves of its batch. It needn't have a piece size at all: the one that uses it counts its cost.
 
 ### Baker's % and Absolute %
 
@@ -797,28 +797,30 @@ Each section's tab shows its form:
 
 - **Role**, and an optional **Name**. The name tells apart two sections in the same role, such as *Filling: Ube* and *Filling: Cheese*, here and wherever the saved product shows: Reports, printouts and the Price Simulator.
 - **Existing Sub-Assembly** picker, when you're linking or copying.
-- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece.
+- **The lines table**: **Ingredient**, **Grams**, the Baker's % or Absolute %, **Cost/g**, **Cost** and **Base**. Under it are **Insert Line**, **Remove Line** and the section's cost per piece. The Ingredient list also has the recipe's other sections, such as *Sponge (section)* (see below).
 - **Batch parameters**:
-  - **Goes into**: another section of this recipe whose batch this one's whole batch goes into, or **Nothing** (see below). It shows once the recipe has another section.
-  - **Weight/piece (g)** and **Yield (pcs)**: type either one. They're hidden while the section goes into another.
-  - **Total weight**: the batch, including add-ins and any section that goes into it whole, which the pieces share out
+  - **Weight/piece (g)** and **Yield (pcs)**: type either one.
+  - **Total weight**: the batch, including add-ins and any section on its lines, which the pieces share out, less what other sections use of it
 - **Cost/piece** and **Batch cost** tiles.
 
 You don't need a piece size to add a section or to save it. Its cost per piece reads 0 until you enter one. A new or copied section in a product-owned role already has one: a Yield of 1 (see [Piece size](#piece-size-weight-per-piece-and-yield)).
 
 A section's changes go into the recipe when you leave its tab, or when you press Save. **Undo** after leaving the tab takes the change back in one step and shows that section's tab again, as it was before you typed.
 
-#### A section that goes whole into another
+#### A section on another section's lines
 
-Some sections are mixed whole into another: a sponge or a tangzhong into the dough, say. Pick that one in the sponge's **Goes into**, and:
+Some sections go into another: a sponge or a tangzhong into the dough, say. On the dough's tab, pick **Sponge (section)** in a line's Ingredient list, just above the ingredients, and type its grams, or its Baker's %, as for any line:
 
-- The dough's lines table shows the sponge under its lines as a shaded row, **Sponge (whole batch)**, with its grams, percentage and cost. The row is for reading: change the sponge on its own tab, and the dough follows.
-- The dough's **Total weight** and **Batch cost** include the sponge's whole batch, and so do its Weight/piece and Yield, which share it out. With nothing ticked as the base, the dough's Absolute % are of the whole batch, the sponge included.
-- The sponge has no piece size of its own: its Weight/piece and Yield are hidden, its **Cost/piece** reads —, and the product counts its cost once, in the dough's pieces. It isn't flagged for having no piece size.
-- The sponge keeps its own tab and lines, and can be linked or the product's own, like any section. One section can go into another that goes into a third, but never back round into itself, so **Goes into** only offers the sections that can take it.
-- Removing the dough leaves the sponge with pieces of its own again, with no piece size until you type one. A message says so.
+- The line costs its grams at the sponge's cost per gram, and the dough's **Total weight**, **Batch cost** and pieces take it in, as any line's.
+- Change the sponge on its own tab, and the dough's line follows its cost.
+- The sponge's own pieces are of what the dough leaves. Its tab says how much the dough uses, and its **Yield** shares out the rest. It needn't have a piece size: with none, the dough counts its cost, and it isn't flagged for having no piece size. With a Yield and nothing left, it is.
+- The sponge keeps its own tab and lines, and can be linked or the product's own, like any section. A section can be on several sections' lines, and one on another's that's on a third's, but never back round on its own, so the list only offers the sections that can go in. A section is never part of the Base.
+- On a linked section, whose lines are kept on Sub-Assemblies, put the sponge in its **Add-Ins** instead.
+- A section another uses can't be deleted from the recipe: take it off the other's lines first. Deleting the dough takes its line of the sponge with it.
 
-Printouts show the sponge under the dough's lines too, and the sponge's piece size reads *Goes whole into Dough*. The History tab lists a section going into another, or no longer, as a change.
+Before 24 November 2026 a section could instead go whole into another, with a **Goes into** picker. The update took that setting away: put the section on the other's lines with its whole batch's grams, and save.
+
+Printouts show the sponge among the dough's lines too. The History tab lists a section's line added, changed or taken off, as any line's.
 
 #### Linked sections
 
@@ -1258,7 +1260,7 @@ This happens as soon as you save. A product you had open on the Products screen 
 ### A product's sections
 
 - Cost per piece = batch cost × weight per piece ÷ batch weight (including add-ins). This is the same as batch cost ÷ yield.
-- A section that goes whole into another adds its whole batch, weight and cost, to that one's batch, and costs nothing per piece itself.
+- A section on another's lines costs that one its grams at its own cost per gram: its batch cost ÷ its batch weight. Its own pieces are of what's left: its batch weight less what the others use of it.
 
 ### The selling price (cost-plus)
 

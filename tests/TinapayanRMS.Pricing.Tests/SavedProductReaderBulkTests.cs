@@ -258,12 +258,12 @@ public class SavedProductReaderBulkTests(DatabaseFixture fixture) : PersistenceT
         public Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
             inner.GetForProductsAsync(productIds, cancellationToken);
 
-        public Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken) =>
-            inner.GetAddInsForProductAsync(productId, cancellationToken);
+        public Task<UsageLines> GetLinesForProductAsync(int productId, CancellationToken cancellationToken) =>
+            inner.GetLinesForProductAsync(productId, cancellationToken);
 
-        public async Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
+        public async Task<UsageLines> GetLinesForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken)
         {
-            var addIns = await inner.GetAddInsForProductsAsync(productIds, cancellationToken);
+            var addIns = await inner.GetLinesForProductsAsync(productIds, cancellationToken);
             if (!HasSaved)
             {
                 HasSaved = true;

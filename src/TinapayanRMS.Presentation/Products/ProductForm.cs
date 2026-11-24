@@ -1169,7 +1169,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // next, so they can reselect the Packaging tab if it showed (ProductDraft.ShowParts).
         SetComposite(product.IsComposite);
         Draft.ShowParts(detail, product.BulkPackagingQuantity);
-        Recipe.ShowSaved(detail.Usages, detail.SubAssemblyLines, detail.AddIns);
+        Recipe.ShowSaved(detail.Usages, detail.SubAssemblyLines, new UsageLines(detail.AddIns, detail.SectionUses));
         Costing.Load(detail.Costing);
         Recipe.RefreshLinkableOptions();
         RefreshComponentOptions();

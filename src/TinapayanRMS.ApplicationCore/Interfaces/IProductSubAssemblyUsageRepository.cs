@@ -15,13 +15,19 @@ public interface IProductSubAssemblyUsageRepository
     Task<IReadOnlyList<ProductSubAssemblyUsage>> GetForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The product's add-ins: its own extra ingredients on top of the recipes it links, each with its
-    /// Ingredient, in one query. Keyed by UsageId, not by sub-assembly — a product's add-ins are its own,
-    /// so two products linking the same sub-assembly each have their own set. Written by
-    /// IProductRepository.SaveAsync.
+    /// The product's own lines on its sections, in one command: its add-ins, its extra ingredients on top of the recipes it
+    /// links, each with its Ingredient, and its lines that are others of its sections (UsageSectionLine). Keyed by UsageId,
+    /// not by sub-assembly: they're the product's own, so two products linking the same sub-assembly each have their own.
+    /// Written by IProductRepository.SaveAsync.
     /// </summary>
-    Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductAsync(int productId, CancellationToken cancellationToken);
+    Task<UsageLines> GetLinesForProductAsync(int productId, CancellationToken cancellationToken);
 
-    /// <summary>GetAddInsForProductAsync for several products at once, in one query; each line's UsageId says whose it is.</summary>
-    Task<IReadOnlyList<UsageAddInLine>> GetAddInsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+    /// <summary>GetLinesForProductAsync for several products at once, in one command; each line's UsageId says whose it is.</summary>
+    Task<UsageLines> GetLinesForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+}
+
+/// <summary>A product's own lines on its sections (IProductSubAssemblyUsageRepository.GetLinesForProductAsync), each in its table's order.</summary>
+public sealed record UsageLines(IReadOnlyList<UsageAddInLine> AddIns, IReadOnlyList<UsageSectionLine> SectionLines)
+{
+    public static UsageLines None { get; } = new([], []);
 }

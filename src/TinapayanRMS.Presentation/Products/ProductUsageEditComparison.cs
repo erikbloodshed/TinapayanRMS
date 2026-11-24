@@ -17,7 +17,7 @@ public static class ProductUsageEditComparison
         && usage.Name == other.Name
         && usage.AuthoredField == other.AuthoredField
         && usage.AuthoredValue == other.AuthoredValue
-        && usage.GoesInto == other.GoesInto
+        && usage.SectionLines.SequenceEqual(other.SectionLines)
         && usage.AreLinkedLinesEdited == other.AreLinkedLinesEdited
         && usage.HasSameKeptLines(other)
         && usage.Lines.Count == other.Lines.Count

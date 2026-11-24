@@ -164,11 +164,8 @@ public sealed record PrintedSection(
     /// <summary>On the Price Simulator report, the batch's cost at today's prices, when a price change moves it; null otherwise.</summary>
     public decimal? NowBatchCost { get; init; }
 
-    /// <summary>What the section goes into whole, "Dough"; null for one cut into pieces itself, which then has no piece size.</summary>
-    public string? GoesIntoName { get; init; }
-
-    /// <summary>The recipe's sections that go into this one whole, each as a line of its whole batch, after its lines.</summary>
-    public IReadOnlyList<PrintedLine> FoldedIn { get; init; } = [];
+    /// <summary>Some of its batch is on the recipe's other sections' lines, and it has no piece size: they cost it, so it isn't one lacking a size.</summary>
+    public bool IsUsedElsewhere { get; init; }
 
     /// <summary>The section as its recipe tab shows it, at <paramref name="basis"/>.</summary>
     public static PrintedSection From(PricedSection section, CostBasis basis)
@@ -183,12 +180,16 @@ public sealed record PrintedSection(
         PrintedLine Line(SectionLine line) =>
             new(line.Ingredient.Name, line.Grams, PercentOf(line.Grams), line.CostPerGramAt(basis), line.CostAt(basis));
 
+        // Its lines that are the recipe's other sections, each at its place among its lines, or a linked one's add-ins.
+        var sectionLines = section.SectionLines.Select(l =>
+            (l.Position, new PrintedLine($"{l.SectionName} (section)", l.Grams, PercentOf(l.Grams), l.CostPerGramAt(basis), l.CostAt(basis))));
+
         return new(
             section.SectionName,
             section.LinkedFrom,
             IngredientLineRow.PercentHeader(formulaBase),
-            [.. section.Lines.Select(Line)],
-            [.. section.AddIns.Select(Line)],
+            IngredientLineRow.Merged(section.Lines.Select(Line), section.IsLinked ? [] : sectionLines),
+            IngredientLineRow.Merged(section.AddIns.Select(Line), section.IsLinked ? sectionLines : []),
             section.TotalWeight,
             PercentOf(section.TotalWeight),
             section.TotalCostAt(basis),
@@ -197,16 +198,7 @@ public sealed record PrintedSection(
             section.CostPerPieceAt(basis),
             section.HasPieceSize)
         {
-            GoesIntoName = section.GoesIntoName,
-            FoldedIn =
-            [
-                .. section.FoldedIn.Select(f => new PrintedLine(
-                    $"{f.SectionName} (whole batch)",
-                    f.Batch.Weight,
-                    PercentOf(f.Batch.Weight),
-                    f.Batch.Weight > 0 ? f.Batch.CostAt(basis) / f.Batch.Weight : 0m,
-                    f.Batch.CostAt(basis))),
-            ],
+            IsUsedElsewhere = section.IsUsedElsewhere && !section.HasPieceSize,
         };
     }
 }
