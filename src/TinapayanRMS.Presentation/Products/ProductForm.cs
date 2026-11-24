@@ -862,23 +862,17 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
         // What's linked as it's kept now (ProductDraft.RebaseLinked): the linked packaging, read again for this product only
         // while it showed the link as saved, and the recipe's sections.
-        var (linkedSectionsChanged, linkedPackagingNow) = Draft.RebaseLinked(
+        var linkedPackagingNow = Draft.RebaseLinked(
             load.DetailProductId == _detailProductId && load.LinkedPackaging is { } now ? (load.SavedLinks.Link, load.SavedLinks.BulkLink, now) : null,
             read.LinkedSubAssemblies, read.LinkedLines, Recipe.CaptureForm());
 
-        // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll):
-        // an undo of something typed before the load would otherwise put back a linked sub-assembly's lines, or a linked
-        // packaging's, as they were before they were saved on the Sub-Assemblies screen.
-        if (linkedSectionsChanged || linkedPackagingNow is not null)
-        {
-            History.RewriteAll(snapshot => snapshot with
-            {
-                Recipe = linkedSectionsChanged
-                    ? Recipe.Draft.StepAsSavedNow(snapshot.Recipe, read.LinkedSubAssemblies, read.LinkedLines)
-                    : snapshot.Recipe,
-                Packaging = linkedPackagingNow is { } now ? ProductPackagingDraft.AsLinkedNow(snapshot.Packaging, now) : snapshot.Packaging,
-            });
-        }
+        // What came in from where it's kept is put into every undo and redo step too, as an outside save is (RewriteAll), on
+        // every load: an undo would otherwise put back a linked sub-assembly's lines, or a linked packaging's, as they were
+        // before they were saved elsewhere, or a section linked though the product owns it now, the form showing it or not.
+        var recipeAsSavedNow = Recipe.Draft.StepsAsSavedNow(read.LinkedSubAssemblies, read.LinkedLines);
+        History.RewriteAll(snapshot => recipeAsSavedNow(snapshot.Recipe) is var recipe && ReferenceEquals(recipe, snapshot.Recipe) && linkedPackagingNow is null
+            ? snapshot
+            : snapshot with { Recipe = recipe, Packaging = linkedPackagingNow is { } now ? ProductPackagingDraft.AsLinkedNow(snapshot.Packaging, now) : snapshot.Packaging });
 
         // The packaging lines at their materials' refreshed costs and units, in place, so a line being typed isn't lost.
         Packaging.Draft.ResolveRows();

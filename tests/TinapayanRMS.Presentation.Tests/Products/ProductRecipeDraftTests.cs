@@ -157,6 +157,27 @@ public class ProductRecipeDraftTests
     }
 
     [Test]
+    public void A_section_only_an_undo_step_holds_takes_its_role_made_product_owned_elsewhere()
+    {
+        // The cheese filling linked, then copied as the product's own: only the step before the copy holds it linked.
+        var world = new World();
+        world.Apply(new Link(SubAssembly: 2));
+        var cheese = world.Draft.UsageEdits.Single(u => u.SubAssemblyId == 43);
+        world.Apply(new CopyLinked(Row: world.Draft.UsageEdits.IndexOf(cheese), IsOwn: true));
+        world.Draft.UsageEdits.Should().NotContain(u => u.SubAssemblyId == 43);
+
+        // Its role made product-owned on the Sub-Assemblies screen, so this product owns it now.
+        world.Apply(new ChangedElsewhere(Kind: 3));
+        world.Apply(new Undo()).Should().BeTrue();
+
+        world.Draft.UsageEdits.Single(u => u.SubAssemblyId == 43).IsOwned.Should().BeTrue("the step was taken in as the form takes one the product owns now");
+        world.ShouldBeRight("undone");
+        var before = Describe(world.Draft.CurrentDraft());
+        world.Apply(new Load(CostsChanged: false));
+        Describe(world.Draft.CurrentDraft()).Should().Be(before, "the load finds it as the undo put it back");
+    }
+
+    [Test]
     public void A_linked_section_copied_becomes_a_new_one_of_its_lines_and_add_ins_at_its_piece_size()
     {
         var world = new World();
@@ -362,14 +383,17 @@ public class ProductRecipeDraftTests
 
                     Load(step is ProductRecipeDraftTests.Load { CostsChanged: true });
                     _restoring = true;
-                    if (Draft.RefreshRows(_kept, _keptLines))
-                    {
-                        // As the form does (ProductForm.TakeLoad): what came in from where it's kept goes into every step too, so
-                        // an undo never puts back a linked sub-assembly's lines as they were before they were saved there.
-                        History.RewriteAll(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
-                        _model.Rewritten(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
-                        Start = AsSavedNow(Start);
-                    }
+                    Draft.RefreshRows(_kept, _keptLines);
+
+                    // As the form does (ProductForm.TakeLoad), on every load: what came in from where it's kept goes into every
+                    // step too, the form showing it or not, so an undo never puts back a linked sub-assembly's lines as they
+                    // were before they were saved there, nor a section linked that the product owns now.
+                    var asSavedNow = Draft.StepsAsSavedNow(_kept, _keptLines);
+                    IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages) =>
+                        asSavedNow(new RecipeSnapshot { Usages = usages, SelectedTab = null, HasAddSubAssemblyTab = false, Form = ClosedForm }).Usages;
+                    History.RewriteAll(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
+                    _model.Rewritten(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
+                    Start = AsSavedNow(Start);
 
                     _restoring = false;
                     return false;
@@ -461,13 +485,7 @@ public class ProductRecipeDraftTests
             }
         }
 
-        /// <summary>
-        /// An undo step's sections as the sub-assemblies are kept now, as the form rewrites every step
-        /// (ProductRecipeDraft.StepAsSavedNow), the section form closed.
-        /// </summary>
-        private IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages) =>
-            Draft.StepAsSavedNow(new RecipeSnapshot { Usages = usages, SelectedTab = null, HasAddSubAssemblyTab = false, Form = ClosedForm }, _kept, _keptLines).Usages;
-
+        /// <summary>An undo step's section form, closed, for its sections to be taken in by a load (ProductRecipeDraft.StepsAsSavedNow).</summary>
         private static readonly SectionFormSnapshot ClosedForm = new()
         {
             IsOpen = false, IsAdding = false, Title = string.Empty, Mode = default, IsEditingLines = false, IsPickingSource = false,

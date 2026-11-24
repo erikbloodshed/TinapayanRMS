@@ -102,14 +102,14 @@ public class ProductDraftTests
         world.Draft.Packaging.LoadLink(new PackagingLink { LinkedSubAssemblyId = 81, LinkedSubAssembly = new SubAssembly { Id = 81, Name = "Standard Wrap" } });
         world.Draft.Packaging.LoadLines([Line(1m)]);
 
-        world.Draft.RebaseLinked(null, [], []).LinkedPackagingNow.Should().BeNull("the linked packaging wasn't read again");
-        world.Draft.RebaseLinked((set, null, new PackagingNow([Line(1m)], [])), [], []).LinkedPackagingNow.Should().BeNull("it's as it was");
+        world.Draft.RebaseLinked(null, [], []).Should().BeNull("the linked packaging wasn't read again");
+        world.Draft.RebaseLinked((set, null, new PackagingNow([Line(1m)], [])), [], []).Should().BeNull("it's as it was");
 
-        var renamed = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(1m)], [])), [], []).LinkedPackagingNow;
+        var renamed = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(1m)], [])), [], []);
         renamed.Should().NotBeNull("the set was renamed where it's kept");
         world.Draft.Packaging.PackagingLinkedToText.Should().Contain("Standard Wrap 10 x 14");
 
-        var moreLines = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(2m)], [])), [], []).LinkedPackagingNow;
+        var moreLines = world.Draft.RebaseLinked((set with { Name = "Standard Wrap 10 x 14" }, null, new PackagingNow([Line(2m)], [])), [], []);
         moreLines!.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "the set's lines changed where it's kept");
     }
 

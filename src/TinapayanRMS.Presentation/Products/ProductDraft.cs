@@ -195,12 +195,12 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     /// What a load brought from where it's kept, nothing typed changed (ADR 0007): the linked packaging as saved now
     /// (<paramref name="linkedPackaging"/>, the links the form still showed as saved, the packaging per piece's and the bulk
     /// packaging's, and what the product's packaging shows now; null when nothing was read again), and the recipe's sections
-    /// at the fresh ingredients, roles and linked sub-assemblies. What changed of what's linked, for the form's undo history
-    /// to take in too: whether a linked section did, and the packaging as it shows now when its linked lines or a name did.
-    /// The packaging's rows at their materials' refreshed costs are the form's to re-point after its history is rewritten
-    /// (ProductPackagingDraft.ResolveRows).
+    /// at the fresh ingredients, roles and linked sub-assemblies. The packaging as it shows now when its linked lines or a
+    /// name changed, for the form's undo history to take in too (the recipe's it takes in on every load,
+    /// ProductRecipeDraft.StepsAsSavedNow), else null. The packaging's rows at their materials' refreshed costs are the
+    /// form's to re-point after its history is rewritten (ProductPackagingDraft.ResolveRows).
     /// </summary>
-    internal (bool LinkedSectionsChanged, PackagingSnapshot? LinkedPackagingNow) RebaseLinked(
+    internal PackagingSnapshot? RebaseLinked(
         (PackagingLinkTarget? Link, PackagingLinkTarget? BulkLink, PackagingNow Now)? linkedPackaging,
         IReadOnlyList<SubAssembly> linkedSubAssemblies,
         IReadOnlyList<SubAssemblyLine> linkedLines,
@@ -213,8 +213,8 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             linkedPackagingNow = Packaging.Capture();
         }
 
-        var linkedSectionsChanged = Recipe.RefreshRows(linkedSubAssemblies, linkedLines, form);
-        return (linkedSectionsChanged, linkedPackagingNow);
+        Recipe.RefreshRows(linkedSubAssemblies, linkedLines, form);
+        return linkedPackagingNow;
     }
 
     /// <summary>

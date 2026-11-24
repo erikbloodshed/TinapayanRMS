@@ -164,11 +164,11 @@ public sealed class ProductRecipeDraft : ObservableState
     /// changed on other tabs reach the recipe and the cost summary. Only a section that shows something
     /// different is rebuilt. One whose role was made product-owned, or no longer, is the product's own now, or linked, but
     /// not while it's changed here (<see cref="IsChangedHere"/>): it stays as it's being edited, and Save is refused (ADR
-    /// 0007). The screen points the packaging rows at their refreshed materials the same way after. True when
-    /// a linked section came in changed from where it's kept, which the undo history then follows (<see cref="StepAsSavedNow"/>).
+    /// 0007). The screen points the packaging rows at their refreshed materials the same way after. The undo history takes
+    /// the load in too, every step of it (<see cref="StepsAsSavedNow"/>).
     /// </summary>
     /// <param name="form">The section form as it stands: what's typed into it is changed here too, applied or not.</param>
-    internal bool RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines, SectionFormSnapshot? form = null)
+    internal void RefreshRows(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines, SectionFormSnapshot? form = null)
     {
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
@@ -177,7 +177,6 @@ public sealed class ProductRecipeDraft : ObservableState
         var productId = _host.DetailProductId;
 
         var changed = false;
-        var linkedChanged = false;
         for (var i = 0; i < UsageEdits.Count; i++)
         {
             var edit = UsageEdits[i];
@@ -211,7 +210,6 @@ public sealed class ProductRecipeDraft : ObservableState
             {
                 UsageEdits[i] = fresh;
                 changed = true;
-                linkedChanged |= edit.IsLinked;
             }
         }
 
@@ -228,8 +226,6 @@ public sealed class ProductRecipeDraft : ObservableState
                 }
             }
         }
-
-        return linkedChanged;
     }
 
     /// <summary>
@@ -293,19 +289,27 @@ public sealed class ProductRecipeDraft : ObservableState
     }
 
     /// <summary>
-    /// An undo step's recipe (<paramref name="step"/>) with its linked sections as a load just found them saved where
+    /// What takes an undo step's recipe to its linked sections as a load just found them saved where
     /// they're kept (as <see cref="RefreshRows"/> brought them into the form), and the section form open on one of them
     /// showing it as saved now, unless it's typed into there. A linked one whose role was made product-owned is the
     /// product's own, as the form takes it, unless the step holds a change of the user's to it. What the product holds of
     /// its own (a piece size, add-ins, lines edited here and the ones they were changed from) stays as the step had it, and
     /// the sections are in recipe order again, a moved role moving its section, the form's and the tab's places with them.
-    /// An undo or a redo then never puts back a sub-assembly as it was before it was saved elsewhere.
+    /// An undo or a redo then never puts back a sub-assembly as it was before it was saved elsewhere. Every step is taken in
+    /// on every load, as one can hold a section the form no longer shows; one holding nothing that changed comes back as it
+    /// was, the same instance. What it reads of the load is looked up once, here, for all of them.
     /// </summary>
-    internal RecipeSnapshot StepAsSavedNow(RecipeSnapshot step, IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
+    internal Func<RecipeSnapshot, RecipeSnapshot> StepsAsSavedNow(IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
     {
         var ingredientsById = _ingredients.ToDictionary(m => m.Id);
         var linkedById = linkedSubAssemblies.ToDictionary(s => s.Id);
         var linkedLinesById = linkedLines.ToLookup(l => l.SubAssemblyId);
+        return step => StepAsSavedNow(step, ingredientsById, linkedById, linkedLinesById);
+    }
+
+    private RecipeSnapshot StepAsSavedNow(
+        RecipeSnapshot step, Dictionary<int, RawMaterial> ingredientsById, Dictionary<int, SubAssembly> linkedById, ILookup<int, SubAssemblyLine> linkedLinesById)
+    {
         var productId = _host.DetailProductId;
         List<ProductUsageEdit> usages = [.. step.Usages];
         var form = step.Form;
@@ -487,7 +491,7 @@ public sealed class ProductRecipeDraft : ObservableState
     /// them, by id, as a load points the sections at them (<see cref="Repriced"/>). A step keeps the copies it was taken
     /// with, so without this a section put back after a load that moved its ingredients' costs would show the old costs,
     /// the header's figures too, until the next load. A linked section a load found changed where it's kept is already as
-    /// kept in every step (StepAsSavedNow); its lines and add-ins are repriced here like any other's.
+    /// kept in every step (StepsAsSavedNow); its lines and add-ins are repriced here like any other's.
     /// </summary>
     internal void Restore(IReadOnlyList<ProductUsageEdit> sections)
     {
