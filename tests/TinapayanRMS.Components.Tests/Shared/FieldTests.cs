@@ -14,6 +14,44 @@ namespace TinapayanRMS.Components.Tests.Shared;
 /// </summary>
 public class FieldTests
 {
+    [Test]
+    public async Task A_change_with_nothing_typed_leaves_the_number_its_rounded_figure_stands_for()
+    {
+        // As the Vim keys' Esc raises one in a Baker's % cell showing 13.3 for 13.3333…%.
+        await using var context = AppServices.NewContext();
+        List<decimal?> typed = [];
+        var field = context.Render<NumberField<decimal?>>(parameters => parameters
+            .Add(f => f.Value, 13.333333m)
+            .Add(f => f.Format, "N1")
+            .Add(f => f.ValueChanged, typed.Add));
+
+        field.Find("input").Focus();
+        field.Find("input").Change("13.3");
+        field.Find("input").Blur();
+
+        typed.Should().BeEmpty("nothing was typed");
+    }
+
+    [Test]
+    public async Task The_figure_shown_typed_into_a_box_that_lands_on_leave_is_taken()
+    {
+        // Only the change passes it on here, so it's the change that's tested: typed, even the figure it showed, it's taken.
+        await using var context = AppServices.NewContext();
+        List<decimal?> typed = [];
+        var field = context.Render<NumberField<decimal?>>(parameters => parameters
+            .Add(f => f.Value, 13.333333m)
+            .Add(f => f.Format, "N1")
+            .Add(f => f.LandsOnLeave, true)
+            .Add(f => f.ValueChanged, typed.Add));
+
+        field.Find("input").Focus();
+        field.Find("input").Input("13.3");
+        typed.Should().BeEmpty("it lands only once it's left");
+        field.Find("input").Change("13.3");
+
+        typed.Should().Equal([13.3m]);
+    }
+
     public FieldTests() => CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("en-US");
 
     /// <summary>A screen's form as its boxes see it: which record it's for, and the undo steps they open and close.</summary>

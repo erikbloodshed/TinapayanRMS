@@ -190,7 +190,16 @@
             return;
         }
 
-        _typed = e.Value?.ToString() ?? "";
+        // A change raised with nothing typed since the box took the cursor, the box still holding the number as it was
+        // drawn (the Vim keys' Esc lands what's typed by raising one): the number stays as it is. Taken as typed, the
+        // rounded figure the box shows replaced it: 1,600 g of water shown as 13.3% became 1,596 g.
+        var value = e.Value?.ToString() ?? "";
+        if (_typed is null && value == _text)
+        {
+            return;
+        }
+
+        _typed = value;
         var text = _typed.Trim();
         if (text.Length == 0)
         {
