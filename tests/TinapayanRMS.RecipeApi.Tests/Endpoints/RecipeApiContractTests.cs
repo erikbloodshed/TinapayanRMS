@@ -55,7 +55,7 @@ public class RecipeApiContractTests(DatabaseFixture fixture) : PersistenceTestBa
             "[].sections[].lines[].ingredientId", "[].sections[].lines[].ingredient", "[].sections[].lines[].grams",
             "[].sections[].addIns", "[].sections[].addIns[].ingredientId", "[].sections[].addIns[].ingredient",
             "[].sections[].addIns[].grams", "[].sections[].goesIntoSubAssemblyId", "[].sections[].sectionLines",
-            "[].sections[].sectionLines[].subAssemblyId", "[].sections[].sectionLines[].sectionName", "[].sections[].sectionLines[].grams", "[].wastagePercent", "[].packagingPerUnit", "[].packagingPerUnit[].materialId",
+            "[].sections[].sectionLines[].subAssemblyId", "[].sections[].sectionLines[].sectionName", "[].sections[].sectionLines[].grams", "[].sections[].isLocked", "[].wastagePercent", "[].packagingPerUnit", "[].packagingPerUnit[].materialId",
             "[].packagingPerUnit[].baseQuantity", "[].includesComponentPackaging", "[].costing", "[].costing.currentPrice",
             "[].costing.sellingPrice", "[].costing.vatPercent", "[].costing.baseCost",
         ]),

@@ -22,7 +22,7 @@ public partial class ProductSubAssemblyUsageEntityType
             "TinapayanRMS.Domain.Entities.ProductSubAssemblyUsage",
             typeof(ProductSubAssemblyUsage),
             baseEntityType,
-            propertyCount: 5,
+            propertyCount: 6,
             navigationCount: 2,
             foreignKeyCount: 2,
             unnamedIndexCount: 2,
@@ -58,6 +58,15 @@ public partial class ProductSubAssemblyUsageEntityType
             sentinel: 0m);
         authoredValue.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         authoredValue.AddAnnotation("Relational:ColumnName", "authored_value");
+
+        var isUnlocked = runtimeEntityType.AddProperty(
+            "IsUnlocked",
+            typeof(bool),
+            propertyInfo: typeof(ProductSubAssemblyUsage).GetProperty("IsUnlocked", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductSubAssemblyUsage).GetField("<IsUnlocked>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        isUnlocked.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        isUnlocked.AddAnnotation("Relational:ColumnName", "is_unlocked");
 
         var productId = runtimeEntityType.AddProperty(
             "ProductId",

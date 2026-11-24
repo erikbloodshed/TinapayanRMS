@@ -55,10 +55,13 @@ public static class ProductRecipeEndpoints
                 s.LinkedName,
                 s.RoleName,
                 s.AuthoredField.ToString(),
-                s.AuthoredValue,
+
+                // A locked section has no pieces of its own, whatever piece size it keeps for when it's unlocked.
+                s.IsLocked ? 0m : s.AuthoredValue,
                 [.. s.Lines.Select(l => new PlanLine(l.Ingredient.Id, l.Ingredient.Name, l.Grams))],
                 [.. s.AddIns.Select(a => new PlanLine(a.Ingredient.Id, a.Ingredient.Name, a.Grams))],
-                SectionLines: [.. s.SectionLines.Select(l => new SectionLineInfo(l.SubAssemblyId, l.SectionName, l.Grams))])),
+                SectionLines: [.. s.SectionLines.Select(l => new SectionLineInfo(l.SubAssemblyId, l.SectionName, l.Grams))],
+                IsLocked: s.IsLocked)),
         ],
         saved.Costs.WastagePercent,
         PackagingPerUnit(saved),

@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261124054152_SectionLines";
+    public override string LastMigrationId => "20261124085149_SectionUnlock";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -750,6 +750,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("authored_value");
+
+                b.Property<bool>("IsUnlocked")
+                    .HasColumnType("boolean")
+                    .HasColumnName("is_unlocked");
 
                 b.Property<int>("ProductId")
                     .HasColumnType("integer")

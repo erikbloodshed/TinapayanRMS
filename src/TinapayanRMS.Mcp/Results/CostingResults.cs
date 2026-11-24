@@ -76,7 +76,8 @@ public sealed record ProductCostSheet(
 /// One section of a recipe (a sub-assembly it uses): its batch, how much of it a piece takes, and its lines. Line and
 /// batch costs are for the whole batch; CostPerPiece is what one piece takes of it, add-ins included. Its lines that are the
 /// recipe's other sections (SectionLines, each named by the section and costed at its cost per gram; null when none) are in
-/// its batch; what the others use of it (UsedElsewhereGrams; null when nothing) leaves the rest for its own pieces.
+/// its batch; what the others use of it (UsedElsewhereGrams; null when nothing) leaves the rest for its own pieces, unless it's
+/// locked as their ingredient (IsLocked; null when not), with no pieces of its own.
 /// </summary>
 public sealed record SectionCosting(
     string Name,
@@ -89,7 +90,8 @@ public sealed record SectionCosting(
     IReadOnlyList<LineCosting> Lines,
     IReadOnlyList<LineCosting> AddIns,
     IReadOnlyList<LineCosting>? SectionLines = null,
-    decimal? UsedElsewhereGrams = null)
+    decimal? UsedElsewhereGrams = null,
+    bool? IsLocked = null)
 {
     public static SectionCosting From(PricedSection section, CostBasis basis) => new(
         section.SectionName,
@@ -104,7 +106,8 @@ public sealed record SectionCosting(
         section.SectionLines.Count > 0
             ? [.. section.SectionLines.Select(l => new LineCosting(l.SectionName, l.Grams, l.CostPerGramAt(basis), l.CostAt(basis)))]
             : null,
-        section.IsUsedElsewhere ? section.Figures.UsedElsewhereWeight : null);
+        section.IsUsedElsewhere ? section.Figures.UsedElsewhereWeight : null,
+        section.IsLocked ? true : null);
 }
 
 public sealed record LineCosting(string Ingredient, decimal Grams, decimal CostPerGram, decimal Cost)

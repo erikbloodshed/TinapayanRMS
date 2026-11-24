@@ -151,6 +151,7 @@ public sealed class ProductRecipeDraft : ObservableState
         {
             Key = usage.Key,
             SectionLines = AfterLines(usage.SectionLines, usage.Lines.Count),
+            IsUnlocked = usage.IsUnlocked,
         };
 
     /// <summary>A linked section's lines that are other sections, placed among its add-ins, placed after <paramref name="lineCount"/> lines instead.</summary>
@@ -248,6 +249,7 @@ public sealed class ProductRecipeDraft : ObservableState
         {
             Key = edit.Key,
             SectionLines = AfterLines(edit.SectionLines, linkedLinesById[saved.Id].Count()),
+            IsUnlocked = edit.IsUnlocked,
         };
 
     /// <summary>
@@ -264,8 +266,8 @@ public sealed class ProductRecipeDraft : ObservableState
         }
 
         return edit.IsLinked
-            ? (_savedRecipe.Linked.FirstOrDefault(l => l.SubAssemblyId == edit.SubAssemblyId) is { } linked ? !SavesSame(LinkedDraftOf(edit, SectionIdsByKey()), linked) : edit.AreLinkedLinesEdited)
-            : _savedRecipe.New.FirstOrDefault(n => n.Id == edit.SubAssemblyId) is not { } own || !SavesSame(OwnDraftOf(edit, SectionIdsByKey()), own);
+            ? (_savedRecipe.Linked.FirstOrDefault(l => l.SubAssemblyId == edit.SubAssemblyId) is { } linked ? !SavesSame(LinkedDraftOf(edit, SectionIdsByKey(), UsedKeys()), linked) : edit.AreLinkedLinesEdited)
+            : _savedRecipe.New.FirstOrDefault(n => n.Id == edit.SubAssemblyId) is not { } own || !SavesSame(OwnDraftOf(edit, SectionIdsByKey(), UsedKeys()), own);
     }
 
     /// <summary>
@@ -502,7 +504,8 @@ public sealed class ProductRecipeDraft : ObservableState
         .. sections
             .Select((s, i) => s.Keyed(
                 version[i].SubAssemblyId,
-                [.. (version[i].SectionLines ?? []).Select(l => new UsedSectionEdit(l.SubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))]))
+                [.. (version[i].SectionLines ?? []).Select(l => new UsedSectionEdit(l.SubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))],
+                version[i].IsUnlocked == true))
             .Order(ProductUsageEdit.RecipeOrder),
     ];
 
@@ -533,9 +536,10 @@ public sealed class ProductRecipeDraft : ObservableState
     internal RecipeDraft CurrentDraft()
     {
         var sectionIdOf = SectionIdsByKey();
+        var used = UsedKeys();
         return new(
-            [.. UsageEdits.Where(u => u.IsEditable).Select(u => OwnDraftOf(u, sectionIdOf))],
-            [.. UsageEdits.Where(u => u.IsLinked).Select(u => LinkedDraftOf(u, sectionIdOf))])
+            [.. UsageEdits.Where(u => u.IsEditable).Select(u => OwnDraftOf(u, sectionIdOf, used))],
+            [.. UsageEdits.Where(u => u.IsLinked).Select(u => LinkedDraftOf(u, sectionIdOf, used))])
         {
             Components = _host.IsEditingComposite ? [.. ProductComponentRow.CompleteLines(_components.ComponentEdits).Select(c => (c.Product.Id, c.Quantity))] : [],
             OwnTaken = SavedOwnSectionIds,
@@ -568,7 +572,10 @@ public sealed class ProductRecipeDraft : ObservableState
         [.. u.SectionLines.Select(l => new SectionLineDraft(sectionIdOf.GetValueOrDefault(l.Key), l.Grams, l.AuthoredBakersPercent, l.Position))];
 
     /// <summary>A section whose lines the form edits, the product's own or a new one, as Save writes it.</summary>
-    private static NewSubAssemblyDraft OwnDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf) =>
+    /// <summary>The keys of the sections another's lines use: an unlock is kept only for these, so a section used again starts locked.</summary>
+    private HashSet<long> UsedKeys() => [.. UsageEdits.SelectMany(u => u.SectionLines.Select(l => l.Key))];
+
+    private static NewSubAssemblyDraft OwnDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf, HashSet<long> used) =>
         new(u.RoleId, [.. u.Lines.Select(l => new RecipeLine(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))], u.AuthoredField, u.AuthoredValue, u.Name)
         {
             // The product's own keeps its id, so Save rewrites it in place; a new section's is 0.
@@ -578,14 +585,16 @@ public sealed class ProductRecipeDraft : ObservableState
                 : u.IsOwned ? new SectionPlacement.ProductsOwn()
                 : new SectionPlacement.ByRole(),
             SectionLines = SectionLinesOf(u, sectionIdOf),
+            IsUnlocked = u.IsUnlocked && used.Contains(u.Key),
         };
 
     /// <summary>A linked section as Save writes it.</summary>
-    private static LinkedUsageDraft LinkedDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf) =>
+    private static LinkedUsageDraft LinkedDraftOf(ProductUsageEdit u, Dictionary<long, int> sectionIdOf, HashSet<long> used) =>
         new(u.SubAssemblyId, u.AuthoredField, u.AuthoredValue)
         {
             AddIns = [.. u.AddIns.Select(a => (a.Ingredient.Id, a.Grams))],
             SectionLines = SectionLinesOf(u, sectionIdOf),
+            IsUnlocked = u.IsUnlocked && used.Contains(u.Key),
 
             // Only lines changed here are written, so a product's Save doesn't put back lines the Sub-Assemblies
             // screen has changed since; and with those, the lines they were changed from, so it's refused over others.
@@ -619,6 +628,7 @@ public sealed class ProductRecipeDraft : ObservableState
         && a.AuthoredValue == b.AuthoredValue
         && a.AddIns.SequenceEqual(b.AddIns)
         && a.SectionLines.SequenceEqual(b.SectionLines)
+        && a.IsUnlocked == b.IsUnlocked
         && (a.Lines is null) == (b.Lines is null)
         && (a.Lines ?? []).SequenceEqual(b.Lines ?? []);
 
@@ -630,6 +640,7 @@ public sealed class ProductRecipeDraft : ObservableState
         && a.AuthoredField == b.AuthoredField
         && a.AuthoredValue == b.AuthoredValue
         && a.SectionLines.SequenceEqual(b.SectionLines)
+        && a.IsUnlocked == b.IsUnlocked
         && a.Lines.SequenceEqual(b.Lines);
 
     /// <summary>

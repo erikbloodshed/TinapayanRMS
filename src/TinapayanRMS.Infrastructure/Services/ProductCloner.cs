@@ -209,8 +209,8 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
         var ownUsages = usages.Where(u => u.SubAssembly!.OwnerProductId == u.ProductId).ToList();
         var linkedUsages = usages.Where(u => u.SubAssembly!.OwnerProductId != u.ProductId).ToList();
         return new RecipeDraft(
-            [.. own.Select((draft, i) => draft with { SectionLines = SectionLinesOf(ownUsages[i]) })],
-            [.. linked.Select((draft, i) => draft with { SectionLines = SectionLinesOf(linkedUsages[i]) })]);
+            [.. own.Select((draft, i) => draft with { SectionLines = SectionLinesOf(ownUsages[i]), IsUnlocked = ownUsages[i].IsUnlocked })],
+            [.. linked.Select((draft, i) => draft with { SectionLines = SectionLinesOf(linkedUsages[i]), IsUnlocked = linkedUsages[i].IsUnlocked })]);
     }
 
     /// <summary>
@@ -228,6 +228,7 @@ public sealed class ProductCloner(IDbContextFactory<TinapayanRMSDbContext> dbCon
                     {
                         AddIns = [.. addInsByUsage[u.Id].Select(l => (l.IngredientId, l.Grams))],
                         SectionLines = [.. sectionLinesByUsage[u.Id].Select(l => new SectionLineDraft(l.SectionSubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))],
+                        IsUnlocked = u.IsUnlocked,
                     }),
             ]);
 }

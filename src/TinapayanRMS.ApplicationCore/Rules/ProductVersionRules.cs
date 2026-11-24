@@ -151,6 +151,11 @@ public static class ProductVersionRules
             }
 
             AddPieceSizeChanges(changes, title, was, now);
+            if ((was.IsUnlocked == true) != (now.IsUnlocked == true))
+            {
+                changes.Add(now.IsUnlocked == true ? $"{title}: unlocked" : $"{title}: locked as an ingredient again");
+            }
+
             AddLineChanges(changes, title, was.Lines, now.Lines, names);
             AddAddInChanges(changes, title, was.AddIns, now.AddIns, names);
             AddSectionLineChanges(changes, title, SectionLinesOf(was, older), SectionLinesOf(now, newer));

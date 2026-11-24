@@ -153,6 +153,32 @@ public class ProductSectionLinePersistenceTests(DatabaseFixture fixture) : Persi
     }
 
     [Test]
+    public async Task An_unlocked_section_saves_and_a_clone_and_a_variant_keep_it_unlocked()
+    {
+        var (productId, flourId) = await SeedSpongeInDoughAsync();
+        var (doughRoleId, spongeRoleId) = (await RoleIdAsync("Dough"), await RoleIdAsync("Sponge"));
+        var doughId = await SubAssemblyIdAsync(productId, doughRoleId);
+        var spongeId = await SubAssemblyIdAsync(productId, spongeRoleId);
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m)
+                {
+                    Id = doughId,
+                    SectionLines = [new SectionLineDraft(spongeId, 300m, null, 1)],
+                },
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m) { Id = spongeId, IsUnlocked = true },
+            ],
+            []));
+
+        var cloneId = await CreateCloner().CloneAsync(productId, "Spanish Bread Copy", Cancellation);
+        var variantId = await CreateCloner().CreateVariantAsync(productId, "Spanish Bread Small", Cancellation);
+
+        await using var dbContext = CreateDbContext();
+        var unlocked = await dbContext.ProductSubAssemblyUsages.Where(u => u.IsUnlocked).Select(u => u.ProductId).ToListAsync(Cancellation);
+        unlocked.Should().BeEquivalentTo([productId, cloneId, variantId]);
+    }
+
+    [Test]
     public async Task A_product_with_a_section_on_anothers_lines_can_be_deleted_for_good()
     {
         var (productId, _) = await SeedSpongeInDoughAsync();

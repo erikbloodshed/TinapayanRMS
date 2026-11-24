@@ -138,7 +138,7 @@ public class ProductsStateSequenceTests(DatabaseFixture fixture) : PersistenceTe
         var expected = UsageFormFigures.Of(
             form.Batch(),
             form.FormAddIns.Where(l => l.Ingredient is not null || l.IsSection).Sum(l => l.Grams) ?? 0m,
-            (form.Sections.UsedElsewhere, form.Sections.Users),
+            (form.Sections.UsedElsewhere, form.Sections.Users, form.Sections.IsLocked),
             form.AuthoredField,
             form.AuthoredValue,
             form.FormFormulaBase,

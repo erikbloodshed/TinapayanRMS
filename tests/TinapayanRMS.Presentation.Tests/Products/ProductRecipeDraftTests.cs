@@ -450,10 +450,10 @@ public class ProductRecipeDraftTests
                     break;
                 case EditLines(var row, var ingredient, var grams) when At(row) is { } usage:
                     IReadOnlyList<SectionLine> lines = [.. usage.Lines.Where(l => l.Ingredient.Id != Ingredients[ingredient].Id), new SectionLine(Ingredients[ingredient], grams)];
-                    Draft.ReplaceInRecipeOrder(usage, usage.IsLinked ? usage.WithLinkedForm(lines, usage.AuthoredField, usage.AuthoredValue, usage.AddIns, usage.SectionLines) : usage.With(usage.Role, lines));
+                    Draft.ReplaceInRecipeOrder(usage, usage.IsLinked ? usage.WithLinkedForm(lines, usage.AuthoredField, usage.AuthoredValue, usage.AddIns, usage.SectionLines, usage.IsUnlocked) : usage.With(usage.Role, lines));
                     break;
                 case PieceSize(var row, var yield, var value) when At(row) is { IsLinked: true } usage:
-                    Draft.ReplaceInRecipeOrder(usage, usage.WithLinkedForm(usage.Lines, yield ? UsageAuthoredField.Yield : UsageAuthoredField.WeightPerPiece, value, usage.AddIns, usage.SectionLines));
+                    Draft.ReplaceInRecipeOrder(usage, usage.WithLinkedForm(usage.Lines, yield ? UsageAuthoredField.Yield : UsageAuthoredField.WeightPerPiece, value, usage.AddIns, usage.SectionLines, usage.IsUnlocked));
                     break;
                 case Remove(var row) when At(row) is { } usage:
                     sections.Remove(usage);

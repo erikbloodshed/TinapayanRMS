@@ -41,6 +41,7 @@ internal static class SectionFormCapture
         AuthoredField = form.AuthoredField,
         WeightPerPiece = form.EditingUsageWeightPerPiece,
         Yield = form.EditingUsageYield,
+        IsUnlocked = form.Sections.IsUnlocked,
     };
 
     /// <summary>
@@ -53,6 +54,7 @@ internal static class SectionFormCapture
     {
         var editing = snapshot.EditingUsageIndex is { } index && index < draft.UsageEdits.Count ? draft.UsageEdits[index] : null;
         ShowSections(form, editing, draft);
+        form.Sections.IsUnlocked = snapshot.IsUnlocked;
         form.FormFormulaBase = snapshot.FormulaBase;
         RestoreIngredientLines(form.FormLines, snapshot.Lines, snapshot.FormulaBase, ingredients, draft);
         RestoreIngredientLines(form.FormAddIns, snapshot.AddIns, snapshot.FormulaBase, ingredients, draft);
@@ -66,6 +68,7 @@ internal static class SectionFormCapture
     public static void ShowSections(ProductUsageForm form, ProductUsageEdit? editing, ProductRecipeDraft draft)
     {
         form.Sections.ShowPicks(RecipeSectionLines.For(draft, editing));
+        form.Sections.IsUnlocked = editing?.IsUnlocked ?? false;
         form.Sections.ShowUsedElsewhere(editing is null ? (0m, []) : RecipeSectionLines.UsedElsewhere(draft, editing));
     }
 

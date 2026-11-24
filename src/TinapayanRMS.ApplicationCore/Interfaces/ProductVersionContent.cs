@@ -20,8 +20,10 @@ public sealed record ProductVersionContent
     /// (<see cref="VatPercent"/>), where 2 and before kept the product's own in its costing. 4: a section could go whole into
     /// another (VersionSection.GoesIntoSubAssemblyId), which before 4 none did. 5: a section can be on another's lines, in
     /// grams (VersionSection.SectionLines), which replaced 4's; <see cref="FromJson"/> reads a 4 as lines of the whole batch.
+    /// 6: a section the others use can be unlocked (VersionSection.IsUnlocked), which before 6 none was, so an older one reads
+    /// as locked.
     /// </summary>
-    public const int CurrentSchema = 5;
+    public const int CurrentSchema = 6;
 
     public int Schema { get; init; } = CurrentSchema;
 
@@ -181,6 +183,10 @@ public sealed record VersionCosting(
 /// The recipe's other sections on its lines, or a linked one's add-ins (UsageSectionLine), each by that one's
 /// <see cref="SubAssemblyId"/> here; null or empty for none, and in every snapshot before schema 5.
 /// </param>
+/// <param name="IsUnlocked">
+/// True when the recipe's other sections used it and it was unlocked (ProductSubAssemblyUsage.IsUnlocked); null otherwise,
+/// and in every snapshot before schema 6.
+/// </param>
 public sealed record VersionSection(
     int SubAssemblyId,
     string SubAssemblyName,
@@ -192,7 +198,8 @@ public sealed record VersionSection(
     IReadOnlyList<VersionAddIn> AddIns,
     string? Label = null,
     int? GoesIntoSubAssemblyId = null,
-    IReadOnlyList<VersionSectionLine>? SectionLines = null)
+    IReadOnlyList<VersionSectionLine>? SectionLines = null,
+    bool? IsUnlocked = null)
 {
     /// <summary>
     /// What it went by beside its role in <paramref name="productName"/>'s recipe: its <see cref="Label"/>, or in a

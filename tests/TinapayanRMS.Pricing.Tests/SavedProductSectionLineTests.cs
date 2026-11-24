@@ -25,14 +25,14 @@ public class SavedProductSectionLineTests(DatabaseFixture fixture) : Persistence
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
 
-        // The dough (1,000 g of flour) takes 300 g of the sponge (400 g of flour); each makes one piece of what it has.
+        // The dough (1,000 g of flour) takes 300 g of the sponge (400 g of flour), unlocked; each makes one piece of what it has.
         await SaveRecipeAsync(productId, new RecipeDraft(
             [
                 new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.Yield, 1m)
                 {
                     SectionLines = [new SectionLineDraft(RecipeDraft.SectionIdOf(0, 1), 300m, null, 1)],
                 },
-                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m),
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m) { IsUnlocked = true },
             ],
             []));
         var product = (await new ProductRepository(CreateDbContextFactory()).GetByIdAsync(productId, Cancellation))!;
@@ -40,6 +40,7 @@ public class SavedProductSectionLineTests(DatabaseFixture fixture) : Persistence
         var saved = await CreateReader().ReadAsync(product, Cancellation);
 
         var (dough, sponge) = (saved.Sections[0], saved.Sections[1]);
+        sponge.IsUnlocked.Should().BeTrue();
         (dough.TotalWeight, dough.TotalCostAt(CostBasis.Buffered)).Should().Be((1300m, 65m));
         dough.SectionLines.Should().ContainSingle().Which.SectionName.Should().Be("Sponge");
         dough.CostPerPieceAt(CostBasis.Buffered).Should().Be(65m);

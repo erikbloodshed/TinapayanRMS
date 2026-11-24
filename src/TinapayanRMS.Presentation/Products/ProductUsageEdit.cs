@@ -68,6 +68,7 @@ public sealed class ProductUsageEdit : ObservableRow
             // A saved section is known by its sub-assembly, so a line that is one is too.
             Key = saved.SubAssemblyId,
             SectionLines = [.. saved.SectionLines.Select(l => new UsedSectionEdit(l.SubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))],
+            IsUnlocked = usage.IsUnlocked,
         };
     }
 
@@ -93,6 +94,12 @@ public sealed class ProductUsageEdit : ObservableRow
     public IReadOnlyList<UsedSectionEdit> SectionLines { get; init; } = [];
 
     /// <summary>
+    /// Unlocked while the recipe's other sections use it on their lines (ProductSubAssemblyUsage.IsUnlocked): its lines are
+    /// typed into, and it can have pieces of what they leave. Locked, it's only their ingredient.
+    /// </summary>
+    public bool IsUnlocked { get; init; }
+
+    /// <summary>
     /// Refuses Move to Sub-Assemblies and Move to In-House while the section has others of the recipe on its lines: they're
     /// this product's, so the sub-assembly kept there, and a made ingredient's cost, would go without them.
     /// </summary>
@@ -109,11 +116,12 @@ public sealed class ProductUsageEdit : ObservableRow
     /// The same section known by <paramref name="key"/>, with <paramref name="sectionLines"/>: a version's section put back,
     /// known by the sub-assembly it had there, as a line that is it names it.
     /// </summary>
-    public ProductUsageEdit Keyed(long key, IReadOnlyList<UsedSectionEdit> sectionLines) =>
+    public ProductUsageEdit Keyed(long key, IReadOnlyList<UsedSectionEdit> sectionLines, bool isUnlocked) =>
         new(SubAssemblyId, Role, Lines, AuthoredField, AuthoredValue, LinkedName, AddIns, Name, _isOwn, _isReleasing, new KeptLines(_savedLines, LinesTaken), LinkedOwner, _toMadeIngredient)
         {
             Key = key,
             SectionLines = sectionLines,
+            IsUnlocked = isUnlocked,
         };
 
     /// <param name="subAssemblyId">The sub-assembly's id, or 0 for a new section, not saved yet.</param>
@@ -184,6 +192,7 @@ public sealed class ProductUsageEdit : ObservableRow
         new(SubAssemblyId, Role, Label, SectionName, LinkedName, LinkedOwner, AuthoredField, AuthoredValue, Lines, AddIns, Figures)
         {
             SectionLines = [.. SectionLines.Select(l => new SectionUse(l.Key > 0 ? (int)l.Key : 0, l.Grams, l.AuthoredBakersPercent, l.Position))],
+            IsUnlocked = IsUnlocked,
         };
 
     public int SubAssemblyId { get; }
@@ -364,6 +373,7 @@ public sealed class ProductUsageEdit : ObservableRow
         {
             Key = Key,
             SectionLines = SectionLines,
+            IsUnlocked = IsUnlocked,
         };
 
     /// <summary>
@@ -382,6 +392,7 @@ public sealed class ProductUsageEdit : ObservableRow
             {
                 Key = Key,
                 SectionLines = SectionLines,
+                IsUnlocked = IsUnlocked,
             };
     }
 
@@ -391,6 +402,7 @@ public sealed class ProductUsageEdit : ObservableRow
         {
             Key = Key,
             SectionLines = SectionLines,
+            IsUnlocked = IsUnlocked,
         };
 
     /// <summary>The same section of the product's own, for Save to turn into <paramref name="made"/> (Move to In-House).</summary>
@@ -399,6 +411,7 @@ public sealed class ProductUsageEdit : ObservableRow
         {
             Key = Key,
             SectionLines = SectionLines,
+            IsUnlocked = IsUnlocked,
         };
 
     /// <summary>
@@ -424,6 +437,7 @@ public sealed class ProductUsageEdit : ObservableRow
         {
             Key = Key,
             SectionLines = SectionLines,
+            IsUnlocked = IsUnlocked,
         };
     }
 
@@ -433,11 +447,13 @@ public sealed class ProductUsageEdit : ObservableRow
         UsageAuthoredField authoredField,
         decimal authoredValue,
         IReadOnlyList<SectionLine> addIns,
-        IReadOnlyList<UsedSectionEdit> sectionLines) =>
+        IReadOnlyList<UsedSectionEdit> sectionLines,
+        bool isUnlocked) =>
         new(SubAssemblyId, Role, lines, authoredField, authoredValue, LinkedName, addIns, Name, kept: new KeptLines(_savedLines, LinesTaken), linkedOwner: LinkedOwner)
         {
             Key = Key,
             SectionLines = sectionLines,
+            IsUnlocked = isUnlocked,
         };
 
     /// <summary>Whether two sets of lines would save the same: the same ingredients, grams and base ticks, in the same order, whatever they cost.</summary>

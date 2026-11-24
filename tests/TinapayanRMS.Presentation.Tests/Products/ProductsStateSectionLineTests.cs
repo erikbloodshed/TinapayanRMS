@@ -20,9 +20,10 @@ public class ProductsStateSectionLineTests(DatabaseFixture fixture) : Persistenc
 {
     /// <summary>
     /// Spanish Bread: a dough of 1,000 g of flour (50.00) at 70 g a piece, with 300 g of a sponge of 400 g of flour (20.00)
-    /// on its lines after the flour, the sponge one piece of what's left, saved and open in the form.
+    /// on its lines after the flour, the sponge one piece of what's left (unlocked, unless <paramref name="unlocked"/> says
+    /// not), saved and open in the form.
     /// </summary>
-    private async Task<ProductForm> OpenSpongeInDoughAsync(decimal spongeGrams = 300m)
+    private async Task<ProductForm> OpenSpongeInDoughAsync(decimal spongeGrams = 300m, bool unlocked = true)
     {
         await WithoutWastageAsync();
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
@@ -35,7 +36,7 @@ public class ProductsStateSectionLineTests(DatabaseFixture fixture) : Persistenc
                 {
                     SectionLines = spongeGrams > 0 ? [new SectionLineDraft(RecipeDraft.SectionIdOf(0, 1), spongeGrams, null, 1)] : [],
                 },
-                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m),
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m) { IsUnlocked = unlocked && spongeGrams > 0 },
             ],
             []));
 
@@ -103,6 +104,66 @@ public class ProductsStateSectionLineTests(DatabaseFixture fixture) : Persistenc
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(100m, "one piece of the 100 g the dough leaves");
         state.UsageForm.UsageFormPieceSizeCaption.Should().Be("The yield stays at 1 piece of the 100 g that Dough leaves, if the batch changes.");
         state.UsageForm.UsageFormCostPerPieceText.Should().Be("5.00");
+    });
+
+    [Test]
+    public Task A_section_another_uses_is_locked_as_its_ingredient() => UiThread.RunAsync(async () =>
+    {
+        var state = await OpenSpongeInDoughAsync(unlocked: false);
+
+        state.Recipe.PickRecipeTab(Tab(state, "Sponge"));
+
+        state.UsageForm.Sections.IsLocked.Should().BeTrue();
+        state.UsageForm.IsFormLinesEditable.Should().BeFalse("a locked section's lines wait until it's unlocked");
+        state.UsageForm.UsageFormCostPerPieceText.Should().Be("—");
+        state.UsageForm.UsageFormPieceSizeCaption.Should().StartWith("Locked as Dough's ingredient: Dough uses 300 g of it");
+        state.Costing.Costs.SubAssemblies.Should().Be(3.5m, "the dough's piece, and no piece of the sponge");
+        state.Costing.NoPieceSizeText.Should().BeNull();
+    });
+
+    [Test]
+    public Task Unlock_offers_Save_saves_reads_back_and_Lock_puts_it_back() => UiThread.RunAsync(async () =>
+    {
+        var state = await OpenSpongeInDoughAsync(unlocked: false);
+        state.Recipe.PickRecipeTab(Tab(state, "Sponge"));
+
+        await state.UsageForm.Sections.UnlockCommand.ExecuteAsync();
+
+        state.UsageForm.IsFormLinesEditable.Should().BeTrue();
+        state.UsageForm.UsageFormCostPerPieceText.Should().Be("5.00", "one piece of the 100 g left");
+        state.History.IsDirty.Should().BeTrue();
+        state.Recipe.PickRecipeTab(Tab(state, "Dough"));
+        await state.SaveCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && !state.History.IsDirty, () => $"dirty={state.History.IsDirty}");
+
+        state.ErrorMessage.Should().BeNull();
+        Tab(state, "Sponge").Usage.IsUnlocked.Should().BeTrue();
+        await using (var dbContext = CreateDbContext())
+        {
+            (await dbContext.ProductSubAssemblyUsages.CountAsync(u => u.IsUnlocked, Cancellation)).Should().Be(1);
+        }
+
+        state.Recipe.PickRecipeTab(Tab(state, "Sponge"));
+        await state.UsageForm.Sections.LockCommand.ExecuteAsync();
+        state.UsageForm.Sections.IsLocked.Should().BeTrue();
+        state.TryUndo().Should().BeTrue();
+        state.UsageForm.Sections.IsLocked.Should().BeFalse();
+    });
+
+    [Test]
+    public Task A_section_newly_put_on_anothers_lines_starts_locked() => UiThread.RunAsync(async () =>
+    {
+        var state = await OpenSpongeInDoughAsync(spongeGrams: 0m);
+        state.Recipe.PickRecipeTab(Tab(state, "Dough"));
+        var row = new IngredientLineRow();
+        row.Pick(SpongePick(state));
+        row.Grams = 300m;
+        state.UsageForm.FormLines.Add(row);
+
+        state.Recipe.PickRecipeTab(Tab(state, "Sponge"));
+
+        state.UsageForm.Sections.IsLocked.Should().BeTrue();
+        state.Recipe.Draft.FiguresOf(Tab(state, "Sponge").Usage).CostPerPieceAt(CostBasis.Buffered).Should().Be(0m);
     });
 
     [Test]

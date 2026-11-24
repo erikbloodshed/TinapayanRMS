@@ -80,7 +80,10 @@ public enum AppIcon
     Download,
     Upload,
 
-    /// <summary>The title bar's Lock, which puts the sign-in panel over the window (AppLock).</summary>
+    /// <summary>
+    /// The title bar's Lock, which puts the sign-in panel over the window (AppLock), and a Products section's Lock, which makes
+    /// it only the ingredient of the sections that use it again.
+    /// </summary>
     Lock,
 
     // The Products list's Cut and Paste, which move products and folders as a drag does.

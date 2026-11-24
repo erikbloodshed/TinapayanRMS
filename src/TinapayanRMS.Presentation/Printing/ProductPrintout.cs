@@ -198,7 +198,7 @@ public sealed record PrintedSection(
             section.CostPerPieceAt(basis),
             section.HasPieceSize)
         {
-            IsUsedElsewhere = section.IsUsedElsewhere && !section.HasPieceSize,
+            IsUsedElsewhere = section.IsUsedElsewhere && (!section.HasPieceSize || section.IsLocked),
         };
     }
 }

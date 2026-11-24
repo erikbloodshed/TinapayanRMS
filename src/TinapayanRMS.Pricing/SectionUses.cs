@@ -5,8 +5,9 @@ namespace TinapayanRMS.Pricing;
 /// <summary>
 /// A product's sections with their lines that are others of its sections priced (UsageSectionLine): a sponge on the dough's
 /// lines. Each such line costs its grams at the section it uses' cost per gram, that section's own such lines included, so a
-/// chain prices through (a sponge in a dough in a bigger dough); and each section's piece size shares out what the others
-/// leave of its batch, so the product counts each gram once. The one place this is worked out: a saved product's readers
+/// chain prices through (a sponge in a dough in a bigger dough); and a section the others use is locked as their ingredient,
+/// with no pieces of its own, unless it's unlocked (PricedSection.IsUnlocked), when its piece size shares out what they leave
+/// of its batch, so the product counts each gram once. The one place this is worked out: a saved product's readers
 /// (<see cref="SavedProductReader"/>) and the Products screen's recipe both come here.
 /// </summary>
 public static class SectionUses
@@ -76,7 +77,9 @@ public static class SectionUses
                 }
             }
 
-            var result = SectionFigures.Of(section.Lines, section.AddIns, section.AuthoredField, section.AuthoredValue, batch, usedElsewhere[index]);
+            // Locked as the others' ingredient, it cuts no pieces of its own, whatever piece size it has.
+            var authoredValue = usedElsewhere[index] > 0 && !section.IsUnlocked ? 0m : section.AuthoredValue;
+            var result = SectionFigures.Of(section.Lines, section.AddIns, section.AuthoredField, authoredValue, batch, usedElsewhere[index]);
             working[index] = false;
             figures[index] = result;
             return result;

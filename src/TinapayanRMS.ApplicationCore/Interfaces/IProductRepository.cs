@@ -36,6 +36,9 @@ public sealed record NewSubAssemblyDraft(
     /// </summary>
     public IReadOnlyList<SectionLineDraft> SectionLines { get; init; } = [];
 
+    /// <summary>Unlocked while another section uses it on its lines (ProductSubAssemblyUsage.IsUnlocked); false otherwise.</summary>
+    public bool IsUnlocked { get; init; }
+
     /// <summary>Save keeps it on the Sub-Assemblies screen and links it: moved there, or to In-House.</summary>
     public bool MovesToSubAssemblies => Placement is SectionPlacement.MoveToSubAssemblies or SectionPlacement.MoveToInHouse;
 }
@@ -108,6 +111,9 @@ public sealed record LinkedUsageDraft(int SubAssemblyId, UsageAuthoredField Auth
     /// this product's, as its add-ins are. Empty for none.
     /// </summary>
     public IReadOnlyList<SectionLineDraft> SectionLines { get; init; } = [];
+
+    /// <summary>Unlocked while another section uses it on its lines (ProductSubAssemblyUsage.IsUnlocked); false otherwise.</summary>
+    public bool IsUnlocked { get; init; }
 }
 
 /// <summary>

@@ -49,7 +49,8 @@ public static class ProductVersionSnapshot
                 SubAssemblyRules.NormalizeName(SubAssemblyRules.LabelIn(subAssembly, product.Id, product.Name, role.Name)),
                 SectionLines: sectionUsesByUsage[usage.Id] is var uses && uses.Any()
                     ? [.. uses.Select(l => new VersionSectionLine(l.SectionSubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))]
-                    : null));
+                    : null,
+                IsUnlocked: usage.IsUnlocked ? true : null));
         }
 
         // As the Packaging tab shows them (PackagingLineRow.FromSaved): a line saved as pieces per unit is its quantity per
@@ -165,6 +166,7 @@ public static class ProductVersionSnapshot
                 },
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
+                IsUnlocked = section.IsUnlocked == true,
             });
             lines.AddRange(section.Lines.Select((l, sortOrder) => new SubAssemblyLine
             {

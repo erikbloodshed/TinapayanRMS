@@ -125,6 +125,10 @@ public sealed record ComponentInfo(int ProductId, int Quantity);
 /// for most. Make that much of each for each batch of this one: the rest of its batch is its own pieces, if it has a piece
 /// size, which share out only what's left.
 /// </param>
+/// <param name="IsLocked">
+/// The product's other sections use it and it's locked as their ingredient: it has no pieces of its own, so
+/// <paramref name="AuthoredValue"/> is 0; make only what they take of it.
+/// </param>
 public sealed record SectionInfo(
     int SubAssemblyId,
     string SectionName,
@@ -135,7 +139,8 @@ public sealed record SectionInfo(
     IReadOnlyList<PlanLine> Lines,
     IReadOnlyList<PlanLine> AddIns,
     int? GoesIntoSubAssemblyId = null,
-    IReadOnlyList<SectionLineInfo>? SectionLines = null);
+    IReadOnlyList<SectionLineInfo>? SectionLines = null,
+    bool IsLocked = false);
 
 /// <summary>A line of a section that is another of the product's sections, by its <see cref="SectionInfo.SubAssemblyId"/>, and its grams.</summary>
 public sealed record SectionLineInfo(int SubAssemblyId, string SectionName, decimal Grams);

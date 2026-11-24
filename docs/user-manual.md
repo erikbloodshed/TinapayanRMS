@@ -813,7 +813,8 @@ Some sections go into another: a sponge or a tangzhong into the dough, say. On t
 
 - The line costs its grams at the sponge's cost per gram, and the dough's **Total weight**, **Batch cost** and pieces take it in, as any line's.
 - Change the sponge on its own tab, and the dough's line follows its cost.
-- The sponge's own pieces are of what the dough leaves. Its tab says how much the dough uses, and its **Yield** shares out the rest. It needn't have a piece size: with none, the dough counts its cost, and it isn't flagged for having no piece size. With a Yield and nothing left, it is.
+- The sponge is then **locked** as the dough's ingredient. Its lines and add-ins can't be changed, it has no pieces of its own whatever piece size it had, and its tab says *Locked as an ingredient*. The dough counts its cost, and it isn't flagged for having no piece size.
+- Press **Unlock** on the sponge's tab to change its lines, or to give it pieces of what the dough leaves: its **Yield** then shares out the rest. With a Yield and nothing left, it's flagged for having no piece size. **Lock** makes it only the dough's ingredient again. Each is undone like any change, and Save keeps it. Taken off the dough's lines and saved, it's no longer locked; used again after that, it starts locked.
 - The sponge keeps its own tab and lines, and can be linked or the product's own, like any section. A section can be on several sections' lines, and one on another's that's on a third's, but never back round on its own, so the list only offers the sections that can go in. A section is never part of the Base.
 - On a linked section, whose lines are kept on Sub-Assemblies, put the sponge in its **Add-Ins** instead.
 - A section another uses can't be deleted from the recipe: take it off the other's lines first. Deleting the dough takes its line of the sponge with it.
@@ -1260,7 +1261,7 @@ This happens as soon as you save. A product you had open on the Products screen 
 ### A product's sections
 
 - Cost per piece = batch cost × weight per piece ÷ batch weight (including add-ins). This is the same as batch cost ÷ yield.
-- A section on another's lines costs that one its grams at its own cost per gram: its batch cost ÷ its batch weight. Its own pieces are of what's left: its batch weight less what the others use of it.
+- A section on another's lines costs that one its grams at its own cost per gram: its batch cost ÷ its batch weight. Locked, it has no pieces of its own; unlocked, its pieces are of what's left: its batch weight less what the others use of it.
 
 ### The selling price (cost-plus)
 

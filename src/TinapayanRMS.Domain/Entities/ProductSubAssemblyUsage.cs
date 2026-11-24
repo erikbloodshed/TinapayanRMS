@@ -27,4 +27,12 @@ public sealed class ProductSubAssemblyUsage
     /// typed one stays put when the batch changes.
     /// </summary>
     public decimal AuthoredValue { get; set; }
+
+    /// <summary>
+    /// A section the product's other sections use on their lines (UsageSectionLine) is locked as their ingredient: its lines
+    /// aren't changed here, and it has no pieces of its own, whatever piece size it has. Unlocked, it's edited as any section,
+    /// and its piece size shares out what the others leave. Only kept while another section uses it, so one used again
+    /// starts locked.
+    /// </summary>
+    public bool IsUnlocked { get; set; }
 }

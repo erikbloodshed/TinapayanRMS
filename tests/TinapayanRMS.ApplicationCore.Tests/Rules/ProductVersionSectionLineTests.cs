@@ -17,7 +17,7 @@ public class ProductVersionSectionLineTests
     private static readonly VersionRole Dough = new(1, "Dough", 1, false, true);
     private static readonly VersionRole Sponge = new(2, "Sponge", 2, false, true);
 
-    private static ProductVersionContent SpanishBread(decimal? spongeGrams, int doughId = 100, int spongeId = 200) => new()
+    private static ProductVersionContent SpanishBread(decimal? spongeGrams, int doughId = 100, int spongeId = 200, bool? spongeUnlocked = null) => new()
     {
         ProductName = "Spanish Bread",
         QuantityRequired = 1,
@@ -25,7 +25,8 @@ public class ProductVersionSectionLineTests
         [
             new VersionSection(doughId, "Spanish Bread Dough", true, Dough, UsageAuthoredField.WeightPerPiece, 70m, [new VersionLine(Flour, 1000m, true, null)], [],
                 SectionLines: spongeGrams is { } grams ? [new VersionSectionLine(spongeId, grams, null, 1)] : null),
-            new VersionSection(spongeId, "Spanish Bread Sponge", true, Sponge, UsageAuthoredField.WeightPerPiece, 0m, [new VersionLine(Flour, 400m, false, null)], []),
+            new VersionSection(spongeId, "Spanish Bread Sponge", true, Sponge, UsageAuthoredField.WeightPerPiece, 0m, [new VersionLine(Flour, 400m, false, null)], [],
+                IsUnlocked: spongeUnlocked),
         ],
         Materials = [new VersionMaterial(Flour, "Bread Flour", RawMaterialType.Ingredient, null, 0.05m, 0.05m, [])],
     };
@@ -40,6 +41,18 @@ public class ProductVersionSectionLineTests
         ProductVersionRules.Changes(with, SpanishBread(spongeGrams: 250m)).Should().Equal("Dough: Sponge 400 g → 250 g");
         ProductVersionRules.Changes(with, without).Should().Equal("Dough: Sponge removed");
         ProductVersionRules.IsSameRecipe(without, with).Should().BeFalse("a Save that only adds a section's line records a version");
+    }
+
+    [Test]
+    public void Unlocking_a_used_section_or_locking_it_again_is_listed_and_kept()
+    {
+        var locked = SpanishBread(spongeGrams: 400m);
+        var unlocked = SpanishBread(spongeGrams: 400m, spongeUnlocked: true);
+
+        ProductVersionRules.Changes(locked, unlocked).Should().Equal("Sponge: unlocked");
+        ProductVersionRules.Changes(unlocked, locked).Should().Equal("Sponge: locked as an ingredient again");
+        ProductVersionContent.FromJson(unlocked.ToJson()).Sections[1].IsUnlocked.Should().BeTrue();
+        locked.ToJson().Should().NotContain("IsUnlocked", "a locked one is left out, as an older snapshot has it");
     }
 
     [Test]

@@ -677,6 +677,7 @@ public sealed class ProductRecipe : ObservableState
             {
                 Key = linked.Key,
                 SectionLines = SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, subAssembly.Name),
+                IsUnlocked = _usageForm.Sections.IsUnlocked,
             };
             Draft.EnsureSectionsDistinct(replacement, linked);
 
@@ -810,7 +811,7 @@ public sealed class ProductRecipe : ObservableState
 
             IReadOnlyList<SectionLine> lineEdits = [.. lines.Select(l => new SectionLine(l.Ingredient, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
             usage = linked.WithLinkedForm(
-                lineEdits, _usageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits), SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, linked.DisplayName));
+                lineEdits, _usageForm.AuthoredField, authoredValue, CompleteAddIns(linked.DisplayName, lineEdits), SectionFormCapture.SectionLinesOf(_usageForm.FormAddIns, linked.DisplayName), _usageForm.Sections.IsUnlocked);
         }
         else if (_usageForm.IsFormEditingLines)
         {
@@ -830,6 +831,7 @@ public sealed class ProductRecipe : ObservableState
             {
                 Key = _usageForm.EditingUsage?.Key ?? ProductUsageEdit.NewKey(),
                 SectionLines = SectionFormCapture.SectionLinesOf(_usageForm.FormLines, role.Name),
+                IsUnlocked = _usageForm.Sections.IsUnlocked,
             };
         }
         else

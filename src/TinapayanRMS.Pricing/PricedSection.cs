@@ -45,12 +45,21 @@ public sealed record PricedSection(
     /// <summary>Some of its batch is on the product's other sections' lines: its pieces come of what's left.</summary>
     public bool IsUsedElsewhere => Figures.UsedElsewhereWeight > 0;
 
+    /// <summary>Unlocked while the product's other sections use it (ProductSubAssemblyUsage.IsUnlocked): it can have pieces of what they leave.</summary>
+    public bool IsUnlocked { get; init; }
+
+    /// <summary>
+    /// Locked as the ingredient of the product's other sections that use it: no pieces of its own, whatever piece size it
+    /// has (<see cref="SectionUses"/> prices it so), and its lines aren't changed on the Products screen until it's unlocked.
+    /// </summary>
+    public bool IsLocked => IsUsedElsewhere && !IsUnlocked;
+
     /// <summary>
     /// It costs the product nothing per piece where it should cost something: it has no weight per piece or yield, and no
-    /// other section uses it either, or it has a yield and the others use the whole of it. The Products list, Reports and
-    /// Print flag it. One with no piece size that another uses is that one's ingredient, and costs through it.
+    /// other section uses it either, or it's unlocked with a piece size and the others use the whole of it. The Products list,
+    /// Reports and Print flag it. One another uses with no piece size, or locked, is that one's ingredient, and costs through it.
     /// </summary>
-    public bool LacksPieceSize => HasPieceSize ? IsUsedElsewhere && WeightPerPiece <= 0 : !IsUsedElsewhere;
+    public bool LacksPieceSize => !IsLocked && (HasPieceSize ? IsUsedElsewhere && WeightPerPiece <= 0 : !IsUsedElsewhere);
 
     public bool IsLinked => LinkedName is not null;
 
@@ -137,6 +146,7 @@ public sealed record PricedSection(
             SectionFigures.Of(sectionLines, sectionAddIns, usage.AuthoredField, usage.AuthoredValue))
         {
             SectionLines = [.. sectionUses.Select(l => new SectionUse(l.SectionSubAssemblyId, l.Grams, l.AuthoredBakersPercent, l.Position))],
+            IsUnlocked = usage.IsUnlocked,
         };
     }
 

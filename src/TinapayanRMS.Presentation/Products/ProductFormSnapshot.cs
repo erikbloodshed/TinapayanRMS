@@ -168,6 +168,7 @@ public sealed record RecipeSnapshot
                 || a.AuthoredField != b.AuthoredField
                 || a.AuthoredValue != b.AuthoredValue
                 || !SectionFormSnapshot.PlacedSectionLines(a.SectionLines, left).SequenceEqual(SectionFormSnapshot.PlacedSectionLines(b.SectionLines, right))
+                || a.IsUnlocked != b.IsUnlocked
                 || !LinesShowSame(a.Lines, b.Lines)
                 || !LinesShowSame(a.AddIns, b.AddIns))
             {
@@ -213,6 +214,9 @@ public sealed record SectionFormSnapshot
     public required UsageAuthoredField AuthoredField { get; init; }
     public required decimal WeightPerPiece { get; init; }
     public required decimal Yield { get; init; }
+
+    /// <summary>Whether the form unlocked its section, one the recipe's other sections use (UsageFormSections.IsUnlocked).</summary>
+    public bool IsUnlocked { get; init; }
 
     /// <summary>The place among <paramref name="sections"/> of the one keyed <paramref name="key"/>; null for none, -1 for one not among them.</summary>
     public static int? IndexOfKey(IReadOnlyList<ProductUsageEdit> sections, long? key)
@@ -266,6 +270,7 @@ public sealed record SectionFormSnapshot
                 || AuthoredField != section.AuthoredField
                 || (AuthoredField == UsageAuthoredField.WeightPerPiece ? WeightPerPiece : Yield) != section.AuthoredValue
                 || !SectionRows(section.IsLinked ? AddIns : Lines).SequenceEqual(PlacedSectionLines(section.SectionLines, sections))
+                || IsUnlocked != section.IsUnlocked
                 || (!section.IsLinked && (RoleId != section.Role?.Id || Name != section.Name))));
 
     private bool ShowsAddIns(IReadOnlyList<SectionLine> addIns) =>
@@ -302,7 +307,8 @@ public sealed record SectionFormSnapshot
         && FormulaBase == other.FormulaBase
         && AuthoredField == other.AuthoredField
         && WeightPerPiece == other.WeightPerPiece
-        && Yield == other.Yield;
+        && Yield == other.Yield
+        && IsUnlocked == other.IsUnlocked;
 }
 
 /// <summary>

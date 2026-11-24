@@ -463,6 +463,7 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 SubAssemblyId = subAssembly.Id,
                 AuthoredField = section.AuthoredField,
                 AuthoredValue = section.AuthoredValue,
+                IsUnlocked = section.IsUnlocked,
             };
             dbContext.ProductSubAssemblyUsages.Add(usage);
             subAssemblyIdOf[RecipeDraft.SectionIdOf(section.Id, index)] = subAssembly.Id;
@@ -489,6 +490,7 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 SubAssemblyId = l.SubAssemblyId,
                 AuthoredField = l.AuthoredField,
                 AuthoredValue = l.AuthoredValue,
+                IsUnlocked = l.IsUnlocked,
             })),
         ];
 

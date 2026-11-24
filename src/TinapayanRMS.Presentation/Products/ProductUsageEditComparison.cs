@@ -18,6 +18,7 @@ public static class ProductUsageEditComparison
         && usage.AuthoredField == other.AuthoredField
         && usage.AuthoredValue == other.AuthoredValue
         && usage.SectionLines.SequenceEqual(other.SectionLines)
+        && usage.IsUnlocked == other.IsUnlocked
         && usage.AreLinkedLinesEdited == other.AreLinkedLinesEdited
         && usage.HasSameKeptLines(other)
         && usage.Lines.Count == other.Lines.Count

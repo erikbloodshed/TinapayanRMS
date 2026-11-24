@@ -56,7 +56,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         _figures = new Derived<UsageFormFigures>(Figures, RaiseFiguresChanged);
         RowChanges.OnAnyChange(FormLines, _figures.Invalidate);
         RowChanges.OnAnyChange(FormAddIns, _figures.Invalidate);
-        Sections = new UsageFormSections(ingredients, () => RaisePropertyChanged(nameof(Sections)));
+        Sections = new UsageFormSections(ingredients, host, () => RaisePropertyChanged(nameof(Sections)));
 
         // Every row put in a lines table, however it got there (a product read, an undo, a form opened), is priced at the
         // screen's costs, buffered or not; the add rows' factories see to a row still being typed.
@@ -309,7 +309,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
     /// The form's lines can be typed into: a new or own section's, and a linked one's too, which Save writes to the
     /// sub-assembly where it's kept, for every product linking it. Only a link being picked shows them read-only.
     /// </summary>
-    public bool IsFormLinesEditable => IsFormEditingLines || IsEditingLinkedUsage;
+    public bool IsFormLinesEditable => (IsFormEditingLines || IsEditingLinkedUsage) && !Sections.IsLocked;
 
     /// <summary>
     /// The form's add-ins table shows, always, empty or not: only for a sub-assembly the product links, and only
@@ -553,7 +553,7 @@ public sealed class ProductUsageForm : ObservableState, IDisposable
         UsageFormFigures.Of(
             Batch(),
             FormAddIns.Where(l => l.Ingredient is not null || l.IsSection).Sum(l => l.Grams) ?? 0m,
-            (Sections.UsedElsewhere, Sections.Users),
+            (Sections.UsedElsewhere, Sections.Users, Sections.IsLocked),
             AuthoredField,
             AuthoredValue,
             FormFormulaBase,

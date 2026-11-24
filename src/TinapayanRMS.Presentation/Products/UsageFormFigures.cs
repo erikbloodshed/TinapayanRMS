@@ -18,12 +18,12 @@ internal sealed record UsageFormFigures(
     /// gram), <paramref name="addInWeight"/> of it add-ins, cut into pieces by the figure typed, with <paramref name="formulaBase"/>
     /// the grams its ticked lines weigh. <paramref name="recipeName"/> is what the add-ins caption calls the recipe.
     /// <paramref name="used"/> is what the recipe's other sections use of it on their lines, and their names: its pieces come
-    /// of what's left.
+    /// of what's left, and none at all while it's locked as their ingredient.
     /// </summary>
     public static UsageFormFigures Of(
         IReadOnlyList<(decimal Grams, decimal CostPerGram)> batch,
         decimal addInWeight,
-        (decimal Grams, IReadOnlyList<string> Users) used,
+        (decimal Grams, IReadOnlyList<string> Users, bool Locked) used,
         UsageAuthoredField authoredField,
         decimal authoredValue,
         decimal formulaBase,
@@ -31,7 +31,7 @@ internal sealed record UsageFormFigures(
     {
         var (totalWeight, totalCost) = SubAssemblyRules.CalculateTotals(batch);
         var left = Math.Max(totalWeight - used.Grams, 0m);
-        var (weightPerPiece, _) = SectionFigures.PieceSizeOfWhatsLeft(authoredField, authoredValue, totalWeight, used.Grams);
+        var (weightPerPiece, _) = SectionFigures.PieceSizeOfWhatsLeft(authoredField, used.Locked ? 0m : authoredValue, totalWeight, used.Grams);
         var users = string.Join(" and ", used.Users);
         var use = used.Users.Count == 1 ? "uses" : "use";
 
@@ -39,8 +39,12 @@ internal sealed record UsageFormFigures(
         // caption says what that costs: nothing per piece, until one is. A yield of 1 is what a section in a
         // product-owned role starts at (StartingPieceSize), so it says how to size a bigger batch. One the recipe's other
         // sections use needs none: they cost it, and its pieces would only be of what they leave.
-        var pieceSizeCaption = used.Grams > 0 && authoredValue <= 0
-            ? $"{users} {use} {used.Grams:#,0.##} g of it. For pieces of the {left:#,0.##} g left, type the weight per piece or the yield."
+        var pieceSizeCaption = used.Locked
+            ? $"Locked as {users}'s ingredient: {users} {use} {used.Grams:#,0.##} g of it, and it has no pieces of its own. Unlock it to change its lines{(left > 0 ? $", or to give it pieces of the {left:#,0.##} g left" : "")}."
+            : used.Grams > 0 && authoredValue <= 0
+            ? left > 0
+                ? $"{users} {use} {used.Grams:#,0.##} g of it. For pieces of the {left:#,0.##} g left, type the weight per piece or the yield."
+                : $"{users} {use} all {used.Grams:#,0.##} g of it, so it has no pieces of its own."
             : used.Grams > 0 && authoredField == UsageAuthoredField.Yield
             ? $"The yield stays at {authoredValue:#,0.##} {(authoredValue == 1 ? "piece" : "pieces")} of the {left:#,0.##} g that {users} leave{(used.Users.Count == 1 ? "s" : "")}, if the batch changes."
             : used.Grams > 0

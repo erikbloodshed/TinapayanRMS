@@ -7,7 +7,9 @@
    this product's add-ins to a linked recipe under them, beside
    the piece size: what a piece and the batch cost, the weight per piece and yield typed in, and the batch's weight they
    share out. Insert Line and Insert Add-In put a blank line in above the one picked. A line can be another of the
-   recipe's sections, picked from the ingredients' list: among an own or new section's lines, or a linked one's add-ins. *@
+   recipe's sections, picked from the ingredients' list: among an own or new section's lines, or a linked one's add-ins. A
+   section another uses is locked as its ingredient: its tables are read-only and its piece size gives way to Unlock, and
+   once unlocked, Lock puts it back. *@
 <div class="usage-form">
     @if (State.UsageForm.IsFormPickingSource)
     {
@@ -127,16 +129,19 @@
                         <span class="group-heading">Add-Ins</span>
                         <button type="button" class="badge badge-link" @onclick="GoToTopAsync" data-title="Scroll back up to the linked recipe's lines.">Go to top</button>
                     </div>
-                    <IngredientLinesGrid @ref="_addIns" Items="State.UsageForm.FormAddIns" NewItem="State.UsageForm.NewFormAddIn" Ingredients="State.Ingredients"
+                    <IngredientLinesGrid @ref="_addIns" Items="State.UsageForm.FormAddIns" NewItem="@(State.UsageForm.Sections.IsLocked ? null : State.UsageForm.NewFormAddIn)" Ingredients="State.Ingredients"
                                          @bind-SelectedItem="State.UsageForm.SelectedFormAddIn" PercentHeader="@State.UsageForm.UsageFormPercentHeader"
-                                         ShowBase="false" Picks="State.UsageForm.Sections.Picks" />
+                                         ShowBase="false" Picks="State.UsageForm.Sections.Picks" ReadOnly="State.UsageForm.Sections.IsLocked" />
                     <div class="lines-footer">
                         <p class="caption">@State.UsageForm.UsageFormAddInsCaption</p>
-                        <div class="button-row">
-                            <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
-                                          Tooltip="Adds a blank add-in above the selected one, or at the end. Insert." />
-                            <CommandButton Command="State.UsageForm.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
-                        </div>
+                        @if (!State.UsageForm.Sections.IsLocked)
+                        {
+                            <div class="button-row">
+                                <ActionButton Icon="AppIcon.Add" Label="Insert Add-In" OnClick="() => _addIns?.InsertLineAsync() ?? Task.CompletedTask"
+                                              Tooltip="Adds a blank add-in above the selected one, or at the end. Insert." />
+                                <CommandButton Command="State.UsageForm.RemoveAddInCommand" CssClass="remove-line" Icon="AppIcon.Remove" Label="Remove Add-In" />
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -155,16 +160,36 @@
             </div>
 
             <div class="group-heading">Batch parameters</div>
-            <div class="param-row">
-                <label for="usage-weight">Weight/piece (g)</label>
-                <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
-                             Tooltip="Batch weight per piece. Typing it works out the yield." />
-            </div>
-            <div class="param-row">
-                <label for="usage-yield">Yield (pcs)</label>
-                <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
-                             Tooltip="Pieces per batch, of what the recipe's other sections leave of it. Typing it works out the weight per piece." />
-            </div>
+            @if (State.UsageForm.Sections.IsLocked)
+            {
+                <div class="param-row">
+                    <span class="badge badge-muted" data-title="Its lines and piece size wait until it's unlocked; the sections using it cost it.">Locked as an ingredient</span>
+                </div>
+                <div class="param-row">
+                    <CommandButton Command="State.UsageForm.Sections.UnlockCommand" Icon="AppIcon.Edit" Label="Unlock"
+                                   Tooltip="Lets you change its lines, and give it pieces of what the sections using it leave." />
+                </div>
+            }
+            else
+            {
+                <div class="param-row">
+                    <label for="usage-weight">Weight/piece (g)</label>
+                    <NumberField ID="usage-weight" TValue="decimal" Value="State.UsageForm.EditingUsageWeightPerPiece" ValueChanged="State.UsageForm.TypeWeightPerPiece" Min="0" CssClass="param-field"
+                                 Tooltip="Batch weight per piece. Typing it works out the yield." />
+                </div>
+                <div class="param-row">
+                    <label for="usage-yield">Yield (pcs)</label>
+                    <NumberField ID="usage-yield" TValue="decimal" Value="State.UsageForm.EditingUsageYield" ValueChanged="State.UsageForm.TypeYield" Min="0" CssClass="param-field"
+                                 Tooltip="Pieces per batch, of what the recipe's other sections leave of it. Typing it works out the weight per piece." />
+                </div>
+                @if (State.UsageForm.Sections.LockCommand.CanExecute())
+                {
+                    <div class="param-row">
+                        <CommandButton Command="State.UsageForm.Sections.LockCommand" Icon="AppIcon.Lock" Label="Lock"
+                                       Tooltip="Makes it only the ingredient of the sections using it again: no pieces of its own, and its lines read-only." />
+                    </div>
+                }
+            }
 
             <div class="group-heading">Computed</div>
             <div class="param-row" data-title="Its lines, this product's add-ins, and any of the recipe's other sections on its lines. Yield and weight per piece share it out, less what other sections use of it.">

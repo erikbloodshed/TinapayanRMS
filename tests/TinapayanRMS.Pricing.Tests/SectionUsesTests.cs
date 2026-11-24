@@ -21,9 +21,10 @@ public class SectionUsesTests
             SectionLines = spongeGrams > 0 ? [new SectionUse(20, spongeGrams, null, 2)] : [],
         };
 
-    // The sponge: 400 g of flour and 100 g of sugar, 500 g at 30.00 (36.00 buffered): 0.06 a gram (0.072 buffered).
-    private static PricedSection Sponge(UsageAuthoredField authoredField = UsageAuthoredField.WeightPerPiece, decimal authoredValue = 0m) =>
-        Section(20, "Sponge", [new(Flour, 400m), new(Sugar, 100m)], authoredField, authoredValue);
+    // The sponge: 400 g of flour and 100 g of sugar, 500 g at 30.00 (36.00 buffered): 0.06 a gram (0.072 buffered). Unlocked
+    // unless said, so it can have pieces of what the dough leaves.
+    private static PricedSection Sponge(UsageAuthoredField authoredField = UsageAuthoredField.WeightPerPiece, decimal authoredValue = 0m, bool unlocked = true) =>
+        Section(20, "Sponge", [new(Flour, 400m), new(Sugar, 100m)], authoredField, authoredValue) with { IsUnlocked = unlocked };
 
     [Test]
     public void The_dough_weighs_and_costs_its_lines_and_its_grams_of_sponge_and_its_piece_shares_out_both()
@@ -101,6 +102,17 @@ public class SectionUsesTests
 
         (sponge.WeightPerPiece, sponge.Yield, sponge.CostPerPieceAt(CostBasis.Buffered)).Should().Be((0m, 0m, 0m), "the dough takes the whole batch");
         sponge.LacksPieceSize.Should().BeTrue();
+    }
+
+    [Test]
+    public void A_locked_sponge_cuts_no_pieces_whatever_its_piece_size_and_lacks_nothing()
+    {
+        var sponge = SectionUses.Apply([Dough(spongeGrams: 300m), Sponge(UsageAuthoredField.Yield, 10m, unlocked: false)])[1];
+
+        sponge.IsLocked.Should().BeTrue();
+        (sponge.WeightPerPiece, sponge.CostPerPieceAt(CostBasis.Buffered)).Should().Be((0m, 0m), "it's only the dough's ingredient");
+        sponge.LacksPieceSize.Should().BeFalse();
+        Sponge(UsageAuthoredField.Yield, 10m, unlocked: false).IsLocked.Should().BeFalse("nothing uses it, so nothing locks it");
     }
 
     [Test]
