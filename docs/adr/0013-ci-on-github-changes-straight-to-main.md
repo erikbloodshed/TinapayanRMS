@@ -3,7 +3,9 @@
 **Status:** Accepted, 2026-11-25, the owner making the repository public ("so that we can run the github actions
 unlimited. ci would run on the github from now on") and choosing "Straight to main" and, for local CI, "Remove it".
 Supersedes [ADR 0011](0011-change-control-on-the-developers-pc.md) whole; what still stands of it is restated here.
-Withdraws 0011's narrowing of [ADR 0006](0006-testing-strategy.md): the window stays out of CI, as 0006 had it.
+Withdraws 0011's narrowing of [ADR 0006](0006-testing-strategy.md): the window stays out of CI, as 0006 had it. The
+same day the workflow's first runs showed one detail of its Decision wrong: CI installs MAUI's newest workload, not the
+one the SDK ships with, which left the runner's build without MAUI's SDK (the build plan's log, 2026-11-25).
 
 ## Context
 

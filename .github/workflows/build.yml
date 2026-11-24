@@ -52,9 +52,14 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', '**/*.csproj', 'global.json') }}
           restore-keys: nuget-${{ runner.os }}-
 
-      # The workload the SDK ships with, as the developer's PC installs it (CLAUDE.md): not whatever is newest.
+      # Its newest for the SDK, its manifests updated with it. Not with --skip-manifest-update, as the developer's PC installs
+      # it (CLAUDE.md): beside the runner image's Visual Studio workloads that removed the MAUI manifest it had installed
+      # from, so the build found no MAUI SDK and built the app as a plain project (2026-11-25). Listed, for the record.
       - name: MAUI workload
-        run: dotnet workload install maui-windows --skip-manifest-update
+        run: |
+          dotnet workload install maui-windows
+          if ($LASTEXITCODE) { throw "The MAUI workload didn't install ($LASTEXITCODE)" }
+          dotnet workload list
 
       - name: dotnet-ef
         run: dotnet tool install --global dotnet-ef --version 11.0.0
