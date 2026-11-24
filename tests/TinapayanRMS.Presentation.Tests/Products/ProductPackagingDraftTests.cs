@@ -7,6 +7,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
@@ -15,40 +16,37 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// A product's packaging draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user
 /// does to a saved product's packaging (lines typed, picked, given a unit and taken out, a set linked or a product's
 /// packaging copied in, Make a Copy, Remove Link, Move to Sub-Assemblies, bulk lines and how many a pack holds, a set linked
-/// for the bulk packaging, its Make a Copy and Remove Link), each an
-/// undo step, with loads that bring fresh copies of the materials between them, their costs moved or not. Whatever the
-/// sequence, the dirty check says whether the packaging shows differently from where it was loaded, packaging that shows
-/// as loaded saves nothing, a load changes nothing it shows or saves, and undoing every step gives back where it started,
-/// redoing them where it ended. CsCheck shrinks a failure to the shortest sequence.
+/// for the bulk packaging, its Make a Copy and Remove Link), each an undo step, with undos, redos and Saves among them, and
+/// loads that bring fresh copies of the materials, renamed or repriced or not. After every step the draft is where its
+/// history says it is and the dirty check says whether it shows differently from what was last saved; packaging that shows
+/// as loaded saves nothing, and a load changes nothing it shows or saves. A Save here is what the form's dirty check sees of
+/// one: what was written is what's measured against, with nothing to undo; the form's reload of it is tested on the
+/// database. CsCheck shrinks a failure to the shortest sequence.
 /// </summary>
 public class ProductPackagingDraftTests
 {
     [Test]
-    public void Any_sequence_of_edits_and_loads_undoes_back_to_where_it_started() =>
+    public void Any_sequence_keeps_the_draft_and_its_history_right() =>
         Gen.Select(Gen.Bool, Steps.Array[0, 40]).Sample((linked, steps) =>
         {
             var world = new World(linked);
-            var start = world.Draft.Capture();
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                world.History.IsDirty.Should().Be(!start.ShowsSameAs(world.Draft.Capture()), $"after {step}, the dirty check says whether it shows as loaded");
+                world.ShouldBeRight($"after {step}");
             }
 
-            var end = world.Draft.Capture();
-            while (world.TryUndo())
+            // Every step left undone, then redone: the history walks back to what was last saved and forward again.
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            world.Draft.Capture().ShowsSameAs(start).Should().BeTrue("undoing every step gives back where it started");
-            world.History.IsDirty.Should().BeFalse();
-
-            while (world.TryRedo())
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            world.Draft.Capture().ShowsSameAs(end).Should().BeTrue("redoing every step gives back where it ended");
         }, iter: 300);
 
     [Test]
@@ -59,7 +57,7 @@ public class ProductPackagingDraftTests
             var start = world.Draft.Capture();
             world.Saved().Should().Be(Nothing);
 
-            foreach (var step in steps)
+            foreach (var step in steps.Where(s => s is not Save))
             {
                 world.Apply(step);
                 if (world.Draft.Capture().ShowsSameAs(start))
@@ -68,7 +66,7 @@ public class ProductPackagingDraftTests
                 }
             }
 
-            while (world.TryUndo())
+            while (world.Apply(new Undo()))
             {
             }
 
@@ -88,10 +86,12 @@ public class ProductPackagingDraftTests
             var before = world.Draft.Capture();
             var savedBefore = world.Saved();
             var wasDirty = world.History.IsDirty;
-            world.Apply(new Load(CostsChanged: true));
+            world.Apply(new Load(CostsChanged: true, Renamed: true));
 
+            // A refusal names the material as it's called now, so a rename changes its words but not that it's refused.
+            static string Kind(string saved) => saved.StartsWith("refused", StringComparison.Ordinal) ? "refused" : saved;
             world.Draft.Capture().ShowsSameAs(before).Should().BeTrue("a load re-points the rows at fresh copies, by id");
-            world.Saved().Should().Be(savedBefore);
+            Kind(world.Saved()).Should().Be(Kind(savedBefore));
             world.History.IsDirty.Should().Be(wasDirty);
         }, iter: 300);
 
@@ -224,10 +224,24 @@ public class ProductPackagingDraftTests
 
     private sealed record RemoveBulkLink : Step;
 
-    /// <summary>The view's load: fresh copies of the packaging materials, the costs moved or not.</summary>
-    private sealed record Load(bool CostsChanged) : Step;
+    private sealed record Undo : Step;
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
+    private sealed record Redo : Step;
+
+    /// <summary>Save: refused while a line is half typed, else what was written is what the dirty check measures against.</summary>
+    private sealed record Save : Step;
+
+    /// <summary>The view's load: fresh copies of the packaging materials, as saved elsewhere since: repriced, renamed, both or neither.</summary>
+    private sealed record Load(bool CostsChanged, bool Renamed) : Step;
+
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, Edits()),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())),
+        (2, Gen.Select(Gen.Bool, Gen.Bool, (costs, renamed) => (Step)new Load(costs, renamed))));
+
+    private static Gen<Step> Edits() => Gen.OneOf<Step>(
         Gen.Select(Gen.Int[0, 2], Gen.Int[0, 12], (material, quarters) => (Step)new AddLine(material, quarters)),
         Gen.Select(Gen.Int[0, 9], Gen.Int[0, 12], (row, quarters) => (Step)new TypeQuantity(row, quarters)),
         Gen.Select(Gen.Int[0, 9], Gen.Int[0, 2], (row, material) => (Step)new PickMaterial(row, material)),
@@ -244,8 +258,7 @@ public class ProductPackagingDraftTests
         Gen.Const<Step>(new MoveToSubAssemblies()),
         Gen.Int[0, 1].Select(index => (Step)new LinkBulkSet(index)),
         Gen.Const<Step>(new MakeBulkCopy()),
-        Gen.Const<Step>(new RemoveBulkLink()),
-        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)));
+        Gen.Const<Step>(new RemoveBulkLink()));
 
     /// <summary>
     /// A saved product's packaging as a form holds it, its own lines or linked to a set, with bulk packaging: the packaging
@@ -253,12 +266,14 @@ public class ProductPackagingDraftTests
     /// </summary>
     private sealed class World : IProductPackagingDraftHost
     {
+        private readonly UndoModel<PackagingSnapshot> _model;
         private bool _restoring;
         private int _loads;
+        private int _renames;
 
         public World(bool linked)
         {
-            Load(costsChanged: false);
+            Load(costsChanged: false, renamed: false);
             Draft = new ProductPackagingDraft(this, Materials);
             History = new UndoHistory<PackagingSnapshot>(
                 Draft.Capture, (a, b) => a.ShowsSameAs(b), () => !_restoring, (a, b) => a.ShowsSameAs(b));
@@ -269,6 +284,7 @@ public class ProductPackagingDraftTests
             Draft.LoadLines([Saved(61, 30m, unitId: 611), Saved(62, 1m)]);
             Draft.LoadBulk(linked ? [] : [Saved(63, 5m)], linked ? null : 6);
             History.MarkClean();
+            _model = new UndoModel<PackagingSnapshot>(Draft.Capture(), (a, b) => a.ShowsSameAs(b));
         }
 
         public ObservableCollection<RawMaterial> Materials { get; } = [];
@@ -297,34 +313,67 @@ public class ProductPackagingDraftTests
             }
         }
 
-        public void Apply(Step step)
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
         {
-            if (step is Load load)
+            switch (step)
             {
-                // Not the user's: written as a load writes, recording nothing.
-                Load(load.CostsChanged);
-                _restoring = true;
-                Draft.ResolveRows();
-                _restoring = false;
-                return;
-            }
+                case Load load:
+                    // Not the user's: written as a load writes, recording nothing.
+                    var before = Draft.Capture();
+                    Load(load.CostsChanged, load.Renamed);
+                    _restoring = true;
+                    Draft.ResolveRows();
+                    _restoring = false;
+                    Draft.Capture().ShowsSameAs(before).Should().BeTrue($"{load} re-points the rows, changing nothing they show");
+                    foreach (var row in Draft.LineEdits.Concat(Draft.BulkEdits).Where(r => r.PackagingMaterialId is not null))
+                    {
+                        row.PackagingMaterial.Should().BeSameAs(Materials.Single(m => m.Id == row.PackagingMaterialId), $"after {load}, a row refers to the load's copy");
+                    }
 
-            History.Begin();
-            try
-            {
-                Edit(step);
-            }
-            catch (BusinessRuleException)
-            {
-                // Refused, as the tab would refuse it: nothing changed.
-            }
+                    return false;
 
-            History.End();
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+
+                case Save:
+                    if (Saved().StartsWith("refused", StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+
+                    History.Clear();
+                    History.MarkClean();
+                    _model.Saved(Draft.Capture());
+                    return true;
+
+                default:
+                    var was = Draft.Capture();
+                    History.Begin();
+                    try
+                    {
+                        Edit(step);
+                    }
+                    catch (BusinessRuleException)
+                    {
+                        // Refused, as the tab would refuse it: nothing changed.
+                    }
+
+                    History.End();
+                    _model.Edited(was, Draft.Capture());
+                    return false;
+            }
         }
 
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
-
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
+        /// <summary>The draft and its history, as the model says.</summary>
+        public void ShouldBeRight(string when) => _model.ShouldMatch(History, Draft.Capture(), when);
 
         private bool Move(bool moved, PackagingSnapshot snapshot)
         {
@@ -433,17 +482,18 @@ public class ProductPackagingDraftTests
         };
 
         /// <summary>Fresh copies of the packaging materials, in place of the ones held: a ribbon by the centimetre (and by the roll), a box, tape.</summary>
-        private void Load(bool costsChanged)
+        private void Load(bool costsChanged, bool renamed)
         {
             var factor = costsChanged ? 1m + (++_loads % 3) * 0.25m : 1m;
+            var suffix = renamed ? $" ({++_renames})" : string.Empty;
             var centimetre = new UnitOfMeasure { Id = 1, Name = "centimetre", Abbreviation = "cm" };
-            var roll = new UnitOfMeasure { Id = 2, Name = "roll", Abbreviation = "roll" };
+            var roll = new UnitOfMeasure { Id = 2, Name = "roll" + suffix, Abbreviation = "roll" };
             var piece = new UnitOfMeasure { Id = 3, Name = "piece", Abbreviation = "pc" };
 
             Materials.Clear();
-            Materials.Add(Material(61, "Satin Ribbon", centimetre, 0.24m * factor, new RawMaterialUnit { Id = 611, RawMaterialId = 61, UnitOfMeasureId = roll.Id, UnitOfMeasure = roll, BaseUnitsPerUnit = 2000m }));
-            Materials.Add(Material(62, "Box 8 x 8", piece, 26.4m * factor));
-            Materials.Add(Material(63, "Scotch Tape", centimetre, 0.0014m * factor));
+            Materials.Add(Material(61, "Satin Ribbon" + suffix, centimetre, 0.24m * factor, new RawMaterialUnit { Id = 611, RawMaterialId = 61, UnitOfMeasureId = roll.Id, UnitOfMeasure = roll, BaseUnitsPerUnit = 2000m }));
+            Materials.Add(Material(62, "Box 8 x 8" + suffix, piece, 26.4m * factor));
+            Materials.Add(Material(63, "Scotch Tape" + suffix, centimetre, 0.0014m * factor));
         }
 
         private static RawMaterial Material(int id, string name, UnitOfMeasure baseUnit, decimal cost, params RawMaterialUnit[] units) => new()

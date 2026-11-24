@@ -3,7 +3,7 @@
 **Status:** Accepted, 2026-11-23, the owner choosing "ADR 0012, with a figures check" and accepting the gap it names at
 the forms. Restates the reason for [ADR 0003](0003-mutable-observable-screen-state.md)'s rejection of signals, which
 [ADR 0009](0009-close-the-migration.md) took away, and adds a check to [ADR 0006](0006-testing-strategy.md)'s random
-sequences. Changes nothing built.
+sequences. Changes nothing built. Its checks built 2026-11-24 (the build plan's log).
 
 ## Context
 

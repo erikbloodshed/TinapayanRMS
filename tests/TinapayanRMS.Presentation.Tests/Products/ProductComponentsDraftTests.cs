@@ -5,6 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
@@ -12,40 +13,38 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// <summary>
 /// A composite's products draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user
 /// does to a saved composite's Products table (lines added, a product picked from what the cell offers, a quantity typed,
-/// a line taken out, the products' packaging ticked in or out), each an undo step, with the costs a line wants arriving
-/// and loads that bring fresh copies of the products, their costs moved or not, between them. Whatever the sequence, the
-/// dirty check says whether it shows differently from where it was loaded, a load changes nothing it shows, undoing every
-/// step gives back where it started and redoing them where it ended, and every line's Cost is its quantity at what its
-/// product brings, as read, its packaging in only while it's ticked. CsCheck shrinks a failure to the shortest sequence.
+/// a line taken out, the products' packaging ticked in or out), each an undo step, with undos, redos and Saves among them,
+/// the costs a line wants arriving, and loads that bring fresh copies of the products, renamed or repriced or not. After
+/// every step the draft is where its history says it is, the dirty check says whether it shows differently from what was
+/// last saved, and the table's total is its lines' Costs; a load changes nothing it shows, and every line's Cost is its
+/// quantity at what its product brings, as read, its packaging in only while it's ticked. A Save here is what the form's
+/// dirty check sees of one: what was written is what's measured against, with nothing to undo. CsCheck shrinks a failure to
+/// the shortest sequence.
 /// </summary>
 public class ProductComponentsDraftTests
 {
     [Test]
-    public void Any_sequence_of_edits_and_loads_undoes_back_to_where_it_started() =>
+    public void Any_sequence_keeps_the_draft_its_history_and_its_total_right() =>
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-            var start = world.Capture();
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                world.History.IsDirty.Should().Be(!start.ShowsSameAs(world.Capture()), $"after {step}, the dirty check says whether it shows as loaded");
+                world.ShouldBeRight($"after {step}");
             }
 
-            var end = world.Capture();
-            while (world.TryUndo())
+            // Every step left undone, then redone: the history walks back to what was last saved and forward again.
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            world.Capture().ShowsSameAs(start).Should().BeTrue("undoing every step gives back where it started");
-            world.History.IsDirty.Should().BeFalse();
-
-            while (world.TryRedo())
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            world.Capture().ShowsSameAs(end).Should().BeTrue("redoing every step gives back where it ended");
         }, iter: 300);
 
     [Test]
@@ -60,7 +59,7 @@ public class ProductComponentsDraftTests
 
             var before = world.Capture();
             var wasDirty = world.History.IsDirty;
-            world.Apply(new Load(CostsChanged: true));
+            world.Apply(new Load(CostsChanged: true, Renamed: true));
 
             world.Capture().ShowsSameAs(before).Should().BeTrue("a load re-points the lines at fresh products and costs, by id");
             world.History.IsDirty.Should().Be(wasDirty);
@@ -135,7 +134,7 @@ public class ProductComponentsDraftTests
     {
         var world = new World();
         world.Apply(new RemoveLine(1));
-        world.Apply(new Load(CostsChanged: true));
+        world.Apply(new Load(CostsChanged: true, Renamed: false));
 
         world.Apply(new AddLine(Product: 1, Quantity: 1));
         world.Apply(new CostsArrive());
@@ -154,7 +153,7 @@ public class ProductComponentsDraftTests
         var costBefore = world.CostsOf(103);
 
         // The load brings Ube Roll's cost as it is now, moved; then the read started before it lands.
-        world.Apply(new Load(CostsChanged: true));
+        world.Apply(new Load(CostsChanged: true, Renamed: false));
         world.Draft.TakeCosts(new Dictionary<int, ComponentCosts> { [103] = costBefore }, readBefore).Should().BeFalse();
 
         line.RecipeCost.Should().Be(world.CostsOf(103).RecipeBuffered, "the load's cost stands");
@@ -170,7 +169,7 @@ public class ProductComponentsDraftTests
         var shown = adding.RecipeCost;
         shown.Should().NotBeNull();
 
-        world.Apply(new Load(CostsChanged: true));
+        world.Apply(new Load(CostsChanged: true, Renamed: false));
         world.Draft.Reprice();
 
         adding.RecipeCost.Should().Be(shown, "nothing it shows goes blank while it's typed");
@@ -197,17 +196,28 @@ public class ProductComponentsDraftTests
     /// <summary>The costs the lines wanted, read and handed over (ProductComponents.FetchCostsAsync).</summary>
     private sealed record CostsArrive : Step;
 
-    /// <summary>The view's load: fresh copies of the products and what they bring, the costs moved or not.</summary>
-    private sealed record Load(bool CostsChanged) : Step;
+    private sealed record Undo : Step;
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
-        Gen.Select(Gen.Int[0, 2], Gen.Int[0, 6], (product, quantity) => (Step)new AddLine(product, quantity)),
-        Gen.Select(Gen.Int[0, 9], Gen.Int[0, 2], (row, product) => (Step)new PickProduct(row, product)),
-        Gen.Select(Gen.Int[0, 9], Gen.Int[0, 6], (row, quantity) => (Step)new TypeQuantity(row, quantity)),
-        Gen.Int[0, 9].Select(row => (Step)new RemoveLine(row)),
-        Gen.Bool.Select(ticked => (Step)new TickPackaging(ticked)),
-        Gen.Const<Step>(new CostsArrive()),
-        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)));
+    private sealed record Redo : Step;
+
+    /// <summary>Save: what was written is what the dirty check measures against.</summary>
+    private sealed record Save : Step;
+
+    /// <summary>The view's load: fresh copies of the products and what they bring, as saved elsewhere since: repriced, renamed, both or neither.</summary>
+    private sealed record Load(bool CostsChanged, bool Renamed) : Step;
+
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, Gen.OneOf<Step>(
+            Gen.Select(Gen.Int[0, 2], Gen.Int[0, 6], (product, quantity) => (Step)new AddLine(product, quantity)),
+            Gen.Select(Gen.Int[0, 9], Gen.Int[0, 2], (row, product) => (Step)new PickProduct(row, product)),
+            Gen.Select(Gen.Int[0, 9], Gen.Int[0, 6], (row, quantity) => (Step)new TypeQuantity(row, quantity)),
+            Gen.Int[0, 9].Select(row => (Step)new RemoveLine(row)),
+            Gen.Bool.Select(ticked => (Step)new TickPackaging(ticked)))),
+        (2, Gen.Const<Step>(new CostsArrive())),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())),
+        (2, Gen.Select(Gen.Bool, Gen.Bool, (costs, renamed) => (Step)new Load(costs, renamed))));
 
     /// <summary>The table's share of an undo step, as the form keeps it: the checkbox, and the lines (ProductFormSnapshot).</summary>
     private sealed record Snapshot(bool IncludesPackaging, IReadOnlyList<ComponentLineSnapshot> Lines)
@@ -222,12 +232,14 @@ public class ProductComponentsDraftTests
     private sealed class World : IProductComponentsDraftHost
     {
         private readonly Dictionary<int, ComponentCosts> _costs = [];
+        private readonly UndoModel<Snapshot> _model;
         private bool _restoring;
         private int _loads;
+        private int _renames;
 
         public World()
         {
-            Load(costsChanged: false);
+            Load(costsChanged: false, renamed: false);
             Draft = new ProductComponentsDraft(this, Products);
             Draft.CostWanted += id => Wanted.Add(id);
             History = new UndoHistory<Snapshot>(Capture, (a, b) => a.ShowsSameAs(b), () => !_restoring, (a, b) => a.ShowsSameAs(b));
@@ -240,6 +252,7 @@ public class ProductComponentsDraftTests
             Draft.TakeFresh(new Dictionary<int, ComponentCosts>(), Links());
             Draft.RefreshOptions(CompositeId, Products);
             History.MarkClean();
+            _model = new UndoModel<Snapshot>(Capture(), (a, b) => a.ShowsSameAs(b));
         }
 
         public ObservableCollection<Product> Products { get; } = [];
@@ -264,34 +277,61 @@ public class ProductComponentsDraftTests
             Draft.Restore(snapshot.Lines);
         }
 
-        public void Apply(Step step)
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
         {
             switch (step)
             {
                 // Not the user's: written as a load or a read writes, recording nothing.
                 case Load load:
-                    Load(load.CostsChanged);
+                    var before = Capture();
+                    Load(load.CostsChanged, load.Renamed);
                     Unrecorded(() =>
                     {
                         Draft.TakeFresh(_costs.Where(c => Draft.ProductIds.Contains(c.Key)).ToDictionary(), Links());
                         Draft.RefreshOptions(CompositeId, Products);
                     });
-                    return;
+                    Capture().ShowsSameAs(before).Should().BeTrue($"{load} re-points the lines, changing nothing they show");
+                    foreach (var row in Draft.ComponentEdits.Where(r => r.Product is not null))
+                    {
+                        row.Product!.Name.Should().Be(Products.Single(p => p.Id == row.ComponentProductId).Name, $"after {load}, a line shows its product as it's called now");
+                    }
+
+                    return false;
                 case CostsArrive:
                     var arrived = Wanted.ToDictionary(id => id, id => _costs[id]);
                     Wanted.Clear();
                     Unrecorded(() => Draft.TakeCosts(arrived, Draft.Generation));
-                    return;
+                    return false;
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+                case Save:
+                    History.Clear();
+                    History.MarkClean();
+                    _model.Saved(Capture());
+                    return true;
             }
 
+            var was = Capture();
             History.Begin();
             Edit(step);
             History.End();
+            _model.Edited(was, Capture());
+            return false;
         }
 
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
-
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
+        /// <summary>The draft, its history and the table's total, as the model and the lines say.</summary>
+        public void ShouldBeRight(string when)
+        {
+            _model.ShouldMatch(History, Capture(), when);
+            Draft.ComponentsCost.Should().Be(Draft.CostedLines.Sum(r => r.Cost), $"{when}, the total is its lines'");
+        }
 
         private bool Move(bool moved, Snapshot snapshot)
         {
@@ -359,9 +399,10 @@ public class ProductComponentsDraftTests
         ];
 
         /// <summary>Fresh copies of the products and what each brings, in place of the ones held, the costs moved or not.</summary>
-        private void Load(bool costsChanged)
+        private void Load(bool costsChanged, bool renamed)
         {
             var factor = costsChanged ? 1m + (++_loads % 3) * 0.25m : 1m;
+            var suffix = renamed ? $" ({++_renames})" : string.Empty;
             Products.Clear();
             foreach (var (id, name, isComposite) in new[]
             {
@@ -369,7 +410,7 @@ public class ProductComponentsDraftTests
                 (CompositeId, "Gift Box", true), (104, "Gift Box 2", true), (105, "Gift Box 3", true),
             })
             {
-                Products.Add(new Product { Id = id, Name = name, IsComposite = isComposite, QuantityRequired = 1 });
+                Products.Add(new Product { Id = id, Name = name + suffix, IsComposite = isComposite, QuantityRequired = 1 });
             }
 
             foreach (var (id, recipe, packaging) in new[] { (101, 12.5m, 1.25m), (102, 3.2m, 0.4m), (103, 9.75m, 1.1m) })

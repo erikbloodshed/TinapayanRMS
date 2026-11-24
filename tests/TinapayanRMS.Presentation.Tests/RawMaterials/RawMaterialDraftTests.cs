@@ -6,6 +6,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.RawMaterials;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 
 namespace TinapayanRMS.Presentation.Tests.RawMaterials;
 
@@ -13,38 +14,35 @@ namespace TinapayanRMS.Presentation.Tests.RawMaterials;
 /// The Raw Materials draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user does
 /// to a new material (its name, type, source, category, weight loss, a link and its shares, a base unit, the cost buffer and
 /// preferred brand, brand prices, alternative units, a made ingredient's sub-assembly and add-ins), each an undo step, with
-/// loads that bring fresh copies of what it refers to between them, their costs moved or not. Whatever the sequence, the
-/// dirty check says whether it would save differently from where it started, a load changes nothing it saves, and undoing
-/// every step gives back where it started, redoing them where it ended. CsCheck shrinks a failure to the shortest sequence.
+/// undos, redos and Saves among them, and loads that bring fresh copies of what it refers to, renamed or repriced or not.
+/// After every step the draft is where its history says it is, the dirty check says whether it would save differently from
+/// what was last saved, and a made ingredient's totals are what its lines give as they stand (docs/adr/0012). CsCheck
+/// shrinks a failure to the shortest sequence that shows it.
 /// </summary>
 public class RawMaterialDraftTests
 {
     [Test]
-    public void Any_sequence_of_edits_and_loads_undoes_back_to_where_it_started() =>
+    public void Any_sequence_keeps_the_draft_its_history_and_its_totals_right() =>
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-            var start = world.Draft.Capture(0);
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                world.History.IsDirty.Should().Be(!start.SavesSameAs(world.Draft.Capture(0)), $"after {step}, the dirty check says whether a Save would write anything");
+                world.ShouldBeRight($"after {step}");
             }
 
-            var end = world.Draft.Capture(0);
-            while (world.TryUndo())
+            // Every step left undone, then redone: the history walks back to what was last saved and forward again.
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            world.Draft.Capture(0).ShowsSameAs(start).Should().BeTrue("undoing every step gives back where it started");
-            world.History.IsDirty.Should().BeFalse();
-
-            while (world.TryRedo())
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            world.Draft.Capture(0).ShowsSameAs(end).Should().BeTrue("redoing every step gives back where it ended");
         }, iter: 300);
 
     [Test]
@@ -59,7 +57,7 @@ public class RawMaterialDraftTests
 
             var before = world.Draft.Capture(0);
             var wasDirty = world.History.IsDirty;
-            world.Apply(new Load(CostsChanged: true));
+            world.Apply(new Load(CostsChanged: true, Renamed: true));
 
             world.Draft.Capture(0).SavesSameAs(before).Should().BeTrue("a load re-points the draft at fresh copies, by id");
             world.History.IsDirty.Should().Be(wasDirty);
@@ -110,7 +108,19 @@ public class RawMaterialDraftTests
         world.Draft.ToSaveRequest(material).AddIns.Should().BeNull("only a made ingredient's add-ins are written");
     }
 
-    /// <summary>One thing a user does to the draft, as one undo step, or a load between them.</summary>
+    [Test]
+    public void A_made_ingredients_totals_take_its_sub_assemblys_lines_less_the_weight_loss()
+    {
+        var world = new World();
+        world.Apply(new PickSource(1));
+        world.Apply(new PickSubAssembly(0));
+
+        var (grams, _) = IngredientBomRules.CalculateCost([(500m, 0.42m * 1.1m), (100m, 0.09m * 1.1m)], 3m);
+        world.Draft.Recipe.BomTotalWeight.Should().Be(grams);
+        world.Draft.Recipe.BomTotalCost.Should().Be(500m * 0.42m * 1.1m + 100m * 0.09m * 1.1m);
+    }
+
+    /// <summary>One thing a user does to the draft, as one undo step; an undo, a redo or a Save; or a load between them.</summary>
     private abstract record Step;
 
     private sealed record Rename(string Name) : Step;
@@ -149,47 +159,71 @@ public class RawMaterialDraftTests
 
     private sealed record RemoveAddIn(int Row) : Step;
 
-    /// <summary>The view's load: fresh copies of the categories, materials, units and sub-assemblies, the costs moved or not.</summary>
-    private sealed record Load(bool CostsChanged) : Step;
+    private sealed record Undo : Step;
+
+    private sealed record Redo : Step;
+
+    /// <summary>Save, as the form does it: refused when a rule refuses it, else what was saved is what's measured against.</summary>
+    private sealed record Save : Step;
+
+    /// <summary>
+    /// The view's load: fresh copies of the categories, materials, units and sub-assemblies, as saved elsewhere since:
+    /// repriced, renamed, both or neither.
+    /// </summary>
+    private sealed record Load(bool CostsChanged, bool Renamed) : Step;
 
     private static readonly string[] Names = ["Sugar", "Egg Yolk", " Ribbon ", ""];
 
     private static readonly string?[] Brands = [null, "Sugarland", "Victory"];
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
-        Gen.Int[0, 3].Select(index => (Step)new Rename(Names[index])),
-        Gen.Int[0, 1].Select(index => (Step)new PickType(index)),
-        Gen.Int[0, 2].Select(index => (Step)new PickSource(index)),
-        Gen.Int[0, 5].Select(index => (Step)new PickCategory(index)),
-        Gen.Int[0, 20].Select(percent => (Step)new TypeWeightLoss(percent)),
-        Gen.Int[0, 2].Select(index => (Step)new PickLinkedTo(index)),
-        Gen.Select(Gen.Int[1, 100], Gen.Int[1, 100], (weight, cost) => (Step)new TypeShares(weight, cost)),
-        Gen.Int[0, 2].Select(index => (Step)new PickBaseUnit(index)),
-        Gen.Int[0, 50].Select(percent => (Step)new TypeBuffer(percent)),
-        Gen.Int[0, 2].Select(index => (Step)new TypePreferredBrand(index)),
-        Gen.Select(Gen.Int[0, 2], Gen.Int[1, 2000], (brand, price) => (Step)new AddBrandPrice(brand, price)),
-        Gen.Int[0, 9].Select(row => (Step)new RemoveBrandPrice(row)),
-        Gen.Select(Gen.Int[0, 2], Gen.Int[1, 1000], (unit, multiplier) => (Step)new AddUnit(unit, multiplier)),
-        Gen.Int[0, 9].Select(row => (Step)new RemoveUnit(row)),
-        Gen.Int[0, 1].Select(index => (Step)new PickSubAssembly(index)),
-        Gen.Select(Gen.Int[0, 2], Gen.Int[0, 500], (ingredient, grams) => (Step)new AddAddIn(ingredient, grams)),
-        Gen.Select(Gen.Int[0, 9], Gen.Int[0, 500], (row, grams) => (Step)new TypeAddInGrams(row, grams)),
-        Gen.Int[0, 9].Select(row => (Step)new RemoveAddIn(row)),
-        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)));
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, Gen.OneOf<Step>(
+            Gen.Int[0, 3].Select(index => (Step)new Rename(Names[index])),
+            Gen.Int[0, 1].Select(index => (Step)new PickType(index)),
+            Gen.Int[0, 2].Select(index => (Step)new PickSource(index)),
+            Gen.Int[0, 5].Select(index => (Step)new PickCategory(index)),
+            Gen.Int[0, 20].Select(percent => (Step)new TypeWeightLoss(percent)),
+            Gen.Int[0, 2].Select(index => (Step)new PickLinkedTo(index)),
+            Gen.Select(Gen.Int[1, 100], Gen.Int[1, 100], (weight, cost) => (Step)new TypeShares(weight, cost)),
+            Gen.Int[0, 2].Select(index => (Step)new PickBaseUnit(index)),
+            Gen.Int[0, 50].Select(percent => (Step)new TypeBuffer(percent)),
+            Gen.Int[0, 2].Select(index => (Step)new TypePreferredBrand(index)),
+            Gen.Select(Gen.Int[0, 2], Gen.Int[1, 2000], (brand, price) => (Step)new AddBrandPrice(brand, price)),
+            Gen.Int[0, 9].Select(row => (Step)new RemoveBrandPrice(row)),
+            Gen.Select(Gen.Int[0, 2], Gen.Int[1, 1000], (unit, multiplier) => (Step)new AddUnit(unit, multiplier)),
+            Gen.Int[0, 9].Select(row => (Step)new RemoveUnit(row)),
+            Gen.Int[0, 1].Select(index => (Step)new PickSubAssembly(index)),
+            Gen.Select(Gen.Int[0, 2], Gen.Int[0, 500], (ingredient, grams) => (Step)new AddAddIn(ingredient, grams)),
+            Gen.Select(Gen.Int[0, 9], Gen.Int[0, 500], (row, grams) => (Step)new TypeAddInGrams(row, grams)),
+            Gen.Int[0, 9].Select(row => (Step)new RemoveAddIn(row)))),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())),
+        (2, Gen.Select(Gen.Bool, Gen.Bool, (costs, renamed) => (Step)new Load(costs, renamed))));
+
+    /// <summary>The lines each of the sub-assemblies a made ingredient can be made from has, as saved: (ingredient, grams).</summary>
+    private static readonly Dictionary<int, (int Ingredient, decimal Grams)[]> SubAssemblyLines = new()
+    {
+        [41] = [(23, 500m), (22, 100m)],
+        [42] = [(22, 300m), (21, 50m)],
+    };
 
     /// <summary>
-    /// A new material's draft as a form holds it: the view's lists it reads, and an undo history over it recording only the
-    /// user's steps, measuring what a Save would write as the form does (SavesSameAs).
+    /// A new material's draft as a form holds it: the view's lists it reads, the sub-assembly's lines read as a pick or a load
+    /// shows another (RawMaterialForm.LoadRecipeLinesAsync), an undo history over it recording only the user's steps and
+    /// measuring what a Save would write as the form does (SavesSameAs), and beside it a model of that history.
     /// </summary>
     private sealed class World : IRawMaterialDraftHost
     {
         private readonly List<SubAssembly> _subAssemblies = [];
+        private readonly UndoModel<RawMaterialFormSnapshot> _model;
         private bool _restoring;
         private int _loads;
+        private int _renames;
 
         public World()
         {
-            Load(costsChanged: false);
+            Load(costsChanged: false, renamed: false);
             Draft = new RawMaterialDraft(
                 this,
                 new RawMaterialLists(Categories, Ingredients, UnitsOfMeasure),
@@ -197,9 +231,14 @@ public class RawMaterialDraftTests
             History = new UndoHistory<RawMaterialFormSnapshot>(
                 () => Draft.Capture(0), (a, b) => a.ShowsSameAs(b), () => !_restoring, (a, b) => a.SavesSameAs(b));
             Draft.Changed += History.RefreshDirty;
+
+            // As the form reads the recipe's lines: whenever the pick shows another sub-assembly, and on every load.
+            Draft.Recipe.SubAssemblies.Subscribe(ReadRecipeLines);
+
             Draft.Rebase(null, null, null, null, _subAssemblies);
             Draft.Clear(RawMaterialType.Ingredient, categoryId: null, RawMaterialSource.Purchased, defaultCostBufferPercent: 10m);
             History.MarkClean();
+            _model = new UndoModel<RawMaterialFormSnapshot>(Draft.Capture(0), (a, b) => a.ShowsSameAs(b), (a, b) => a.SavesSameAs(b));
         }
 
         public ObservableCollection<RawMaterialCategory> Categories { get; } = [];
@@ -212,35 +251,77 @@ public class RawMaterialDraftTests
 
         public UndoHistory<RawMaterialFormSnapshot> History { get; }
 
-        public void Apply(Step step)
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
         {
-            if (step is Load load)
+            switch (step)
             {
-                // Not the user's: written as a load writes, recording nothing.
-                var draft = Draft;
-                Load(load.CostsChanged);
-                _restoring = true;
-                draft.Rebase(draft.Category?.Id, draft.LinkedTo?.Id, draft.Recipe.SubAssembly?.Id, draft.BaseUnit?.Id, _subAssemblies);
-                _restoring = false;
-                return;
-            }
+                case Load load:
+                    // Not the user's: written as a load writes, recording nothing.
+                    var draft = Draft;
+                    var before = draft.Capture(0);
+                    Load(load.CostsChanged, load.Renamed);
+                    _restoring = true;
+                    draft.Rebase(draft.Category?.Id, draft.LinkedTo?.Id, draft.Recipe.SubAssembly?.Id, draft.BaseUnit?.Id, _subAssemblies);
 
-            History.Begin();
-            try
-            {
-                Edit(step);
-            }
-            catch (BusinessRuleException)
-            {
-                // Refused, as the screen would refuse it: the step keeps whatever it changed before, as there.
-            }
+                    // The form reads the picked sub-assembly's lines on every load (RawMaterialForm's load), not only on a new pick.
+                    ReadRecipeLines(draft.Recipe.SubAssembly);
+                    _restoring = false;
+                    draft.Capture(0).SavesSameAs(before).Should().BeTrue($"{load} re-points the draft, changing nothing it saves");
+                    ShouldReferToTheFreshCopies(load);
+                    return false;
 
-            History.End();
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+
+                case Save:
+                    return TrySave();
+
+                default:
+                    var was = Draft.Capture(0);
+                    History.Begin();
+                    try
+                    {
+                        Edit(step);
+                    }
+                    catch (BusinessRuleException)
+                    {
+                        // Refused, as the screen would refuse it: the step keeps whatever it changed before, as there.
+                    }
+
+                    History.End();
+                    _model.Edited(was, Draft.Capture(0));
+                    return false;
+            }
         }
 
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
+        /// <summary>The draft, its history and a made ingredient's totals, as the model and the lines say.</summary>
+        public void ShouldBeRight(string when)
+        {
+            _model.ShouldMatch(History, Draft.Capture(0), when);
 
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
+            // The totals, worked out afresh from both tables as they stand and the Weight Loss %: a mark missed leaves them as they were.
+            var recipe = Draft.Recipe;
+            List<IngredientLineRow> rows = [.. recipe.Lines, .. recipe.AddIns];
+            var (grams, _) = IngredientBomRules.CalculateCost(
+                [.. rows.Where(l => l.Ingredient is not null).Select(l => (l.Grams ?? 0m, l.Ingredient!.BufferedCostPerBaseUnit))],
+                Draft.WeightLossPercent ?? 0m);
+            (recipe.BomTotalWeight, recipe.BomTotalCost).Should().Be((grams, rows.Sum(l => l.Cost)), $"{when}, the totals follow the lines and the weight loss");
+        }
+
+        /// <summary>The picked sub-assembly's lines as saved, each at the screen's copy of its ingredient, into the recipe (RawMaterialForm.LoadRecipeLinesAsync).</summary>
+        private void ReadRecipeLines(SubAssembly? subAssembly) =>
+            Draft.Recipe.ShowLines(subAssembly is null ? [] : [.. SubAssemblyLines[subAssembly.Id].Select(l => new SubAssemblyLine
+            {
+                SubAssemblyId = subAssembly.Id, IngredientId = l.Ingredient, Ingredient = Ingredients.Single(m => m.Id == l.Ingredient), Grams = l.Grams,
+            })]);
 
         private bool Move(bool moved, RawMaterialFormSnapshot snapshot)
         {
@@ -261,6 +342,62 @@ public class RawMaterialDraftTests
             }
 
             return moved;
+        }
+
+        /// <summary>
+        /// Save as the form does it: a named material in a category, with nothing half filled in, else refused with nothing
+        /// changed; written, what was saved is what the dirty check measures against, with nothing to undo. The form's reload
+        /// of what was saved is the screen's own, tested on the database (RawMaterialsState's tests).
+        /// </summary>
+        private bool TrySave()
+        {
+            if (Draft.Name.Trim().Length == 0 || Draft.Category is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                Draft.ToSaveRequest(Draft.ToMaterial(1, savedVersion: null));
+            }
+            catch (BusinessRuleException)
+            {
+                return false;
+            }
+
+            History.Clear();
+            History.MarkClean();
+            _model.Saved(Draft.Capture(0));
+            return true;
+        }
+
+        /// <summary>After a load, what the draft refers to is the load's copies, so their names and costs are the ones saved now.</summary>
+        private void ShouldReferToTheFreshCopies(Load load)
+        {
+            var draft = Draft;
+            if (draft.Category is { } category)
+            {
+                category.Should().BeSameAs(Categories.Single(c => c.Id == category.Id), $"after {load}, the category is the load's copy");
+            }
+
+            if (draft.LinkedTo is { } linkedTo)
+            {
+                linkedTo.Should().BeSameAs(Ingredients.Single(m => m.Id == linkedTo.Id), $"after {load}, the linked ingredient is the load's copy");
+            }
+
+            // The picker's options keep a sub-assembly whose values didn't change (CollectionMerge.MergeFrom), so it's known by
+            // what it shows: the name saved now.
+            if (draft.Recipe.SubAssembly is { } subAssembly)
+            {
+                (subAssembly.Name, subAssembly.Role?.Name).Should().Be(
+                    (_subAssemblies.Single(s => s.Id == subAssembly.Id).Name, _subAssemblies.Single(s => s.Id == subAssembly.Id).Role?.Name),
+                    $"after {load}, the sub-assembly shows as it's saved now");
+            }
+
+            foreach (var line in draft.Recipe.Lines.Concat(draft.Recipe.AddIns).Where(l => l.IngredientId is not null))
+            {
+                line.Ingredient.Should().BeSameAs(Ingredients.Single(m => m.Id == line.IngredientId), $"after {load}, a line refers to the load's copy");
+            }
         }
 
         private void Edit(Step step)
@@ -347,35 +484,36 @@ public class RawMaterialDraftTests
         }
 
         /// <summary>Fresh copies of the categories, materials, units of measure and sub-assemblies, in place of the ones held.</summary>
-        private void Load(bool costsChanged)
+        private void Load(bool costsChanged, bool renamed)
         {
             var factor = costsChanged ? 1m + (++_loads % 3) * 0.25m : 1m;
+            var suffix = renamed ? $" ({++_renames})" : string.Empty;
 
             Categories.Clear();
-            Categories.Add(new RawMaterialCategory { Id = 11, Name = "Dry goods", Type = RawMaterialCategoryType.Ingredient });
-            Categories.Add(new RawMaterialCategory { Id = 12, Name = "Dairy", Type = RawMaterialCategoryType.Ingredient });
-            Categories.Add(new RawMaterialCategory { Id = 13, Name = "In-House", Type = RawMaterialCategoryType.Made });
-            Categories.Add(new RawMaterialCategory { Id = 14, Name = "Boxes", Type = RawMaterialCategoryType.Packaging });
+            Categories.Add(new RawMaterialCategory { Id = 11, Name = "Dry goods" + suffix, Type = RawMaterialCategoryType.Ingredient });
+            Categories.Add(new RawMaterialCategory { Id = 12, Name = "Dairy" + suffix, Type = RawMaterialCategoryType.Ingredient });
+            Categories.Add(new RawMaterialCategory { Id = 13, Name = "In-House" + suffix, Type = RawMaterialCategoryType.Made });
+            Categories.Add(new RawMaterialCategory { Id = 14, Name = "Boxes" + suffix, Type = RawMaterialCategoryType.Packaging });
 
             UnitsOfMeasure.Clear();
             UnitsOfMeasure.Add(new UnitOfMeasure { Id = 1, Name = "kilogram", Abbreviation = "kg" });
-            UnitsOfMeasure.Add(new UnitOfMeasure { Id = 2, Name = "piece", Abbreviation = "pc" });
-            UnitsOfMeasure.Add(new UnitOfMeasure { Id = 3, Name = "bag", Abbreviation = "bag" });
+            UnitsOfMeasure.Add(new UnitOfMeasure { Id = 2, Name = "piece" + suffix, Abbreviation = "pc" });
+            UnitsOfMeasure.Add(new UnitOfMeasure { Id = 3, Name = "bag" + suffix, Abbreviation = "bag" });
 
             Ingredients.Clear();
             foreach (var (id, name, cost) in new[] { (21, "Bread Flour", 0.05m), (22, "Egg", 0.09m), (23, "Butter", 0.42m) })
             {
                 Ingredients.Add(new RawMaterial
                 {
-                    Id = id, Name = name, Type = RawMaterialType.Ingredient, Source = RawMaterialSource.Purchased, CategoryId = 11,
+                    Id = id, Name = name + suffix, Type = RawMaterialType.Ingredient, Source = RawMaterialSource.Purchased, CategoryId = 11,
                     CostPerBaseUnit = cost * factor, BufferedCostPerBaseUnit = cost * factor * 1.1m, CostBufferPercent = 10m,
                 });
             }
 
             _subAssemblies.Clear();
-            var filling = new SubAssemblyRole { Id = 31, Name = "Filling" };
-            _subAssemblies.Add(new SubAssembly { Id = 41, Name = "Butter Icing Base", RoleId = filling.Id, Role = filling });
-            _subAssemblies.Add(new SubAssembly { Id = 42, Name = "Custard Base", RoleId = filling.Id, Role = filling });
+            var filling = new SubAssemblyRole { Id = 31, Name = "Filling" + suffix };
+            _subAssemblies.Add(new SubAssembly { Id = 41, Name = "Butter Icing Base" + suffix, RoleId = filling.Id, Role = filling });
+            _subAssemblies.Add(new SubAssembly { Id = 42, Name = "Custard Base" + suffix, RoleId = filling.Id, Role = filling });
         }
 
         RawMaterial? IRawMaterialDraftHost.SelectedRawMaterial => null;

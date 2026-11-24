@@ -5,6 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Pricing;
 using TinapayanRMS.UseCases.Products;
 
@@ -13,40 +14,37 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// <summary>
 /// A product's draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user does to a
 /// saved product's own fields (its name, description, quantity, current price and category) and, through its parts' drafts,
-/// to its costing and packaging, each an undo step. Whatever the sequence, undoing every step gives back where it started
-/// and redoing them where it ended, and the costs always follow the fields: the quantity they're for, the current price
-/// they're compared with, the category's own wastage, and the packaging they add. Each part's draft has its own tests;
-/// these are what the product's draft adds over them.
+/// to its costing and packaging, each an undo step, with undos, redos and Saves among them, and loads that bring fresh
+/// copies of the categories and packaging materials, renamed, repriced or with a category's own wastage moved, or not.
+/// After every step the draft is where its history says it is, the dirty check says whether it would save differently from
+/// what was last saved, and the costs follow the fields: the quantity they're for, the current price they're compared with,
+/// the category's own wastage, and the packaging they add. Each part's draft has its own tests; these are what the
+/// product's draft adds over them.
 /// </summary>
 public class ProductDraftTests
 {
     [Test]
-    public void Any_sequence_undoes_back_to_where_it_started_and_the_costs_follow_the_fields() =>
+    public void Any_sequence_keeps_the_draft_and_its_history_right_and_the_costs_follow_the_fields() =>
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-            var start = world.Capture();
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                world.ShouldPriceTheFields($"after {step}");
+                world.ShouldBeRight($"after {step}");
             }
 
-            var end = world.Capture();
-            while (world.TryUndo())
+            // Every step left undone, then redone: the history walks back to what was last saved and forward again.
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            world.Capture().ShowsSameAs(start).Should().BeTrue("undoing every step gives back where it started");
-            world.ShouldPriceTheFields("undone");
-
-            while (world.TryRedo())
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            world.Capture().ShowsSameAs(end).Should().BeTrue("redoing every step gives back where it ended");
-            world.ShouldPriceTheFields("redone");
         }, iter: 300);
 
     [Test]
@@ -115,8 +113,21 @@ public class ProductDraftTests
         moreLines!.Lines.Should().ContainSingle().Which.QtyPerUnit.Should().Be(2m, "the set's lines changed where it's kept");
     }
 
-    /// <summary>One thing a user does to the product, as one undo step.</summary>
+    /// <summary>One thing a user does to the product, as one undo step; an undo, a redo or a Save; or a load between them.</summary>
     private abstract record Step;
+
+    private sealed record Undo : Step;
+
+    private sealed record Redo : Step;
+
+    /// <summary>Save, as the form does it: refused without a name, else written and its fields shown again as saved.</summary>
+    private sealed record Save : Step;
+
+    /// <summary>
+    /// The view's load: fresh copies of the categories and packaging materials, as saved elsewhere since: the materials
+    /// repriced and Loaves' own wastage moved, renamed, both or neither.
+    /// </summary>
+    private sealed record Load(bool Changed, bool Renamed) : Step;
 
     private sealed record Rename(string Name) : Step;
 
@@ -138,15 +149,20 @@ public class ProductDraftTests
 
     private static readonly string[] Descriptions = ["Soft, with macapuno", "   ", ""];
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
-        Gen.Int[0, 2].Select(index => (Step)new Rename(Names[index])),
-        Gen.Int[0, 2].Select(index => (Step)new Describe(index)),
-        Gen.Int[1, 12].Select(quantity => (Step)new TypeQuantity(quantity)),
-        Gen.Int[0, 150].Select(pesos => (Step)new TypePrice(pesos == 0 ? null : pesos)),
-        Gen.Int[0, 2].Select(index => (Step)new PickCategory(index)),
-        Gen.Int[0, 60].Select(percent => (Step)new TypeLabor(percent)),
-        Gen.Select(Gen.Int[0, 1], Gen.Int[1, 12], (material, quarters) => (Step)new AddPackaging(material, quarters)),
-        Gen.Int[0, 9].Select(row => (Step)new RemovePackaging(row)));
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, Gen.OneOf<Step>(
+            Gen.Int[0, 2].Select(index => (Step)new Rename(Names[index])),
+            Gen.Int[0, 2].Select(index => (Step)new Describe(index)),
+            Gen.Int[1, 12].Select(quantity => (Step)new TypeQuantity(quantity)),
+            Gen.Int[0, 150].Select(pesos => (Step)new TypePrice(pesos == 0 ? null : pesos)),
+            Gen.Int[0, 2].Select(index => (Step)new PickCategory(index)),
+            Gen.Int[0, 60].Select(percent => (Step)new TypeLabor(percent)),
+            Gen.Select(Gen.Int[0, 1], Gen.Int[1, 12], (material, quarters) => (Step)new AddPackaging(material, quarters)),
+            Gen.Int[0, 9].Select(row => (Step)new RemovePackaging(row)))),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())),
+        (2, Gen.Select(Gen.Bool, Gen.Bool, (changed, renamed) => (Step)new Load(changed, renamed))));
 
     /// <summary>
     /// A saved product's draft as its form holds it: the lists it reads (two packaging materials, three categories, one of
@@ -169,20 +185,16 @@ public class ProductDraftTests
         };
 
         private readonly ObservableCollection<ProductCategory> _categories = [];
+        private readonly ObservableCollection<RawMaterial> _materials = [];
+        private readonly UndoModel<ProductFormSnapshot> _model;
         private bool _restoring;
+        private int _loads;
+        private int _renames;
 
         public World()
         {
-            _categories.Add(new ProductCategory { Id = 61, Name = "Breads" });
-            _categories.Add(new ProductCategory { Id = 62, Name = "Loaves", WastagePercent = 5m });
-            _categories.Add(new ProductCategory { Id = 63, Name = "Cakes" });
-
-            Material71 = Material(71, "Cello Wrapper", 0.7m);
-            Draft = new ProductDraft(this, new ProductLists(
-                [],
-                [],
-                [Material71, Material(72, "Sticker Label", 0.4m)],
-                []));
+            Load(changed: false, renamed: false);
+            Draft = new ProductDraft(this, new ProductLists([], [], _materials, []));
             Draft.Costing.SetDefaults(new CostingDefaults { WastagePercent = 3m, VatPercent = 12m, PriceRoundingStep = 1m });
             Draft.Costing.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m });
             Draft.EditingName = "Ube Loaf";
@@ -191,12 +203,13 @@ public class ProductDraftTests
 
             History = new UndoHistory<ProductFormSnapshot>(Capture, (a, b) => a.ShowsSameAs(b), () => !_restoring, (a, b) => a.SavesSameAs(b));
             History.MarkClean();
+            _model = new UndoModel<ProductFormSnapshot>(Capture(), (a, b) => a.ShowsSameAs(b), (a, b) => a.SavesSameAs(b));
         }
 
         public ProductDraft Draft { get; }
 
         /// <summary>The cello wrapper, as the screen holds it.</summary>
-        public RawMaterial Material71 { get; }
+        public RawMaterial Material71 => _materials[0];
 
         public UndoHistory<ProductFormSnapshot> History { get; }
 
@@ -215,8 +228,52 @@ public class ProductDraftTests
             costs.Packaging.Should().Be(Draft.Packaging.LineEdits.Sum(l => l.CostPerUnit), $"{when}, the packaging lines as they stand");
         }
 
-        public void Apply(Step step)
+        /// <summary>The draft, its history and its costs, as the model and the fields say.</summary>
+        public void ShouldBeRight(string when)
         {
+            _model.ShouldMatch(History, Capture(), when);
+            ShouldPriceTheFields(when);
+        }
+
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
+        {
+            switch (step)
+            {
+                case Load load:
+                    // As the form's load (ProductForm.TakeLoad): the category back on its fresh copy, the packaging rows at
+                    // their fresh materials, and the costs told that what they're worked out from changed.
+                    var before = Capture();
+                    Load(load.Changed, load.Renamed);
+                    _restoring = true;
+                    Draft.Rebase(Draft.EditingCategory?.Id, _categories, new Dictionary<int, ComponentCosts>(), []);
+                    Draft.Packaging.ResolveRows();
+                    Draft.Costing.InputsChanged();
+                    _restoring = false;
+                    History.RefreshDirty();
+                    Capture().SavesSameAs(before).Should().BeTrue($"{load} re-points the draft, changing nothing it saves");
+                    if (Draft.EditingCategory is { } category)
+                    {
+                        category.Should().BeSameAs(_categories.Single(c => c.Id == category.Id), $"after {load}, the category is the load's copy");
+                    }
+
+                    return false;
+
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+
+                case Save:
+                    return TrySave();
+            }
+
+            var was = Capture();
             History.Begin();
             switch (step)
             {
@@ -254,11 +311,12 @@ public class ProductDraftTests
             }
 
             History.End();
+
+            // As the form's watchers do on every change to what it holds (the fields, the tables): Save's dirty check is told.
+            History.RefreshDirty();
+            _model.Edited(was, Capture());
+            return false;
         }
-
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
-
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
 
         private bool Move(bool moved, ProductFormSnapshot snapshot)
         {
@@ -268,9 +326,51 @@ public class ProductDraftTests
                 _restoring = true;
                 Draft.Restore(snapshot, _categories);
                 _restoring = false;
+                History.RefreshDirty();
             }
 
             return moved;
+        }
+
+        /// <summary>
+        /// Save, as the form does it: refused without a name; written, the product's fields are shown again as saved
+        /// (ProductDraft.ShowFields), with nothing to undo, and what a Save of them would write is what was just written.
+        /// </summary>
+        private bool TrySave()
+        {
+            if (Draft.EditingName.Trim().Length == 0)
+            {
+                return false;
+            }
+
+            var written = Draft.ToProduct(7, ProductStage.Production, folderId: null, DateTime.Now);
+            History.Clear();
+            _restoring = true;
+            Draft.ShowFields(written, _categories);
+            _restoring = false;
+            History.MarkClean();
+
+            Fields(Draft.ToProduct(7, ProductStage.Production, folderId: null, written.UpdatedAt)).Should().Be(Fields(written), "the product shown again as saved writes what was saved");
+            _model.Saved(Capture());
+            return true;
+        }
+
+        private static string Fields(Product product) =>
+            $"{product.Name}|{product.Description}|{product.QuantityRequired}|{product.CurrentPrice}|{product.CategoryId}|{product.IsComposite}|{product.IncludesComponentPackaging}";
+
+        /// <summary>Fresh copies of the categories and packaging materials, in place of the ones held, as a load brings them.</summary>
+        private void Load(bool changed, bool renamed)
+        {
+            var factor = changed ? 1m + (++_loads % 3) * 0.25m : 1m;
+            var suffix = renamed ? $" ({++_renames})" : string.Empty;
+            _categories.Clear();
+            _categories.Add(new ProductCategory { Id = 61, Name = "Breads" + suffix });
+            _categories.Add(new ProductCategory { Id = 62, Name = "Loaves" + suffix, WastagePercent = changed ? 5m + _loads % 3 : 5m });
+            _categories.Add(new ProductCategory { Id = 63, Name = "Cakes" + suffix });
+
+            _materials.Clear();
+            _materials.Add(Material(71, "Cello Wrapper" + suffix, 0.7m * factor));
+            _materials.Add(Material(72, "Sticker Label" + suffix, 0.4m * factor));
         }
 
         private static RawMaterial Material(int id, string name, decimal cost) => new()

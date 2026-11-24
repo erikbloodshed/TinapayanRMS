@@ -1,7 +1,7 @@
 # 0009. The migration closes: what it dropped, and what stays open
 
 **Status:** Accepted, 2026-11-22, the owner choosing "Drop a and b, keep c" of the three below. Narrows ADR 0002, ADR 0003
-and ADR 0006 in what it drops, and changes nothing else in them.
+and ADR 0006 in what it drops, and changes nothing else in them. Its (c) done 2026-11-24 (the build plan's log).
 
 ## Context
 

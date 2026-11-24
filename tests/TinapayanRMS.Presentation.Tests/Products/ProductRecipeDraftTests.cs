@@ -7,6 +7,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
@@ -15,51 +16,47 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// A product's recipe draft on its own, with no database and no screen (docs/adr/0006): random sequences of what the recipe
 /// part does to a saved product's sections (a section of its own added, a sub-assembly linked, a linked one copied or
 /// unlinked, one of its own moved to Sub-Assemblies, its lines or a linked one's piece size changed, a section taken out),
-/// each an undo step, with loads between them that bring fresh copies of the ingredients and the sub-assemblies, their
-/// costs moved or not. Whatever the sequence, the sections stay in recipe order and told apart, each knows whether others
-/// share its role, the dirty check says whether a Save would write the recipe differently from where it was loaded, a load
-/// changes nothing Save writes, a recipe that saves as loaded is as saved, and undoing every step gives back where it
-/// started, redoing them where it ended, at the costs the last load brought.
+/// each an undo step, with undos, redos and Saves among them, and loads that bring fresh copies of the ingredients and the
+/// sub-assemblies, their costs moved or not, and what was saved elsewhere since. After every step the sections are where
+/// their history says, in recipe order and told apart, each knows whether others share its role, and the dirty check says
+/// whether a Save would write the recipe differently from what was last saved; a load changes nothing Save writes, a
+/// recipe that saves as loaded is as saved, and an undo shows the costs the last load brought. A Save here is what the
+/// form's dirty check sees of one: what was written is what's measured against, with nothing to undo; the form's reload of
+/// it is tested on the database.
 /// </summary>
 public class ProductRecipeDraftTests
 {
     [Test]
-    public void Any_sequence_undoes_back_to_where_it_started_and_keeps_the_sections_in_order() =>
+    public void Any_sequence_keeps_the_sections_and_their_history_right_and_in_order() =>
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                world.ShouldHoldItsRules($"after {step}");
-                world.History.IsDirty.Should().Be(!SavesSameAs(world.Start, world.Capture()), $"after {step}, the dirty check says whether Save would write it");
+                world.ShouldBeRight($"after {step}");
             }
 
-            // As it started, at the costs the last load brought: a step keeps the ingredients it was taken with, and an undo
-            // puts its sections back at the ones the screen holds now (ProductRecipeDraft.Restore).
-            var end = world.Capture();
-            while (world.TryUndo())
+            // Every step left undone, at the costs the last load brought: a step keeps the ingredients it was taken with, and
+            // an undo puts its sections back at the ones the screen holds now (ProductRecipeDraft.Restore).
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            SavesSameAs(world.Capture(), world.Start).Should().BeTrue("undoing every step gives back where it started");
             world.ShouldShowTheLastLoadsCosts("undone");
-            world.History.IsDirty.Should().BeFalse();
-            if (!steps.Any(s => s is ChangedElsewhere(3)))
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            if (!steps.Any(s => s is ChangedElsewhere(3) or Save))
             {
-                // Unless the load made a linked section the product's own, which Save then writes as such.
+                // Unless the load made a linked section the product's own, which Save then writes as such, or a Save moved
+                // what's measured against from what was loaded.
                 world.Draft.IsAsSaved(world.Draft.CurrentDraft()).Should().BeTrue("undone back to how it was loaded, Save needn't write it");
             }
 
-            world.ShouldHoldItsRules("undone");
-
-            while (world.TryRedo())
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            ShowsSameAs(world.Capture(), end).Should().BeTrue("redoing every step gives back where it ended, costs and all");
-            world.ShouldHoldItsRules("redone");
         }, iter: 300);
 
     [Test]
@@ -132,7 +129,9 @@ public class ProductRecipeDraftTests
         {
             var world = new World();
             var loaded = Describe(world.Draft.CurrentDraft());
-            foreach (var step in steps)
+
+            // What's as saved is measured from the load; a Save's reload, which would move it, is the form's.
+            foreach (var step in steps.Where(s => s is not Save))
             {
                 world.Apply(step);
                 var now = world.Draft.CurrentDraft();
@@ -149,7 +148,7 @@ public class ProductRecipeDraftTests
         world.Apply(new EditLines(Row: world.Draft.UsageEdits.IndexOf(dough), Ingredient: 0, Grams: 500));
         world.Apply(new Load(CostsChanged: true));
 
-        world.TryUndo().Should().BeTrue();
+        world.Apply(new Undo()).Should().BeTrue();
 
         var undone = world.Draft.UsageEdits.Single(u => !u.IsLinked);
         undone.Lines.Select(l => (l.Ingredient.Id, l.Grams)).Should().Equal(dough.Lines.Select(l => (l.Ingredient.Id, l.Grams)), "the edit is undone");
@@ -218,18 +217,29 @@ public class ProductRecipeDraftTests
     /// </summary>
     private sealed record ChangedElsewhere(int Kind) : Step;
 
+    private sealed record Undo : Step;
+
+    private sealed record Redo : Step;
+
+    /// <summary>Save: what was written is what the dirty check measures against.</summary>
+    private sealed record Save : Step;
+
     private static readonly string?[] Names = [null, "Ube", "Pandan"];
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
-        Gen.Select(Gen.Int[0, 2], Gen.Int[0, 2], Gen.Int[0, 3], Gen.Int[1, 900], (role, name, ingredient, grams) => (Step)new AddOwn(role, name, ingredient, grams)),
-        Gen.Int[0, 2].Select(subAssembly => (Step)new Link(subAssembly)),
-        Gen.Select(Gen.Int[0, 9], Gen.Bool, (row, isOwn) => (Step)new CopyLinked(row, isOwn)),
-        Gen.Int[0, 9].Select(row => (Step)new MoveToSubAssemblies(row)),
-        Gen.Select(Gen.Int[0, 9], Gen.Int[0, 3], Gen.Int[1, 900], (row, ingredient, grams) => (Step)new EditLines(row, ingredient, grams)),
-        Gen.Select(Gen.Int[0, 9], Gen.Bool, Gen.Int[1, 120], (row, yield, value) => (Step)new PieceSize(row, yield, value)),
-        Gen.Int[0, 9].Select(row => (Step)new Remove(row)),
-        Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged)),
-        Gen.Int[0, 3].Select(kind => (Step)new ChangedElsewhere(kind)));
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, Gen.OneOf<Step>(
+            Gen.Select(Gen.Int[0, 2], Gen.Int[0, 2], Gen.Int[0, 3], Gen.Int[1, 900], (role, name, ingredient, grams) => (Step)new AddOwn(role, name, ingredient, grams)),
+            Gen.Int[0, 2].Select(subAssembly => (Step)new Link(subAssembly)),
+            Gen.Select(Gen.Int[0, 9], Gen.Bool, (row, isOwn) => (Step)new CopyLinked(row, isOwn)),
+            Gen.Int[0, 9].Select(row => (Step)new MoveToSubAssemblies(row)),
+            Gen.Select(Gen.Int[0, 9], Gen.Int[0, 3], Gen.Int[1, 900], (row, ingredient, grams) => (Step)new EditLines(row, ingredient, grams)),
+            Gen.Select(Gen.Int[0, 9], Gen.Bool, Gen.Int[1, 120], (row, yield, value) => (Step)new PieceSize(row, yield, value)),
+            Gen.Int[0, 9].Select(row => (Step)new Remove(row)))),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())),
+        (2, Gen.Bool.Select(costsChanged => (Step)new Load(costsChanged))),
+        (1, Gen.Int[0, 3].Select(kind => (Step)new ChangedElsewhere(kind))));
 
     /// <summary>The sections as an undo step keeps them (RecipeSnapshot.Usages), as a class for the undo history.</summary>
     private sealed class Snapshot(IReadOnlyList<ProductUsageEdit> usages)
@@ -247,6 +257,7 @@ public class ProductRecipeDraftTests
         private readonly List<SubAssembly> _kept = [];
         private readonly List<SubAssemblyLine> _keptLines = [];
         private readonly HashSet<int> _changedElsewhere = [];
+        private readonly UndoModel<Snapshot> _model;
         private bool _restoring;
         private int _loads;
 
@@ -265,6 +276,11 @@ public class ProductRecipeDraftTests
                 [new UsageAddInLine { UsageId = 82, IngredientId = 24, Ingredient = Ingredients.First(i => i.Id == 24), Grams = 5m }]);
             History.MarkClean();
             Start = Capture();
+            _model = new UndoModel<Snapshot>(
+                new Snapshot(Start),
+                (a, b) => ShowsSameAs(a.Usages, b.Usages),
+                (a, b) => SavesSameAs(a.Usages, b.Usages),
+                (a, b) => SavesSameAs(a.Usages, b.Usages));
         }
 
         /// <summary>Where the history started, as it keeps it: rewritten, as every step is, when a load brings what was saved elsewhere.</summary>
@@ -316,30 +332,65 @@ public class ProductRecipeDraftTests
             }
         }
 
-        public void Apply(Step step)
+        /// <summary>
+        /// The sections, their history and their rules, as the model says, and the recipe's figures what its sections give as
+        /// they stand, folded afresh as the draft folds them (ProductRecipeDraft.Priced): a mark missed leaves them as they were.
+        /// </summary>
+        public void ShouldBeRight(string when)
         {
-            if (step is ProductRecipeDraftTests.Load or ChangedElsewhere)
+            _model.ShouldMatch(History, new Snapshot(Capture()), when);
+            ShouldHoldItsRules(when);
+
+            List<ProductUsageEdit> sections = [.. Draft.UsageEdits];
+            int? IndexOf(long? key) => key is { } k && sections.FindIndex(u => u.Key == k) is var i and >= 0 ? i : null;
+            var fresh = SectionFolds.Apply([.. sections.Select(u => u.ToPriced())], [.. sections.Select(u => IndexOf(u.GoesInto))]);
+            Draft.Priced().Select(p => p.Figures).Should().Equal(fresh.Select(p => p.Figures), $"{when}, the recipe's figures follow its sections");
+        }
+
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
+        {
+            switch (step)
             {
-                // Not the part's: written as a load writes, recording nothing.
-                if (step is ChangedElsewhere(var kind))
-                {
-                    _changedElsewhere.Add(kind);
-                }
+                case ProductRecipeDraftTests.Load or ChangedElsewhere:
+                    // Not the part's: written as a load writes, recording nothing.
+                    if (step is ChangedElsewhere(var kind))
+                    {
+                        _changedElsewhere.Add(kind);
+                    }
 
-                Load(step is ProductRecipeDraftTests.Load { CostsChanged: true });
-                _restoring = true;
-                if (Draft.RefreshRows(_kept, _keptLines))
-                {
-                    // As the form does (ProductForm.TakeLoad): what came in from where it's kept goes into every step too, so
-                    // an undo never puts back a linked sub-assembly's lines as they were before they were saved there.
-                    History.RewriteAll(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
-                    Start = AsSavedNow(Start);
-                }
+                    Load(step is ProductRecipeDraftTests.Load { CostsChanged: true });
+                    _restoring = true;
+                    if (Draft.RefreshRows(_kept, _keptLines))
+                    {
+                        // As the form does (ProductForm.TakeLoad): what came in from where it's kept goes into every step too, so
+                        // an undo never puts back a linked sub-assembly's lines as they were before they were saved there.
+                        History.RewriteAll(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
+                        _model.Rewritten(snapshot => new Snapshot(AsSavedNow(snapshot.Usages)));
+                        Start = AsSavedNow(Start);
+                    }
 
-                _restoring = false;
-                return;
+                    _restoring = false;
+                    return false;
+
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+
+                case Save:
+                    History.Clear();
+                    History.MarkClean();
+                    _model.Saved(new Snapshot(Capture()));
+                    return true;
             }
 
+            var was = new Snapshot(Capture());
             History.Begin();
             try
             {
@@ -351,11 +402,9 @@ public class ProductRecipeDraftTests
             }
 
             History.End();
+            _model.Edited(was, new Snapshot(Capture()));
+            return false;
         }
-
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
-
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
 
         private bool Move(bool moved, Snapshot snapshot)
         {
@@ -411,15 +460,19 @@ public class ProductRecipeDraftTests
             }
         }
 
-        /// <summary>An undo step's linked sections as the sub-assemblies are kept now (ProductRecipeDraft.StepAsSavedNow's sections).</summary>
-        private IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages)
+        /// <summary>
+        /// An undo step's sections as the sub-assemblies are kept now, as the form rewrites every step
+        /// (ProductRecipeDraft.StepAsSavedNow), the section form closed.
+        /// </summary>
+        private IReadOnlyList<ProductUsageEdit> AsSavedNow(IReadOnlyList<ProductUsageEdit> usages) =>
+            Draft.StepAsSavedNow(new RecipeSnapshot { Usages = usages, SelectedTab = null, HasAddSubAssemblyTab = false, Form = ClosedForm }, _kept, _keptLines).Usages;
+
+        private static readonly SectionFormSnapshot ClosedForm = new()
         {
-            var ingredientsById = Ingredients.ToDictionary(i => i.Id);
-            var linesById = _keptLines.ToLookup(l => l.SubAssemblyId);
-            return [.. usages.Select(u => u.IsLinked && _kept.FirstOrDefault(s => s.Id == u.SubAssemblyId) is { } saved && saved.OwnerProductId != ProductId
-                ? Draft.AsSavedNow(u, saved, linesById, ingredientsById)
-                : u)];
-        }
+            IsOpen = false, IsAdding = false, Title = string.Empty, Mode = default, IsEditingLines = false, IsPickingSource = false,
+            EditingUsageIndex = null, RoleId = null, Name = null, SourceKey = null, Lines = [], AddIns = [], FormulaBase = 0m,
+            AuthoredField = UsageAuthoredField.WeightPerPiece, WeightPerPiece = 0m, Yield = 0m,
+        };
 
         private IEnumerable<SectionLine> KeptLines(int subAssemblyId) =>
             _keptLines.Where(l => l.SubAssemblyId == subAssemblyId).Select(l => new SectionLine(Ingredients.First(i => i.Id == l.IngredientId), l.Grams));

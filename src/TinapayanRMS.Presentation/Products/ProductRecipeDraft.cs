@@ -183,20 +183,7 @@ public sealed class ProductRecipeDraft : ObservableState
             }
             else if (saved is not null && edit.IsLinked && isOwnNow)
             {
-                // Its role was made product-owned: the product owns it now, with any add-ins it had merged into its lines.
-                var role = roles.FirstOrDefault(r => r.Id == saved.RoleId) ?? saved.Role;
-                fresh = new ProductUsageEdit(
-                    saved.Id,
-                    role,
-                    [.. linkedLinesById[saved.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
-                    edit.AuthoredField,
-                    edit.AuthoredValue,
-                    linkedName: null,
-                    name: saved.SectionName)
-                {
-                    Key = edit.Key,
-                    GoesInto = edit.GoesInto,
-                };
+                fresh = AsOwnNow(edit, saved, linkedLinesById, ingredientsById);
             }
             else if (edit.IsLinked || (edit.IsOwned && saved is not null && !isOwnNow))
             {
@@ -239,13 +226,33 @@ public sealed class ProductRecipeDraft : ObservableState
     }
 
     /// <summary>
+    /// A linked section whose role was made product-owned where it's kept (<paramref name="saved"/>, its owner this product):
+    /// the product owns it now, with any add-ins it had merged into its lines, at its own piece size.
+    /// </summary>
+    private ProductUsageEdit AsOwnNow(
+        ProductUsageEdit edit, SubAssembly saved, ILookup<int, SubAssemblyLine> linkedLinesById, Dictionary<int, RawMaterial> ingredientsById) =>
+        new(
+            saved.Id,
+            _roles.FirstOrDefault(r => r.Id == saved.RoleId) ?? saved.Role,
+            [.. linkedLinesById[saved.Id].Select(l => new SectionLine(ingredientsById.GetValueOrDefault(l.IngredientId) ?? l.Ingredient!, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))],
+            edit.AuthoredField,
+            edit.AuthoredValue,
+            linkedName: null,
+            name: saved.SectionName)
+        {
+            Key = edit.Key,
+            GoesInto = edit.GoesInto,
+        };
+
+    /// <summary>
     /// Whether a saved section holds a change of the user's: something Save would write of it that isn't as the recipe was
     /// saved, or something typed into its form and not applied yet. A linked one the saved recipe doesn't link (a version
     /// put back links it) holds one only once its lines are changed here.
     /// </summary>
-    private bool IsChangedHere(ProductUsageEdit edit, int index, SectionFormSnapshot? form)
+    /// <param name="sections">The recipe the section is the <paramref name="index"/>th of: the form's, or an undo step's.</param>
+    private bool IsChangedHere(ProductUsageEdit edit, int index, SectionFormSnapshot? form, IReadOnlyList<ProductUsageEdit>? sections = null)
     {
-        if (form?.IsTypedInto(index, edit, UsageEdits) == true)
+        if (form?.IsTypedInto(index, edit, sections ?? UsageEdits) == true)
         {
             return true;
         }
@@ -280,9 +287,11 @@ public sealed class ProductRecipeDraft : ObservableState
     /// <summary>
     /// An undo step's recipe (<paramref name="step"/>) with its linked sections as a load just found them saved where
     /// they're kept (as <see cref="RefreshRows"/> brought them into the form), and the section form open on one of them
-    /// showing its lines as saved now, unless they're typed into there. What the product holds of its own (a piece size,
-    /// add-ins, lines edited here and the ones they were changed from) stays as the step had it. An undo or a redo then
-    /// never puts back a sub-assembly's lines as they were before it was saved on the Sub-Assemblies screen.
+    /// showing it as saved now, unless it's typed into there. A linked one whose role was made product-owned is the
+    /// product's own, as the form takes it, unless the step holds a change of the user's to it. What the product holds of
+    /// its own (a piece size, add-ins, lines edited here and the ones they were changed from) stays as the step had it, and
+    /// the sections are in recipe order again, a moved role moving its section, the form's and the tab's places with them.
+    /// An undo or a redo then never puts back a sub-assembly as it was before it was saved elsewhere.
     /// </summary>
     internal RecipeSnapshot StepAsSavedNow(RecipeSnapshot step, IReadOnlyList<SubAssembly> linkedSubAssemblies, IReadOnlyList<SubAssemblyLine> linkedLines)
     {
@@ -296,14 +305,22 @@ public sealed class ProductRecipeDraft : ObservableState
         for (var i = 0; i < usages.Count; i++)
         {
             var edit = usages[i];
-            if (!edit.IsLinked
-                || linkedById.GetValueOrDefault(edit.SubAssemblyId) is not { } saved
-                || (saved.OwnerProductId is { } ownerId && ownerId == productId))
+            if (!edit.IsLinked || linkedById.GetValueOrDefault(edit.SubAssemblyId) is not { } saved)
             {
                 continue;
             }
 
-            var fresh = AsSavedNow(edit, saved, linkedLinesById, ingredientsById, step.Form.HasLinesTypedInto(i, edit));
+            // As the form takes one the product owns now (RefreshRows): not while it holds a change of the user's, which
+            // Save then refuses (ADR 0007).
+            var isOwnNow = saved.OwnerProductId is { } ownerId && ownerId == productId;
+            if (isOwnNow && IsChangedHere(edit, i, step.Form, step.Usages))
+            {
+                continue;
+            }
+
+            var fresh = isOwnNow
+                ? AsOwnNow(edit, saved, linkedLinesById, ingredientsById)
+                : AsSavedNow(edit, saved, linkedLinesById, ingredientsById, step.Form.HasLinesTypedInto(i, edit));
             if (fresh.ShowsSameAs(edit))
             {
                 continue;
@@ -313,24 +330,63 @@ public sealed class ProductRecipeDraft : ObservableState
             changed = true;
             if (form is { IsAdding: false, EditingUsageIndex: { } at } && at == i && !edit.AreLinkedLinesEdited && form.ShowsLines(edit.Lines))
             {
-                IReadOnlyList<IngredientLineSnapshot> lines =
-                    [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
-                // The figure typed stays and the other follows the new batch, as the form's own does (FollowPieceSize).
-                var batchWeight = lines.Sum(l => l.Grams ?? 0m) + form.AddIns.Sum(l => l.Grams ?? 0m) + Fold(usages)[i].Figures.FoldedInWeight;
-                var typed = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : form.Yield;
-                var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(form.AuthoredField, typed, batchWeight);
-                form = form with
-                {
-                    Title = fresh.EditTitle,
-                    Lines = lines,
-                    FormulaBase = SubAssemblyRules.FormulaBaseWeight([.. lines.Select(l => (l.Grams ?? 0m, l.IsFormulaBase))]),
-                    WeightPerPiece = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : Math.Round(weightPerPiece, 2, MidpointRounding.ToEven),
-                    Yield = form.AuthoredField == UsageAuthoredField.Yield ? form.Yield : Math.Round(yield, 2, MidpointRounding.ToEven),
-                };
+                form = FormShowing(form, fresh, isOwnNow, Fold(usages)[i].Figures.FoldedInWeight);
             }
         }
 
-        return changed ? step with { Usages = usages, Form = form } : step;
+        return changed ? InRecipeOrder(step with { Usages = usages, Form = form }) : step;
+    }
+
+    /// <summary>
+    /// A step's section form, open on a section a load found changed where it's kept, showing it as saved now, as the form
+    /// opened on it shows it (ProductRecipe.OpenUsageForm): one the product owns now (<paramref name="isOwnNow"/>) has its
+    /// add-ins in its lines, which are typed into here. The piece size typed stays, and the other figure follows the new
+    /// batch (FollowPieceSize).
+    /// </summary>
+    private static SectionFormSnapshot FormShowing(SectionFormSnapshot form, ProductUsageEdit fresh, bool isOwnNow, decimal foldedInWeight)
+    {
+        IReadOnlyList<IngredientLineSnapshot> lines =
+            [.. fresh.Lines.Select(l => new IngredientLineSnapshot(l.Ingredient.Id, l.Grams, l.IsFormulaBase, l.AuthoredBakersPercent))];
+        var addIns = isOwnNow ? [] : form.AddIns;
+        var batchWeight = lines.Sum(l => l.Grams ?? 0m) + addIns.Sum(l => l.Grams ?? 0m) + foldedInWeight;
+        var typed = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : form.Yield;
+        var (weightPerPiece, yield) = ProductRules.ResolvePieceSize(form.AuthoredField, typed, batchWeight);
+        return form with
+        {
+            Title = fresh.EditTitle,
+            IsEditingLines = fresh.IsEditable,
+            RoleId = fresh.Role?.Id,
+            Name = fresh.Name,
+            Lines = lines,
+            AddIns = addIns,
+            FormulaBase = SubAssemblyRules.FormulaBaseWeight([.. lines.Select(l => (l.Grams ?? 0m, l.IsFormulaBase))]),
+            WeightPerPiece = form.AuthoredField == UsageAuthoredField.WeightPerPiece ? form.WeightPerPiece : Math.Round(weightPerPiece, 2, MidpointRounding.ToEven),
+            Yield = form.AuthoredField == UsageAuthoredField.Yield ? form.Yield : Math.Round(yield, 2, MidpointRounding.ToEven),
+        };
+    }
+
+    /// <summary>
+    /// <paramref name="step"/>'s sections in recipe order again, as RefreshRows sorts the form's when a moved role moves one:
+    /// the form's section, the one it goes into and the tab showing, each kept by place, follow theirs.
+    /// </summary>
+    private static RecipeSnapshot InRecipeOrder(RecipeSnapshot step)
+    {
+        var usages = step.Usages;
+        ProductUsageEdit? At(int? index) => index is { } at && at >= 0 && at < usages.Count ? usages[at] : null;
+        var editing = At(step.Form.EditingUsageIndex);
+        var goesInto = At(step.Form.GoesIntoIndex);
+        var shown = step.SelectedTab is RecipeTabChoice.Usage(var tabIndex) ? At(tabIndex) : null;
+        List<ProductUsageEdit> sorted = [.. usages.Order(ProductUsageEdit.RecipeOrder)];
+        return step with
+        {
+            Usages = sorted,
+            Form = step.Form with
+            {
+                EditingUsageIndex = editing is null ? step.Form.EditingUsageIndex : sorted.IndexOf(editing),
+                GoesIntoIndex = goesInto is null ? step.Form.GoesIntoIndex : sorted.IndexOf(goesInto),
+            },
+            SelectedTab = shown is null ? step.SelectedTab : new RecipeTabChoice.Usage(sorted.IndexOf(shown)),
+        };
     }
 
     /// <summary><paramref name="lines"/> with each ingredient swapped for its refreshed copy when that differs; unchanged lines are kept as they are.</summary>

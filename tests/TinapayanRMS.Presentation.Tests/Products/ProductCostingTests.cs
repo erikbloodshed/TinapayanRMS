@@ -5,6 +5,7 @@ using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Presentation.Products;
 using TinapayanRMS.Presentation.Shared;
+using TinapayanRMS.Presentation.Tests.Fixtures;
 using TinapayanRMS.Pricing;
 
 namespace TinapayanRMS.Presentation.Tests.Products;
@@ -13,10 +14,10 @@ namespace TinapayanRMS.Presentation.Tests.Products;
 /// A product's costing draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user
 /// does to a saved product's Costing tab (a percentage typed, or the amount it comes to typed in its place), each an undo
 /// step, with what the costs are worked out from changing between them as the form changes it (a recipe or packaging edit
-/// on another tab, the cost basis switched, Settings' defaults and rates read again by a load). Whatever the sequence, the
-/// figures are never stale (they're what the inputs and percentages come to now), the dirty check and Save's
-/// <see cref="ProductCosting.IsChanged"/> say whether the percentages moved from where they were loaded, an amount typed
-/// shows as typed, and undoing every step gives back where it started, redoing them where it ended.
+/// on another tab, the cost basis switched, Settings' defaults and rates read again by a load), and undos, redos and Saves
+/// among them. Whatever the sequence, the figures are never stale (they're what the inputs and percentages come to now),
+/// the percentages are where their history says, the dirty check and Save's <see cref="ProductCosting.IsChanged"/> say
+/// whether they moved from what was last saved, and an amount typed shows as typed.
 /// </summary>
 public class ProductCostingTests
 {
@@ -33,40 +34,32 @@ public class ProductCostingTests
         }, iter: 300);
 
     [Test]
-    public void Any_sequence_undoes_back_to_where_it_started_and_Save_sees_only_a_moved_percentage() =>
+    public void Any_sequence_keeps_the_percentages_and_their_history_right_and_Save_sees_only_a_moved_percentage() =>
         Steps.Array[0, 40].Sample(steps =>
         {
             var world = new World();
-            var start = world.Costing.Percentages;
-
             foreach (var step in steps)
             {
                 world.Apply(step);
-                var moved = world.Costing.Percentages != start;
-                world.History.IsDirty.Should().Be(moved, $"after {step}, the dirty check says whether the percentages moved");
-                world.Costing.IsChanged.Should().Be(moved, $"after {step}, Save sends the costing only when it moved");
+                world.ShouldBeRight($"after {step}");
             }
 
-            var end = world.Costing.Percentages;
-            while (world.TryUndo())
+            // Every step left undone, then redone: the history walks back to what was last saved and forward again.
+            while (world.Apply(new Undo()))
             {
+                world.ShouldBeRight("undoing every step");
             }
 
-            world.Costing.Percentages.Should().Be(start, "undoing every step gives back where it started");
-            world.History.IsDirty.Should().BeFalse();
-            world.ShouldPriceAsNow("undone");
-
-            while (world.TryRedo())
+            world.History.IsDirty.Should().BeFalse("every step undone gives back what was last saved");
+            while (world.Apply(new Redo()))
             {
+                world.ShouldBeRight("redoing every step");
             }
-
-            world.Costing.Percentages.Should().Be(end, "redoing every step gives back where it ended");
-            world.ShouldPriceAsNow("redone");
         }, iter: 300);
 
     [Test]
     public void An_amount_typed_shows_as_typed_and_sets_the_percentage_it_comes_to() =>
-        Gen.Select(Steps.Array[0, 20], Gen.Int[0, 3], Gen.Int[1, 9999]).Sample((steps, metric, cents) =>
+        Gen.Select(Edits.Array[0, 20], Gen.Int[0, 3], Gen.Int[1, 9999]).Sample((steps, metric, cents) =>
         {
             var world = new World();
             foreach (var step in steps)
@@ -92,7 +85,7 @@ public class ProductCostingTests
 
     [Test]
     public void A_new_product_still_on_the_defaults_follows_every_change_to_them() =>
-        Steps.Array[0, 40].Sample(steps =>
+        Edits.Array[0, 40].Sample(steps =>
         {
             var world = new World(isNew: true);
 
@@ -173,7 +166,27 @@ public class ProductCostingTests
     /// <summary>A load read Settings' defaults and the shop's rates again, moved or not.</summary>
     private sealed record ReadDefaults(int Labor, int Vat, int Rounding) : Step;
 
-    private static readonly Gen<Step> Steps = Gen.OneOf<Step>(
+    private sealed record Undo : Step;
+
+    private sealed record Redo : Step;
+
+    /// <summary>Save: the percentages written, and loaded again as saved, as the form's reload does.</summary>
+    private sealed record Save : Step;
+
+    /// <summary>
+    /// Every step, undos, redos and Saves among the edits. On a saved product only: a new one takes Settings' defaults
+    /// as they land, with no undo step, which the edits alone test (A_new_product_still_on_the_defaults_follows_every_change_to_them).
+    /// </summary>
+    private static readonly Gen<Step> Steps = Gen.Frequency(
+        (12, EditsOf()),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())),
+        (1, Gen.Const<Step>(new Save())));
+
+    /// <summary>The edits, and the changes the form makes to the costing's inputs between them.</summary>
+    private static readonly Gen<Step> Edits = EditsOf();
+
+    private static Gen<Step> EditsOf() => Gen.OneOf<Step>(
         Gen.Select(Gen.Int[0, 3], Gen.Int[0, 120], (metric, percent) => (Step)new TypePercent(metric, percent)),
         Gen.Select(Gen.Int[0, 3], Gen.Int[0, 9999], (metric, cents) => (Step)new TypeAmount(metric, cents)),
         Gen.Select(Gen.Int[0, 2], Gen.Int[0, 5000], (part, cents) => (Step)new EditRecipe(part, cents)),
@@ -200,6 +213,7 @@ public class ProductCostingTests
         private bool _butterBelowCost = true;
         private bool _doughUnsized;
         private bool _restoring;
+        private readonly UndoModel<Snapshot> _model;
 
         /// <param name="isNew">A new product, on Settings' defaults, as New starts one; else a saved one, at its own costing.</param>
         public World(bool isNew = false)
@@ -222,6 +236,7 @@ public class ProductCostingTests
             Costing.PropertyChanged += (_, _) => History.RefreshDirty();
             History.MarkClean();
             Baseline = Costing.Percentages;
+            _model = new UndoModel<Snapshot>(new Snapshot(Costing.Percentages), (a, b) => a.Percentages == b.Percentages);
         }
 
         public ProductCosting Costing { get; }
@@ -273,7 +288,16 @@ public class ProductCostingTests
             (Costing.NoPieceSizeText is null).Should().Be(!_doughUnsized, when);
         }
 
-        public void Apply(Step step)
+        /// <summary>The percentages, their history and the figures, as the model and the inputs say: on a saved product.</summary>
+        public void ShouldBeRight(string when)
+        {
+            _model.ShouldMatch(History, new Snapshot(Costing.Percentages), when);
+            Costing.IsChanged.Should().Be(Costing.Percentages != Baseline, $"{when}, Save sends the costing only when it moved");
+            ShouldPriceAsNow(when);
+        }
+
+        /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
+        public bool Apply(Step step)
         {
             switch (step)
             {
@@ -283,6 +307,26 @@ public class ProductCostingTests
                 case TypeAmount(var metric, var cents):
                     Recorded(() => SetAmount(metric, cents / 100m));
                     break;
+                case Undo:
+                    var undid = Move(History.TryUndo(out var undone), undone);
+                    _model.Undone(undid);
+                    return undid;
+                case Redo:
+                    var redid = Move(History.TryRedo(out var redone), redone);
+                    _model.Redone(redid);
+                    return redid;
+                case Save:
+                    // As the form's reload after a Save: the costing loaded as written, with nothing to undo.
+                    var written = Costing.Percentages;
+                    Costing.Load(new CostingParameters
+                    {
+                        LaborPercent = written.Labor, OverheadPercent = written.Overhead, AdministrativePercent = written.Administrative, MarkupPercent = written.Margin,
+                    });
+                    History.Clear();
+                    History.MarkClean();
+                    Baseline = Costing.Percentages;
+                    _model.Saved(new Snapshot(Costing.Percentages));
+                    return true;
 
                 // Not this tab's: what the form changes, telling the costing as it does (InvalidateCosts).
                 case EditRecipe(var part, var cents):
@@ -314,11 +358,9 @@ public class ProductCostingTests
 
                     break;
             }
+
+            return false;
         }
-
-        public bool TryUndo() => Move(History.TryUndo(out var snapshot), snapshot);
-
-        public bool TryRedo() => Move(History.TryRedo(out var snapshot), snapshot);
 
         private bool Move(bool moved, Snapshot snapshot)
         {
@@ -334,9 +376,11 @@ public class ProductCostingTests
 
         private void Recorded(Action edit)
         {
+            var was = new Snapshot(Costing.Percentages);
             History.Begin();
             edit();
             History.End();
+            _model.Edited(was, new Snapshot(Costing.Percentages));
         }
 
         private void SetPercent(int metric, decimal percent)
