@@ -341,6 +341,31 @@ public sealed class RawMaterialDraft : ObservableState, IDisposable, IRawMateria
     }
 
     /// <summary>
+    /// Settings' cost buffer for a new material moved from <paramref name="from"/> to <paramref name="to"/>, as a load read it.
+    /// A new material still on the old default takes the new (<see cref="CostBufferDefaultMoved.IsOnDefault"/>); one whose buffer
+    /// was typed keeps it, and a saved one's is its own, though one saved unpriced at the default looks just like it. Hands back
+    /// what moved, for the form to carry into what Save measures against and every undo and redo step
+    /// (<see cref="CostBufferDefaultMoved.Carry"/>), which isn't the user's change: an undo past the typing then lands on the new
+    /// default, and follows Settings again. Null when the default didn't move, or the material isn't new.
+    /// </summary>
+    public CostBufferDefaultMoved? TakeDefaultCostBuffer(decimal from, decimal to, bool isNewMaterial)
+    {
+        if (!isNewMaterial || from == to)
+        {
+            return null;
+        }
+
+        var cost = PurchaseCost;
+        if (CostBufferDefaultMoved.IsOnDefault(cost.EditingCostBufferPercent, cost.EditingTargetCostBufferPercent, cost.EditingBufferedCost, from))
+        {
+            cost.EditingCostBufferPercent = to;
+            cost.EditingTargetCostBufferPercent = to;
+        }
+
+        return new CostBufferDefaultMoved(from, to);
+    }
+
+    /// <summary>
     /// A load's fresh copies taken in place of what the draft refers to, by id, nothing typed changed (ADR 0007): the category,
     /// the linked-to ingredient, the sub-assembly options and the one picked, the base unit, the add-ins' ingredients and the
     /// alternative units' units of measure, so a rename or a new price elsewhere shows.

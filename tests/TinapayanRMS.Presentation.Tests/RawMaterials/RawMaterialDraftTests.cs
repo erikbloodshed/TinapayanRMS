@@ -14,7 +14,8 @@ namespace TinapayanRMS.Presentation.Tests.RawMaterials;
 /// The Raw Materials draft on its own, with no database and no screen (docs/adr/0006): random sequences of what a user does
 /// to a new material (its name, type, source, category, weight loss, a link and its shares, a base unit, the cost buffer and
 /// preferred brand, brand prices, alternative units, a made ingredient's sub-assembly and add-ins), each an undo step, with
-/// undos, redos and Saves among them, and loads that bring fresh copies of what it refers to, renamed or repriced or not.
+/// undos, redos and Saves among them, loads that bring fresh copies of what it refers to, renamed or repriced or not, and
+/// Settings' cost buffer for a new material read again, moved or not.
 /// After every step the draft is where its history says it is, the dirty check says whether it would save differently from
 /// what was last saved, and a made ingredient's totals are what its lines give as they stand (docs/adr/0012). CsCheck
 /// shrinks a failure to the shortest sequence that shows it.
@@ -120,6 +121,75 @@ public class RawMaterialDraftTests
         world.Draft.Recipe.BomTotalCost.Should().Be(500m * 0.42m * 1.1m + 100m * 0.09m * 1.1m);
     }
 
+    [Test]
+    public void A_buffer_typed_and_typed_back_before_the_default_moved_comes_back_at_the_new_one()
+    {
+        var world = new World();
+        world.Apply(new TypeBuffer(12));
+        world.Apply(new TypeDefaultBuffer());
+        world.Apply(new MoveDefault(15));
+        world.Buffer.Should().Be((15m, 15m), "it was showing the default, so it takes the new one");
+
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Buffer.Should().Be((12m, 12m));
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Buffer.Should().Be((15m, 15m), "the step before the typing showed the default, which is 15 now");
+        world.History.IsDirty.Should().BeFalse("it's back where it started, so there's nothing for Save");
+
+        world.Apply(new Redo()).Should().BeTrue();
+        world.Apply(new Redo()).Should().BeTrue();
+        world.Buffer.Should().Be((15m, 15m), "typed back to the default, which is 15 now");
+        world.History.IsDirty.Should().BeFalse();
+    }
+
+    [Test]
+    public void A_buffer_typed_before_the_default_moved_and_undone_after_comes_back_at_the_new_one_and_follows_it()
+    {
+        var world = new World();
+        world.Apply(new TypeBuffer(12));
+        world.Apply(new MoveDefault(15));
+        world.Buffer.Should().Be((12m, 12m), "what was typed stays");
+
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Buffer.Should().Be((15m, 15m), "the step before the typing showed the default, which is 15 now");
+        world.History.IsDirty.Should().BeFalse("it's back where it started, so there's nothing for Save");
+
+        world.Apply(new MoveDefault(18));
+        world.Buffer.Should().Be((18m, 18m), "back on the default, it follows it again");
+        world.History.IsDirty.Should().BeFalse();
+    }
+
+    [Test]
+    public void A_buffer_typed_over_a_price_keeps_its_buffered_cost_when_the_default_moves()
+    {
+        var world = new World();
+        world.Apply(new AddPricedBrand(0, 500));
+        world.Apply(new TypeDefaultBuffer());
+        world.Draft.PurchaseCost.EditingBufferedCost.Should().Be(0.055m, "₱0.05 a gram with the 10% on top, fixed");
+
+        world.Apply(new MoveDefault(15));
+
+        world.Buffer.Should().Be((10m, 10m), "the buffer typed over a price fixed a buffered cost of the user's, which the % follows");
+        world.Draft.PurchaseCost.EditingBufferedCost.Should().Be(0.055m);
+        world.Draft.PurchaseCost.IsBufferOffTarget.Should().BeFalse("the target is the % typed, not a default it was never on");
+    }
+
+    [Test]
+    public void A_default_read_again_unchanged_or_on_a_saved_material_moves_nothing()
+    {
+        var world = new World();
+        world.Draft.TakeDefaultCostBuffer(10m, 10m, isNewMaterial: true).Should().BeNull("nothing moved, so no step needs rewriting");
+        world.Buffer.Should().Be((10m, 10m));
+
+        // Saved unpriced at the default, it looks just like a new one still on it: only its being saved keeps it.
+        world.Apply(new Rename("Sugar"));
+        world.Apply(new PickCategory(0));
+        world.Apply(new Save()).Should().BeTrue();
+        world.Apply(new MoveDefault(15));
+        world.Buffer.Should().Be((10m, 10m), "a saved material's buffer is its own");
+        world.History.IsDirty.Should().BeFalse();
+    }
+
     /// <summary>One thing a user does to the draft, as one undo step; an undo, a redo or a Save; or a load between them.</summary>
     private abstract record Step;
 
@@ -141,9 +211,16 @@ public class RawMaterialDraftTests
 
     private sealed record TypeBuffer(int Percent) : Step;
 
+    /// <summary>The Cost Buffer % typed back to Settings' default, as it stands: a new material shows its default again.</summary>
+    private sealed record TypeDefaultBuffer : Step;
+
     private sealed record TypePreferredBrand(int Index) : Step;
 
+    /// <summary>A brand row with a price and no unit yet, which prices nothing.</summary>
     private sealed record AddBrandPrice(int Brand, int Price) : Step;
+
+    /// <summary>A brand row priced per base unit, in ten-thousandths: the material is costed at it, and a % typed fixes a buffered cost.</summary>
+    private sealed record AddPricedBrand(int Brand, int Price) : Step;
 
     private sealed record RemoveBrandPrice(int Row) : Step;
 
@@ -172,6 +249,12 @@ public class RawMaterialDraftTests
     /// </summary>
     private sealed record Load(bool CostsChanged, bool Renamed) : Step;
 
+    /// <summary>
+    /// A load reading Settings' cost buffer for a new material, moved or not, and the form taking it
+    /// (RawMaterialForm.RefreshDefaultCostBuffer): not the user's change.
+    /// </summary>
+    private sealed record MoveDefault(int Percent) : Step;
+
     private static readonly string[] Names = ["Sugar", "Egg Yolk", " Ribbon ", ""];
 
     private static readonly string?[] Brands = [null, "Sugarland", "Victory"];
@@ -187,8 +270,10 @@ public class RawMaterialDraftTests
             Gen.Select(Gen.Int[1, 100], Gen.Int[1, 100], (weight, cost) => (Step)new TypeShares(weight, cost)),
             Gen.Int[0, 2].Select(index => (Step)new PickBaseUnit(index)),
             Gen.Int[0, 50].Select(percent => (Step)new TypeBuffer(percent)),
+            Gen.Const<Step>(new TypeDefaultBuffer()),
             Gen.Int[0, 2].Select(index => (Step)new TypePreferredBrand(index)),
             Gen.Select(Gen.Int[0, 2], Gen.Int[1, 2000], (brand, price) => (Step)new AddBrandPrice(brand, price)),
+            Gen.Select(Gen.Int[0, 2], Gen.Int[1, 2000], (brand, price) => (Step)new AddPricedBrand(brand, price)),
             Gen.Int[0, 9].Select(row => (Step)new RemoveBrandPrice(row)),
             Gen.Select(Gen.Int[0, 2], Gen.Int[1, 1000], (unit, multiplier) => (Step)new AddUnit(unit, multiplier)),
             Gen.Int[0, 9].Select(row => (Step)new RemoveUnit(row)),
@@ -199,7 +284,8 @@ public class RawMaterialDraftTests
         (3, Gen.Const<Step>(new Undo())),
         (2, Gen.Const<Step>(new Redo())),
         (1, Gen.Const<Step>(new Save())),
-        (2, Gen.Select(Gen.Bool, Gen.Bool, (costs, renamed) => (Step)new Load(costs, renamed))));
+        (2, Gen.Select(Gen.Bool, Gen.Bool, (costs, renamed) => (Step)new Load(costs, renamed))),
+        (2, Gen.Int[5, 15].Select(percent => (Step)new MoveDefault(percent))));
 
     /// <summary>The lines each of the sub-assemblies a made ingredient can be made from has, as saved: (ingredient, grams).</summary>
     private static readonly Dictionary<int, (int Ingredient, decimal Grams)[]> SubAssemblyLines = new()
@@ -221,6 +307,12 @@ public class RawMaterialDraftTests
         private int _loads;
         private int _renames;
 
+        /// <summary>Settings' cost buffer for a new material, as the form last read it (RawMaterialForm's _defaultCostBufferPercent).</summary>
+        private decimal _defaultBuffer = 10m;
+
+        /// <summary>The material isn't saved yet: once it is, it's the saved material's form, and Settings' buffer isn't its.</summary>
+        private bool _isNew = true;
+
         public World()
         {
             Load(costsChanged: false, renamed: false);
@@ -236,7 +328,7 @@ public class RawMaterialDraftTests
             Draft.Recipe.SubAssemblies.Subscribe(ReadRecipeLines);
 
             Draft.Rebase(null, null, null, null, _subAssemblies);
-            Draft.Clear(RawMaterialType.Ingredient, categoryId: null, RawMaterialSource.Purchased, defaultCostBufferPercent: 10m);
+            Draft.Clear(RawMaterialType.Ingredient, categoryId: null, RawMaterialSource.Purchased, _defaultBuffer);
             History.MarkClean();
             _model = new UndoModel<RawMaterialFormSnapshot>(Draft.Capture(0), (a, b) => a.ShowsSameAs(b), (a, b) => a.SavesSameAs(b));
         }
@@ -250,6 +342,9 @@ public class RawMaterialDraftTests
         public RawMaterialDraft Draft { get; }
 
         public UndoHistory<RawMaterialFormSnapshot> History { get; }
+
+        /// <summary>The Cost Buffer % and its target, as the form shows them.</summary>
+        public (decimal? Percent, decimal? Target) Buffer => (Draft.PurchaseCost.EditingCostBufferPercent, Draft.PurchaseCost.EditingTargetCostBufferPercent);
 
         /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
         public bool Apply(Step step)
@@ -269,6 +364,31 @@ public class RawMaterialDraftTests
                     _restoring = false;
                     draft.Capture(0).SavesSameAs(before).Should().BeTrue($"{load} re-points the draft, changing nothing it saves");
                     ShouldReferToTheFreshCopies(load);
+                    return false;
+
+                case MoveDefault(var percent):
+                    // As the form takes it (RawMaterialForm.RefreshDefaultCostBuffer), within its refresh: nothing recorded.
+                    var from = _defaultBuffer;
+                    _restoring = true;
+                    if (Draft.TakeDefaultCostBuffer(from, percent, isNewMaterial: _isNew) is { } moved)
+                    {
+                        History.RewriteAll(moved.Carry);
+                    }
+
+                    _restoring = false;
+                    _defaultBuffer = percent;
+
+                    // The model: on a new material, wherever the old default was held (the form, what Save measures against, any
+                    // step), the new one is now, whether or not the form showed it, so no undo or redo brings the old one back and
+                    // one landing on it follows Settings again. A buffer on the old default is the % and its target at it, with no
+                    // fixed buffered cost (one typed over a price, or as an amount), which the % would follow instead.
+                    if (_isNew && from != percent)
+                    {
+                        _model.Rewritten(s => s.CostBufferPercent == from && s.TargetCostBufferPercent == from && s.BufferedCost is not > 0m
+                            ? s with { CostBufferPercent = percent, TargetCostBufferPercent = percent }
+                            : s);
+                    }
+
                     return false;
 
                 case Undo:
@@ -368,6 +488,7 @@ public class RawMaterialDraftTests
             History.Clear();
             History.MarkClean();
             _model.Saved(Draft.Capture(0));
+            _isNew = false;
             return true;
         }
 
@@ -437,6 +558,9 @@ public class RawMaterialDraftTests
                 case TypeBuffer(var percent) when draft.ShowPurchaseSetup:
                     draft.PurchaseCost.TypedCostBufferPercent = percent;
                     break;
+                case TypeDefaultBuffer when draft.ShowPurchaseSetup:
+                    draft.PurchaseCost.TypedCostBufferPercent = _defaultBuffer;
+                    break;
                 case TypePreferredBrand(var index) when draft.ShowPurchaseSetup:
                     draft.PurchaseCost.EditingPreferredBrand = Brands[index];
                     break;
@@ -446,6 +570,14 @@ public class RawMaterialDraftTests
                     row.Price = price / 100m;
                     brands.Add(row);
                     row.Brand = Brands[brand];
+                    break;
+                case AddPricedBrand(var brand, var price) when draft.ShowPurchaseSetup:
+                    // As the add row with its base unit picked: priced at once, so the material is costed at it.
+                    var priced = draft.PurchaseCost.NewBrandPriceRow();
+                    priced.UnitKey = PurchaseUnitChoice.BaseUnitKey;
+                    priced.Price = price / 10000m;
+                    brands.Add(priced);
+                    priced.Brand = Brands[brand];
                     break;
                 case RemoveBrandPrice(var at) when brands.Count > 0:
                     brands.RemoveAt(at % brands.Count);

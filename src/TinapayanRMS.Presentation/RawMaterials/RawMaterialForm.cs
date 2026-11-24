@@ -914,20 +914,19 @@ public sealed class RawMaterialForm : RecordScreenState<RawMaterialFormSnapshot>
         LastUpdatedText = material?.CostUpdatedAt?.ToString("MMM d, yyyy", CultureInfo.CurrentCulture) ?? "—";
 
     /// <summary>
-    /// Takes up Settings' cost buffer for a new material as LoadCommand read it. A new material still showing the one it
-    /// started with takes the new one, and what Save measures against follows it, since the change isn't the user's; one
-    /// whose buffer was typed keeps it.
+    /// Takes up Settings' cost buffer for a new material as LoadCommand read it. A new material still on the one it started
+    /// with takes the new one; one whose buffer was typed keeps it (RawMaterialDraft.TakeDefaultCostBuffer). Not the user's
+    /// change, so what Save measures against and every undo and redo step that held the old one follow it (RewriteAll), or
+    /// an undo would bring the old one back, with Save offered, and leave the form no longer following Settings.
     /// </summary>
     private void RefreshDefaultCostBuffer(decimal defaultCostBufferPercent)
     {
-        var untouchedNewMaterial = _editingId == 0 && PurchaseCost.EditingCostBufferPercent == _defaultCostBufferPercent;
-        _defaultCostBufferPercent = defaultCostBufferPercent;
-        if (untouchedNewMaterial)
+        if (Draft.TakeDefaultCostBuffer(_defaultCostBufferPercent, defaultCostBufferPercent, isNewMaterial: _editingId == 0) is { } moved)
         {
-            PurchaseCost.EditingCostBufferPercent = defaultCostBufferPercent;
-            PurchaseCost.EditingTargetCostBufferPercent = defaultCostBufferPercent;
-            History.Rebase((settled, now) => settled with { CostBufferPercent = now.CostBufferPercent, TargetCostBufferPercent = now.TargetCostBufferPercent });
+            History.RewriteAll(moved.Carry);
         }
+
+        _defaultCostBufferPercent = defaultCostBufferPercent;
     }
 
     /// <summary>

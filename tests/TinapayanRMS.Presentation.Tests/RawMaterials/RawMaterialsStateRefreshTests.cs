@@ -1547,6 +1547,57 @@ public class RawMaterialsStateRefreshTests(DatabaseFixture fixture) : Persistenc
     });
 
     [Test]
+    public Task Undoing_an_edit_made_before_Settings_cost_buffer_changed_keeps_the_new_one() => UiThread.RunAsync(async () =>
+    {
+        var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 10m }, Cancellation);
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        await state.NewCommand.ExecuteAsync();
+        IUndoRecorder recorder = state;
+
+        // Named, as the name box does: one undo step, which holds the buffer as it stood, at the default.
+        recorder.BeginUndoStep();
+        state.EditingName = "Sugar";
+        recorder.EndUndoStep();
+
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 12m }, Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+        state.PurchaseCost.EditingCostBufferPercent.Should().Be(12m);
+
+        state.TryUndo().Should().BeTrue();
+        state.EditingName.Should().BeEmpty();
+        (state.PurchaseCost.EditingCostBufferPercent, state.PurchaseCost.EditingTargetCostBufferPercent)
+            .Should().Be((12m, 12m), "the step held the default, which is 12% now");
+        state.History.IsDirty.Should().BeFalse("it's the material as New left it, at the default as it is now");
+    });
+
+    [Test]
+    public Task A_material_saved_unpriced_at_the_default_keeps_its_buffer_when_Settings_changes() => UiThread.RunAsync(async () =>
+    {
+        var defaults = new CostingDefaultsRepository(CreateDbContextFactory());
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 10m }, Cancellation);
+        await SeedCategoryAsync("Dry goods");
+        var state = CreateState();
+        await state.LoadCommand.ExecuteAsync();
+        await state.NewCommand.ExecuteAsync();
+        state.EditingName = "Sugar";
+        PickCategory(state);
+        await state.SaveCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.SelectedRawMaterial is not null && state.AreDetailsReady && !state.History.IsDirty,
+            () => $"selected={state.SelectedRawMaterial?.Name ?? "none"}, error={state.ErrorMessage ?? "none"}");
+
+        // Saved with no price, so with no buffered cost of its own, at the default: just as a new material still on it.
+        state.PurchaseCost.EditingBufferedCost.Should().Be(0m);
+        await defaults.SetAsync(new CostingDefaults { CostBufferPercent = 15m }, Cancellation);
+        await state.LoadCommand.ExecuteAsync();
+
+        (state.PurchaseCost.EditingCostBufferPercent, state.PurchaseCost.EditingTargetCostBufferPercent)
+            .Should().Be((10m, 10m), "a saved material's buffer is its own");
+        state.History.IsDirty.Should().BeFalse();
+    });
+
+    [Test]
     public Task New_starts_a_purchased_ingredient_with_the_other_pickers_empty_and_the_numbers_kept() => UiThread.RunAsync(async () =>
     {
         var bagId = await SeedUnitOfMeasureAsync("bag", "bag");
