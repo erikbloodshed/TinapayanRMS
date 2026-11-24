@@ -6,8 +6,10 @@ namespace TinapayanRMS.Infrastructure.Tests.Persistence;
 
 /// <summary>
 /// A restore has to wait for connections it can't end, such as the Recipe API's as its reader role, and gives up after 30
-/// seconds (DatabaseBackups). A read-only connection left idle in its pool has to have closed by itself before then. In
-/// the collection of the tests that clear every pool, which would close it first.
+/// seconds (DatabaseBackups). A read-only connection left idle in its pool has to have closed by itself before then. Its
+/// pool is a data source of its own, with the read-only connection's settings: the tests that clear every pool
+/// (NpgsqlConnection.ClearAllPools, in collections A and B) run beside it, and a clear reaches only the pools Npgsql keeps
+/// per connection string, where one closed the connection before it was counted (2026-11-25).
 /// </summary>
 [NotInParallel(DatabaseCollection.D)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
@@ -22,9 +24,11 @@ public class ReadOnlyConnectionIdleTests(DatabaseFixture fixture)
     {
         var name = $"idle-{Guid.NewGuid():N}";
         var pooled = new NpgsqlConnectionStringBuilder(ReadOnlyConnection.Of(fixture.ConnectionString)) { ApplicationName = name };
-        await using (var connection = new NpgsqlConnection(pooled.ConnectionString))
+
+        // Kept to the end: disposing a data source closes its connections, which is what the test waits for the pool to do.
+        await using var dataSource = NpgsqlDataSource.Create(pooled.ConnectionString);
+        await using (await dataSource.OpenConnectionAsync(Cancellation))
         {
-            await connection.OpenAsync(Cancellation);
         }
 
         (await OpenConnectionsAsync(name)).Should().Be(1, "closing it only hands it back to its pool, still open on the server");
