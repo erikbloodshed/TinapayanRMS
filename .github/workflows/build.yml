@@ -97,8 +97,19 @@ jobs:
           & "$bin\postgres.exe" --version
 
       - name: Build
-        # Warnings fail the build, as the developer's has none; NuGet's vulnerability audit only reports.
-        run: dotnet build TinapayanRMS.slnx -warnaserror "-warnnotaserror:NU1900,NU1901,NU1902,NU1903,NU1904"
+        # Warnings fail the build, as the developer's has none; NuGet's vulnerability audit only reports. Its binary log
+        # is kept when it fails (below), as what the runner's build saw can differ from the developer's.
+        run: dotnet build TinapayanRMS.slnx -warnaserror "-warnnotaserror:NU1900,NU1901,NU1902,NU1903,NU1904" "-bl:${{ runner.temp }}/build.binlog"
+
+      # The failed build's binary log, a week, for the MSBuild Structured Log Viewer or `gh run download <id> -n build-binlog`.
+      - name: The build's binary log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-binlog
+          path: ${{ runner.temp }}/build.binlog
+          if-no-files-found: ignore
+          retention-days: 7
 
       # The runner's image sets PGUSER and PGPASSWORD for its own PostgreSQL. A password in the environment wins over
       # pgpass.conf, for Npgsql and pg_dump alike, and the backup test of a pg_dump with no password at all expects none.
