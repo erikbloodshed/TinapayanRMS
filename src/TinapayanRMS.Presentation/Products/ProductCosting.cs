@@ -278,19 +278,21 @@ public sealed class ProductCosting : ObservableState
     /// <summary>
     /// Takes up the defaults as a load read them (<see cref="SetDefaults"/>). A new product still showing the ones it started
     /// with (the screen's first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed
-    /// into keeps it. True when the new ones landed on it: not the user's change, so the form moves what Save measures
-    /// against along with them.
+    /// into keeps it. On a new product whose defaults moved, typed into or not, what they were and are now, for the form to
+    /// carry into what Save measures against and every undo and redo step (<see cref="CostingDefaultsMoved.Carry"/>), which
+    /// isn't the user's change: an undo past the typing then lands on the new ones, and follows Settings again. Else null.
     /// </summary>
-    public bool TakeDefaults(CostingDefaults defaults, bool isNewProduct)
+    public CostingDefaultsMoved? TakeDefaults(CostingDefaults defaults, bool isNewProduct)
     {
         var untouchedNewProduct = isNewProduct && ShowsDefaults;
+        var before = _defaults;
         SetDefaults(defaults);
         if (untouchedNewProduct)
         {
             ApplyDefaults();
         }
 
-        return untouchedNewProduct;
+        return isNewProduct && before != _defaults ? new CostingDefaultsMoved(before, _defaults) : null;
     }
 
     /// <summary>
@@ -348,6 +350,22 @@ public sealed class ProductCosting : ObservableState
     /// </summary>
     private sealed record CostingFigures(
         ProductCostSummary Costs, string? BelowCostText, string? NoPieceSizeText, int QuantityRequired, bool IsComposite, bool IncludesComponentPackaging);
+}
+
+/// <summary>
+/// Settings' costing defaults moved while a new product is open, typed into or not (ProductCosting.TakeDefaults):
+/// <paramref name="From"/> the old ones, <paramref name="To"/> the new.
+/// </summary>
+public sealed record CostingDefaultsMoved(
+    (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) From,
+    (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) To)
+{
+    /// <summary>
+    /// A costing the form holds (what Save measures against, an undo or redo step) as of the new defaults: the old ones become
+    /// the new, as on a form still showing them, so no undo or redo brings them back, and anything else stays, being the user's.
+    /// </summary>
+    public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Carry(
+        (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) costing) => costing == From ? To : costing;
 }
 
 /// <summary>

@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -1367,12 +1367,12 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing tab
         // follows them; and a new product still showing the defaults it started with takes the new ones (TakeDefaults).
         NewProductPlace.TakeDefault(defaults.NewProductStage, formIsNew: EditingId == 0);
-        if (Costing.TakeDefaults(defaults, isNewProduct: EditingId == 0))
+        if (Costing.TakeDefaults(defaults, isNewProduct: EditingId == 0) is { } moved)
         {
-            // The defaults landing on a form that was still showing the previous ones isn't the user's change -
-            // on the screen's first load they land on a blank form costed at nothing - so what Save measures
-            // against follows them. Only the costing moves: a product whose costing was typed into isn't here.
-            History.Rebase((settled, now) => settled with { Costing = now.Costing });
+            // New defaults on a new product (on the first load, over a blank form costed at nothing) aren't the user's change,
+            // so what Save measures against and every undo and redo step that held the old ones follow them (RewriteAll), or an
+            // undo would bring them back, with Save offered, and leave the form no longer following Settings. The rest is the user's.
+            History.RewriteAll(snapshot => snapshot with { Costing = moved.Carry(snapshot.Costing) });
         }
     }
 

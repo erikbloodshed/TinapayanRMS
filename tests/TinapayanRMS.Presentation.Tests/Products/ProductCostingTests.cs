@@ -104,6 +104,78 @@ public class ProductCostingTests
         }, iter: 300);
 
     [Test]
+    public void A_new_product_undone_and_redone_around_new_defaults_never_brings_back_the_old_ones() =>
+        NewProductSteps.Array[0, 40].Sample(steps =>
+        {
+            var world = new World(isNew: true);
+            foreach (var step in steps)
+            {
+                world.Apply(step);
+                world.ShouldMatchItsHistory($"after {step}");
+            }
+
+            while (world.Apply(new Undo()))
+            {
+                world.ShouldMatchItsHistory("undoing every step");
+            }
+
+            world.History.IsDirty.Should().BeFalse("every step undone gives back the defaults it started with, as they are now");
+            while (world.Apply(new Redo()))
+            {
+                world.ShouldMatchItsHistory("redoing every step");
+            }
+        }, iter: 300);
+
+    [Test]
+    public void A_percentage_typed_and_typed_back_before_the_defaults_moved_comes_back_at_the_new_ones()
+    {
+        var world = new World(isNew: true);
+        world.Apply(new TypePercent(0, 40));
+        world.Apply(new TypePercent(0, 35));
+        world.Apply(new ReadDefaults(30, 12, 1));
+        world.Costing.EditingLaborPercent.Should().Be(30m, "it was still showing the defaults, so it takes the new ones");
+
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Costing.EditingLaborPercent.Should().Be(40m);
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Costing.EditingLaborPercent.Should().Be(30m, "the step before the typing showed the defaults, which are 30 now");
+        world.History.IsDirty.Should().BeFalse("it's back where it started, so there's nothing for Save");
+
+        world.Apply(new Redo()).Should().BeTrue();
+        world.Apply(new Redo()).Should().BeTrue();
+        world.Costing.EditingLaborPercent.Should().Be(30m, "typed back to the defaults, which are 30 now");
+        world.History.IsDirty.Should().BeFalse();
+    }
+
+    [Test]
+    public void A_percentage_typed_before_the_defaults_moved_and_undone_after_comes_back_at_the_new_ones_and_follows_them()
+    {
+        var world = new World(isNew: true);
+        world.Apply(new TypePercent(0, 40));
+        world.Apply(new ReadDefaults(30, 12, 1));
+        world.Costing.EditingLaborPercent.Should().Be(40m, "what was typed stays");
+
+        world.Apply(new Undo()).Should().BeTrue();
+        world.Costing.EditingLaborPercent.Should().Be(30m, "the step before the typing showed the defaults, which are 30 now");
+        world.History.IsDirty.Should().BeFalse("it's back where it started, so there's nothing for Save");
+
+        world.Apply(new ReadDefaults(28, 12, 1));
+        world.Costing.EditingLaborPercent.Should().Be(28m, "back on the defaults, it follows them again");
+        world.History.IsDirty.Should().BeFalse();
+    }
+
+    [Test]
+    public void Defaults_read_again_unchanged_move_nothing()
+    {
+        var costing = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
+        costing.Load(null);
+        costing.SetDefaults(Defaults(labor: 35m));
+        costing.ApplyDefaults();
+
+        costing.TakeDefaults(Defaults(labor: 35m), isNewProduct: true).Should().BeNull("nothing moved, so no step needs rewriting");
+    }
+
+    [Test]
     public void A_new_product_still_on_the_defaults_takes_new_ones_and_one_typed_into_keeps_its_costing()
     {
         var untouched = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
@@ -111,7 +183,10 @@ public class ProductCostingTests
         untouched.SetDefaults(Defaults(labor: 35m));
         untouched.ApplyDefaults();
 
-        untouched.TakeDefaults(Defaults(labor: 30m), isNewProduct: true).Should().BeTrue();
+        var moved = untouched.TakeDefaults(Defaults(labor: 30m), isNewProduct: true);
+        moved.Should().Be(new CostingDefaultsMoved((35m, 25m, 15m, 40m), (30m, 25m, 15m, 40m)));
+        moved!.Carry((35m, 25m, 15m, 40m)).Should().Be((30m, 25m, 15m, 40m), "a step on the old defaults takes the new ones");
+        moved.Carry((40m, 25m, 15m, 40m)).Should().Be((40m, 25m, 15m, 40m), "one typed into keeps what was typed");
         untouched.EditingLaborPercent.Should().Be(30m);
 
         var typed = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
@@ -120,14 +195,15 @@ public class ProductCostingTests
         typed.ApplyDefaults();
         typed.EditingLaborPercent = 40m;
 
-        typed.TakeDefaults(Defaults(labor: 30m), isNewProduct: true).Should().BeFalse();
+        typed.TakeDefaults(Defaults(labor: 30m), isNewProduct: true).Should()
+            .Be(new CostingDefaultsMoved((35m, 25m, 15m, 40m), (30m, 25m, 15m, 40m)), "its undo steps on the old defaults still move");
         typed.EditingLaborPercent.Should().Be(40m, "what was typed stays");
 
         var saved = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
         saved.SetDefaults(Defaults(labor: 35m));
         saved.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 40m });
 
-        saved.TakeDefaults(Defaults(labor: 30m), isNewProduct: false).Should().BeFalse("a saved product's costing is its own");
+        saved.TakeDefaults(Defaults(labor: 30m), isNewProduct: false).Should().BeNull("a saved product's costing is its own");
         saved.EditingLaborPercent.Should().Be(35m);
         saved.IsChanged.Should().BeFalse();
     }
@@ -148,6 +224,9 @@ public class ProductCostingTests
 
     /// <summary>A metric's percentage typed: labor, overhead, admin, markup (0 to 3).</summary>
     private sealed record TypePercent(int Metric, int Percent) : Step;
+
+    /// <summary>A metric's percentage typed back to Settings' default for it, as they stand: the form shows the defaults again.</summary>
+    private sealed record TypeDefault(int Metric) : Step;
 
     /// <summary>A metric's amount typed in pesos, in its value box.</summary>
     private sealed record TypeAmount(int Metric, int Cents) : Step;
@@ -182,6 +261,16 @@ public class ProductCostingTests
         (3, Gen.Const<Step>(new Undo())),
         (2, Gen.Const<Step>(new Redo())),
         (1, Gen.Const<Step>(new Save())));
+
+    /// <summary>
+    /// A new product's steps: the edits, Settings' defaults read again among them, with undos and redos. No Save, which
+    /// would make it a saved product.
+    /// </summary>
+    private static readonly Gen<Step> NewProductSteps = Gen.Frequency(
+        (12, EditsOf()),
+        (3, Gen.Int[0, 3].Select(metric => (Step)new TypeDefault(metric))),
+        (3, Gen.Const<Step>(new Undo())),
+        (2, Gen.Const<Step>(new Redo())));
 
     /// <summary>The edits, and the changes the form makes to the costing's inputs between them.</summary>
     private static readonly Gen<Step> Edits = EditsOf();
@@ -243,7 +332,7 @@ public class ProductCostingTests
 
         public UndoHistory<Snapshot> History { get; }
 
-        /// <summary>What the dirty check measures against: as loaded, or the defaults that landed on a new product since.</summary>
+        /// <summary>What the dirty check measures against: as loaded, or the new defaults that took the old ones' place on a new product since.</summary>
         public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Baseline { get; private set; }
 
         public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) DefaultsAsPercentages =>
@@ -296,6 +385,13 @@ public class ProductCostingTests
             ShouldPriceAsNow(when);
         }
 
+        /// <summary>The percentages where their history says, and the figures as the inputs say: on a new product too.</summary>
+        public void ShouldMatchItsHistory(string when)
+        {
+            _model.ShouldMatch(History, new Snapshot(Costing.Percentages), when);
+            ShouldPriceAsNow(when);
+        }
+
         /// <summary>Takes <paramref name="step"/>, the model with it. True when an undo or a redo moved, or a Save wrote.</summary>
         public bool Apply(Step step)
         {
@@ -303,6 +399,16 @@ public class ProductCostingTests
             {
                 case TypePercent(var metric, var percent):
                     Recorded(() => SetPercent(metric, percent));
+                    break;
+                case TypeDefault(var metric):
+                    var defaults = DefaultsAsPercentages;
+                    Recorded(() => SetPercent(metric, metric switch
+                    {
+                        0 => defaults.Labor,
+                        1 => defaults.Overhead,
+                        2 => defaults.Administrative,
+                        _ => defaults.Margin,
+                    }));
                     break;
                 case TypeAmount(var metric, var cents):
                     Recorded(() => SetAmount(metric, cents / 100m));
@@ -347,13 +453,23 @@ public class ProductCostingTests
                     Costing.InputsChanged();
                     break;
                 case ReadDefaults(var labor, var vat, var rounding):
+                    var defaultsBefore = DefaultsAsPercentages;
                     _defaults = Defaults(labor, vat: vat, rounding: rounding);
-                    if (Costing.TakeDefaults(_defaults, isNewProduct: _isNew))
+                    if (Costing.TakeDefaults(_defaults, isNewProduct: _isNew) is { } moved)
                     {
-                        // As the form does (RefreshCostingDefaults): the defaults landing aren't the user's change, so what
-                        // the dirty check measures against moves with them.
-                        History.Rebase((settled, now) => settled with { Percentages = now.Percentages });
-                        Baseline = Costing.Percentages;
+                        // As the form does (RefreshCostingDefaults): the defaults moving aren't the user's change, so what
+                        // the dirty check measures against, and every undo and redo step, move with them.
+                        History.RewriteAll(snapshot => new Snapshot(moved.Carry(snapshot.Percentages)));
+                    }
+
+                    // The model: on a new product, wherever the old defaults were held (the form, what Save measures against,
+                    // any step), the new ones are now, whether or not the form showed them, so no undo or redo brings the
+                    // old ones back and one landing on them follows Settings again.
+                    if (_isNew && defaultsBefore != DefaultsAsPercentages)
+                    {
+                        var now = new Snapshot(DefaultsAsPercentages);
+                        _model.Rewritten(s => s.Percentages == defaultsBefore ? now : s);
+                        Baseline = Baseline == defaultsBefore ? DefaultsAsPercentages : Baseline;
                     }
 
                     break;
