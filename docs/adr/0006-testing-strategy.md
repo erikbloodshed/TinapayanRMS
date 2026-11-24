@@ -2,7 +2,8 @@
 
 **Status:** Accepted, 2026-11-20. Narrowed by [ADR 0009](0009-close-the-migration.md): the screens' tests may use the database. The
 random sequences stand, and take every step it names since 2026-11-24, the form's own at the form. Narrowed by [ADR 0011](0011-change-control-on-the-developers-pc.md)
-too: local CI is to run the window's smoke run, once it's built, where 0006 kept the window out of CI. Extended by
+too: local CI is to run the window's smoke run, once it's built, where 0006 kept the window out of CI; withdrawn by
+[ADR 0013](0013-ci-on-github-changes-straight-to-main.md), which keeps the window out of CI, the smoke run a script of its own. Extended by
 [ADR 0012](0012-figures-hear-of-a-change-from-whoever-made-it.md): the sequences check each figure after every step.
 
 ## Context

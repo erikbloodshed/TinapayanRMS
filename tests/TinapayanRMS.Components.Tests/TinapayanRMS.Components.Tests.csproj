@@ -17,7 +17,7 @@
   <!-- With UseBuiltApp=true the app's assembly is read as its last build left it, and the app isn't built: its WinUI XAML
        compiler runs on every build, changed or not, about 10 s of the 13 a build of this project took with nothing
        changed (2026-11-23). scripts/Test-Changed.ps1 sets it only when that file is newer than every file of the app's
-       own; everything else (dotnet test, local CI) builds the app. -->
+       own; everything else (dotnet test, CI) builds the app. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\TinapayanRMS.Maui\TinapayanRMS.Maui.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" OutputItemType="ReadAssembly"
                       Condition="'$(UseBuiltApp)' != 'true'" />

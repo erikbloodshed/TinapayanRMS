@@ -1,7 +1,6 @@
-# Dependency updates as pull requests, each checked by local CI (scripts/Invoke-LocalCI.ps1) before it's merged: GitHub
-# runs no CI since 2026-11-21 (docs/adr/0011). Weekly and grouped, so a week's updates are a few pull
-# requests to check rather than one per package. Packages that must move together are grouped together, as
-# Directory.Packages.props says they must.
+# Dependency updates as pull requests, each checked by the build workflow (.github/workflows/build.yml) before it's merged
+# on its own (docs/adr/0013). Weekly and grouped, so a week's updates are a few pull requests to check rather than one per
+# package. Packages that must move together are grouped together, as Directory.Packages.props says they must.
 version: 2
 updates:
   - package-ecosystem: nuget
@@ -29,6 +28,13 @@ updates:
         versions: [">= 6.0.0"]
 
   - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  # The build workflow's actions.
+  - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly

@@ -11,13 +11,14 @@ written. A decision that changes gets a new record that supersedes the old one, 
 | [0003](0003-mutable-observable-screen-state.md) | Mutable, observable screen state | Accepted; narrowed by 0009; its rejection of signals restated by 0012 |
 | [0004](0004-quality-gates.md) | Quality gates the build enforces | Accepted, its text edited after (0009); partly superseded by 0010 |
 | [0005](0005-change-control-and-dependencies.md) | Change control and dependencies | Accepted, amended 2026-11-21; superseded by 0011 |
-| [0006](0006-testing-strategy.md) | Testing strategy | Accepted; narrowed by 0009 and 0011, extended by 0012 |
+| [0006](0006-testing-strategy.md) | Testing strategy | Accepted; narrowed by 0009 and 0011 (0011's withdrawn by 0013), extended by 0012 |
 | [0007](0007-a-load-repoints-a-draft.md) | A load re-points a draft; it doesn't merge saves made elsewhere | Accepted |
 | [0008](0008-benchmarks-and-performance-budgets.md) | Benchmarks, startup timing and performance budgets | Accepted |
 | [0009](0009-close-the-migration.md) | The migration closes: what it dropped, and what stays open | Accepted |
 | [0010](0010-the-gates-read-method-bodies.md) | The gates read method bodies, the app's and the servers' too | Accepted |
-| [0011](0011-change-control-on-the-developers-pc.md) | Change control on the developer's PC | Accepted |
+| [0011](0011-change-control-on-the-developers-pc.md) | Change control on the developer's PC | Accepted; superseded by 0013 |
 | [0012](0012-figures-hear-of-a-change-from-whoever-made-it.md) | Figures hear of a change from whoever made it | Accepted |
+| [0013](0013-ci-on-github-changes-straight-to-main.md) | CI on GitHub, changes straight to main | Accepted |
 
 ## Writing one
 

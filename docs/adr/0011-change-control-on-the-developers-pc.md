@@ -1,7 +1,8 @@
 # 0011. Change control on the developer's PC
 
-**Status:** Accepted, 2026-11-23, the owner choosing "Straight to main after review" and "Add a smoke run to local CI",
-and keeping the review's account in the build plan's log. Supersedes [ADR 0005](0005-change-control-and-dependencies.md)
+**Status:** Superseded by [ADR 0013](0013-ci-on-github-changes-straight-to-main.md), 2026-11-25: the repository went public, and CI
+runs on GitHub again. Accepted, 2026-11-23, the owner choosing "Straight to main after review" and "Add a smoke run to
+local CI", and keeping the review's account in the build plan's log. Supersedes [ADR 0005](0005-change-control-and-dependencies.md)
 whole, its amendment included; what still stands of it is restated here. Narrows [ADR 0006](0006-testing-strategy.md)
 in one alternative it turned down, tests in the window on CI.
 
