@@ -1,11 +1,43 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
 @* The tooltips of what it holds, in the activity bar's look: one SfTooltip shows the data-title of whatever the pointer is
    on (never a title attribute, which would bring up the browser's own tooltip as well). MainLayout holds the whole page
    in one, and a dialog its content in another, as SfDialog moves itself out to the body. The activity bar keeps its own,
-   to the icons' right. Its element is display: contents (app.css), so the layout around it doesn't see it. *@
-<SfTooltip Target="[data-title]:not(.activity-item)" WindowCollision="true" OpenDelay="300" CssClass="app-tooltip" class="app-tooltip-host">
+   to the icons' right. Its element is display: contents (app.css), so the layout around it doesn't see it. A tooltip whose
+   target a click or a key takes off the page closes then (app.js's watchTooltip), rather than stay at the window's top
+   left. *@
+<SfTooltip @ref="_tooltip" ID="@_id" Target="[data-title]:not(.activity-item)" WindowCollision="true" OpenDelay="300" CssClass="app-tooltip" class="app-tooltip-host">
     @ChildContent
 </SfTooltip>
 
 @code {
     [Parameter, EditorRequired] public RenderFragment ChildContent { get; set; } = null!;
+
+    // Its own id, so the page's script watches its popup (the id followed by _content) and no other host's.
+    private readonly string _id = $"app-tooltip-{Guid.NewGuid():N}";
+    private SfTooltip? _tooltip;
+    private DotNetObjectReference<Tooltips>? _self;
+    private IJSObjectReference? _watch;
+    private bool _disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            _watch = await JS.InvokeAsync<IJSObjectReference>("tinapayan.watchTooltip", _self, $"{_id}_content").KeepUnlessGoneAsync(() => _disposed);
+        }
+    }
+
+    /// <summary>The open tooltip's target left the page: it closes, as it would have had the pointer left it.</summary>
+    [JSInvokable]
+    public Task CloseTooltipAsync() => InvokeAsync(() => _tooltip?.CloseAsync() ?? Task.CompletedTask);
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await _watch.StopAsync();
+        _self?.Dispose();
+    }
 }

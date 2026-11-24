@@ -347,6 +347,33 @@ window.addEventListener("beforeprint", () => {
 });
 
 window.tinapayan = {
+    // Tooltips.razor's tooltip, popup `popupId`, closes once a click or a key takes its target off the page (the linked
+    // badge's pencil, a section's Unlock): Syncfusion's closes when the pointer leaves its target, which a target gone never
+    // does, so the tooltip stayed, dropped to the window's top left. A little after each click or key, as the screen redraws,
+    // the open tooltip's target is looked for by the marker Syncfusion gives it; gone, the component is asked to close it.
+    // Its own tooltip only, so another's (the Print dialog's, the activity bar's) is left alone.
+    watchTooltip(dotNet, popupId) {
+        const check = () => {
+            const popup = document.getElementById(popupId);
+            if (popup?.classList.contains("e-popup-open") && !document.querySelector(`[data-tooltip-id="${CSS.escape(popupId)}"]`)) {
+                dotNet.invokeMethodAsync("CloseTooltipAsync").catch(() => { });
+            }
+        };
+        const handler = () => {
+            for (const delay of [50, 250, 750]) {
+                setTimeout(check, delay);
+            }
+        };
+        document.addEventListener("click", handler, true);
+        document.addEventListener("keydown", handler, true);
+        return {
+            dispose: () => {
+                document.removeEventListener("click", handler, true);
+                document.removeEventListener("keydown", handler, true);
+            },
+        };
+    },
+
     // Scrolls an element into view only if it isn't already.
     scrollIntoView(id) {
         const element = document.getElementById(id);
