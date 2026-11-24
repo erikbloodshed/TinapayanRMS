@@ -4,6 +4,30 @@ M:System.Decimal.#ctor(System.Double);Since .NET 11 it keeps the double's binary
 M:System.Decimal.#ctor(System.Single);Since .NET 11 it keeps the float's binary noise: take the decimal from text or a literal (PLAN.md, Conventions, "Decimal precision")
 M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.IObservable{``0}});A failure that reaches Switch ends the subscription for good: load through ScreenState.LoadLatest
 M:System.Reactive.Linq.Observable.Switch``1(System.IObservable{System.Threading.Tasks.Task{``0}});A failure that reaches Switch ends the subscription for good: load through ScreenState.LoadLatest
+M:System.Reactive.Linq.Observable.First``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.First``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.FirstOrDefault``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.FirstOrDefault``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.Last``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.Last``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.LastOrDefault``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.LastOrDefault``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.Single``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.Single``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.SingleOrDefault``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.SingleOrDefault``1(System.IObservable{``0},System.Func{``0,System.Boolean});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.Wait``1(System.IObservable{``0});Blocks the thread until the observable produces, which deadlocks on the UI thread: await it (FirstAsync, LastAsync, SingleAsync and the like) or subscribe
+M:System.Reactive.Linq.Observable.ForEach``1(System.IObservable{``0},System.Action{``0});Blocks the thread until the observable completes, which deadlocks on the UI thread: subscribe, or await ForEachAsync
+M:System.Reactive.Linq.Observable.ForEach``1(System.IObservable{``0},System.Action{``0,System.Int32});Blocks the thread until the observable completes, which deadlocks on the UI thread: subscribe, or await ForEachAsync
+M:System.Reactive.Linq.Observable.GetEnumerator``1(System.IObservable{``0});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.ToEnumerable``1(System.IObservable{``0});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.Latest``1(System.IObservable{``0});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.MostRecent``1(System.IObservable{``0},``0);Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.Next``1(System.IObservable{``0});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.Chunkify``1(System.IObservable{``0});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.Collect``2(System.IObservable{``0},System.Func{``1},System.Func{``1,``0,``1});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Linq.Observable.Collect``2(System.IObservable{``0},System.Func{``1},System.Func{``1,``0,``1},System.Func{``1,``1});Each step of its enumeration blocks the thread until the observable produces, which deadlocks on the UI thread: subscribe, or await it
+M:System.Reactive.Subjects.AsyncSubject`1.GetResult;Blocks the thread until the subject completes, which deadlocks on the UI thread: await it
 P:System.Threading.Tasks.Task`1.Result;Blocks the thread on async work, which deadlocks on the UI thread: await it
 M:System.Threading.Tasks.Task.Wait;Blocks the thread on async work, which deadlocks on the UI thread: await it
 M:System.Threading.Tasks.Task.Wait(System.Int32);Blocks the thread on async work, which deadlocks on the UI thread: await it
@@ -18,6 +42,12 @@ M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
 M:System.Threading.Tasks.Task.WaitAll(System.Threading.Tasks.Task[],System.TimeSpan);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAll
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[]);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAny
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Int32);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAny
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Int32,System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAny
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.Threading.CancellationToken);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAny
+M:System.Threading.Tasks.Task.WaitAny(System.Threading.Tasks.Task[],System.TimeSpan);Blocks the thread on async work, which deadlocks on the UI thread: await Task.WhenAny
+M:System.Threading.Tasks.TaskAsyncEnumerableExtensions.ToBlockingEnumerable``1(System.Collections.Generic.IAsyncEnumerable{``0},System.Threading.CancellationToken);Blocks the thread on each item of async work, which deadlocks on the UI thread: await foreach
 M:System.Runtime.CompilerServices.TaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
 M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it
 M:System.Runtime.CompilerServices.ConfiguredTaskAwaitable.ConfiguredTaskAwaiter.GetResult;Blocks the thread on async work, which deadlocks on the UI thread: await it

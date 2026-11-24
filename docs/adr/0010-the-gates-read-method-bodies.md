@@ -3,7 +3,8 @@
 **Status:** Accepted, 2026-11-23, the owner keeping its rule for when a gate needs a record. Supersedes
 [ADR 0004](0004-quality-gates.md) in what it says the gates check (its banned APIs, its doubles, its data access, the
 code metrics' reach) and in its rejection of ArchUnitNET and NetArchTest; 0004's ratchet, and why the gates are
-ratchets, stand. Records what four changes of 2026-11-22 built without a record.
+ratchets, stand. Records what four changes of 2026-11-22 built without a record. The blocking calls it names as not
+listed yet were listed on 2026-11-25, with Rx's `AsyncSubject<T>.GetResult` (the build plan's log).
 
 ## Context
 
