@@ -1,7 +1,8 @@
 # The window's starts for scripts/Compare-Benchmarks.ps1 -Window, which dot-sources this: each side's published app
 # started on its prepared database, its window moved past the desktop's right edge as it appears (it opens centred on
 # the mouse's monitor, WindowsWindow.OpenCentred), its page watched by window-start.js, then closed. The same helpers
-# measure both sides: they come from the working tree whichever commits are compared.
+# measure both sides: they come from the working tree whichever commits are compared. scripts/Test-Window.ps1 dot-sources
+# it too, for its window mover and the prepared database's password.
 
 if (-not ('BenchWindow' -as [type])) {
     Add-Type @"

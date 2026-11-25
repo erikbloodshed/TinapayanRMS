@@ -28,6 +28,7 @@ dotnet ef dbcontext optimize --output-dir CompiledModels --namespace TinapayanRM
 gh run list --branch main --limit 3                                                # GitHub CI's last runs (gh run watch <id> follows one, gh run view <id> --log-failed shows why it failed)
 dotnet run -c Release --project tests/TinapayanRMS.Benchmarks -- --quick                 # time the benchmarks' scenarios once (--scenario "Screens.*")
 powershell -ExecutionPolicy Bypass -File scripts/Compare-Benchmarks.ps1 -Base main      # how fast a refactor left it: base vs working tree, the start included (-Window: the window's own start)
+powershell -ExecutionPolicy Bypass -File scripts/Test-Window.ps1                        # the window's check before an install, on a scratch copy of the data: smoke, soak (heap), close question, log (-Rounds 0: no soak; -Exe: a trial install)
 ```
 
 - **While developing, run what a change reaches:** `scripts/Test-Changed.ps1` picks the test projects from the project references (a change to the screens runs `Components.Tests` alone). The full suite still decides when work is done, and GitHub CI runs it on every push. Neither script runs while that project's tests already are, as both would reset its test databases: stop any `Watch-Tests.ps1` first.

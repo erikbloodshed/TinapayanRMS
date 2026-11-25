@@ -49,12 +49,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $P eval "document.title"    
 powershell -NoProfile -ExecutionPolicy Bypass -File $P shot now                     # the page
 powershell -NoProfile -ExecutionPolicy Bypass -File $P window frame                 # the whole window, title bar and frame (PrintWindow)
 powershell -NoProfile -ExecutionPolicy Bypass -File $P hit 800 16 20 16             # Windows' hit test at window points: 2 caption, 1 client, 12 top edge
-powershell -NoProfile -ExecutionPolicy Bypass -File $P smoke                        # every screen and Settings page, then a record of each record screen
+powershell -NoProfile -ExecutionPolicy Bypass -File $P smoke                        # every screen and Settings page, then a record of each record screen (--quiet: failures only)
 powershell -NoProfile -ExecutionPolicy Bypass -File $P close                        # the title bar's Close; says so if the window stays
 ```
 
-**`smoke` is the check before an install.** It visits every address, opens the first record in each record screen's
-list, and fails (exit 1) on the page's error bar, a screen's error panel, a red toast or an error in the page's console
+**The check before an install is `scripts/Test-Window.ps1`**, which needs no copy of the app open: on a scratch copy of the
+shop's data (never the dev database), it starts the Debug build off the screen, runs `smoke`, a soak run that fails on
+anything left alive in the heap (`dotnet-dump`), the close question answered Cancel and then No (`closecheck`, which edits
+and so is for a scratch database only), and reads the log for errors; it puts `view-state.json` back after. `-Rounds 0`
+leaves the soak out, `-Exe <path>` checks a trial install.
+
+**`smoke` is its first step.** It visits every address, opens the first record in each record screen's
+list (opening a folder when every one is closed), and fails (exit 1) on the page's error bar, a screen's error panel, a red toast or an error in the page's console
 (the favicon request aside). It saves nothing; opening records unfolds their folders in `view-state.json`, as any pick
 does. To check the build the shop will run, install it into a trial folder (`scripts/Install-TinapayanRMS.ps1
 -InstallFolder <scratch folder> -NoDesktopShortcut -NoStartMenuShortcut`), start that exe with the debugging port as
