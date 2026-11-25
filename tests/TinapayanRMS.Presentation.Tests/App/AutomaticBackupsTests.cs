@@ -187,6 +187,72 @@ public sealed class AutomaticBackupsTests : IDisposable
         state.BackupProblemText.Should().Contain("no password supplied");
     });
 
+    [Test]
+    public Task The_newest_backup_is_proved_once_a_week_and_the_Database_tab_says_what_it_held() => UiThread.RunAsync(async () =>
+    {
+        var newest = Backup(Today.AddHours(-1));
+        var backups = new FileBackups(BackupsFolder()) { Newest = newest };
+        var logger = new LoggerConfiguration().CreateLogger();
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), new InMemoryViewStateStore(), logger);
+        var state = new DatabaseBackupsState(new BackupLibrary(backups), _ => { }, logger, automatic);
+        state.ProofText.Should().StartWith("Not yet");
+
+        (await automatic.ProveIfDueAsync(Today, Cancellation)).Should().NotBeNull();
+        (await automatic.ProveIfDueAsync(Today.AddDays(6), Cancellation)).Should().BeNull("a week hasn't gone");
+        (await automatic.ProveIfDueAsync(Today.AddDays(7), Cancellation)).Should().NotBeNull();
+
+        backups.Proved.Should().Equal(newest, newest);
+        state.ProofText.Should().Contain("November 5, 2026").And.Contain("117 raw materials").And.Contain("30 sub-assemblies").And.Contain("1,088 products");
+        automatic.ProofWarning.Should().BeNull();
+    });
+
+    [Test]
+    public Task A_backup_that_wont_restore_is_said_over_every_screen_and_tried_again_the_next_day() => UiThread.RunAsync(async () =>
+    {
+        var backups = new FileBackups(BackupsFolder()) { Newest = Backup(Today), ProofRefusal = new PostgresFailure("pg_restore: error: could not read input file") };
+        var viewState = new InMemoryViewStateStore();
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), viewState, new LoggerConfiguration().CreateLogger());
+
+        (await automatic.ProveIfDueAsync(Today, Cancellation)).Should().BeNull();
+
+        automatic.ProofWarning.Should().Contain("couldn't be restored").And.Contain("could not read input file").And.Contain("tries again tomorrow");
+        new AutomaticBackups(new BackupLibrary(backups), viewState, new LoggerConfiguration().CreateLogger()).ProofWarning
+            .Should().Be(automatic.ProofWarning, "a restart mustn't make it look as if the backups would restore");
+
+        await automatic.ProveIfDueAsync(Today.AddHours(1), Cancellation);
+        backups.Proved.Should().HaveCount(1, "the hourly checks don't try again the same day");
+
+        backups.ProofRefusal = null;
+        (await automatic.ProveIfDueAsync(Today.AddDays(1), Cancellation)).Should().NotBeNull();
+        automatic.ProofWarning.Should().BeNull();
+        automatic.LastProof.Should().NotBeNull();
+    });
+
+    [Test]
+    public Task With_no_backup_there_is_nothing_to_prove() => UiThread.RunAsync(async () =>
+    {
+        var backups = new FileBackups(BackupsFolder());
+        var automatic = new AutomaticBackups(new BackupLibrary(backups), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
+
+        (await automatic.ProveIfDueAsync(Today, Cancellation)).Should().BeNull();
+
+        backups.Proved.Should().BeEmpty();
+        automatic.ProofWarning.Should().BeNull();
+    });
+
+    [Test]
+    public void Setting_or_clearing_the_second_folder_says_so()
+    {
+        var automatic = new AutomaticBackups(new BackupLibrary(new FileBackups(_root)), new InMemoryViewStateStore(), new LoggerConfiguration().CreateLogger());
+        var changes = 0;
+        automatic.CopyFolderChanged += () => changes++;
+
+        automatic.CopyFolder = @"E:\Backups";
+        automatic.CopyFolder = null;
+
+        changes.Should().Be(2);
+    }
+
     private string BackupsFolder() => Directory.CreateDirectory(Path.Combine(_root, "backups")).FullName;
 
     private AutomaticBackups Create(string copyFolder) =>
@@ -255,5 +321,19 @@ public sealed class AutomaticBackupsTests : IDisposable
         public void Delete(DatabaseBackup backup) => throw new NotSupportedException();
 
         public Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        /// <summary>What proving a backup fails with; null when it goes through.</summary>
+        public Exception? ProofRefusal { get; set; }
+
+        /// <summary>The backups proved, in turn.</summary>
+        public List<DatabaseBackup> Proved { get; } = [];
+
+        public Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken)
+        {
+            Proved.Add(backup);
+            return ProofRefusal is { } refusal
+                ? Task.FromException<BackupProof>(refusal)
+                : Task.FromResult(new BackupProof(backup, 42, 117, 30, 1088));
+        }
     }
 }

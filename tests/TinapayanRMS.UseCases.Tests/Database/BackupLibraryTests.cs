@@ -50,5 +50,7 @@ public class BackupLibraryTests
         public void Delete(DatabaseBackup backup) => throw new NotSupportedException();
 
         public Task<bool> RecoverInterruptedRestoreAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

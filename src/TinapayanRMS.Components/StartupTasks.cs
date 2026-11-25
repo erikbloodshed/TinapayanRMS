@@ -11,6 +11,8 @@ namespace TinapayanRMS.Components;
 /// open for days still takes one a day. Neither holds the window up. A database that can't be made ready shows in the
 /// sign-in panel, and in the banner for a check that started signed in; a backup that fails is logged, and once the
 /// newest backup is getting old the window's banner says so (AutomaticBackups.OverdueWarningAsync), until one is taken.
+/// Once a week, after the day's backup, the newest backup is proved by restoring it into a scratch database
+/// (AutomaticBackups.ProveIfDueAsync); one that won't restore is said in the banner until one does.
 /// </summary>
 public sealed class StartupTasks(
     DatabaseReadiness readiness,
@@ -72,5 +74,23 @@ public sealed class StartupTasks(
         {
             logger.Warning(ex, "Couldn't check the day's automatic backup");
         }
+
+        await ProveWeeklyAsync(cancellationToken);
+    }
+
+    // After the day's backup, so the one proved is usually today's. What a proof found the last time shows from the start,
+    // as it's kept for the Windows user: a backup that wouldn't restore is still said after a restart.
+    private async Task ProveWeeklyAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await backups.ProveIfDueAsync(DateTime.Now, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.Warning(ex, "Couldn't check whether the newest backup is due to be proved");
+        }
+
+        status.WarnOfBackupProof(backups.ProofWarning);
     }
 }

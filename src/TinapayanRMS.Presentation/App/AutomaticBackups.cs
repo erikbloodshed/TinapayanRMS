@@ -1,3 +1,4 @@
+using System.Globalization;
 using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Rules;
 using TinapayanRMS.UseCases.Database;
@@ -13,6 +14,9 @@ namespace TinapayanRMS.Presentation.App;
 /// so backups can't stop for weeks with a failure only in the log, or a copy's problem forgotten at the next start. The
 /// Database tab shows both problems, and an
 /// automatic backup failing with the newest one getting old also says so once a run (<see cref="OverdueWarningAsync"/>).
+/// Once a week the newest backup is proved, restored into a scratch database and dropped again (<see cref="ProveIfDueAsync"/>):
+/// the Database tab says when it last went through, and a backup that won't restore is said over every screen
+/// (<see cref="ProofWarning"/>) until one does.
 /// </summary>
 public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore viewState, ILogger logger)
 {
@@ -24,6 +28,18 @@ public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore vie
 
     /// <summary>The view state key what went wrong with the last copy to the second folder is kept under, when something did.</summary>
     public const string CopyProblemKey = "backup-copy-problem";
+
+    /// <summary>The view state key when the newest backup was last proved is kept under (round-trip format).</summary>
+    public const string ProvedAtKey = "backup-proved-at";
+
+    /// <summary>The view state key what the last proof found is kept under, as the Database tab says it.</summary>
+    public const string ProofKey = "backup-proof";
+
+    /// <summary>The view state key when a proof was last tried, whether it went through or not, is kept under.</summary>
+    public const string ProofTriedAtKey = "backup-proof-tried-at";
+
+    /// <summary>The view state key what went wrong with the last proof is kept under, when something did.</summary>
+    public const string ProofProblemKey = "backup-proof-problem";
 
     /// <summary>How often a running app checks whether the day's backup is due.</summary>
     public static readonly TimeSpan CheckEvery = TimeSpan.FromHours(1);
@@ -41,7 +57,42 @@ public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore vie
         {
             Write(CopyFolderKey, value);
             LastCopyProblem = null;
+            CopyFolderChanged?.Invoke();
         }
+    }
+
+    /// <summary>Raised on whichever thread set <see cref="CopyFolder"/>: the window's reminder to set one goes or comes back.</summary>
+    public event Action? CopyFolderChanged;
+
+    /// <summary>What the last proof found, as the Database tab says it; null before the first went through.</summary>
+    public string? LastProof
+    {
+        get => Read(ProofKey);
+        private set => Write(ProofKey, value);
+    }
+
+    /// <summary>Why the last proof failed: the newest backup wouldn't restore. Null when it went through, or none was tried.</summary>
+    public string? LastProofProblem
+    {
+        get => Read(ProofProblemKey);
+        private set => Write(ProofProblemKey, value);
+    }
+
+    /// <summary>What to say over every screen while the newest backup won't restore; null while the last proof went through.</summary>
+    public string? ProofWarning => LastProofProblem is { } problem
+        ? problem + " A backup that won't restore can't bring the data back. Ask whoever set up the app to look into it: the app tries again tomorrow."
+        : null;
+
+    private DateTime? ProvedAt
+    {
+        get => ReadTime(ProvedAtKey);
+        set => Write(ProvedAtKey, value?.ToString("o", CultureInfo.InvariantCulture));
+    }
+
+    private DateTime? ProofTriedAt
+    {
+        get => ReadTime(ProofTriedAtKey);
+        set => Write(ProofTriedAtKey, value?.ToString("o", CultureInfo.InvariantCulture));
     }
 
     /// <summary>Why the last automatic backup wasn't taken; null when it was, or today's is there already.</summary>
@@ -84,6 +135,40 @@ public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore vie
         }
 
         return backup;
+    }
+
+    /// <summary>
+    /// Proves the newest backup, when a week has gone since the last that went through (BackupRules.IsProofDue): restored
+    /// into a scratch database and dropped again, the database untouched. What it found, or why it failed, is kept for the
+    /// Database tab and the window's banner (<see cref="ProofWarning"/>), and logged. The proof, or null when none was due,
+    /// there was no backup to prove, or it failed.
+    /// </summary>
+    public async Task<BackupProof?> ProveIfDueAsync(DateTime now, CancellationToken cancellationToken)
+    {
+        if (!BackupRules.IsProofDue(ProvedAt, ProofTriedAt, now) || await backups.NewestAsync(cancellationToken) is not { } newest)
+        {
+            return null;
+        }
+
+        ProofTriedAt = now;
+        try
+        {
+            var proof = await backups.ProveAsync(newest, cancellationToken);
+            ProvedAt = now;
+            LastProof = $"On {now:MMMM d, yyyy}, the backup of {newest.TakenAt:MMMM d 'at' h:mm tt} was restored into a scratch copy in full: "
+                + $"{proof.RawMaterials:N0} raw materials, {proof.SubAssemblies:N0} sub-assemblies and {proof.Products:N0} products.";
+            LastProofProblem = null;
+            _logger.Information(
+                "Proved the backup {Path}: restored with {Updates} updates, {RawMaterials} raw materials, {SubAssemblies} sub-assemblies and {Products} products",
+                newest.Path, proof.Updates, proof.RawMaterials, proof.SubAssemblies, proof.Products);
+            return proof;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LastProofProblem = $"The backup of {newest.TakenAt:MMMM d 'at' h:mm tt} couldn't be restored when it was checked on {now:MMMM d}. {Failure.Of(ex).Text}";
+            _logger.Warning(ex, "Couldn't prove the backup {Path}", newest.Path);
+            return null;
+        }
     }
 
     /// <summary>
@@ -157,6 +242,10 @@ public sealed class AutomaticBackups(IBackupLibrary backups, IViewStateStore vie
             .OfType<DatabaseBackup>();
 
     private string? Read(string key) => viewState.ReadList(key) is [{ Length: > 0 } value] ? value : null;
+
+    /// <summary>A time kept in round-trip format; null when none is, or what's there doesn't read as one.</summary>
+    private DateTime? ReadTime(string key) =>
+        DateTime.TryParse(Read(key), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var time) ? time : null;
 
     /// <summary>Written only when it changes: most hours, nothing has.</summary>
     private void Write(string key, string? value)

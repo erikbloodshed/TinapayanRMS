@@ -52,11 +52,13 @@ public static class StartDatabase
 
     /// <summary>
     /// Drops <paramref name="database"/> if it's there, and deletes the backups the window's starts took of it (the day's
-    /// automatic backup, in the backups folder every Windows user shares).
+    /// automatic backup, in the backups folder every Windows user shares). The scratch copy a weekly proof of that backup
+    /// restores goes too, left behind when the window closed part-way through one.
     /// </summary>
     public static async Task<int> DropAsync(string database)
     {
         await BenchDatabases.DropAsync(database);
+        await BenchDatabases.DropAsync(database + DatabaseBackups.ProvingSuffix);
         if (Directory.Exists(DatabaseBackups.DefaultFolder))
         {
             foreach (var backup in Directory.EnumerateFiles(DatabaseBackups.DefaultFolder, $"{database}_*"))

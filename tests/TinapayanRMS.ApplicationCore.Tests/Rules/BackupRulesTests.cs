@@ -208,6 +208,33 @@ public class BackupRulesTests
         BackupRules.IsOverdue(null, Morning).Should().BeTrue();
     }
 
+    [Test]
+    [Arguments(1, false)]
+    [Arguments(6.9, false)]
+    [Arguments(7, true)]
+    [Arguments(30, true)]
+    public void The_newest_backup_is_proved_again_a_week_after_the_last_proof(double daysSince, bool due)
+    {
+        var proved = Morning.AddDays(-daysSince);
+
+        BackupRules.IsProofDue(proved, proved, Morning).Should().Be(due);
+    }
+
+    [Test]
+    public void A_backup_never_proved_is_due()
+    {
+        BackupRules.IsProofDue(null, null, Morning).Should().BeTrue();
+    }
+
+    [Test]
+    [Arguments(1, false)]
+    [Arguments(23, false)]
+    [Arguments(24, true)]
+    public void A_proof_that_failed_is_tried_again_the_next_day_not_every_hour(int hoursSince, bool due)
+    {
+        BackupRules.IsProofDue(Morning.AddDays(-20), Morning.AddHours(-hoursSince), Morning).Should().Be(due);
+    }
+
     private static DatabaseBackup Backup(BackupKind kind, DateTime takenAt, string databaseName = "TinapayanRMS") =>
         new($"{kind}-{takenAt:O}.backup", databaseName, kind, takenAt, 1024);
 }

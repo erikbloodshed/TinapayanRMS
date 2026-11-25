@@ -446,6 +446,17 @@ html, body {
     font-size: 16px;
 }
 
+/* The reminder to set Also Copy To: its message takes the room, its two buttons (Choose a Folder, and the × that closes it
+   until the next start) keep to the right. */
+
+.app-banner-message {
+    flex: 1;
+}
+
+.app-banner-reminder .e-btn {
+    flex: none;
+}
+
 /* The sign-in page (Layout/SignInScreen): the whole window under the title bar, in the card colour, its title, text,
    boxes and button one column centred on the window, each centred in it, the labels over their boxes. Locked after a
    sign-in, it covers the screens, which wait under it as they were, so nothing of them shows. */

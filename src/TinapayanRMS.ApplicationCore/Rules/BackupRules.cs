@@ -30,6 +30,18 @@ public static class BackupRules
     /// </summary>
     public static readonly TimeSpan OverdueAfter = TimeSpan.FromDays(3);
 
+    /// <summary>
+    /// How often the newest backup is proved: restored into a scratch database of its own, as a restore would, and dropped
+    /// again. A backup nobody has restored is only hoped to be one.
+    /// </summary>
+    public static readonly TimeSpan ProveEvery = TimeSpan.FromDays(7);
+
+    /// <summary>How long after a proof that failed it's tried again: the next day, not every hour.</summary>
+    public static readonly TimeSpan ProveAgainAfter = TimeSpan.FromDays(1);
+
+    /// <summary>A backup that restored but holds no record of the app's updates: it isn't TinapayanRMS's data.</summary>
+    public const string ProvedNotThisAppsText = "It restored, but it holds none of TinapayanRMS's data.";
+
     public const string NotADatabaseBackupText = "That file isn't a backup of a whole database, so it can't be restored.";
 
     public const string NewerPostgresText =
@@ -148,6 +160,15 @@ public static class BackupRules
     /// <summary>Whether <paramref name="newest"/> is too old to go on relying on at <paramref name="now"/>, or there's none at all (<see cref="OverdueAfter"/>).</summary>
     public static bool IsOverdue(DatabaseBackup? newest, DateTime now) =>
         newest is null || now - newest.TakenAt >= OverdueAfter;
+
+    /// <summary>
+    /// Whether the newest backup is due to be proved at <paramref name="now"/>: never proved, or not for <see cref="ProveEvery"/>,
+    /// and not tried in the last <see cref="ProveAgainAfter"/>, so a proof that fails is tried again the next day rather than
+    /// at every hourly check. A proof that went through was tried then too.
+    /// </summary>
+    public static bool IsProofDue(DateTime? lastProved, DateTime? lastTried, DateTime now) =>
+        (lastProved is not { } proved || now - proved >= ProveEvery)
+        && (lastTried is not { } tried || now - tried >= ProveAgainAfter);
 
     private static IEnumerable<DatabaseBackup> AutomaticOf(IEnumerable<DatabaseBackup> backups, string databaseName) =>
         backups.Where(backup => backup.Kind == BackupKind.Automatic && string.Equals(backup.DatabaseName, databaseName, StringComparison.OrdinalIgnoreCase));

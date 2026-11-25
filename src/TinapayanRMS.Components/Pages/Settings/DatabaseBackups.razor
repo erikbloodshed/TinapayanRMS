@@ -9,7 +9,8 @@
 @* Settings → Database, with the computer's own dialogs: Open Folder shows the backups folder in File Explorer, Copy
    To… saves the picked backup where the Save dialog says, and Restore from File… opens one, which the screen state copies
    into the backups folder and restores. Also Copy To is a folder each automatic backup is copied to as well (a USB stick
-   left in, or a synced cloud folder). What went wrong with the last automatic backup, or its copy, shows in amber. *@
+   left in, or a synced cloud folder). Last Proved says when the weekly check last restored the newest backup into a
+   scratch copy. What went wrong with the last automatic backup, its copy, or the check, shows in amber. *@
 <section class="card list-card">
     <h2 class="section-header">Database Backups</h2>
     <p class="caption">Copies of all of the app's data. One is taken automatically each day: as the app starts, and within the hour after midnight while it runs. The newest 14 of those are kept. Set Also Copy To, or copy one to a USB stick now and then, so a broken computer doesn't take every copy with it.</p>
@@ -31,6 +32,13 @@
     @if (State!.CopyProblemText is { } copyProblem)
     {
         <p class="warning-text">@copyProblem</p>
+    }
+    <FormRow Label="Last Proved">
+        <span id="backup-proof" class="read-only-text" data-title="Once a week the newest backup is restored into a scratch copy, which is then deleted, to prove it would bring the data back. Your data isn't touched.">@State!.ProofText</span>
+    </FormRow>
+    @if (State!.ProofProblemText is { } proofProblem)
+    {
+        <p class="warning-text">@proofProblem The app tries again tomorrow.</p>
     }
     <FormRow Label="App Version">
         <span id="app-version" class="read-only-text" data-title="Which build of TinapayanRMS this is. Give it when reporting a problem.">@AppVersion.Current</span>

@@ -100,6 +100,12 @@ public sealed class DatabaseBackupsState : ScreenState, IBusyWork
     /// <summary>Why the last automatic backup wasn't taken, in amber under the backups folder; null when it was.</summary>
     public string? BackupProblemText => _automatic?.LastBackupProblem;
 
+    /// <summary>When the newest backup was last proved, by restoring it into a scratch copy, and what it held.</summary>
+    public string ProofText => _automatic?.LastProof ?? "Not yet. Once a week, after the day's backup, the newest backup is restored into a scratch copy to prove it works.";
+
+    /// <summary>Why the last proof failed, in amber under it; null when it went through.</summary>
+    public string? ProofProblemText => _automatic?.LastProofProblem;
+
     /// <summary>Output: the folder to copy automatic backups to, or null when cancelled. The page shows the folder dialog (IFileDialogs).</summary>
     public Interaction<Unit, string?> ChooseCopyFolder { get; } = new();
 
@@ -308,5 +314,7 @@ public sealed class DatabaseBackupsState : ScreenState, IBusyWork
         RaisePropertyChanged(nameof(CopyFolderText));
         RaisePropertyChanged(nameof(CopyProblemText));
         RaisePropertyChanged(nameof(BackupProblemText));
+        RaisePropertyChanged(nameof(ProofText));
+        RaisePropertyChanged(nameof(ProofProblemText));
     }
 }

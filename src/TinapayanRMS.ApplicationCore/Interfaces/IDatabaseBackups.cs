@@ -54,6 +54,13 @@ public interface IDatabaseBackups
     void Delete(DatabaseBackup backup);
 
     /// <summary>
+    /// Proves <paramref name="backup"/> can be restored: restores it into a scratch database of its own, as a restore does
+    /// before the swap, counts what it holds, and drops it again. The database itself is never touched. A file that isn't a
+    /// backup, one that fails to restore, or one that isn't the app's data throws.
+    /// </summary>
+    Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Puts the database back under its own name when a restore was cut short as it swapped the restored copy in, between
     /// renaming the database aside and renaming the copy in its place: the app ended there (a power cut, the process
     /// killed), and no database has the app's name. True when it put one back; false, doing nothing, otherwise.
@@ -82,6 +89,12 @@ public sealed record DatabaseBackup(string Path, string? DatabaseName, BackupKin
 
 /// <summary>What a backup file says of itself: the database it's of, and when it was taken.</summary>
 public sealed record BackupHeader(string DatabaseName, DateTime TakenAt);
+
+/// <summary>
+/// A backup restored into a scratch database and found whole: how many of the app's updates it records, and how many raw
+/// materials, sub-assemblies and products it holds, deleted ones included.
+/// </summary>
+public sealed record BackupProof(DatabaseBackup Backup, int Updates, long RawMaterials, long SubAssemblies, long Products);
 
 /// <summary>A restore that went through: the safety backup taken before it, and how many app updates the backup needed.</summary>
 public sealed record RestoredBackup(DatabaseBackup SafetyBackup, int UpdatesApplied);

@@ -2,6 +2,7 @@
 @using TinapayanRMS.Components.Printing
 @implements IAsyncDisposable
 @inject AppStatus Status
+@inject AutomaticBackups Backups
 @inject AppLock Lock
 @inject IAppWindow Window
 @inject NavigationManager Navigation
@@ -34,6 +35,26 @@
         <div class="app-banner app-banner-text" role="alert">
             <Icon Of="AppIcon.Warning" />
             <span>@backupWarning</span>
+        </div>
+    }
+    @if (!_locked && Status.BackupProofWarning is { } proofWarning)
+    {
+        <div id="backup-proof-banner" class="app-banner app-banner-text" role="alert">
+            <Icon Of="AppIcon.Warning" />
+            <span>@proofWarning</span>
+        </div>
+    }
+    @* Every backup is on this computer while Also Copy To is empty: said until a folder is set, or until the app starts
+       again once it's closed. *@
+    @if (!_locked && Backups.CopyFolder is null && !Status.CopyFolderReminderClosed)
+    {
+        <div id="copy-folder-banner" class="app-banner app-banner-reminder" role="status">
+            <Icon Of="AppIcon.Warning" />
+            <span class="app-banner-message">Every backup is on this computer only, so a broken computer would take them all with it. Choose a second folder for them, such as a USB stick or OneDrive.</span>
+            <ActionButton Label="Choose a Folder" Flat="true" OnClick="OpenBackupSettings"
+                          Tooltip="Opens Settings → Database, where Also Copy To sets a folder each automatic backup is copied to." />
+            <ActionButton Icon="AppIcon.Cancel" Flat="true" CssClass="app-banner-close" OnClick="Status.CloseCopyFolderReminder"
+                          Tooltip="Hides this until TinapayanRMS starts again." />
         </div>
     }
 
@@ -96,6 +117,7 @@
         (_locked, _signedIn) = (Lock.IsLocked, Lock.HasSignedIn);
         Status.Restored += OnRestored;
         Status.Changed += OnStatusChanged;
+        Backups.CopyFolderChanged += OnStatusChanged;
         Lock.Changed += OnLockChanged;
 
         // No move to another address while locked: Back, Forward, a mouse's back button, a link.
@@ -159,6 +181,8 @@
 
     private void OnStatusChanged() => InvokeAsync(StateHasChanged).Forget(Logger);
 
+    private void OpenBackupSettings() => Navigation.NavigateTo("settings/database");
+
     // A restore replaced what every screen holds: load the window's page again, which builds every screen afresh.
     private void OnRestored() => InvokeAsync(() => Navigation.NavigateTo(Navigation.Uri, forceLoad: true)).Forget(Logger);
 
@@ -169,6 +193,7 @@
         _stopping.Dispose();
         Status.Restored -= OnRestored;
         Status.Changed -= OnStatusChanged;
+        Backups.CopyFolderChanged -= OnStatusChanged;
         Lock.Changed -= OnLockChanged;
         _navigationGuard?.Dispose();
         await _activity.StopAsync();

@@ -456,6 +456,67 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
     }
 
     [Test]
+    public async Task A_backup_is_proved_in_a_scratch_database_that_goes_after_and_the_data_is_untouched()
+    {
+        await AddCategoryAsync("Breads");
+        var backup = await _backups.BackUpAsync(BackupKind.Manual, Cancellation);
+        await AddCategoryAsync("Cakes");
+
+        var proof = await _backups.ProveAsync(backup, Cancellation);
+
+        await using (var dbContext = _database.CreateDbContext())
+        {
+            proof.Updates.Should().Be(dbContext.Database.GetMigrations().Count(), "the restored copy records every update the backup's database had");
+        }
+
+        proof.Backup.Should().Be(backup);
+        (await DatabaseExistsAsync(_database.Name + DatabaseBackups.ProvingSuffix)).Should().BeFalse("the scratch copy is dropped once it's counted");
+        (await CategoryNamesAsync()).Should().Equal(["Breads", "Cakes"], "proving a backup never touches the database");
+        _backups.List().Should().ContainSingle("a proof takes no safety backup: there's nothing to keep safe");
+    }
+
+    [Test]
+    public async Task A_file_that_isnt_a_backup_fails_its_proof_and_leaves_no_scratch_database()
+    {
+        var notABackup = Path.Combine(Path.GetTempPath(), $"not a backup {Guid.NewGuid():N}.backup");
+        await File.WriteAllTextAsync(notABackup, "Pandesal, 4.50", Cancellation);
+        try
+        {
+            var prove = () => _backups.ProveAsync(new DatabaseBackup(notABackup, null, BackupKind.CopiedIn, DateTime.Now, 14), Cancellation);
+
+            await prove.Should().ThrowAsync<BusinessRuleException>().WithMessage(BackupRules.NotADatabaseBackupText);
+            (await DatabaseExistsAsync(_database.Name + DatabaseBackups.ProvingSuffix)).Should().BeFalse();
+        }
+        finally
+        {
+            File.Delete(notABackup);
+        }
+    }
+
+    [Test]
+    public async Task A_backup_of_a_database_that_isnt_the_apps_fails_its_proof()
+    {
+        var other = _database.Name + "_other";
+        await MaintenanceAsync($"CREATE DATABASE \"{other}\"");
+        try
+        {
+            var otherConnection = new NpgsqlConnectionStringBuilder(_database.ConnectionString) { Database = other }.ConnectionString;
+            using var otherBackups = new DatabaseBackups(new SharedTransactionDbContextFactory(otherConnection), _folder);
+            var backup = await otherBackups.BackUpAsync(BackupKind.Manual, Cancellation);
+
+            var prove = () => _backups.ProveAsync(backup, Cancellation);
+
+            await prove.Should().ThrowAsync<BusinessRuleException>().WithMessage(BackupRules.ProvedNotThisAppsText);
+            (await DatabaseExistsAsync(_database.Name + DatabaseBackups.ProvingSuffix)).Should().BeFalse();
+        }
+        finally
+        {
+            NpgsqlConnection.ClearAllPools();
+            await MaintenanceAsync($"DROP DATABASE IF EXISTS \"{other}\"");
+        }
+    }
+
+    [Test]
     public async Task A_backup_copied_out_and_back_in_restores()
     {
         await AddCategoryAsync("Breads");
@@ -581,6 +642,16 @@ public sealed class DatabaseBackupsTests(DatabaseFixture fixture) : IAsyncDispos
         await connection.OpenAsync(Cancellation);
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync(Cancellation);
+    }
+
+    private async Task<bool> DatabaseExistsAsync(string name)
+    {
+        var settings = new NpgsqlConnectionStringBuilder(fixture.ConnectionString) { Database = "postgres", Pooling = false };
+        await using var connection = new NpgsqlConnection(settings.ConnectionString);
+        await connection.OpenAsync(Cancellation);
+        await using var command = new NpgsqlCommand("SELECT EXISTS (SELECT FROM pg_database WHERE datname = @name)", connection);
+        command.Parameters.AddWithValue("name", name);
+        return (bool)(await command.ExecuteScalarAsync(Cancellation))!;
     }
 
     private async Task AddCategoryAsync(string name)

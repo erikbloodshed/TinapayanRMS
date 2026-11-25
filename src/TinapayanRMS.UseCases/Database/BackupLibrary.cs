@@ -46,6 +46,12 @@ public interface IBackupLibrary
 
     /// <summary>Deletes a backup file: one copied in to restore and then refused or not used.</summary>
     void Delete(DatabaseBackup backup);
+
+    /// <summary>
+    /// Proves <paramref name="backup"/> can be restored, by restoring it into a scratch database of its own and dropping it
+    /// again, the database untouched (the weekly check, AutomaticBackups).
+    /// </summary>
+    Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken);
 }
 
 /// <inheritdoc cref="IBackupLibrary"/>
@@ -74,4 +80,6 @@ public sealed class BackupLibrary(IDatabaseBackups backups) : IBackupLibrary
     public Task<RestoredBackup> RestoreAsync(DatabaseBackup backup, CancellationToken cancellationToken) => backups.RestoreAsync(backup, cancellationToken);
 
     public void Delete(DatabaseBackup backup) => backups.Delete(backup);
+
+    public Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken) => backups.ProveAsync(backup, cancellationToken);
 }

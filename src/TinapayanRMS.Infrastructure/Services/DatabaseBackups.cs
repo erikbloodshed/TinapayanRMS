@@ -160,6 +160,76 @@ public sealed class DatabaseBackups(IDbContextFactory<TinapayanRMSDbContext> dbC
     public void Delete(DatabaseBackup backup) => File.Delete(backup.Path);
 
     /// <summary>
+    /// Restores <paramref name="backup"/> into a scratch database (<see cref="ProvingSuffix"/>), all or nothing as a restore
+    /// does, counts what it holds and drops it. It needs no turn: it reads a finished file and never touches the database.
+    /// Two copies of the app on one server take turns by an advisory lock held on the maintenance connection meanwhile, as
+    /// they'd otherwise drop each other's scratch database part-way. One cut short (the app ended) leaves the scratch
+    /// database to the next proof, which drops it first.
+    /// </summary>
+    public async Task<BackupProof> ProveAsync(DatabaseBackup backup, CancellationToken cancellationToken)
+    {
+        var target = await TargetAsync(cancellationToken);
+        await ReadHeaderAsync(target, backup.Path, cancellationToken);
+        var scratch = target.WithDatabase(target.Database + ProvingSuffix);
+        await using var turn = await OpenMaintenanceAsync(target, cancellationToken);
+        await using (var take = new NpgsqlCommand("SELECT pg_advisory_lock(@key, hashtext(@name))", turn))
+        {
+            take.Parameters.AddWithValue("key", ProvingLockKey);
+            take.Parameters.AddWithValue("name", scratch.Database);
+            await take.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        try
+        {
+            await CreateDatabaseAsync(target, scratch.Database, cancellationToken);
+            await RestoreFileAsync(scratch, backup.Path, cancellationToken);
+            return await CountAsync(scratch, backup, cancellationToken);
+        }
+        finally
+        {
+            // The lock goes with the maintenance connection, as it closes.
+            await DropDatabaseAsync(target, scratch.Database, CancellationToken.None);
+        }
+    }
+
+    /// <summary>What a proof's scratch database is named after the database: "tinapayanrms_proving".</summary>
+    public const string ProvingSuffix = "_proving";
+
+    /// <summary>The advisory lock's first key a proof takes, with the scratch database's name as its second ("TRMP").</summary>
+    private const int ProvingLockKey = 0x54524D50;
+
+    /// <summary>
+    /// The restored copy's record of the app's updates, and its raw materials, sub-assemblies and products. A copy with no
+    /// such record isn't the app's data, whatever else it holds.
+    /// </summary>
+    private static async Task<BackupProof> CountAsync(Target scratch, DatabaseBackup backup, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(scratch.Connection.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT (SELECT count(*) FROM "__EFMigrationsHistory"),
+                   (SELECT count(*) FROM raw_materials),
+                   (SELECT count(*) FROM sub_assemblies),
+                   (SELECT count(*) FROM products)
+            """,
+            connection);
+        try
+        {
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+            var updates = reader.GetInt64(0);
+            return updates == 0
+                ? throw new BusinessRuleException(BackupRules.ProvedNotThisAppsText)
+                : new BackupProof(backup, (int)updates, reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3));
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            throw new BusinessRuleException(BackupRules.ProvedNotThisAppsText, ex);
+        }
+    }
+
+    /// <summary>
     /// <see cref="SwapInAsync"/> renames the database aside (<see cref="ReplacedSuffix"/>), closed to connections, before it
     /// renames the restored copy in its place: cut short between the two (the app ended, a power cut), nothing has the
     /// database's name and every screen fails to load. This renames the one set aside back and opens it again, as it was
