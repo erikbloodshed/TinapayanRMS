@@ -20,6 +20,8 @@ powershell -ExecutionPolicy Bypass -File scripts/Watch-Tests.ps1 Presentation -C
 dotnet run --project src/TinapayanRMS.Maui                                        # the app's window
 dotnet run --project src/TinapayanRMS.RecipeApi                                   # the Recipe API, http://localhost:5290/api/v1
 powershell -ExecutionPolicy Bypass -File scripts/Install-TinapayanRMS.ps1         # install or update the app for this Windows user
+powershell -ExecutionPolicy Bypass -File scripts/Setup-Database.ps1 -Backup <file>    # a new PC: the app's role, this user's pgpass.conf, the data from a backup
+powershell -ExecutionPolicy Bypass -File scripts/Undo-Update.ps1 -Msi <older msi>     # back from a bad update: Before update restored, updated data kept aside (admin for -Msi)
 
 dotnet ef migrations add <Name>                                                   # from any folder: .config/dotnet-ef.json names Infrastructure
 dotnet ef database update

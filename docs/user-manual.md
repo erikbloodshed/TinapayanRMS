@@ -1467,7 +1467,7 @@ Run the same command again to update the app after the code changes. How the lis
 The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanRMS on a PC for every Windows user, in `C:\Program Files\TinapayanRMS`, with a **TinapayanRMS** shortcut in everyone's Start menu and on everyone's Desktop. Whoever looks after the app makes it from the source folder (the developer manual says how). The PC it goes on needs no build tools, only:
 
 - the **.NET 11 Runtime (x64)**, from Microsoft's .NET download page. Without it the installer stops before changing anything and says where to get it;
-- PostgreSQL, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing. The app's database itself needn't be there: the app makes it the first time it opens.
+- PostgreSQL, and, for each Windows user who'll use the app, the app's sign-in in that user's password file, as for the other way of installing. On a new PC, `scripts\Setup-Database.ps1` sets both up (see [Move TinapayanRMS to a new PC](#move-tinapayanrms-to-a-new-pc)). The app's database itself needn't be there: the app makes it the first time it opens.
 
 1. Close TinapayanRMS if it's open. If it's still open, the installer offers to close it. If it has changes you haven't saved, it stays open and asks about them instead, and the installer can't close it: answer the app, which then closes. If the installer asks to restart Windows at the end, restart before you open the app again.
 2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
@@ -1483,6 +1483,27 @@ A new version of the app sometimes needs to add to how the data is kept, such as
 - **On a PC where the app's data isn't there yet**, the app makes it, empty, and asks you to set a password. Then set things up as in [First-time setup](#3-first-time-setup), or restore a backup in Settings → Database.
 - **If several PCs use the same data**, update them all. The first one to open the new version updates the data, and a PC still on the older version then won't open, saying the data was updated by a newer version: install the newer version there too.
 - **If the backup can't be taken**, nothing is changed and the password box says why. Nothing is updated without a backup to go back to.
+
+### Go back from an update that went wrong
+
+If a new version doesn't work, you can go back to the version before it until it's fixed. The older version won't open data the newer one has updated, and its installer won't install over the newer one. So the data goes back to its **Before update** backup, and the older version is installed again, in one step:
+
+1. Close TinapayanRMS on every PC that uses this data.
+2. On the PC that holds the database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Undo-Update.ps1 -Msi <the older installer>`. It says when the backup it puts back was taken, and asks before it changes anything. Type `y`.
+3. Open the app. It opens the data as it was just before the update.
+
+Anything saved after the update isn't in the restored data. It isn't lost: the data as it was is kept, under another name that the script shows (such as *tinapayanrms_before_undo_20261126_101500*), for whoever looks after the app to copy back what's needed. When the fixed version comes, install it as usual: it updates the data again, after another **Before update** backup.
+
+Without `-Msi`, the script puts the data back only, and you install the older version yourself before anyone opens the app: uninstall TinapayanRMS in **Settings > Apps**, then open the older installer. A copy installed with `scripts\Install-TinapayanRMS.ps1` is installed again by running that script from the older version's source.
+
+### Move TinapayanRMS to a new PC
+
+1. Install PostgreSQL 18 on the new PC.
+2. Copy the newest backup from the old PC to the new one: the folder **Also Copy To** copies to, or **Copy To…** in **Settings → Database**. If the old PC won't start, the copy in the **Also Copy To** folder is the one to use.
+3. Open PowerShell on the new PC, as the Windows user who'll use the app, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Setup-Database.ps1 -Backup <the backup file>`. It asks for the password of PostgreSQL's *postgres* account, chosen when PostgreSQL was installed. It sets up the app's sign-in to PostgreSQL and restores the backup as the app's data.
+4. Install TinapayanRMS from its installer, and open it. If the backup is from an earlier version, the first start updates it.
+
+Each other Windows user of the PC who'll use the app runs `Setup-Database.ps1` too, without `-Backup`. It asks for the app's sign-in password, which is in the first user's `%APPDATA%\postgresql\pgpass.conf`. To start with no data at all, run it without `-Backup`: the app makes an empty database the first time it opens.
 
 ### Share the recipes with TinapayanBMS
 

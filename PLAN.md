@@ -55,6 +55,8 @@ TinapayanRMS.slnx
 ├── .github/                          — workflows/build.yml (CI: the build, the migration check and the whole suite, on every push to main and every pull request); dependabot.yml (the weekly dependency updates, as pull requests)
 ├── scripts/                          — Install-RecipeApi.ps1, Uninstall-RecipeApi.ps1 and New-DatabaseReader.ps1 (the Recipe API);
 │                                       Reset-Password.ps1 (clears a forgotten password: the app then asks for a new one);
+│                                       Setup-Database.ps1 (a new PC: the app's role, the user's pgpass.conf, and the data from a backup);
+│                                       Undo-Update.ps1 (back from a bad update: the Before update backup restored, the updated data kept aside, the older MSI installed);
 │                                       Start-McpServer.ps1 (which .mcp.json runs); Test-Changed.ps1 and Watch-Tests.ps1 (fewer tests while developing);
 │                                       Install-TinapayanRMS.ps1 and Uninstall-TinapayanRMS.ps1 (the app, for one Windows user);
 │                                       Build-Installer.ps1 (the app's MSI, for every user of a PC, into artifacts\installer\)
