@@ -78,6 +78,8 @@
     <!-- ASP.NET Core ships with the .NET runtime too: the Recipe API's tests run it in memory on the same release. -->
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="$(MicrosoftExtensionsVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />
+    <!-- PageScripts.Tests drives the Edge installed (ADR 0020): a new version drives a newer Edge, so check it against the one installed. -->
+    <PackageVersion Include="Microsoft.Playwright" Version="1.65.1" />
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
     <!-- At the Microsoft.Testing.Platform version TUnit brings (2.5.3 with TUnit 1.87.12): move them together. It does
          nothing unless TESTINGPLATFORM_HOTRELOAD_ENABLED is 1, which only scripts/Watch-Tests.ps1 sets. -->

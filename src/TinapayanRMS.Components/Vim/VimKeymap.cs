@@ -67,6 +67,12 @@ public sealed record VimKeyBinding(string Keys, VimAction Action, VimContexts Wh
 }
 
 /// <summary>
+/// A key as <c>vim.js</c> reads it (<c>tinapayanVim.enable</c>, in camelCase as JS interop writes it): its keys, its
+/// action's name, the contexts it works in by name, whether it works anywhere, whether it's typed as text, and what it does.
+/// </summary>
+public sealed record VimPageKey(string Keys, string Action, IReadOnlyList<string> Where, bool Anywhere, bool Typed, string Description);
+
+/// <summary>
 /// Every Vim key the app knows, where it works and what it does there: the one table the browser reads the keys from
 /// (it's handed to <c>vim.js</c> as the keys are turned on) and the cheat sheet is drawn from, so neither can drift from
 /// the other. In the web view the screens are pages, Back and Forward are the browser's own, and Ctrl+N is the
@@ -76,6 +82,23 @@ public static class VimKeymap
 {
     private const VimContexts Lists = VimContexts.Table | VimContexts.Tree;
     private const VimContexts Controls = VimContexts.Field | VimContexts.Other;
+
+    /// <summary>
+    /// <see cref="Bindings"/> as the page is handed them (VimKeys, and the page scripts' tests), each binding's contexts
+    /// named one by one.
+    /// </summary>
+    public static IReadOnlyList<VimPageKey> ForPage() =>
+    [
+        .. Bindings.Select(binding => new VimPageKey(
+            binding.Keys,
+            binding.Action.ToString(),
+            [.. Enum.GetValues<VimContexts>()
+                .Where(context => context is VimContexts.Field or VimContexts.Table or VimContexts.Tree or VimContexts.Other && binding.Where.HasFlag(context))
+                .Select(context => context.ToString())],
+            binding.Where == VimContexts.Anywhere,
+            binding.IsTyped,
+            binding.Description)),
+    ];
 
     public static IReadOnlyList<VimKeyBinding> Bindings { get; } =
     [

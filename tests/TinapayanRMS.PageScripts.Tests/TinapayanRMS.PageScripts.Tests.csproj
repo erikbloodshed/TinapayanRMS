@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The page's own scripts (app.js and vim.js, Components' wwwroot) in headless Edge, through Playwright (ADR 0020):
+       loaded into a page of a few lines of markup shaped as the components draw it, with no Blazor, components or
+       Syncfusion, and keys, clicks and typing as a person's. Edge is the one installed (Playwright's msedge channel):
+       nothing is downloaded. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- VimKeymap: the Vim keys are turned on with the app's own key table, as VimKeys.razor sends it. -->
+    <ProjectReference Include="..\..\src\TinapayanRMS.Components\TinapayanRMS.Components.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The scripts under test, the app's own files. -->
+    <Content Include="..\..\src\TinapayanRMS.Components\wwwroot\app.js" Link="Scripts\app.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\src\TinapayanRMS.Components\wwwroot\vim.js" Link="Scripts\vim.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

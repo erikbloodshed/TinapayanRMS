@@ -30,9 +30,15 @@ public sealed record VimCommandDefinition(string Name, int ShortestLength, VimCo
         typed.Length >= ShortestLength && typed.Length <= Name.Length && Name.StartsWith(typed, StringComparison.OrdinalIgnoreCase);
 }
 
+/// <summary>A command as <c>vim.js</c> reads it (<c>tinapayanVim.enable</c>, for its cheat sheet): how it's typed, and what it does.</summary>
+public sealed record VimPageCommand(string Usage, string Description);
+
 /// <summary>Reads what's typed after <c>:</c> into a command, or says why it can't.</summary>
 public static class VimCommandLine
 {
+    /// <summary><see cref="Commands"/> as the page is handed them (VimKeys, and the page scripts' tests).</summary>
+    public static IReadOnlyList<VimPageCommand> ForPage() => [.. Commands.Select(command => new VimPageCommand(command.Usage, command.Description))];
+
     public static IReadOnlyList<VimCommandDefinition> Commands { get; } =
     [
         new("write", 1, VimCommandKind.Save, default, false, ":w", "Save"),

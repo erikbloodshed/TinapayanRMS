@@ -34,18 +34,8 @@
             return;
         }
 
-        var keys = VimKeymap.Bindings.Select(binding => new
-        {
-            keys = binding.Keys,
-            action = binding.Action.ToString(),
-            where = Enum.GetValues<VimContexts>()
-                .Where(context => context is VimContexts.Field or VimContexts.Table or VimContexts.Tree or VimContexts.Other && binding.Where.HasFlag(context))
-                .Select(context => context.ToString()),
-            anywhere = binding.Where == VimContexts.Anywhere,
-            typed = binding.IsTyped,
-            description = binding.Description,
-        });
-        var commands = VimCommandLine.Commands.Select(command => new { usage = command.Usage, description = command.Description });
+        var keys = VimKeymap.ForPage();
+        var commands = VimCommandLine.ForPage();
         await JS.InvokeVoidAsync("tinapayanVim.enable", _self, keys, commands);
     }
 

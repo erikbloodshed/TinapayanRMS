@@ -4,7 +4,8 @@
 random sequences stand, and take every step it names since 2026-11-24, the form's own at the form. Narrowed by [ADR 0011](0011-change-control-on-the-developers-pc.md)
 too: local CI is to run the window's smoke run, once it's built, where 0006 kept the window out of CI; withdrawn by
 [ADR 0013](0013-ci-on-github-changes-straight-to-main.md), which keeps the window out of CI, the smoke run a script of its own. Extended by
-[ADR 0012](0012-figures-hear-of-a-change-from-whoever-made-it.md): the sequences check each figure after every step.
+[ADR 0012](0012-figures-hear-of-a-change-from-whoever-made-it.md): the sequences check each figure after every step. Extended
+by [ADR 0020](0020-page-scripts-tested-in-headless-edge.md): the page scripts are a level of their own, in headless Edge.
 
 ## Context
 
