@@ -90,6 +90,32 @@ public sealed class ScriptPage : IAsyncDisposable
     /// <summary>The names of the C# methods the scripts have called so far, in order.</summary>
     public async Task<IReadOnlyList<string>> CallsAsync() => await Page.EvaluateAsync<string[]>("window.dotNetCalls.map(call => call.name)");
 
+    /// <summary>What each call to <paramref name="method"/> so far was given, as JSON: "[0,2]", "[\"tree-cakes\"]".</summary>
+    public async Task<IReadOnlyList<string>> CallsOfAsync(string method) =>
+        await Page.EvaluateAsync<string[]>("name => window.dotNetCalls.filter(call => call.name === name).map(call => JSON.stringify(call.args))", method);
+
+    /// <summary>
+    /// A drag with the mouse, as a hand makes it: pressed at <paramref name="from"/>'s middle, moved in steps to
+    /// <paramref name="to"/> (an element's middle, or a point), and let go there unless <paramref name="release"/> is false.
+    /// </summary>
+    public async Task DragAsync(string from, (float X, float Y) to, bool release = true)
+    {
+        var start = await MiddleOfAsync(from);
+        await Page.Mouse.MoveAsync(start.X, start.Y);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(to.X, to.Y, new MouseMoveOptions { Steps = 8 });
+        if (release)
+        {
+            await Page.Mouse.UpAsync();
+        }
+    }
+
+    public async Task<(float X, float Y)> MiddleOfAsync(string selector)
+    {
+        var box = await Page.Locator(selector).BoundingBoxAsync() ?? throw new InvalidOperationException($"{selector} isn't laid out.");
+        return (box.X + box.Width / 2, box.Y + box.Height / 2);
+    }
+
     public Task<T> EvaluateAsync<T>(string expression, object? argument = null) => Page.EvaluateAsync<T>(expression, argument);
 
     public Task EvaluateAsync(string expression, object? argument = null) => Page.EvaluateAsync(expression, argument);

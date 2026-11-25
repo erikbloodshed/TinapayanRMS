@@ -195,6 +195,31 @@ public sealed class VimKeysTests(EdgeBrowser edge)
         (await page.EvaluateAsync<int>("window.escapes")).Should().Be(1, "the second Esc is the dialog's");
     }
 
+    /// <summary>
+    /// A list's name box (TreeNameBox) takes the cursor typing: the first Esc stops the typing, and only the second reaches
+    /// the box, which gives the new row up (by design, 2026-11-14; Find is the one dialog that closes on the first).
+    /// </summary>
+    [Test]
+    public async Task Esc_in_a_lists_name_box_stops_typing_first_and_reaches_the_box_on_the_second()
+    {
+        await using var page = await ScriptPage.OpenAsync(edge,
+            """
+            <span id="vim-mode" hidden></span>
+            <div class="folder-tree" tabindex="0"><div class="tree-row"><input id="name-box" type="text" value="New Folder"></div></div>
+            """);
+        await page.EnableVimKeysAsync();
+        await CountEscapesAsync(page, "#name-box");
+        await page.Page.ClickAsync("#name-box");
+        (await ModeAsync(page)).Should().Be("INSERT");
+
+        await page.Keyboard.PressAsync("Escape");
+        (await page.EvaluateAsync<int>("window.escapes")).Should().Be(0);
+        (await ModeAsync(page)).Should().Be("NORMAL");
+
+        await page.Keyboard.PressAsync("Escape");
+        (await page.EvaluateAsync<int>("window.escapes")).Should().Be(1);
+    }
+
     [Test]
     public async Task Turned_off_the_keys_type_again()
     {
