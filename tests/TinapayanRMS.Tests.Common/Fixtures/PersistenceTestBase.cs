@@ -167,10 +167,17 @@ public abstract class PersistenceTestBase(DatabaseFixtureBase fixture)
     protected Task WithoutWastageAsync() => SetWastageAsync(0m);
 
     /// <summary>A role for a test's sub-assemblies; <paramref name="isPackaging"/> makes it the role packaging sets go in.</summary>
-    protected async Task<int> AddRoleAsync(string name, int sortOrder = 1, bool isPackaging = false, bool isProductOwned = false)
+    protected async Task<int> AddRoleAsync(string name, int sortOrder = 1, bool isPackaging = false, bool isProductOwned = false, bool canGoIntoOtherSections = false)
     {
         await using var dbContext = CreateDbContext();
-        var role = new SubAssemblyRole { Name = name, SortOrder = sortOrder, IsPackaging = isPackaging, IsProductOwned = isProductOwned };
+        var role = new SubAssemblyRole
+        {
+            Name = name,
+            SortOrder = sortOrder,
+            IsPackaging = isPackaging,
+            IsProductOwned = isProductOwned,
+            CanGoIntoOtherSections = canGoIntoOtherSections,
+        };
         dbContext.SubAssemblyRoles.Add(role);
         await dbContext.SaveChangesAsync(Cancellation);
         return role.Id;

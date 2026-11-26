@@ -27,7 +27,7 @@ public class ProductsStateSectionLineTests(DatabaseFixture fixture) : Persistenc
     {
         await WithoutWastageAsync();
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
         await SaveRecipeAsync(productId, new RecipeDraft(
@@ -251,13 +251,93 @@ public class ProductsStateSectionLineTests(DatabaseFixture fixture) : Persistenc
         state.UsageForm.EditingUsageWeightPerPiece.Should().Be(400m, "its one piece is its whole batch again");
     });
 
+    /// <summary>
+    /// Pan de Coco: a dough, a sponge and a filling, nothing on another's lines, open in the form on the dough's tab. Only the
+    /// sponge's role can go into another section.
+    /// </summary>
+    private async Task<ProductForm> OpenDoughSpongeAndFillingAsync()
+    {
+        await WithoutWastageAsync();
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 3, isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var productId = await AddProductAsync("Pan de Coco");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 70m),
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.Yield, 1m),
+                new NewSubAssemblyDraft(fillingRoleId, [(flourId, 100m)], UsageAuthoredField.WeightPerPiece, 10m),
+            ],
+            []));
+
+        var state = ProductsViews.Create(CreateDbContextFactory(), CreateUnitOfWork()).Form!;
+        await state.LoadCommand.ExecuteAsync();
+        state.Pick(state.Products.Single());
+        await Settle.UntilAsync(state, () => state.AreDetailsReady && state.Recipe.UsageEdits.Count == 3, () => $"ready={state.AreDetailsReady}, sections={state.Recipe.UsageEdits.Count}");
+        state.Recipe.PickRecipeTab(Tab(state, "Dough"));
+        return state;
+    }
+
+    private async Task SetGoesIntoOthersAsync(string roleName, bool value)
+    {
+        await using var dbContext = CreateDbContext();
+        await dbContext.SubAssemblyRoles.Where(r => r.Name == roleName)
+            .ExecuteUpdateAsync(set => set.SetProperty(r => r.CanGoIntoOtherSections, value), Cancellation);
+    }
+
+    [Test]
+    public Task Only_sections_in_a_role_that_can_go_into_another_are_offered_on_the_lines() => UiThread.RunAsync(async () =>
+    {
+        var state = await OpenDoughSpongeAndFillingAsync();
+
+        state.UsageForm.Sections.Picks.Where(p => p.Section != null).Select(p => p.Name).Should().Equal("Sponge (section)");
+    });
+
+    [Test]
+    public Task A_role_ticked_in_Settings_reaches_the_open_form_with_the_next_load() => UiThread.RunAsync(async () =>
+    {
+        var state = await OpenDoughSpongeAndFillingAsync();
+
+        await SetGoesIntoOthersAsync("Filling", true);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(
+            state,
+            () => state.UsageForm.Sections.Picks.Any(p => p.Name == "Filling (section)"),
+            () => string.Join(", ", state.UsageForm.Sections.Picks.Where(p => p.Section != null).Select(p => p.Name)));
+
+        state.UsageForm.Sections.Picks.Where(p => p.Section != null).Select(p => p.Name).Should().Equal("Sponge (section)", "Filling (section)");
+        state.History.IsDirty.Should().BeFalse("a role's tick isn't an edit of the product");
+    });
+
+    [Test]
+    public Task A_section_on_the_lines_stays_offered_after_its_role_stops_going_into_others_and_Save_says_why() => UiThread.RunAsync(async () =>
+    {
+        // Unticked behind Settings' back, which refuses it while the dough has the sponge on its lines.
+        var state = await OpenSpongeInDoughAsync();
+        await SetGoesIntoOthersAsync("Sponge", false);
+        await state.LoadCommand.ExecuteAsync();
+        await Settle.UntilAsync(state, () => state.Roles.Single(r => r.Name == "Sponge").CanGoIntoOtherSections == false, () => "roles not reloaded");
+        state.Recipe.PickRecipeTab(Tab(state, "Dough"));
+
+        state.UsageForm.FormLines.Select(r => r.Picked?.Name).Should().Equal("Flour", "Sponge (section)");
+        state.UsageForm.Sections.Picks.Should().Contain(p => p.Name == "Sponge (section)", "the row's own pick stays, so the row still shows it");
+
+        state.UsageForm.FormLines[1].Grams = 250m;
+        state.Recipe.PickRecipeTab(Tab(state, "Sponge"));
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().StartWith("Sponge can't be on Dough's lines: Settings → Roles doesn't let a Sponge section go into another.");
+        (await SavedSectionLinesAsync()).Should().Equal((300m, 1));
+    });
+
     [Test]
     public Task A_new_section_on_anothers_lines_survives_the_save_that_writes_it() => UiThread.RunAsync(async () =>
     {
         // Saved apart, the dough is sized by itself; a new sponge is added, and the dough's form puts it on its lines, unapplied.
         await WithoutWastageAsync();
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
         await SaveRecipeAsync(productId, new RecipeDraft(

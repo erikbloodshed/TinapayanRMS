@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.EntityFrameworkCore;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.Domain.Entities;
 using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
@@ -24,7 +25,52 @@ public class DataUpgradesTests(DatabaseFixture fixture) : PersistenceTestBase(fi
 
         await dbContext.Database.MigrateAsync(Cancellation);
 
-        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(["2026-11-05 section names", "2026-11-05 target buffers", "2026-11-09 innovation stage", "2026-11-12 product folders"]);
+        (await dbContext.DataUpgrades.Select(u => u.Id).ToListAsync(Cancellation)).Should().Contain(
+            ["2026-11-05 section names", "2026-11-05 target buffers", "2026-11-09 innovation stage", "2026-11-12 product folders", "2026-11-26 roles into other sections"]);
+    }
+
+    [Test]
+    public async Task The_roles_into_other_sections_upgrade_ticks_the_roles_already_on_anothers_lines_once()
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
+        var fillingRoleId = await AddRoleAsync("Filling", sortOrder: 3, isProductOwned: true);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var productId = await AddProductAsync("Spanish Bread");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m)
+                {
+                    SectionLines = [new SectionLineDraft(RecipeDraft.SectionIdOf(0, 1), 300m, null, 1)],
+                },
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.WeightPerPiece, 0m),
+                new NewSubAssemblyDraft(fillingRoleId, [(flourId, 100m)], UsageAuthoredField.WeightPerPiece, 10m),
+            ],
+            []));
+        await using (var dbContext = CreateDbContext())
+        {
+            // As the column came in: unticked everywhere.
+            await dbContext.SubAssemblyRoles.ExecuteUpdateAsync(set => set.SetProperty(r => r.CanGoIntoOtherSections, false), Cancellation);
+            await DataUpgrades.RunAsync(dbContext, Cancellation);
+        }
+
+        (await TickedRolesAsync()).Should().Equal("Sponge");
+
+        // Made once: a role ticked or unticked since stays as it is.
+        await using (var dbContext = CreateDbContext())
+        {
+            await dbContext.SubAssemblyRoles.Where(r => r.Id == fillingRoleId).ExecuteUpdateAsync(set => set.SetProperty(r => r.CanGoIntoOtherSections, true), Cancellation);
+            await dbContext.SubAssemblyRoles.Where(r => r.Id == spongeRoleId).ExecuteUpdateAsync(set => set.SetProperty(r => r.CanGoIntoOtherSections, false), Cancellation);
+            await DataUpgrades.RunAsync(dbContext, Cancellation);
+        }
+
+        (await TickedRolesAsync()).Should().Equal("Filling");
+    }
+
+    private async Task<List<string>> TickedRolesAsync()
+    {
+        await using var dbContext = CreateDbContext();
+        return await dbContext.SubAssemblyRoles.Where(r => r.CanGoIntoOtherSections).OrderBy(r => r.Name).Select(r => r.Name).ToListAsync(Cancellation);
     }
 
     [Test]

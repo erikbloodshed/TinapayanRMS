@@ -20,6 +20,7 @@
                 <GridColumn Field="@nameof(SubAssemblyRole.Name)" HeaderText="Name" />
                 <GridColumn Field="@nameof(SubAssemblyRole.SortOrder)" HeaderText="Order" Width="90" TextAlign="TextAlign.Right" />
                 <GridColumn Field="@nameof(SubAssemblyRole.IsProductOwned)" HeaderText="Product-owned" Width="130" DisplayAsCheckBox="true" TextAlign="TextAlign.Center" />
+                <GridColumn Field="@nameof(SubAssemblyRole.CanGoIntoOtherSections)" HeaderText="Into other sections" Width="150" DisplayAsCheckBox="true" TextAlign="TextAlign.Center" />
             </Columns>
         </PickGrid>
     </section>
@@ -31,6 +32,9 @@
         </FormRow>
         <FormRow Label="">
             <span class="tip-host" data-title="Sections in this role stay their product's own: edited in its recipe, copied not linked by others. Not for Packaging."><SfCheckBox Label="Product-owned" @bind-Checked="State!.EditingIsProductOwned" Disabled="!State!.CanEditProductOwned" /></span>
+        </FormRow>
+        <FormRow Label="">
+            <span class="tip-host" data-title="A section in this role can be a line of another section of its product, as a sponge goes into the dough. Not for Packaging."><SfCheckBox Label="Into other sections" @bind-Checked="State!.EditingCanGoIntoOtherSections" Disabled="!State!.CanEditProductOwned" /></span>
         </FormRow>
         <div class="button-row">
             <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />

@@ -16,7 +16,7 @@ public interface ISubAssemblyRoleEditor : ILookupListEditor<SubAssemblyRole>
     /// <summary>Adds a role named <paramref name="name"/> after the others; the role as saved, with its id.</summary>
     Task<SubAssemblyRole> AddAsync(string name, CancellationToken cancellationToken);
 
-    /// <summary>Renames <paramref name="role"/>, keeping its place and whether products own it.</summary>
+    /// <summary>Renames <paramref name="role"/>, keeping its place, whether products own it and whether it goes into other sections.</summary>
     Task RenameAsync(SubAssemblyRole role, string name, CancellationToken cancellationToken);
 
     /// <summary>
@@ -81,6 +81,7 @@ public sealed class SubAssemblyRoleEditor(ISubAssemblyRoleRepository roleReposit
             SortOrder = role.SortOrder,
             IsPackaging = role.IsPackaging,
             IsProductOwned = role.IsProductOwned,
+            CanGoIntoOtherSections = role.CanGoIntoOtherSections,
         };
         EnsureValid(renamed);
         await roleRepository.UpdateAsync(renamed, cancellationToken);

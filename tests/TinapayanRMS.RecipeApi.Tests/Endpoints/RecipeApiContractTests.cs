@@ -99,6 +99,9 @@ public class RecipeApiContractTests(DatabaseFixture fixture) : PersistenceTestBa
         var flourId = await AddIngredientAsync("Flour");
         var waterId = await AddIngredientAsync("Water");
         var ubeId = await AddIngredientAsync("Ube");
+
+        // The role AddRecipeAsync files every recipe in, the sponge's too, which goes into the dough.
+        await AddRoleAsync("Base", canGoIntoOtherSections: true);
         await AddMadeIngredientAsync("Syrup", [(waterId, 100m), (flourId, 10m)]);
         var doughId = await AddRecipeAsync("Sweet Dough", [(flourId, 1000m), (waterId, 500m)]);
         var spongeId = await AddRecipeAsync("Ube Sponge", [(flourId, 200m), (waterId, 200m)]);

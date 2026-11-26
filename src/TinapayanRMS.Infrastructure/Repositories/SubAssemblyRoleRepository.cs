@@ -15,7 +15,7 @@ public sealed class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbCo
 
     public async Task AddAsync(SubAssemblyRole role, CancellationToken cancellationToken)
     {
-        SubAssemblyRules.EnsureProductOwnedAllowed(role);
+        SubAssemblyRules.EnsureRoleTicksAllowed(role);
 
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         role.SortOrder = (await dbContext.SubAssemblyRoles.MaxAsync(r => (int?)r.SortOrder, cancellationToken) ?? 0) + 1;
@@ -31,8 +31,21 @@ public sealed class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbCo
         var existing = await dbContext.SubAssemblyRoles.FirstOrDefaultAsync(r => r.Id == role.Id, cancellationToken)
             ?? throw new BusinessRuleException($"Sub-assembly role {role.Id} does not exist.");
 
-        // The flag is checked against the role as stored: IsPackaging is never the caller's to change.
-        SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = existing.Name, IsPackaging = existing.IsPackaging, IsProductOwned = role.IsProductOwned });
+        // The ticks are checked against the role as stored: IsPackaging is never the caller's to change.
+        SubAssemblyRules.EnsureRoleTicksAllowed(new SubAssemblyRole
+        {
+            Name = existing.Name,
+            IsPackaging = existing.IsPackaging,
+            IsProductOwned = role.IsProductOwned,
+            CanGoIntoOtherSections = role.CanGoIntoOtherSections,
+        });
+
+        // A section in it on another's lines would have its product's next Save refused, so while there's one it goes on.
+        if (existing.CanGoIntoOtherSections && !role.CanGoIntoOtherSections
+            && await ProductSubAssemblyUsageRepository.ProductsWithSectionLinesInRoleAsync(dbContext, existing.Id, null, cancellationToken) is [_, ..] products)
+        {
+            throw new BusinessRuleException(SubAssemblyRules.StillGoesIntoOthersMessage(existing.Name, products));
+        }
 
         // A composite's own sections are only in product-owned roles, so while one has a section in this role it stays one.
         if (existing.IsProductOwned && !role.IsProductOwned
@@ -47,6 +60,7 @@ public sealed class SubAssemblyRoleRepository(IDbContextFactory<TinapayanRMSDbCo
         var wasProductOwned = existing.IsProductOwned;
         existing.Name = role.Name;
         existing.IsProductOwned = role.IsProductOwned;
+        existing.CanGoIntoOtherSections = role.CanGoIntoOtherSections;
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (!wasProductOwned && role.IsProductOwned)

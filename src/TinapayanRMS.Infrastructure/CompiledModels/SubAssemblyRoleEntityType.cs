@@ -20,7 +20,7 @@ public partial class SubAssemblyRoleEntityType
             "TinapayanRMS.Domain.Entities.SubAssemblyRole",
             typeof(SubAssemblyRole),
             baseEntityType,
-            propertyCount: 5,
+            propertyCount: 6,
             unnamedIndexCount: 1,
             keyCount: 1);
 
@@ -34,6 +34,15 @@ public partial class SubAssemblyRoleEntityType
             sentinel: 0);
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         id.AddAnnotation("Relational:ColumnName", "id");
+
+        var canGoIntoOtherSections = runtimeEntityType.AddProperty(
+            "CanGoIntoOtherSections",
+            typeof(bool),
+            propertyInfo: typeof(SubAssemblyRole).GetProperty("CanGoIntoOtherSections", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(SubAssemblyRole).GetField("<CanGoIntoOtherSections>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            sentinel: false);
+        canGoIntoOtherSections.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        canGoIntoOtherSections.AddAnnotation("Relational:ColumnName", "can_go_into_other_sections");
 
         var isPackaging = runtimeEntityType.AddProperty(
             "IsPackaging",

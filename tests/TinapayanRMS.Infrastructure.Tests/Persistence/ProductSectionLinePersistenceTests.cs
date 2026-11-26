@@ -36,7 +36,7 @@ public class ProductSectionLinePersistenceTests(DatabaseFixture fixture) : Persi
     private async Task<(int ProductId, int FlourId)> SeedSpongeInDoughAsync()
     {
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
         await SaveRecipeAsync(productId, new RecipeDraft(
@@ -81,7 +81,7 @@ public class ProductSectionLinePersistenceTests(DatabaseFixture fixture) : Persi
     public async Task A_linked_section_can_have_one_of_the_products_own_among_its_add_ins()
     {
         var doughRoleId = await AddRoleAsync("Dough");
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var (_, doughId) = await AddProductWithSubAssemblyAsync("Pan de Sal", doughRoleId, [(flourId, 1000m)], weightPerPiece: 30m);
         var productId = await AddProductAsync("Spanish Bread");
@@ -96,8 +96,8 @@ public class ProductSectionLinePersistenceTests(DatabaseFixture fixture) : Persi
     [Test]
     public async Task A_loop_is_refused_and_nothing_is_written()
     {
-        var doughRoleId = await AddRoleAsync("Dough", isProductOwned: true);
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var doughRoleId = await AddRoleAsync("Dough", isProductOwned: true, canGoIntoOtherSections: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
 

@@ -297,17 +297,21 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
                 .Select(s => (s.RoleId, s.Role!.Name, SubAssemblyRules.LabelIn(s, productId, productName, s.Role.Name))),
         ]);
 
-        // A section on another's lines is one of this recipe's, once there, with grams, and never round on its own; each is
-        // named by its id, or a new one's stand-in (RecipeDraft.SectionIdOf).
+        // A section on another's lines is one of this recipe's, in a role that can go into another, once there, with grams,
+        // and never round on its own; each is named by its id, or a new one's stand-in (RecipeDraft.SectionIdOf).
         ProductRules.EnsureValidSectionLines(
         [
             .. recipe.New.Select((n, i) => (
                 RecipeDraft.SectionIdOf(n.Id, i),
                 SubAssemblyRules.NormalizeName(n.SectionName) is { } label ? $"{roles[n.RoleId].Name}: {label}" : roles[n.RoleId].Name,
+                roles[n.RoleId].Name,
+                roles[n.RoleId].CanGoIntoOtherSections,
                 (IReadOnlyList<(int, decimal)>)[.. n.SectionLines.Select(l => (l.SectionId, l.Grams))])),
             .. recipe.Linked.Select(l => (
                 l.SubAssemblyId,
                 linkedSubAssemblies[l.SubAssemblyId].Name,
+                linkedSubAssemblies[l.SubAssemblyId].Role!.Name,
+                linkedSubAssemblies[l.SubAssemblyId].Role!.CanGoIntoOtherSections,
                 (IReadOnlyList<(int, decimal)>)[.. l.SectionLines.Select(line => (line.SectionId, line.Grams))])),
         ]);
 
@@ -520,4 +524,23 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// The products with a section in role <paramref name="roleId"/> on another of their sections' lines (UsageSectionLine),
+    /// by name: while there are any, the role goes on going into other sections (SubAssemblyRoleRepository.UpdateAsync).
+    /// Optionally only through <paramref name="subAssemblyId"/>, which keeps a role that can while it's on one
+    /// (SubAssemblyRepository). A deleted product counts, named as deleted (ProductRules.ListedName).
+    /// </summary>
+    internal static async Task<IReadOnlyList<string>> ProductsWithSectionLinesInRoleAsync(
+        TinapayanRMSDbContext dbContext, int roleId, int? subAssemblyId, CancellationToken cancellationToken) =>
+        [
+            .. (await dbContext.UsageSectionLines
+                .Where(l => (subAssemblyId == null || l.SectionSubAssemblyId == subAssemblyId)
+                    && dbContext.SubAssemblies.Any(s => s.Id == l.SectionSubAssemblyId && s.RoleId == roleId))
+                .Select(l => new { l.Usage!.Product!.Name, l.Usage.Product.DeletedAt })
+                .Distinct()
+                .OrderBy(p => p.Name)
+                .ToListAsync(cancellationToken))
+                .Select(p => ProductRules.ListedName(p.Name, p.DeletedAt is not null)),
+        ];
 }

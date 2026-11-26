@@ -24,7 +24,7 @@ internal static class Columns
         [typeof(RawMaterialBrandPrice)] = ["id", "raw_material_id", "brand", "unit_id", "price"],
         [typeof(RawMaterialPriceHistory)] = ["id", "raw_material_id", "date", "unit_id", "brand", "price"],
         [typeof(IngredientAddInLine)] = ["id", "ingredient_id", "add_in_ingredient_id", "grams", "sort_order"],
-        [typeof(SubAssemblyRole)] = ["id", "name", "sort_order", "is_packaging", "is_product_owned"],
+        [typeof(SubAssemblyRole)] = ["id", "name", "sort_order", "is_packaging", "is_product_owned", "can_go_into_other_sections"],
         [typeof(SubAssembly)] = ["id", "name", "role_id", "owner_product_id", "section_name", "updated_at"],
         [typeof(SubAssemblyLine)] = ["id", "sub_assembly_id", "ingredient_id", "grams", "is_formula_base", "authored_bakers_percent", "sort_order"],
         [typeof(SubAssemblyPackagingLine)] = ["id", "sub_assembly_id", "packaging_material_id", "unit_id", "qty_per_set", "sort_order"],

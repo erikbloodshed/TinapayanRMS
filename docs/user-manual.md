@@ -342,8 +342,11 @@ Each role has:
 - **Product-owned**: a section made in a product in this role stays that product's own. It's edited in the product's recipe instead of on the Sub-Assemblies screen, and other products can copy it but not link it, except its variants. Turning this on or off for a role that's already used asks first, and says how many sub-assemblies will move. A section of one that you were changing in a product keeps what you typed, and that product's **Save** is refused until you press **Revert** and make the change again.
   - These are also the only roles a composite product can have sections in. So Product-owned can't be turned off while a composite has a section in the role; the message names the composites. Take the section out there first.
   - A section you make in a product in this role starts at a Yield of 1, so its Weight/piece is the whole batch (see [Piece size](#piece-size-weight-per-piece-and-yield)).
+- **Into other sections**: a section in this role can be a line of another section of the same product, as a sponge goes into the dough (see [A section on another section's lines](#a-section-on-another-sections-lines)). Only sections in these roles are offered in a line's Ingredient list.
+  - It can't be turned off while a product has a section in the role on another's lines; the message names the products. Take the section off those lines first.
+  - The roles already used that way when this came in (2026-11-26) were ticked for you. Every other role starts without it, a new one too.
 
-The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned.
+The **Packaging** role is special. Sub-assemblies in it are packaging sets. It can be renamed but not deleted, and it can't be product-owned or go into another section.
 
 A role can't be deleted while any sub-assembly uses it.
 
@@ -626,7 +629,7 @@ Right-click menus:
 
 The same commands are buttons under the search box. Each button shows only its icon; point at it to see its name.
 
-Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned.
+Dragging sub-assemblies onto another role's folder changes their role straight away, and every product that links them follows. A recipe can't go into the Packaging role, and a packaging set can't leave it. A move is refused, with a message saying why, when a product that links the sub-assembly would end up with two sections in that role it can't tell apart, or when a composite product links it and the new role isn't product-owned, or when a product has it on another section's lines and the new role can't go into another section.
 
 **Names are typed straight into the list**, as on the Products screen. **Rename** (or F2, or clicking the sub-assembly you've already picked once more, slowly: a double-click doesn't rename) turns its name into a box: press **Enter**, or click away, and the new name is saved straight away, as a move is. If the sub-assembly is open in a tab, its name or role there changes too, and anything else you've changed stays to be saved. **Esc** leaves it as it was. **Rename Role** does the same for a role's folder.
 
@@ -812,6 +815,8 @@ A section's changes go into the recipe when you leave its tab, or when you press
 #### A section on another section's lines
 
 Some sections go into another: a sponge or a tangzhong into the dough, say. On the dough's tab, pick **Sponge (section)** in a line's Ingredient list, just above the ingredients, and type its grams, or its Baker's %, as for any line:
+
+- The list only has sections whose role has **Into other sections** ticked in Settings → Roles (see [Roles](#roles)), so a Filling or a Topping isn't offered unless you tick it for that role. A role ticked while a product is open shows up in the list when you come back to Products. A line that already holds a section keeps showing it even if its role is unticked behind the app's back, but **Save** then says what's wrong.
 
 - The line costs its grams at the sponge's cost per gram, and the dough's **Total weight**, **Batch cost** and pieces take it in, as any line's.
 - Change the sponge on its own tab, and the dough's line follows its cost.
@@ -1553,6 +1558,9 @@ A composite is made of two or more different products. For more of one product, 
 
 **"… can only have sections in product-owned roles …"**
 A composite product's own sections can only be in a role with **Product-owned** ticked in Settings ▸ Roles, such as Topping or Filling. Pick one of those, or tick Product-owned for the role. Settings also won't untick Product-owned, nor the Sub-Assemblies screen move a sub-assembly out of such a role, while a composite has a section there: the message names it.
+
+**"… can't be on Dough's lines: Settings → Roles doesn't let a … section go into another …"**
+A line of a section holds another section whose role doesn't have **Into other sections** ticked in Settings ▸ Roles. Tick it for that role, or delete the line. Settings won't untick it while a product has a section in the role on another's lines, nor will the Sub-Assemblies screen move such a sub-assembly into a role without it: the message names the products. Take the section off those lines first, or pick a role that has it.
 
 **A product can't go into a composite.**
 The product picker leaves out the composite itself, and any composite that already holds it. Otherwise the composite would end up holding itself.

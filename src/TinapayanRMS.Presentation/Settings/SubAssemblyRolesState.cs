@@ -8,8 +8,9 @@ namespace TinapayanRMS.Presentation.Settings;
 
 /// <summary>
 /// Settings' Roles tab: the sections a product's recipe is split into (Dough, Filling, …),
-/// in their order, and which of them are product-owned (a section made in a product stays that product's own).
-/// A new role goes last; Move Up and Move Down change the picked one's place.
+/// in their order, which of them are product-owned (a section made in a product stays that product's own), and which can
+/// go into another section (a sponge on the dough's lines). A new role goes last; Move Up and Move Down change the picked
+/// one's place.
 /// </summary>
 public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
 {
@@ -26,8 +27,22 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
         set => RaiseAndSetIfChanged(ref _editingIsProductOwned, value);
     }
 
+    private bool _editingCanGoIntoOtherSections;
+    /// <summary>
+    /// A section in this role can be a line of another of its product's sections, as a sponge goes into the dough: the
+    /// section form's picker offers it there. Unticking it is refused while a product has one on another's lines.
+    /// </summary>
+    public bool EditingCanGoIntoOtherSections
+    {
+        get => _editingCanGoIntoOtherSections;
+        set => RaiseAndSetIfChanged(ref _editingCanGoIntoOtherSections, value);
+    }
+
     private bool _canEditProductOwned = true;
-    /// <summary>False for the Packaging role, which holds packaging sets from the Sub-Assemblies screen.</summary>
+    /// <summary>
+    /// False for the Packaging role, which holds packaging sets from the Sub-Assemblies screen: neither Product-owned nor
+    /// Into other sections is for it.
+    /// </summary>
     public bool CanEditProductOwned
     {
         get => _canEditProductOwned;
@@ -60,6 +75,7 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
     {
         EditingName = item.Name;
         EditingIsProductOwned = item.IsProductOwned;
+        EditingCanGoIntoOtherSections = item.CanGoIntoOtherSections;
         CanEditProductOwned = !item.IsPackaging;
     }
 
@@ -74,6 +90,7 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
             SortOrder = stored?.SortOrder ?? 0,
             IsPackaging = stored?.IsPackaging ?? false,
             IsProductOwned = EditingIsProductOwned,
+            CanGoIntoOtherSections = EditingCanGoIntoOtherSections,
         };
     }
 
@@ -81,6 +98,7 @@ public sealed class SubAssemblyRolesState : LookupListState<SubAssemblyRole>
     protected override void ClearFields()
     {
         EditingIsProductOwned = false;
+        EditingCanGoIntoOtherSections = false;
         CanEditProductOwned = true;
     }
 

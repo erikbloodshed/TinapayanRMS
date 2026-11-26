@@ -184,15 +184,32 @@ public static class SubAssemblyRules
     public static string? SectionNameFromSavedName(string name, string productName, string roleName) =>
         IsNamedAfter(name, productName, roleName, null) ? null : StoredSectionName(SectionLabel(name, productName, roleName), roleName);
 
-    /// <summary>The Packaging role holds packaging sets from the Sub-Assemblies screen, so it's never product-owned.</summary>
-    public static void EnsureProductOwnedAllowed(SubAssemblyRole role)
+    /// <summary>
+    /// The Packaging role holds packaging sets from the Sub-Assemblies screen, so it's never product-owned, and never goes
+    /// into another section.
+    /// </summary>
+    public static void EnsureRoleTicksAllowed(SubAssemblyRole role)
     {
         if (role.IsPackaging && role.IsProductOwned)
         {
             throw new BusinessRuleException(
                 $"The {role.Name} role holds packaging sets from the Sub-Assemblies screen, so it can't be product-owned.");
         }
+
+        if (role.IsPackaging && role.CanGoIntoOtherSections)
+        {
+            throw new BusinessRuleException(
+                $"The {role.Name} role holds packaging sets from the Sub-Assemblies screen, so it can't go into another section.");
+        }
     }
+
+    /// <summary>
+    /// What Settings says when a role can't stop going into other sections: the products named have a section in it on
+    /// another section's lines, which Save would then refuse.
+    /// </summary>
+    public static string StillGoesIntoOthersMessage(string roleName, IReadOnlyList<string> productNames) =>
+        $"{string.Join(", ", productNames)} {(productNames.Count == 1 ? "has" : "have")} a {roleName} section on another section's lines. "
+        + "Take it off those lines first, then untick Into other sections.";
 
     /// <summary>
     /// A batch from its lines: TotalWeight = Σ grams; TotalCost = Σ (grams × the line's ingredient cost per gram as given,

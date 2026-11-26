@@ -30,4 +30,12 @@ public sealed class SubAssemblyRole
     /// batch going into one piece (ProductsState.StartingPieceSize).
     /// </summary>
     public bool IsProductOwned { get; set; }
+
+    /// <summary>
+    /// A section in this role can be a line of another of its product's sections (UsageSectionLine), as a sponge goes into
+    /// the dough. Set on Settings' Roles tab; never on the Packaging role. The section form's picker offers only these, and
+    /// Save refuses a line in another role (ProductRules.EnsureValidSectionLines), so it can't be cleared while a product
+    /// has a section in it on another's lines.
+    /// </summary>
+    public bool CanGoIntoOtherSections { get; set; }
 }

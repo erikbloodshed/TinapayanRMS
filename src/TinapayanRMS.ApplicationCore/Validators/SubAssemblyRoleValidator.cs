@@ -9,6 +9,6 @@ public sealed class SubAssemblyRoleValidator : AbstractValidator<SubAssemblyRole
     public SubAssemblyRoleValidator()
     {
         RuleFor(r => r.Name).NotEmpty().WithMessage("Name is required.");
-        RuleFor(r => r).Satisfies(SubAssemblyRules.EnsureProductOwnedAllowed);
+        RuleFor(r => r).Satisfies(SubAssemblyRules.EnsureRoleTicksAllowed);
     }
 }

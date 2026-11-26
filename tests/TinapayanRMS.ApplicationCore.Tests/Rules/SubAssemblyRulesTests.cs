@@ -248,13 +248,23 @@ public class SubAssemblyRulesTests
     }
 
     [Test]
-    public void EnsureProductOwnedAllowed_refuses_only_a_product_owned_packaging_role()
+    public void EnsureRoleTicksAllowed_refuses_either_tick_only_on_the_packaging_role()
     {
-        var packaging = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });
-        var filling = () => SubAssemblyRules.EnsureProductOwnedAllowed(new SubAssemblyRole { Name = "Filling", IsProductOwned = true });
+        var ownedPackaging = () => SubAssemblyRules.EnsureRoleTicksAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, IsProductOwned = true });
+        var packagingInOthers = () => SubAssemblyRules.EnsureRoleTicksAllowed(new SubAssemblyRole { Name = "Packaging", IsPackaging = true, CanGoIntoOtherSections = true });
+        var filling = () => SubAssemblyRules.EnsureRoleTicksAllowed(new SubAssemblyRole { Name = "Filling", IsProductOwned = true, CanGoIntoOtherSections = true });
 
-        packaging.Should().Throw<BusinessRuleException>().WithMessage("*can't be product-owned*");
+        ownedPackaging.Should().Throw<BusinessRuleException>().WithMessage("*can't be product-owned*");
+        packagingInOthers.Should().Throw<BusinessRuleException>().WithMessage("*can't go into another section*");
         filling.Should().NotThrow();
+    }
+
+    [Test]
+    public void StillGoesIntoOthersMessage_names_the_products()
+    {
+        SubAssemblyRules.StillGoesIntoOthersMessage("Sponge", ["Spanish Bread"]).Should().Be(
+            "Spanish Bread has a Sponge section on another section's lines. Take it off those lines first, then untick Into other sections.");
+        SubAssemblyRules.StillGoesIntoOthersMessage("Sponge", ["Spanish Bread", "Pan de Coco"]).Should().StartWith("Spanish Bread, Pan de Coco have a Sponge section");
     }
 
     [Test]

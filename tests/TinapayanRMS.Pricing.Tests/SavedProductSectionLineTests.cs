@@ -21,7 +21,7 @@ public class SavedProductSectionLineTests(DatabaseFixture fixture) : Persistence
     {
         await WithoutWastageAsync();
         var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
-        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true, canGoIntoOtherSections: true);
         var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
         var productId = await AddProductAsync("Spanish Bread");
 

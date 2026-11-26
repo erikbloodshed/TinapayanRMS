@@ -5,11 +5,38 @@ namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
 /// <summary>
 /// A product's sections on each other's lines (ProductRules.EnsureValidSectionLines): one of the recipe's, never the section
-/// it's on, once there, with grams, and never round in a loop.
+/// it's on, in a role that can go into another, once there, with grams, and never round in a loop.
 /// </summary>
 public class ProductRulesSectionLineTests
 {
-    private static (int, string, IReadOnlyList<(int, decimal)>) Section(int id, string name, params (int UsedId, decimal Grams)[] lines) => (id, name, lines);
+    /// <summary>A section named for its role, whose role can go into other sections.</summary>
+    private static (int, string, string, bool, IReadOnlyList<(int, decimal)>) Section(int id, string name, params (int UsedId, decimal Grams)[] lines) =>
+        (id, name, name, true, lines);
+
+    [Test]
+    public void A_section_whose_role_cant_go_into_another_is_refused_on_its_lines()
+    {
+        var act = () => ProductRules.EnsureValidSectionLines(
+        [
+            Section(1, "Dough", (2, 400m)),
+            (2, "Filling: Ube", "Filling", false, []),
+        ]);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage(
+            "Filling: Ube can't be on Dough's lines: Settings → Roles doesn't let a Filling section go into another. Tick Into other sections on the Filling role, or delete its line.");
+    }
+
+    [Test]
+    public void A_section_whose_role_cant_go_into_another_can_still_have_others_on_its_lines()
+    {
+        var act = () => ProductRules.EnsureValidSectionLines(
+        [
+            (1, "Dough", "Dough", false, [(2, 400m)]),
+            Section(2, "Sponge"),
+        ]);
+
+        act.Should().NotThrow();
+    }
 
     [Test]
     public void Sections_of_ingredients_alone_are_fine()

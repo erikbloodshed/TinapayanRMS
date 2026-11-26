@@ -199,6 +199,16 @@ public sealed class SubAssemblyRepository(IDbContextFactory<TinapayanRMSDbContex
                     + $"have sections in product-owned roles, which {role.Name} isn't. Take it out there first, or pick a product-owned role.");
             }
 
+            // One on another section's lines in a product (a linked sponge in its dough) stays in a role that can go into one.
+            if (stored.RoleId != subAssembly.RoleId
+                && !role.CanGoIntoOtherSections
+                && await ProductSubAssemblyUsageRepository.ProductsWithSectionLinesInRoleAsync(dbContext, stored.RoleId, stored.Id, cancellationToken) is [_, ..] products)
+            {
+                throw new BusinessRuleException(
+                    $"{ProductComponentRepository.NamesHave(products)} {stored.Name} on another section's lines, and Settings → Roles doesn't let "
+                    + $"a {role.Name} section go into another. Take it off those lines first, or pick a role that can.");
+            }
+
             stored.Name = name;
             stored.RoleId = subAssembly.RoleId;
         }

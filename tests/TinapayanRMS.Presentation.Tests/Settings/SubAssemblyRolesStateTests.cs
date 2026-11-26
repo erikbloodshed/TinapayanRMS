@@ -1,7 +1,9 @@
 using AwesomeAssertions;
 using Serilog;
+using TinapayanRMS.ApplicationCore.Interfaces;
 using TinapayanRMS.ApplicationCore.Validators;
 using TinapayanRMS.Domain.Entities;
+using TinapayanRMS.Domain.Enums;
 using TinapayanRMS.Infrastructure.Repositories;
 using TinapayanRMS.Tests.Common.Fixtures;
 using TinapayanRMS.Presentation.Tests.Fixtures;
@@ -12,7 +14,8 @@ namespace TinapayanRMS.Presentation.Tests.Settings;
 
 /// <summary>
 /// Settings' Roles tab and its Product-owned option: shown for the role picked, saved with it, asked about first when
-/// it moves sub-assemblies (saying how many), and never offered for the Packaging role.
+/// it moves sub-assemblies (saying how many), and never offered for the Packaging role; and its Can go into another
+/// section option, kept while a product has a section in the role on another's lines.
 /// </summary>
 [NotInParallel(DatabaseCollection.D)]
 [ClassDataSource<DatabaseFixture>(Shared = SharedType.Keyed, Key = DatabaseCollection.D)]
@@ -107,6 +110,43 @@ public class SubAssemblyRolesStateTests(DatabaseFixture fixture) : PersistenceTe
 
         state.ErrorMessage.Should().BeNull();
         state.Items.Single(r => r.Name == "Glaze").IsProductOwned.Should().BeTrue();
+    });
+
+    [Test]
+    public Task Can_go_into_another_section_is_shown_saved_and_kept_while_a_product_uses_it() => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
+        var spongeRoleId = await AddRoleAsync("Sponge", sortOrder: 2, isProductOwned: true);
+        var state = CreateState(confirm: true);
+        await state.LoadCommand.ExecuteAsync();
+        state.Pick(state.Items.Single(r => r.Id == spongeRoleId));
+        state.EditingCanGoIntoOtherSections.Should().BeFalse();
+
+        state.EditingCanGoIntoOtherSections = true;
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await RoleAsync(spongeRoleId)).CanGoIntoOtherSections.Should().BeTrue();
+        state.Items.Single(r => r.Id == spongeRoleId).CanGoIntoOtherSections.Should().BeTrue("the grid shows it");
+
+        // A product puts the sponge on its dough's lines: now it stays ticked.
+        var flourId = await AddIngredientAsync("Flour");
+        var productId = await AddProductAsync("Spanish Bread");
+        await SaveRecipeAsync(productId, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m)
+                {
+                    SectionLines = [new SectionLineDraft(RecipeDraft.SectionIdOf(0, 1), 300m, null, 1)],
+                },
+                new NewSubAssemblyDraft(spongeRoleId, [(flourId, 400m)], UsageAuthoredField.WeightPerPiece, 0m),
+            ],
+            []));
+        state.Pick(state.Items.Single(r => r.Id == spongeRoleId));
+        state.EditingCanGoIntoOtherSections = false;
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().StartWith("Spanish Bread has a Sponge section on another section's lines.");
+        (await RoleAsync(spongeRoleId)).CanGoIntoOtherSections.Should().BeTrue();
     });
 
     [Test]

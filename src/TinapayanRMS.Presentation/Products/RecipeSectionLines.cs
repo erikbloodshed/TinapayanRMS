@@ -26,19 +26,24 @@ internal static class RecipeSectionLines
     }
 
     /// <summary>
-    /// The sections <paramref name="usage"/>'s lines can use: the recipe's others, less any that uses it already, even
-    /// through others, which would make a loop (ProductRules.EnsureValidSectionLines). All of them for a section being
-    /// added. In recipe order.
+    /// The sections <paramref name="usage"/>'s lines can use: the recipe's others in a role that can go into another
+    /// (SubAssemblyRole.CanGoIntoOtherSections, as the screen last loaded the roles), less any that uses it already, even
+    /// through others, which would make a loop (ProductRules.EnsureValidSectionLines). For a section being added, every one
+    /// in such a role. One already on its lines, or on a row of <paramref name="onRows"/> (the form's, typed but not yet
+    /// applied), stays whatever its role, so the row still shows it, and Save says what's wrong. In recipe order.
     /// </summary>
-    public static IReadOnlyList<LineSection> For(ProductRecipeDraft draft, ProductUsageEdit? usage)
+    public static IReadOnlyList<LineSection> For(ProductRecipeDraft draft, ProductUsageEdit? usage, IEnumerable<long>? onRows = null)
     {
         var usesOf = draft.UsageEdits.ToDictionary(u => u.Key, u => u.SectionLines.Select(l => l.Key));
+        HashSet<long> kept = [.. usage?.SectionLines.Select(l => l.Key) ?? [], .. onRows ?? []];
+        HashSet<int> intoOthers = [.. draft.Roles.Where(r => r.CanGoIntoOtherSections).Select(r => r.Id)];
         return
         [
             .. draft.UsageEdits
                 .Select((section, i) => (section, i))
-                .Where(p => usage is null
-                    || (p.section.Key != usage.Key && !ProductRules.Reaches(p.section.Key, usage.Key, key => usesOf.GetValueOrDefault(key, []))))
+                .Where(p => (intoOthers.Contains(p.section.RoleId) || kept.Contains(p.section.Key))
+                    && (usage is null
+                        || (p.section.Key != usage.Key && !ProductRules.Reaches(p.section.Key, usage.Key, key => usesOf.GetValueOrDefault(key, [])))))
                 .Select(p => At(draft, p.i)),
         ];
     }

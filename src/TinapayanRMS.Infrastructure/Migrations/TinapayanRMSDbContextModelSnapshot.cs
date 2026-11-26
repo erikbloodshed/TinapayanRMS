@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261124085149_SectionUnlock";
+    public override string LastMigrationId => "20261126144828_RoleCanGoIntoOtherSections";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -1279,6 +1279,10 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<bool>("CanGoIntoOtherSections")
+                    .HasColumnType("boolean")
+                    .HasColumnName("can_go_into_other_sections");
+
                 b.Property<bool>("IsPackaging")
                     .HasColumnType("boolean")
                     .HasColumnName("is_packaging");
@@ -1311,6 +1315,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 1,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = false,
                         IsProductOwned = false,
                         Name = "Dough",
@@ -1319,6 +1324,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 2,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = false,
                         IsProductOwned = false,
                         Name = "Filling",
@@ -1327,6 +1333,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 3,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = false,
                         IsProductOwned = false,
                         Name = "Topping",
@@ -1335,6 +1342,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 4,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = false,
                         IsProductOwned = false,
                         Name = "Inclusion",
@@ -1343,6 +1351,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 5,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = false,
                         IsProductOwned = false,
                         Name = "Finishing",
@@ -1351,6 +1360,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     new
                     {
                         Id = 6,
+                        CanGoIntoOtherSections = false,
                         IsPackaging = true,
                         IsProductOwned = false,
                         Name = "Packaging",

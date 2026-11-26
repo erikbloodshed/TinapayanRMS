@@ -17,12 +17,16 @@ internal sealed class SectionFormChoices(IProductRecipeHost host, ProductUsageFo
     /// </summary>
     private int _builtFrom = -1;
 
-    /// <summary>The view's load is merged: the choices follow the lists it read, if they changed.</summary>
+    /// <summary>
+    /// The view's load is merged: the choices follow the lists it read, if they changed, the lines' picker too, as a role
+    /// may go into other sections now, or no longer.
+    /// </summary>
     public void RefreshAfterLoad()
     {
         if (_builtFrom != host.LinkableVersion)
         {
             Refresh();
+            SectionFormCapture.FollowSections(form, draft);
         }
     }
 

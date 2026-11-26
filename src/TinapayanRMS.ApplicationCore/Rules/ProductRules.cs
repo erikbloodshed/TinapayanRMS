@@ -68,12 +68,12 @@ public static class ProductRules
     /// <summary>
     /// The lines of a product's sections that are others of its sections (UsageSectionLine): a sponge on the dough's lines.
     /// Each section is named by <paramref name="sections"/>' SectionId, and each line by the SectionId of the one it uses.
-    /// A line uses one of the recipe's sections, never the section it's on, once in that section, with grams; a section can
-    /// be on several others' lines, and a chain (a sponge in a dough in a bigger dough) is fine, but a loop is not, as no
-    /// batch could cost what it does.
+    /// A line uses one of the recipe's sections, never the section it's on, in a role that can go into another
+    /// (SubAssemblyRole.CanGoIntoOtherSections), once in that section, with grams; a section can be on several others' lines,
+    /// and a chain (a sponge in a dough in a bigger dough) is fine, but a loop is not, as no batch could cost what it does.
     /// </summary>
     public static void EnsureValidSectionLines(
-        IReadOnlyList<(int SectionId, string Name, IReadOnlyList<(int UsedId, decimal Grams)> Lines)> sections)
+        IReadOnlyList<(int SectionId, string Name, string RoleName, bool CanGoIntoOtherSections, IReadOnlyList<(int UsedId, decimal Grams)> Lines)> sections)
     {
         var byId = sections.ToDictionary(s => s.SectionId);
         IEnumerable<int> UsesOf(int id) => byId.TryGetValue(id, out var section) ? section.Lines.Select(l => l.UsedId) : [];
@@ -90,6 +90,13 @@ public static class ProductRules
                 if (usedId == section.SectionId)
                 {
                     throw new BusinessRuleException($"{section.Name} can't be on its own lines.");
+                }
+
+                if (!usedSection.CanGoIntoOtherSections)
+                {
+                    throw new BusinessRuleException(
+                        $"{usedSection.Name} can't be on {section.Name}'s lines: Settings → Roles doesn't let a {usedSection.RoleName} section go into "
+                        + $"another. Tick Into other sections on the {usedSection.RoleName} role, or delete its line.");
                 }
 
                 if (!used.Add(usedId))

@@ -85,9 +85,9 @@ internal static class SectionFormCapture
         [.. IngredientLineRow.CompleteSectionLines(rows, madeInto).Select(l => new UsedSectionEdit(l.Section.Key, l.Grams, l.AuthoredBakersPercent, l.Position))];
 
     /// <summary>
-    /// The recipe's sections changed (a load repricing them, a linked one's lines saved elsewhere, an undo): the open form's
-    /// rows that are sections follow their costs, its picker the sections there are, and its piece-size figure not typed
-    /// what the others now use of it, as it follows the lines.
+    /// The recipe's sections changed (a load repricing them, a linked one's lines saved elsewhere, an undo), or the roles they
+    /// can go into: the open form's rows that are sections follow their costs, its picker the sections there are (a row's
+    /// own pick kept), and its piece-size figure not typed what the others now use of it, as it follows the lines.
     /// </summary>
     public static void FollowSections(ProductUsageForm form, ProductRecipeDraft draft)
     {
@@ -96,8 +96,9 @@ internal static class SectionFormCapture
             return;
         }
 
-        IngredientLineRow.ResolveSections(form.FormLines.Concat(form.FormAddIns), key => RecipeSectionLines.Find(draft, key));
-        form.Sections.ShowPicks(RecipeSectionLines.For(draft, form.EditingUsage));
+        var rows = form.FormLines.Concat(form.FormAddIns).ToList();
+        IngredientLineRow.ResolveSections(rows, key => RecipeSectionLines.Find(draft, key));
+        form.Sections.ShowPicks(RecipeSectionLines.For(draft, form.EditingUsage, rows.Select(r => r.SectionKey).OfType<long>()));
         if (form.EditingUsage is { } editing && form.Sections.ShowUsedElsewhere(RecipeSectionLines.UsedElsewhere(draft, editing)))
         {
             form.FollowPieceSize();
