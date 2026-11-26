@@ -77,7 +77,26 @@ public static class SavedVersionRules
     /// (<paramref name="isOwnNow"/>), or no longer its own: its role's Product-owned was changed in Settings.
     /// </summary>
     public static string OwnershipChangedText(string name, bool isOwnNow) =>
-        RecipeSavedSinceText(isOwnNow ? $"{name} became this product's own" : $"{name} moved to the Sub-Assemblies screen");
+        RecipeSavedSinceText(OwnershipChangedSince(name, isOwnNow));
+
+    /// <summary>
+    /// A product's Save refused over <paramref name="subAssemblyId"/>, whose owner changed since the form took the product
+    /// (<see cref="OwnershipChangedText"/>), saying which it is: once the form has read the product again, it can say whether
+    /// it now shows that one as it is (<see cref="OwnershipShownText"/>).
+    /// </summary>
+    public static SavedSinceException OwnershipChanged(int subAssemblyId, string name, bool isOwnNow) =>
+        new(OwnershipChangedText(name, isOwnNow)) { Ownership = new(subAssemblyId, name, isOwnNow) };
+
+    /// <summary>
+    /// What that refusal says once the form, having read the product again, shows <paramref name="change"/>'s sub-assembly as
+    /// it is now, as a load does one with nothing changed in it: Save again saves what's typed, with no Revert.
+    /// </summary>
+    public static string OwnershipShownText(OwnershipChange change) =>
+        $"{OwnershipChangedSince(change.Name, change.IsOwnNow)} after you opened this product, so your changes weren't saved. "
+        + $"They're still on the form, which shows {change.Name} as it is now: press Save again.";
+
+    private static string OwnershipChangedSince(string name, bool isOwnNow) =>
+        isOwnNow ? $"{name} became this product's own" : $"{name} moved to the Sub-Assemblies screen";
 
     private static string RecipeSavedSinceText(string happened) =>
         $"{happened} after you opened this product, so your changes weren't saved. They're still on the form: "

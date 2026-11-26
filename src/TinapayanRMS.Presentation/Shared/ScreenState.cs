@@ -194,13 +194,15 @@ public abstract class ScreenState : ObservableState, IScreenPartHost
         }
         catch (Exception ex)
         {
-            await OnActionFailedAsync(ex);
-            ShowFailure(ex);
+            ShowFailure(await OnActionFailedAsync(ex));
         }
     });
 
-    /// <summary>What the screen does about an action's failure before it's shown; nothing unless the screen says otherwise.</summary>
-    protected virtual Task OnActionFailedAsync(Exception failure) => Task.CompletedTask;
+    /// <summary>
+    /// What the screen does about an action's failure before it's shown, and the failure it shows: nothing, and the failure
+    /// itself, unless the screen says otherwise.
+    /// </summary>
+    protected virtual Task<Exception> OnActionFailedAsync(Exception failure) => Task.FromResult(failure);
 
     /// <summary>The same for an action that's done when it returns.</summary>
     protected Task RunSafelyAsync(Action action) => RunSafelyAsync(() =>

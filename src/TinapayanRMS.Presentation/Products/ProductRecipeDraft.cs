@@ -614,6 +614,14 @@ public sealed class ProductRecipeDraft : ObservableState
     internal bool IsAsSaved(RecipeDraft draft) => IsSameRecipe(draft, _savedRecipe);
 
     /// <summary>
+    /// Whether the recipe has <paramref name="change"/>'s sub-assembly as whose it is now, the product's own or linked, as
+    /// <see cref="CurrentDraft"/> would send it: a load leaves one with nothing changed in it so, and Save is no longer refused
+    /// over it. One changed here, or taken out, it doesn't.
+    /// </summary>
+    internal bool ShowsAsItIsNow(OwnershipChange change) =>
+        UsageEdits.Any(u => u.SubAssemblyId == change.SubAssemblyId && (change.IsOwnNow ? u.IsEditable : u.IsLinked));
+
+    /// <summary>
     /// Whether two recipes would save the same: the same sub-assemblies, roles, lines, add-ins and piece
     /// sizes, and the same products at the same quantities, in the same order. A linked draft is compared field by
     /// field rather than as a record, as a new one already is: a record's own Equals compares its AddIns list by

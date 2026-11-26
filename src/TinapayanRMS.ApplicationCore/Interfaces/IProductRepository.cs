@@ -144,7 +144,7 @@ public sealed record RecipeDraft(IReadOnlyList<NewSubAssemblyDraft> New, IReadOn
     /// <summary>
     /// The product's own sub-assemblies as the form took them. One that's its own now, isn't among these and isn't kept
     /// as its own here became so since (its role made product-owned), so Save is refused rather than delete it as one
-    /// taken out (SavedVersionRules.OwnershipChangedText). Null, from a caller that isn't a form, isn't checked.
+    /// taken out (SavedVersionRules.OwnershipChanged). Null, from a caller that isn't a form, isn't checked.
     /// </summary>
     public IReadOnlyCollection<int>? OwnTaken { get; init; }
 

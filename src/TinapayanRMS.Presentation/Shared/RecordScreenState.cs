@@ -222,9 +222,24 @@ public abstract class RecordScreenState<TSnapshot> : ScreenState, IUndoScreen, I
     /// A Save, or a rename or move from the list, refused for a save made since the form opened the record reads the screen's
     /// lists again before it says so: the record opened next is then the one that's saved now, where the list's old copy would
     /// be refused in its turn. What's typed stays, and so does the time the form took (<see cref="FollowSavedVersion"/>).
+    /// Then the form says it as <see cref="RefusalReadAgain"/> has it.
     /// </summary>
-    protected override Task OnActionFailedAsync(Exception failure) =>
-        failure is SavedSinceException ? ReadListsAgainAsync() : Task.CompletedTask;
+    protected override async Task<Exception> OnActionFailedAsync(Exception failure)
+    {
+        if (failure is not SavedSinceException refusal)
+        {
+            return failure;
+        }
+
+        await ReadListsAgainAsync();
+        return RefusalReadAgain(refusal);
+    }
+
+    /// <summary>
+    /// What a refusal for a save made since says once the form has read the record again: as it was refused, unless the form
+    /// now shows what it was refused over as it's saved (Products, a sub-assembly whose owner changed).
+    /// </summary>
+    protected virtual Exception RefusalReadAgain(SavedSinceException refusal) => refusal;
 
     /// <summary>The form's last Save (<see cref="RunSaveAsync"/>), done or still running.</summary>
     private Task _saving = Task.CompletedTask;

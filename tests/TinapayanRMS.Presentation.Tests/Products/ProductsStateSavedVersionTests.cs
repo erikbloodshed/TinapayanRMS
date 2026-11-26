@@ -479,8 +479,8 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
 
     /// <summary>
     /// With no load since the role changed, as when it's changed on another PC, a Save that writes the recipe (another section
-    /// changed) is refused for a section nothing is typed into too; its own load turns that section round, so Save again
-    /// saves what's typed, with no Revert. The user manual says so.
+    /// changed) is refused for a section nothing is typed into too; its own load turns that section round, so the refusal
+    /// says to press Save again, which saves what's typed, with no Revert. The user manual says so.
     /// </summary>
     [Test]
     [Arguments(true)]
@@ -507,7 +507,7 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         await SetProductOwnedAsync(toppingRoleId, !startsOwned);
         await state.SaveCommand.ExecuteAsync();
 
-        state.ErrorMessage.Should().Be(SavedVersionRules.OwnershipChangedText("Loaf Topping", isOwnNow: !startsOwned));
+        state.ErrorMessage.Should().Be(SavedVersionRules.OwnershipShownText(new OwnershipChange(toppingId, "Loaf Topping", IsOwnNow: !startsOwned)));
         state.Recipe.UsageEdits.Single(u => u.RoleId == toppingRoleId).IsOwned.Should()
             .Be(!startsOwned, "the refusal's own load turns round a section nothing is typed into");
 

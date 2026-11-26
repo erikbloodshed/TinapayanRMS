@@ -33,6 +33,29 @@ public class SavedVersionRulesTests
     }
 
     [Test]
+    public void A_sub_assembly_whose_owner_changed_since_refuses_by_name_and_says_which_it_is()
+    {
+        var adopted = SavedVersionRules.OwnershipChanged(12, "Loaf Topping", isOwnNow: true);
+        var released = SavedVersionRules.OwnershipChanged(12, "Loaf Topping", isOwnNow: false);
+
+        adopted.Ownership.Should().Be(new OwnershipChange(12, "Loaf Topping", IsOwnNow: true));
+        adopted.Message.Should().Be(
+            "Loaf Topping became this product's own after you opened this product, so your changes weren't saved. They're still on "
+            + "the form: note them, press Revert to see what was saved, then make yours again.");
+        released.Message.Should().StartWith("Loaf Topping moved to the Sub-Assemblies screen after you opened this product");
+    }
+
+    [Test]
+    public void A_sub_assembly_whose_owner_changed_shown_as_it_is_now_needs_only_another_Save()
+    {
+        var text = SavedVersionRules.OwnershipShownText(new OwnershipChange(12, "Loaf Topping", IsOwnNow: false));
+
+        text.Should().Be(
+            "Loaf Topping moved to the Sub-Assemblies screen after you opened this product, so your changes weren't saved. They're "
+            + "still on the form, which shows Loaf Topping as it is now: press Save again.");
+    }
+
+    [Test]
     public void Lines_that_dont_say_what_they_were_taken_from_arent_checked()
     {
         var act = () => SavedVersionRules.EnsureLinesNotSavedSince("House Dough", storedLines: [new(1, 1000m)], linesTaken: null);

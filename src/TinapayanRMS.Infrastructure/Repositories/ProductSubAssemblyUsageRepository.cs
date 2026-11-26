@@ -121,14 +121,14 @@ public sealed class ProductSubAssemblyUsageRepository(IDbContextFactory<Tinapaya
         {
             if (subAssembly.OwnerProductId is null)
             {
-                throw new SavedSinceException(SavedVersionRules.OwnershipChangedText(subAssembly.Name, isOwnNow: false));
+                throw SavedVersionRules.OwnershipChanged(subAssembly.Id, subAssembly.Name, isOwnNow: false);
             }
 
             if (subAssembly.OwnerProductId == productId
                 && !keptOwnIds.Contains(subAssembly.Id)
                 && (recipe.Linked.Any(l => l.SubAssemblyId == subAssembly.Id) || recipe.OwnTaken?.Contains(subAssembly.Id) == false))
             {
-                throw new SavedSinceException(SavedVersionRules.OwnershipChangedText(subAssembly.Name, isOwnNow: true));
+                throw SavedVersionRules.OwnershipChanged(subAssembly.Id, subAssembly.Name, isOwnNow: true);
             }
         }
     }

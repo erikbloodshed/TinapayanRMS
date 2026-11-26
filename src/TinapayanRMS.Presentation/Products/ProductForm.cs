@@ -1508,6 +1508,11 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
 
     protected override Task ReadListsAgainAsync() => LoadCommand.ExecuteAsync();
 
+    protected override Exception RefusalReadAgain(SavedSinceException refusal) =>
+        refusal.Ownership is { } change && Recipe.Draft.ShowsAsItIsNow(change)
+            ? new SavedSinceException(SavedVersionRules.OwnershipShownText(change), refusal)
+            : refusal;
+
     protected override int ShowingRecordId => EditingId;
 
     /// <summary>
