@@ -1,9 +1,9 @@
 @* A product's Costing tab: on the left, the four costing metrics, each as a percentage and the
    amount it comes to, either of which can be typed, with its share of the price under it; on the right the Costing
    Summary, from the parts and their wastage through labor, overhead and administrative to the base cost, each with its
-   share of the price; under it, the suggested selling price beside the current store price, each as its markup, VAT and
-   price (the markup one row, each price's amount with its percentage in a column of its own beside it, with no
-   heading, so the amounts stay in line), the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
+   share of the price; under it, in the same table so its columns line up with the breakdown's, the suggested selling
+   price beside the current store price, each as its markup, VAT and price (the markup one row, each price's percentage
+   before its amount, as "(30.0%) 30.00"), the suggested one also rounded up as Settings → Costing Defaults → Price Rounding says. *@
 <div class="costing">
     <div class="costing-heading">
         <h2 class="panel-header">Costing Summary</h2>
@@ -38,105 +38,104 @@
             </div>
         </div>
 
-        <div class="cost-summary-tables">
-            <table class="cost-summary">
-                <thead>
-                    <tr>
-                        <th>Component</th>
-                        <th class="number">@State.Costing.CostUnitCaption</th>
-                        <th class="number">% of Price</th>
+        <table class="cost-summary">
+            <thead>
+                <tr>
+                    <th>Component</th>
+                    <th class="number">@State.Costing.CostUnitCaption</th>
+                    <th class="number">% of Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@State.Costing.Costs.PartsTitle</td>
+                    <td class="number">@State.Costing.Costs.SubAssemblies.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.SubAssembliesShare.ToString("N1")%</td>
+                </tr>
+                @foreach (var line in State.Costing.Costs.SubAssemblyLines)
+                {
+                    <tr class="part-row">
+                        <td>@line.Name</td>
+                        <td class="number">@line.Cost.ToString("N2")</td>
+                        <td class="number">@line.Share.ToString("N1")%</td>
                     </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>@State.Costing.Costs.PartsTitle</td>
-                        <td class="number">@State.Costing.Costs.SubAssemblies.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.SubAssembliesShare.ToString("N1")%</td>
+                }
+                <tr data-title="What's lost in making, as a cost: the category's Wastage %, or else the shop's (Settings → Costing Defaults).">
+                    <td>Wastage (@State.Costing.Costs.WastagePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
+                    <td class="number">@State.Costing.Costs.Wastage.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.WastageShare.ToString("N1")%</td>
+                </tr>
+                <tr>
+                    <td>@State.Costing.Costs.PackagingTitle</td>
+                    <td class="number">@State.Costing.Costs.Packaging.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.PackagingShare.ToString("N1")%</td>
+                </tr>
+                <tr>
+                    <td>Labor (@State.Costing.Costs.LaborPercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
+                    <td class="number">@State.Costing.Costs.Labor.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.LaborShare.ToString("N1")%</td>
+                </tr>
+                <tr>
+                    <td>Overhead (@State.Costing.Costs.OverheadPercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
+                    <td class="number">@State.Costing.Costs.Overhead.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.OverheadShare.ToString("N1")%</td>
+                </tr>
+                <tr>
+                    <td>Administrative (@State.Costing.Costs.AdministrativePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
+                    <td class="number">@State.Costing.Costs.Administrative.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.AdministrativeShare.ToString("N1")%</td>
+                </tr>
+                <tr class="subtotal-row">
+                    <td>Subtotal (base cost)</td>
+                    <td class="number">@State.Costing.Costs.BaseCost.ToString("N2")</td>
+                    <td class="number share">@State.Costing.Costs.BaseCostShare.ToString("N1")%</td>
+                </tr>
+            </tbody>
+            <tbody class="price-comparison">
+                <tr class="section-gap"><td colspan="3"></td></tr>
+                <tr class="price-heading">
+                    <th>Component</th>
+                    <th class="number" data-title="@($"{State.Costing.SuggestedSellingPriceLabel}: the base cost plus the Markup Metric, then VAT")">Suggested Price</th>
+                    <th class="number" data-title="@CurrentPriceTooltip">Current Price</th>
+                </tr>
+                <tr>
+                    <td>Markup</td>
+                    <td class="number"><span class="percent">@PercentBefore(Costs.MarkupPercent)</span>@Costs.Markup.ToString("N2")</td>
+                    <td class="number @CurrentMarkupClass" data-title="@CurrentMarkupTooltip">
+                        @if (Costs.CurrentMarkup is { } currentMarkup)
+                        {
+                            @if (Costs.CurrentMarkupPercent is { } percent)
+                            {
+                                <span class="percent">@PercentBefore(percent)</span>
+                            }
+                            @currentMarkup.ToString("N2")
+                        }
+                        else
+                        {
+                            @("—")
+                        }
+                    </td>
+                </tr>
+                <tr>
+                    <td>VAT (@Costs.VatPercent.ToString("0.##")%)</td>
+                    <td class="number">@Costs.Vat.ToString("N2")</td>
+                    <td class="number">@(Costs.CurrentVat?.ToString("N2") ?? "—")</td>
+                </tr>
+                <tr class="total-row">
+                    <td>Selling price</td>
+                    <td class="number">@Costs.SellingPrice.ToString("N2")</td>
+                    <td class="number">@(Costs.CurrentPrice?.ToString("N2") ?? "—")</td>
+                </tr>
+                @if (Costs.HasPriceRounding)
+                {
+                    <tr class="rounded-row">
+                        <td>@Costs.PriceRoundingLabel</td>
+                        <td class="number">@Costs.RoundedSellingPrice.ToString("N2")</td>
+                        <td></td>
                     </tr>
-                    @foreach (var line in State.Costing.Costs.SubAssemblyLines)
-                    {
-                        <tr class="part-row">
-                            <td>@line.Name</td>
-                            <td class="number">@line.Cost.ToString("N2")</td>
-                            <td class="number">@line.Share.ToString("N1")%</td>
-                        </tr>
-                    }
-                    <tr data-title="What's lost in making, as a cost: the category's Wastage %, or else the shop's (Settings → Costing Defaults).">
-                        <td>Wastage (@State.Costing.Costs.WastagePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
-                        <td class="number">@State.Costing.Costs.Wastage.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.WastageShare.ToString("N1")%</td>
-                    </tr>
-                    <tr>
-                        <td>@State.Costing.Costs.PackagingTitle</td>
-                        <td class="number">@State.Costing.Costs.Packaging.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.PackagingShare.ToString("N1")%</td>
-                    </tr>
-                    <tr>
-                        <td>Labor (@State.Costing.Costs.LaborPercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
-                        <td class="number">@State.Costing.Costs.Labor.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.LaborShare.ToString("N1")%</td>
-                    </tr>
-                    <tr>
-                        <td>Overhead (@State.Costing.Costs.OverheadPercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
-                        <td class="number">@State.Costing.Costs.Overhead.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.OverheadShare.ToString("N1")%</td>
-                    </tr>
-                    <tr>
-                        <td>Administrative (@State.Costing.Costs.AdministrativePercent.ToString("0.##")% of @State.Costing.Costs.PartsBase)</td>
-                        <td class="number">@State.Costing.Costs.Administrative.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.AdministrativeShare.ToString("N1")%</td>
-                    </tr>
-                    <tr class="subtotal-row">
-                        <td>Subtotal (base cost)</td>
-                        <td class="number">@State.Costing.Costs.BaseCost.ToString("N2")</td>
-                        <td class="number share">@State.Costing.Costs.BaseCostShare.ToString("N1")%</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <table class="cost-summary price-comparison">
-                <thead>
-                    <tr>
-                        <th>Component</th>
-                        <th class="number" data-title="@($"{State.Costing.SuggestedSellingPriceLabel}: the base cost plus the Markup Metric, then VAT")">Suggested Price</th>
-                        <th class="percent"></th>
-                        <th class="number" data-title="@CurrentPriceTooltip">Current Price</th>
-                        <th class="percent"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Markup</td>
-                        <td class="number">@Costs.Markup.ToString("N2")</td>
-                        <td class="number percent">(@Costs.MarkupPercent.ToString("N1")%)</td>
-                        <td class="number @CurrentMarkupClass" data-title="@CurrentMarkupTooltip">@(Costs.CurrentMarkup?.ToString("N2") ?? "—")</td>
-                        <td class="number percent @CurrentMarkupClass" data-title="@CurrentMarkupTooltip">@(Costs.CurrentMarkupPercent is { } percent ? $"({percent:N1}%)" : "")</td>
-                    </tr>
-                    <tr>
-                        <td>VAT (@Costs.VatPercent.ToString("0.##")%)</td>
-                        <td class="number">@Costs.Vat.ToString("N2")</td>
-                        <td class="percent"></td>
-                        <td class="number">@(Costs.CurrentVat?.ToString("N2") ?? "—")</td>
-                        <td class="percent"></td>
-                    </tr>
-                    <tr class="total-row">
-                        <td>Selling price</td>
-                        <td class="number">@Costs.SellingPrice.ToString("N2")</td>
-                        <td class="percent"></td>
-                        <td class="number">@(Costs.CurrentPrice?.ToString("N2") ?? "—")</td>
-                        <td class="percent"></td>
-                    </tr>
-                    @if (Costs.HasPriceRounding)
-                    {
-                        <tr class="rounded-row">
-                            <td>@Costs.PriceRoundingLabel</td>
-                            <td class="number">@Costs.RoundedSellingPrice.ToString("N2")</td>
-                            <td colspan="3"></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                }
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -151,6 +150,10 @@
 
     // Red when the price doesn't cover the base cost, amber when it earns less than the Markup Metric, as the header's Markup %.
     private string CurrentMarkupClass => Costs.IsCurrentPriceBelowCost ? "figure-error" : Costs.IsBelowTargetMarkup ? "figure-warning" : "";
+
+    // A markup's percentage before its amount: "(30.0%) 30.00". The space is the string's, as Razor drops one written
+    // after the span.
+    private static string PercentBefore(decimal percent) => $"({percent:N1}%) ";
 
     private string? CurrentMarkupTooltip => Costs.IsCurrentPriceBelowCost
         ? "The current price doesn't cover the base cost."

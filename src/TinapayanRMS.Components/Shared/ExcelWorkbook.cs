@@ -5,6 +5,12 @@ namespace TinapayanRMS.Components.Shared;
 /// <summary>One column of an exported sheet: its heading, each row's value, and how a number shows ("#,##0.00").</summary>
 public sealed record ExcelColumn<TRow>(string Header, Func<TRow, object?> Value, string? Format = null);
 
+/// <summary>
+/// A value with a look of its own in place of its column's: a number format of its own (the Costing sheet's markup,
+/// "(30.0%) 30.00", still a number), or bold (a heading row partway down a sheet).
+/// </summary>
+public sealed record ExcelCell(object? Value, string? Format = null, bool Bold = false);
+
 /// <summary>One sheet of an exported workbook: its name, and its heading row over its rows' values, column by column.</summary>
 public sealed record ExcelSheet(string Name, IReadOnlyList<string> Headers, IReadOnlyList<string?> Formats, IReadOnlyList<object?[]> Rows)
 {
@@ -54,27 +60,7 @@ public static class ExcelWorkbook
             {
                 for (var c = 0; c < sheet.Headers.Count; c++)
                 {
-                    var cell = worksheet.Range[r + 2, c + 1];
-                    switch (sheet.Rows[r][c])
-                    {
-                        case null:
-                            break;
-                        case decimal or double or float or int or long:
-                            cell.Number = Convert.ToDouble(sheet.Rows[r][c], System.Globalization.CultureInfo.InvariantCulture);
-                            if (sheet.Formats[c] is { } format)
-                            {
-                                cell.NumberFormat = format;
-                            }
-
-                            break;
-                        case DateTime date:
-                            cell.DateTime = date;
-                            cell.NumberFormat = sheet.Formats[c] ?? "mmm d, yyyy";
-                            break;
-                        case var text:
-                            cell.Text = text.ToString();
-                            break;
-                    }
+                    Write(worksheet.Range[r + 2, c + 1], sheet.Rows[r][c], sheet.Formats[c]);
                 }
             }
 
@@ -88,5 +74,33 @@ public static class ExcelWorkbook
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
         return stream.ToArray();
+    }
+
+    private static void Write(IRange cell, object? value, string? format)
+    {
+        switch (value)
+        {
+            case null:
+                break;
+            case ExcelCell own:
+                cell.CellStyle.Font.Bold = own.Bold;
+                Write(cell, own.Value, own.Format ?? format);
+                break;
+            case decimal or double or float or int or long:
+                cell.Number = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                if (format is not null)
+                {
+                    cell.NumberFormat = format;
+                }
+
+                break;
+            case DateTime date:
+                cell.DateTime = date;
+                cell.NumberFormat = format ?? "mmm d, yyyy";
+                break;
+            default:
+                cell.Text = value.ToString();
+                break;
+        }
     }
 }

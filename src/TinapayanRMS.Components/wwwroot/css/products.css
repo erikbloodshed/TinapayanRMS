@@ -366,16 +366,16 @@
 .cost-administrative { border-left-color: #40a02b; }  /* Latte Green */
 .cost-markup { border-left-color: #179299; }          /* Latte Teal */
 
-/* The breakdown down to the base cost, and under it the suggested price beside the store's. */
-.cost-summary-tables {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+/* The suggested price beside the store's, in the breakdown's table under its subtotal, so Suggested Price lines up with
+   the breakdown's amounts and Current Price with its % of Price. A blank row parts the two, and the prices' own heading
+   row looks like the breakdown's. The table is only about 500px wide on the shop's laptop, so the headings and the row
+   labels are kept on one line. */
+.cost-summary .section-gap td {
+    height: 12px;
+    padding: 0;
+    border-bottom: none;
 }
 
-/* Each price column has a narrow column after it, with no heading, for the markup's percentage, so the amounts stay in
-   line down the column. The table is only about 500px wide on the shop's laptop, so the columns take the width their
-   figures need, the headings and the row labels kept on one line. */
 .price-comparison th.number {
     white-space: nowrap;
     vertical-align: bottom;
@@ -385,19 +385,14 @@
     white-space: nowrap;
 }
 
-.price-comparison .percent {
-    width: 1%;
-    padding-left: 4px;
-    white-space: nowrap;
-}
-
-/* Lighter than the amounts, as the breakdown's % of Price; the store price's keeps its amber or red. */
-.price-comparison .percent:not(.figure-warning, .figure-error) {
+/* A markup's percentage, before its amount: "(30.0%) 30.00". Lighter than the amount, as the breakdown's % of Price;
+   the store price's keeps its amber or red. */
+.price-comparison td:not(.figure-warning, .figure-error) > .percent {
     color: var(--muted-foreground);
 }
 
 /* The suggested price rounded up to a price you'd charge, under the price itself. Its label may wrap, so it doesn't
-   hold the first column wide enough to wrap the price headings. */
+   hold the first column wider than the breakdown's labels need. */
 .cost-summary .rounded-row td {
     color: var(--muted-foreground);
     font-size: 13px;

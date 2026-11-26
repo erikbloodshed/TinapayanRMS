@@ -91,6 +91,21 @@ public class TablePrintoutTests
         costing.Range["B1"].Text.Should().Be("Per piece");
         costing.Range["A2"].Text.Should().Be("Sub-assemblies (ingredients)");
         costing.Range["B2"].Number.Should().Be(2.6);
+
+        // Under the subtotal, after a blank row, the suggested price beside the current one in the breakdown's columns,
+        // as the Costing tab has them, each markup with its percentage before it in the cell's format.
+        var costs = printout.Costs;
+        var heading = Enumerable.Range(1, costing.UsedRange.LastRow).Single(row => costing.Range[row, 2].Text == "Suggested Price");
+        costing.Range[heading - 2, 1].Text.Should().Be("Subtotal (base cost)");
+        costing.Range[heading - 1, 1].Text.Should().BeNullOrEmpty("a blank row parts the comparison from the breakdown");
+        Enumerable.Range(1, 3).Select(column => (costing.Range[heading, column].Text, costing.Range[heading, column].CellStyle.Font.Bold))
+            .Should().Equal(("Component", true), ("Suggested Price", true), ("Current Price", true));
+        Enumerable.Range(heading + 1, 3).Select(row => string.Join(" | ", Enumerable.Range(1, 3).Select(column => costing.Range[row, column].DisplayText)))
+            .Should().Equal(
+                $"Markup | (30.0%) {costs.Markup:N2} | ({costs.CurrentMarkupPercent:N1}%) {costs.CurrentMarkup:N2}",
+                $"VAT (12%) | {costs.Vat:N2} | {costs.CurrentVat:N2}",
+                $"Selling price per piece | {costs.SellingPrice:N2} | 10.00");
+        costing.Range[heading + 1, 2].Number.Should().BeApproximately(decimal.ToDouble(costs.Markup), 1e-9, "the markup stays a number");
         workbook.Worksheets["Recipe"].Range["B2"].Text.Should().Be("Flour");
         workbook.Worksheets["Packaging"].Range["A2"].Text.Should().Be("Glassine");
     }

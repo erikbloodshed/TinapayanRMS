@@ -8,7 +8,8 @@ namespace TinapayanRMS.Components.Tests.Printing;
 
 /// <summary>
 /// The printed costing: a product's breakdown ends at its base cost, with its suggested price beside its current one under
-/// it, as the Costing tab shows them; the Price Simulator's report keeps its now-and-simulated rows in the breakdown.
+/// it in the same table, as the Costing tab shows them; the Price Simulator's report keeps its now-and-simulated rows in
+/// the breakdown.
 /// </summary>
 public class PrintDocumentCostingTests
 {
@@ -20,17 +21,19 @@ public class PrintDocumentCostingTests
         // A base cost of 100.00 at a 30% markup and 12% VAT is 145.60; a current price of 134.40 is 120.00 before VAT.
         var document = Render(context, Printout(currentPrice: 134.40m));
 
-        var breakdown = Rows(document, ".print-costing:not(.print-price-comparison)");
+        var breakdown = Rows(document, ".print-costing > tbody:not(.print-price-comparison)");
         breakdown.Should().EndWith("Subtotal (base cost) | 100.00 | 68.7%");
         breakdown.Should().NotContain(row => row.StartsWith("Markup", StringComparison.Ordinal) || row.StartsWith("VAT", StringComparison.Ordinal));
+        document.FindAll(".print-costing").Should().ContainSingle("the comparison's columns line up with the breakdown's");
         Rows(document, ".print-price-comparison").Should().Equal(
-            "Component | Suggested Price |  | Current Price | ",
-            "Markup | 30.00 | (30.0%) | 20.00 | (20.0%)",
-            "VAT (12%) | 15.60 |  | 14.40 | ",
-            "Selling price | 145.60 |  | 134.40 | ",
+            "",
+            "Component | Suggested Price | Current Price",
+            "Markup | (30.0%) 30.00 | (20.0%) 20.00",
+            "VAT (12%) | 15.60 | 14.40",
+            "Selling price | 145.60 | 134.40",
             "Rounded up to the next 0.25 | 145.75 | ");
-        document.FindAll(".print-price-comparison .print-warning").Select(cell => cell.TextContent).Should().Equal(
-            ["20.00", "(20.0%)"], "the current price earns less than the 30% markup");
+        document.FindAll(".print-price-comparison .print-warning").Select(cell => cell.TextContent.Trim()).Should().Equal(
+            ["(20.0%) 20.00"], "the current price earns less than the 30% markup");
     }
 
     [Test]
@@ -40,10 +43,10 @@ public class PrintDocumentCostingTests
 
         var document = Render(context, Printout(currentPrice: null));
 
-        Rows(document, ".print-price-comparison").Skip(1).Take(3).Should().Equal(
-            "Markup | 30.00 | (30.0%) | — | ",
-            "VAT (12%) | 15.60 |  | — | ",
-            "Selling price | 145.60 |  | — | ");
+        Rows(document, ".print-price-comparison").Skip(2).Take(3).Should().Equal(
+            "Markup | (30.0%) 30.00 | —",
+            "VAT (12%) | 15.60 | —",
+            "Selling price | 145.60 | —");
         document.FindAll(".print-warning, .print-error").Should().BeEmpty();
     }
 

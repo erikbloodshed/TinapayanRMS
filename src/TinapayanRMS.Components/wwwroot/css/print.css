@@ -401,24 +401,21 @@
     margin-top: 14px;
 }
 
-/* A product's suggested price beside its current one, under the costing's base cost. */
-.print-price-comparison {
-    margin-top: 10px;
+/* A product's suggested price beside its current one, in the costing's table under its base cost, after a blank row:
+   Suggested Price in line with the amounts, Current Price with % of Price. */
+.print-table .print-gap td {
+    height: 10px;
+    padding: 0;
+    border-bottom: none;
 }
 
 .print-price-comparison th.n {
-    width: 28%;
-}
-
-/* Each price's markup percentage, in a narrow column of its own with no heading, lighter than the amounts, as the
-   Costing tab has it; the current price's keeps its amber or red. */
-.print-price-comparison .print-percent {
-    width: 1%;
-    padding-left: 3px;
     white-space: nowrap;
 }
 
-.print-price-comparison .print-percent:not(.print-warning, .print-error) {
+/* Each markup's percentage, before its amount, lighter than it, as the Costing tab has it; the current price's keeps
+   its amber or red. */
+.print-price-comparison td:not(.print-warning, .print-error) > .print-percent {
     color: #5c5f77;
 }
 

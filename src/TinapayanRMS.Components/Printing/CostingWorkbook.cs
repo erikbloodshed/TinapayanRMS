@@ -1,3 +1,4 @@
+using System.Globalization;
 using TinapayanRMS.Components.Shared;
 using TinapayanRMS.Presentation.Printing;
 using TinapayanRMS.Pricing;
@@ -6,8 +7,10 @@ namespace TinapayanRMS.Components.Printing;
 
 /// <summary>
 /// A product's costing as an Excel workbook (the Costing tab's Export to Excel), from what it would print: a Costing sheet,
-/// the breakdown down to the base cost with each part's share of the price, then the suggested and current prices with
-/// their markup and VAT; a Recipe sheet, each section's lines with their grams, share, cost per gram and cost; and a
+/// the breakdown down to the base cost with each part's share of the price, then, after a blank row and a heading row of
+/// their own, the suggested price beside the current one with their markup and VAT, laid out as the Costing tab has them
+/// (the suggested price under the amounts, the current price under % of Price, a markup reading "(30.0%) 30.00"); a
+/// Recipe sheet, each section's lines with their grams, share, cost per gram and cost; and a
 /// Packaging sheet when it has packaging. Numbers stay numbers, in the screen's decimals.
 /// </summary>
 public static class CostingWorkbook
@@ -29,8 +32,7 @@ public static class CostingWorkbook
         List<ExcelSheet> sheets = [ExcelSheet.Of("Costing", CostingRows(printout.Costs, printout.CostUnitCaption),
             new ExcelColumn<CostingRow>("Component", r => r.Component),
             new(printout.CostUnitCaption, r => r.Amount, ExcelWorkbook.Money),
-            new("% of Price", r => r.Share, ExcelWorkbook.OneDecimal),
-            new("Current Price", r => r.Current, ExcelWorkbook.Money))];
+            new("% of Price", r => r.Share, ExcelWorkbook.OneDecimal))];
 
         var recipe = printout.Sections.SelectMany(section =>
             section.Lines.Select(line => (Section: section.Name, Kind: "", Line: line))
@@ -60,8 +62,12 @@ public static class CostingWorkbook
         return ExcelWorkbook.Build([.. sheets]);
     }
 
-    /// <summary>One row of the Costing sheet: a part and what it comes to, its share of the price, and the current price's.</summary>
-    public sealed record CostingRow(string Component, decimal? Amount, decimal? Share, decimal? Current = null);
+    /// <summary>
+    /// One row of the Costing sheet: in the breakdown, a part, what it comes to and its share of the price; in the price
+    /// comparison under it, its heading or a row with the suggested price's figure and the current price's, the latter in
+    /// the share's column as an <see cref="ExcelCell"/> with the money's format.
+    /// </summary>
+    public sealed record CostingRow(object? Component, object? Amount, object? Share);
 
     public static IReadOnlyList<CostingRow> CostingRows(ProductCostSummary costs, string unit)
     {
@@ -73,19 +79,31 @@ public static class CostingWorkbook
         rows.Add(new($"Overhead ({costs.OverheadPercent:0.##}% of {costs.PartsBase})", costs.Overhead, costs.OverheadShare));
         rows.Add(new($"Administrative ({costs.AdministrativePercent:0.##}% of {costs.PartsBase})", costs.Administrative, costs.AdministrativeShare));
         rows.Add(new("Subtotal (base cost)", costs.BaseCost, costs.BaseCostShare));
-        rows.Add(new($"Markup ({costs.MarkupPercent:0.##}%)", costs.Markup, costs.MarkupShare, costs.CurrentMarkup));
-        rows.Add(new($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, costs.VatShare, costs.CurrentVat));
-        rows.Add(new($"Selling price {unit.ToLowerInvariant()}", costs.SellingPrice, costs.SellingPriceShare, costs.CurrentPrice));
+        rows.Add(new(null, null, null));
+        rows.Add(new(Heading("Component"), Heading("Suggested Price"), Heading("Current Price")));
+        rows.Add(new("Markup", Markup(costs.Markup, costs.MarkupPercent),
+            costs.CurrentMarkup is { } markup ? Markup(markup, costs.CurrentMarkupPercent) : NoCurrentPrice));
+        rows.Add(new($"VAT ({costs.VatPercent:0.##}%)", costs.Vat, Current(costs.CurrentVat)));
+        rows.Add(new($"Selling price {unit.ToLowerInvariant()}", costs.SellingPrice, Current(costs.CurrentPrice)));
         if (costs.HasPriceRounding)
         {
             rows.Add(new(costs.PriceRoundingLabel, costs.RoundedSellingPrice, null));
         }
 
-        if (costs.CurrentMarkupPercent is { } markup)
-        {
-            rows.Add(new("Markup at current price (%)", null, null, markup));
-        }
-
         return rows;
     }
+
+    // A dash where the product has no current price, as the Costing tab shows.
+    private const string NoCurrentPrice = "—";
+
+    private static ExcelCell Heading(string text) => new(text, Bold: true);
+
+    // A current price's figure, in the column whose own format is the share's.
+    private static object Current(decimal? amount) => amount is { } value ? new ExcelCell(value, ExcelWorkbook.Money) : NoCurrentPrice;
+
+    // A markup with its percentage before it, "(30.0%) 30.00": the percentage is written into the cell's number format,
+    // so the cell stays the amount.
+    private static ExcelCell Markup(decimal amount, decimal? percent) => new(amount, percent is { } value
+        ? $"\"({value.ToString("N1", CultureInfo.CurrentCulture)}%) \"{ExcelWorkbook.Money}"
+        : ExcelWorkbook.Money);
 }
