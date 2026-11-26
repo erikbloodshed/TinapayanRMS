@@ -1621,13 +1621,16 @@ Only one copy of TinapayanRMS opens at a time on a PC, so that two copies don't 
 Someone else signed in to Windows on this PC has TinapayanRMS open. Only one copy can be open on the PC, for the same reason as above. Sign in as them and close it there, or ask them to, then open it again.
 
 **"Someone else saved … after you opened it, so your changes weren't saved."**
-Another PC using the same database saved this product, raw material or sub-assembly while you had it open, and saving yours would have overwritten what they saved. What you typed is still on the form, and **Save** keeps refusing it. Note what you changed. Then go to another item in the list, or to another screen, and answer **No** when asked about saving your changes. Come back to the item: it now shows what they saved. On the Products screen, **Revert** does the same without leaving it. Make your changes again and press **Save**.
+This product, raw material or sub-assembly was saved while you had changes on it, and saving yours would have overwritten what was saved. Usually that's another PC using the same database. A product is also saved by its variant: a variant's **Save** that changes a section of this product's own saves this product too, even from another tab on this PC (see [Clone tab](#clone-tab)). What you typed is still on the form, and **Save** keeps refusing it. Note what you changed. Then close the item's tab with its **✕** and answer **No** when asked about saving your changes. Open the item again: it now shows what was saved. On the Products screen, **Revert** does the same without closing the tab. Make your changes again and press **Save**.
 
 **"…'s lines were saved after you opened this product, so your changes weren't saved."**
 You changed a linked sub-assembly's lines in a product's recipe, and that sub-assembly's lines were saved meanwhile: on the Sub-Assemblies screen, from another product's tab or on another PC. What you typed is still on the form. Note it, press **Revert** to see the lines saved, then make your changes again and press **Save**.
 
 **"… became this product's own after you opened this product, …"** or **"… moved to the Sub-Assemblies screen after you opened this product, …"**
-**Product-owned** was turned on or off in Settings ▸ Roles for the role of a section you were changing or had taken out. Nothing was saved, and what you typed is still on the form. Note it, press **Revert** to see the section as it is now, then make your changes again and press **Save**.
+**Product-owned** was turned on or off in Settings ▸ Roles, after you opened the product, for the role of one of its sections or of one you had taken out, and you had changed the recipe. Nothing was saved, and what you typed is still on the form.
+
+- **If you hadn't changed that section** (Product-owned was changed on another PC), the product now shows it as it is now. You don't need **Revert**: press **Save** again.
+- **If you had changed it, or taken it out**, note what you typed, press **Revert** to see the section as it is now, then make your changes again and press **Save**. Revert puts the whole product back as it was last saved, so note every change you want to keep, not only the section's.
 
 **The password is forgotten.**
 Clear it, and the app asks for a new one. On the PC that holds the database, signed in to Windows as the app's user, open PowerShell, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\Reset-Password.ps1`. It asks first; answer **y**. The next time the app opens, or its window is locked, it asks you to set a new password. Nothing else changes, the auto-lock's minutes included.

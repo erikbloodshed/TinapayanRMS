@@ -477,6 +477,47 @@ public class ProductsStateSavedVersionTests(DatabaseFixture fixture) : Persisten
         state.Recipe.UsageEdits.Single().IsOwned.Should().Be(!startsOwned);
     });
 
+    /// <summary>
+    /// With no load since the role changed, as when it's changed on another PC, a Save that writes the recipe (another section
+    /// changed) is refused for a section nothing is typed into too; its own load turns that section round, so Save again
+    /// saves what's typed, with no Revert. The user manual says so.
+    /// </summary>
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public Task A_roles_Product_owned_changed_with_no_load_since_refuses_one_Save_over_a_section_nothing_is_typed_into(bool startsOwned) => UiThread.RunAsync(async () =>
+    {
+        var doughRoleId = await AddRoleAsync("Dough", sortOrder: 1, isProductOwned: true);
+        var toppingRoleId = await AddRoleAsync("Topping", sortOrder: 2, isProductOwned: startsOwned);
+        var flourId = await AddIngredientAsync("Flour", costPerGram: 0.05m);
+        var butterId = await AddIngredientAsync("Butter", costPerGram: 0.4m);
+        var id = await AddProductAsync("Loaf");
+        await SaveRecipeAsync(id, new RecipeDraft(
+            [
+                new NewSubAssemblyDraft(doughRoleId, [(flourId, 1000m)], UsageAuthoredField.WeightPerPiece, 60m),
+                new NewSubAssemblyDraft(toppingRoleId, [(flourId, 100m)], UsageAuthoredField.WeightPerPiece, 5m),
+            ],
+            []));
+        var (doughId, toppingId) = (await SubAssemblyIdAsync(id, doughRoleId), await SubAssemblyIdAsync(id, toppingRoleId));
+        var state = await OpenedStateAsync(id);
+        state.ConfirmDelete.RegisterHandler(context => context.SetOutput(true));
+        await state.Recipe.EditUsageCommand.ExecuteAsync(state.Recipe.UsageEdits.Single(u => u.RoleId == doughRoleId));
+        Edit(state, () => state.UsageForm.FormLines.Add(new IngredientLineRow { IngredientId = butterId, Grams = 250m }));
+
+        await SetProductOwnedAsync(toppingRoleId, !startsOwned);
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().Be(SavedVersionRules.OwnershipChangedText("Loaf Topping", isOwnNow: !startsOwned));
+        state.Recipe.UsageEdits.Single(u => u.RoleId == toppingRoleId).IsOwned.Should()
+            .Be(!startsOwned, "the refusal's own load turns round a section nothing is typed into");
+
+        await state.SaveCommand.ExecuteAsync();
+
+        state.ErrorMessage.Should().BeNull();
+        (await StoredLinesAsync(doughId)).Should().Equal((flourId, 1000m), (butterId, 250m));
+        (await StoredLinesAsync(toppingId)).Should().Equal((flourId, 100m));
+    });
+
     [Test]
     [Arguments(true)]
     [Arguments(false)]
