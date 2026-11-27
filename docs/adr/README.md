@@ -26,6 +26,7 @@ written. A decision that changes gets a new record that supersedes the old one, 
 | [0018](0018-syncfusion-blazor.md) | Syncfusion's Blazor components | Accepted 2026-11-07; recorded after the fact |
 | [0019](0019-recipe-api-plain-http.md) | The Recipe API on plain HTTP over the shop's own network | Accepted 2026-11-22; recorded after the fact |
 | [0020](0020-page-scripts-tested-in-headless-edge.md) | The page scripts are tested in headless Edge | Accepted |
+| [0021](0021-recipe-api-windows-service-in-the-msi.md) | The Recipe API as a Windows service in the app's MSI | Accepted |
 
 Records 0014 to 0019 are decisions taken before the records began (ADR 0001), or, for 0019, kept only in PLAN.md,
 written from the build plan's log, PLAN.md and the commits, with the owner's own reasons where those left them unsaid

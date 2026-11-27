@@ -1486,7 +1486,7 @@ The installer, a file named like `TinapayanRMS-1.0.414-x64.msi`, puts TinapayanR
 2. Open the `.msi` file and agree when Windows asks to let it make changes. It needs an administrator.
 3. Open the app. If this version changes the data, the first start updates it, after a backup (see [What an update does](#what-an-update-does)).
 
-To update, on this PC or another, open the newer installer the same way: it replaces the version installed. It won't install over a newer version. Each user's lists, Vim keys setting, backups and the data stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
+To update, on this PC or another, open the newer installer the same way: it replaces the version installed, and the Recipe API with it on the PC that has it (see [Share the recipes with TinapayanBMS](#share-the-recipes-with-tinapayanbms)). It won't install over a newer version. Each user's lists, Vim keys setting, backups and the data stay as they are. To remove the app, go to **Settings > Apps > Installed apps**, find **TinapayanRMS**, and choose **Uninstall**.
 
 ### What an update does
 
@@ -1507,7 +1507,7 @@ If a new version doesn't work, you can go back to the version before it until it
 
 Anything saved after the update isn't in the restored data. It isn't lost: the data as it was is kept, under another name that the script shows (such as *tinapayanrms_before_undo_20261126_101500*), for whoever looks after the app to copy back what's needed. When the fixed version comes, install it as usual: it updates the data again, after another **Before update** backup.
 
-Without `-Msi`, the script puts the data back only, and you install the older version yourself before anyone opens the app: uninstall TinapayanRMS in **Settings > Apps**, then open the older installer. A copy installed with `scripts\Install-TinapayanRMS.ps1` is installed again by running that script from the older version's source.
+Without `-Msi`, the script puts the data back only, and you install the older version yourself before anyone opens the app: uninstall TinapayanRMS in **Settings > Apps**, then open the older installer. On the PC that runs the Recipe API, install it with `msiexec /i <the older installer> ADDLOCAL=ALL` in PowerShell as an administrator instead, or the Recipe API is left out (with `-Msi`, the script does this itself). An installer from before 2026-11-28 has no Recipe API in it: the script then says how to bring back that version's own. A copy installed with `scripts\Install-TinapayanRMS.ps1` is installed again by running that script from the older version's source.
 
 ### Move TinapayanRMS to a new PC
 
@@ -1520,29 +1520,33 @@ Each other Windows user of the PC who'll use the app runs `Setup-Database.ps1` t
 
 ### Share the recipes with TinapayanBMS
 
-TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background on the PC that holds the TinapayanRMS database. The Recipe API only reads. It never changes a recipe, a price or anything else.
+TinapayanBMS, the app for weighing ingredients out ahead of mixing, keeps a copy of TinapayanRMS's recipes, ingredients, prices and costs, and plans production from it. It copies them through the **Recipe API**, a small program that runs in the background, as a Windows service, on the PC that holds the TinapayanRMS database. It comes with TinapayanRMS's installer, so updating the app updates it too. The Recipe API only reads. It never changes a recipe, a price or anything else.
 
-1. On the PC that holds the TinapayanRMS database, open PowerShell **as an administrator**, go to the TinapayanRMS folder, and run `powershell -ExecutionPolicy Bypass -File scripts\New-DatabaseReader.ps1`, then `powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1 -ReadOnlyUser tinapayanrms_reader`. The first makes a database sign-in that can read and never change anything, which the Recipe API then uses. You only need it once on that PC. The second installs the Recipe API, starts it, and starts it again each time you sign in to Windows. Running it as an administrator also lets the other PCs on the shop's network reach it. The first time, it also makes the Recipe API's **key**, a long password for apps, and shows it at the end. Copy it for the next step.
-2. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Paste the key into **Key**. Then press **Save and Test**.
+To set it up, once, on the PC that holds the TinapayanRMS database:
 
-The Recipe API answers only an app that gives it the key, so other programs on the shop's network can't read your recipes, costs and prices. Every copy of TinapayanBMS uses the same key. To copy it again, run this in PowerShell on the PC with the Recipe API, then paste it where it's needed:
+1. Install TinapayanRMS with the Recipe API: open PowerShell **as an administrator**, go to the folder with the installer, and run `msiexec /i TinapayanRMS-1.0.414-x64.msi ADDLOCAL=ALL`, with your installer's name. It's the usual installer, with its Recipe API part added, which it leaves out unless asked for, as only this PC runs it. Each later installer keeps it, so you update the app as usual from then on. This PC also needs the **ASP.NET Core Runtime 11 (x64)**, from Microsoft's .NET download page: without it the installer stops before changing anything and says so.
+2. In the same administrator PowerShell, go to the TinapayanRMS folder and run `powershell -ExecutionPolicy Bypass -File scripts\New-DatabaseReader.ps1`, then `powershell -ExecutionPolicy Bypass -File scripts\Setup-RecipeApi.ps1 -ReadOnlyUser tinapayanrms_reader`. The first makes a database sign-in that can read and never change anything, which the Recipe API then uses. The second gives the Recipe API that sign-in, starts it, and checks it answers. From then on it starts with Windows, whether or not anyone signs in. The first time, it also makes the Recipe API's **key**, a long password for apps, and shows it at the end. Copy it for the next step. If the Recipe API was set up before with the older `Install-RecipeApi.ps1`, it keeps that key instead, removes the older copy, and TinapayanBMS needs no change.
+3. In TinapayanBMS's **Settings**, type the Recipe API's address. Use `http://localhost:5290` when TinapayanBMS runs on the same PC, or `http://` and that PC's name or network address followed by `:5290` when it runs on another PC. Paste the key into **Key**. Then press **Save and Test**.
+
+The installer lets the other PCs on the shop's network reach the Recipe API, and nothing outside it. The Recipe API answers only an app that gives it the key, so other programs on the shop's network can't read your recipes, costs and prices. Every copy of TinapayanBMS uses the same key. To copy it again, run this in PowerShell **as an administrator** on the PC with the Recipe API, then paste it where it's needed:
 
 ```powershell
-(Get-Content "$env:LOCALAPPDATA\Programs\TinapayanRMS.RecipeApi\recipeapi.json" -Raw | ConvertFrom-Json).RecipeApi.Key | Set-Clipboard
+(Get-Content "$env:ProgramData\TinapayanRMS\RecipeApi\recipeapi.json" -Raw | ConvertFrom-Json).RecipeApi.Key | Set-Clipboard
 ```
 
-Running the install script again, to update the Recipe API, keeps the same key, and the read-only sign-in, so `-ReadOnlyUser` is only needed the first time. Removing the Recipe API removes its key too, so after installing it again TinapayanBMS needs the new key in its Settings.
+Running `Setup-RecipeApi.ps1` again keeps the same key, and the read-only sign-in, so `-ReadOnlyUser` is only needed the first time. Run it again after `New-DatabaseReader.ps1`, which gives the sign-in a new password. Removing the Recipe API removes its key too, so after setting it up again TinapayanBMS needs the new key in its Settings.
 
 When TinapayanBMS can't get through, what it says points to the reason:
 
 - **"TinapayanRMS didn't accept the key":** the key in its Settings isn't the Recipe API's. Copy it again as above.
-- **"answered with an error (503)":** the Recipe API is running but can't use the database. Check that PostgreSQL is running on that PC, then try again.
-- **"answered with an error (403)":** the Recipe API has no key, so it only answers on its own PC. Run the script in step 1 again. It makes a new key.
+- **"answered with an error (503)":** the Recipe API is running but can't use the database. Check that PostgreSQL is running on that PC, then try again. If `New-DatabaseReader.ps1` was run again since, run `Setup-RecipeApi.ps1` again too.
+- **"answered with an error (403)":** the Recipe API has no key, so it only answers on its own PC. Run `Setup-RecipeApi.ps1` as in step 2. It makes a new key.
 - **"answered with an error (500)":** something unexpected went wrong in the Recipe API.
+- **It can't reach it at all:** check that the **TinapayanRMS Recipe API** service is running, in Windows' **Services**. If it stopped, Windows starts it again after a minute.
 
-The Recipe API's log, in the `logs` folder of `%LocalAppData%\Programs\TinapayanRMS.RecipeApi`, says more about an error.
+The Recipe API's log, in `C:\ProgramData\TinapayanRMS\RecipeApi\logs`, says more about an error.
 
-The Recipe API runs only while someone is signed in to Windows on that PC. TinapayanBMS keeps working from its own copy of the recipes while it isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, run `scripts\Uninstall-RecipeApi.ps1` the same way.
+TinapayanBMS keeps working from its own copy of the recipes while the Recipe API isn't running; it just doesn't see changes made here until it can sync again. To remove the Recipe API, leaving TinapayanRMS installed, run `scripts\Uninstall-RecipeApi.ps1` in PowerShell as an administrator.
 
 ---
 

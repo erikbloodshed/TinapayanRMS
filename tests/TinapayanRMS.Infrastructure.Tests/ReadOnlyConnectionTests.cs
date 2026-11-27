@@ -31,6 +31,37 @@ public class ReadOnlyConnectionTests
     }
 
     [Test]
+    public void A_password_file_set_is_the_one_it_signs_in_with()
+    {
+        var connection = new NpgsqlConnectionStringBuilder(
+            ReadOnlyConnection.Of(AppConnection, "tinapayanrms_reader", @" C:\ProgramData\TinapayanRMS\RecipeApi\pgpass.conf "));
+
+        connection.Passfile.Should().Be(@"C:\ProgramData\TinapayanRMS\RecipeApi\pgpass.conf");
+        connection.Username.Should().Be("tinapayanrms_reader");
+    }
+
+    [Test]
+    public void With_no_password_file_set_it_signs_in_with_the_users_own()
+    {
+        var connection = new NpgsqlConnectionStringBuilder(ReadOnlyConnection.Of(AppConnection));
+
+        connection.Passfile.Should().BeNull("Npgsql then reads the Windows user's %APPDATA%\\postgresql\\pgpass.conf");
+    }
+
+    [Test]
+    public void Apply_signs_in_with_the_password_file_its_settings_name()
+    {
+        var builder = new ConfigurationBuilder().AddInMemoryCollection([
+            new("ConnectionStrings:Default", AppConnection),
+            new(ReadOnlyConnection.PasswordFileKey, @"D:\pgpass.conf"),
+        ]);
+
+        ReadOnlyConnection.Apply(new HostBuilderContext(new Dictionary<object, object>()), builder);
+
+        new NpgsqlConnectionStringBuilder(builder.Build().GetConnectionString("Default")).Passfile.Should().Be(@"D:\pgpass.conf");
+    }
+
+    [Test]
     [Arguments(null, "tinapayanrms")]
     [Arguments("", "tinapayanrms")]
     [Arguments("tinapayanrms_reader", "tinapayanrms_reader")]

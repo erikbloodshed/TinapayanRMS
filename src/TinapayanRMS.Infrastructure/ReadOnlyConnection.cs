@@ -21,6 +21,12 @@ public static class ReadOnlyConnection
     public const string UserKey = "Database:ReadOnlyUser";
 
     /// <summary>
+    /// The setting naming the password file to sign in with, in pgpass.conf's form, in place of the Windows user's own:
+    /// the Recipe API's service has no user profile, so it sets its own (RecipeApiService). Unset, the user's pgpass.conf.
+    /// </summary>
+    public const string PasswordFileKey = "Database:PasswordFile";
+
+    /// <summary>
     /// How many seconds a connection left idle in its pool stays open. A restore can't end the connections of another role,
     /// such as the reader's, and waits 30 seconds for them to go (DatabaseBackups), where a pool's default of 5 minutes
     /// would refuse the restore for up to 5 minutes after the Recipe API's last request.
@@ -30,8 +36,11 @@ public static class ReadOnlyConnection
     /// <summary>How often, in seconds, the pool looks for connections left idle: at most <see cref="IdleLifetimeSeconds"/>.</summary>
     public const int PruningIntervalSeconds = 5;
 
-    /// <summary><paramref name="connectionString"/>, its transactions read-only, and as <paramref name="user"/> when one is given.</summary>
-    public static string Of(string connectionString, string? user = null)
+    /// <summary>
+    /// <paramref name="connectionString"/>, its transactions read-only, as <paramref name="user"/> when one is given, with
+    /// the password from <paramref name="passwordFile"/> when one is given.
+    /// </summary>
+    public static string Of(string connectionString, string? user = null, string? passwordFile = null)
     {
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
         {
@@ -44,18 +53,23 @@ public static class ReadOnlyConnection
             builder.Username = user.Trim();
         }
 
+        if (!string.IsNullOrWhiteSpace(passwordFile))
+        {
+            builder.Passfile = passwordFile.Trim();
+        }
+
         return builder.ConnectionString;
     }
 
     /// <summary>
     /// Puts a read-only copy of the app's connection string (appsettings.json's, which DatabaseHost added) over it, as the
-    /// role <see cref="UserKey"/> names when it's set.
+    /// role <see cref="UserKey"/> names when it's set, with the password file <see cref="PasswordFileKey"/> names when it's set.
     /// </summary>
     public static void Apply(HostBuilderContext context, IConfigurationBuilder config)
     {
         var settings = config.Build();
         var connectionString = settings.GetConnectionString("Default")
             ?? throw new InvalidOperationException("Missing 'ConnectionStrings:Default' configuration value.");
-        config.AddInMemoryCollection([new("ConnectionStrings:Default", Of(connectionString, settings[UserKey]))]);
+        config.AddInMemoryCollection([new("ConnectionStrings:Default", Of(connectionString, settings[UserKey], settings[PasswordFileKey]))]);
     }
 }

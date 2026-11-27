@@ -1,9 +1,13 @@
 <!-- TinapayanRMS for every Windows user on the PC: the published app in Program Files\TinapayanRMS, with Start menu and
      Desktop shortcuts for everyone. Each user's own data stays theirs, in %LocalAppData%\TinapayanRMS\Maui (the view
      state, the log and the web view's folder), and the MSI never touches it, nor the database: the app brings the
-     database up to its version the first time it opens after an install, after a backup (IDatabaseUpdater). -->
+     database up to its version the first time it opens after an install, after a backup (IDatabaseUpdater).
+     On the PC that holds the database, its Recipe API feature also installs the Recipe API as a Windows service
+     (ADR 0021), so an update brings the app and the API to the same version in one step. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx">
+     xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall"
+     xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <!-- The UpgradeCode is the app's for good: a new MSI with it replaces the copy installed. -->
   <Package Name="TinapayanRMS"
@@ -29,6 +33,16 @@
     <Launch Condition="Installed OR DOTNET_RUNTIME_CHECK=&quot;0&quot;"
             Message="TinapayanRMS needs the .NET 11 Runtime (x64). Install it from https://dotnet.microsoft.com/download/dotnet/11.0, then run this installer again." />
 
+    <!-- The Recipe API runs on ASP.NET Core's runtime as well, which only the PC that installs it needs: its feature's
+         state is known only once costing is done, so this is an error action then, not a launch condition. -->
+    <netfx:DotNetCompatibilityCheck Property="ASPNETCORE_RUNTIME_CHECK" RuntimeType="aspnet" Platform="x64" Version="11.0.0" RollForward="minor" />
+    <CustomAction Id="RecipeApiNeedsAspNetCore"
+                  Error="The Recipe API needs the ASP.NET Core Runtime 11 (x64). Install it from https://dotnet.microsoft.com/download/dotnet/11.0, then run this installer again." />
+    <InstallExecuteSequence>
+      <Custom Action="RecipeApiNeedsAspNetCore" After="CostFinalize"
+              Condition="(&amp;RecipeApi = 3) AND ASPNETCORE_RUNTIME_CHECK &lt;&gt; &quot;0&quot;" />
+    </InstallExecuteSequence>
+
     <!-- A copy that's open holds its files: Windows Installer's Restart Manager asks it to close (InstallValidate),
          finding it by the files it holds, so only the copy in INSTALLFOLDER. The app answers as its Close would: with a
          form's unsaved changes it stays open and asks about them (WindowsWindow), and the files it holds are replaced at
@@ -36,8 +50,36 @@
          and could only reach copies run from elsewhere, as it finds the app by its .exe's name alone. -->
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="TinapayanRMS" />
+      <Directory Id="INSTALLFOLDER" Name="TinapayanRMS">
+        <Directory Id="RECIPEAPIFOLDER" Name="RecipeApi" />
+      </Directory>
     </StandardDirectory>
+
+    <!-- The Recipe API's service: its .exe (left out of the harvest, RecipeApiFiles.xslt) is this component's key path,
+         which is the file a service runs. It runs as its own virtual account, NT SERVICE\TinapayanRMSRecipeApi, which
+         scripts\Setup-RecipeApi.ps1 gives its data folder, %ProgramData%\TinapayanRMS\RecipeApi, to read: its key, the
+         role it reads as and that role's password. It starts at boot, with nobody signed in, and again a minute after
+         it stops on a failure (Util's ServiceConfig: WiX warns that Windows Installer's own doesn't work as expected). An update stops it before its files are replaced (Stop="both"), so Restart Manager has
+         nothing of it to ask about, and starts the new one. It's started without waiting for it: one that stops at once,
+         as before its setup when the per-user copy it replaces still holds the port, doesn't fail the install. The
+         firewall rule lets the local subnet reach its port, on private networks only. -->
+    <DirectoryRef Id="RECIPEAPIFOLDER">
+      <Component Id="RecipeApiService">
+        <File Id="RecipeApiExe" Source="$(var.RecipeApiPublishDir)TinapayanRMS.RecipeApi.exe" KeyPath="yes">
+          <fire:FirewallException Id="RecipeApiFirewall" Name="TinapayanRMS Recipe API" Port="5290" Protocol="tcp"
+                                  Scope="localSubnet" Profile="private"
+                                  Description="Lets TinapayanBMS on the shop's other PCs read the recipes from the TinapayanRMS Recipe API." />
+        </File>
+        <ServiceInstall Id="RecipeApiService" Name="TinapayanRMSRecipeApi" DisplayName="TinapayanRMS Recipe API"
+                        Description="Serves TinapayanRMS's recipes, ingredients, prices and costs, read-only, to TinapayanBMS on port 5290."
+                        Type="ownProcess" Start="auto" ErrorControl="normal" Account="NT SERVICE\TinapayanRMSRecipeApi" Vital="yes">
+          <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="60" ResetPeriodInDays="1" />
+        </ServiceInstall>
+        <ServiceControl Id="StopRecipeApi" Name="TinapayanRMSRecipeApi" Stop="both" Remove="uninstall" Wait="yes" />
+        <ServiceControl Id="StartRecipeApi" Name="TinapayanRMSRecipeApi" Start="install" Wait="no" />
+      </Component>
+    </DirectoryRef>
 
     <!-- Each shortcut is kept by a value of its own under HKLM, as a per-machine shortcut has no file to be kept by. It
          takes its icon from the .exe. -->
@@ -61,6 +103,15 @@
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
+    </Feature>
+
+    <!-- Only on the PC that holds the database, so off unless asked for (Level 2, over the default INSTALLLEVEL of 1):
+         msiexec /i <msi> ADDLOCAL=ALL. An update keeps it as it was, as MajorUpgrade migrates the features' states
+         (ADDLOCAL naming only this feature would skip that, and leave the app out). -->
+    <Feature Id="RecipeApi" Title="Recipe API" Level="2"
+             Description="Serves the recipes to TinapayanBMS, as a Windows service on this PC.">
+      <ComponentGroupRef Id="RecipeApiFiles" />
+      <ComponentRef Id="RecipeApiService" />
     </Feature>
 
   </Package>

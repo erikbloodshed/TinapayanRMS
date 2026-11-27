@@ -3,11 +3,13 @@
     Makes the PostgreSQL role the Recipe API reads the database as: one that can read every table and write none.
 
 .DESCRIPTION
-    Run it on the PC that holds the TinapayanRMS database, as the Windows user the Recipe API runs as, then install the API
-    with -ReadOnlyUser tinapayanrms_reader. It creates the role, or gives it a new password if it's there already, with a
-    password of its own that's never shown, and puts that password in this user's %APPDATA%\postgresql\pgpass.conf, beside
-    the app's own role's, so no connection string or file of the API's holds it. Running it again is safe: the role gets a
-    new password, and pgpass.conf has it in place of the old one.
+    Run it on the PC that holds the TinapayanRMS database, then set up the Recipe API's service with Setup-RecipeApi.ps1
+    -ReadOnlyUser tinapayanrms_reader, as the same Windows user. It creates the role, or gives it a new password if it's
+    there already, with a password of its own that's never shown, and puts that password in this user's
+    %APPDATA%\postgresql\pgpass.conf, beside the app's own role's, where Setup-RecipeApi.ps1 copies it from to the
+    service's own pgpass.conf, which only the administrators and the service can read. Running it again is safe: the role
+    gets a new password, and pgpass.conf has it in place of the old one; run Setup-RecipeApi.ps1 again after it, or the
+    service keeps signing in with the old one and answers 503.
 
     The role is a member of PostgreSQL's pg_read_all_data, so it reads every table, one a migration adds and a restored
     backup's included (a restore rebuilds the database, which would lose grants made inside it), and has no right to write
@@ -95,5 +97,5 @@ if ($check -ne 't') {
 }
 
 Write-Host "Made $Role, which reads every table and writes none. Its password is in $pgpass."
-Write-Host 'Now install the Recipe API to read as it:'
-Write-Host "  powershell -ExecutionPolicy Bypass -File scripts\Install-RecipeApi.ps1 -ReadOnlyUser $Role"
+Write-Host 'Now set up the Recipe API to read as it, which also copies the new password to it, in an administrator PowerShell:'
+Write-Host "  powershell -ExecutionPolicy Bypass -File scripts\Setup-RecipeApi.ps1 -ReadOnlyUser $Role"

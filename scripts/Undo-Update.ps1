@@ -209,7 +209,13 @@ Write-Host "Restored. TinapayanRMS's data is as it was on $($takenAt.ToString('M
 # ---------------------------------------------------------------------------------------------------------------------
 # The app.
 
+# The Recipe API's feature isn't installed unless asked for, and an uninstall then an install doesn't carry it over as an
+# update does: asked for again where its service was. Its settings in ProgramData outlive both.
+$hasRecipeApi = [bool](Get-Service -Name 'TinapayanRMSRecipeApi' -ErrorAction SilentlyContinue)
+$recipeApiGone = 'The older version has no Recipe API service (it came with the MSI from 2026-11-28), so TinapayanBMS can''t sync from this PC. To run that version''s Recipe API, from a checkout of the older commit run scripts\Install-RecipeApi.ps1 -ReadOnlyUser tinapayanrms_reader, then put the key from %ProgramData%\TinapayanRMS\RecipeApi\recipeapi.json in its recipeapi.json (RecipeApi:Key) and start it again, so TinapayanBMS keeps its key.'
+
 if ($Msi) {
+    $features = if ($hasRecipeApi) { 'ADDLOCAL=ALL' } else { $null }
     $installer = New-Object -ComObject WindowsInstaller.Installer
     foreach ($product in @($installer.RelatedProducts($upgradeCode))) {
         Write-Host "Uninstalling TinapayanRMS ($product)..."
@@ -217,14 +223,24 @@ if ($Msi) {
         if ($remove.ExitCode -notin 0, 3010) { throw "Uninstalling TinapayanRMS failed (msiexec exit code $($remove.ExitCode)). The data is restored: uninstall it from Settings > Apps, then open $Msi." }
     }
     Write-Host "Installing $Msi..."
-    $install = Start-Process msiexec.exe -ArgumentList '/i', "`"$Msi`"", '/passive', '/norestart' -Wait -PassThru
+    $install = Start-Process msiexec.exe -ArgumentList (@('/i', "`"$Msi`"", $features, '/passive', '/norestart') | Where-Object { $_ }) -Wait -PassThru
     if ($install.ExitCode -notin 0, 3010) { throw "Installing $Msi failed (msiexec exit code $($install.ExitCode)). The data is restored: open $Msi to install it." }
     Write-Host 'Installed.'
+    if ($hasRecipeApi -and -not (Get-Service -Name 'TinapayanRMSRecipeApi' -ErrorAction SilentlyContinue)) {
+        Write-Warning $recipeApiGone
+    }
 }
 else {
     Write-Host ''
     Write-Host 'Now install the older version, before anyone opens TinapayanRMS: the newer one would update the data again.'
-    Write-Host '  An MSI install: uninstall TinapayanRMS from Settings > Apps, then open the older MSI.'
+    if ($hasRecipeApi) {
+        Write-Host '  An MSI install: uninstall TinapayanRMS from Settings > Apps, then, in an administrator PowerShell, install the'
+        Write-Host '  older MSI with its Recipe API: msiexec /i <the older msi> ADDLOCAL=ALL. Without ADDLOCAL=ALL the Recipe API is left out.'
+        Write-Host "  If the older version has no Recipe API service: $recipeApiGone"
+    }
+    else {
+        Write-Host '  An MSI install: uninstall TinapayanRMS from Settings > Apps, then open the older MSI.'
+    }
     Write-Host '  An install by Install-TinapayanRMS.ps1: run that script from a checkout of the older commit.'
 }
 

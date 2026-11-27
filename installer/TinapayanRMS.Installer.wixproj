@@ -1,7 +1,8 @@
 <!-- The app's MSI, a per-machine install into Program Files (Package.wxs). Built from a publish of src\TinapayanRMS.Maui
-     by scripts\Build-Installer.ps1, which passes AppPublishDir and ProductVersion. It isn't in TinapayanRMS.slnx: the
-     publish needs the Syncfusion licence key, which neither a solution build nor CI has. The WiX SDK's version is in
-     global.json (msbuild-sdks), its extensions' in Directory.Packages.props. -->
+     and one of src\TinapayanRMS.RecipeApi by scripts\Build-Installer.ps1, which passes AppPublishDir, RecipeApiPublishDir
+     and ProductVersion. It isn't in TinapayanRMS.slnx: the publish needs the Syncfusion licence key, which neither a
+     solution build nor CI has. The WiX SDK's version is in global.json (msbuild-sdks), its extensions' in
+     Directory.Packages.props. -->
 <Project Sdk="WixToolset.Sdk">
 
   <PropertyGroup>
@@ -11,8 +12,9 @@
          only when its version is higher, or the same (Package.wxs, MajorUpgrade). -->
     <ProductVersion Condition="'$(ProductVersion)' == ''">1.0.0</ProductVersion>
     <AppPublishDir>$([MSBuild]::EnsureTrailingSlash('$(AppPublishDir)'))</AppPublishDir>
+    <RecipeApiPublishDir>$([MSBuild]::EnsureTrailingSlash('$(RecipeApiPublishDir)'))</RecipeApiPublishDir>
     <AppIconFile>$(MSBuildThisFileDirectory)..\src\TinapayanRMS.Maui\Resources\AppIcon\tinapayan-rms-icon.ico</AppIconFile>
-    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);AppPublishDir=$(AppPublishDir);AppIconFile=$(AppIconFile)</DefineConstants>
+    <DefineConstants>$(DefineConstants);ProductVersion=$(ProductVersion);AppPublishDir=$(AppPublishDir);RecipeApiPublishDir=$(RecipeApiPublishDir);AppIconFile=$(AppIconFile)</DefineConstants>
     <!-- Windows Installer's checks that are wrong about this package:
          - ICE03: the Windows App SDK's WinUI files carry their own languages, which the binder copies into the File
            table: its .mui files for Scottish Gaelic, Maori and Uyghur (gd-gb, mi-NZ, ug-CN) have language ids older
@@ -24,12 +26,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="WixToolset.Firewall.wixext" />
     <PackageReference Include="WixToolset.Heat" />
     <PackageReference Include="WixToolset.Netfx.wixext" />
+    <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>
 
-  <!-- Every file the publish made, as the AppFiles component group, under INSTALLFOLDER. Heat is deprecated from WiX 6
-       on (its Files element does this), but 6 isn't free (Directory.Packages.props). -->
+  <!-- Every file each publish made: the app's as the AppFiles component group, under INSTALLFOLDER, and the Recipe API's
+       as RecipeApiFiles, under its RecipeApi folder, but for its .exe, which Package.wxs authors with the service
+       (RecipeApiFiles.xslt). Heat is deprecated from WiX 6 on (its Files element does this), but 6 isn't free
+       (Directory.Packages.props). -->
   <ItemGroup>
     <HarvestDirectory Include="$(AppPublishDir)">
       <ComponentGroupName>AppFiles</ComponentGroupName>
@@ -39,10 +45,23 @@
       <SuppressCom>true</SuppressCom>
       <SuppressRegistry>true</SuppressRegistry>
     </HarvestDirectory>
+    <HarvestDirectory Include="$(RecipeApiPublishDir)">
+      <ComponentGroupName>RecipeApiFiles</ComponentGroupName>
+      <DirectoryRefId>RECIPEAPIFOLDER</DirectoryRefId>
+      <PreprocessorVariable>var.RecipeApiPublishDir</PreprocessorVariable>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+      <SuppressCom>true</SuppressCom>
+      <SuppressRegistry>true</SuppressRegistry>
+      <Transforms>$(MSBuildThisFileDirectory)RecipeApiFiles.xslt</Transforms>
+    </HarvestDirectory>
   </ItemGroup>
 
   <Target Name="RequireAppPublish" BeforeTargets="HarvestDirectory" Condition="!Exists('$(AppPublishDir)TinapayanRMS.Maui.exe')">
     <Error Text="No published app in '$(AppPublishDir)'. Build the MSI with scripts\Build-Installer.ps1, which publishes it first." />
+  </Target>
+
+  <Target Name="RequireRecipeApiPublish" BeforeTargets="HarvestDirectory" Condition="!Exists('$(RecipeApiPublishDir)TinapayanRMS.RecipeApi.exe')">
+    <Error Text="No published Recipe API in '$(RecipeApiPublishDir)'. Build the MSI with scripts\Build-Installer.ps1, which publishes it first." />
   </Target>
 
 </Project>

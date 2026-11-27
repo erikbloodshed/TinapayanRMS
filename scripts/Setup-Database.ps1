@@ -20,8 +20,8 @@
          the app opens, after a backup of its own. Without -Backup, the app makes the database, empty, the first time it
          opens, and asks for a password to set.
 
-    Every other Windows user of the PC who uses the app runs it too, for their own password file. For the Recipe API, run
-    New-DatabaseReader.ps1 and Install-RecipeApi.ps1 afterwards.
+    Every other Windows user of the PC who uses the app runs it too, for their own password file. For the Recipe API,
+    install the MSI with it (msiexec /i <msi> ADDLOCAL=ALL), then run New-DatabaseReader.ps1 and Setup-RecipeApi.ps1.
 
 .PARAMETER Backup
     A TinapayanRMS backup to restore as the app's database.
