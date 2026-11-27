@@ -51,7 +51,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         await costings.SetAsync(ensaymadaId, 35m, 25m, 15m, 60m, Cancellation);
         var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
 
-        var changed = await CreateSaves().ApplyCostingAsync([pandesalId, ensaymadaId], defaults, DateTime.Now, Cancellation);
+        var changed = await CreateSaves().ApplyCostingAsync(Each(defaults, pandesalId, ensaymadaId), DateTime.Now, Cancellation);
 
         changed.Should().Equal(["Pandesal"], "Ensaymada had the defaults already");
         var pandesal = (await costings.GetForProductAsync(pandesalId, Cancellation))!;
@@ -84,7 +84,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         var appliedAt = DateTime.Now;
 
         // Given out of the list's order, and Pandesal twice: the names come back in the order given, each once.
-        var changed = await CreateSaves().ApplyCostingAsync([cheeseRollId, ensaymadaId, pandesalId, spanishBreadId, pandesalId], defaults, appliedAt, Cancellation);
+        var changed = await CreateSaves().ApplyCostingAsync(Each(defaults, cheeseRollId, ensaymadaId, pandesalId, spanishBreadId, pandesalId), appliedAt, Cancellation);
 
         changed.Should().Equal(["Cheese Roll", "Pandesal", "Spanish Bread"], "Ensaymada had the defaults already");
         foreach (var id in new[] { pandesalId, cheeseRollId, spanishBreadId })
@@ -108,6 +108,32 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
     }
 
     [Test]
+    public async Task ApplyCosting_writes_each_product_the_costing_given_for_it_in_one_go()
+    {
+        var doughRoleId = await AddRoleAsync("Dough");
+        var flourId = await AddIngredientAsync("Bread Flour", 0.05m);
+        var (pandesalId, _) = await AddProductWithSubAssemblyAsync("Pandesal", doughRoleId, [new RecipeLine(flourId, 500m)]);
+        var (ubeCakeId, _) = await AddProductWithSubAssemblyAsync("Ube Cake", doughRoleId, [new RecipeLine(flourId, 400m)]);
+        var (ensaymadaId, _) = await AddProductWithSubAssemblyAsync("Ensaymada", doughRoleId, [new RecipeLine(flourId, 300m)]);
+        var costings = new CostingParametersRepository(CreateDbContextFactory());
+        await costings.SetAsync(ensaymadaId, 50m, 25m, 15m, 80m, Cancellation);
+        var settings = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
+        var cakes = new CostingParameters { LaborPercent = 50m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 80m };
+
+        var changed = await CreateSaves().ApplyCostingAsync([(pandesalId, settings), (ubeCakeId, cakes), (ensaymadaId, cakes)], DateTime.Now, Cancellation);
+
+        changed.Should().Equal(["Pandesal", "Ube Cake"], "Ensaymada had what it was given already");
+        async Task<(decimal, decimal, decimal, decimal)> CostingOf(int id) =>
+            (await costings.GetForProductAsync(id, Cancellation)) is { } c ? (c.LaborPercent, c.OverheadPercent, c.AdministrativePercent, c.MarkupPercent) : default;
+        (await CostingOf(ubeCakeId)).Should().Be((50m, 25m, 15m, 80m));
+        (await CostingOf(pandesalId)).Should().Be((35m, 25m, 15m, 60m));
+    }
+
+    /// <summary>Each of <paramref name="productIds"/> given <paramref name="costing"/>, as Apply Costing Defaults gives products of one category.</summary>
+    private static IReadOnlyList<(int ProductId, CostingParameters Costing)> Each(CostingParameters costing, params int[] productIds) =>
+        [.. productIds.Select(id => (id, costing))];
+
+    [Test]
     public async Task ApplyCosting_whose_versions_are_refused_changes_no_costing()
     {
         var doughRoleId = await AddRoleAsync("Dough");
@@ -117,7 +143,7 @@ public class VersionedSavesTests(DatabaseFixture fixture) : PersistenceTestBase(
         await costings.SetAsync(pandesalId, 10m, 5m, 5m, 40m, Cancellation);
         var defaults = new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 60m };
 
-        var apply = () => CreateSaves(refuseVersions: true).ApplyCostingAsync([pandesalId], defaults, DateTime.Now, Cancellation);
+        var apply = () => CreateSaves(refuseVersions: true).ApplyCostingAsync(Each(defaults, pandesalId), DateTime.Now, Cancellation);
 
         await apply.Should().ThrowAsync<TimeoutException>().WithMessage(Refused);
         (await costings.GetForProductAsync(pandesalId, Cancellation))!.LaborPercent.Should().Be(10m);

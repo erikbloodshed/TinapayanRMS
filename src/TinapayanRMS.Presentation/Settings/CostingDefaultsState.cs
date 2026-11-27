@@ -11,8 +11,9 @@ namespace TinapayanRMS.Presentation.Settings;
 /// <summary>
 /// Settings' Costing Defaults tab: the stage New files a new product in, the labor, overhead, administrative,
 /// markup and VAT percentages its costing starts with, the Cost Buffer % a new raw material starts with
-/// (RawMaterialsState), and the shop-wide Wastage % every product is priced with. Saving the defaults changes no saved
-/// product or material, but the wastage reprices every product. Its second card works every stored cost out again
+/// (RawMaterialsState), the shop-wide Wastage % every product is priced with, and the Warn Below % every product's
+/// short-of-target flag waits for. Saving the defaults changes no saved product or material, but the wastage reprices every
+/// product. Its second card works every stored cost out again
 /// (RecalculateCostsCommand).
 /// </summary>
 public sealed class CostingDefaultsState : ScreenState
@@ -95,6 +96,17 @@ public sealed class CostingDefaultsState : ScreenState
         set => RaiseAndSetIfChanged(ref _editingPriceRounding, value);
     }
 
+    private decimal? _editingMarkupFloorPercent;
+    /// <summary>
+    /// Warn Below %: a product is flagged short of its target only when its current price earns under both its Markup %
+    /// and this; null (blank) to flag any shortfall.
+    /// </summary>
+    public decimal? EditingMarkupFloorPercent
+    {
+        get => _editingMarkupFloorPercent;
+        set => RaiseAndSetIfChanged(ref _editingMarkupFloorPercent, value);
+    }
+
     public ScreenCommand LoadCommand { get; }
     public ScreenCommand SaveCommand { get; }
 
@@ -124,6 +136,7 @@ public sealed class CostingDefaultsState : ScreenState
             EditingWastagePercent = defaults.WastagePercent;
             EditingCostBufferPercent = defaults.CostBufferPercent;
             EditingPriceRounding = PriceRoundingOptions.FirstOrDefault(o => o.Step == defaults.PriceRoundingStep) ?? PriceRoundingOptions[0];
+            EditingMarkupFloorPercent = defaults.MarkupFloorPercent;
         }));
 
         SaveCommand = new ScreenCommand(() => RunSafelyAsync(async () =>
@@ -141,6 +154,7 @@ public sealed class CostingDefaultsState : ScreenState
                     WastagePercent = EditingWastagePercent,
                     CostBufferPercent = EditingCostBufferPercent,
                     PriceRoundingStep = EditingPriceRounding.Step,
+                    MarkupFloorPercent = EditingMarkupFloorPercent,
                 },
                 CancellationToken.None);
             SuccessMessage = "Costing defaults saved. New products and raw materials start with them, and every product is priced with the VAT and the wastage.";

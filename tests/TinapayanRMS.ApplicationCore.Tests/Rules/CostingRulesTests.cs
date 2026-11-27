@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using TinapayanRMS.ApplicationCore.Rules;
+using TinapayanRMS.Domain.Entities;
 
 namespace TinapayanRMS.ApplicationCore.Tests.Rules;
 
@@ -268,5 +269,41 @@ public class CostingRulesTests
 
         boxOfEight.SellingPrice.Should().Be(piece.SellingPrice * 8m);
         boxOfEight.BaseCost.Should().Be(piece.BaseCost * 8m);
+    }
+
+    [Test]
+    public void A_new_products_costing_is_Settings_with_each_percentage_its_category_sets_in_its_place()
+    {
+        var defaults = new CostingDefaults { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 30m };
+        var cakes = new ProductCategory { Name = "Cakes", LaborPercent = 50m, MarkupPercent = 0m };
+
+        var costing = CostingRules.DefaultCostingFor(defaults, cakes);
+        (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent).Should().Be((50m, 25m, 15m, 0m), "0 is a figure of its own, not blank");
+
+        var none = CostingRules.DefaultCostingFor(defaults, null);
+        (none.LaborPercent, none.OverheadPercent, none.AdministrativePercent, none.MarkupPercent).Should().Be((35m, 25m, 15m, 30m));
+
+        CostingRules.SetsOwnCosting(cakes).Should().BeTrue();
+        CostingRules.SetsOwnCosting(new ProductCategory { Name = "Breads", WastagePercent = 5m }).Should().BeFalse("its wastage isn't costing");
+    }
+
+    [Test]
+    public void A_categorys_costing_is_refused_negative_as_a_products_is_and_blank_is_fine()
+    {
+        var negative = () => CostingRules.EnsureValidCategoryCosting(new ProductCategory { Name = "Cakes", OverheadPercent = -1m });
+        negative.Should().Throw<BusinessRuleException>().WithMessage("Labor, overhead and administrative percentages can't be negative.");
+
+        var blank = () => CostingRules.EnsureValidCategoryCosting(new ProductCategory { Name = "Cakes" });
+        blank.Should().NotThrow();
+    }
+
+    [Test]
+    public void A_negative_Warn_Below_Markup_is_refused_and_none_is_fine()
+    {
+        var act = () => CostingRules.EnsureValidMarkupFloor(-0.5m);
+
+        act.Should().Throw<BusinessRuleException>().WithMessage("The Warn Below % can't be negative.");
+        CostingRules.EnsureValidMarkupFloor(0m);
+        CostingRules.EnsureValidMarkupFloor(null);
     }
 }

@@ -31,26 +31,34 @@ public sealed class VersionedSaves(
     public const string CostingDefaultsNote = "Costing defaults applied";
 
     /// <summary>
-    /// The Products list's Apply Costing Defaults: each of <paramref name="productIds"/> whose costing isn't
-    /// <paramref name="costing"/>'s labor, overhead, administrative and markup percentages already takes them, gets a
-    /// version noted <see cref="CostingDefaultsNote"/> (with how it stood before, for one with no versions yet) and is stamped
-    /// as saved now, all in one unit of work. One with no costing saved counts as all zero. Returns the names of the ones it
-    /// changed, in the order given.
+    /// The Products list's Apply Costing Defaults: each product in <paramref name="costings"/> whose costing isn't already
+    /// the labor, overhead, administrative and markup percentages given for it (its category's costing defaults, as the
+    /// question that confirmed them named them: CostingRules.DefaultCostingFor) takes them, gets a version noted
+    /// <see cref="CostingDefaultsNote"/> (with how it stood before, for one with no versions yet) and is stamped as saved now,
+    /// all in one unit of work. One with no costing saved counts as all zero; a product given twice takes its first. Returns
+    /// the names of the ones it changed, in the order given.
     /// </summary>
     public Task<IReadOnlyList<string>> ApplyCostingAsync(
-        IReadOnlyList<int> productIds, CostingParameters costing, DateTime savedAt, CancellationToken cancellationToken) =>
+        IReadOnlyList<(int ProductId, CostingParameters Costing)> costings, DateTime savedAt, CancellationToken cancellationToken) =>
         unitOfWork.RunAsync<IReadOnlyList<string>>(async () =>
         {
-            // The products are read and written together, in the same few commands however many there are: one at a time,
-            // it took some 30 a product, over 2,400 for the shop's 84, and 1.6 s (2026-11-13).
-            var wanted = (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent);
-            List<int> given = [.. productIds.Distinct()];
-            var costings = (await costingParametersRepository.GetForProductsAsync(given, cancellationToken)).ToDictionary(c => c.ProductId);
-            bool TakesThemAlready(int productId) =>
-                costings.GetValueOrDefault(productId) is var current
-                && (current?.LaborPercent ?? 0m, current?.OverheadPercent ?? 0m, current?.AdministrativePercent ?? 0m, current?.MarkupPercent ?? 0m) == wanted;
+            // The products are read and written together, in the same few commands however many there are (one more for each
+            // other set of percentages): one at a time, it took some 30 a product, over 2,400 for the shop's 84, and 1.6 s
+            // (2026-11-13).
+            static (decimal, decimal, decimal, decimal) Percentages(CostingParameters? costing) =>
+                (costing?.LaborPercent ?? 0m, costing?.OverheadPercent ?? 0m, costing?.AdministrativePercent ?? 0m, costing?.MarkupPercent ?? 0m);
+            Dictionary<int, (decimal, decimal, decimal, decimal)> wanted = [];
+            foreach (var (productId, costing) in costings)
+            {
+                wanted.TryAdd(productId, Percentages(costing));
+            }
 
-            var productsById = (await productRepository.GetByIdsAsync([.. given.Where(id => !TakesThemAlready(id))], cancellationToken)).ToDictionary(p => p.Id);
+            (decimal, decimal, decimal, decimal) Wanted(Product product) => wanted[product.Id];
+
+            List<int> given = [.. wanted.Keys];
+            var saved = (await costingParametersRepository.GetForProductsAsync(given, cancellationToken)).ToDictionary(c => c.ProductId);
+            var productsById = (await productRepository.GetByIdsAsync([.. given.Where(id => Percentages(saved.GetValueOrDefault(id)) != wanted[id])], cancellationToken))
+                .ToDictionary(p => p.Id);
             List<Product> changing = [.. given.Where(productsById.ContainsKey).Select(id => productsById[id])];
             if (changing.Count == 0)
             {
@@ -59,8 +67,12 @@ public sealed class VersionedSaves(
 
             List<int> changingIds = [.. changing.Select(p => p.Id)];
             var before = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
-            await costingParametersRepository.SetForProductsAsync(
-                changingIds, costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent, cancellationToken);
+            foreach (var group in changing.GroupBy(Wanted))
+            {
+                var (labor, overhead, administrative, markup) = group.Key;
+                await costingParametersRepository.SetForProductsAsync([.. group.Select(p => p.Id)], labor, overhead, administrative, markup, cancellationToken);
+            }
+
             var after = await savedProducts.ReadDetailsAsync(changingIds, cancellationToken);
 
             // One with no versions yet gets how it stood before first, dated when it was last saved, as a Save's would be

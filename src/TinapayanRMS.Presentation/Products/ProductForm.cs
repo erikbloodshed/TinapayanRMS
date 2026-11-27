@@ -93,7 +93,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
         Draft = new ProductDraft(this, new ProductLists(Ingredients, Roles, PackagingMaterials, Products));
         Draft.PropertyChanged += DraftChanged;
         _categoryPicker = new CategoryPicker<ProductCategory>(
-            () => EditingCategory, category => AsUndoStep(() => EditingCategory = category), () => Categories, c => c.Name,
+            () => EditingCategory, category => AsUndoStep(() => Draft.PickCategory(category, isNewProduct: EditingId == 0)), () => Categories, c => c.Name,
             () => CategorySearchText, text => CategorySearchText = text, async typed => await PromptForNewCategory.Handle(typed),
             SaveNewCategoryAsync, RunSafelyAsync, message => SuccessMessage = message, ex => ShowFailure(ex));
         _queries = queries;
@@ -311,7 +311,7 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     {
         if (_view.CostingDefaults is { } defaults)
         {
-            Costing.SetDefaults(defaults);
+            Costing.SetDefaults(defaults, Categories);
             NewProductPlace.TakeDefault(defaults.NewProductStage, formIsNew: true);
         }
 
@@ -1352,21 +1352,21 @@ public sealed class ProductForm : RecordScreenState<ProductFormSnapshot>, IDispo
     }
 
     /// <summary>
-    /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the screen's
-    /// first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed into keeps it.
+    /// Takes up the defaults as LoadCommand read them. A new product still showing the ones it started with (the first load,
+    /// or ones changed in Settings or in its category since) takes the new ones; one whose costing was typed into keeps it.
     /// A new product started by New goes in the new stage whatever was typed, since its stage was never picked.
     /// </summary>
-    private void RefreshCostingDefaults(CostingDefaults defaults)
+    internal void RefreshCostingDefaults(CostingDefaults defaults)
     {
         // Every product is priced with the shop's wastage, VAT and price rounding, the one open included: its Costing tab
         // follows them; and a new product still showing the defaults it started with takes the new ones (TakeDefaults).
         NewProductPlace.TakeDefault(defaults.NewProductStage, formIsNew: EditingId == 0);
-        if (Costing.TakeDefaults(defaults, isNewProduct: EditingId == 0) is { } moved)
+        if (Costing.TakeDefaults(defaults, Categories, EditingCategory?.Id, isNewProduct: EditingId == 0) is { } moved)
         {
             // New defaults on a new product (on the first load, over a blank form costed at nothing) aren't the user's change,
             // so what Save measures against and every undo and redo step that held the old ones follow them (RewriteAll), or an
             // undo would bring them back, with Save offered, and leave the form no longer following Settings. The rest is the user's.
-            History.RewriteAll(snapshot => snapshot with { Costing = moved.Carry(snapshot.Costing) });
+            History.RewriteAll(snapshot => snapshot with { Costing = moved.Carry(snapshot.Costing, snapshot.CategoryId) });
         }
     }
 

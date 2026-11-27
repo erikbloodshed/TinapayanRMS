@@ -78,6 +78,52 @@ public class ProductCostSummaryTests
         Summary(20m, currentPrice: 25.996m, markupPercent: 29.99m).IsBelowTargetMarkup.Should().BeTrue();
     }
 
+    public static IEnumerable<(decimal, bool)> PricesWithAFloor() =>
+    [
+        (25.60m, false),
+        (25.59m, true),
+        (25.5999m, false),
+        (25.99m, false),
+    ];
+
+    [Test]
+    [MethodDataSource(nameof(PricesWithAFloor))]
+    public void With_a_Warn_Below_Markup_under_its_target_a_price_is_short_only_under_both(decimal price, bool isShort)
+    {
+        // A base cost of 20.00 at a 30% target, warned below 28%: 25.60 earns exactly 28%, the least it may.
+        var costs = new ProductCostSummary(new ProductCostInputs
+        {
+            Parts = [("Dough", 20m)],
+            MarkupPercent = 30m,
+            MarkupFloorPercent = 28m,
+            CurrentPrice = price,
+        });
+
+        costs.IsBelowTargetMarkup.Should().Be(isShort);
+        costs.BelowTargetMarkupText.Should().Be(isShort ? "Less than the Markup Metric, and under 28%, the Warn Below % (Settings)." : null);
+    }
+
+    [Test]
+    public void A_Warn_Below_Markup_over_its_target_never_flags_a_price_that_meets_its_target()
+    {
+        // Aiming for 20% on a base cost of 20.00, warned below 28%: 24.00 earns its 20%, and 23.99 falls short of it.
+        ProductCostSummary Costs(decimal price) => new(new ProductCostInputs
+        {
+            Parts = [("Dough", 20m)],
+            MarkupPercent = 20m,
+            MarkupFloorPercent = 28m,
+            CurrentPrice = price,
+        });
+
+        Costs(24.00m).IsBelowTargetMarkup.Should().BeFalse("it meets its own target");
+        Costs(23.99m).IsBelowTargetMarkup.Should().BeTrue();
+        Costs(23.99m).BelowTargetMarkupText.Should().Be("Less than the Markup Metric.", "its own target is the lower");
+    }
+
+    [Test]
+    public void Without_a_Warn_Below_Markup_the_tooltip_says_only_that_its_under_the_Markup_Metric() =>
+        Summary(20m, currentPrice: 25.99m).BelowTargetMarkupText.Should().Be("Less than the Markup Metric.");
+
     /// <summary>One section at <paramref name="doughCost"/> a piece, at a 30% markup unless another is given, with no VAT unless one is given.</summary>
     private static ProductCostSummary Summary(
         decimal doughCost, decimal? currentPrice = null, decimal priceRoundingStep = 0m, decimal vatPercent = 0m, decimal markupPercent = 30m) =>

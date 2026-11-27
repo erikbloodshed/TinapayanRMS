@@ -16,7 +16,7 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of
     // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
-    public override string LastMigrationId => "20261126144828_RoleCanGoIntoOtherSections";
+    public override string LastMigrationId => "20261127001030_CategoryCostingAndMarkupFloor";
 
     protected override void BuildModel(ModelBuilder modelBuilder)
     {
@@ -92,6 +92,11 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                     .HasColumnType("numeric(18,4)")
                     .HasColumnName("labor_percent");
 
+                b.Property<decimal?>("MarkupFloorPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("markup_floor_percent");
+
                 b.Property<decimal>("MarkupPercent")
                     .HasPrecision(18, 4)
                     .HasColumnType("numeric(18,4)")
@@ -133,6 +138,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
                 b.ToTable("costing_defaults", t =>
                     {
                         t.HasCheckConstraint("CK_CostingDefaults_CostBufferPercent", "cost_buffer_percent >= 0 AND cost_buffer_percent <= 100");
+
+                        t.HasCheckConstraint("CK_CostingDefaults_MarkupFloorPercent", "markup_floor_percent IS NULL OR markup_floor_percent >= 0");
 
                         t.HasCheckConstraint("CK_CostingDefaults_PriceRoundingStep", "price_rounding_step IN (0, 0.25, 0.5, 1, 5, 10)");
 
@@ -621,12 +628,37 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(id);
 
+                b.Property<decimal?>("AdministrativePercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("administrative_percent");
+
+                b.Property<decimal?>("LaborPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("labor_percent");
+
+                b.Property<decimal?>("MarkupFloorPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("markup_floor_percent");
+
+                b.Property<decimal?>("MarkupPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("markup_percent");
+
                 b.Property<string>("Name")
                     .IsRequired()
                     .HasMaxLength(100)
                     .HasColumnType("character varying(100)")
                     .HasColumnName("name")
                     .UseCollation("case_insensitive");
+
+                b.Property<decimal?>("OverheadPercent")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("numeric(18,4)")
+                    .HasColumnName("overhead_percent");
 
                 b.Property<decimal?>("WastagePercent")
                     .HasPrecision(18, 4)
@@ -642,6 +674,8 @@ partial class TinapayanRMSDbContextModelSnapshot : ModelSnapshot
 
                 b.ToTable("product_categories", t =>
                     {
+                        t.HasCheckConstraint("CK_ProductCategories_CostingPercents", "(labor_percent IS NULL OR labor_percent >= 0) AND (overhead_percent IS NULL OR overhead_percent >= 0) AND (administrative_percent IS NULL OR administrative_percent >= 0) AND (markup_percent IS NULL OR markup_percent >= 0) AND (markup_floor_percent IS NULL OR markup_floor_percent >= 0)");
+
                         t.HasCheckConstraint("CK_ProductCategories_WastagePercent", "wastage_percent IS NULL OR (wastage_percent >= 0 AND wastage_percent <= 100)");
                     });
             });

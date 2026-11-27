@@ -331,7 +331,13 @@ A made ingredient saved in an ingredient category before Made categories existed
 
 ### Product Categories
 
-Each category has a **Name**, and can have its own **Wastage %** (0 to 100), which its products are priced with in place of the shop's (see [Wastage](#wastage)). Leave it blank, as it starts, and its products use the shop's Wastage % from Costing Defaults. The list shows each category's Wastage %, blank for those using the shop's. Changing it reprices the category's products, saved ones included. Products don't need a category, and the **category filter** on the Products list finds those without one under **Uncategorized**. A category isn't a folder of the Products list: the list's folders are your own (see [The list](#the-list-2) under Products). Deleting a category leaves its products uncategorized, in whatever folder they're in.
+Each category has a **Name**, and can have its own **Wastage %** (0 to 100), which its products are priced with in place of the shop's (see [Wastage](#wastage)). Leave it blank, as it starts, and its products use the shop's Wastage % from Costing Defaults. Changing it reprices the category's products, saved ones included.
+
+A category can also have its own **Labor %**, **Overhead %**, **Administrative %** and **Markup %**: what a new product in the category starts with, each in place of the one in [Costing Defaults](#costing-defaults). Leave one blank, as each starts, and the category uses Costing Defaults' for it, so a Cakes category can set only its Labor % and Markup % and take the rest from Costing Defaults. These are starting values, as Costing Defaults' are: changing them changes no saved product. A new product you haven't saved yet takes its category's costing when you pick the category, and again if the category's costing changes, unless you've typed into it. **Apply Costing Defaults…** on the Products list gives each product its own category's (see [The list](#the-list-2) under Products).
+
+A category can also have its own **Warn Below %**, in place of the one in [Costing Defaults](#costing-defaults): its products are flagged as short of their target markup only once their price earns under both their Markup Metric and this. Unlike the costing percentages, it reaches saved products too, as the Wastage % does.
+
+The list shows each category's percentages, blank for those using Costing Defaults'. Products don't need a category, and the **category filter** on the Products list finds those without one under **Uncategorized**. A category isn't a folder of the Products list: the list's folders are your own (see [The list](#the-list-2) under Products). Deleting a category leaves its products uncategorized, in whatever folder they're in.
 
 ### Roles
 
@@ -354,7 +360,7 @@ A role can't be deleted while any sub-assembly uses it.
 
 **New Products In** is where **New** on the Products screen files a product when you name it: **Production** (the default) or **Innovation**. That's the **New** shown while no product is open, and **New Product** under the list's search box while nothing in the list is highlighted. Like **Type** on Material Categories, it's a picker you can type into to narrow its list, as on the screens. **New Product Here**, and **New Product** with a folder or product highlighted, still file it in that folder, and a clone or variant still goes in Innovation, in the folder with the same path as its source's.
 
-Under it are the four percentages a **new** product's costing starts with:
+Under it are the four percentages a **new** product's costing starts with, unless its category sets its own (Settings → [Product Categories](#product-categories)):
 
 - **Labor %**, **Overhead %** and **Administrative %** (office, permits, bookkeeping): each is a percentage of the product's sub-assemblies (ingredients) cost.
 - **Markup %**: added on the base cost (materials, wastage, labour, overhead and administrative).
@@ -364,6 +370,8 @@ Under it are the four percentages a **new** product's costing starts with:
 Under them, **Wastage %** is the shop's [wastage](#wastage): a percentage of every product's sub-assemblies (ingredients) cost, added to its costing. It starts at 3%, and can be anything from 0 to 100. Like the VAT, it isn't where a new product starts: **every** product is priced with it, saved ones included, unless its category sets its own (Settings → Product Categories), so changing it changes those products' costs and suggested prices.
 
 **Price Rounding** rounds a suggested price up to a price you'd charge: up to the next 0.25, 0.50, 1, 5 or 10, or **None** (the default). It's always rounded up, so the rounded price still earns at least the markup. The exact figures don't change: the rounded price is shown beside them, in the last row of a product's Costing tab, under the **Suggested Price** (*Rounded up to the next 0.25*), in the **Rounded Price** column of Reports' Product Cost Summary, and in the Price Simulator.
+
+**Warn Below %** is the markup a product's current price can fall to before it's flagged as short: the amber Markup % in its header and on its Costing tab, the ⚠ in the Products list, and the **Short By** column in Reports. A product is flagged only when its price earns under both its own **Markup Metric** and this. At 28%, a product aiming for 30% is flagged once it earns under 28%, and one aiming for 20% still once it earns under its 20%: a product that meets its own target is never flagged. Leave it blank, as it starts, to flag any shortfall from the Markup Metric. A product category can set its own in place of this one (Settings → [Product Categories](#product-categories)). It changes no cost or price, only which products are flagged.
 
 **Cost Buffer %** is what a new raw material's [cost buffer](#cost-buffer) starts with on the Raw Materials screen. It starts at 10%, and can be anything from 0 to 100. It only matters for a purchased material: a linked ingredient takes the buffer of the one it's linked to, and a made ingredient has none of its own.
 
@@ -723,7 +731,7 @@ Right-click menus:
   - **Promote to Production** or **Send Back to Innovation**: puts the product in the other stage, in the folder with the same path there (Innovation › Breads › Holiday goes to Production › Breads › Holiday). Any of those folders that isn't there yet is made. **Undo** on the notice moves the product back, and takes away any folder the move made, if nothing else has gone in it since.
   - **Move to**: any stage, then the top of the stage or any folder in it. A folder that holds others opens a further menu, starting with the folder itself. The place the product is in already is greyed.
   - **Cut** (Ctrl+X) and **Paste** (Ctrl+V): see Cut and paste above. Paste on a product moves what was cut into that product's folder.
-  - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, once you confirm. Each product it changes gets a version noted "Costing defaults applied". If a tab holds one of the products with unsaved changes, it shows, and you're asked to save or discard them first.
+  - **Apply Costing Defaults…**: sets the product's Labor, Overhead, Admin and Markup percentages to Settings' Costing Defaults, each in place of which its category sets its own (Settings → Product Categories), once you confirm. The question names the percentages; when the products' categories come to different ones, it has a line for each, such as *Cakes: labor 50%, …*. Each product it changes gets a version noted "Costing defaults applied". If a tab holds one of the products with unsaved changes, it shows, and you're asked to save or discard them first.
   - **Print**: the product as saved, in the Print window.
   - **Rename** (F2)
   - **Clone…** and **Create Variant…** (both ask for the new product's name)
@@ -747,7 +755,7 @@ If the name is already taken, a message says so and the box stays open with what
 
 **Clone…** and **Create Variant…** put the new product in Innovation, in the folder with the same path as the source's (made if it isn't there).
 
-A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab. A section mark (the icon of a recipe section) means one of its recipe sections has neither a **Weight per Piece** nor a **Yield**: that section adds nothing to the product's cost until one is typed, so its costs and suggested price leave it out. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new marks the next time the Products tab opens.
+A ⚠ after a product's name means its **Current Price** earns less than the **Markup Metric** on its Costing tab, and less than the [Warn Below %](#costing-defaults) if one is set. A section mark (the icon of a recipe section) means one of its recipe sections has neither a **Weight per Piece** nor a **Yield**: that section adds nothing to the product's cost until one is typed, so its costs and suggested price leave it out. The marks are worked out from the products as saved, a moment after the list loads, so a product you've just saved shows its new marks the next time the Products tab opens.
 
 ### The header
 
@@ -909,7 +917,7 @@ Save needs at least **two different products** in a composite.
 
 ### Costing tab
 
-On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**. A new product's metrics start with the Costing Defaults. The VAT is the same for every product, so it isn't set here: the summary on the right shows what it adds to the price, and it's changed only in Settings → Costing Defaults.
+On the left are the product's four metrics, **Labor Metric**, **Overhead Metric**, **Admin Metric** and **Markup Metric**. A new product's metrics start with the Costing Defaults, or its category's own where it sets them, and change when you pick another category until you type into them. The VAT is the same for every product, so it isn't set here: the summary on the right shows what it adds to the price, and it's changed only in Settings → Costing Defaults.
 
 Each metric has two boxes. The first is its percentage, shown to one decimal with its % sign. The second is what that percentage comes to in pesos for one sellable unit, shown to two decimals. Type in either box and the other one follows. For example, with ₱20.00 of sub-assemblies, typing **5.00** in Labor Metric's peso box sets its percentage to **25.0%**.
 
@@ -943,7 +951,7 @@ Each column shows, for its price:
 
 For example, with a base cost of ₱100.00, a Markup Metric of 30% and 12% VAT, the suggested price is ₱145.60: ₱30.00 of markup and ₱15.60 of VAT. A store price of ₱134.40 is ₱120.00 before VAT, so it earns ₱20.00 (20%) and holds ₱14.40 of VAT.
 
-The Markup's percentages are in lighter text, so the amounts stand out. The store price's Markup turns **amber** when it earns less than the Markup Metric, and **red** when it doesn't cover the base cost, as the header's Markup % does. With no Current Price entered, its column shows dashes. When Settings sets a [price rounding](#costing-defaults), a last row shows the suggested price rounded up, such as *Rounded up to the next 0.25*.
+The Markup's percentages are in lighter text, so the amounts stand out. The store price's Markup turns **amber** when it earns less than the Markup Metric (and less than the [Warn Below %](#costing-defaults), if one is set), and **red** when it doesn't cover the base cost, as the header's Markup % does. With no Current Price entered, its column shows dashes. When Settings sets a [price rounding](#costing-defaults), a last row shows the suggested price rounded up, such as *Rounded up to the next 0.25*.
 
 Everything updates as you type, before you save. See [How costs are worked out](#12-how-costs-are-worked-out).
 
@@ -1068,7 +1076,7 @@ One row for every product, as it's saved:
 - **Current Price**: what the shop charges now, as entered on the product. Blank if none is entered.
 - **Markup %**: what the current price earns on the base cost, as the product's header shows it. Blank without a current price.
 - **Target Markup %**: the **Markup Metric** on the product's Costing tab, what you're aiming for.
-- **Short By**: how many percentage points **Markup %** is under **Target Markup %**. Blank when it isn't short, or there's no current price.
+- **Short By**: how many percentage points **Markup %** is under **Target Markup %**. Blank when it isn't flagged short (under both its Target Markup % and any [Warn Below %](#costing-defaults)), or there's no current price.
 - **No Piece Size**: the product's recipe sections that have neither a weight per piece nor a yield, such as **Topping**. Each adds nothing to the product's costs until one is typed. Blank when every section has one.
 
 Sort by **Markup %** to see which products earn the least, or by **Short By** to see which fall furthest short of what you're aiming for. Sort by **No Piece Size** to bring the products missing a piece size together.
@@ -1366,7 +1374,7 @@ The app keeps costs at full precision and rounds them only for display. So a tot
 
 ### Check whether a product's price still earns enough
 
-Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for: the header's figure is amber when it's short. In the Products list, a ⚠ marks every product that's short. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Short By**.
+Open the product and compare the header's **Markup %**, which is what the current price earns, with the **Markup Metric** on the Costing tab, which is what you're aiming for: the header's figure is amber when it's short. In the Products list, a ⚠ marks every product that's short. Both wait for the **Warn Below %** (Settings → Costing Defaults, or the product's category): with one set, a product a hair under its target isn't marked. For an overview of all products, look at **Reports → Product Cost Summary** and sort by **Short By**.
 
 ### Bring back a deleted product
 

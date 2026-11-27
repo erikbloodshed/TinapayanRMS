@@ -13,7 +13,7 @@ public sealed class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbCo
 
     public async Task AddAsync(ProductCategory category, CancellationToken cancellationToken)
     {
-        EnsureValidWastage(category);
+        EnsureValidFigures(category);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         dbContext.ProductCategories.Add(category);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -21,7 +21,7 @@ public sealed class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbCo
 
     public async Task UpdateAsync(ProductCategory category, CancellationToken cancellationToken)
     {
-        EnsureValidWastage(category);
+        EnsureValidFigures(category);
         await using var dbContext = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
         var existing = await dbContext.ProductCategories.FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken)
@@ -29,6 +29,11 @@ public sealed class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbCo
 
         existing.Name = category.Name;
         existing.WastagePercent = category.WastagePercent;
+        existing.LaborPercent = category.LaborPercent;
+        existing.OverheadPercent = category.OverheadPercent;
+        existing.AdministrativePercent = category.AdministrativePercent;
+        existing.MarkupPercent = category.MarkupPercent;
+        existing.MarkupFloorPercent = category.MarkupFloorPercent;
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -39,11 +44,15 @@ public sealed class ProductCategoryRepository(IDbContextFactory<TinapayanRMSDbCo
         await dbContext.ProductCategories.Where(c => c.Id == id).ExecuteDeleteAsync(cancellationToken);
     }
 
-    private static void EnsureValidWastage(ProductCategory category)
+    /// <summary>Its own wastage, costing and Warn Below Markup percentages, each checked as Settings' are; a blank one is Settings'.</summary>
+    private static void EnsureValidFigures(ProductCategory category)
     {
         if (category.WastagePercent is { } wastage)
         {
             CostingRules.EnsureValidWastage(wastage);
         }
+
+        CostingRules.EnsureValidCategoryCosting(category);
+        CostingRules.EnsureValidMarkupFloor(category.MarkupFloorPercent);
     }
 }

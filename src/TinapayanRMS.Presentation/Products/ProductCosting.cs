@@ -29,8 +29,11 @@ public sealed class ProductCosting : ObservableState
         _figures = new Derived<CostingFigures>(() => Figures(inputs()), RaiseFiguresChanged);
     }
 
-    /// <summary>What a new product's costing starts with (Settings → Costing Defaults), as of the screen's last load.</summary>
-    private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _defaults;
+    /// <summary>
+    /// What a new product's costing starts with (Settings → Costing Defaults, each in place of which its category sets its
+    /// own), as of the screen's last load.
+    /// </summary>
+    private NewProductCosting _defaults = NewProductCosting.None;
 
     /// <summary>
     /// The shop-wide Wastage % (Settings → Costing Defaults), as of the screen's last load: what a product is priced with
@@ -43,6 +46,9 @@ public sealed class ProductCosting : ObservableState
 
     /// <summary>What the rounded selling price is rounded up to a multiple of (CostingDefaults.PriceRoundingStep).</summary>
     private decimal _priceRoundingStep;
+
+    /// <summary>Settings' Warn Below % (CostingDefaults.MarkupFloorPercent), unless the product's category sets its own.</summary>
+    private decimal? _markupFloorPercent;
 
     /// <summary>The costing as loaded, so Save only sends it when it changed.</summary>
     private (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) _saved;
@@ -227,8 +233,8 @@ public sealed class ProductCosting : ObservableState
     /// <summary>Whether the percentages differ from the costing as loaded: what Save sends only then.</summary>
     public bool IsChanged => Percentages != _saved;
 
-    /// <summary>Whether the percentages are still the defaults a new product started with.</summary>
-    public bool ShowsDefaults => Percentages == _defaults;
+    /// <summary>Whether the percentages are still the defaults a new product in <paramref name="categoryId"/> starts with.</summary>
+    public bool ShowsDefaultsFor(int? categoryId) => Percentages == _defaults.For(categoryId);
 
     /// <summary>The percentages as Save writes them.</summary>
     public CostingParameters ToParameters() => new()
@@ -251,20 +257,22 @@ public sealed class ProductCosting : ObservableState
     }
 
     /// <summary>
-    /// A new product's costing starts at the defaults, while what Save compares against stays at none (Load(null)), so
-    /// its first Save writes them as its own. Defaults of all zero write nothing, as before there were defaults.
+    /// A new product's costing starts at the defaults for its category (<paramref name="categoryId"/>, none for a product
+    /// New starts), while what Save compares against stays at none (Load(null)), so its first Save writes them as its own.
+    /// Defaults of all zero write nothing, as before there were defaults.
     /// </summary>
-    public void ApplyDefaults() => Percentages = _defaults;
+    public void ApplyDefaults(int? categoryId = null) => Percentages = _defaults.For(categoryId);
 
     /// <summary>
-    /// Takes up the defaults as the screen's load read them: the percentages for the next new product, and the shop's
-    /// wastage, VAT and price rounding, which every product is priced with: when those change, the product showing is
-    /// priced again, as it's next read.
+    /// Takes up the defaults as the screen's load read them: the percentages for the next new product, Settings' and
+    /// <paramref name="categories"/>' own, and the shop's wastage, VAT, price rounding and Warn Below %, which every
+    /// product is priced and flagged with: when those change, the product showing is priced again, as it's next read.
     /// </summary>
-    public void SetDefaults(CostingDefaults defaults)
+    public void SetDefaults(CostingDefaults defaults, IReadOnlyList<ProductCategory>? categories = null)
     {
-        _defaults = (defaults.LaborPercent, defaults.OverheadPercent, defaults.AdministrativePercent, defaults.MarkupPercent);
-        if (_wastagePercent == defaults.WastagePercent && _vatPercent == defaults.VatPercent && _priceRoundingStep == defaults.PriceRoundingStep)
+        _defaults = NewProductCosting.From(defaults, categories ?? []);
+        if (_wastagePercent == defaults.WastagePercent && _vatPercent == defaults.VatPercent && _priceRoundingStep == defaults.PriceRoundingStep
+            && _markupFloorPercent == defaults.MarkupFloorPercent)
         {
             return;
         }
@@ -272,27 +280,41 @@ public sealed class ProductCosting : ObservableState
         _wastagePercent = defaults.WastagePercent;
         _vatPercent = defaults.VatPercent;
         _priceRoundingStep = defaults.PriceRoundingStep;
+        _markupFloorPercent = defaults.MarkupFloorPercent;
         _figures.Invalidate();
     }
 
     /// <summary>
-    /// Takes up the defaults as a load read them (<see cref="SetDefaults"/>). A new product still showing the ones it started
-    /// with (the screen's first load, or defaults changed in Settings since) takes the new ones; one whose costing was typed
-    /// into keeps it. On a new product whose defaults moved, typed into or not, what they were and are now, for the form to
-    /// carry into what Save measures against and every undo and redo step (<see cref="CostingDefaultsMoved.Carry"/>), which
-    /// isn't the user's change: an undo past the typing then lands on the new ones, and follows Settings again. Else null.
+    /// Takes up the defaults as a load read them (<see cref="SetDefaults"/>), for a product in <paramref name="categoryId"/>.
+    /// A new product still showing the ones it started with (the screen's first load, or defaults changed in Settings or its
+    /// category since) takes the new ones; one whose costing was typed into keeps it. On a new product whose defaults moved,
+    /// typed into or not, what they were and are now, for the form to carry into what Save measures against and every undo
+    /// and redo step (<see cref="CostingDefaultsMoved.Carry"/>), which isn't the user's change: an undo past the typing then
+    /// lands on the new ones, and follows Settings again. Else null.
     /// </summary>
-    public CostingDefaultsMoved? TakeDefaults(CostingDefaults defaults, bool isNewProduct)
+    public CostingDefaultsMoved? TakeDefaults(CostingDefaults defaults, IReadOnlyList<ProductCategory> categories, int? categoryId, bool isNewProduct)
     {
-        var untouchedNewProduct = isNewProduct && ShowsDefaults;
+        var untouchedNewProduct = isNewProduct && ShowsDefaultsFor(categoryId);
         var before = _defaults;
-        SetDefaults(defaults);
+        SetDefaults(defaults, categories);
         if (untouchedNewProduct)
         {
-            ApplyDefaults();
+            ApplyDefaults(categoryId);
         }
 
-        return isNewProduct && before != _defaults ? new CostingDefaultsMoved(before, _defaults) : null;
+        return isNewProduct && !before.SameAs(_defaults) ? new CostingDefaultsMoved(before, _defaults) : null;
+    }
+
+    /// <summary>
+    /// A new product's category picked, <paramref name="from"/> one <paramref name="to"/> another (ProductDraft.PickCategory):
+    /// still showing the old one's costing defaults, it takes the new one's; one whose costing was typed into keeps it.
+    /// </summary>
+    internal void FollowCategory(int? from, int? to)
+    {
+        if (ShowsDefaultsFor(from))
+        {
+            ApplyDefaults(to);
+        }
     }
 
     /// <summary>
@@ -309,6 +331,7 @@ public sealed class ProductCosting : ObservableState
             WastagePercent = inputs.CategoryWastagePercent ?? _wastagePercent,
             VatPercent = _vatPercent,
             PriceRoundingStep = _priceRoundingStep,
+            MarkupFloorPercent = inputs.CategoryMarkupFloorPercent ?? _markupFloorPercent,
             LaborPercent = EditingLaborPercent,
             OverheadPercent = EditingOverheadPercent,
             AdministrativePercent = EditingAdministrativePercent,
@@ -353,19 +376,49 @@ public sealed class ProductCosting : ObservableState
 }
 
 /// <summary>
-/// Settings' costing defaults moved while a new product is open, typed into or not (ProductCosting.TakeDefaults):
-/// <paramref name="From"/> the old ones, <paramref name="To"/> the new.
+/// Settings' costing defaults, or a category's own, moved while a new product is open, typed into or not
+/// (ProductCosting.TakeDefaults): <paramref name="From"/> the old ones, <paramref name="To"/> the new.
 /// </summary>
-public sealed record CostingDefaultsMoved(
-    (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) From,
-    (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) To)
+public sealed record CostingDefaultsMoved(NewProductCosting From, NewProductCosting To)
 {
     /// <summary>
-    /// A costing the form holds (what Save measures against, an undo or redo step) as of the new defaults: the old ones become
-    /// the new, as on a form still showing them, so no undo or redo brings them back, and anything else stays, being the user's.
+    /// A costing the form holds (what Save measures against, an undo or redo step) with the product in
+    /// <paramref name="categoryId"/>, as of the new defaults: the old ones for that category become the new, as on a form
+    /// still showing them, so no undo or redo brings them back, and anything else stays, being the user's.
     /// </summary>
     public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Carry(
-        (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) costing) => costing == From ? To : costing;
+        (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) costing, int? categoryId) =>
+        costing == From.For(categoryId) ? To.For(categoryId) : costing;
+}
+
+/// <summary>
+/// What a new product's costing starts with, as a load read it (CostingRules.DefaultCostingFor): Settings' costing
+/// defaults (<paramref name="Shop"/>), and for each category that sets any of its own, by id, what they come to with them
+/// in place of Settings' (<paramref name="ByCategory"/>). Kept as figures, so a later load's lists don't change it.
+/// </summary>
+public sealed record NewProductCosting(
+    (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) Shop,
+    IReadOnlyDictionary<int, (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin)> ByCategory)
+{
+    /// <summary>Before any load: all zero, as before there were defaults.</summary>
+    public static NewProductCosting None { get; } = new(default, new Dictionary<int, (decimal, decimal, decimal, decimal)>());
+
+    /// <summary><paramref name="defaults"/> and each of <paramref name="categories"/> that sets any costing of its own.</summary>
+    public static NewProductCosting From(CostingDefaults defaults, IReadOnlyList<ProductCategory> categories) => new(
+        Percentages(CostingRules.DefaultCostingFor(defaults, null)),
+        categories.Where(CostingRules.SetsOwnCosting).ToDictionary(c => c.Id, c => Percentages(CostingRules.DefaultCostingFor(defaults, c))));
+
+    /// <summary>What a new product in <paramref name="categoryId"/> starts with: its category's, or Settings' own.</summary>
+    public (decimal Labor, decimal Overhead, decimal Administrative, decimal Margin) For(int? categoryId) =>
+        categoryId is { } id && ByCategory.TryGetValue(id, out var own) ? own : Shop;
+
+    /// <summary>Every new product starts with the same costing under <paramref name="other"/>.</summary>
+    public bool SameAs(NewProductCosting other) =>
+        Shop == other.Shop && ByCategory.Count == other.ByCategory.Count
+        && ByCategory.All(c => other.ByCategory.TryGetValue(c.Key, out var theirs) && theirs == c.Value);
+
+    private static (decimal, decimal, decimal, decimal) Percentages(CostingParameters costing) =>
+        (costing.LaborPercent, costing.OverheadPercent, costing.AdministrativePercent, costing.MarkupPercent);
 }
 
 /// <summary>
@@ -376,4 +429,7 @@ public sealed record ProductCostingInputs(ProductCostInputs Recipe, decimal? Cat
 {
     /// <summary>The form's sections with no weight per piece or yield (ProductRules.HasPieceSize), by name, in recipe order.</summary>
     public IReadOnlyList<string> SectionsWithoutPieceSize { get; init; } = [];
+
+    /// <summary>The product's category's own Warn Below %, if it sets one, in place of Settings'.</summary>
+    public decimal? CategoryMarkupFloorPercent { get; init; }
 }

@@ -157,5 +157,5 @@
 
     private string? CurrentMarkupTooltip => Costs.IsCurrentPriceBelowCost
         ? "The current price doesn't cover the base cost."
-        : Costs.IsBelowTargetMarkup ? "Less than the Markup Metric." : null;
+        : Costs.BelowTargetMarkupText;
 }

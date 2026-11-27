@@ -37,23 +37,23 @@ public sealed class ProductRepository(IDbContextFactory<TinapayanRMSDbContext> d
     public Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         dbContextFactory.ReadAsync(dbContext => ProductComponentRepository.GetForProductsAsync(dbContext, productIds, cancellationToken), cancellationToken);
 
-    public async Task<IReadOnlyDictionary<int, decimal>> GetCategoryWastageForProductsAsync(
+    public async Task<IReadOnlyDictionary<int, CategoryFigures>> GetCategoryFiguresForProductsAsync(
         IReadOnlyCollection<int> productIds, CancellationToken cancellationToken) =>
         productIds.Count == 0
-            ? new Dictionary<int, decimal>()
-            : (await dbContextFactory.QueryAsync<CategoryWastageRow>(
+            ? new Dictionary<int, CategoryFigures>()
+            : (await dbContextFactory.QueryAsync<CategoryFiguresRow>(
                 $"""
-                SELECT p.id AS product_id, c.wastage_percent
+                SELECT p.id AS product_id, c.wastage_percent, c.markup_floor_percent
                 FROM products p
                 JOIN product_categories c ON c.id = p.category_id
-                WHERE c.wastage_percent IS NOT NULL AND p.id IN ({DapperReads.IdsTable})
+                WHERE (c.wastage_percent IS NOT NULL OR c.markup_floor_percent IS NOT NULL) AND p.id IN ({DapperReads.IdsTable})
                 """,
                 new { ids = DapperReads.IdList(productIds) },
                 cancellationToken))
-            .ToDictionary(r => r.ProductId, r => r.WastagePercent);
+            .ToDictionary(r => r.ProductId, r => new CategoryFigures(r.WastagePercent, r.MarkupFloorPercent));
 
-    /// <summary>A product whose category sets its own Wastage %.</summary>
-    private sealed record CategoryWastageRow(int ProductId, decimal WastagePercent);
+    /// <summary>A product whose category sets its own Wastage % or Warn Below %.</summary>
+    private sealed record CategoryFiguresRow(int ProductId, decimal? WastagePercent, decimal? MarkupFloorPercent);
 
     public Task<IReadOnlyList<ProductComponent>> GetAllComponentsAsync(CancellationToken cancellationToken) =>
         dbContextFactory.QueryAsync<ProductComponent>(

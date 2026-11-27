@@ -31,7 +31,7 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
     }
 
     [Test]
-    public async Task A_categorys_own_wastage_is_kept_read_for_its_products_and_held_to_0_to_100()
+    public async Task A_categorys_own_wastage_and_Warn_Below_Markup_are_kept_read_for_its_products_and_held_in_range()
     {
         var repository = CreateRepository();
         await repository.AddAsync(new ProductCategory { Name = "Breads", WastagePercent = 7.5m }, Cancellation);
@@ -45,14 +45,45 @@ public class ProductCategoryPersistenceTests(DatabaseFixture fixture) : Persiste
         }
 
         breads.WastagePercent.Should().Be(7.5m);
-        (await products.GetCategoryWastageForProductsAsync([inBreads, uncategorized], Cancellation))
-            .Should().BeEquivalentTo(new Dictionary<int, decimal> { [inBreads] = 7.5m }, "a product without its own category's figure isn't in it");
+        (await products.GetCategoryFiguresForProductsAsync([inBreads, uncategorized], Cancellation))
+            .Should().BeEquivalentTo(new Dictionary<int, CategoryFigures> { [inBreads] = new(7.5m, null) }, "a product without its own category's figure isn't in it");
 
-        await repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", WastagePercent = null }, Cancellation);
-        (await products.GetCategoryWastageForProductsAsync([inBreads], Cancellation)).Should().BeEmpty("blank is the shop-wide one");
+        await repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", MarkupFloorPercent = 25m }, Cancellation);
+        (await products.GetCategoryFiguresForProductsAsync([inBreads], Cancellation))
+            .Should().BeEquivalentTo(new Dictionary<int, CategoryFigures> { [inBreads] = new(null, 25m) }, "its wastage is the shop-wide one now, its warning its own");
+
+        await repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads" }, Cancellation);
+        (await products.GetCategoryFiguresForProductsAsync([inBreads], Cancellation)).Should().BeEmpty("blank is Settings' own");
+
+        var negativeFloor = () => repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", MarkupFloorPercent = -1m }, Cancellation);
+        await negativeFloor.Should().ThrowAsync<BusinessRuleException>().WithMessage("The Warn Below % can't be negative.");
 
         var tooMuch = () => repository.UpdateAsync(new ProductCategory { Id = breads.Id, Name = "Breads", WastagePercent = 101m }, Cancellation);
         await tooMuch.Should().ThrowAsync<BusinessRuleException>();
+    }
+
+    [Test]
+    public async Task A_categorys_own_costing_percentages_are_kept_each_blank_for_Settings_and_none_negative()
+    {
+        var repository = CreateRepository();
+        await repository.AddAsync(new ProductCategory { Name = "Cakes", LaborPercent = 50m, MarkupPercent = 80m }, Cancellation);
+        var cakes = (await repository.GetAllAsync(Cancellation)).Single();
+        (cakes.LaborPercent, cakes.OverheadPercent, cakes.AdministrativePercent, cakes.MarkupPercent)
+            .Should().Be(((decimal?)50m, (decimal?)null, (decimal?)null, (decimal?)80m));
+
+        await repository.UpdateAsync(new ProductCategory { Id = cakes.Id, Name = "Cakes", OverheadPercent = 20m, AdministrativePercent = 0m }, Cancellation);
+        var updated = (await repository.GetAllAsync(Cancellation)).Single();
+        (updated.LaborPercent, updated.OverheadPercent, updated.AdministrativePercent, updated.MarkupPercent)
+            .Should().Be(((decimal?)null, (decimal?)20m, (decimal?)0m, (decimal?)null));
+
+        var negative = () => repository.UpdateAsync(new ProductCategory { Id = cakes.Id, Name = "Cakes", MarkupPercent = -5m }, Cancellation);
+        await negative.Should().ThrowAsync<BusinessRuleException>().WithMessage("The markup percentage can't be negative.");
+
+        // The database refuses one the rule missed, as a backstop.
+        await using var dbContext = CreateDbContext();
+        var backstop = () => dbContext.ProductCategories.Where(c => c.Id == cakes.Id)
+            .ExecuteUpdateAsync(set => set.SetProperty(c => c.LaborPercent, -1m), Cancellation);
+        await backstop.Should().ThrowAsync<Exception>();
     }
 
     [Test]

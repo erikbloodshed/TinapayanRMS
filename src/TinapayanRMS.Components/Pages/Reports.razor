@@ -33,7 +33,7 @@
                                 <ActionButton Icon="AppIcon.Columns" Label="Columns" Tooltip="Choose which columns show. Product always does." OnClick="OpenColumnChooserAsync" />
                             </div>
                         </div>
-                        <p class="caption">Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost, and Short By how far it falls short of the Target Markup %. Filter by product, stage or category from the funnel in its heading, and double-click a product to open it.</p>
+                        <p class="caption">Every product as it's saved, costed at today's prices. Each figure is for one sellable unit of the pieces shown; Markup % is what the current price earns on the base cost, and Short By how far it falls short of the Target Markup %, for a product flagged short: under its Target Markup % and any Warn Below % in Settings. Filter by product, stage or category from the funnel in its heading, and double-click a product to open it.</p>
                         <SelfDrawn>
                             <SfGrid @ref="_productCosts" ID="report-product-costs" TValue="ProductCostRow" DataSource="State!.ProductCosts" GridLines="GridLine.Both" Height="100%" Width="100%" RowHeight="24"
                                     AllowSorting="true" AllowFiltering="true" AllowExcelExport="true" ShowColumnChooser="true" AllowTextWrap="true" AllowResizing="true">

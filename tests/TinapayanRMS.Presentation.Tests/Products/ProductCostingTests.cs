@@ -172,7 +172,7 @@ public class ProductCostingTests
         costing.SetDefaults(Defaults(labor: 35m));
         costing.ApplyDefaults();
 
-        costing.TakeDefaults(Defaults(labor: 35m), isNewProduct: true).Should().BeNull("nothing moved, so no step needs rewriting");
+        costing.TakeDefaults(Defaults(labor: 35m), [], null, isNewProduct: true).Should().BeNull("nothing moved, so no step needs rewriting");
     }
 
     [Test]
@@ -183,10 +183,11 @@ public class ProductCostingTests
         untouched.SetDefaults(Defaults(labor: 35m));
         untouched.ApplyDefaults();
 
-        var moved = untouched.TakeDefaults(Defaults(labor: 30m), isNewProduct: true);
-        moved.Should().Be(new CostingDefaultsMoved((35m, 25m, 15m, 40m), (30m, 25m, 15m, 40m)));
-        moved!.Carry((35m, 25m, 15m, 40m)).Should().Be((30m, 25m, 15m, 40m), "a step on the old defaults takes the new ones");
-        moved.Carry((40m, 25m, 15m, 40m)).Should().Be((40m, 25m, 15m, 40m), "one typed into keeps what was typed");
+        var moved = untouched.TakeDefaults(Defaults(labor: 30m), [], null, isNewProduct: true);
+        moved!.From.Shop.Should().Be((35m, 25m, 15m, 40m));
+        moved.To.Shop.Should().Be((30m, 25m, 15m, 40m));
+        moved.Carry((35m, 25m, 15m, 40m), null).Should().Be((30m, 25m, 15m, 40m), "a step on the old defaults takes the new ones");
+        moved.Carry((40m, 25m, 15m, 40m), null).Should().Be((40m, 25m, 15m, 40m), "one typed into keeps what was typed");
         untouched.EditingLaborPercent.Should().Be(30m);
 
         var typed = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
@@ -195,15 +196,15 @@ public class ProductCostingTests
         typed.ApplyDefaults();
         typed.EditingLaborPercent = 40m;
 
-        typed.TakeDefaults(Defaults(labor: 30m), isNewProduct: true).Should()
-            .Be(new CostingDefaultsMoved((35m, 25m, 15m, 40m), (30m, 25m, 15m, 40m)), "its undo steps on the old defaults still move");
+        typed.TakeDefaults(Defaults(labor: 30m), [], null, isNewProduct: true)!.To.Shop.Should()
+            .Be((30m, 25m, 15m, 40m), "its undo steps on the old defaults still move");
         typed.EditingLaborPercent.Should().Be(40m, "what was typed stays");
 
         var saved = new ProductCosting(() => new ProductCostingInputs(new ProductCostInputs(), null, []));
         saved.SetDefaults(Defaults(labor: 35m));
         saved.Load(new CostingParameters { LaborPercent = 35m, OverheadPercent = 25m, AdministrativePercent = 15m, MarkupPercent = 40m });
 
-        saved.TakeDefaults(Defaults(labor: 30m), isNewProduct: false).Should().BeNull("a saved product's costing is its own");
+        saved.TakeDefaults(Defaults(labor: 30m), [], null, isNewProduct: false).Should().BeNull("a saved product's costing is its own");
         saved.EditingLaborPercent.Should().Be(35m);
         saved.IsChanged.Should().BeFalse();
     }
@@ -455,11 +456,11 @@ public class ProductCostingTests
                 case ReadDefaults(var labor, var vat, var rounding):
                     var defaultsBefore = DefaultsAsPercentages;
                     _defaults = Defaults(labor, vat: vat, rounding: rounding);
-                    if (Costing.TakeDefaults(_defaults, isNewProduct: _isNew) is { } moved)
+                    if (Costing.TakeDefaults(_defaults, [], null, isNewProduct: _isNew) is { } moved)
                     {
                         // As the form does (RefreshCostingDefaults): the defaults moving aren't the user's change, so what
                         // the dirty check measures against, and every undo and redo step, move with them.
-                        History.RewriteAll(snapshot => new Snapshot(moved.Carry(snapshot.Percentages)));
+                        History.RewriteAll(snapshot => new Snapshot(moved.Carry(snapshot.Percentages, null)));
                     }
 
                     // The model: on a new product, wherever the old defaults were held (the form, what Save measures against,

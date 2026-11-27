@@ -56,7 +56,7 @@
         <div class="figure-tile tile-green" data-title="The markup the current price earns on the base cost, VAT excluded">
             <div class="figure-label">Markup %</div>
             <div class="figure-value @(State.Costing.Costs.IsCurrentPriceBelowCost ? "figure-error" : State.Costing.Costs.IsBelowTargetMarkup ? "figure-warning" : "")"
-                 data-title="@(State.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : State.Costing.Costs.IsBelowTargetMarkup ? "Less than the Markup Metric on the Costing tab." : null)">@(State.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
+                 data-title="@(State.Costing.Costs.IsCurrentPriceBelowCost ? "The current price doesn't cover the base cost." : State.Costing.Costs.BelowTargetMarkupText)">@(State.Costing.Costs.CurrentMarkupPercent is { } markup ? $"{markup:N2}%" : "—")</div>
         </div>
         <div class="figure-tile tile-mauve" data-title="@State.LastUpdatedText">
             <div class="figure-label">Last Updated</div>
@@ -99,7 +99,7 @@
 
     private void PickCategory(ProductCategory? category)
     {
-        State.EditingCategory = category;
+        State.Draft.PickCategory(category, isNewProduct: State.EditingId == 0);
         State.CategorySearchText = category?.Name ?? "";
     }
 }

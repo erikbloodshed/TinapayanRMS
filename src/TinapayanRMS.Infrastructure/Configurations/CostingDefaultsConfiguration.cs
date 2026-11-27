@@ -52,6 +52,9 @@ public sealed class CostingDefaultsConfiguration : IEntityTypeConfiguration<Cost
 
             // None, or a step CostingRules.PriceRoundingSteps offers.
             t.HasCheckConstraint("CK_CostingDefaults_PriceRoundingStep", "price_rounding_step IN (0, 0.25, 0.5, 1, 5, 10)");
+
+            // CostingRules.EnsureValidMarkupFloor, or none.
+            t.HasCheckConstraint("CK_CostingDefaults_MarkupFloorPercent", "markup_floor_percent IS NULL OR markup_floor_percent >= 0");
         });
     }
 }

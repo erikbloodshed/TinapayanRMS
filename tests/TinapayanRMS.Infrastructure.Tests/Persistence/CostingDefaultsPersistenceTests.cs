@@ -56,6 +56,22 @@ public class CostingDefaultsPersistenceTests(DatabaseFixture fixture) : Persiste
     }
 
     [Test]
+    public async Task The_Warn_Below_Markup_reads_as_none_until_saved_and_is_kept_but_never_negative()
+    {
+        (await CreateRepository().GetAsync(Cancellation)).MarkupFloorPercent.Should().BeNull();
+
+        await CreateRepository().SetAsync(new CostingDefaults { MarkupFloorPercent = 28m }, Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).MarkupFloorPercent.Should().Be(28m);
+
+        var negative = () => CreateRepository().SetAsync(new CostingDefaults { MarkupFloorPercent = -1m }, Cancellation);
+        await negative.Should().ThrowAsync<BusinessRuleException>().WithMessage("The Warn Below % can't be negative.");
+        (await CreateRepository().GetAsync(Cancellation)).MarkupFloorPercent.Should().Be(28m);
+
+        await CreateRepository().SetAsync(new CostingDefaults { MarkupFloorPercent = null }, Cancellation);
+        (await CreateRepository().GetAsync(Cancellation)).MarkupFloorPercent.Should().BeNull("blank flags any shortfall again");
+    }
+
+    [Test]
     public async Task SetAsync_keeps_the_stage_picked_for_new_products_even_Innovation()
     {
         await CreateRepository().SetAsync(new CostingDefaults { NewProductStage = ProductStage.Innovation }, Cancellation);

@@ -45,8 +45,12 @@ public interface IProductEditor
     /// </summary>
     Task<int> MakeFromAsync(int sourceProductId, string name, bool isVariant, DateTime savedAt, CancellationToken cancellationToken);
 
-    /// <summary>Gives <paramref name="productIds"/> <paramref name="costing"/>, each it changes with a version; their names.</summary>
-    Task<IReadOnlyList<string>> ApplyCostingAsync(IReadOnlyList<int> productIds, CostingParameters costing, DateTime savedAt, CancellationToken cancellationToken);
+    /// <summary>
+    /// Gives each product in <paramref name="costings"/> the costing given for it (its category's costing defaults, as the
+    /// Products list worked them out for its question), each it changes with a version; their names.
+    /// </summary>
+    Task<IReadOnlyList<string>> ApplyCostingAsync(
+        IReadOnlyList<(int ProductId, CostingParameters Costing)> costings, DateTime savedAt, CancellationToken cancellationToken);
 
     /// <summary>Gives a version a new note, or takes it away (null or blank). Refused when it's too long.</summary>
     Task SetVersionNoteAsync(int versionId, string? note, CancellationToken cancellationToken);
@@ -104,8 +108,8 @@ public sealed class ProductEditor(
             cancellationToken);
 
     public Task<IReadOnlyList<string>> ApplyCostingAsync(
-        IReadOnlyList<int> productIds, CostingParameters costing, DateTime savedAt, CancellationToken cancellationToken) =>
-        versionedSaves.ApplyCostingAsync(productIds, costing, savedAt, cancellationToken);
+        IReadOnlyList<(int ProductId, CostingParameters Costing)> costings, DateTime savedAt, CancellationToken cancellationToken) =>
+        versionedSaves.ApplyCostingAsync(costings, savedAt, cancellationToken);
 
     public Task SetVersionNoteAsync(int versionId, string? note, CancellationToken cancellationToken) =>
         versionRepository.SetNoteAsync(versionId, note, cancellationToken);

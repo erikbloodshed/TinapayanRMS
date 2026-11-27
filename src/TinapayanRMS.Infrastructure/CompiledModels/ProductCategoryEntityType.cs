@@ -20,7 +20,7 @@ public partial class ProductCategoryEntityType
             "TinapayanRMS.Domain.Entities.ProductCategory",
             typeof(ProductCategory),
             baseEntityType,
-            propertyCount: 3,
+            propertyCount: 8,
             unnamedIndexCount: 1,
             keyCount: 1);
 
@@ -35,6 +35,50 @@ public partial class ProductCategoryEntityType
         id.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         id.AddAnnotation("Relational:ColumnName", "id");
 
+        var administrativePercent = runtimeEntityType.AddProperty(
+            "AdministrativePercent",
+            typeof(decimal?),
+            propertyInfo: typeof(ProductCategory).GetProperty("AdministrativePercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductCategory).GetField("<AdministrativePercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        administrativePercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        administrativePercent.AddAnnotation("Relational:ColumnName", "administrative_percent");
+
+        var laborPercent = runtimeEntityType.AddProperty(
+            "LaborPercent",
+            typeof(decimal?),
+            propertyInfo: typeof(ProductCategory).GetProperty("LaborPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductCategory).GetField("<LaborPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        laborPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        laborPercent.AddAnnotation("Relational:ColumnName", "labor_percent");
+
+        var markupFloorPercent = runtimeEntityType.AddProperty(
+            "MarkupFloorPercent",
+            typeof(decimal?),
+            propertyInfo: typeof(ProductCategory).GetProperty("MarkupFloorPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductCategory).GetField("<MarkupFloorPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        markupFloorPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        markupFloorPercent.AddAnnotation("Relational:ColumnName", "markup_floor_percent");
+
+        var markupPercent = runtimeEntityType.AddProperty(
+            "MarkupPercent",
+            typeof(decimal?),
+            propertyInfo: typeof(ProductCategory).GetProperty("MarkupPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductCategory).GetField("<MarkupPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        markupPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        markupPercent.AddAnnotation("Relational:ColumnName", "markup_percent");
+
         var name = runtimeEntityType.AddProperty(
             "Name",
             typeof(string),
@@ -43,6 +87,17 @@ public partial class ProductCategoryEntityType
             maxLength: 100);
         name.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         name.AddAnnotation("Relational:ColumnName", "name");
+
+        var overheadPercent = runtimeEntityType.AddProperty(
+            "OverheadPercent",
+            typeof(decimal?),
+            propertyInfo: typeof(ProductCategory).GetProperty("OverheadPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(ProductCategory).GetField("<OverheadPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        overheadPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        overheadPercent.AddAnnotation("Relational:ColumnName", "overhead_percent");
 
         var wastagePercent = runtimeEntityType.AddProperty(
             "WastagePercent",

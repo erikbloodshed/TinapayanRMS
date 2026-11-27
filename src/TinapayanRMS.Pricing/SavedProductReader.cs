@@ -44,6 +44,13 @@ public sealed record ProductDetail(
     public decimal PriceRoundingStep { get; init; }
 
     /// <summary>
+    /// The Warn Below % it's flagged with: its category's when that sets one (ProductCategory.MarkupFloorPercent), else
+    /// Settings' (CostingDefaults.MarkupFloorPercent), today's; null for none, and for a version's, as its price rounding is
+    /// 0, so a version's printout flags any shortfall from its Markup %.
+    /// </summary>
+    public decimal? MarkupFloorPercent { get; init; }
+
+    /// <summary>
     /// A composite that holds itself, through the products it holds, as only data changed outside the app can leave one
     /// (CompositeProductRules.HoldsItselfText): the product that closes the loop brings nothing at that point.
     /// </summary>
@@ -187,7 +194,7 @@ public sealed class SavedProductReader(
         var usages = await usageRepository.GetForProductsAsync(ids, cancellationToken);
         var sectionLines = await subAssemblyLineRepository.GetForSubAssembliesAsync([.. usages.Select(u => u.SubAssemblyId).Distinct()], cancellationToken);
         var costingDefaults = await costingDefaultsRepository.GetAsync(cancellationToken);
-        var categoryWastage = await productRepository.GetCategoryWastageForProductsAsync(ids, cancellationToken);
+        var categoryFigures = await productRepository.GetCategoryFiguresForProductsAsync(ids, cancellationToken);
 
         var usagesByProduct = usages.ToLookup(u => u.ProductId);
         var productIdByUsage = usages.ToDictionary(u => u.Id, u => u.ProductId);
@@ -226,9 +233,10 @@ public sealed class SavedProductReader(
                 SectionUses = [.. sectionUsesByProduct[productId]],
 
                 // Its category's, when that sets one; a composite's own, never its products'.
-                WastagePercent = categoryWastage.TryGetValue(productId, out var wastage) ? wastage : costingDefaults.WastagePercent,
+                WastagePercent = categoryFigures.GetValueOrDefault(productId)?.WastagePercent ?? costingDefaults.WastagePercent,
                 VatPercent = costingDefaults.VatPercent,
                 PriceRoundingStep = costingDefaults.PriceRoundingStep,
+                MarkupFloorPercent = categoryFigures.GetValueOrDefault(productId)?.MarkupFloorPercent ?? costingDefaults.MarkupFloorPercent,
                 Components =
                 [
                     .. componentsByHolder.GetValueOrDefault(productId, [])
@@ -431,6 +439,7 @@ public sealed class SavedProductReader(
             VatPercent = detail.VatPercent,
             WastagePercent = detail.WastagePercent,
             PriceRoundingStep = detail.PriceRoundingStep,
+            MarkupFloorPercent = detail.MarkupFloorPercent,
             CurrentPrice = product.CurrentPrice,
             IsComposite = product.IsComposite,
             HasOwnSections = product.IsComposite && sections.Count > 0,

@@ -38,6 +38,12 @@ public sealed record ProductCostInputs
     /// <summary>What the selling price is rounded up to a multiple of; 0 for no rounding.</summary>
     public decimal PriceRoundingStep { get; init; }
 
+    /// <summary>
+    /// The Warn Below % it's flagged with: its category's when that sets one, else Settings'; null to flag any
+    /// shortfall from its Markup %.
+    /// </summary>
+    public decimal? MarkupFloorPercent { get; init; }
+
     /// <summary>What the shop charges now, VAT included; null when none is entered.</summary>
     public decimal? CurrentPrice { get; init; }
 

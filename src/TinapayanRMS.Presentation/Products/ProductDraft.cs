@@ -118,7 +118,10 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
     }
 
     private ProductCategory? _editingCategory;
-    /// <summary>The product's category, or null for none: a product doesn't need one. It can set the Wastage % the product is priced with.</summary>
+    /// <summary>
+    /// The product's category, or null for none: a product doesn't need one. It can set the Wastage % the product is priced
+    /// with, and the costing a new one starts with (<see cref="PickCategory"/>, the user's pick; a load or an undo writes this alone).
+    /// </summary>
     public ProductCategory? EditingCategory
     {
         get => _editingCategory;
@@ -128,6 +131,20 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
             {
                 Costing.InputsChanged();
             }
+        }
+    }
+
+    /// <summary>
+    /// The Category picker's pick: the category, and on a new product (<paramref name="isNewProduct"/>) still showing the
+    /// costing defaults of the one it had, the new one's, in the one edit, so an undo puts both back (ProductCosting.FollowCategory).
+    /// </summary>
+    public void PickCategory(ProductCategory? category, bool isNewProduct)
+    {
+        var from = EditingCategory?.Id;
+        EditingCategory = category;
+        if (isNewProduct && from != category?.Id)
+        {
+            Costing.FollowCategory(from, category?.Id);
         }
     }
 
@@ -352,6 +369,7 @@ public sealed class ProductDraft : ObservableState, IDisposable, IProductPackagi
                 .Concat(Packaging.AllLineEdits.Select(l => l.PackagingMaterial).OfType<RawMaterial>())])
         {
             SectionsWithoutPieceSize = [.. sections.Where(s => s.LacksPieceSize).Select(s => s.SectionName)],
+            CategoryMarkupFloorPercent = EditingCategory?.MarkupFloorPercent,
         };
     }
 

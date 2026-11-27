@@ -24,6 +24,7 @@ public sealed class ProductCostSummary
         var quantityRequired = inputs.QuantityRequired;
         IReadOnlyList<decimal> usageCostsPerPiece = [.. inputs.Parts.Select(u => u.CostPerPiece)];
         PriceRoundingStep = inputs.PriceRoundingStep;
+        MarkupFloorPercent = inputs.MarkupFloorPercent;
         IsComposite = inputs.IsComposite;
         HasSections = inputs.HasOwnSections;
         QuantityRequired = quantityRequired;
@@ -189,14 +190,31 @@ public sealed class ProductCostSummary
     /// <summary>The current price doesn't cover the base cost: a negative markup, which the header shows in red.</summary>
     public bool IsCurrentPriceBelowCost => CurrentMarkupPercent < 0;
 
+    /// <summary>The Warn Below % it's flagged with (its category's, else Settings'); null for none.</summary>
+    public decimal? MarkupFloorPercent { get; }
+
     /// <summary>
-    /// The current price earns less than the costing's Markup %, compared as they're shown,
-    /// to 2 decimals and rounded half away from zero as a shown number is, so a price that shows the target isn't flagged:
-    /// amber in the header, the Products list and Reports.
+    /// The current price earns less than the costing's Markup %, and less than the Warn Below % when there is one: under
+    /// the lower of the two, compared as they're shown, to 2 decimals and rounded half away from zero as a shown number is, so
+    /// a price that shows that figure isn't flagged: amber in the header, the Products list and Reports.
     /// </summary>
     public bool IsBelowTargetMarkup =>
-        CurrentMarkupPercent is { } earned
-        && Math.Round(earned, 2, MidpointRounding.AwayFromZero) < Math.Round(MarkupPercent, 2, MidpointRounding.AwayFromZero);
+        CurrentMarkupPercent is { } earned && Shown(earned) < WarnedBelow;
+
+    /// <summary>The markup a price is flagged under, as shown: the Markup % or, lower, the Warn Below %.</summary>
+    private decimal WarnedBelow => MarkupFloorPercent is { } floor ? Math.Min(Shown(MarkupPercent), Shown(floor)) : Shown(MarkupPercent);
+
+    private static decimal Shown(decimal percent) => Math.Round(percent, 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// What the amber markup's tooltip says (<see cref="IsBelowTargetMarkup"/>): under the Markup Metric, and under the Warn
+    /// Below Markup % when that's the lower. Null when it isn't flagged.
+    /// </summary>
+    public string? BelowTargetMarkupText => !IsBelowTargetMarkup
+        ? null
+        : WarnedBelow < Shown(MarkupPercent)
+            ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"Less than the Markup Metric, and under {WarnedBelow:0.##}%, the Warn Below % (Settings).")
+            : "Less than the Markup Metric.";
 
     public decimal SubAssembliesShare => CostingRules.PercentOf(SubAssemblies, SellingPrice);
 

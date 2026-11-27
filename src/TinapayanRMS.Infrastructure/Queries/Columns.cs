@@ -28,7 +28,7 @@ internal static class Columns
         [typeof(SubAssembly)] = ["id", "name", "role_id", "owner_product_id", "section_name", "updated_at"],
         [typeof(SubAssemblyLine)] = ["id", "sub_assembly_id", "ingredient_id", "grams", "is_formula_base", "authored_bakers_percent", "sort_order"],
         [typeof(SubAssemblyPackagingLine)] = ["id", "sub_assembly_id", "packaging_material_id", "unit_id", "qty_per_set", "sort_order"],
-        [typeof(ProductCategory)] = ["id", "name", "wastage_percent"],
+        [typeof(ProductCategory)] = ["id", "name", "wastage_percent", "labor_percent", "overhead_percent", "administrative_percent", "markup_percent", "markup_floor_percent"],
         [typeof(Product)] = ["id", "name", "description", "category_id", "quantity_required", "updated_at", "current_price", "stage", "is_composite", "includes_component_packaging", "deleted_at", "bulk_packaging_quantity", "folder_id"],
         [typeof(ProductFolder)] = ["id", "name", "stage", "parent_id"],
         [typeof(ProductComponent)] = ["id", "product_id", "component_product_id", "quantity", "sort_order"],
@@ -39,7 +39,7 @@ internal static class Columns
             ["id", "product_id", "packaging_material_id", "unit_id", "qty_per_unit", "units_per_packaging_unit", "authored_field", "sort_order", "is_bulk"],
         [typeof(CostingParameters)] =
             ["id", "product_id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent"],
-        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent", "price_rounding_step"],
+        [typeof(CostingDefaults)] = ["id", "labor_percent", "overhead_percent", "administrative_percent", "margin_percent", "vat_percent", "wastage_percent", "new_product_stage", "cost_buffer_percent", "price_rounding_step", "markup_floor_percent"],
         [typeof(AccessSettings)] = ["id", "password_hash", "password_salt", "password_iterations", "password_changed_at", "auto_lock_minutes"],
         [typeof(PrintSettings)] =
         [

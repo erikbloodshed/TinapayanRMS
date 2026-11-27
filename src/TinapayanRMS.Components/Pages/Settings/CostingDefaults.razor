@@ -10,7 +10,7 @@
 <div class="card-wrap">
     <section class="card fixed-card">
         <h2 class="section-header">Costing Defaults</h2>
-        <p class="caption">Where a new product goes, what its costing starts with, and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. VAT % and Wastage % are different: every product is priced with them (Wastage % unless its category sets its own, in Product Categories), so changing either reprices them all.</p>
+        <p class="caption">Where a new product goes, what its costing starts with (unless its category sets its own, in Product Categories), and what a new raw material's cost buffer starts with: each keeps its own from its first Save, so changing these doesn't change anything saved. VAT % and Wastage % are different: every product is priced with them (Wastage % unless its category sets its own), so changing either reprices them all. Warn Below % only changes which products are flagged short of their target markup.</p>
 
         <FormRow Label="New Products In" For="new-products-in">
             <PickField ID="new-products-in" TItem="KeyValuePair<ProductStage, string>" Items="State!.Stages" TextOf="s => s.Value"
@@ -18,16 +18,16 @@
                        Tooltip="Where New files a product. New Product Here uses its folder; clones and variants go in Innovation." />
         </FormRow>
         <FormRow Label="Labor %" For="labor-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="labor-percent" @bind-Value="State!.EditingLaborPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="labor-percent" @bind-Value="State!.EditingLaborPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece, unless the product's category sets its own" />
         </FormRow>
         <FormRow Label="Overhead %" For="overhead-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="overhead-percent" @bind-Value="State!.EditingOverheadPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="overhead-percent" @bind-Value="State!.EditingOverheadPercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece, unless the product's category sets its own" />
         </FormRow>
         <FormRow Label="Administrative %" For="administrative-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="administrative-percent" @bind-Value="State!.EditingAdministrativePercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="administrative-percent" @bind-Value="State!.EditingAdministrativePercent" Tooltip="Of the sub-assemblies (ingredients) cost per piece: office, permits, bookkeeping. Unless the product's category sets its own." />
         </FormRow>
         <FormRow Label="Markup %" For="markup-percent">
-            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarkupPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative" />
+            <NumberField TValue="decimal" Format="N2" Min="0" ID="markup-percent" @bind-Value="State!.EditingMarkupPercent" Tooltip="On the base cost: materials, wastage, labor, overhead and administrative. Unless the product's category sets its own." />
         </FormRow>
         <FormRow Label="VAT %" For="vat-percent">
             <NumberField TValue="decimal" Format="N2" Min="0" ID="vat-percent" @bind-Value="State!.EditingVatPercent" Tooltip="VAT on top of the marked-up price. Changing it reprices every product." />
@@ -42,6 +42,10 @@
             <PickField ID="price-rounding" TItem="PriceRoundingOption" Items="State!.PriceRoundingOptions" TextOf="o => o.Label"
                        Value="State!.EditingPriceRounding" ValueChanged="o => { if (o is not null) State!.EditingPriceRounding = o; }"
                        Tooltip="Rounds suggested prices up to a price you'd charge, shown beside the exact one. Exact figures don't change." />
+        </FormRow>
+        <FormRow Label="Warn Below %" For="markup-floor-percent">
+            <NumberField TValue="decimal?" Format="N2" Min="0" ID="markup-floor-percent" @bind-Value="State!.EditingMarkupFloorPercent" Placeholder="Markup Metric"
+                         Tooltip="A product is flagged when its current price earns under both its Markup Metric and this. At 28%, one aiming for 30% is flagged under 28%. Blank flags any shortfall. A category can set its own." />
         </FormRow>
 
         <div class="button-row form-extra">

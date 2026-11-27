@@ -12,7 +12,12 @@
             <Columns>
                 <GridColumn Field="@nameof(ProductCategory.Id)" IsPrimaryKey="true" Visible="false" />
                 <GridColumn Field="@nameof(ProductCategory.Name)" HeaderText="Name" />
-                <GridColumn Field="@nameof(ProductCategory.WastagePercent)" HeaderText="Wastage %" Format="N2" TextAlign="TextAlign.Right" Width="110" />
+                <GridColumn Field="@nameof(ProductCategory.WastagePercent)" HeaderText="Wastage %" Format="N2" TextAlign="TextAlign.Right" Width="100" />
+                <GridColumn Field="@nameof(ProductCategory.LaborPercent)" HeaderText="Labor %" Format="N2" TextAlign="TextAlign.Right" Width="90" />
+                <GridColumn Field="@nameof(ProductCategory.OverheadPercent)" HeaderText="Overhead %" Format="N2" TextAlign="TextAlign.Right" Width="100" />
+                <GridColumn Field="@nameof(ProductCategory.AdministrativePercent)" HeaderText="Admin %" Format="N2" TextAlign="TextAlign.Right" Width="90" />
+                <GridColumn Field="@nameof(ProductCategory.MarkupPercent)" HeaderText="Markup %" Format="N2" TextAlign="TextAlign.Right" Width="90" />
+                <GridColumn Field="@nameof(ProductCategory.MarkupFloorPercent)" HeaderText="Warn Below %" Format="N2" TextAlign="TextAlign.Right" Width="110" />
             </Columns>
         </PickGrid>
     </section>
@@ -26,7 +31,27 @@
             <NumberField ID="product-category-wastage" TValue="decimal?" @bind-Value="State!.EditingWastagePercent" Format="N2" Min="0" Max="100" Placeholder="Shop-wide"
                          Tooltip="Replaces the shop-wide Wastage % (Costing Defaults) for this category. Blank uses the shop-wide one." />
         </FormRow>
-        <p class="caption form-extra">Blank uses the shop-wide Wastage % from Costing Defaults. A composite product uses its own category's, not its products'.</p>
+        <FormRow Label="Labor %" For="product-category-labor">
+            <NumberField ID="product-category-labor" TValue="decimal?" @bind-Value="State!.EditingLaborPercent" Format="N2" Min="0" Placeholder="Costing Defaults'"
+                         Tooltip="What a new product in this category starts with, in place of Costing Defaults' Labor %. Blank uses Costing Defaults'." />
+        </FormRow>
+        <FormRow Label="Overhead %" For="product-category-overhead">
+            <NumberField ID="product-category-overhead" TValue="decimal?" @bind-Value="State!.EditingOverheadPercent" Format="N2" Min="0" Placeholder="Costing Defaults'"
+                         Tooltip="What a new product in this category starts with, in place of Costing Defaults' Overhead %. Blank uses Costing Defaults'." />
+        </FormRow>
+        <FormRow Label="Administrative %" For="product-category-administrative">
+            <NumberField ID="product-category-administrative" TValue="decimal?" @bind-Value="State!.EditingAdministrativePercent" Format="N2" Min="0" Placeholder="Costing Defaults'"
+                         Tooltip="What a new product in this category starts with, in place of Costing Defaults' Administrative %. Blank uses Costing Defaults'." />
+        </FormRow>
+        <FormRow Label="Markup %" For="product-category-markup">
+            <NumberField ID="product-category-markup" TValue="decimal?" @bind-Value="State!.EditingMarkupPercent" Format="N2" Min="0" Placeholder="Costing Defaults'"
+                         Tooltip="What a new product in this category starts with, in place of Costing Defaults' Markup %. Blank uses Costing Defaults'." />
+        </FormRow>
+        <FormRow Label="Warn Below %" For="product-category-markup-floor">
+            <NumberField ID="product-category-markup-floor" TValue="decimal?" @bind-Value="State!.EditingMarkupFloorPercent" Format="N2" Min="0" Placeholder="Costing Defaults'"
+                         Tooltip="Its products are flagged when their current price earns under both their Markup Metric and this, in place of Costing Defaults' Warn Below %. Blank uses Costing Defaults'." />
+        </FormRow>
+        <p class="caption form-extra">Blank uses Costing Defaults' own. Wastage % prices every product in the category, and Warn Below % flags them: changing either reaches saved products too. The costing percentages are only what a new product starts with, and what Apply Costing Defaults gives a product: changing them changes no saved product. A composite product uses its own category's, not its products'.</p>
         <div class="button-row">
             <CommandButton Command="State!.NewCommand" Icon="AppIcon.Add" Label="New" />
             <CommandButton Command="State!.SaveCommand" Icon="AppIcon.Save" Label="Save" Primary="true" />

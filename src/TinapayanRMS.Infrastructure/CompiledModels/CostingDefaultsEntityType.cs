@@ -22,7 +22,7 @@ public partial class CostingDefaultsEntityType
             "TinapayanRMS.Domain.Entities.CostingDefaults",
             typeof(CostingDefaults),
             baseEntityType,
-            propertyCount: 10,
+            propertyCount: 11,
             keyCount: 1);
 
         var id = runtimeEntityType.AddProperty(
@@ -69,6 +69,17 @@ public partial class CostingDefaultsEntityType
             sentinel: 0m);
         laborPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
         laborPercent.AddAnnotation("Relational:ColumnName", "labor_percent");
+
+        var markupFloorPercent = runtimeEntityType.AddProperty(
+            "MarkupFloorPercent",
+            typeof(decimal?),
+            propertyInfo: typeof(CostingDefaults).GetProperty("MarkupFloorPercent", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            fieldInfo: typeof(CostingDefaults).GetField("<MarkupFloorPercent>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly),
+            nullable: true,
+            precision: 18,
+            scale: 4);
+        markupFloorPercent.AddAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.None);
+        markupFloorPercent.AddAnnotation("Relational:ColumnName", "markup_floor_percent");
 
         var markupPercent = runtimeEntityType.AddProperty(
             "MarkupPercent",

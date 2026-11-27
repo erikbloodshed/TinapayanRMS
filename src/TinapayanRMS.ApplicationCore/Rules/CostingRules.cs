@@ -1,3 +1,5 @@
+using TinapayanRMS.Domain.Entities;
+
 namespace TinapayanRMS.ApplicationCore.Rules;
 
 public static class CostingRules
@@ -12,6 +14,42 @@ public static class CostingRules
         if (markupPercent < 0)
         {
             throw new BusinessRuleException("The markup percentage can't be negative.");
+        }
+    }
+
+    /// <summary>
+    /// A category's own costing percentages (ProductCategory.LaborPercent…), each checked as a product's is, a blank one
+    /// (Settings') as nothing.
+    /// </summary>
+    public static void EnsureValidCategoryCosting(ProductCategory category) => EnsureValidParameters(
+        category.LaborPercent ?? 0m, category.OverheadPercent ?? 0m, category.AdministrativePercent ?? 0m, category.MarkupPercent ?? 0m);
+
+    /// <summary>
+    /// The costing a new product in <paramref name="category"/> starts with, and Apply Costing Defaults gives it: each of
+    /// Settings' percentages (<paramref name="defaults"/>), or the category's in place of one it sets. Without a category,
+    /// Settings' own.
+    /// </summary>
+    public static CostingParameters DefaultCostingFor(CostingDefaults defaults, ProductCategory? category) => new()
+    {
+        LaborPercent = category?.LaborPercent ?? defaults.LaborPercent,
+        OverheadPercent = category?.OverheadPercent ?? defaults.OverheadPercent,
+        AdministrativePercent = category?.AdministrativePercent ?? defaults.AdministrativePercent,
+        MarkupPercent = category?.MarkupPercent ?? defaults.MarkupPercent,
+    };
+
+    /// <summary>The category sets one of its own costing percentages or more, in place of Settings'.</summary>
+    public static bool SetsOwnCosting(ProductCategory category) =>
+        category.LaborPercent is not null || category.OverheadPercent is not null
+        || category.AdministrativePercent is not null || category.MarkupPercent is not null;
+
+    /// <summary>
+    /// A Warn Below % (CostingDefaults.MarkupFloorPercent, ProductCategory.MarkupFloorPercent): 0 or more, or none.
+    /// </summary>
+    public static void EnsureValidMarkupFloor(decimal? floorPercent)
+    {
+        if (floorPercent < 0)
+        {
+            throw new BusinessRuleException("The Warn Below % can't be negative.");
         }
     }
 

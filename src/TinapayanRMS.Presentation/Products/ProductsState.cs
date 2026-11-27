@@ -332,7 +332,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
 
     /// <summary>
     /// The categories read again (a new one added from a form's Category picker): merged in, every form's picker kept on the
-    /// one it holds, within each form's refresh, since a picker whose item gets replaced can clear its own selection.
+    /// one it holds, within each form's refresh, since a picker whose item gets replaced can clear its own selection. Their
+    /// costing, which may have changed in Settings since the last load, is what a new product picking one starts with now.
     /// </summary>
     internal void TakeCategories(IReadOnlyList<ProductCategory> categories)
     {
@@ -344,6 +345,10 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
             for (var i = 0; i < forms.Count; i++)
             {
                 forms[i].TakeCategory(held[i]);
+                if (CostingDefaults is { } defaults)
+                {
+                    forms[i].RefreshCostingDefaults(defaults);
+                }
             }
         });
     }
@@ -497,8 +502,8 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
     }
 
     /// <summary>
-    /// Applies Settings' costing defaults (labor, overhead, administrative and markup) to <paramref name="products"/>, once
-    /// it's confirmed. A tab holding one of them with unsaved changes is shown and has them saved or thrown away first, and
+    /// Applies Settings' costing defaults (labor, overhead, administrative and markup) to <paramref name="products"/>, each
+    /// with its category's own in place of any it sets (CostingRules.DefaultCostingFor), once it's confirmed. A tab holding one of them with unsaved changes is shown and has them saved or thrown away first, and
     /// each tab holding one shows its new costing after.
     /// </summary>
     private async Task ApplyCostingDefaultsAsync(IReadOnlyList<Product> products)
@@ -521,23 +526,18 @@ public sealed class ProductsState : RecordViewState<ProductForm>, IProductsListH
         var part = (IScreenPartHost)this;
         await part.RunSafelyAsync(async () =>
         {
+            // Each product takes its category's costing defaults, as it's saved now (a tab's changes saved just above, or another
+            // PC's), and exactly what the question names is written.
             var defaults = await Task.Run(() => _queries.ReadCostingDefaultsAsync(CancellationToken.None));
-            var question = $"Set the costing of {ProductNames(products)} to the costing defaults: labor {defaults.LaborPercent:0.##}%, overhead "
-                + $"{defaults.OverheadPercent:0.##}%, administrative {defaults.AdministrativePercent:0.##}% and markup {defaults.MarkupPercent:0.##}%?"
-                + "\n\nA version is recorded of each one this changes.";
-            if (!await Runner.ConfirmDelete.Handle(question))
+            var categories = await Task.Run(() => _queries.ReadCategoriesAsync(CancellationToken.None));
+            var current = await Task.Run(() => _queries.ReadManyAsync(ids, CancellationToken.None));
+            var plan = CostingDefaultsQuestion.Plan(current, defaults, categories);
+            if (!await Runner.ConfirmDelete.Handle(CostingDefaultsQuestion.For(ProductNames(products), current, defaults, categories)))
             {
                 return;
             }
 
-            var costing = new CostingParameters
-            {
-                LaborPercent = defaults.LaborPercent,
-                OverheadPercent = defaults.OverheadPercent,
-                AdministrativePercent = defaults.AdministrativePercent,
-                MarkupPercent = defaults.MarkupPercent,
-            };
-            var changed = await Task.Run(() => _editor.ApplyCostingAsync([.. ids], costing, DateTime.Now, CancellationToken.None));
+            var changed = await Task.Run(() => _editor.ApplyCostingAsync(plan, DateTime.Now, CancellationToken.None));
 
             // The window's own save: each form showing one takes its new time, and its new costing below, as after its own Save.
             List<ProductForm> showing = [.. Tabs.All.Select(tab => tab.Form).Where(form => form.DetailProductId is { } id && ids.Contains(id))];

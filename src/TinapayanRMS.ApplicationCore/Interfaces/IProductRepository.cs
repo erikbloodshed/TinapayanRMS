@@ -231,11 +231,11 @@ public interface IProductRepository
     Task<IReadOnlyList<ProductComponent>> GetComponentsAsync(int productId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The Wastage % each of <paramref name="productIds"/> is priced with because its category sets one
-    /// (ProductCategory.WastagePercent), by product id. A product without a category, or whose category leaves it to the
-    /// shop-wide one, isn't in it.
+    /// What each of <paramref name="productIds"/>' category sets in place of Settings' figures every product is priced and
+    /// flagged with (its Wastage % and Warn Below %), by product id. A product without a category, or whose category
+    /// sets neither, isn't in it.
     /// </summary>
-    Task<IReadOnlyDictionary<int, decimal>> GetCategoryWastageForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<int, CategoryFigures>> GetCategoryFiguresForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
 
     /// <summary>GetComponentsAsync for several composites at once, in one query: each one's lines in its Products table's order.</summary>
     Task<IReadOnlyList<ProductComponent>> GetComponentsForProductsAsync(IReadOnlyCollection<int> productIds, CancellationToken cancellationToken);
@@ -367,3 +367,9 @@ public interface IProductRepository
     /// </summary>
     Task DeletePermanentlyAsync(int id, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// What a product's category sets in place of Settings': the Wastage % it's priced with (ProductCategory.WastagePercent) and
+/// the Warn Below % it's flagged with (ProductCategory.MarkupFloorPercent), each null for Settings'.
+/// </summary>
+public sealed record CategoryFigures(decimal? WastagePercent, decimal? MarkupFloorPercent);

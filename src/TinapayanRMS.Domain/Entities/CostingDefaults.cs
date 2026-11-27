@@ -8,8 +8,10 @@ namespace TinapayanRMS.Domain.Entities;
 /// with, set in Settings. One row at most (Id 1); none until they're first saved, which reads as new products in
 /// <see cref="DefaultNewProductStage"/>, the costing and VAT at zero, the buffer at <see cref="DefaultCostBufferPercent"/>
 /// and the wastage at <see cref="DefaultWastagePercent"/>. A product keeps its own stage and CostingParameters and a
-/// material its own buffer: changing those defaults never touches a saved one. The VAT and the wastage are different:
-/// they aren't starting values but the figures every product is priced with, so changing either reprices them all.
+/// material its own buffer: changing those defaults never touches a saved one. A product category can set its own
+/// costing percentages in place of these (ProductCategory.LaborPercent…, CostingRules.DefaultCostingFor). The VAT and the
+/// wastage are different: they aren't starting values but the figures every product is priced with, so changing either
+/// reprices them all.
 /// </summary>
 public sealed class CostingDefaults
 {
@@ -63,4 +65,12 @@ public sealed class CostingDefaults
     /// 0 for none. Only the rounded figures shown beside the costing's exact ones follow it (CostingRules.RoundPriceUp).
     /// </summary>
     public decimal PriceRoundingStep { get; set; }
+
+    /// <summary>
+    /// Settings' Warn Below %: a product's current price is flagged short of its target only when it earns under both
+    /// its own Markup % and this (ProductCostSummary.IsBelowTargetMarkup), 0 or more; null flags any shortfall from its
+    /// Markup %. At 28, a product aiming for 30% is flagged under 28%, and one aiming for 20% still under 20%. A product
+    /// category can set its own (ProductCategory.MarkupFloorPercent). Only the warnings follow it; no figure does.
+    /// </summary>
+    public decimal? MarkupFloorPercent { get; set; }
 }
