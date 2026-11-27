@@ -12,7 +12,7 @@
          so they can be ahead of it (11.0.10 over the 11.0.0 workload). Keep both on the same release. -->
     <MauiPackagesVersion>11.0.10</MauiPackagesVersion>
     <!-- Every Syncfusion package must be on the same version: upgrade them together. -->
-    <SyncfusionVersion>35.2.12</SyncfusionVersion>
+    <SyncfusionVersion>35.2.13</SyncfusionVersion>
   </PropertyGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Dapper" Version="2.1.100" />
