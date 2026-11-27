@@ -9,8 +9,9 @@
     TinapayanRMS.RecipeApi, Release) to artifacts\installer\recipeapi, then builds installer\
     TinapayanRMS.Installer.wixproj over them (WiX 5) into artifacts\installer\TinapayanRMS-<version>-x64.msi.
 
-    The Recipe API is a feature of its own, installed only when asked for (msiexec /i <msi> ADDLOCAL=ALL), on the PC that
-    holds the database, as a Windows service; Setup-RecipeApi.ps1 then gives it its key and the role it reads as.
+    The Recipe API is a feature of its own, installed only when ticked on the MSI's features page (or msiexec /i <msi>
+    ADDLOCAL=ALL), on the PC that holds the database, as a Windows service; Setup-RecipeApi.ps1 then gives it its key and
+    the role it reads as.
 
     Building needs what building from source does: the .NET SDK in global.json, the maui-windows workload, and the
     SYNCFUSION_LICENSE_KEY user environment variable, which the build compiles into the app, so the MSI carries the key:
@@ -22,7 +23,8 @@
     time it opens after the install, on this PC or another, after a backup (IDatabaseUpdater), and makes it on a PC where
     it isn't there yet.
 
-    Install it by opening it (it asks for an administrator), or `msiexec /i <msi>`; remove it from Settings > Apps.
+    Install it by opening it (Welcome, the features, Install; it asks for an administrator), or `msiexec /i <msi>`; change
+    its features or remove it from Settings > Apps.
 
 .PARAMETER Version
     The MSI's version, three numbers. Defaults to the app's ApplicationDisplayVersion (1.0) and the commit count, so each

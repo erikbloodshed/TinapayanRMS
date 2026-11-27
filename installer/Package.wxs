@@ -2,11 +2,12 @@
      Desktop shortcuts for everyone. Each user's own data stays theirs, in %LocalAppData%\TinapayanRMS\Maui (the view
      state, the log and the web view's folder), and the MSI never touches it, nor the database: the app brings the
      database up to its version the first time it opens after an install, after a backup (IDatabaseUpdater).
-     On the PC that holds the database, its Recipe API feature also installs the Recipe API as a Windows service
+     On the PC that holds the database, its Recipe API feature, ticked on its features page, also installs the Recipe API as a Windows service
      (ADR 0021), so an update brings the app and the API to the same version in one step. -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:fire="http://wixtoolset.org/schemas/v4/wxs/firewall"
      xmlns:netfx="http://wixtoolset.org/schemas/v4/wxs/netfx"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <!-- The UpgradeCode is the app's for good: a new MSI with it replaces the copy installed. -->
@@ -25,7 +26,15 @@
     <Icon Id="AppIcon" SourceFile="$(var.AppIconFile)" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPCOMMENTS" Value="Recipes and costing for Tinapayan Festival Bakeshoppe." />
-    <Property Id="ARPNOMODIFY" Value="1" />
+    <!-- Its screens: WiX's feature-tree set, with the Recipe API unticked unless this PC has it, but for its licence page,
+         which has no licence of the shop's to show: Welcome goes straight to the features, and their Back to Welcome
+         (a NewDialog of a higher Order wins). An update shows them again, the features as they were installed
+         (MigrateFeatureStates), and Settings > Apps > Modify opens them to add or take away the Recipe API. -->
+    <ui:WixUI Id="WixUI_FeatureTree" />
+    <UI>
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="CustomizeDlg" Order="2" Condition="NOT Installed" />
+      <Publish Dialog="CustomizeDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="NOT Installed" />
+    </UI>
 
     <!-- The app is framework-dependent: it runs on the PC's .NET 11 (Microsoft.NETCore.App 11.x, x64), which the MSI
          can't install. Not there, and the install stops before changing anything, saying where to get it. -->
@@ -98,18 +107,19 @@
       </Component>
     </StandardDirectory>
 
-    <Feature Id="Main" Title="TinapayanRMS">
+    <Feature Id="Main" Title="TinapayanRMS" AllowAbsent="no" Display="expand"
+             Description="The app, for every Windows user of this PC, with its Start menu and Desktop shortcuts.">
       <!-- The published app, harvested by the project (HarvestDirectory). -->
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
     </Feature>
 
-    <!-- Only on the PC that holds the database, so off unless asked for (Level 2, over the default INSTALLLEVEL of 1):
-         msiexec /i <msi> ADDLOCAL=ALL. An update keeps it as it was, as MajorUpgrade migrates the features' states
+    <!-- Only on the PC that holds the database, so off unless asked for (Level 2, over the default INSTALLLEVEL of 1): ticked
+         on the features page, or msiexec /i <msi> ADDLOCAL=ALL. An update keeps it as it was, as MajorUpgrade migrates the features' states
          (ADDLOCAL naming only this feature would skip that, and leave the app out). -->
     <Feature Id="RecipeApi" Title="Recipe API" Level="2"
-             Description="Serves the recipes to TinapayanBMS, as a Windows service on this PC.">
+             Description="Only on the PC that holds the database: serves the recipes to TinapayanBMS, as a Windows service. Needs the ASP.NET Core Runtime 11 (x64).">
       <ComponentGroupRef Id="RecipeApiFiles" />
       <ComponentRef Id="RecipeApiService" />
     </Feature>

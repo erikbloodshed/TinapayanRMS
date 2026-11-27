@@ -29,6 +29,7 @@
     <PackageReference Include="WixToolset.Firewall.wixext" />
     <PackageReference Include="WixToolset.Heat" />
     <PackageReference Include="WixToolset.Netfx.wixext" />
+    <PackageReference Include="WixToolset.UI.wixext" />
     <PackageReference Include="WixToolset.Util.wixext" />
   </ItemGroup>
 
